@@ -23,11 +23,50 @@ vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefi
 vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/order-commit', () => ({
-  quoteShipping: vi.fn().mockResolvedValue(0),
+  quoteShipping: vi.fn().mockResolvedValue({ shipping: 0, codFee: 0 }),
   validateCouponForUser: vi.fn(),
 }))
 vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
+vi.mock('@/lib/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({
+    razorpayEnabled: true,
+    codEnabled: true,
+    gstEnabled: false,
+    inventoryValidationEnabled: true,
+    smsEnabled: true,
+    whatsappEnabled: true,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+    ondeviceSummaryMobileEnabled: false,
+    ondeviceSummaryDesktopEnabled: false,
+    ondeviceFinetuneMobileEnabled: false,
+    ondeviceFinetuneDesktopEnabled: false,
+  }),
+  getBusinessValues: vi.fn().mockResolvedValue({
+    codSurchargeFlat: 0,
+    codSurchargePct: 0,
+    shippingMinCharge: 0,
+    shippingMaxCharge: 0,
+    orderAutoCancelMinutes: 10,
+    returnStandardCharge: 0,
+    delhiveryOriginPincode: '110001',
+    businessStateCode: '22',
+    defaultProductWeightG: 500,
+    defaultWeightG: 50,
+    pickupLocation: '',
+    sellerName: '',
+    sellerAddress: '',
+    sellerPhone: '',
+  }),
+}))
+vi.mock('@/lib/delhivery', () => ({
+  checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
+}))
+vi.mock('@/lib/edd', () => ({
+  computeEdd: vi.fn().mockReturnValue('2026-09-30'),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
@@ -120,7 +159,7 @@ describe('POST /api/orders/create', () => {
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     const body = await res.json()
 
@@ -133,7 +172,7 @@ describe('POST /api/orders/create', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
     vi.mocked(db.queryMany).mockResolvedValue([])
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     const body = await res.json()
 
@@ -148,7 +187,7 @@ describe('POST /api/orders/create', () => {
       .mockResolvedValueOnce({ value: '500' }) // min_order_amount = 500
     vi.mocked(db.queryMany).mockResolvedValue([CART_ITEM]) // subtotal = 200
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     const body = await res.json()
 
@@ -183,7 +222,7 @@ describe('POST /api/orders/create', () => {
     expect(body.error).toMatch(/unpaid order/i)
   })
 
-  it('happy path: creates order and returns orderId for manual payment', async () => {
+  it('happy path: creates order and returns orderId for COD payment', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_USER)  // user
@@ -199,7 +238,7 @@ describe('POST /api/orders/create', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     const body = await res.json()
 
@@ -263,7 +302,7 @@ describe('POST /api/orders/create', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual', couponId: 'coupon-1' })
+    const req = makeRequest({ paymentMethod: 'cod', couponId: 'coupon-1' })
     const res = await POST(req as any)
 
     expect(res.status).toBe(200)
@@ -315,7 +354,7 @@ describe('POST /api/orders/create', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual', couponId: 'coupon-flat' })
+    const req = makeRequest({ paymentMethod: 'cod', couponId: 'coupon-flat' })
     const res = await POST(req as any)
 
     expect(res.status).toBe(200)
@@ -355,7 +394,7 @@ describe('POST /api/orders/create', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual', couponId: 'coupon-limited' })
+    const req = makeRequest({ paymentMethod: 'cod', couponId: 'coupon-limited' })
     const res = await POST(req as any)
 
     // Order should still be created (coupon simply not applied), not an error
@@ -384,7 +423,7 @@ describe('POST /api/orders/create', () => {
     })
 
     const req = makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: {
         fullName: 'Test User',
         addressLine1: '123 Main St',
@@ -421,7 +460,7 @@ describe('POST /api/orders/create', () => {
     })
 
     const req = makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: {
         fullName: 'Test User',
         addressLine1: '456 New St',
@@ -456,7 +495,7 @@ describe('POST /api/orders/create', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
 
     expect(res.status).toBe(200)
@@ -469,7 +508,7 @@ describe('POST /api/orders/create', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
     vi.mocked(db.queryMany).mockRejectedValue(new Error('DB exploded'))
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
 
     expect(res.status).toBe(500)

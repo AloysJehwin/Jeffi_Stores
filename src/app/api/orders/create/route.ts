@@ -15,9 +15,13 @@ import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendOrderConfirmedSMS } from '@/lib/sms'
+import { checkPincodeServiceability } from '@/lib/delhivery'
 
 const CreateOrderSchema = z.object({
-  paymentMethod: z.enum(['razorpay', 'manual', 'cod']),
+  // 'manual' is accepted only from the business (B2B) portal — a server check below
+  // rejects it for the consumer storefront. Manual orders stay unpaid/pending (never
+  // auto-confirmed), so they carry no free-order bypass.
+  paymentMethod: z.enum(['razorpay', 'cod', 'manual']),
   shippingAddress: z.any().optional(),
   notes: z.string().nullish(),
   couponId: z.string().nullish(),
@@ -31,7 +35,8 @@ const CreateOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const isGSTEnabled = (await getFeatureFlags()).gstEnabled
+    const flags = await getFeatureFlags()
+    const isGSTEnabled = flags.gstEnabled
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -53,6 +58,24 @@ export async function POST(request: NextRequest) {
     const clientCodFee = parsed.data.codFeeAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
+    const isManual = paymentMethod === 'manual'
+
+    // Server is authoritative on payment availability — never trust the client's method.
+    if (isRazorpayPayment && !flags.razorpayEnabled) {
+      return NextResponse.json({ error: 'Online payment is currently unavailable.' }, { status: 422 })
+    }
+    if (isCod && !flags.codEnabled) {
+      return NextResponse.json({ error: 'Cash on delivery is currently unavailable.' }, { status: 422 })
+    }
+    // Manual (contact-for-payment) is a B2B-only method. The consumer storefront must never
+    // create a manual order — that was the free-order bypass. isBusiness comes from the
+    // authenticated business session, not the client body.
+    if (isManual && !authUser.isBusiness) {
+      return NextResponse.json({ error: 'No valid payment method selected.' }, { status: 400 })
+    }
+    if (!isRazorpayPayment && !isCod && !isManual) {
+      return NextResponse.json({ error: 'No valid payment method selected.' }, { status: 400 })
+    }
 
     const cartUserId = userId
 
@@ -87,7 +110,9 @@ export async function POST(request: NextRequest) {
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'price_ex_gst', psv.price_ex_gst,
             'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity,
-            'discount_pct', psv.discount_pct
+            'discount_pct', psv.discount_pct,
+            'weight_grams', psv.weight_grams, 'package_type', psv.package_type,
+            'length_cm', psv.length_cm, 'breadth_cm', psv.breadth_cm, 'height_cm', psv.height_cm
           )
         ELSE NULL END AS sub_variant
       FROM cart_items ci
@@ -168,13 +193,25 @@ export async function POST(request: NextRequest) {
     }, 0)
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
+    // Serviceability gate: the buyer's pincode must be one Delhivery actually delivers to.
+    // The rate endpoint quotes a charge even for unserviceable pins, so this is checked
+    // explicitly and authoritatively here — never trust the client's shown quote.
+    if (destinationPin) {
+      const service = await checkPincodeServiceability(destinationPin)
+      if (!service.serviceable) {
+        return NextResponse.json({ error: 'Delivery is not available to this pincode.', unserviceable: true }, { status: 422 })
+      }
+      if (isCod && !service.cod) {
+        return NextResponse.json({ error: 'Cash on delivery is not available to this pincode. Please choose online payment.' }, { status: 422 })
+      }
+    }
     // Server re-quotes with the correct COD flag; fall back to the client-quoted
     // amount when the live quote is unavailable so the charged total matches what
     // the customer saw instead of silently dropping shipping to 0.
     const quote = destinationPin
       ? await quoteShipping({
           destinationPin,
-          items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) })),
+          items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, subVariantId: c.sub_variant_id, quantity: Number(c.quantity) })),
           subtotal,
           isCod,
         })
@@ -193,7 +230,8 @@ export async function POST(request: NextRequest) {
     const _eddPin = String(destinationPin || '')
     const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _edd = computeEdd({ pin: _eddPin, handlingDays: _eddHandling, extraDays: _eddExtra })
+    const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
+    const _edd = computeEdd({ pin: _eddPin, originPin: _eddOrigin, handlingDays: _eddHandling, extraDays: _eddExtra })
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
@@ -309,7 +347,7 @@ export async function POST(request: NextRequest) {
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', isCod ? 'cod_pending' : 'unpaid', isCod ? 'cod' : (isRazorpayPayment ? 'razorpay' : 'manual'), subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, txTotal, shippingAddressId, billingAddressId,
+         'pending', isCod ? 'cod_pending' : 'unpaid', isCod ? 'cod' : isManual ? 'manual' : 'razorpay', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, txTotal, shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
@@ -336,11 +374,11 @@ export async function POST(request: NextRequest) {
           : item.variant?.mrp != null ? Number(item.variant.mrp)
           : item.products?.mrp != null ? Number(item.products.mrp)
           : null
-        const snapWeightGrams = item.variant?.weight_grams ?? item.products?.weight_grams ?? 500
-        const snapPackageType = item.variant?.package_type ?? item.products?.package_type ?? null
-        const snapLengthCm = item.variant?.length_cm ?? item.products?.length_cm ?? null
-        const snapBreadthCm = item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
-        const snapHeightCm = item.variant?.height_cm ?? item.products?.height_cm ?? null
+        const snapWeightGrams = item.sub_variant?.weight_grams ?? item.variant?.weight_grams ?? item.products?.weight_grams ?? 500
+        const snapPackageType = item.sub_variant?.package_type ?? item.variant?.package_type ?? item.products?.package_type ?? null
+        const snapLengthCm = item.sub_variant?.length_cm ?? item.variant?.length_cm ?? item.products?.length_cm ?? null
+        const snapBreadthCm = item.sub_variant?.breadth_cm ?? item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
+        const snapHeightCm = item.sub_variant?.height_cm ?? item.variant?.height_cm ?? item.products?.height_cm ?? null
         await client.query(
           `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, weight_grams, package_type, length_cm, breadth_cm, height_cm)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
@@ -406,7 +444,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (!isRazorpayPayment) {
+    if (isCod) {
       await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
       const confirmedOrder = { ...order, status: 'confirmed' }
       createDraftInvoice(order.id).catch(() => {})

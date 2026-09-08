@@ -145,6 +145,11 @@ CREATE TABLE public.product_sub_variants (
     discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
     supplier_id uuid,
+    weight_grams integer,
+    length_cm numeric(6,2),
+    breadth_cm numeric(6,2),
+    height_cm numeric(6,2),
+    package_type character varying(30),
     CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 

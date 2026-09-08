@@ -27,6 +27,10 @@ vi.mock('@/lib/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
+vi.mock('@/lib/shipping-rate', () => ({
+  computeShippingRate: vi.fn(),
+}))
+
 import {
   loadActiveCart,
   cartLineUnitPrice,
@@ -43,7 +47,9 @@ import {
   type CartLine,
 } from '@/lib/order-commit'
 import { queryMany, queryOne, withTransaction } from '@/lib/db'
+import { computeShippingRate } from '@/lib/shipping-rate'
 
+const mockComputeShippingRate = vi.mocked(computeShippingRate)
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)
 const mockWithTransaction = vi.mocked(withTransaction)
@@ -568,18 +574,18 @@ describe('getMinOrderAmount', () => {
 describe('quoteShipping', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.stubGlobal('fetch', vi.fn())
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+  function rate(overrides: Record<string, unknown>) {
+    return {
+      charge: 0, codFee: 0, totalCharge: 0, zone: '', source: 'fallback',
+      chargedWeightGrams: 0, cartonCount: 0, serviceable: true,
+      ...overrides,
+    } as any
+  }
 
   it('returns charge and codFee from successful response', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ charge: 50, codFee: 25 }),
-    } as Response)
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: 50, codFee: 25, source: 'delhivery' }))
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [{ productId: 'p1', quantity: 1 }],
@@ -590,10 +596,7 @@ describe('quoteShipping', () => {
   })
 
   it('returns codFee 0 when response omits it', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ charge: 50 }),
-    } as Response)
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: 50, codFee: 0 }))
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [{ productId: 'p1', quantity: 1 }],
@@ -602,8 +605,8 @@ describe('quoteShipping', () => {
     expect(result).toEqual({ shipping: 50, codFee: 0 })
   })
 
-  it('returns zeros when fetch response is not ok', async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
+  it('returns zeros when computeShippingRate reports unserviceable', async () => {
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: 0, codFee: 0, source: 'unserviceable', serviceable: false }))
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [],
@@ -612,8 +615,8 @@ describe('quoteShipping', () => {
     expect(result).toEqual({ shipping: 0, codFee: 0 })
   })
 
-  it('returns zeros when fetch throws', async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error('network'))
+  it('returns zeros when computeShippingRate throws', async () => {
+    mockComputeShippingRate.mockRejectedValue(new Error('no rate'))
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [],
@@ -623,28 +626,19 @@ describe('quoteShipping', () => {
   })
 
   it('returns 0 shipping when charge is negative', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ charge: -10 }),
-    } as Response)
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: -10 }))
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
     expect(result.shipping).toBe(0)
   })
 
   it('returns 0 shipping when charge is not finite', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ charge: null }),
-    } as Response)
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: null }))
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
     expect(result.shipping).toBe(0)
   })
 
   it('rounds charge to 2 decimal places', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ charge: 49.999 }),
-    } as Response)
+    mockComputeShippingRate.mockResolvedValue(rate({ charge: 49.999 }))
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
     expect(result.shipping).toBe(50)
   })

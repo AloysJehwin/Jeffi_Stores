@@ -39,6 +39,7 @@ const EDITABLE_KEYS = [
   'invoice_prefix',
   // Feature flags
   'feature_razorpay_enabled',
+  'feature_cod_enabled',
   'feature_gst_enabled',
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
@@ -58,6 +59,7 @@ const EDITABLE_KEYS = [
   'return_standard_charge',
   'delhivery_origin_pincode',
   'default_product_weight_g',
+  'default_weight_g',
   'delhivery_pickup_location',
   'delhivery_seller_name',
   'delhivery_seller_address',

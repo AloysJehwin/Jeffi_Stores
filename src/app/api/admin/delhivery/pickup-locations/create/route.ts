@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { createDelhiveryPickupLocation, checkPincodeServiceability } from '@/lib/delhivery'
 
 export const dynamic = 'force-dynamic'
@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
   if (phone.length < 10) return NextResponse.json({ error: 'A 10-digit phone number is required.' }, { status: 400 })
   if (!/^\d{6}$/.test(pincode)) return NextResponse.json({ error: 'A six-digit pincode is required.' }, { status: 400 })
 
-  const tenantId = getCurrentTenant()?.tenantId
+  const tenantId = await resolveTenantId()
 
-  const serviceability = await checkPincodeServiceability(pincode, tenantId)
+  const serviceability = await checkPincodeServiceability(pincode, tenantId ?? undefined)
   if (!serviceability.pickup) {
     return NextResponse.json(
       { error: serviceability.error || 'Delhivery cannot pick up from this pincode.' },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await createDelhiveryPickupLocation({
-    name, phone, pincode, address, registeredName, email, city, state, tenantId,
+    name, phone, pincode, address, registeredName, email, city, state, tenantId: tenantId ?? undefined,
   })
   if (!result.ok) return NextResponse.json({ error: result.error || 'Could not create the warehouse.' }, { status: 502 })
 

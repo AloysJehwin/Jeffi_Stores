@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { humanizeLabel } from '@/lib/format'
 
 type Category = { id: string; name: string; parent_category_id: string | null }
 type Brand = { id: string; name: string }
@@ -387,7 +388,7 @@ export default function MobileFilterSheet({
                         <button key={vt.value}
                           onClick={() => { setPendingVariantType(isActive ? '' : vt.value); if (isActive) setPendingVariantValue('') }}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>
-                          {vt.value} <span className="text-foreground-muted">({vt.count})</span>
+                          {humanizeLabel(vt.value)} <span className="text-foreground-muted">({vt.count})</span>
                         </button>
                       )
                     })}
@@ -400,7 +401,7 @@ export default function MobileFilterSheet({
                           <button key={vv.value}
                             onClick={() => setPendingVariantValue(isActive ? '' : vv.value)}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>
-                            {vv.value}
+                            {humanizeLabel(vv.value)}
                           </button>
                         )
                       })}
@@ -415,7 +416,7 @@ export default function MobileFilterSheet({
                   <h3 className="text-sm font-semibold text-foreground mb-3">Specifications</h3>
                   {facets.specFacets.slice(0, 4).map(spec => (
                     <div key={spec.key} className="mb-4">
-                      <p className="text-xs text-foreground-muted mb-2 font-medium">{spec.key}</p>
+                      <p className="text-xs text-foreground-muted mb-2 font-medium">{humanizeLabel(spec.key)}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {spec.values.slice(0, 8).map(sv => {
                           const isActive = pendingSpecKey === spec.key && pendingSpecValue === sv.value
@@ -423,7 +424,7 @@ export default function MobileFilterSheet({
                             <button key={sv.value}
                               onClick={() => { if (isActive) { setPendingSpecKey(''); setPendingSpecValue('') } else { setPendingSpecKey(spec.key); setPendingSpecValue(sv.value) }}}
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${isActive ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>
-                              {sv.value} <span className="text-foreground-muted">({sv.count})</span>
+                              {humanizeLabel(sv.value)} <span className="text-foreground-muted">({sv.count})</span>
                             </button>
                           )
                         })}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import {
   saveIntegrationCredential,
   listIntegrationCredentials,
@@ -27,8 +27,8 @@ const PROVIDER_LABELS: Record<(typeof PROVIDERS)[number], string> = {
   razorpay: 'Razorpay',
 }
 
-function requireTenant(): { tenantId: string } | { error: NextResponse } {
-  const t = getCurrentTenant()
+async function requireTenant(): Promise<{ tenantId: string } | { error: NextResponse }> {
+  const t = await resolveTenant()
   if (!t) return { error: NextResponse.json({ error: 'No tenant context' }, { status: 400 }) }
   return { tenantId: t.tenantId }
 }
@@ -36,7 +36,7 @@ function requireTenant(): { tenantId: string } | { error: NextResponse } {
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:read')
   if (admin instanceof NextResponse) return admin
-  const gate = requireTenant()
+  const gate = await requireTenant()
   if ('error' in gate) return gate.error
   const integrations = await listIntegrationCredentials(gate.tenantId)
   return NextResponse.json({ integrations })
@@ -50,7 +50,7 @@ const PostSchema = z.object({
 export async function POST(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const gate = requireTenant()
+  const gate = await requireTenant()
   if ('error' in gate) return gate.error
 
   const raw = await request.json().catch(() => null)
@@ -117,7 +117,7 @@ const DeleteSchema = z.object({ provider: z.enum(PROVIDERS) })
 export async function DELETE(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const gate = requireTenant()
+  const gate = await requireTenant()
   if ('error' in gate) return gate.error
 
   const raw = await request.json().catch(() => null)

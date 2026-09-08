@@ -314,6 +314,7 @@ export async function getMinOrderAmount(): Promise<number> {
 interface ShippingQuoteItem {
   productId: string
   variantId?: string | null
+  subVariantId?: string | null
   quantity: number
 }
 
@@ -330,27 +331,21 @@ export async function quoteShipping(input: {
   subtotal: number
   isCod?: boolean
 }): Promise<ShippingQuote> {
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
   try {
-    const res = await fetch(new URL('/api/shipping/rate', origin).toString(), {
-      method: 'POST',
-      signal: AbortSignal.timeout(4000),
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        destinationPin: input.destinationPin,
-        cartItems: input.items.map(i => ({
-          productId: i.productId,
-          variantId: i.variantId || null,
-          quantity: i.quantity,
-        })),
-        subtotal: input.subtotal,
-        isCod: !!input.isCod,
-      }),
+    const { computeShippingRate } = await import('./shipping-rate')
+    const data = await computeShippingRate({
+      destinationPin: input.destinationPin,
+      cartItems: input.items.map(i => ({
+        productId: i.productId,
+        variantId: i.variantId || null,
+        subVariantId: i.subVariantId || null,
+        quantity: i.quantity,
+      })),
+      subtotal: input.subtotal,
+      isCod: !!input.isCod,
     })
-    if (!res.ok) return { shipping: 0, codFee: 0 }
-    const data = await res.json()
-    const charge = Number(data?.charge)
-    const codFee = Number(data?.codFee)
+    const charge = Number(data.charge)
+    const codFee = Number(data.codFee)
     return {
       shipping: Number.isFinite(charge) && charge >= 0 ? round2(charge) : 0,
       codFee: Number.isFinite(codFee) && codFee >= 0 ? round2(codFee) : 0,
@@ -432,11 +427,12 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const maxHandlingDays = input.mode === 'cart'
       ? Math.max(2, ...input.cartItems.map(i => Number(i.products.handling_days ?? 2)))
       : Number(input.product.handling_days ?? 2)
-    const estimatedDeliveryDate = computeEdd({ pin, handlingDays: maxHandlingDays, extraDays: maxExtraDays })
+    const bv = await getBusinessValues()
+    const estimatedDeliveryDate = computeEdd({ pin, originPin: bv.delhiveryOriginPincode, handlingDays: maxHandlingDays, extraDays: maxExtraDays })
 
     const customerName = `${input.user.first_name || ''} ${input.user.last_name || ''}`.trim() || 'Customer'
     const isGSTEnabled = (await getFeatureFlags()).gstEnabled
-    const sellerStateCode = (await getBusinessValues()).businessStateCode
+    const sellerStateCode = bv.businessStateCode
     const isIGST = isGSTEnabled ? isInterState(address.state || '', sellerStateCode) : false
 
     let orderTaxableAmount = 0

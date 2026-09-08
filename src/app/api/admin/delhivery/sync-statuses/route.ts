@@ -7,7 +7,7 @@ import { restoreOrderStock } from '@/lib/order-stock'
 import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
 import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { settleDelhiveryCostToWallet } from '@/lib/wallet'
 
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
   // Origin pincode is the same for every shipment — resolve once, not per order.
   const originPin = (await getBusinessValues()).delhiveryOriginPincode
-  const tenantId = getCurrentTenant()?.tenantId ?? null
+  const tenantId = await resolveTenantId()
 
   const DELHIVERY_TOKEN = await resolveDelhiveryToken(tenantId ?? undefined)
   if (!DELHIVERY_TOKEN) {

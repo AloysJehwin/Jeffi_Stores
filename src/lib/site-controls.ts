@@ -19,6 +19,9 @@ export interface StoreIdentity {
 
 export interface FeatureFlags {
   razorpayEnabled: boolean
+  // Site-level Cash-on-Delivery gate. COD is offered only when this is on AND every cart
+  // product's own is_cod_allowed is true (two-place validation).
+  codEnabled: boolean
   gstEnabled: boolean
   // When false, confirmed→processing order status change skips inventory validation.
   // Basic plan tenants have no inventory module so this defaults to false for them.
@@ -50,6 +53,9 @@ export interface BusinessValues {
   delhiveryOriginPincode: string
   businessStateCode: string
   defaultProductWeightG: number
+  // Fallback shipping weight used when a product's own weight is missing OR very low (<= 50g),
+  // so under-weighed items still price against a realistic parcel weight.
+  defaultWeightG: number
   pickupLocation: string
   sellerName: string
   sellerAddress: string
@@ -114,6 +120,7 @@ const DEFAULTS: SiteControls = {
   flags: {
     // Preserve current env-driven behavior when the DB key is unset.
     razorpayEnabled: envBool(process.env.ENABLE_RAZORPAY),
+    codEnabled: true,
     gstEnabled: envBool(process.env.ENABLE_GST),
     inventoryValidationEnabled: true,
     smsEnabled: process.env.SMS_DISABLED !== 'true',
@@ -136,6 +143,7 @@ const DEFAULTS: SiteControls = {
     delhiveryOriginPincode: process.env.DELHIVERY_ORIGIN_PINCODE || '492001',
     businessStateCode: process.env.BUSINESS_STATE_CODE || '22',
     defaultProductWeightG: 500,
+    defaultWeightG: 50,
     pickupLocation: process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores',
     sellerName: process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores',
     sellerAddress: process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur',
@@ -177,7 +185,7 @@ const DEFAULTS: SiteControls = {
 
 const KEYS = [
   'business_name', 'business_email', 'business_phone', 'business_web', 'business_logo_url',
-  'feature_razorpay_enabled', 'feature_gst_enabled', 'feature_inventory_validation_enabled',
+  'feature_razorpay_enabled', 'feature_cod_enabled', 'feature_gst_enabled', 'feature_inventory_validation_enabled',
   'feature_sms_enabled', 'feature_whatsapp_enabled',
   'feature_ondevice_summary_enabled', 'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled', 'feature_ondevice_summary_desktop_enabled',
@@ -185,7 +193,7 @@ const KEYS = [
   'cod_surcharge_flat', 'cod_surcharge_pct', 'shipping_min_charge', 'shipping_max_charge',
   'order_auto_cancel_minutes', 'delhivery_origin_pincode', 'business_state_code',
   'return_standard_charge',
-  'default_product_weight_g',
+  'default_product_weight_g', 'default_weight_g',
   'delhivery_pickup_location', 'delhivery_seller_name', 'delhivery_seller_address', 'delhivery_seller_phone',
   'storefront_featured_limit', 'storefront_new_arrivals_limit',
   'storefront_stats_json', 'storefront_about_copy',
@@ -320,6 +328,7 @@ export async function getSiteControls(): Promise<SiteControls> {
       },
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),
+        codEnabled: bool('feature_cod_enabled', d.flags.codEnabled),
         gstEnabled: bool('feature_gst_enabled', d.flags.gstEnabled),
         inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
         smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
@@ -341,6 +350,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         delhiveryOriginPincode: str('delhivery_origin_pincode', d.values.delhiveryOriginPincode),
         businessStateCode: str('business_state_code', d.values.businessStateCode),
         defaultProductWeightG: Math.max(1, num('default_product_weight_g', d.values.defaultProductWeightG)),
+        defaultWeightG: Math.max(1, num('default_weight_g', d.values.defaultWeightG)),
         pickupLocation: str('delhivery_pickup_location', d.values.pickupLocation),
         sellerName: str('delhivery_seller_name', d.values.sellerName),
         sellerAddress: str('delhivery_seller_address', d.values.sellerAddress),
