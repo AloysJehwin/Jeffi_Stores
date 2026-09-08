@@ -7,6 +7,7 @@ import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TextControl, TextAreaControl } from '@/components/admin/site-controls/controls'
+import WalletCard from './WalletCard'
 
 type DefaultWarehouse = {
   pickupLocation: string
@@ -49,6 +50,7 @@ function DelhiveryCredentialCard() {
   const canWrite = useCanWrite('merchant_sync')
   const [connected, setConnected] = useState<boolean | null>(null)
   const [open, setOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
@@ -89,15 +91,21 @@ function DelhiveryCredentialCard() {
 
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
-      <div className="px-6 py-5 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Delhivery API Credential</h2>
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${connected
-            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-            : 'bg-surface-secondary text-foreground-muted'}`}>
-            {connected == null ? 'Checking…' : connected ? 'Own token connected' : 'Using platform token'}
-          </span>
-        </div>
+      <button type="button" onClick={() => setExpanded(e => !e)}
+        className="w-full flex flex-wrap items-center gap-3 px-6 py-4 text-left">
+        <h2 className="text-lg font-semibold text-foreground">Delhivery API Credential</h2>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${connected
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-surface-secondary text-foreground-muted'}`}>
+          {connected == null ? 'Checking…' : connected ? 'Own token connected' : 'Using platform token'}
+        </span>
+        <svg className={`ml-auto w-4 h-4 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {expanded && (
+      <div className="px-6 pb-5 space-y-4">
         <p className="text-sm text-foreground-secondary">
           Connect your own Delhivery account to ship under your token and be billed directly by Delhivery.
           When no token is connected, shipments use the platform&apos;s Delhivery account.
@@ -138,6 +146,7 @@ function DelhiveryCredentialCard() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
@@ -295,12 +304,14 @@ const STATUS_STYLES: Record<PickupRequest['pickup_status'], string> = {
   failed:    'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
 }
 
-export default function DelhiveryPageClient({ defaultWarehouse }: { defaultWarehouse: DefaultWarehouse }) {
+export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: { ownDelhivery: boolean; defaultWarehouse: DefaultWarehouse }) {
   const canWrite = useCanWrite('delhivery:write')
   const [orders, setOrders] = useState<EligibleOrder[]>([])
   const [pickupHistory, setPickupHistory] = useState<PickupRequest[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pickupDate, setPickupDate] = useState(todayIST())
+  const [pickupLocations, setPickupLocations] = useState<Warehouse[]>([])
+  const [pickupLocation, setPickupLocation] = useState<string>(defaultWarehouse.pickupLocation || '')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -342,6 +353,22 @@ export default function DelhiveryPageClient({ defaultWarehouse }: { defaultWareh
 
   useEffect(() => { loadData() }, [])
 
+  useEffect(() => {
+    const seed: Warehouse[] = defaultWarehouse.pickupLocation
+      ? [{ name: defaultWarehouse.pickupLocation, pin: defaultWarehouse.originPincode || '', phone: '', address: defaultWarehouse.sellerAddress || '', active: true }]
+      : []
+    fetch('/api/admin/delhivery/pickup-locations')
+      .then(r => r.json())
+      .then(d => {
+        const locs: Warehouse[] = (d.locations && d.locations.length) ? d.locations : seed
+        setPickupLocations(locs)
+        if (locs.length && !locs.some(l => l.name === pickupLocation)) {
+          setPickupLocation(defaultWarehouse.pickupLocation || locs[0].name)
+        }
+      })
+      .catch(() => { setPickupLocations(seed) })
+  }, [])
+
   const toggleAll = () => {
     if (selected.size === orders.length) setSelected(new Set())
     else setSelected(new Set(orders.map(o => o.id)))
@@ -362,7 +389,7 @@ export default function DelhiveryPageClient({ defaultWarehouse }: { defaultWareh
       const res = await fetch('/api/admin/delhivery/pickup-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderIds: Array.from(selected), pickupDate }),
+        body: JSON.stringify({ orderIds: Array.from(selected), pickupDate, pickupLocation }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -485,7 +512,9 @@ export default function DelhiveryPageClient({ defaultWarehouse }: { defaultWareh
         </div>
       )}
 
-      <DelhiveryCredentialCard />
+      {/* own_delhivery tenants ship on their own account and manage a credential; platform-token
+          tenants are billed by wallet per AWB, so they get the wallet instead. */}
+      {ownDelhivery ? <DelhiveryCredentialCard /> : <WalletCard />}
 
       <WarehousesCard defaultWarehouse={defaultWarehouse} />
 
@@ -495,9 +524,23 @@ export default function DelhiveryPageClient({ defaultWarehouse }: { defaultWareh
             <h2 className="text-lg font-semibold text-foreground">Eligible Orders</h2>
             <span className="text-sm text-foreground-secondary">{orders.length} found</span>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-foreground-secondary">Pickup date</label>
-            <DatePicker value={pickupDate} min={todayIST()} onChange={setPickupDate} />
+          <div className="flex flex-wrap items-center gap-4">
+            {pickupLocations.length > 0 && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-foreground-secondary">Pickup address</label>
+                <AdminSelect
+                  sm
+                  value={pickupLocation}
+                  onChange={setPickupLocation}
+                  options={pickupLocations.map(l => ({ value: l.name, label: l.name }))}
+                  className="min-w-48"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-foreground-secondary">Pickup date</label>
+              <DatePicker value={pickupDate} min={todayIST()} onChange={setPickupDate} />
+            </div>
           </div>
         </div>
 

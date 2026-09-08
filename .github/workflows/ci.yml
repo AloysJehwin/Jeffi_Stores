@@ -769,11 +769,17 @@ jobs:
 
       - name: Apply pending migrations via EC2
         uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          # Forwarded for the tenant fan-out, same rationale as the schema-diff job: decouple the
+          # fan-out from container/slot state on the box.
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 10m
+          envs: DEPLOY_SHA,CRON_SECRET
           script: |
             set -e
             cd /opt/jeffi-stores
@@ -812,6 +818,56 @@ jobs:
                 printf '%s\n' "$PENDING" | sed 's/^/- `/;s/$/`/'
               fi
             } >> "$GITHUB_STEP_SUMMARY"
+
+            # The flagship apply above never touched customer databases, so a migration file on
+            # main reached only jeffi_stores — every tenant RDS silently fell behind. Fan the same
+            # pending files out to each active tenant, tracked in that DB's own schema_migrations
+            # ledger. Mirrors the schema-diff job's fan-out: prefer the forwarded secret, fall back
+            # to the running container's env, isolate per-tenant failures, fail the job on non-200.
+            echo "::group::Tenant migration-files fan-out"
+            if [ -z "$CRON_SECRET" ]; then
+              SLOT=$(cat active_slot 2>/dev/null || echo blue)
+              if ! docker inspect jeffi-app-$SLOT >/dev/null 2>&1; then
+                echo "::error::app container jeffi-app-$SLOT not found — cannot source CRON_SECRET for the fan-out"
+                exit 1
+              fi
+              CRON_SECRET=$(docker exec jeffi-app-$SLOT printenv CRON_SECRET 2>/dev/null || true)
+            fi
+            if [ -z "$CRON_SECRET" ]; then
+              echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
+              exit 1
+            fi
+            echo "POST /api/internal/migrations/files-fanout  (gitSha=$DEPLOY_SHA, 300s timeout)"
+            CODE=$(curl -s -o /tmp/files-fanout.json -w '%{http_code}' --max-time 300 \
+              -X POST http://localhost/api/internal/migrations/files-fanout \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H 'Content-Type: application/json' \
+              -H 'Host: jeffistores.in' \
+              -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
+
+            if command -v jq >/dev/null 2>&1 && jq -e . /tmp/files-fanout.json >/dev/null 2>&1; then
+              TOTAL=$(jq -r '.result.total   // 0' /tmp/files-fanout.json)
+              APPLIED=$(jq -r '.result.applied // 0' /tmp/files-fanout.json)
+              SKIPPED=$(jq -r '.result.skipped // 0' /tmp/files-fanout.json)
+              FAILEDN=$(jq -r '.result.failed  // 0' /tmp/files-fanout.json)
+              echo "Tenants: $TOTAL total — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
+              if [ "$FAILEDN" != "0" ]; then
+                echo "Failed tenants:"
+                jq -r '.result.failures[]? | "  x \(.slug): \(.error)"' /tmp/files-fanout.json
+              fi
+              {
+                echo ""
+                echo "### Tenant DB migrations"
+                echo ""
+                echo "$TOTAL tenant(s) — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "(could not parse fan-out response as JSON — raw body follows)"
+              cat /tmp/files-fanout.json; echo
+            fi
+            rm -f /tmp/files-fanout.json
+            echo "::endgroup::"
+            [ "$CODE" = "200" ] || { echo "::error::tenant migration-files fan-out failed (HTTP $CODE)"; exit 1; }
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy + CDN invalidation)

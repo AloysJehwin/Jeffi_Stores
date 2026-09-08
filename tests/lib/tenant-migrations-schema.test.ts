@@ -67,4 +67,12 @@ describe('buildTenantSchemaSql — re-apply safety', () => {
   it('strips psql meta-commands the pg driver cannot parse', () => {
     expect(sql).not.toMatch(/^\s*\\(restrict|unrestrict|connect)/m)
   })
+
+  // COMMENT ON EXTENSION requires owning the extension; on a tenant RDS rds_superuser owns it,
+  // so the app role running the fan-out fails with "must be owner of extension". The comment is
+  // a cosmetic pg_dump artifact — drop it, but keep CREATE EXTENSION (the role may create).
+  it('strips COMMENT ON EXTENSION but keeps CREATE EXTENSION', () => {
+    expect(sql).not.toMatch(/COMMENT ON EXTENSION/i)
+    expect(sql).toMatch(/CREATE EXTENSION IF NOT EXISTS pg_trgm/i)
+  })
 })
