@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
@@ -692,9 +692,12 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                 </tr>
               </thead>
               <tbody>
-                {pagedHistory.map(req => (
-                  <>
-                    <tr key={req.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
+                {pagedHistory.map(req => {
+                  const awbs = req.awbs ?? []
+                  const status = req.pickup_status || 'pending'
+                  return (
+                  <Fragment key={req.id}>
+                    <tr className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
                       <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">
                         {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
@@ -706,7 +709,7 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          {req.awbs.map(awb => (
+                          {awbs.map(awb => (
                             <span key={awb} className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground">{awb}</span>
                           ))}
                           <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
@@ -716,13 +719,13 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                         {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
-                          {req.pickup_status.replace('_', ' ')}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
+                          {status.replace('_', ' ')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {req.awbs.length > 0 && (
+                          {awbs.length > 0 && (
                             <button
                               onClick={() => handleDownloadLabels(req)}
                               disabled={downloadingId === req.id}
@@ -813,8 +816,9 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                         </td>
                       </tr>
                     )}
-                  </>
-                ))}
+                  </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>

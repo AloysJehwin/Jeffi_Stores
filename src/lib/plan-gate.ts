@@ -124,8 +124,8 @@ export function invalidatePlanCache(tenantId: string): void {
  * Falls back to 'basic' if no tenant in context.
  */
 export async function currentTenantPlanGate(scopeKey: string): Promise<PlanGateResult> {
-  const { getCurrentTenantId } = await import('./tenant-context')
-  const tenantId = getCurrentTenantId()
+  const { resolveTenantId } = await import('./tenant-context')
+  const tenantId = await resolveTenantId()
   if (!tenantId) return { allowed: true, plan: 'platform', upgradeRequired: null }
   return planGate(tenantId, scopeKey)
 }

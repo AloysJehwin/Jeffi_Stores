@@ -376,6 +376,24 @@ export async function getSiteControls(): Promise<SiteControls> {
       },
     }
 
+    // Stock validation is a Growth+ feature. On a tenant whose plan lacks inventory:read the
+    // site-controls UI locks the toggle off, but the stored/default flag is otherwise true — so
+    // force it off here at the source, matching the UI, so no consumer (order create, processing
+    // transition, invoices, quotations, returns) enforces stock the tenant cannot manage.
+    if (result.flags.inventoryValidationEnabled) {
+      try {
+        const { resolveTenantId } = await import('./tenant-context')
+        const tenantId = await resolveTenantId()
+        if (tenantId) {
+          const { getTenantPlan } = await import('./plan-gate')
+          const { scopes } = await getTenantPlan(tenantId)
+          if (!scopes.has('inventory:read')) result.flags.inventoryValidationEnabled = false
+        }
+      } catch {
+        // Control-plane hiccup: leave the stored flag as-is (the UI lock remains the backstop).
+      }
+    }
+
     cache.set(key, { value: result, expiresAt: Date.now() + TTL_MS })
     return result
   } catch {
