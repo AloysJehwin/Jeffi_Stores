@@ -31,18 +31,20 @@ export default async function EcomLandingPage() {
 
   return (
     <div className="text-foreground relative isolate">
-      {/* ── Global light grid background ── sits above the layout's solid base, below content (z-0; content is z-10) ── */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-surface">
-        <div className="absolute inset-0 opacity-[0.5] bg-[linear-gradient(to_right,#d9dbe3_1px,transparent_1px),linear-gradient(to_bottom,#d9dbe3_1px,transparent_1px)] bg-[size:44px_44px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(92,170,0,0.10),transparent),radial-gradient(ellipse_60%_40%_at_80%_80%,rgba(245,158,11,0.06),transparent)]" />
+      {/* ── Global grid background ── sits above the layout's solid base, below content (z-0; content is z-10).
+          Base is a soft neutral (not pure white) with stronger brand tints so the white browser-frame
+          screenshots stay clearly framed against the page instead of washing out. ── */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-[#e9ebf0] dark:bg-surface">
+        {/* Continuous top-to-bottom wash — one gradient with no transparent stop, so there is no
+            band/seam anywhere down the page. Corner glows sit on top for life, kept wide and soft. */}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,#eef1f6_0%,#e8efe4_45%,#f3efe6_100%)] dark:bg-none" />
+        <div className="absolute inset-0 opacity-[0.65] bg-[linear-gradient(to_right,#cdd0da_1px,transparent_1px),linear-gradient(to_bottom,#cdd0da_1px,transparent_1px)] bg-[size:44px_44px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(90%_70%_at_50%_-10%,rgba(92,170,0,0.16),transparent),radial-gradient(80%_60%_at_90%_110%,rgba(245,158,11,0.12),transparent)]" />
       </div>
       <div className="relative z-10">
 
-      {/* ── Hero ── */}
+      {/* ── Hero ── (no local gradient: the global continuous wash covers it seamlessly) */}
       <section className="relative overflow-hidden">
-        <div aria-hidden className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_80%_-10%,rgba(92,170,0,0.14),transparent),radial-gradient(50%_40%_at_0%_10%,rgba(245,158,11,0.08),transparent)]" />
-        </div>
         <div className="w-full px-6 lg:px-12 pt-20 pb-14 sm:pt-28 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border-default bg-surface-elevated/70 backdrop-blur px-3 py-1 text-xs font-medium text-foreground-secondary">
             <span className="w-1.5 h-1.5 rounded-full bg-accent-500 animate-pulse" /> Now onboarding new stores
@@ -199,9 +201,8 @@ export default async function EcomLandingPage() {
         <div className="text-center mt-6"><Link href="/pricing" className="inline-flex items-center gap-1 text-accent-600 dark:text-accent-400 font-semibold hover:underline">Compare all features across plans →</Link></div>
       </section>
 
-      {/* ── Final CTA ── */}
+      {/* ── Final CTA ── (no local gradient: the global continuous wash covers it seamlessly) */}
       <section className="relative overflow-hidden">
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(50%_60%_at_50%_120%,rgba(16,185,129,0.20),transparent)]" />
         <div className="w-full px-6 lg:px-12 py-24 text-center">
           <h2 className="text-5xl lg:text-6xl font-extrabold">Your store is one step away</h2>
           <p className="text-foreground-secondary mt-4 text-lg">Set it up in minutes. Start selling today.</p>
