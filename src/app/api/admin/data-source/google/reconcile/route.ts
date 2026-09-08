@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'jobId and decision (approve|keep) are required' }, { status: 400 })
   }
 
-  const tenantId = resolveImportTenantId()
+  const tenantId = await resolveImportTenantId()
   const job = await getImportJob(jobId, tenantId)
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   if (job.source !== 'google_sheet' || !job.spreadsheet_id) {

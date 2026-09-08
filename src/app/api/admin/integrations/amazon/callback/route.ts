@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { getCurrentTenant } from '@/lib/tenant-context'
-import { currentAdminBaseUrl } from '@/lib/brand'
+import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState } from '@/app/api/admin/integrations/state'
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 // marketplace ids Amazon carries back. Redirects to the store-admin merchant-sync page.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const backTo = `${currentAdminBaseUrl()}/admin/merchant-sync`
+  const backTo = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
 
   const err = params.get('error')
   if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)

@@ -15,7 +15,7 @@ export async function GET(
   if (admin instanceof NextResponse) return admin
 
   const { id } = await params
-  const job = await getImportJob(id, resolveImportTenantId())
+  const job = await getImportJob(id, await resolveImportTenantId())
   if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({ job })

@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       let newStatus = req.pickup_status
       if (anyPickedUp && req.pickup_status === 'pending') {
         await query(
-          `UPDATE delhivery_pickup_requests SET pickup_status = 'picked_up', updated_at = NOW() WHERE id = $1`,
+          `UPDATE delhivery_pickup_requests SET pickup_status = 'picked_up' WHERE id = $1`,
           [pollId]
         )
         newStatus = 'picked_up'

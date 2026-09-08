@@ -13,5 +13,5 @@ export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'products:read')
   if (admin instanceof NextResponse) return admin
 
-  return NextResponse.json(await getGsheetStatus(resolveImportTenantId()))
+  return NextResponse.json(await getGsheetStatus(await resolveImportTenantId()))
 }
