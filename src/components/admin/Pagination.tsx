@@ -4,10 +4,11 @@ interface PaginationProps {
   page: number
   total: number
   pageSize: number
-  buildUrl: (page: number) => string
+  buildUrl?: (page: number) => string
+  onPageChange?: (page: number) => void
 }
 
-export default function Pagination({ page, total, pageSize, buildUrl }: PaginationProps) {
+export default function Pagination({ page, total, pageSize, buildUrl, onPageChange }: PaginationProps) {
   const totalPages = Math.ceil(total / pageSize)
   if (totalPages <= 1) return null
 
@@ -16,6 +17,21 @@ export default function Pagination({ page, total, pageSize, buildUrl }: Paginati
 
   const btnCls = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
+  const navBtn = (targetPage: number, label: string, disabled: boolean) => {
+    if (onPageChange) {
+      return (
+        <button type="button" onClick={() => onPageChange(targetPage)} disabled={disabled} className={btnCls} aria-label={label}>
+          {label}
+        </button>
+      )
+    }
+    return (
+      <Link href={buildUrl!(targetPage)} className={`${btnCls} ${disabled ? 'opacity-40 pointer-events-none' : ''}`} aria-label={label}>
+        {label}
+      </Link>
+    )
+  }
+
   return (
     <div className="flex items-center justify-between gap-2 px-1 pt-4">
       <p className="text-xs text-foreground-muted whitespace-nowrap">
@@ -23,13 +39,9 @@ export default function Pagination({ page, total, pageSize, buildUrl }: Paginati
         {' '}of <span className="font-medium text-foreground">{total}</span> results
       </p>
       <div className="flex items-center gap-1.5">
-        <Link href={buildUrl(page - 1)} className={`${btnCls} ${page <= 1 ? 'opacity-40 pointer-events-none' : ''}`} aria-label="Previous">
-          Prev
-        </Link>
+        {navBtn(page - 1, 'Prev', page <= 1)}
         <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{totalPages}</span>
-        <Link href={buildUrl(page + 1)} className={`${btnCls} ${page >= totalPages ? 'opacity-40 pointer-events-none' : ''}`} aria-label="Next">
-          Next
-        </Link>
+        {navBtn(page + 1, 'Next', page >= totalPages)}
       </div>
     </div>
   )
