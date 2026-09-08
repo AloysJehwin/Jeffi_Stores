@@ -51,8 +51,8 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
   if (maxDomains === 0) {
     return (
       <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
-        <div className="text-xs text-foreground-muted uppercase tracking-widest mb-2">Custom domain</div>
-        <p className="text-sm text-foreground-muted">Available on Pro plan and above. Upgrade to connect your own domain.</p>
+        <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-2">Custom domain</div>
+        <p className="text-sm text-foreground-secondary">Available on Pro plan and above. Upgrade to connect your own domain.</p>
       </div>
     )
   }
@@ -67,8 +67,8 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
   return (
     <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs text-foreground-muted uppercase tracking-widest">Custom domains</div>
-        <span className="text-xs text-foreground-muted">{domains.length}/{maxDomains} used</span>
+        <div className="text-xs text-foreground-secondary uppercase tracking-widest">Custom domains</div>
+        <span className="text-xs text-foreground-secondary">{domains.length}/{maxDomains} used</span>
       </div>
 
       {domains.map((d) => (
@@ -96,7 +96,7 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
               Add
             </button>
           </div>
-          <p className="text-xs text-foreground-muted">
+          <p className="text-xs text-foreground-secondary">
             Point a CNAME record to <span className="font-mono text-foreground">{cnameTarget}</span>, then click Verify.
           </p>
         </div>

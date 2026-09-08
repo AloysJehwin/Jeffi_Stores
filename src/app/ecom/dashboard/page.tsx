@@ -50,171 +50,94 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
   const monthly = Number(tenant.monthly_price_inr ?? 0)
   const price = tenant.billing_interval === 'yearly' ? monthly * 12 : monthly
 
+  const created = new Date(tenant.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  const priceLabel = price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'
+
   return (
     <div className="w-full min-h-screen bg-surface-secondary">
       {/* Top bar */}
-      <div className="border-b border-border-default bg-surface-elevated px-6 lg:px-10 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-foreground">{tenant.display_name}</h1>
+      <div className="border-b border-border-default bg-surface-elevated px-6 lg:px-10 py-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-xl font-bold text-foreground truncate">{tenant.display_name}</h1>
             <StatusPill status={tenant.status} />
             {isLive && <SiteReachabilityBadge url={storeUrl} />}
           </div>
           <div className="flex gap-2">
             <Link href={`/dashboard/billing?tenant=${tenant.slug}`}
-              className="px-4 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+              className="px-4 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
               Billing
-            </Link>
-            <Link href="/onboard"
-              className="px-4 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
-              + New store
             </Link>
             {isLive && (
               <a href={storeUrl} target="_blank" rel="noopener noreferrer"
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium transition-colors">
+                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">
                 Open store →
               </a>
             )}
           </div>
         </div>
-
-        {/* Store switcher — only when the owner has more than one store */}
-        {tenants.length > 1 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {tenants.map((t) => {
-              const active = t.slug === tenant.slug
-              return (
-                <Link key={t.id} href={`/dashboard?tenant=${t.slug}`}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                    active
-                      ? 'border-accent-400 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300'
-                      : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
-                  }`}>
-                  {t.display_name}
-                  <span className="font-mono text-[10px] text-foreground-muted">{t.slug}</span>
-                </Link>
-              )
-            })}
-          </div>
-        )}
       </div>
 
       <div className="px-6 lg:px-10 py-8 space-y-6">
-        {/* Store info cards row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Store identity */}
-          <div className="lg:col-span-2 rounded-2xl border border-border-default bg-surface-elevated p-5">
-            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Store identity</div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Name</span>
-                <span className="font-medium text-foreground">{tenant.display_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Subdomain</span>
-                <span className="font-mono text-foreground text-xs">{tenant.slug}.jeffistores.in</span>
-              </div>
-              {tenant.custom_domain && (
-                <div className="flex justify-between">
-                  <span className="text-foreground-muted">Custom domain</span>
-                  <span className="font-mono text-foreground text-xs">{tenant.custom_domain}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Status</span>
-                <StatusPill status={tenant.status} />
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Created</span>
-                <span className="text-foreground">{new Date(tenant.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              </div>
+        {/* ── Store overview: identity + subscription + infra ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <InfoCard title="Store identity">
+            <Row label="Name" value={tenant.display_name} />
+            <Row label="Subdomain" mono value={`${tenant.slug}.jeffistores.in`} />
+            {tenant.custom_domain && <Row label="Custom domain" mono value={tenant.custom_domain} />}
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-foreground-secondary">Status</span>
+              <StatusPill status={tenant.status} />
             </div>
-          </div>
+            <Row label="Created" value={created} />
+          </InfoCard>
 
-          {/* Subscription */}
-          <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
-            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Subscription</div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Plan</span>
-                <span className="font-semibold text-foreground capitalize">{tenant.plan ?? '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Billing</span>
-                <span className="text-foreground capitalize">{tenant.billing_interval}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-foreground-muted">Price</span>
-                <span className="text-foreground font-medium">
-                  {price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'}
-                </span>
-              </div>
-              {renewalDate && (
-                <div className="flex justify-between">
-                  <span className="text-foreground-muted">Renews</span>
-                  <span className="text-foreground">{renewalDate}</span>
-                </div>
-              )}
-            </div>
-          </div>
+          <InfoCard title="Subscription">
+            <Row label="Plan" value={<span className="capitalize font-semibold">{tenant.plan ?? '—'}</span>} />
+            <Row label="Billing" value={<span className="capitalize">{tenant.billing_interval}</span>} />
+            <Row label="Price" value={<span className="font-semibold">{priceLabel}</span>} />
+            {renewalDate && <Row label="Renews" value={renewalDate} />}
+          </InfoCard>
 
-          {/* Infrastructure — only show provisioned URLs when active */}
-          <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
-            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Infrastructure</div>
+          <InfoCard title="Infrastructure">
             {isLive ? (
-              <div className="space-y-2 text-sm">
-                <div>
-                  <div className="text-foreground-muted text-xs mb-1">Storefront</div>
+              <>
+                <Field label="Storefront">
                   <a href={storeUrl} target="_blank" rel="noopener noreferrer"
                     className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all">
                     {tenant.slug}.jeffistores.in
                   </a>
-                </div>
-                {tenant.rds_endpoint && (
-                  <div>
-                    <div className="text-foreground-muted text-xs mb-1">Database</div>
-                    <span className="font-mono text-xs text-foreground break-all">{tenant.rds_endpoint}</span>
-                  </div>
-                )}
-                {tenant.s3_bucket && (
-                  <div>
-                    <div className="text-foreground-muted text-xs mb-1">Storage bucket</div>
-                    <span className="font-mono text-xs text-foreground break-all">{tenant.s3_bucket}</span>
-                  </div>
-                )}
-                {tenant.region && (
-                  <div>
-                    <div className="text-foreground-muted text-xs mb-1">Region</div>
-                    <span className="text-xs text-foreground">{tenant.region}</span>
-                  </div>
-                )}
-              </div>
+                </Field>
+                {tenant.rds_endpoint && <Field label="Database"><span className="font-mono text-xs text-foreground break-all">{tenant.rds_endpoint}</span></Field>}
+                {tenant.s3_bucket && <Field label="Storage bucket"><span className="font-mono text-xs text-foreground break-all">{tenant.s3_bucket}</span></Field>}
+                {tenant.region && <Field label="Region"><span className="text-xs text-foreground">{tenant.region}</span></Field>}
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center h-24 text-center">
                 <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin mb-2" />
-                <p className="text-xs text-foreground-muted">Provisioning in progress…</p>
-                <p className="text-xs text-foreground-muted mt-1">URLs will appear once live.</p>
+                <p className="text-sm text-foreground-secondary">Provisioning in progress…</p>
+                <p className="text-xs text-foreground-secondary mt-1">URLs will appear once live.</p>
               </div>
             )}
-          </div>
+          </InfoCard>
         </div>
 
-        {/* Subdomains */}
-        <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
-          <div className="text-xs text-foreground-muted uppercase tracking-widest mb-4">Your subdomains</div>
+        {/* ── Subdomains ── */}
+        <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
+          <SectionHeading>Your subdomains</SectionHeading>
           <SubdomainList
             slug={tenant.slug}
             plan={tenant.plan}
             maxCustomDomains={tenant.max_custom_domains ?? 0}
             rdsReady={!!tenant.rds_endpoint}
           />
-        </div>
+        </section>
 
-        {/* Custom domains */}
+        {/* ── Custom domains ── */}
         <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />
 
-        {/* Transactions + ledger tabs */}
-        <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
+        {/* ── Transactions + ledger tabs ── */}
+        <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
           <StoreDashboardTabs
             transactions={billing.transactions}
             ledger={billing.ledger}
@@ -226,8 +149,41 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
             renewalDate={renewalDate}
             slug={tenant.slug}
           />
-        </div>
+        </section>
       </div>
+    </div>
+  )
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-xs font-semibold text-foreground-secondary uppercase tracking-widest mb-4">{children}</h2>
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+      <SectionHeading>{title}</SectionHeading>
+      <div className="space-y-2.5 text-sm">{children}</div>
+    </div>
+  )
+}
+
+// A label→value line. Value is real data, so it renders in full foreground; the label in secondary.
+function Row({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-foreground-secondary flex-shrink-0">{label}</span>
+      <span className={`text-foreground text-right ${mono ? 'font-mono text-xs break-all' : 'font-medium'}`}>{value}</span>
+    </div>
+  )
+}
+
+// Stacked label-over-value, for longer values (URLs, endpoints) that shouldn't be squeezed inline.
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-foreground-secondary text-xs mb-1">{label}</div>
+      {children}
     </div>
   )
 }
