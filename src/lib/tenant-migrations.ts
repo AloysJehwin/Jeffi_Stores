@@ -1,7 +1,6 @@
 import fs from 'fs'
 import path from 'path'
 import { Pool } from 'pg'
-import { Signer } from '@aws-sdk/rds-signer'
 import { controlPlanePool } from './tenant-registry'
 import { buildTenantSchemaSql } from './tenant-migrations-schema'
 
@@ -20,10 +19,21 @@ import { buildTenantSchemaSql } from './tenant-migrations-schema'
  * Ordering matters: extensions → tables → constraints → indexes → functions → triggers.
  */
 
-/** Build a short-lived pool to a tenant's RDS using IAM auth (mirrors db.ts). */
-function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string; region: string }): Pool {
-  const user = process.env.RDS_USER || 'app_user'
-  const signer = new Signer({ hostname: infra.rdsEndpoint, port: infra.rdsPort, region: infra.region, username: user })
+/**
+ * Build a short-lived pool to a tenant's RDS as the MASTER user (password auth).
+ *
+ * The fan-out runs DDL (CREATE TABLE/EXTENSION, ALTER, …). app_user is granted privileges
+ * on existing tables/sequences at provisioning time but NOT CREATE on schema public, so
+ * connecting via IAM as app_user fails with "permission denied for schema public" the
+ * moment the schema tries to create a new object. Provisioning's own loadSchema connects
+ * as the master user for exactly this reason (aws-provider.tenantPool) — mirror that here.
+ */
+function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string }): Pool {
+  const masterUser = process.env.TENANT_RDS_MASTER_USER || 'postgres'
+  const masterPassword = process.env.RDS_MASTER_PASSWORD
+  if (!masterPassword) {
+    throw new Error('RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for the schema fan-out')
+  }
   const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
   const ssl = fs.existsSync(certPath)
     ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
@@ -32,8 +42,8 @@ function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string
     host: infra.rdsEndpoint,
     port: infra.rdsPort,
     database: infra.rdsDb,
-    user,
-    password: () => signer.getAuthToken(),
+    user: masterUser,
+    password: masterPassword,
     ssl,
     max: 2,
     connectionTimeoutMillis: 15000,
@@ -104,7 +114,7 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
 
     let pool: Pool | null = null
     try {
-      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores', region: t.region || 'us-east-1' })
+      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores' })
       // Apply the whole schema in one connection. ON_ERROR_STOP semantics via a
       // single multi-statement query — pg aborts the batch on first error.
       await pool.query(schemaSql)
@@ -162,7 +172,7 @@ export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutRes
   for (const t of targets) {
     let pool: Pool | null = null
     try {
-      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores', region: t.region || 'us-east-1' })
+      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores' })
       await pool.query(SCHEMA_MIGRATIONS_DDL)
       const doneRes = await pool.query('SELECT filename FROM schema_migrations')
       const done = new Set<string>(doneRes.rows.map((r: { filename: string }) => r.filename))
