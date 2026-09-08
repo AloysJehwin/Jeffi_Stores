@@ -628,7 +628,15 @@ export function getScopeForPath(pathname: string): string | null {
   }
 
   if (pathname.startsWith('/api/admin/notifications')) return 'notifications:read'
+  // Wallet top-up for shared-Delhivery shipping cost — a delhivery-flow helper that lives under
+  // /financial but is gated on delhivery:write (see the route handlers), so it must be reachable on
+  // plans without financial:* (basic/growth). Keep this above the generic financial match.
+  if (pathname.startsWith('/api/admin/financial/wallet/topup')) return 'delhivery:read'
   if (pathname.startsWith('/api/admin/financial')) return 'financial:read'
+  // Batch allocation for an order line / invoice create — an orders-flow helper that
+  // lives under /inventory but is gated on orders:read (see the route handler), so it
+  // must be reachable on plans without inventory:*. Keep this above the generic match.
+  if (pathname.startsWith('/api/admin/inventory/batches/available')) return 'orders:read'
   if (pathname.startsWith('/api/admin/inventory')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/gst')) return 'gst:read'
   if (pathname.startsWith('/api/admin/labels')) return 'labels:read'

@@ -11,6 +11,10 @@ export interface AdminOAuthState {
   provider: string
   nonce: string
   spreadsheetId?: string
+  // Tenant's own admin base URL, stamped at connect time (on the tenant host) so the callback —
+  // which always lands on the platform OAuth host with no tenant in context — can return the user
+  // to their own admin instead of the platform's.
+  returnBase?: string
 }
 
 function key(): string {

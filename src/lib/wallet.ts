@@ -184,3 +184,108 @@ export async function settleDelhiveryCostToWallet(opts: {
   if (flag.rows[0]?.own_delhivery) return true
   return debitWalletForAwb(opts)
 }
+
+export interface BillingReconcileRow {
+  awb: string
+  billedAmount: number
+}
+
+export type ReconcileOutcome = 'adjusted' | 'skipped' | 'unmatched' | 'exempt' | 'error'
+
+export interface ReconcileResult {
+  awb: string
+  outcome: ReconcileOutcome
+  delta?: number
+}
+
+/**
+ * True up wallet debits against Delhivery's authoritative monthly billing CSV.
+ *
+ * The delivery-time debit (debitWalletForAwb) is only an estimate priced on our stored weight;
+ * Delhivery re-weighs at the hub and the real charge is exposed nowhere in the API — only in the
+ * panel's monthly billing export. For each CSV row this posts one 'adjustment' entry for
+ * (realBilled - alreadyDebited): a higher real charge debits further, an over-estimate credits back.
+ *
+ * Idempotent per (awb, period): a deterministic marker in the note is checked before inserting, so
+ * re-importing the same month's CSV is a no-op. The debit-scoped unique index does not cover
+ * 'adjustment' rows, so nothing blocks the insert. own_delhivery tenants are billed directly by
+ * Delhivery and are exempt. Returns a per-AWB summary; balance and ledger move in one transaction.
+ */
+export async function reconcileDelhiveryBilling(
+  rows: BillingReconcileRow[],
+  tenantId: string,
+  period: string,
+): Promise<ReconcileResult[]> {
+  const results: ReconcileResult[] = []
+  if (!tenantId || !period || rows.length === 0) return results
+
+  const pool = controlPlanePool()
+  const flag = await pool.query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [tenantId]).catch(() => null)
+  if (!flag?.rows[0]) return rows.map((r) => ({ awb: r.awb, outcome: 'error' as const }))
+  if (flag.rows[0].own_delhivery) return rows.map((r) => ({ awb: r.awb, outcome: 'exempt' as const }))
+
+  for (const row of rows) {
+    const awb = String(row.awb || '').trim()
+    const billed = Number(row.billedAmount)
+    if (!awb || !Number.isFinite(billed) || billed < 0) {
+      results.push({ awb, outcome: 'error' })
+      continue
+    }
+
+    const marker = `adj:${awb}:${period}`
+    const client = await pool.connect().catch(() => null)
+    if (!client) { results.push({ awb, outcome: 'error' }); continue }
+    try {
+      await client.query('BEGIN')
+
+      const dup = await client.query(
+        `SELECT 1 FROM wallet_ledger
+          WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'adjustment' AND note LIKE $3 LIMIT 1`,
+        [tenantId, awb, `${marker}%`],
+      )
+      if (dup.rowCount && dup.rowCount > 0) {
+        await client.query('ROLLBACK')
+        results.push({ awb, outcome: 'skipped' })
+        continue
+      }
+
+      const debitRes = await client.query(
+        `SELECT amount FROM wallet_ledger
+          WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'debit' LIMIT 1`,
+        [tenantId, awb],
+      )
+      if (debitRes.rowCount === 0) {
+        await client.query('ROLLBACK')
+        results.push({ awb, outcome: 'unmatched' })
+        continue
+      }
+
+      const alreadyDebited = Math.abs(Number(debitRes.rows[0].amount))
+      const delta = Math.round((billed - alreadyDebited) * 100) / 100
+      if (Math.abs(delta) < 0.01) {
+        await client.query('ROLLBACK')
+        results.push({ awb, outcome: 'skipped', delta: 0 })
+        continue
+      }
+
+      await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, note)
+         VALUES ($1, 'adjustment', $2, $3, $4)`,
+        [tenantId, -delta, awb, `${marker} — Delhivery billing true-up (${period})`],
+      )
+      await client.query(
+        `UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1`,
+        [tenantId, delta],
+      )
+      await client.query('COMMIT')
+      results.push({ awb, outcome: 'adjusted', delta })
+    } catch {
+      await client.query('ROLLBACK').catch(() => {})
+      results.push({ awb, outcome: 'error' })
+    } finally {
+      client.release()
+    }
+  }
+
+  return results
+}

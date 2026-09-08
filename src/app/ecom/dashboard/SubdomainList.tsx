@@ -19,7 +19,7 @@ function CopyButton({ text }: { text: string }) {
   }
   return (
     <button onClick={copy}
-      className="ml-2 text-xs px-2 py-0.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary transition-colors flex-shrink-0">
+      className="ml-2 text-xs px-2 py-0.5 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors flex-shrink-0">
       {copied ? 'Copied!' : 'Copy'}
     </button>
   )
@@ -81,26 +81,26 @@ export default function SubdomainList({ slug, plan, maxCustomDomains, rdsReady }
   return (
     <div className="space-y-2">
       {subdomains.map((s) => (
-        <div key={s.label} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${s.available ? 'border-border-default bg-surface' : 'border-border-default/40 bg-surface-secondary/30 opacity-60'}`}>
+        <div key={s.label} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${s.available ? 'border-border-default bg-surface' : 'border-border-default/60 bg-surface-secondary/40'}`}>
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.available ? 'bg-green-500' : 'bg-foreground-muted/30'}`} />
-            <span className="text-foreground-muted w-28 flex-shrink-0 text-xs">{s.label}</span>
-            <span className={`font-mono text-xs truncate ${s.available ? 'text-foreground' : 'text-foreground-muted'}`}>{s.url}</span>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'bg-green-500' : 'bg-foreground-muted/50'}`} />
+            <span className="text-foreground-secondary w-28 flex-shrink-0 text-xs font-medium">{s.label}</span>
+            <span className={`font-mono text-xs truncate ${s.available ? 'text-foreground' : 'text-foreground-secondary'}`}>{s.url}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-            {s.note && <span className="text-xs text-foreground-muted hidden sm:inline">{s.note}</span>}
+            {s.note && <span className="text-xs text-foreground-secondary hidden sm:inline">{s.note}</span>}
             {s.available && <CopyButton text={`https://${s.url}`} />}
           </div>
         </div>
       ))}
 
       {maxCustomDomains > 0 && (
-        <div className="px-4 py-2.5 rounded-xl border border-dashed border-border-default bg-surface text-sm text-foreground-muted">
+        <div className="px-4 py-2.5 rounded-xl border border-dashed border-border-default bg-surface text-sm text-foreground-secondary">
           Up to <span className="font-medium text-foreground">{maxCustomDomains}</span> custom domain{maxCustomDomains > 1 ? 's' : ''} available — configure in store settings.
         </div>
       )}
       {maxCustomDomains === 0 && (
-        <div className="px-4 py-2 text-xs text-foreground-muted">
+        <div className="px-4 py-2 text-xs text-foreground-secondary">
           Custom domains available on Pro plan and above.
         </div>
       )}

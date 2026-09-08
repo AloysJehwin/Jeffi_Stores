@@ -123,6 +123,72 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
   return result
 }
 
+interface MigrationFile { filename: string; sql: string }
+
+/** Read database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
+function readMigrationFiles(): MigrationFile[] {
+  const dir = path.join(process.cwd(), 'database', 'migrations')
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .map((filename) => ({ filename, sql: fs.readFileSync(path.join(dir, filename), 'utf8') }))
+}
+
+const SCHEMA_MIGRATIONS_DDL = `
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename   TEXT        PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`
+
+/**
+ * Apply pending database/migrations/*.sql files to every active tenant's own RDS.
+ *
+ * The desired-state fan-out (runMigrationFanout) only re-applies the topic schema; migration
+ * files that carry data fixes or one-off DDL never reached tenants — the deploy applied them to
+ * the flagship alone. This mirrors deploy/run-migrations.sh per tenant: each tenant DB has its
+ * own schema_migrations ledger, and only files absent from it are applied, so re-runs are
+ * naturally idempotent and a failure on one tenant is isolated (recorded, not fatal to the rest).
+ *
+ * Not gated on git_sha: the pending set is derived from each DB's ledger, so a new migration added
+ * under a SHA already recorded still applies.
+ */
+export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutResult> {
+  const targets = await listActiveTenantTargets()
+  const files = readMigrationFiles()
+  const result: FanoutResult = { gitSha, total: targets.length, applied: 0, skipped: 0, failed: 0, failures: [] }
+  if (files.length === 0) return result
+
+  for (const t of targets) {
+    let pool: Pool | null = null
+    try {
+      pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores', region: t.region || 'us-east-1' })
+      await pool.query(SCHEMA_MIGRATIONS_DDL)
+      const doneRes = await pool.query('SELECT filename FROM schema_migrations')
+      const done = new Set<string>(doneRes.rows.map((r: { filename: string }) => r.filename))
+
+      const pending = files.filter((f) => !done.has(f.filename))
+      if (pending.length === 0) { result.skipped++; continue }
+
+      for (const f of pending) {
+        await pool.query(f.sql)
+        await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1)', [f.filename])
+      }
+      await recordRun(t.id, gitSha, 'success')
+      result.applied++
+    } catch (err: any) {
+      const msg = err?.message ?? String(err)
+      await recordRun(t.id, gitSha, 'failed', msg).catch(() => {})
+      result.failed++
+      result.failures.push({ slug: t.slug, error: msg })
+    } finally {
+      if (pool) await pool.end().catch(() => {})
+    }
+  }
+
+  return result
+}
+
 export interface TenantMigrationRun {
   git_sha: string; status: string; error: string | null; ran_at: string
 }

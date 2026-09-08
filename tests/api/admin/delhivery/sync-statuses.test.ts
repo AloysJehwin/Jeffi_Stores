@@ -30,9 +30,10 @@ vi.mock('@/lib/delhivery', () => ({
   fetchDelhiveryInvoiceCharges: vi.fn(),
   // Real helper — the route uses it to build the cgm param; keeping the real maths means the
   // assertion below pins the actual value sent to Delhivery.
-  chargeableGrams: (c: unknown, q: unknown) => {
+  chargeableGrams: (c: unknown, q: unknown, allowFloor = true) => {
     const kg = Number(c) || Number(q) || 0
-    return kg > 0 ? Math.round(kg * 1000) : 500
+    if (kg > 0) return Math.round(kg * 1000)
+    return allowFloor ? 500 : 0
   },
 }))
 
@@ -83,6 +84,7 @@ const ORDER = {
   id: 'ord-1', awb_number: 'AWB001', status: 'shipped',
   order_number: 'ORD-001', customer_name: 'John Doe',
   customer_email: 'john@example.com', user_id: 'user-1',
+  delhivery_quoted_weight_kg: 1, delhivery_charged_weight_kg: null,
 }
 
 function makeShipmentData(awb: string, statusType: string, extra: Record<string, any> = {}) {
@@ -1139,6 +1141,28 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     } as any)
 
     await POST(makeReq())
+    const billUpdate = mockQuery.mock.calls.find(([sql]) =>
+      (sql as string).includes('delhivery_billed_amount')
+    )
+    expect(billUpdate).toBeUndefined()
+  })
+
+  it('skips billing when the order has no trustworthy weight', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([{
+        ...ORDER, status: 'out_for_delivery', delhivery_billed_at: null,
+        delhivery_quoted_weight_kg: null, delhivery_charged_weight_kg: null,
+      }] as any)
+      .mockResolvedValueOnce([])
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => makeShipmentData('AWB001', 'DL'),
+    } as any)
+
+    await POST(makeReq())
+    // No weight → no 500 g floor in the wallet path → billing is deferred, not floored.
+    expect(mockInvoiceCharges).not.toHaveBeenCalled()
     const billUpdate = mockQuery.mock.calls.find(([sql]) =>
       (sql as string).includes('delhivery_billed_amount')
     )

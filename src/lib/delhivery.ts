@@ -350,12 +350,17 @@ export interface DelhiveryInvoiceCharges {
 
 /**
  * Chargeable weight in grams for the charges API. Delhivery bills on the weight it measured;
- * our quoted weight is the fallback, and 500 g is the floor so a missing weight cannot send
- * cgm=0 (which the API rejects).
+ * our quoted weight (volumetric-aware, set at shipment creation) is the fallback.
+ *
+ * allowFloor governs the missing-weight case. The 500 g floor exists so a display/quote call
+ * cannot send cgm=0 (which the API rejects). The wallet-debit path passes allowFloor=false and
+ * gets 0 instead: with no trustworthy weight, billing the 500 g slab would systematically
+ * under-charge, so the caller must skip billing rather than debit a floored guess.
  */
-export function chargeableGrams(chargedKg: unknown, quotedKg: unknown): number {
+export function chargeableGrams(chargedKg: unknown, quotedKg: unknown, allowFloor = true): number {
   const kg = Number(chargedKg) || Number(quotedKg) || 0
-  return kg > 0 ? Math.round(kg * 1000) : 500
+  if (kg > 0) return Math.round(kg * 1000)
+  return allowFloor ? 500 : 0
 }
 
 export interface InvoiceChargeQuery {

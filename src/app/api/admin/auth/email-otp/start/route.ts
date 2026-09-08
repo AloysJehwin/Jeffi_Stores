@@ -5,11 +5,13 @@ import { resolveAdminByEmail, enforceCertGate } from '@/lib/admin-identity'
 
 export const dynamic = 'force-dynamic'
 
-const GENERIC = { message: 'If that email is registered, a verification code has been sent.' }
+const SENT = { message: 'A verification code has been sent to your email.' }
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Layer 2 (identity) — send an email OTP to a registered admin. Returns a generic
-// success for unknown/unauthorized emails so admin existence isn't leaked.
+// Layer 2 (identity) — send an email OTP to a registered admin. By product choice this
+// endpoint blocks on the email step for non-admins (returns 404) rather than masking
+// existence: the panel is gated by mTLS, so account-enumeration risk is acceptable and a
+// clear "no admin account" message is preferred over silently advancing to the OTP step.
 export async function POST(request: NextRequest) {
   try {
     const { email } = await request.json().catch(() => ({}))
@@ -25,11 +27,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Resolve the admin FIRST — for unknown emails we return generic success
-    // without touching the cert gate (so success/failure look identical).
+    // Validate the admin/moderator exists BEFORE sending anything. Unknown emails are
+    // rejected here so the client stays on the email step instead of the OTP step.
     const admin = await resolveAdminByEmail(email)
     if (!admin) {
-      return NextResponse.json(GENERIC)
+      return NextResponse.json({ error: 'No admin account found for this email.' }, { status: 404 })
     }
 
     // Cert gate (prod). A cert failure for a real admin is a genuine 403.
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     await sendAdminOTPEmail(email, otp, admin.first_name || undefined)
     await recordSendOtp(email)
 
-    return NextResponse.json({ ...GENERIC, nextCooldown: rate.nextCooldown })
+    return NextResponse.json({ ...SENT, nextCooldown: rate.nextCooldown })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

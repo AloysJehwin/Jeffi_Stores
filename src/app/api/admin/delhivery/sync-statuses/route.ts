@@ -211,39 +211,49 @@ export async function POST(request: NextRequest) {
 
         // Pull actual Delhivery invoice charges on delivery — only once (idempotent guard).
         if (syncRule.orderStatus === 'delivered' && !order.delhivery_billed_at) {
-          const invoiceCharges = await fetchDelhiveryInvoiceCharges({
-            awb,
-            settledStatus: 'Delivered',
-            chargedWeightG: chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg),
-            originPin,
-            destPin: (order as any).dest_pin ?? '',
-            paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
-            tenantId: tenantId ?? undefined,
-          }).catch(() => null)
-          if (invoiceCharges) {
-            // Gate billed_at on a durable wallet debit: settle first, stamp billed_at only when the
-            // charge is on the books (or no wallet applies). A transient failure leaves billed_at NULL
-            // so the next sync retries rather than losing the charge.
-            const settled = tenantId && invoiceCharges.total > 0
-              ? await settleDelhiveryCostToWallet({
-                  tenantId,
-                  awb,
-                  orderRef: order.order_number,
-                  amountInr: invoiceCharges.total,
-                }).catch(() => false)
-              : true
-            await query(
-              `UPDATE orders SET
-                delhivery_billed_amount = $2,
-                delhivery_freight_charge = $3,
-                delhivery_cod_charge = $4,
-                delhivery_oda_charge = $5,
-                delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
-                delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
-                updated_at = NOW()
-               WHERE id = $1`,
-              [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
-            ).catch(() => {})
+          // Bill on the real (volumetric-aware) weight only. When no trustworthy weight exists,
+          // grams is 0 (no silent 500 g floor) — skip billing so the wallet is not under-charged;
+          // billed_at stays NULL and the next sync retries once a weight is present.
+          const grams = chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg, false)
+          if (grams === 0) {
+            console.warn('[delhivery] billing skipped — no trustworthy weight', {
+              awb, orderId: order.id, orderNumber: order.order_number,
+            })
+          } else {
+            const invoiceCharges = await fetchDelhiveryInvoiceCharges({
+              awb,
+              settledStatus: 'Delivered',
+              chargedWeightG: grams,
+              originPin,
+              destPin: (order as any).dest_pin ?? '',
+              paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+              tenantId: tenantId ?? undefined,
+            }).catch(() => null)
+            if (invoiceCharges) {
+              // Gate billed_at on a durable wallet debit: settle first, stamp billed_at only when the
+              // charge is on the books (or no wallet applies). A transient failure leaves billed_at NULL
+              // so the next sync retries rather than losing the charge.
+              const settled = tenantId && invoiceCharges.total > 0
+                ? await settleDelhiveryCostToWallet({
+                    tenantId,
+                    awb,
+                    orderRef: order.order_number,
+                    amountInr: invoiceCharges.total,
+                  }).catch(() => false)
+                : true
+              await query(
+                `UPDATE orders SET
+                  delhivery_billed_amount = $2,
+                  delhivery_freight_charge = $3,
+                  delhivery_cod_charge = $4,
+                  delhivery_oda_charge = $5,
+                  delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
+                  delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
+                  updated_at = NOW()
+                 WHERE id = $1`,
+                [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
+              ).catch(() => {})
+            }
           }
         }
 
