@@ -682,11 +682,11 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-secondary">
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Pickup Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Pickup Date</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Request ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Requested At</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Requested At</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-foreground-secondary">Actions</th>
                 </tr>
@@ -695,7 +695,7 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                 {pagedHistory.map(req => (
                   <>
                     <tr key={req.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
-                      <td className="px-4 py-3 text-foreground font-medium">
+                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">
                         {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
                       <td className="px-4 py-3 font-mono text-foreground-secondary">
@@ -712,7 +712,7 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                           <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-foreground-secondary">
+                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
                         {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">

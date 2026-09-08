@@ -135,7 +135,7 @@ function ShortcutRow({
   const preview = parseComboDisplay(shortcut.combo, isMac)
 
   return (
-    <div className="flex items-center gap-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
       <span className="w-32 shrink-0 text-sm font-medium text-foreground truncate" title={shortcut.label}>{shortcut.label}</span>
       <span className="flex-1 min-w-0 text-xs text-foreground-muted font-mono truncate" title={shortcut.path}>{shortcut.path}</span>
       <kbd className="w-24 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
@@ -259,7 +259,7 @@ export default function CustomShortcutsCard({
           ⚠ Some shortcuts have no key set — click the key field and press a letter or number to activate them.
         </p>
       )}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 pt-1">
         <input
           type="text"
           value={newLabel}

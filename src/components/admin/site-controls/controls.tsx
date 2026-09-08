@@ -337,7 +337,7 @@ export function KeyboardShortcutControl({
   }))
 
   return (
-    <div className="flex items-center gap-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
       <span className="w-24 shrink-0 text-sm font-medium text-foreground truncate">{label}</span>
       <kbd className="w-20 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
         {comboPreview || '—'}
