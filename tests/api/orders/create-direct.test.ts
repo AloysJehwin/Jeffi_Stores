@@ -39,6 +39,41 @@ vi.mock('@/lib/checkout-intent', () => ({
 vi.mock('@/lib/edd', () => ({
   computeEdd: vi.fn().mockReturnValue(null),
 }))
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({
+    razorpayEnabled: true,
+    codEnabled: true,
+    gstEnabled: false,
+    inventoryValidationEnabled: true,
+    smsEnabled: true,
+    whatsappEnabled: true,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+    ondeviceSummaryMobileEnabled: false,
+    ondeviceSummaryDesktopEnabled: false,
+    ondeviceFinetuneMobileEnabled: false,
+    ondeviceFinetuneDesktopEnabled: false,
+  }),
+  getBusinessValues: vi.fn().mockResolvedValue({
+    codSurchargeFlat: 40,
+    codSurchargePct: 2,
+    shippingMinCharge: 0,
+    shippingMaxCharge: 200,
+    orderAutoCancelMinutes: 10,
+    returnStandardCharge: 100,
+    delhiveryOriginPincode: '492001',
+    businessStateCode: '22',
+    defaultProductWeightG: 500,
+    defaultWeightG: 50,
+    pickupLocation: 'Jeffi Stores',
+    sellerName: 'Jeffi Stores',
+    sellerAddress: 'Raipur',
+    sellerPhone: '07713585374',
+  }),
+}))
+vi.mock('@/lib/delhivery', () => ({
+  checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
+}))
 
 import { POST } from '@/app/api/orders/create-direct/route'
 import * as jwt from '@/lib/jwt'
@@ -71,7 +106,7 @@ const VALID_ITEM = {
 }
 
 const VALID_BODY = {
-  paymentMethod: 'manual',
+  paymentMethod: 'cod',
   item: VALID_ITEM,
 }
 
@@ -325,7 +360,7 @@ describe('POST /api/orders/create-direct', () => {
       .mockResolvedValueOnce(MOCK_VARIANT)         // variant lookup
 
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       item: { productId: '550e8400-e29b-41d4-a716-446655440001', variantId: VARIANT_ID, qty: 1 },
     }) as any)
     expect(res.status).toBe(200)
@@ -341,7 +376,7 @@ describe('POST /api/orders/create-direct', () => {
       .mockResolvedValueOnce(null)         // no existing unpaid
     vi.mocked(checkoutIntent.verifyIntent).mockResolvedValue(null)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'bad-token' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', intent: 'bad-token' }) as any)
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/Invalid or expired checkout intent/)
   })
@@ -357,7 +392,7 @@ describe('POST /api/orders/create-direct', () => {
       qty: 1, buyMode: null, buyUnit: null,
     } as any)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'cart-token' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', intent: 'cart-token' }) as any)
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/cart order route/)
   })
@@ -380,7 +415,7 @@ describe('POST /api/orders/create-direct', () => {
       .mockResolvedValueOnce(MOCK_PRODUCT)  // product
       .mockResolvedValueOnce(null)           // min_order_amount
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'valid-intent' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', intent: 'valid-intent' }) as any)
     expect(res.status).toBe(200)
     expect(vi.mocked(checkoutIntent.verifyIntent)).toHaveBeenCalledWith('valid-intent')
   })
@@ -392,7 +427,7 @@ describe('POST /api/orders/create-direct', () => {
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/required/i)
@@ -459,7 +494,7 @@ describe('POST /api/orders/create-direct', () => {
       .mockResolvedValueOnce({ ...MOCK_PRODUCT, id: 'prod-1', category_id: 'cat-1' })
       .mockResolvedValueOnce(null)  // min_order_amount
 
-    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     expect((await res.json()).message).toBe('Order created successfully')
   })
@@ -502,7 +537,7 @@ describe('POST /api/orders/create-direct — targeted fallback branches', () => 
       .mockResolvedValueOnce(MOCK_PRODUCT)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'tok' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', intent: 'tok' }) as any)
     expect(res.status).toBe(200)
     expect(vi.mocked(orderCommit.resolveBuyNowItem)).toHaveBeenCalledWith(
       expect.objectContaining({ buyMode: 'box', buyUnit: 'dozen' })
@@ -668,7 +703,7 @@ describe('POST /api/orders/create-direct — targeted fallback branches', () => 
 
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
-    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     expect(vi.mocked(db.query)).toHaveBeenCalledWith(
       expect.stringMatching(/UPDATE orders SET status = 'confirmed'/),
@@ -866,7 +901,7 @@ describe('POST /api/orders/create-direct — additional branch coverage', () => 
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(MOCK_VARIANT)
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       item: { productId: '550e8400-e29b-41d4-a716-446655440001', variantId: VARIANT_ID, qty: 1 },
     }) as any)
     expect(res.status).toBe(200)

@@ -430,14 +430,18 @@ export async function publishProductDraft(productId: string): Promise<void> {
             await client.query(
               `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
                  price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
+                 weight_grams, length_cm, breadth_cm, height_cm, package_type,
                  created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())`,
               [
                 vid, productId, sv.sku || null, sv.sub_variant_name,
                 num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
                 sv.attributes || null, sv.is_active != null ? sv.is_active : true,
                 num(sv.inventory_quantity) ?? 0, num(sv.discount_pct) ?? 0,
                 sv.stock_status || 'In Stock',
+                num(sv.weight_grams) ?? null, num(sv.length_cm) ?? null,
+                num(sv.breadth_cm) ?? null, num(sv.height_cm) ?? null,
+                sv.package_type || null,
               ]
             )
           } else {
@@ -446,13 +450,18 @@ export async function publishProductDraft(productId: string): Promise<void> {
               `UPDATE product_sub_variants SET
                  sku = $3, sub_variant_name = $4, price = $5, mrp = $6,
                  price_ex_gst = $7, mrp_ex_gst = $8, attributes = COALESCE($9, attributes),
-                 is_active = $10, discount_pct = $11, stock_status = $12, updated_at = NOW()
+                 is_active = $10, discount_pct = $11, stock_status = $12,
+                 weight_grams = $13, length_cm = $14, breadth_cm = $15, height_cm = $16, package_type = $17,
+                 updated_at = NOW()
                WHERE id = $1 AND product_id = $2`,
               [
                 sv.id, productId, sv.sku || null, sv.sub_variant_name,
                 num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
                 sv.attributes || null, sv.is_active != null ? sv.is_active : true,
                 num(sv.discount_pct) ?? 0, sv.stock_status || 'In Stock',
+                num(sv.weight_grams) ?? null, num(sv.length_cm) ?? null,
+                num(sv.breadth_cm) ?? null, num(sv.height_cm) ?? null,
+                sv.package_type || null,
               ]
             )
           }

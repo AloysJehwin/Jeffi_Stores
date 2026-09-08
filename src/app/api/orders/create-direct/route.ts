@@ -11,6 +11,7 @@ import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
 import { verifyIntent } from '@/lib/checkout-intent'
+import { checkPincodeServiceability } from '@/lib/delhivery'
 
 const DirectItemSchema = z.object({
   productId: zUuid,
@@ -22,7 +23,10 @@ const DirectItemSchema = z.object({
 })
 
 const CreateDirectOrderSchema = z.object({
-  paymentMethod: z.enum(['razorpay', 'manual', 'cod']),
+  // 'manual' is accepted only from the business (B2B) portal — a server check below
+  // rejects it for the consumer storefront. Manual orders stay unpaid/pending (never
+  // auto-confirmed), so they carry no free-order bypass.
+  paymentMethod: z.enum(['razorpay', 'cod', 'manual']),
   item: DirectItemSchema.optional(),
   intent: z.string().nullish(),
   shippingAddress: z.any().optional(),
@@ -39,7 +43,8 @@ const CreateDirectOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const isGSTEnabled = (await getFeatureFlags()).gstEnabled
+    const flags = await getFeatureFlags()
+    const isGSTEnabled = flags.gstEnabled
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -60,6 +65,24 @@ export async function POST(request: NextRequest) {
     const clientCodFee = parsed.data.codFeeAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
+    const isManual = paymentMethod === 'manual'
+
+    // Server is authoritative on payment availability — never trust the client's method.
+    if (isRazorpayPayment && !flags.razorpayEnabled) {
+      return NextResponse.json({ error: 'Online payment is currently unavailable.' }, { status: 422 })
+    }
+    if (isCod && !flags.codEnabled) {
+      return NextResponse.json({ error: 'Cash on delivery is currently unavailable.' }, { status: 422 })
+    }
+    // Manual (contact-for-payment) is a B2B-only method. The consumer storefront must never
+    // create a manual order — that was the free-order bypass. isBusiness comes from the
+    // authenticated business session, not the client body.
+    if (isManual && !authUser.isBusiness) {
+      return NextResponse.json({ error: 'No valid payment method selected.' }, { status: 400 })
+    }
+    if (!isRazorpayPayment && !isCod && !isManual) {
+      return NextResponse.json({ error: 'No valid payment method selected.' }, { status: 400 })
+    }
 
     // When an intent token is present, derive item from the server-signed intent
     // rather than trusting the raw client body — prevents qty/buyMode/buyUnit tampering.
@@ -160,6 +183,18 @@ export async function POST(request: NextRequest) {
     }
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
+    // Serviceability gate: the buyer's pincode must be one Delhivery actually delivers to.
+    // The rate endpoint quotes a charge even for unserviceable pins, so this is checked
+    // explicitly and authoritatively here — never trust the client's shown quote.
+    if (destinationPin) {
+      const service = await checkPincodeServiceability(destinationPin)
+      if (!service.serviceable) {
+        return NextResponse.json({ error: 'Delivery is not available to this pincode.', unserviceable: true }, { status: 422 })
+      }
+      if (isCod && !service.cod) {
+        return NextResponse.json({ error: 'Cash on delivery is not available to this pincode. Please choose online payment.' }, { status: 422 })
+      }
+    }
     // Authoritative server re-quote (with the correct COD flag). If the live quote
     // is unavailable (Delhivery timeout/error → 0) but the client displayed a
     // shipping amount, fall back to that so the charged total matches the shown
@@ -167,7 +202,7 @@ export async function POST(request: NextRequest) {
     const quoted = destinationPin
       ? await quoteShipping({
           destinationPin,
-          items: [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }],
+          items: [{ productId: resolved.item.productId, variantId: resolved.item.variantId, subVariantId: resolved.item.subVariantId, quantity: resolved.item.qty }],
           subtotal,
           isCod,
         })
@@ -206,8 +241,10 @@ export async function POST(request: NextRequest) {
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const _eddPin = String(destinationPin || '')
+    const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
     const _edd = computeEdd({
       pin: _eddPin,
+      originPin: _eddOrigin,
       handlingDays: Number(product.handling_days ?? 2),
       extraDays: Number(product.extra_delivery_days ?? 0),
     })
@@ -264,7 +301,7 @@ export async function POST(request: NextRequest) {
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
          'pending',
          isCod ? 'cod_pending' : 'unpaid',
-         isCod ? 'cod' : (isRazorpayPayment ? 'razorpay' : 'manual'),
+         isCod ? 'cod' : isManual ? 'manual' : 'razorpay',
          subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
          shippingAddressId, billingAddressId,
          notes || null,
@@ -337,9 +374,9 @@ export async function POST(request: NextRequest) {
       buy_unit: item.buyUnit || null,
     }]
 
-    if (!isRazorpayPayment) {
-      // COD / manual orders confirm on placement (payment is collected later — on
-      // delivery for COD). Mirrors the cart path (orders/create).
+    if (isCod) {
+      // COD orders confirm on placement (payment is collected on delivery).
+      // Mirrors the cart path (orders/create). Razorpay confirms only after HMAC verify.
       await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
       order.status = 'confirmed'
       sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})

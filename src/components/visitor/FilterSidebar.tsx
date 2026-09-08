@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { humanizeLabel } from '@/lib/format'
 
 type FacetValue = { value: string; count: number }
 
@@ -550,7 +551,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                       : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
                   }`}
                 >
-                  {vt.value}
+                  {humanizeLabel(vt.value)}
                   {typeof vt.count === 'number' && (
                     <span className="ml-1 text-foreground-muted">{vt.count}</span>
                   )}
@@ -573,7 +574,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                         : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
                     }`}
                   >
-                    {vv.value}
+                    {humanizeLabel(vv.value)}
                     {typeof vv.count === 'number' && (
                       <span className="ml-1 text-foreground-muted">{vv.count}</span>
                     )}
@@ -591,7 +592,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
           {facets.specFacets.map(spec => {
             const active = currentSpecKey === spec.key
             return (
-              <Section key={spec.key} title={spec.key} open={sectionOpen(spec.key)} onToggle={() => toggleSection(spec.key)}>
+              <Section key={spec.key} title={humanizeLabel(spec.key)} open={sectionOpen(spec.key)} onToggle={() => toggleSection(spec.key)}>
                 <div className="flex flex-wrap gap-2">
                   {spec.values.map(sv => {
                     const isActive = active && currentSpecValue === sv.value
@@ -611,7 +612,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                             : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
                         }`}
                       >
-                        {sv.value}
+                        {humanizeLabel(sv.value)}
                         {typeof sv.count === 'number' && (
                           <span className="ml-1 text-foreground-muted">{sv.count}</span>
                         )}

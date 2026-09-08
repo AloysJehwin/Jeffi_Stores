@@ -39,7 +39,7 @@ export default function NotificationBell() {
   const [items, setItems] = useState<Notification[]>([])
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; right: number; left?: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const seenRef = useRef<Set<string>>(new Set())
@@ -145,7 +145,13 @@ export default function NotificationBell() {
   const toggle = () => {
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) })
+      // On narrow viewports pin the panel as a full-width sheet (left/right = 8) just below the
+      // header so it never overflows off-screen or misaligns to the bell's corner. On wider
+      // screens keep it anchored to the bell's right edge.
+      const isMobile = window.innerWidth < 640
+      setPos(isMobile
+        ? { top: r.bottom + 8, right: 8, left: 8 }
+        : { top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) })
     }
     setOpen(o => !o)
   }
@@ -201,8 +207,8 @@ export default function NotificationBell() {
       {open && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 10000, pointerEvents: 'auto' }}
-          className="w-[360px] max-w-[calc(100vw-16px)] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
+          style={{ position: 'fixed', top: pos.top, right: pos.right, ...(pos.left != null ? { left: pos.left } : {}), zIndex: 10000, pointerEvents: 'auto' }}
+          className="sm:w-[360px] w-auto max-w-[calc(100vw-16px)] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
             <span className="text-sm font-bold text-foreground">Notifications</span>

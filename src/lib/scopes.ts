@@ -718,6 +718,10 @@ export function hasScope(role: string, scopes: string[], requiredScope: string):
   // Only the platform operator short-circuits. A tenant owner is also 'super_admin', so the
   // wider isPlatformOwner() check let every tenant past its plan entitlement entirely.
   if (isPlatformAdmin(role)) return true
+  // The notification bell is admin-shell chrome present on every admin page, sells with every
+  // plan, and exposes no tenant-specific feature data (rows are still filtered per-scope in
+  // admin-notify). Grant it to any authenticated admin so no tenant is locked out of the feed.
+  if (requiredScope === 'notifications:read') return true
   if (scopes.includes(requiredScope)) return true
   // write implies read for all namespaced scopes (e.g. products:write grants products:read)
   if (requiredScope.endsWith(':read')) {
