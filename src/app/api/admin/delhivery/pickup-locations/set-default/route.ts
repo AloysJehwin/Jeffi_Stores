@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { setDefaultPickupLocation } from '@/lib/delhivery'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const name = String(body?.name || '').trim()
   if (!name) return NextResponse.json({ error: 'Warehouse name is required.' }, { status: 400 })
 
-  const tenantId = getCurrentTenant()?.tenantId
+  const tenantId = (await resolveTenantId()) ?? undefined
   const result = await setDefaultPickupLocation(name, tenantId)
   if (!result.ok) return NextResponse.json({ error: result.error || 'Could not set default.' }, { status: 400 })
 

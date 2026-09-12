@@ -23,6 +23,10 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'users', 'users/[id]', 'users/[id]/revoke-sessions', 'users/[id]/resend-certificate',
   // Platform control plane: gated by host and isPlatformAdmin in middleware.
   'ecom/kyc/[tenantId]/approve', 'ecom/kyc/[tenantId]/reject',
+  // Platform-admin tenant billing controls (admin.jeffistores.in): gated on isPlatformAdmin,
+  // which is strictly stronger than any :write scope, so a read-only member can never reach them.
+  'ecom/[tenantId]/account-mode', 'ecom/[tenantId]/delivery-mode',
+  'ecom/[tenantId]/shipments/[orderId]/correct',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',

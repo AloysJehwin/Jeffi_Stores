@@ -7,8 +7,8 @@ import { parseBody } from '@/lib/validate'
 import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
 import { logAdminAudit } from '@/lib/admin-audit'
-import { getCurrentTenant } from '@/lib/tenant-context'
-import { settleDelhiveryCostToWallet } from '@/lib/wallet'
+import { resolveTenantId } from '@/lib/tenant-context'
+import { settleDelhiveryCostToWallet, correctWalletDebitForAwb } from '@/lib/wallet'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +27,7 @@ export const dynamic = 'force-dynamic'
 const Schema = z.object({
   chargedWeightKg: z.number().positive().max(1000).nullish(),
   chargedAmount: z.number().nonnegative().max(1_000_000).nullish(),
+  proofNote: z.string().trim().max(500).nullish(),
 }).refine((v) => v.chargedWeightKg != null || v.chargedAmount != null, {
   message: 'Give the charged weight, the charged amount, or both',
 })
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const parsed = parseBody(Schema, await request.json().catch(() => null))
   if (!parsed.ok) return parsed.response
-  const { chargedWeightKg, chargedAmount } = parsed.data
+  const { chargedWeightKg, chargedAmount, proofNote } = parsed.data
 
   const order = await queryOne<{
     awb_number: string | null
@@ -50,10 +51,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     shipping_amount: string | null
     dest_pin: string | null
     delhivery_charged_weight_kg: string | null
+    delhivery_billed_at: string | null
   }>(
     `SELECT awb_number, order_number, payment_mode, shipping_amount,
             shipping_address_snapshot->>'postal_code' AS dest_pin,
-            delhivery_charged_weight_kg
+            delhivery_charged_weight_kg,
+            delhivery_billed_at
        FROM orders WHERE id = $1`,
     [id]
   )
@@ -86,18 +89,40 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const total = chargedAmount ?? charges!.total
 
   // Debit the tenant's prepaid wallet by the real Delhivery cost first (own_delhivery tenants are
-  // exempt inside settleDelhiveryCostToWallet, which then returns true). Only stamp billed_at when
-  // the charge is durably settled, so a transient debit failure leaves it NULL and the next sync
-  // retries instead of silently losing the charge. The (tenant_id, awb) index keeps re-runs idempotent.
-  const tenant = getCurrentTenant()
-  const settled = tenant?.tenantId && order.awb_number && total > 0
-    ? await settleDelhiveryCostToWallet({
-        tenantId: tenant.tenantId,
+  // exempt inside both wallet helpers, which then succeed with no ledger movement). Only stamp
+  // billed_at when the charge is durably settled, so a transient failure leaves it NULL and the next
+  // sync retries instead of silently losing the charge.
+  //
+  // First settlement (no delhivery_billed_at) goes through settleDelhiveryCostToWallet, whose
+  // one-shot (tenant_id, awb) index keeps re-runs idempotent. A correction (the charge was already
+  // billed once, so the operator is re-pricing post-pickup) goes through correctWalletDebitForAwb,
+  // which posts a net adjustment refunding the initial debit and re-debiting the actual amount — the
+  // one-shot debit would otherwise no-op and the wallet would never reflect the new price.
+  const tenantId = await resolveTenantId()
+  const isCorrection = order.delhivery_billed_at != null
+  const walletNote = proofNote
+    ? `Delhivery charge ${isCorrection ? 'correction' : ''} — AWB ${order.awb_number} — ${proofNote}`
+    : undefined
+  let settled = true
+  if (tenantId && order.awb_number && total > 0) {
+    if (isCorrection) {
+      const res = await correctWalletDebitForAwb({
+        tenantId,
+        awb: order.awb_number,
+        orderRef: order.order_number,
+        newAmountInr: total,
+        note: walletNote,
+      }).catch(() => ({ ok: false as const, error: 'wallet correction failed' }))
+      settled = res.ok
+    } else {
+      settled = await settleDelhiveryCostToWallet({
+        tenantId,
         awb: order.awb_number,
         orderRef: order.order_number,
         amountInr: total,
       }).catch(() => false)
-    : true
+    }
+  }
 
   await query(
     `UPDATE orders SET
@@ -119,7 +144,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: 'update',
     entityType: 'order',
     entityId: id,
-    summary: `Delivery charge set to ₹${total} (quoted ₹${quoted})`
+    summary: `Delivery charge ${isCorrection ? 'corrected' : 'set'} to ₹${total} (quoted ₹${quoted})`
       + (chargedAmount != null ? ' — entered' : ` — calculated at ${chargedWeightKg} kg`),
     diff: {
       delhivery_charged_weight_kg: { from: order.delhivery_charged_weight_kg, to: chargedWeightKg ?? order.delhivery_charged_weight_kg },
@@ -128,6 +153,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     metadata: {
       awb: order.awb_number,
       source: chargedAmount != null ? 'entered' : 'calculated',
+      correction: isCorrection,
+      proofNote: proofNote ?? null,
       zone: charges?.zone ?? null, freight: charges?.freight ?? null, tax: charges?.tax ?? null,
     },
     request,

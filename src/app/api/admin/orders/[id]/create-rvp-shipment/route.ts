@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { createRVPShipment } from '@/lib/delhivery'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,7 +13,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    if (!process.env.DELHIVERY_API_KEY) {
+    const TOKEN = await resolveDelhiveryToken()
+    if (!TOKEN) {
       return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
     }
 

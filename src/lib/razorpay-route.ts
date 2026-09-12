@@ -414,6 +414,23 @@ export async function reverseTransfer(transferId: string, amountPaise?: number):
 }
 
 /**
+ * Look up the Route transfer id created for a captured payment, so a refund can reverse it.
+ * The transfer id is not persisted on the tenant `payments` row, so it is fetched from Razorpay
+ * on the platform account (Route transfers always originate there). Returns null on any failure —
+ * a missing transfer must never block the buyer refund.
+ */
+export async function fetchTransferIdForPayment(paymentId: string): Promise<string | null> {
+  try {
+    const rz = getRazorpayInstance()
+    const list = await (rz.payments as any).fetchTransfer(paymentId)
+    const items = Array.isArray(list?.items) ? list.items : Array.isArray(list) ? list : []
+    return items[0]?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Record a COD order settlement in the control-plane ledger.
  *
  * COD cash is collected by Delhivery and remitted to the PLATFORM's account

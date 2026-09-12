@@ -23,6 +23,7 @@ const CSP = [
 
 const nextConfig = {
   output: 'standalone',
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   reactStrictMode: true,
   devIndicators: false,
   experimental: {

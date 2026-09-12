@@ -3,6 +3,8 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
+import { resolveRequestTenant } from '@/lib/db'
+import { controlPlanePool } from '@/lib/tenant-registry'
 import { computeRefundableAmount } from '@/lib/refund'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -44,6 +46,18 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
   const backUrl = (typeof back === 'string' && back.startsWith('/admin/orders')) ? back : '/admin/orders'
   const host = await getHost()
   const order = await getOrder(id).catch(() => null)
+
+  // Which Razorpay account collected this order's payments. Reflects the tenant's CURRENT mode, not
+  // the mode at capture time — a post-capture toggle is an accepted edge case. Platform's own store
+  // (no tenant) falls through to the platform label.
+  const tenant = await resolveRequestTenant().catch(() => null)
+  const ownRazorpay = tenant?.tenantId
+    ? await controlPlanePool()
+        .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
+        .then(r => r.rows[0]?.own_razorpay === true)
+        .catch(() => false)
+    : false
+  const collectedViaLabel = ownRazorpay ? "Tenant's own Razorpay" : 'Platform (jeffistores)'
 
   if (!order) {
     notFound()
@@ -721,6 +735,12 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground-secondary">Gateway</span>
                             <span className="text-foreground capitalize">{p.payment_gateway}</span>
+                          </div>
+                        )}
+                        {p.payment_gateway === 'razorpay' && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Collected via</span>
+                            <span className="text-foreground">{collectedViaLabel}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-sm">

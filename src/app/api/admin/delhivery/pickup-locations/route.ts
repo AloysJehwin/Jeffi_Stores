@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { listDelhiveryPickupLocations } from '@/lib/delhivery'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +13,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const locations = await listDelhiveryPickupLocations(getCurrentTenant()?.tenantId)
+  const locations = await listDelhiveryPickupLocations((await resolveTenantId()) ?? undefined)
   return NextResponse.json({ locations })
 }

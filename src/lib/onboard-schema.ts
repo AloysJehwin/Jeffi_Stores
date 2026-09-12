@@ -25,6 +25,9 @@ export const OnboardSchema = z.object({
   // Step 4 — Warehouse (optional)
   dailyPayout: z.boolean().optional(),
   ownDelhivery: z.boolean().optional(),
+  // Own-Delhivery token (only meaningful when ownDelhivery). Sent once to the submit route and
+  // encrypted there — never round-trips the cleartext draft, like the Razorpay secret.
+  delhiveryToken: z.string().optional(),
   warehouse: z.object({
     // 6 digits when given. A malformed pincode is worse than none: it reaches Razorpay and
     // Delhivery as if it were real.
@@ -72,6 +75,15 @@ export const OnboardSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['razorpayKeySecret'],
       message: 'Razorpay Key ID and Key Secret are required to collect on your own account',
+    })
+  }
+
+  // Shipping on your own Delhivery account needs the token to sign shipment calls with.
+  if (d.ownDelhivery && !d.delhiveryToken?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['delhiveryToken'],
+      message: 'A Delhivery API token is required to ship on your own account',
     })
   }
 })

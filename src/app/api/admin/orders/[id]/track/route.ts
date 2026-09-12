@@ -6,10 +6,9 @@ import { sendOrderStatusUpdate } from '@/lib/email'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType } from '@/lib/shipment-status'
 import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { settleDelhiveryCostToWallet } from '@/lib/wallet'
-
-const TOKEN = process.env.DELHIVERY_API_KEY
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const STATUS_SYNC: Record<string, {
   orderStatus: string
@@ -104,6 +103,7 @@ export async function GET(
       })
     }
 
+    const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
     const res = await fetch(
@@ -233,7 +233,7 @@ export async function GET(
         // Gate delhivery_billed_at on a durable wallet debit: settle first, and only stamp billed_at
         // when the charge is on the books (or no wallet applies). A transient debit failure leaves
         // billed_at NULL so the next 'delivered' sync retries instead of losing the charge.
-        const tenantId = getCurrentTenant()?.tenantId ?? null
+        const tenantId = await resolveTenantId()
         const settled = tenantId && order.awb_number && invoiceCharges.total > 0
           ? await settleDelhiveryCostToWallet({
               tenantId,

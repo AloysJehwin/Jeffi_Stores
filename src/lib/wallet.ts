@@ -185,6 +185,70 @@ export async function settleDelhiveryCostToWallet(opts: {
   return debitWalletForAwb(opts)
 }
 
+/**
+ * Correct an already-settled Delhivery charge for one AWB, netting the wallet to exactly
+ * -newAmountInr. Unlike debitWalletForAwb (one-shot per AWB), this is used when the platform admin
+ * re-prices a shipment post-pickup: it sums the existing debit + any prior adjustment rows for the
+ * AWB and posts a single 'adjustment' row for the delta needed to reach -newAmountInr, preserving the
+ * original debit as an audit trail (the initial amount debited is refunded and the actual amount is
+ * debited, as a net movement). own_delhivery tenants are billed directly by Delhivery and are exempt.
+ * Balance + ledger move in one control-plane transaction. Returns the outcome and the applied delta.
+ */
+export async function correctWalletDebitForAwb(opts: {
+  tenantId: string
+  awb: string
+  orderRef?: string | null
+  newAmountInr: number
+  note?: string
+}): Promise<{ ok: true; outcome: 'adjusted' | 'noop' | 'exempt'; delta: number } | { ok: false; error: string }> {
+  if (!opts.tenantId || !opts.awb) return { ok: false, error: 'tenantId and awb are required.' }
+  if (!(opts.newAmountInr >= 0)) return { ok: false, error: 'Corrected amount must be zero or positive.' }
+
+  const pool = controlPlanePool()
+  const flag = await pool.query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [opts.tenantId]).catch(() => null)
+  if (!flag) return { ok: false, error: 'Failed to read tenant delivery mode.' }
+  if (flag.rows[0]?.own_delhivery) return { ok: true, outcome: 'exempt', delta: 0 }
+
+  const client = await pool.connect().catch(() => null)
+  if (!client) return { ok: false, error: 'Failed to open wallet transaction.' }
+  try {
+    await client.query('BEGIN')
+    await client.query(
+      `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
+      [opts.tenantId],
+    )
+    const net = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS net FROM wallet_ledger
+        WHERE tenant_id = $1 AND awb = $2 AND entry_type IN ('debit', 'adjustment')`,
+      [opts.tenantId, opts.awb],
+    )
+    const currentNet = Number(net.rows[0]?.net ?? 0)
+    const target = -Math.abs(opts.newAmountInr)
+    const delta = Math.round((target - currentNet) * 100) / 100
+    if (Math.abs(delta) < 0.01) {
+      await client.query('COMMIT')
+      return { ok: true, outcome: 'noop', delta: 0 }
+    }
+    await client.query(
+      `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
+       VALUES ($1, 'adjustment', $2, $3, $4, $5)`,
+      [opts.tenantId, delta, opts.orderRef ?? null, opts.awb,
+       opts.note ?? `Delhivery charge correction — AWB ${opts.awb}`],
+    )
+    await client.query(
+      `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`,
+      [opts.tenantId, delta],
+    )
+    await client.query('COMMIT')
+    return { ok: true, outcome: 'adjusted', delta }
+  } catch (e: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    return { ok: false, error: e?.message || 'Failed to correct wallet debit.' }
+  } finally {
+    client.release()
+  }
+}
+
 export interface BillingReconcileRow {
   awb: string
   billedAmount: number

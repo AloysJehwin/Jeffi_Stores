@@ -76,3 +76,37 @@ describe('buildTenantSchemaSql — re-apply safety', () => {
     expect(sql).toMatch(/CREATE EXTENSION IF NOT EXISTS pg_trgm/i)
   })
 })
+
+// CREATE TABLE IF NOT EXISTS is a no-op on a table a tenant already has, so a column added to
+// an existing table's definition never lands without an explicit ADD COLUMN. This pass reconciles.
+describe('buildTenantSchemaSql — column reconcile on existing tables', () => {
+  const marker = sql.indexOf('reconcile columns on pre-existing tables')
+  const reconcileTail = marker > 0 ? sql.slice(marker) : ''
+
+  it('emits a reconcile section with ADD COLUMN IF NOT EXISTS', () => {
+    expect(marker).toBeGreaterThan(0)
+    expect(reconcileTail).toMatch(/ALTER TABLE .* ADD COLUMN IF NOT EXISTS/)
+  })
+
+  it('reconciles the sub-variant shipping-physical columns (the confirmed drift case)', () => {
+    for (const col of ['weight_grams', 'length_cm', 'breadth_cm', 'height_cm', 'package_type']) {
+      expect(reconcileTail).toMatch(
+        new RegExp(`ALTER TABLE public\\.product_sub_variants ADD COLUMN IF NOT EXISTS ${col}\\b`)
+      )
+    }
+  })
+
+  it('keeps a column type with a comma (numeric(6,2)) intact — no split mid-type', () => {
+    expect(reconcileTail).toMatch(/ADD COLUMN IF NOT EXISTS length_cm numeric\(6,2\)/)
+  })
+
+  it('strips NOT NULL so the ADD COLUMN is safe on a populated table', () => {
+    const addColumnLines = reconcileTail.split('\n').filter(l => l.includes('ADD COLUMN IF NOT EXISTS'))
+    expect(addColumnLines.length).toBeGreaterThan(0)
+    expect(addColumnLines.some(l => /NOT\s+NULL/i.test(l))).toBe(false)
+  })
+
+  it('does not emit ADD COLUMN for table-level constraints', () => {
+    expect(reconcileTail).not.toMatch(/ADD COLUMN IF NOT EXISTS (CONSTRAINT|PRIMARY|FOREIGN|UNIQUE|CHECK)\b/i)
+  })
+})

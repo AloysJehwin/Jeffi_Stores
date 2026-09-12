@@ -3,7 +3,7 @@ import { authenticateAnyUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { getTenantOwners } from '@/lib/tenant-registry'
 import { createAdminNotification } from '@/lib/admin-notify'
 import { z } from 'zod'
@@ -74,11 +74,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ session: existing })
     }
 
-    const tenant = getCurrentTenant()
+    const tenantId = await resolveTenantId()
 
     const session = await queryOne(
       `INSERT INTO support_sessions (user_id, tenant_id) VALUES ($1, $2) RETURNING id, status, created_at`,
-      [authUser.userId, tenant?.tenantId ?? null]
+      [authUser.userId, tenantId ?? null]
     )
 
     logActivity({
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     if (user) {
       const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-      const recipients = await resolveEscalationRecipients(tenant?.tenantId ?? null)
+      const recipients = await resolveEscalationRecipients(tenantId ?? null)
       if (recipients.length > 0) {
         await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, recipients)
       }

@@ -8,7 +8,6 @@ export interface DeliverySettings {
   discountMinSubtotal: number
   discountLabel: string
   baseCharge: number
-  perKgOver3: number
   freeWeightCeilingKg: number
 }
 
@@ -43,10 +42,8 @@ export function applyDeliveryRules(params: {
 
   // Buyer-facing base is the live Delhivery/fallback quote passed in as params.baseCharge.
   // settings.baseCharge acts only as an explicit flat-rate override when an admin sets it > 0.
-  // A per-kg surcharge is added for each whole kg above the ceiling.
   const base = settings.baseCharge > 0 ? settings.baseCharge : Math.max(0, params.baseCharge)
-  const overKg = Math.max(0, Math.ceil(weightKg - ceiling))
-  const original = Math.max(0, round2(base + overKg * settings.perKgOver3))
+  const original = Math.max(0, round2(base))
 
   // Free shipping now also requires the parcel to be under the weight ceiling.
   if (settings.freeThreshold > 0 && subtotal >= settings.freeThreshold && weightKg < ceiling) {

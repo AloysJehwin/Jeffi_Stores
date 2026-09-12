@@ -41,9 +41,10 @@ interface Props {
   plan: string | null
   renewalDate: string | null
   slug: string
+  ownRazorpay: boolean
 }
 
-export default function StoreDashboardTabs({ transactions, ledger, balance, totals, subscriptionStatus, billingInterval, plan, renewalDate, slug }: Props) {
+export default function StoreDashboardTabs({ transactions, ledger, balance, totals, subscriptionStatus, billingInterval, plan, renewalDate, slug, ownRazorpay }: Props) {
   const [tab, setTab] = useState<Tab>('overview')
 
   const tabs: { id: Tab; label: string }[] = [
@@ -67,6 +68,17 @@ export default function StoreDashboardTabs({ transactions, ledger, balance, tota
       {/* Overview */}
       {tab === 'overview' && (
         <div className="space-y-6">
+          {/* Account-mode badge — explains why platform fees are zero for own-Razorpay tenants. */}
+          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
+            ownRazorpay
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+          }`}>
+            {ownRazorpay
+              ? 'Collecting on your own Razorpay — no platform commission'
+              : 'Platform Razorpay — Route settlement applies'}
+          </div>
+
           {/* Financial summary tiles */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[

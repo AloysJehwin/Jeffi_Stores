@@ -7,13 +7,21 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/email', () => ({
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/razorpay', () => ({
-  getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(true),
+}))
+vi.mock('@/lib/razorpay-route', () => ({
+  fetchTransferIdForPayment: vi.fn().mockResolvedValue(null),
+  reverseTransfer: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/tenant-registry', () => ({
+  controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
 vi.mock('@/lib/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
@@ -120,9 +128,7 @@ describe('POST /api/orders/[id]/refund', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockResolvedValue({ id: 'rfnd_123' })
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      payments: { refund: mockRefund },
-    } as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { payments: { refund: mockRefund } } } as any)
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -138,9 +144,7 @@ describe('POST /api/orders/[id]/refund', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce({ ...MOCK_ORDER, status: 'returned' })
     vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockResolvedValue({ id: 'rfnd_456' })
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      payments: { refund: mockRefund },
-    } as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { payments: { refund: mockRefund } } } as any)
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -152,9 +156,7 @@ describe('POST /api/orders/[id]/refund', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockRejectedValue(new Error('Gateway error'))
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      payments: { refund: mockRefund },
-    } as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { payments: { refund: mockRefund } } } as any)
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(500)
   })

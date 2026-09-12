@@ -5,15 +5,20 @@ vi.mock('@/lib/jwt', () => ({
 }))
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/razorpay', () => ({
-  getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
 }))
 
 import { POST } from '@/app/api/razorpay/payment-link/route'
 import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 import * as razorpayLib from '@/lib/razorpay'
+
+function rzpMock(impl: Record<string, unknown>) {
+  vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { paymentLink: impl } } as any)
+}
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
 
@@ -83,9 +88,7 @@ describe('POST /api/razorpay/payment-link', () => {
       .mockResolvedValueOnce(MOCK_ORDER)
       .mockResolvedValueOnce(null) // UPDATE returns null via queryOne
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      paymentLink: { create: mockCreate },
-    } as any)
+    rzpMock({ create: mockCreate })
     const res = await POST(makeRequest() as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -104,9 +107,7 @@ describe('POST /api/razorpay/payment-link', () => {
     }
     vi.mocked(db.queryOne).mockResolvedValueOnce(orderWithLink)
     const mockFetch = vi.fn().mockResolvedValue({ status: 'created' })
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      paymentLink: { fetch: mockFetch },
-    } as any)
+    rzpMock({ fetch: mockFetch })
     const res = await POST(makeRequest() as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -126,9 +127,7 @@ describe('POST /api/razorpay/payment-link', () => {
       .mockResolvedValueOnce(null)
     const mockFetch = vi.fn().mockResolvedValue({ status: 'expired' })
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      paymentLink: { fetch: mockFetch, create: mockCreate },
-    } as any)
+    rzpMock({ fetch: mockFetch, create: mockCreate })
     const res = await POST(makeRequest() as any)
     expect(res.status).toBe(200)
     expect(mockCreate).toHaveBeenCalled()
@@ -140,9 +139,7 @@ describe('POST /api/razorpay/payment-link', () => {
       .mockResolvedValueOnce(MOCK_ORDER)
       .mockResolvedValueOnce(null)
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      paymentLink: { create: mockCreate },
-    } as any)
+    rzpMock({ create: mockCreate })
     await POST(makeRequest({ orderId: 'order-123', expiryHours: 24 }) as any)
     const createCall = mockCreate.mock.calls[0][0]
     expect(createCall).toHaveProperty('expire_by')
@@ -151,9 +148,7 @@ describe('POST /api/razorpay/payment-link', () => {
   it('returns 500 on razorpay error', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
-      paymentLink: { create: vi.fn().mockRejectedValue(new Error('Gateway error')) },
-    } as any)
+    rzpMock({ create: vi.fn().mockRejectedValue(new Error('Gateway error')) })
     const res = await POST(makeRequest() as any)
     expect(res.status).toBe(500)
   })
