@@ -148,6 +148,7 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
             plan={tenant.plan}
             renewalDate={renewalDate}
             slug={tenant.slug}
+            ownRazorpay={tenant.own_razorpay === true}
           />
         </section>
       </div>

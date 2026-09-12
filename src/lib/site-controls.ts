@@ -386,6 +386,31 @@ export async function getSiteControls(): Promise<SiteControls> {
       },
     }
 
+    // COD is offered only to tenants shipping on their own Delhivery account (own_delhivery). A
+    // platform-Delhivery tenant's shipping cost is fronted by the platform and reconciled post-pickup
+    // against the prepaid wallet, so COD (no upfront collection) would leave that charge unrecoverable.
+    // Gate it here at the single source that flows to the buyer UI, getFeatureFlags, and the order
+    // create/create-direct server checks. The platform's own store (no tenant in scope) is treated as
+    // own_delhivery=true and keeps COD on the site flag alone.
+    if (result.flags.codEnabled) {
+      try {
+        const { resolveTenantId } = await import('./tenant-context')
+        const tenantId = await resolveTenantId()
+        if (tenantId) {
+          const { controlPlanePool } = await import('./tenant-registry')
+          const cp = await controlPlanePool().query(
+            `SELECT own_delhivery FROM tenants WHERE id = $1`,
+            [tenantId],
+          )
+          if (!cp.rows[0]?.own_delhivery) result.flags.codEnabled = false
+        }
+      } catch {
+        // Control-plane hiccup: fail closed on COD so a platform-Delhivery tenant can't collect COD
+        // it can't reconcile.
+        result.flags.codEnabled = false
+      }
+    }
+
     // Stock validation is a Growth+ feature. On a tenant whose plan lacks inventory:read the
     // site-controls UI locks the toggle off, but the stored/default flag is otherwise true — so
     // force it off here at the source, matching the UI, so no consumer (order create, processing

@@ -71,6 +71,19 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // 2c. Own-Delhivery tenant: persist their Delhivery token, encrypted. Same handling as the Razorpay
+  //     secret — arrives over TLS, encrypted immediately, never entered the cleartext draft. This is
+  //     what resolveDelhiveryToken / hasOwnDelhiveryToken read (cfg.token), so shipments sign with it.
+  if (d.ownDelhivery && d.delhiveryToken) {
+    await saveIntegrationCredential({
+      tenantId: result.tenantId,
+      provider: 'delhivery',
+      label: 'Delhivery',
+      configEnc: encryptToken(JSON.stringify({ token: d.delhiveryToken })),
+      meta: {},
+    })
+  }
+
   // 3. Save KYC details for admin review.
   await saveKyc(result.tenantId, owner.id, {
     gst_number: d.gstNumber,

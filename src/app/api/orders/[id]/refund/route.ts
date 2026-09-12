@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany, query } from '@/lib/db'
+import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
+import { fetchTransferIdForPayment, reverseTransfer } from '@/lib/razorpay-route'
+import { controlPlanePool } from '@/lib/tenant-registry'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { getReturnRequest } from '@/lib/queries'
@@ -69,7 +71,17 @@ export async function POST(
       return NextResponse.json({ error: 'Nothing to refund after the return standard charge.' }, { status: 400 })
     }
 
-    const razorpay = getRazorpayInstance()
+    // Refund from the SAME account that collected: the tenant's own keys when they use their own
+    // Razorpay, else the platform account. A platform refund of an own-account payment would fail.
+    const tenant = await resolveRequestTenant()
+    const ownRazorpay = tenant?.tenantId
+      ? await controlPlanePool()
+          .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
+          .then(r => r.rows[0]?.own_razorpay === true)
+          .catch(() => false)
+      : false
+
+    const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
     const refundIds: string[] = []
     let totalRefunded = 0
     let remaining = targetRefund
@@ -84,13 +96,26 @@ export async function POST(
       totalRefunded += thisRefund
       remaining = Math.round((remaining - thisRefund) * 100) / 100
 
+      // For platform-keys tenants the buyer money was Route-transferred to the linked account, so
+      // reverse the tenant's share proportional to this refund. Own-account tenants were never
+      // transferred (platform never held the money), so there is nothing to reverse.
+      let transferReversal: unknown = null
+      if (!ownRazorpay) {
+        const transferId = await fetchTransferIdForPayment(paymentRecord.transaction_id)
+        if (transferId) {
+          transferReversal = await reverseTransfer(transferId, amountInPaise)
+            .then(() => ({ transferId, amountPaise: amountInPaise }))
+            .catch((e: any) => ({ transferId, amountPaise: amountInPaise, error: e?.message || 'reverse failed' }))
+        }
+      }
+
       const existingResponse = typeof paymentRecord.gateway_response === 'string'
         ? JSON.parse(paymentRecord.gateway_response)
         : (paymentRecord.gateway_response || {})
 
       await query(
         `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-        [JSON.stringify({ ...existingResponse, refund }), paymentRecord.id]
+        [JSON.stringify({ ...existingResponse, refund, ...(transferReversal ? { transferReversal } : {}) }), paymentRecord.id]
       )
     }
 

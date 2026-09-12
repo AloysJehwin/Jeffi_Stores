@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
-import { getRazorpayInstance } from '@/lib/razorpay'
+import { queryOne, resolveRequestTenant } from '@/lib/db'
+import { getRazorpayInstanceFor } from '@/lib/razorpay'
 import { storeBaseUrlAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
@@ -24,8 +24,13 @@ export async function POST(request: NextRequest) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.payment_status === 'paid') return NextResponse.json({ error: 'Order already paid' }, { status: 409 })
 
+    // Collect on the tenant's own Razorpay account when they use one, else the platform account —
+    // the notes carry the tenant so the (host-less) webhook can attribute the sale for billing.
+    const tenant = await resolveRequestTenant()
+    const { instance: rzpBase } = await getRazorpayInstanceFor(tenant?.tenantId)
+
     if (order.payment_link_id && order.payment_link_status === 'created') {
-      const rzp = getRazorpayInstance() as any
+      const rzp = rzpBase as any
       const existing = await rzp.paymentLink.fetch(order.payment_link_id)
       if (existing.status === 'created') {
         return NextResponse.json({
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const rzp = getRazorpayInstance() as any
+    const rzp = rzpBase as any
     const expiresAt = Math.floor(Date.now() / 1000) + expiryHours * 60 * 60
     const storeBaseUrl = await storeBaseUrlAsync()
 
@@ -55,7 +60,12 @@ export async function POST(request: NextRequest) {
         email: !!order.customer_email,
       },
       reminder_enable: true,
-      notes: { order_id: orderId, order_number: order.order_number },
+      notes: {
+        order_id: orderId,
+        order_number: order.order_number,
+        ...(tenant?.tenantId ? { tenant_id: tenant.tenantId } : {}),
+        ...(tenant?.slug ? { tenant_slug: tenant.slug } : {}),
+      },
       expire_by: expiresAt,
       callback_url: `${storeBaseUrl}/api/razorpay/payment-link/callback`,
       callback_method: 'get',

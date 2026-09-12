@@ -3,11 +3,10 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 import { buildLabelPDF, type LabelItem } from '@/lib/shipping-label-pdf'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-const TOKEN = process.env.DELHIVERY_API_KEY
 
 async function build4RPDF(pkg: any, awb: string, orderRow: any, items: LabelItem[]): Promise<Buffer> {
   return buildLabelPDF(pkg, awb, orderRow, items)
@@ -20,6 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+    const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     const order = await queryOne<any>(

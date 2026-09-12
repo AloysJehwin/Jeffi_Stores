@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
-
-const TOKEN = process.env.DELHIVERY_API_KEY
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -12,6 +11,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+    const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     const order = await queryOne<{ awb_number: string | null }>(
