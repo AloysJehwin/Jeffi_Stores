@@ -8,9 +8,10 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/razorpay', () => ({
-  getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
 }))
 vi.mock('sharp', () => ({
   default: vi.fn(),
@@ -22,7 +23,7 @@ import { POST } from '@/app/api/admin/razorpay/qr/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
-import { getRazorpayInstance } from '@/lib/razorpay'
+import { getRazorpayInstanceFor } from '@/lib/razorpay'
 import sharp from 'sharp'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,14 +102,14 @@ describe('POST /api/admin/razorpay/qr', () => {
   it('creates QR code, crops image, updates order and returns qrId', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1' } as any)
+    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1', order_number: 'ORD-001' } as any)
 
     const mockQr = {
       id: 'qr_abc123',
       image_url: 'https://rzp.io/qr/abc.png',
     }
     const mockRzp = { qrCode: { create: vi.fn().mockResolvedValue(mockQr) } }
-    vi.mocked(getRazorpayInstance).mockReturnValue(mockRzp as any)
+    vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: mockRzp } as any)
 
     // Mock fetch for downloading QR image
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
@@ -141,11 +142,11 @@ describe('POST /api/admin/razorpay/qr', () => {
   it('uses default description when not provided', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1' } as any)
+    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1', order_number: 'ORD-001' } as any)
 
     const mockQr = { id: 'qr_xyz', image_url: 'https://rzp.io/qr/xyz.png' }
     const mockRzp = { qrCode: { create: vi.fn().mockResolvedValue(mockQr) } }
-    vi.mocked(getRazorpayInstance).mockReturnValue(mockRzp as any)
+    vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: mockRzp } as any)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       arrayBuffer: async () => Buffer.from('img').buffer,
     }))
@@ -162,9 +163,9 @@ describe('POST /api/admin/razorpay/qr', () => {
   it('returns 500 on razorpay error', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1' } as any)
+    vi.mocked(queryOne).mockResolvedValue({ id: 'order-1', order_number: 'ORD-001' } as any)
     const mockRzp = { qrCode: { create: vi.fn().mockRejectedValue(new Error('razorpay error')) } }
-    vi.mocked(getRazorpayInstance).mockReturnValue(mockRzp as any)
+    vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: mockRzp } as any)
 
     const res = await POST(makePost(VALID_BODY))
     expect(res.status).toBe(500)

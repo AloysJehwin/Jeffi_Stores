@@ -11,9 +11,9 @@ import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings
 import { getBusinessValues, type BusinessValues } from '@/lib/site-controls'
 import { getCurrentTenantId, resolveTenantId } from '@/lib/tenant-context'
 import { listDelhiveryPickupLocations, checkPincodeServiceability } from '@/lib/delhivery'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
-const TOKEN = process.env.DELHIVERY_API_KEY
 
 export interface RateBreakdown {
   charge: number
@@ -49,19 +49,36 @@ async function resolveOriginPin(defaultOriginPin: string, pickupLocationName: st
   return match?.pin || defaultOriginPin
 }
 
-async function callDelhiveryForCarton(weightGrams: number, destinationPin: string, isCod: boolean, originPin: string) {
+async function callDelhiveryForCarton(
+  carton: { chargedWeightGrams: number; actualWeightGrams?: number; length_cm?: number; breadth_cm?: number; height_cm?: number },
+  destinationPin: string,
+  isCod: boolean,
+  originPin: string,
+  token: string,
+) {
+  const cgmGrams = Number(carton.actualWeightGrams) > 0
+    ? Number(carton.actualWeightGrams)
+    : carton.chargedWeightGrams
   const params = new URLSearchParams({
     md: 'S',
     ss: 'Delivered',
     d_pin: destinationPin,
     o_pin: originPin,
-    cgm: String(weightGrams),
+    cgm: String(Math.max(1, Math.round(cgmGrams))),
     pt: isCod ? 'COD' : 'Pre-paid',
     cod: '0',
   })
+  // Dimensions are optional per the invoice-charges spec. Send them when known so Delhivery
+  // applies its own volumetric divisor rather than relying on our pre-collapsed weight.
+  const dims: Array<[string, number | undefined]> = [
+    ['l', carton.length_cm], ['b', carton.breadth_cm], ['h', carton.height_cm],
+  ]
+  for (const [key, val] of dims) {
+    if (Number(val) > 0) params.set(key, String(Math.round(Number(val))))
+  }
   const res = await fetch(`${DELHIVERY_API}?${params}`, {
     headers: {
-      Authorization: `Token ${TOKEN}`,
+      Authorization: `Token ${token}`,
       'Content-Type': 'application/json',
     },
     next: { revalidate: 0 },
@@ -73,7 +90,7 @@ async function callDelhiveryForCarton(weightGrams: number, destinationPin: strin
   return {
     charge: Number(rate.total_amount),
     zone: String(rate.zone || ''),
-    chargedWeight: Number(rate.charged_weight) || weightGrams,
+    chargedWeight: Number(rate.charged_weight) || carton.chargedWeightGrams,
   }
 }
 
@@ -88,6 +105,7 @@ function resolveShipWeight(raw: unknown, bv: BusinessValues): number {
 
 export async function computeShippingRate(input: RateInput): Promise<RateBreakdown> {
   const { destinationPin, cartItems, subtotal, isCod } = input
+  const TOKEN = await resolveDelhiveryToken()
   const bv = await getBusinessValues()
   const originPin = await resolveOriginPin(bv.delhiveryOriginPincode, bv.pickupLocation)
 
@@ -244,7 +262,7 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
   if (TOKEN) {
     try {
       for (const c of cartons) {
-        const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod, originPin)
+        const r = await callDelhiveryForCarton(c, destinationPin, !!isCod, originPin, TOKEN)
         totalCharge += r.charge
         totalChargedWeight += r.chargedWeight
         zone = r.zone || zone

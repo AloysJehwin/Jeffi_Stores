@@ -144,7 +144,17 @@ async function fireRouteTransfer(opts: {
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
-  const ownRazorpay = row?.rows[0]?.own_razorpay === true
+  const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
+
+  // The own_razorpay column (skip-split) and which keys actually signed (creds.isOwn) are stored
+  // separately and can drift. Reconcile to the account that really holds the money: if the column
+  // says own-account but platform keys collected, the platform must still transfer or the tenant is
+  // never paid; if the column says platform but tenant keys collected, a transfer would be rejected.
+  const { isOwn } = await resolveRazorpayCreds(tenant.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
+  const ownRazorpay = ownRazorpayFlag && isOwn
+  if (ownRazorpayFlag !== isOwn) {
+    console.warn('[fireRouteTransfer] own_razorpay/creds mismatch', { tenantId: tenant.tenantId, orderRef: opts.orderRef, ownRazorpayFlag, isOwn })
+  }
 
   // A tenant on its own Razorpay account collects buyer payments directly — the platform never
   // touches the money, so there is nothing to split. Record the sale for billing visibility, but

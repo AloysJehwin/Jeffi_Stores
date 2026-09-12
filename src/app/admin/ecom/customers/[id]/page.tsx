@@ -4,8 +4,10 @@ import { isPlatformAdmin } from '@/lib/scopes'
 import {
   getTenant, getTenantBilling, getKyc, getProvisioningJob,
   getTenantOwners, getTenantSocialAccounts, listIntegrationCredentials,
-  listCustomDomains, getTenantBankAccount,
+  listCustomDomains, getTenantBankAccount, lookupTenantContextById,
 } from '@/lib/tenant-registry'
+import { runWithTenantContext } from '@/lib/tenant-context'
+import { queryMany } from '@/lib/db'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
 import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
 import { TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
@@ -14,10 +16,23 @@ import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'
 import ProvisioningTab from '@/components/admin/ecom/tabs/ProvisioningTab'
 import InfrastructureTab from '@/components/admin/ecom/tabs/InfrastructureTab'
 import CommerceTab from '@/components/admin/ecom/tabs/CommerceTab'
+import ShipmentsTab from '@/components/admin/ecom/tabs/ShipmentsTab'
 import KycTab from '@/components/admin/ecom/tabs/KycTab'
 import AccessTab from '@/components/admin/ecom/tabs/AccessTab'
 
 export const dynamic = 'force-dynamic'
+
+export interface ShipmentRow {
+  id: string
+  order_number: string | null
+  awb_number: string | null
+  payment_mode: string | null
+  shipment_status: string | null
+  shipping_amount: string | null
+  delhivery_billed_amount: string | null
+  delhivery_extra_charge: string | null
+  delhivery_billed_at: string | null
+}
 
 /**
  * Single object page for a tenant. Replaces the four pages that each loaded the same
@@ -76,6 +91,7 @@ export default async function TenantObjectPage({
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
         {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}
         {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id)} />}
+        {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
       </div>
@@ -110,4 +126,23 @@ async function commerceData(id: string) {
     getTenantBankAccount(id).catch(() => null),
   ])
   return { billing, bank }
+}
+
+// Shipment charges live in the *tenant* DB orders table, which the control-plane detail page does
+// not otherwise touch. Resolve the tenant's context by id and run the read inside it so query() hits
+// the tenant pool. Read-only; returns [] for a tenant with no active infra (e.g. pending provisioning).
+async function shipmentData(id: string): Promise<ShipmentRow[]> {
+  const ctx = await lookupTenantContextById(id).catch(() => null)
+  if (!ctx) return []
+  return runWithTenantContext(ctx, async () => {
+    const rows = await queryMany<ShipmentRow>(
+      `SELECT id, order_number, awb_number, payment_mode, shipment_status,
+              shipping_amount, delhivery_billed_amount, delhivery_extra_charge, delhivery_billed_at
+         FROM orders
+        WHERE awb_number IS NOT NULL
+        ORDER BY COALESCE(delhivery_billed_at, created_at) DESC
+        LIMIT 100`,
+    ).catch(() => [])
+    return rows
+  }).catch(() => [])
 }

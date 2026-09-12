@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
-import { getRazorpayInstance } from '@/lib/razorpay'
+import { query, queryOne, resolveRequestTenant } from '@/lib/db'
+import { getRazorpayInstanceFor } from '@/lib/razorpay'
 import { currentBrandNameAsync } from '@/lib/brand'
 import sharp from 'sharp'
 
@@ -39,10 +39,14 @@ export async function POST(request: NextRequest) {
     const { orderId, amountPaise, description } = await request.json()
     if (!orderId || !amountPaise) return NextResponse.json({ error: 'orderId and amountPaise required' }, { status: 400 })
 
-    const order = await queryOne<{ id: string }>('SELECT id FROM orders WHERE id = $1', [orderId])
+    const order = await queryOne<{ id: string; order_number: string }>('SELECT id, order_number FROM orders WHERE id = $1', [orderId])
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
-    const rzp = getRazorpayInstance() as any
+    // Collect on the tenant's own Razorpay when they use one, else platform; notes carry the tenant
+    // so the host-less webhook can attribute the QR credit for billing.
+    const tenant = await resolveRequestTenant()
+    const { instance } = await getRazorpayInstanceFor(tenant?.tenantId)
+    const rzp = instance as any
     const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60
 
     const qr = await rzp.qrCode.create({
@@ -53,6 +57,12 @@ export async function POST(request: NextRequest) {
       payment_amount: amountPaise,
       description: description || `${await currentBrandNameAsync()} Invoice`,
       close_by: closeBy,
+      notes: {
+        order_id: order.id,
+        order_number: order.order_number,
+        ...(tenant?.tenantId ? { tenant_id: tenant.tenantId } : {}),
+        ...(tenant?.slug ? { tenant_slug: tenant.slug } : {}),
+      },
     })
 
     const qrImageUrl = await cropRazorpayQr(qr.image_url)

@@ -3,10 +3,9 @@ import { applyDeliveryRules, DeliverySettings } from '@/lib/delivery-rules'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 //
-// The buyer-facing charge derives from the admin-editable weight formula
-// (settings.baseCharge flat up to the ceiling + perKgOver3 per whole kg over it),
-// NOT from the incoming Delhivery quote. Tests set settings.baseCharge to control
-// the "original" charge and pass weightGrams under the ceiling unless testing weight.
+// The buyer-facing charge is the incoming Delhivery/fallback quote (params.baseCharge),
+// unless an admin sets a flat settings.baseCharge override. Tests set settings.baseCharge to
+// control the "original" charge and pass weightGrams under the ceiling unless testing weight.
 
 function makeSettings(overrides: Partial<DeliverySettings> = {}): DeliverySettings {
   return {
@@ -17,7 +16,6 @@ function makeSettings(overrides: Partial<DeliverySettings> = {}): DeliverySettin
     discountMinSubtotal: 0,
     discountLabel: '',
     baseCharge: 0,
-    perKgOver3: 0,
     freeWeightCeilingKg: 3,
     ...overrides,
   }
@@ -114,43 +112,43 @@ describe('applyDeliveryRules — weight pricing', () => {
     const result = applyDeliveryRules({
       baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+      settings: makeSettings({ baseCharge: 60 }),
       weightGrams: 3000,
     })
     expect(result.charge).toBe(60)
     expect(result.source).toBe('as_is')
   })
 
-  it('adds per-kg surcharge for each whole kg over the ceiling', () => {
-    // 4.2kg → ceil(4.2-3)=2 kg over → 60 + 2*20 = 100
+  it('does not add any surcharge for weight over the ceiling (Delhivery is authoritative)', () => {
+    // 4.2kg used to add per-kg surcharge; now the flat baseCharge stands unchanged.
     const result = applyDeliveryRules({
       baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+      settings: makeSettings({ baseCharge: 60 }),
       weightGrams: 4200,
     })
-    expect(result.charge).toBe(100)
-    expect(result.originalCharge).toBe(100)
+    expect(result.charge).toBe(60)
+    expect(result.originalCharge).toBe(60)
   })
 
   it('treats missing weight as 0 (flat baseCharge)', () => {
     const result = applyDeliveryRules({
       baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+      settings: makeSettings({ baseCharge: 60 }),
     })
     expect(result.charge).toBe(60)
   })
 
-  it('honours a custom freeWeightCeilingKg', () => {
-    // ceiling 5kg → 4kg is under, no surcharge
+  it('uses the incoming quote as base when no override is set', () => {
     const result = applyDeliveryRules({
-      baseCharge: 0,
+      baseCharge: 85,
       subtotal: 200,
-      settings: makeSettings({ baseCharge: 60, perKgOver3: 20, freeWeightCeilingKg: 5 }),
+      settings: makeSettings(),
       weightGrams: 4000,
     })
-    expect(result.charge).toBe(60)
+    expect(result.charge).toBe(85)
+    expect(result.source).toBe('as_is')
   })
 })
 

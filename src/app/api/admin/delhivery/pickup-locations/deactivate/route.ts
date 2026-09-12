@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { deactivateDelhiveryPickupLocation } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const tenantId = getCurrentTenant()?.tenantId
+  const tenantId = (await resolveTenantId()) ?? undefined
   const result = await deactivateDelhiveryPickupLocation(name, tenantId)
   if (!result.ok) return NextResponse.json({ error: result.error || 'Could not remove the warehouse.' }, { status: 502 })
 

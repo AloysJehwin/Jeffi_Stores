@@ -16,6 +16,7 @@ import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { getCurrentTenant } from '@/lib/tenant-context'
 import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
+import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 export async function POST(request: NextRequest) {
@@ -54,6 +55,8 @@ export async function POST(request: NextRequest) {
       await handlePaymentLinkExpired(event.payload.payment_link.entity)
     } else if (eventType === 'qr_code.credited') {
       await handleQrCodeCredited(event.payload.qr_code.entity)
+    } else if (eventType === 'transfer.processed') {
+      await handleTransferProcessed(event.payload.transfer.entity)
     }
 
     return NextResponse.json({ status: 'ok' })
@@ -107,7 +110,15 @@ async function fireRouteTransfer(opts: {
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
-  const ownRazorpay = row?.rows[0]?.own_razorpay === true
+  const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
+
+  // Reconcile the own_razorpay column against the keys that actually signed (see verify route):
+  // fall to the money-safe branch on drift so a tenant is never left unpaid nor a bad transfer fired.
+  const { isOwn } = await resolveRazorpayCreds(resolved.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
+  const ownRazorpay = ownRazorpayFlag && isOwn
+  if (ownRazorpayFlag !== isOwn) {
+    console.warn('[fireRouteTransfer:webhook] own_razorpay/creds mismatch', { tenantId: resolved.tenantId, orderRef: opts.orderRef, ownRazorpayFlag, isOwn })
+  }
 
   if (ownRazorpay) {
     await recordTenantTransaction({
@@ -348,23 +359,36 @@ async function handleQrCodeCredited(qrCode: any) {
   const qrId = qrCode?.id
   if (!qrId) return
 
-  const order = await queryOne<{ id: string; payment_status: string; total_amount: string }>(
-    `SELECT id, payment_status, total_amount FROM orders WHERE razorpay_qr_id = $1`,
+  const order = await queryOne<{ id: string; payment_status: string; total_amount: string; shipping_amount: string; order_number: string }>(
+    `SELECT id, payment_status, total_amount, shipping_amount, order_number FROM orders WHERE razorpay_qr_id = $1`,
     [qrId]
   )
   if (!order || order.payment_status === 'paid') return
 
-  await query(
+  const upd = await query(
     `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
      WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
     [qrId]
   )
+  const flippedToPaid = (upd.rowCount ?? 0) > 0
+  const qrPaymentId = qrCode.payments?.[0]?.razorpay_payment_id
   await query(
     `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
      VALUES ($1, 'razorpay_qr', $2, $3, 'completed', $4)
      ON CONFLICT DO NOTHING`,
-    [order.id, qrCode.payments?.[0]?.razorpay_payment_id || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
+    [order.id, qrPaymentId || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
   )
+
+  if (flippedToPaid && qrPaymentId) {
+    fireRouteTransfer({
+      paymentId: qrPaymentId,
+      totalAmountInr: parseFloat(order.total_amount),
+      shippingAmountInr: parseFloat(order.shipping_amount) || 0,
+      orderId: order.id,
+      orderRef: order.order_number,
+      payment: qrCode,
+    }).catch(() => {})
+  }
 }
 
 async function handlePaymentLinkExpired(paymentLink: any) {
@@ -373,6 +397,20 @@ async function handlePaymentLinkExpired(paymentLink: any) {
      WHERE payment_link_id = $1 AND payment_link_status = 'created'`,
     [paymentLink.id]
   )
+}
+
+// A Route transfer to a linked account has cleared its on_hold window and processed, so the split
+// tenant_transactions row (whose gateway_txn_id is the trf_... id) advances captured -> settled.
+// Own-account/gross-only rows never route through the platform, so they get no transfer.processed
+// event here; their money settles on the tenant's own Razorpay account. Non-fatal bookkeeping.
+async function handleTransferProcessed(transfer: any) {
+  const transferId = (transfer?.id ?? '').toString().trim()
+  if (!transferId || transfer?.status !== 'processed' || transfer?.on_hold === true) return
+  await controlPlanePool().query(
+    `UPDATE tenant_transactions SET status = 'settled'
+     WHERE gateway_txn_id = $1 AND status = 'captured'`,
+    [transferId]
+  ).catch(() => {})
 }
 
 async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId: string, payment: any) {

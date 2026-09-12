@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { queryOne, query } from '@/lib/db'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
-
-const TOKEN = process.env.DELHIVERY_API_KEY
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export async function GET(
   request: NextRequest,
@@ -45,6 +44,7 @@ export async function GET(
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ tracking: null })
 
+    const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
     const res = await fetch(

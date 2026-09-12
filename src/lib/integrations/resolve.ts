@@ -148,6 +148,15 @@ export async function resolveDelhiveryToken(tenantId?: string): Promise<string> 
   return process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN || ''
 }
 
+/** True iff the tenant has a connected, non-empty Delhivery token of their own (ignoring the platform
+ * env fallback). Mirrors RazorpayCreds.isOwn for the own_delhivery toggle guard: enabling own-Delhivery
+ * without a connected token would leave the tenant unable to ship. */
+export async function hasOwnDelhiveryToken(tenantId: string): Promise<boolean> {
+  if (!tenantId) return false
+  const cfg = await tenantConfigFor(tenantId, 'delhivery').catch(() => null)
+  return !!cfg?.token
+}
+
 export interface RazorpayCreds {
   key_id: string
   key_secret: string

@@ -698,6 +698,31 @@ export async function saveLinkedAccountId(tenantId: string, linkedAccountId: str
 }
 
 /**
+ * Switch a tenant between collecting on its own Razorpay account (skip Route split, zero platform
+ * charges) and the platform account (full Route split). Enabling own-account requires connected
+ * tenant Razorpay credentials — enforced by the caller, not here.
+ */
+export async function setOwnRazorpay(tenantId: string, value: boolean): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenants SET own_razorpay=$1, updated_at=now() WHERE id=$2`,
+    [value, tenantId],
+  )
+}
+
+/**
+ * Flip whether a tenant ships on their own Delhivery token. Enabling requires a connected Delhivery
+ * token — enforced by the caller (delivery-mode route), not here.
+ */
+export async function setOwnDelhivery(tenantId: string, value: boolean): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenants SET own_delhivery=$1, updated_at=now() WHERE id=$2`,
+    [value, tenantId],
+  )
+}
+
+/**
  * Copy the Razorpay linked account (acc_xxx) onto the owner-scoped bank row so it survives a
  * hard tenant purge. tenant_bank_accounts cascades off owners (not tenants), so this value
  * outlives the tenant DELETE and lets a re-onboarding owner reuse their existing Route account

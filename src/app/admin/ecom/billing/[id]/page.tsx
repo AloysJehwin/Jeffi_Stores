@@ -3,7 +3,10 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/scopes'
 import { getTenant, getTenantBilling } from '@/lib/tenant-registry'
+import { resolveRazorpayCreds, hasOwnDelhiveryToken } from '@/lib/integrations/resolve'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import AccountModeToggle from './AccountModeToggle'
+import DeliveryModeToggle from './DeliveryModeToggle'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +33,8 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
   const t = await getTenant(id)
   if (!t) notFound()
   const { transactions, ledger, balance, totals } = await getTenantBilling(id)
+  const hasOwnCreds = await resolveRazorpayCreds(id).then(c => c.isOwn).catch(() => false)
+  const hasOwnDelhivery = await hasOwnDelhiveryToken(id).catch(() => false)
 
   return (
     <div className="p-6 w-full">
@@ -40,7 +45,7 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Settlement summary tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
         <div className="rounded-xl border border-border-default p-4 bg-surface-elevated">
           <div className="text-xs text-foreground-muted uppercase tracking-wide">Settlement balance</div>
           <div className={`text-xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{inr(balance)}</div>
@@ -61,6 +66,8 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
           <div className="text-xs text-foreground-muted uppercase tracking-wide">Gateway fees</div>
           <div className="text-xl font-bold text-foreground">{inr(totals.fees)}</div>
         </div>
+        <AccountModeToggle tenantId={id} initial={t.own_razorpay === true} hasOwnCreds={hasOwnCreds} />
+        <DeliveryModeToggle tenantId={id} initial={t.own_delhivery === true} hasOwnCreds={hasOwnDelhivery} />
       </div>
 
       {/* Transactions with split breakdown */}

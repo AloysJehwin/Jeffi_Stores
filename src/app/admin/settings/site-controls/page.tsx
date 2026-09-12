@@ -227,6 +227,9 @@ export default async function SiteControlsPage() {
           <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds, shipping charge caps and default weights. The default warehouse origin and pickup identity are below (also editable under Delhivery)." columns>
             <FullSpan><DeliverySettingsForm initial={delivery} /></FullSpan>
             <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
+            <NumberControl settingKey="delivery_base_charge" label="Flat base charge override (≤3kg)" hint="Leave 0 to charge the live Delhivery rate. Set a value to override with a flat buyer charge up to the free-weight ceiling." prefix="₹" initial={delivery.baseCharge} />
+            <NumberControl settingKey="delivery_free_weight_ceiling_kg" label="Free-weight ceiling" hint="Weight below which the free-shipping threshold applies." suffix="kg" min={0} step={0.5} initial={delivery.freeWeightCeilingKg} />
+            <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
             <NumberControl settingKey="shipping_min_charge" label="Minimum shipping charge" hint="Floor applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMinCharge} />
             <NumberControl settingKey="shipping_max_charge" label="Maximum shipping charge" hint="Cap applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMaxCharge} />
             <NumberControl settingKey="default_product_weight_g" label="Default product weight" hint="Assumed weight for products with no weight set." suffix="g" min={1} initial={c.values.defaultProductWeightG} />

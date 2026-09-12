@@ -12,7 +12,6 @@ const DEFAULTS: DeliverySettings = {
   discountMinSubtotal: 0,
   discountLabel: '',
   baseCharge: 0,
-  perKgOver3: 0,
   freeWeightCeilingKg: 3,
 }
 
@@ -24,7 +23,6 @@ const KEYS = [
   'delivery_discount_min_subtotal',
   'delivery_discount_label',
   'delivery_base_charge',
-  'delivery_per_kg_over_3',
   'delivery_free_weight_ceiling_kg',
 ]
 
@@ -53,7 +51,6 @@ export async function getDeliverySettings(): Promise<DeliverySettings> {
       discountMinSubtotal: Math.max(0, parseNum(map.get('delivery_discount_min_subtotal'), 0)),
       discountLabel: (map.get('delivery_discount_label') ?? '').trim(),
       baseCharge: Math.max(0, parseNum(map.get('delivery_base_charge'), 0)),
-      perKgOver3: Math.max(0, parseNum(map.get('delivery_per_kg_over_3'), 0)),
       freeWeightCeilingKg: Math.max(0, parseNum(map.get('delivery_free_weight_ceiling_kg'), 3)),
     }
     cache = { value: result, expiresAt: Date.now() + TTL_MS }
