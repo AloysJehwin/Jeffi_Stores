@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
-
-const TOKEN = process.env.DELHIVERY_API_KEY
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export async function GET(
   request: NextRequest,
@@ -19,6 +18,7 @@ export async function GET(
     )
 
     if (!rr?.rvp_awb_number) return NextResponse.json({ tracking: null })
+    const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
     const res = await fetch(

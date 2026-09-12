@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { getBusinessValues } from '@/lib/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/delhivery'
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // ?poll=<db_id> — fetch live AWB status for a specific pickup request
     const pollId = request.nextUrl.searchParams.get('poll')
     if (pollId) {
-      const token = await resolveDelhiveryToken(getCurrentTenant()?.tenantId)
+      const token = await resolveDelhiveryToken((await resolveTenantId()) ?? undefined)
       if (!token) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
       const req = await queryOne<{ id: string; awbs: string[]; pickup_status: string }>(
@@ -181,15 +181,15 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'delhivery:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const tenant = getCurrentTenant()
-    if (tenant?.tenantId && await walletBlocksShipment(tenant.tenantId).catch(() => false)) {
+    const tenantId = (await resolveTenantId()) ?? undefined
+    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
       return NextResponse.json(
         { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
         { status: 402 }
       )
     }
 
-    const token = await resolveDelhiveryToken(tenant?.tenantId)
+    const token = await resolveDelhiveryToken(tenantId)
     if (!token) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     const bv = await getBusinessValues()
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
 
     let pickupLocation = bv.pickupLocation
     if (requestedLocation) {
-      const known = await listDelhiveryPickupLocations(tenant?.tenantId).catch(() => [])
+      const known = await listDelhiveryPickupLocations(tenantId).catch(() => [])
       if (known.some(l => l.name === requestedLocation)) pickupLocation = requestedLocation
     }
 

@@ -26,6 +26,9 @@ vi.mock('@/lib/tenant-context', () => ({
   getCurrentTenantId: vi.fn(() => null),
   resolveTenantId: vi.fn(async () => null),
 }))
+vi.mock('@/lib/integrations/resolve', () => ({
+  resolveDelhiveryToken: vi.fn(async () => 'test-delhivery-token'),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
@@ -207,11 +210,11 @@ describe('POST /api/shipping/rate', () => {
     expect(json.error).toContain('No valid cart items')
   })
 
-  // TOKEN = process.env.DELHIVERY_API_KEY is a module-level constant captured at import time.
-  // In this test environment the env var is set, so TOKEN is always truthy and the
-  // Delhivery fetch path is always active regardless of per-test process.env changes.
+  // The Delhivery token is now resolved per-request via resolveDelhiveryToken() (mocked to a
+  // fixed token above), so the invoice-charges fetch path is active for these tests regardless
+  // of process.env. Tenants with their own token sign with it; here there is no tenant.
 
-  it('uses Delhivery API when token is set at module load time', async () => {
+  it('uses Delhivery API when a token resolves', async () => {
     mockQueryMany.mockResolvedValueOnce([mockVariantRow])
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
@@ -227,6 +230,26 @@ describe('POST /api/shipping/rate', () => {
     expect(json.source).toBe('delhivery')
     expect(json.charge).toBe(80)
     expect(mockFetch).toHaveBeenCalled()
+  })
+
+  it('sends carton dimensions (l/b/h) and actual weight as cgm to Delhivery', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([
+      { chargedWeightGrams: 800, actualWeightGrams: 600, length_cm: 20, breadth_cm: 15, height_cm: 10 },
+    ] as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ total_amount: 80, zone: 'C', charged_weight: 800, error: null }],
+    })
+    mockApplyRules.mockReturnValueOnce({ charge: 80, source: 'as_is' } as any)
+
+    await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    const calledUrl = String(mockFetch.mock.calls[0]?.[0] ?? '')
+    expect(calledUrl).toContain('l=20')
+    expect(calledUrl).toContain('b=15')
+    expect(calledUrl).toContain('h=10')
+    expect(calledUrl).toContain('cgm=600')
   })
 
   it('falls back when Delhivery API fetch fails', async () => {

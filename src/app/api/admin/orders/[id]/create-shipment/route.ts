@@ -6,7 +6,7 @@ import { round2 } from '@/lib/gst'
 import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
 import { sendOrderShippedSMS } from '@/lib/sms'
 import { getBusinessValues } from '@/lib/site-controls'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/delhivery'
 import { walletBlocksShipment } from '@/lib/wallet'
@@ -54,15 +54,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
     // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
     // Delhivery bills them directly). Best-effort: a control-plane read failure must not wedge ops.
-    const tenant = getCurrentTenant()
-    if (tenant?.tenantId && await walletBlocksShipment(tenant.tenantId).catch(() => false)) {
+    const tenantId = (await resolveTenantId()) ?? undefined
+    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
       return NextResponse.json(
         { error: 'Wallet balance is below the minimum. Recharge the wallet before creating shipments.' },
         { status: 402 }
       )
     }
 
-    const TOKEN = await resolveDelhiveryToken(tenant?.tenantId)
+    const TOKEN = await resolveDelhiveryToken(tenantId)
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     // Pickup warehouse: honour the posted choice only if it belongs to this account's
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let pickupLocationName = PICKUP_LOCATION
     const requested = String((await request.json().catch(() => ({})))?.pickupLocation || '').trim()
     if (requested) {
-      const owned = await listDelhiveryPickupLocations(tenant?.tenantId)
+      const owned = await listDelhiveryPickupLocations(tenantId)
       if (owned.some(w => w.name === requested)) pickupLocationName = requested
     }
 

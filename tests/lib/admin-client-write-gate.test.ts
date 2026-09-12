@@ -28,6 +28,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/admin/ecom/kyc/KycActionButtons.tsx',
   'src/components/admin/ecom/TenantActions.tsx',
   'src/components/admin/ecom/PurgeCustomerButton.tsx',
+  'src/app/admin/ecom/billing/[id]/AccountModeToggle.tsx',
+  'src/app/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
+  'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',
   'src/components/admin/AdminUserActions.tsx',

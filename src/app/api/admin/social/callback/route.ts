@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveTenantSocialAccount } from '@/lib/tenant-registry'
 import { exchangeCodeForToken, getLongLivedToken, getPageAndIgAccounts } from '@/lib/meta'
@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
 
   const admin = await requireAdminScope(request, 'campaigns:write')
   if (admin instanceof NextResponse) return NextResponse.redirect(`${backTo}?connected=0&error=not_authorized`)
-  const tenant = getCurrentTenant()
-  if (!tenant || tenant.tenantId !== state.tenantId) {
+  const tenantId = await resolveTenantId()
+  if (tenantId !== state.tenantId) {
     return NextResponse.redirect(`${backTo}?connected=0&error=tenant_mismatch`)
   }
 

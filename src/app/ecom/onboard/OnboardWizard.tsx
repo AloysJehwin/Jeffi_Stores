@@ -100,6 +100,9 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
   // Step 4 — Warehouse
   const [dailyPayout, setDailyPayout] = useState(init.dailyPayout ?? false)
   const [ownDelhivery, setOwnDelhivery] = useState(init.ownDelhivery ?? false)
+  // The Delhivery token is a secret like the Razorpay key secret: it lives only in local state and is
+  // sent once to submit(), never round-tripped through the cleartext autosave `data` blob.
+  const [delhiveryToken, setDelhiveryToken] = useState('')
   const [wh, setWh] = useState(init.wh ?? { originPincode: '', pickupLocation: '', sellerName: '', sellerAddress: '', sellerPhone: '' })
   const [pinCheck, setPinCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'warn' | 'bad'; msg: string }>({ state: 'idle', msg: '' })
 
@@ -227,6 +230,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
           businessName: bizName, businessType: bizType, pan, businessAddress: bizAddress,
           gstNumber, gstCertS3Key: gstS3Key || undefined,
           dailyPayout, ownDelhivery, ownRazorpay, warehouse: wh,
+          delhiveryToken: ownDelhivery ? delhiveryToken || undefined : undefined,
           razorpayKeyId: ownRazorpay ? rzpKeyId || undefined : undefined,
           razorpayKeySecret: ownRazorpay ? rzpKeySecret || undefined : undefined,
           razorpayWebhookSecret: ownRazorpay ? rzpWebhookSecret || undefined : undefined,
@@ -559,6 +563,16 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                     <div className="text-xs text-foreground-muted">You&apos;ll connect your own Delhivery token and be billed by Delhivery directly — we won&apos;t deduct courier cost from a wallet.</div>
                   </div>
                 </label>
+                {ownDelhivery && (
+                  <div className="space-y-2 rounded-xl border border-border-default bg-surface p-4">
+                    <p className="text-xs text-foreground-muted">Enter your Delhivery API token so shipments are created on your account. It is encrypted and never shown again.</p>
+                    <div>
+                      <label className={lbl}>Delhivery API token</label>
+                      <input className={inp} type="password" autoComplete="off" placeholder="••••••••" value={delhiveryToken}
+                        onChange={(e) => setDelhiveryToken(e.target.value.trim())} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

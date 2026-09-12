@@ -22,7 +22,73 @@ export function buildTenantSchemaSql(): string {
       parts.push(`-- ==== ${file} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
     }
   }
-  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(stripExtensionComments(parts.join('\n\n')))))
+  const raw = stripExtensionComments(parts.join('\n\n'))
+  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
+}
+
+/**
+ * Close the fan-out's column-drift hole.
+ *
+ * makeCreatesIdempotent() rewrites CREATE TABLE → CREATE TABLE IF NOT EXISTS, which is a no-op
+ * for a table that already exists on a tenant. So a column ADDED to an existing table's
+ * definition after that tenant was first provisioned never lands — the fan-out records success
+ * while the column is silently missing (confirmed live: product_sub_variants shipping-physical
+ * columns absent on an existing tenant). There is no ALTER ... ADD COLUMN anywhere in the files.
+ *
+ * This pass parses every `CREATE TABLE public.<name> (...)` on the RAW pg_dump text (before the
+ * CREATE is rewritten) and appends `ALTER TABLE <name> ADD COLUMN IF NOT EXISTS <col> <type>` for
+ * each column it declares. Postgres's ADD COLUMN IF NOT EXISTS is natively idempotent, so this is
+ * safe on both fresh and existing tables. NOT NULL is stripped from the type (adding a NOT NULL
+ * column with no default to a populated table errors); a DEFAULT is kept so it still backfills.
+ * The original CREATE is left in place — this only appends the reconciling ALTERs after it.
+ */
+function syncTableColumns(sql: string): string {
+  const createRe = /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?((?:[A-Za-z0-9_]+\.)?[A-Za-z0-9_]+)\s*\(([\s\S]*?)\n\);/gi
+  const CONSTRAINT_LEADERS = /^(CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE|LIKE)\b/i
+  const alters: string[] = []
+
+  let m: RegExpExecArray | null
+  while ((m = createRe.exec(sql)) !== null) {
+    const table = m[1]
+    const body = m[2]
+    for (const col of splitTopLevel(body)) {
+      const line = col.trim()
+      if (!line || CONSTRAINT_LEADERS.test(line)) continue
+      const nameMatch = line.match(/^("?[A-Za-z0-9_]+"?)\s+(.*)$/s)
+      if (!nameMatch) continue
+      const colName = nameMatch[1]
+      // Drop NOT NULL (unsafe on populated tables); keep everything else incl. DEFAULT.
+      const colType = nameMatch[2].replace(/\bNOT\s+NULL\b/gi, '').replace(/\s+/g, ' ').trim()
+      if (!colType) continue
+      alters.push(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${colName} ${colType};`)
+    }
+  }
+
+  if (alters.length === 0) return sql
+  return `${sql}\n\n-- ==== reconcile columns on pre-existing tables (ADD COLUMN IF NOT EXISTS) ====\n${alters.join('\n')}\n`
+}
+
+/**
+ * Split a CREATE TABLE body into its top-level comma-separated items, ignoring commas nested
+ * inside parentheses (e.g. numeric(6,2), CHECK (x IN ('a','b'))). A naive split on ',' would
+ * cut those in half.
+ */
+function splitTopLevel(body: string): string[] {
+  const items: string[] = []
+  let depth = 0
+  let current = ''
+  for (const ch of body) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === ',' && depth === 0) {
+      items.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  if (current.trim()) items.push(current)
+  return items
 }
 
 /**

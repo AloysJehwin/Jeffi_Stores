@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, query } from '@/lib/db'
 import { generateOrderInvoice } from '@/lib/invoice'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import { recordCodSettlement } from '@/lib/razorpay-route'
 
 export const dynamic = 'force-dynamic'
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
   // For tenant stores (not the platform's own store), record a COD settlement in
   // the control-plane ledger so the tenant is credited (gross − commission − actual
   // Delhivery charge). Uses the reconciled delhivery_billed_amount when available.
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   if (tenant?.tenantId && remitted.rows.length > 0) {
     const { controlPlanePool } = await import('@/lib/tenant-registry')
     const cpRow = await controlPlanePool()
