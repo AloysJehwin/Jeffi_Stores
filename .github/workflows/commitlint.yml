@@ -1,0 +1,44 @@
+name: PR Title
+
+# The repo squash-merges, so the PR TITLE becomes the commit subject on main —
+# which is what Release Please reads to decide the version bump. A malformed
+# title silently means "no release", so check it here.
+#
+# Advisory for now (not a required status check). Promote it once it has run
+# quietly for a few PRs.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title format
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # type(optional scope)!: subject
+          PATTERN='^(feat|fix|perf|refactor|revert|docs|test|ci|build|chore)(\([a-z0-9._/,+ -]+\))?!?: .+'
+          if printf '%s' "$TITLE" | grep -qE "$PATTERN"; then
+            echo "OK: $TITLE"
+          else
+            echo "PR title is not a conventional commit:"
+            echo "  $TITLE"
+            echo ""
+            echo "Expected:  type(scope): subject"
+            echo "Types:     feat fix perf refactor revert docs test ci build chore"
+            echo ""
+            echo "Version impact when squashed to main:"
+            echo "  fix:    -> patch   (1.0.0 -> 1.0.1)"
+            echo "  feat:   -> minor   (1.0.0 -> 1.1.0)"
+            echo "  feat!:  -> major   (1.0.0 -> 2.0.0)"
+            echo "  others  -> no release"
+            exit 1
+          fi

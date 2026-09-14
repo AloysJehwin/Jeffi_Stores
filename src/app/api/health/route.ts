@@ -14,5 +14,14 @@ export const dynamic = 'force-dynamic'
  * the app was "alive" but every DB-backed page 500'd.
  */
 export async function GET() {
-  return NextResponse.json({ status: 'ok' }, { status: 200 })
+  return NextResponse.json(
+    {
+      status: 'ok',
+      // Baked in at build time, so a running box can be identified without
+      // shell access — which version is actually serving this traffic.
+      version: process.env.NEXT_PUBLIC_APP_VERSION ?? 'unknown',
+      commit: process.env.NEXT_PUBLIC_GIT_SHA ?? 'unknown',
+    },
+    { status: 200 }
+  )
 }
