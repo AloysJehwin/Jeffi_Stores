@@ -622,7 +622,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
     setShowBuyerDrop(false)
   }
 
-  const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
+  const inputCls = 'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
   const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
   if (view === 'list') {
@@ -661,12 +661,12 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 inputClassName={inputCls + ' pr-9'}
               />
             </div>
-            <button onClick={() => loadList(1)} className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => loadList(1)} className="control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 text-white font-medium transition-colors">
               Search
             </button>
             {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
               <button onClick={() => { setSearchQ(''); setStatusFilter('all'); setFromDate(''); setToDate(''); syncUrl({ q: '', status: '', from: '', to: '' }) }}
-                className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+                className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 Clear
               </button>
             )}
@@ -1115,7 +1115,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                           return allocated < item.required_qty || allocated > item.required_qty
                         })) ||
                         (convertSerialPickerItems?.filter(i => !i.already_assigned).some(item =>
-                          (convertSerialSelections[item.order_item_id]?.size ?? 0) !== item.required_qty
+                          (convertSerialSelections[item.order_item_id]?.size ?? 0) !== (item.required_serials ?? item.required_qty)
                         ))
                       }
                       className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors">
@@ -1677,7 +1677,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       return allocated < item.required_qty || allocated > item.required_qty
                     })) ||
                     (convertSerialPickerItems?.filter(i => !i.already_assigned).some(item =>
-                      (convertSerialSelections[item.order_item_id]?.size ?? 0) !== item.required_qty
+                      (convertSerialSelections[item.order_item_id]?.size ?? 0) !== (item.required_serials ?? item.required_qty)
                     ))
                   }
                   className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors">

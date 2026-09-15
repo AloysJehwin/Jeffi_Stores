@@ -59,8 +59,8 @@ export interface ShelfStock {
 
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
-const btnPrimary = 'flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
-const btnSecondary = 'px-4 py-2 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50'
+const btnPrimary = 'flex-1 control-md border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+const btnSecondary = 'control-md border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
 export function WarehouseForm({ onSave, onCancel, initial }: {
   onSave: (data: { name: string; code: string; address: string }) => Promise<void>

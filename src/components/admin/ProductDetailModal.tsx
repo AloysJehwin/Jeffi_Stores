@@ -141,6 +141,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                     <ImgWithSkeleton
                       src={activeImg.image_url}
                       alt={p.name}
+                      blurhash={activeImg.blurhash}
                       className="w-full h-full object-contain"
                     />
                   ) : (
@@ -155,7 +156,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         onClick={() => setImgIdx(idx)}
                         className={`w-12 h-12 rounded border-2 overflow-hidden flex-shrink-0 transition-colors ${idx === imgIdx ? 'border-accent-500' : 'border-border-default'}`}
                       >
-                        <ImgWithSkeleton src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
+                        <ImgWithSkeleton src={img.thumbnail_url || img.image_url} alt="" blurhash={img.blurhash} className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
@@ -333,11 +334,11 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   <table className="w-full text-sm divide-y divide-border-default table-fixed">
                     <thead className="bg-surface-secondary">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[30%]">Name</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">SKU</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[26%]">Name</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">SKU</th>
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">Price</th>
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Inventory</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[10%]">Listed</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">Listed</th>
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Status</th>
                       </tr>
                     </thead>
@@ -346,7 +347,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         const subs: any[] = v.sub_variants || []
                         const hasSubs = subs.length > 0
                         const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
-                        const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
+                        const vListed = hasSubs
+                          ? (subs.some((sv: any) => sv.stock_status && sv.stock_status !== 'Out of Stock') ? 'In Stock' : 'Out of Stock')
+                          : (v.stock_status || '—')
                         const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                         return (
                           <React.Fragment key={v.id}>
@@ -360,7 +363,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                 {hasSubs ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}` : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
                               </td>
                               <td className="px-3 py-2 text-foreground font-medium">{vInventory}</td>
-                              <td className="px-3 py-2 text-foreground-muted">{vListed}</td>
+                              <td className="px-3 py-2 text-foreground-muted whitespace-nowrap">{vListed}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                   {v.is_active ? 'Active' : 'Off'}
@@ -373,7 +376,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                 <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
                                 <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
                                 <td className="px-3 py-1.5 text-foreground font-medium">{sv.inventory_quantity ?? 0}</td>
-                                <td className="px-3 py-1.5 text-foreground-muted">{sv.stock_status || '—'}</td>
+                                <td className="px-3 py-1.5 text-foreground-muted whitespace-nowrap">{sv.stock_status || '—'}</td>
                                 <td className="px-3 py-1.5">
                                   <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                     {sv.is_active ? 'Active' : 'Off'}

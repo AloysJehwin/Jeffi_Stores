@@ -95,8 +95,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       for (let idx = 0; idx < computedItems.length; idx++) {
         const item = computedItems[idx]
         await query(
-          `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, base_quantity, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, base_quantity, rate, discount_pct, amount, product_id, variant_id, sub_variant_id, variant_name, sub_variant_name)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [
             id, idx,
             item.description, item.hsn_code || null, Number(item.gst_rate) || 18,
@@ -106,6 +106,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             Number(item.rate),
             Number(item.discount_pct) || 0, item.amount,
             item.product_id || null, item.variant_id || null, item.sub_variant_id || null,
+            item.variant_name || null, item.sub_variant_name || null,
           ]
         )
       }

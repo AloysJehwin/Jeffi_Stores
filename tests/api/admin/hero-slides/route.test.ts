@@ -7,10 +7,12 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 const mockQuery = vi.fn()
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
+const mockClientQuery = vi.fn()
 vi.mock('@/lib/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
+  withTransaction: (fn: any) => fn({ query: (...a: any[]) => mockClientQuery(...a) }),
 }))
 
 import { authenticateAdmin } from '@/lib/jwt'
@@ -155,12 +157,16 @@ describe('PATCH /api/admin/hero-slides (reorder)', () => {
     expect(res.status).toBe(400)
   })
 
-  it('reorders slides', async () => {
-    mockQuery.mockResolvedValue({})
+  it('reorders slides in one atomic statement', async () => {
+    mockClientQuery.mockResolvedValue({})
     const res = await PATCH(req('PATCH', { order: ['id1', 'id2', 'id3'] }))
     const data = await res.json()
     expect(res.status).toBe(200)
     expect(data.success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledTimes(3)
+    // One UPDATE ... unnest(...) WITH ORDINALITY, not N sequential updates.
+    expect(mockClientQuery).toHaveBeenCalledTimes(1)
+    const [sql, params] = mockClientQuery.mock.calls[0]
+    expect(sql).toContain('WITH ORDINALITY')
+    expect(params[0]).toEqual(['id1', 'id2', 'id3'])
   })
 })

@@ -300,25 +300,28 @@ describe('transferToLinkedAccount', () => {
     rz.payments.fetch.mockResolvedValue({ fee: 2360, tax: 360 })
   })
 
-  it('deducts commission, the real gateway fee, the transfer fee and delhivery', async () => {
+  // Shipping is NOT withheld here — it is charged once from the prepaid wallet at the real
+  // invoiced amount. Withholding the estimate here too billed every prepaid order twice.
+  it('deducts commission, the real gateway fee and the transfer fee — but NOT delhivery', async () => {
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_1', status: 'processed' }] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
       paymentId: 'pay_1', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
       delhiveryChargePaise: 2000, orderId: 'o-1', tenantSlug: 'acme',
     })
-    // 100000 - 5000 commission - 2360 gateway - 2000 delhivery = 90640
-    // transfer fee = round(90640 * 0.0025 * 1.18) = 267 → 90373
+    // 100000 - 5000 commission - 2360 gateway = 92640 (delhivery NOT deducted)
+    // transfer fee = round(92640 * 0.0025 * 1.18) = 273 → 92367
     expect(out).toEqual({
-      transferId: 'trf_1', amount: 90373, linkedAccountId: 'acc_1', status: 'processed',
-      gatewayFeePaise: 2360, transferFeePaise: 267, platformCommissionPaise: 5000,
+      transferId: 'trf_1', amount: 92367, linkedAccountId: 'acc_1', status: 'processed',
+      gatewayFeePaise: 2360, transferFeePaise: 273, platformCommissionPaise: 5000,
     })
     expect(rz.payments.fetch).toHaveBeenCalledWith('pay_1')
     const body = rz.api.post.mock.calls[0][0]
     expect(body.url).toBe('/payments/pay_1/transfers')
-    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 90373, currency: 'INR' })
+    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 92367, currency: 'INR' })
+    // The caller may still pass delhiveryChargePaise; it must not reduce the tenant's share.
     expect(body.data.transfers[0].notes).toMatchObject({
-      platform_commission: 5000, gateway_fee: 2360, transfer_fee: 267, delhivery_charge: 2000,
+      platform_commission: 5000, gateway_fee: 2360, transfer_fee: 273, delhivery_charge: 0,
     })
   })
 
@@ -394,19 +397,36 @@ describe('reverseTransfer', () => {
 
 // ── recordCodSettlement — control-plane ledger ──────────────────────────────
 describe('recordCodSettlement', () => {
-  it('writes a tenant_transactions row and three settlement_ledger entries', async () => {
+  it('writes a tenant_transactions row and the settlement_ledger entries', async () => {
     const { recordCodSettlement } = await import('@/lib/razorpay-route')
     await recordCodSettlement({
       tenantId: 't-1', tenantSlug: 'acme', orderRef: 'ORD-1',
       grossAmountInr: 1000, actualDelhiveryChargeInr: 50,
     })
-    expect(pool.query).toHaveBeenCalledTimes(2)
+    // txn + base ledger + the delhivery row (no wallet debit on this order)
+    expect(pool.query).toHaveBeenCalledTimes(3)
     const [txnSql, txnParams] = pool.query.mock.calls[0]
     expect(txnSql).toMatch(/INSERT INTO tenant_transactions/)
     // gross 1000 → commission 5% = 50 → tenant share = 1000 - 50 - 50 = 900
     expect(txnParams).toEqual(['t-1', 'ORD-1', 1000, 900, 50])
     const [ledgerSql] = pool.query.mock.calls[1]
     expect(ledgerSql).toMatch(/INSERT INTO settlement_ledger/)
+  })
+
+  // Regression: the wallet already debited the real courier cost for this AWB, so deducting it
+  // here as well billed the tenant twice for the same shipment.
+  it('does NOT deduct shipping again when the wallet already billed it', async () => {
+    const { recordCodSettlement } = await import('@/lib/razorpay-route')
+    await recordCodSettlement({
+      tenantId: 't-1', tenantSlug: 'acme', orderRef: 'ORD-9',
+      grossAmountInr: 1000, actualDelhiveryChargeInr: 50,
+      walletBilled: true,
+    })
+    // tenant share = 1000 - 50 commission, with NO shipping deduction
+    const [, txnParams] = pool.query.mock.calls[0]
+    expect(txnParams).toEqual(['t-1', 'ORD-9', 1000, 950, 50])
+    // and no delhivery ledger row is written
+    expect(pool.query).toHaveBeenCalledTimes(2)
   })
 
   it('swallows a DB error (best-effort ledger, never throws)', async () => {

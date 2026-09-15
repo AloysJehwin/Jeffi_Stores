@@ -15,7 +15,7 @@ export default function Pagination({ page, total, pageSize, buildUrl, onPageChan
   const start = (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
 
-  const btnCls = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
+  const btnCls = 'control-xs font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
   const navBtn = (targetPage: number, label: string, disabled: boolean) => {
     if (onPageChange) {

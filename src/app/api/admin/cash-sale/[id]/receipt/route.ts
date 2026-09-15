@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { productLabel } from '@/lib/product-label'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
@@ -56,7 +57,7 @@ export async function GET(
     }
 
     const receiptItems: ReceiptItem[] = (saleItems || []).map((it: any) => ({
-      product_name: [it.product_name, it.variant_name].filter(Boolean).join(' — '),
+      product_name: productLabel(it, ' — '),
       quantity: parseFloat(it.quantity),
       unit_price: parseFloat(it.unit_price),
       discount_amount: parseFloat(it.discount_amount || '0') || undefined,

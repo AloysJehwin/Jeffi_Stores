@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, query, queryMany, withTransaction, resolveRequestTenant } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
+import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
+import { controlPlanePool } from '@/lib/tenant-registry'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
@@ -230,20 +232,55 @@ export async function POST(
           : order.payment_status
 
         if (effectivePaymentStatus === 'paid' && (await isRazorpayEnabled())) {
+          // Newest first, not LIMIT 1: an order can carry several completed payments (e.g. a
+          // variant-change top-up collected after the original). Picking one arbitrarily
+          // under-refunds the buyer — the same fix already made in the direct-refund route.
           const paymentRecord = await queryOne(
             `SELECT id, transaction_id, amount, gateway_response FROM payments
              WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
+             ORDER BY created_at DESC
              LIMIT 1`,
             [paymentOrderId]
           )
 
           if (paymentRecord && paymentRecord.transaction_id) {
             try {
-              const razorpay = getRazorpayInstance()
+              // Tenant-aware: an own_razorpay tenant collected on THEIR keys, so refunding from
+              // platform keys fails outright.
+              const tenant = await resolveRequestTenant()
+              const ownRazorpay = tenant?.tenantId
+                ? await controlPlanePool()
+                    .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
+                    .then(r => r.rows[0]?.own_razorpay === true)
+                    .catch(() => false)
+                : false
+              const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
               const amountInPaise = Math.round(netRefundAmount * 100)
               const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
                 amount: amountInPaise,
               })
+
+              // Claw back the tenant's share of this PARTIAL return. Without this the buyer was
+              // refunded from platform funds while the tenant kept 100% of their share.
+              if (!ownRazorpay) {
+                const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
+                if (outcome.unrecoveredPaise > 0) {
+                  console.error(
+                    `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
+                    `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+                  )
+                }
+                if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
+                  await recordRefundSettlement({
+                    tenantId: tenant.tenantId,
+                    orderRef: order.order_number,
+                    refundedInr: netRefundAmount,
+                    reversedInr: outcome.reversedPaise / 100,
+                    unrecoveredInr: outcome.unrecoveredPaise / 100,
+                    note: 'return',
+                  })
+                }
+              }
 
               await withTransaction(async (client) => {
                 await client.query(

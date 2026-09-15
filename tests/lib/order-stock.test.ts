@@ -9,166 +9,174 @@ import { withTransaction } from '@/lib/db'
 import { logStockMovement } from '@/lib/inventory'
 import { syncPerishableStock } from '@/lib/shelf'
 
-function makeMockClient(queryResponses: Record<number, any> = {}) {
-  let idx = 0
-  return {
-    query: vi.fn().mockImplementation(async () => {
-      const resp = queryResponses[idx] ?? { rows: [] }
-      idx++
-      return resp
-    }),
-  } as any
-}
+type Route = (sql: string, params: any[]) => any
+const PLAIN = { rows: [{ perishable: false, serialized: false }] }
+const TRACKED = { rows: [{ perishable: true, serialized: true }] }
+const item = (over: Record<string, unknown> = {}) => ({ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '5', buy_unit: null, ...over })
 
-beforeEach(() => {
-  vi.clearAllMocks()
-})
+// SQL-routed fake client: responses chosen by statement text, every call recorded.
+function makeClient(route: Route) {
+  const calls: { sql: string; params: any[] }[] = []
+  const client: any = {
+    calls,
+    query: vi.fn().mockImplementation(async (sql: string, params: any[] = []) => {
+      calls.push({ sql, params })
+      return route(sql, params) ?? { rows: [] }
+    }),
+  }
+  vi.mocked(withTransaction).mockImplementation(fn => fn(client))
+  return client
+}
+const find = (client: any, re: RegExp) => client.calls.find((c: any) => re.test(c.sql))
+const all = (client: any, re: RegExp) => client.calls.filter((c: any) => re.test(c.sql))
+
+beforeEach(() => { vi.clearAllMocks() })
 
 describe('restoreOrderStock', () => {
   it('skips items that are already restored (return transaction exists)', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '5', buy_unit: null }] },
-      1: { rows: [] }, // unit row
-      2: { rows: [{ id: 1 }] }, // alreadyRestored = true
-      // perishable check loop
-      3: { rows: [{ perishable: false, serialized: false }] },
-      // plain shelf restore loop
-      4: { rows: [{ perishable: false, serialized: false }] },
-      5: { rows: [] }, // unit row for shelf restore
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item()] }
+      if (sql.includes("transaction_type = 'return'")) return { rows: [{ ok: 1 }] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
     await restoreOrderStock('ord-1')
     expect(logStockMovement).not.toHaveBeenCalled()
   })
 
-  it('restores via batch movements when batch transactions exist', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '5', buy_unit: null }] },
-      1: { rows: [] },    // unit row (no factor)
-      2: { rows: [] },    // alreadyRestored = false
-      3: { rows: [{ batch_id: 'b1', quantity_change: '-5', serial_number: null }] }, // batch movements
-      4: { rows: [{ quantity_remaining: '10' }] }, // batch lock
-      5: { rows: [{ lot_number: 'L1', expiry_date: null }] }, // batch update
-      // serial reset
-      6: { rows: [] },
-      // perishable sync loop
-      7: { rows: [{ perishable: false, serialized: false }] },
-      // plain shelf restore
-      8: { rows: [{ perishable: false, serialized: false }] },
-      9: { rows: [] }, // unit for shelf
+  it('restores a plain sub-variant line', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ variant_id: 'v1', sub_variant_id: 'sv1', quantity: '3' })] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM product_sub_variants WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '20', is_active: true }] }
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
     await restoreOrderStock('ord-1')
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
-      transactionType: 'return',
-      quantityChange: 5,
-      batchId: 'b1',
-    }))
+    expect(find(client, /UPDATE product_sub_variants SET inventory_quantity = inventory_quantity \+ \$1/).params).toEqual([3, 'sv1'])
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ subVariantId: 'sv1', transactionType: 'return', quantityChange: 3 }))
   })
 
-  it('restores via sub_variant_id when no batch movements', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1', quantity: '3', buy_unit: null }] },
-      1: { rows: [] },    // unit row
-      2: { rows: [] },    // not already restored
-      3: { rows: [] },    // no batch movements
-      4: { rows: [{ inventory_quantity: '20' }] }, // sub_variant lock
-      5: { rows: [] },    // sub_variant update
-      // logStockMovement call (no batch)
-      6: { rows: [] },    // serial reset
-      7: { rows: [{ perishable: false, serialized: false }] },
-      8: { rows: [{ perishable: false, serialized: false }] },
-      9: { rows: [] },
+  it('restores a plain variant line', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ variant_id: 'v1', quantity: '2' })] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM product_variants WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '15', is_active: true }] }
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
     await restoreOrderStock('ord-1')
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
-      subVariantId: 'sv1',
-      transactionType: 'return',
-    }))
+    expect(find(client, /UPDATE product_variants SET inventory_quantity = inventory_quantity \+ \$1/).params).toEqual([2, 'v1'])
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ variantId: 'v1', currentStock: 15 }))
   })
 
-  it('restores via variant_id when no sub_variant', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: 'v1', sub_variant_id: null, quantity: '2', buy_unit: null }] },
-      1: { rows: [] },
-      2: { rows: [] },
-      3: { rows: [] },
-      4: { rows: [{ inventory_quantity: '15' }] },
-      5: { rows: [] },
-      6: { rows: [] },
-      7: { rows: [{ perishable: false, serialized: false }] },
-      8: { rows: [{ perishable: false, serialized: false }] },
-      9: { rows: [] },
+  it('restores a plain product line', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ quantity: '1' })] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM products WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '50' }] }
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
     await restoreOrderStock('ord-1')
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
-      variantId: 'v1',
-    }))
-  })
-
-  it('restores via product when no variant', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1', buy_unit: null }] },
-      1: { rows: [] },
-      2: { rows: [] },
-      3: { rows: [] },
-      4: { rows: [{ inventory_quantity: '50' }] },
-      5: { rows: [] },
-      6: { rows: [] },
-      7: { rows: [{ perishable: false, serialized: false }] },
-      8: { rows: [{ perishable: false, serialized: false }] },
-      9: { rows: [] },
-    })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
-    await restoreOrderStock('ord-1')
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
-      productId: 'p1',
-      variantId: null,
-    }))
+    expect(find(client, /UPDATE products SET inventory_quantity = inventory_quantity \+ \$1/).params).toEqual([1, 'p1'])
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ productId: 'p1', variantId: null, currentStock: 50 }))
   })
 
   it('applies unit factor when dimension is count', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '2', buy_unit: 'box' }] },
-      1: { rows: [{ factor: '10', dimension: 'count' }] }, // unit factor
-      2: { rows: [] },
-      3: { rows: [] },
-      4: { rows: [{ inventory_quantity: '0' }] },
-      5: { rows: [] },
-      6: { rows: [] },
-      7: { rows: [{ perishable: false, serialized: false }] },
-      8: { rows: [{ perishable: false, serialized: false }] },
-      9: { rows: [{ factor: '10', dimension: 'count' }] },
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ quantity: '2', buy_unit: 'box' })] }
+      if (sql.includes('COALESCE(puv.factor, pup.factor)')) return { rows: [{ factor: '10', dimension: 'count' }] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM products WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '0' }] }
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
     await restoreOrderStock('ord-1')
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
-      quantityChange: 20,
-    }))
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ quantityChange: 20 }))
+    expect(find(client, /UPDATE shelf_stock/).params[0]).toBe(20)
   })
 
-  it('syncs perishable shelf stock for perishable products', async () => {
-    const client = makeMockClient({
-      0: { rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1', buy_unit: null }] },
-      1: { rows: [] },
-      2: { rows: [] },
-      3: { rows: [] },
-      4: { rows: [{ inventory_quantity: '5' }] },
-      5: { rows: [] },
-      6: { rows: [] },
-      7: { rows: [{ perishable: true, serialized: false }] }, // perishable sync loop
-      8: { rows: [{ perishable: true, serialized: false }] }, // plain restore loop (skipped)
+  it('reports a plain line whose variant is no longer active instead of restoring it', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ variant_id: 'v1' })] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM product_variants WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '4', is_active: false }] }
     })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
+    const { skipped } = await restoreOrderStock('ord-1')
+    expect(skipped).toEqual([expect.objectContaining({ variant_id: 'v1', reason: 'variant is no longer active' })])
+    expect(find(client, /UPDATE product_variants SET inventory_quantity/)).toBeUndefined()
+  })
+
+  it('tracked: restores into the batch the sale consumed', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item()] }
+      if (sql.includes('SELECT perishable, serialized')) return TRACKED
+      if (sql.includes("transaction_type = 'sale'")) return { rows: [{ id: 't1', batch_id: 'b1', quantity_change: '-5', serial_number: null, lot_number: 'L1', expiry_date: null }] }
+      if (sql.includes('AS is_leaf')) return { rows: [{ is_leaf: true }] }
+      if (sql.includes('FROM product_batches WHERE id = $1 FOR UPDATE')) return { rows: [{ quantity_remaining: '10' }] }
+    })
     await restoreOrderStock('ord-1')
+    expect(find(client, /UPDATE product_batches SET quantity_remaining = quantity_remaining \+ \$1/).params).toEqual([5, 'b1'])
+    expect(find(client, /INSERT INTO product_batches/)).toBeUndefined()
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ transactionType: 'return', quantityChange: 5, batchId: 'b1', currentStock: 10 }))
     expect(syncPerishableStock).toHaveBeenCalledWith(client, 'p1', null, null)
   })
 
+  it('tracked: recreates a batch the sale emptied and re-links its serials', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ quantity: '2' })] }
+      if (sql.includes('SELECT perishable, serialized')) return TRACKED
+      if (sql.includes("transaction_type = 'sale'")) return { rows: [
+        { id: 't1', batch_id: null, quantity_change: '-1', serial_number: 'SN-1', lot_number: 'L7', expiry_date: '2027-03-01' },
+        { id: 't2', batch_id: null, quantity_change: '-1', serial_number: 'SN-2', lot_number: 'L7', expiry_date: '2027-03-01' },
+      ] }
+      if (sql.includes('AS is_leaf')) return { rows: [{ is_leaf: true }] }
+      if (sql.includes('ORDER BY pri')) return { rows: [{ location_id: 'loc-1' }] }
+      if (sql.includes('INSERT INTO product_batches')) return { rows: [{ id: 'nb1' }] }
+    })
+    await restoreOrderStock('ord-1')
+    const ins = find(client, /INSERT INTO product_batches/)
+    expect(ins.params).toEqual(['p1', null, null, 'L7', '2027-03-01', 2, 'loc-1', expect.stringContaining('ord-1')])
+    expect(find(client, /UPDATE product_serials SET batch_id = \$1/).params).toEqual(['nb1', 'ord-1', ['SN-1', 'SN-2']])
+    expect(logStockMovement).toHaveBeenCalledTimes(2)
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ batchId: 'nb1', serialNumber: 'SN-2', lotNumber: 'L7' }))
+    expect(find(client, /UPDATE products SET inventory_quantity = inventory_quantity/)).toBeUndefined()
+  })
+
+  it('tracked: a grain that no longer holds stock is reported, not restocked', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ variant_id: 'v1' })] }
+      if (sql.includes('SELECT perishable, serialized')) return TRACKED
+      if (sql.includes("transaction_type = 'sale'")) return { rows: [{ id: 't1', batch_id: 'b1', quantity_change: '-5', serial_number: null, lot_number: null, expiry_date: null }] }
+      if (sql.includes('AS is_leaf')) return { rows: [{ is_leaf: false }] }
+    })
+    const { skipped } = await restoreOrderStock('ord-1')
+    expect(skipped).toEqual([expect.objectContaining({ variant_id: 'v1', reason: expect.stringContaining('no longer holds stock') })])
+    expect(all(client, /product_batches SET|INSERT INTO product_batches/)).toHaveLength(0)
+    expect(logStockMovement).not.toHaveBeenCalled()
+  })
+
+  it('serials return to stock only at live grains; the rest are marked returned', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item()] }
+      if (sql.includes('SELECT perishable, serialized')) return PLAIN
+      if (sql.includes('FROM products WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '1' }] }
+      if (sql.includes("status = 'returned'")) return { rows: [{ product_id: 'p1', variant_id: 'v9', sub_variant_id: null }] }
+    })
+    const { skipped } = await restoreOrderStock('ord-1')
+    const revive = find(client, /SET status = 'in_stock'/)
+    expect(revive.sql).toContain('ps.sub_variant_id IS NOT NULL THEN EXISTS')
+    expect(revive.params).toEqual(['ord-1'])
+    expect(find(client, /status = 'returned', returned_at = NOW\(\)/)).toBeDefined()
+    expect(skipped).toEqual([expect.objectContaining({ variant_id: 'v9', reason: expect.stringContaining('marked returned') })])
+  })
+
+  it('tracked line with no sale movements falls back to the plain restore and still syncs', async () => {
+    const client = makeClient(sql => {
+      if (sql.includes('FROM order_items')) return { rows: [item({ quantity: '1' })] }
+      if (sql.includes('SELECT perishable, serialized')) return { rows: [{ perishable: true, serialized: false }] }
+      if (sql.includes('FROM products WHERE id = $1 FOR UPDATE')) return { rows: [{ inventory_quantity: '5' }] }
+    })
+    await restoreOrderStock('ord-1')
+    expect(find(client, /UPDATE products SET inventory_quantity = inventory_quantity/).params).toEqual([1, 'p1'])
+    expect(syncPerishableStock).toHaveBeenCalledWith(client, 'p1', null, null)
+    expect(find(client, /UPDATE shelf_stock/)).toBeUndefined()
+  })
+
   it('handles empty order_items (no-op)', async () => {
-    const client = makeMockClient({ 0: { rows: [] } })
-    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
+    makeClient(sql => (sql.includes('FROM order_items') ? { rows: [] } : undefined))
     await restoreOrderStock('ord-empty')
     expect(logStockMovement).not.toHaveBeenCalled()
   })

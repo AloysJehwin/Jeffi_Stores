@@ -91,9 +91,13 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                   <div className="min-w-0 overflow-hidden">
                     <HoverCard
                       trigger={
-                        <span className="text-sm font-medium text-foreground underline decoration-dotted underline-offset-2 cursor-default hover:text-accent-500 transition-colors truncate block w-full">
+                        <Link
+                          href={ap(`/admin/products/${product.id}`)}
+                          onClick={e => e.stopPropagation()}
+                          className="text-sm font-medium text-foreground underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors truncate block w-full"
+                        >
                           {product.name}
-                        </span>
+                        </Link>
                       }
                       align="left"
                       side="bottom"
@@ -111,7 +115,13 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                             </div>
                           )}
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground leading-tight">{product.name}</p>
+                            <Link
+                              href={ap(`/admin/products/${product.id}`)}
+                              onClick={e => e.stopPropagation()}
+                              className="text-sm font-semibold text-foreground leading-tight hover:text-accent-500 hover:underline underline-offset-2 transition-colors block truncate"
+                            >
+                              {product.name}
+                            </Link>
                             <p className="text-xs text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span></p>
                             <div className="flex gap-1 mt-1 flex-wrap">
                               <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${product.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
@@ -159,13 +169,15 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                                 {product.product_variants.map((v: any) => {
                                   const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
                                   const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
-                                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
+                                  const vListed = hasSubs
+                                    ? (Number(v.sub_variant_stock_total || 0) > 0 ? 'In Stock' : 'Out of Stock')
+                                    : (v.stock_status || '—')
                                   return (
                                     <div key={v.id} className="flex items-center justify-between gap-2">
                                       <span className="text-foreground-secondary truncate">{v.variant_name}</span>
                                       <div className="flex gap-1.5 shrink-0">
                                         <span className={`font-semibold ${vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>{vInv}</span>
-                                        {vListed !== vInv && <span className="text-foreground-muted text-[11px]">/ {vListed}</span>}
+                                        <span className="text-foreground-muted text-[11px] whitespace-nowrap">{vListed}</span>
                                       </div>
                                     </div>
                                   )
@@ -188,7 +200,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-foreground-muted">Status</span>
                                   <span className="font-semibold shrink-0 text-foreground-secondary">
-                                    {product.has_variants ? Number(product.variant_stock_total) : (product.stock_status || '—')}
+                                    {product.stock_status || '—'}
                                   </span>
                                 </div>
                               </div>

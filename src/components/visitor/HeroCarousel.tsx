@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
+import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
 
 export interface HeroSlide {
   // New DB-backed shape
@@ -12,6 +13,8 @@ export interface HeroSlide {
   badge_color?: string | null
   image_url?: string | null
   image_url_mobile?: string | null
+  blurhash?: string | null
+  blurhash_mobile?: string | null
   href?: string
   // Legacy category-derived fields (fallback path)
   name?: string
@@ -51,6 +54,7 @@ interface Resolved {
   badgeColor: string
   mobileImg: string
   desktopImg: string
+  blurhash: string | null
 }
 
 function resolveSlide(s: HeroSlide, i: number): Resolved {
@@ -62,7 +66,10 @@ function resolveSlide(s: HeroSlide, i: number): Resolved {
   const href = s.href ?? (s.slug ? `/categories/${s.slug}` : '/products')
   const mobileImg = s.image_url_mobile ?? s.image_url ?? s.hero_image_mobile ?? PLACEHOLDER
   const desktopImg = s.image_url ?? s.image_url_mobile ?? s.hero_image_desktop ?? s.hero_image_mobile ?? PLACEHOLDER
-  return { key: s.id ?? s.slug ?? String(i), href, title, subtitle, badge, badgeColor, mobileImg, desktopImg }
+  // Mirrors the desktop image's fallback chain: the canvas sits under the <picture>, whose
+  // default <img> is the mobile source, so prefer whichever hash matches what renders first.
+  const blurhash = s.blurhash_mobile || s.blurhash || null
+  return { key: s.id ?? s.slug ?? String(i), href, title, subtitle, badge, badgeColor, mobileImg, desktopImg, blurhash }
 }
 
 export default function HeroCarousel({ slides }: Props) {
@@ -127,6 +134,15 @@ export default function HeroCarousel({ slides }: Props) {
                   (--color-surface #F9FAFB) bled through on the left as a grey haze, and the
                   boundary where that met the image read as a faint vertical line. */}
               <div className="absolute inset-0 bg-[#0d0d0d]">
+                {s.blurhash && (
+                  <div
+                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%]
+                               [-webkit-mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]
+                               [mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]"
+                  >
+                    <BlurhashCanvas hash={s.blurhash} />
+                  </div>
+                )}
                 <picture>
                   <source media="(min-width: 1024px)" srcSet={s.desktopImg} />
                   {/* Fade the image's left edge into the base instead of cutting it off. */}

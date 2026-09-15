@@ -14,8 +14,8 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'
 
-const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
-const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50'
+const btnPrimary = 'control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+const btnSecondary = 'control-sm border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 export default function ShelvingClient() {

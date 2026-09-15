@@ -1,7 +1,6 @@
 import { cookies} from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import ProductDetailClient from './ProductDetailClient'
@@ -19,7 +18,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   let hasInventory = false
   try {
     const payload = await verifyToken(token.value)
-    hasInventory = hasScope(payload?.role ?? '', payload?.scopes ?? [], 'inventory:read')
+    const { hasPlanScope } = await import('@/lib/plan-gate')
+    hasInventory = await hasPlanScope(payload?.role ?? '', payload?.scopes ?? [], 'inventory:read')
   } catch { redirect(ap('/admin/login', host)) }
 
   return <ProductDetailClient id={id} hasInventory={hasInventory} />

@@ -1,4 +1,5 @@
 import { withTransaction } from '@/lib/db'
+import { productLabel } from '@/lib/product-label'
 import type { PoolClient } from 'pg'
 import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/inventory'
 import { syncPerishableStock } from '@/lib/shelf'
@@ -182,18 +183,21 @@ async function deductItems(
     if (!item.product_id) continue
     const qty = parseFloat(item.quantity)
 
-    // Resolve selling unit (factor/dimension/qty_step) — variant row wins over product-level.
+    // Resolve the selling unit at the MOST SPECIFIC grain that defines it:
+    // sub-variant, then variant, then product. Mirrors the cart's resolution
+    // (src/app/api/cart/route.ts) — a sub-variant with its own unit must not be
+    // deducted using its parent's factor.
     const unitRow = await client.query(
-      `SELECT COALESCE(puv.unit, pup.unit) AS unit,
-              COALESCE(puv.factor, pup.factor)::text AS factor,
-              COALESCE(puv.dimension, pup.dimension) AS dimension,
-              COALESCE(puv.qty_step, pup.qty_step)::text AS qty_step,
-              COALESCE(puv.min_qty, pup.min_qty)::text AS min_qty,
-              COALESCE(puv.max_qty, pup.max_qty)::text AS max_qty
-         FROM (SELECT 1) x
-         LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-         LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-      [item.buy_unit || null, item.product_id, item.variant_id || null]
+      `SELECT unit, factor::text AS factor, dimension,
+              qty_step::text AS qty_step, min_qty::text AS min_qty, max_qty::text AS max_qty
+         FROM product_units
+        WHERE product_id = $2 AND unit = $1
+          AND ( ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+                OR (sub_variant_id IS NULL AND variant_id = $3)
+                OR (sub_variant_id IS NULL AND variant_id IS NULL) )
+        ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
+        LIMIT 1`,
+      [item.buy_unit || null, item.product_id, item.variant_id || null, item.sub_variant_id || null]
     )
     const unit = toSellingUnit(unitRow.rows[0])
     const baseQty = toBaseQuantity(qty, unit)
@@ -207,13 +211,17 @@ async function deductItems(
 
     const manualBatches = (opts.batchAssignments ?? []).filter(a => a.order_item_id === item.id)
     const manualSerials = (opts.serialAssignments ?? []).filter(a => a.order_item_id === item.id)
-    const label = `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}`
+    const label = `${productLabel(item)}`
 
     if (isSerialized) {
       const needed = unit ? serialCountForQuantity(qty, unit) : Math.round(baseQty)
-      if (opts.requireSerialAssignments && manualSerials.length < needed) {
+      // Exact, not >=: over-assignment silently marks the extra serials sold
+      // (perSerialBase rescales the batch decrement, so nothing else complains).
+      if (opts.requireSerialAssignments && manualSerials.length !== needed) {
+        const step = unit && unit.qty_step > 0 ? unit.qty_step : 1
         throw new Error(
-          `Serial numbers required for "${label}" — need ${needed}, got ${manualSerials.length}`
+          `Serial numbers for "${label}" — expected ${needed} serial number(s) ` +
+          `(${baseQty} base units / ${step} qty_step), got ${manualSerials.length}`
         )
       }
       await deductSerialized(client, referenceId, item, baseQty, needed, manualSerials, label)
@@ -259,6 +267,7 @@ async function deductPerishable(
           AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
           AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
           AND quantity_remaining > 0
+          AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
         ${FEFO_ORDER}
         FOR UPDATE`,
       [item.product_id, item.variant_id, item.sub_variant_id]
@@ -348,6 +357,7 @@ async function deductSerialized(
           AND (ps.variant_id = $2 OR ($2 IS NULL AND ps.variant_id IS NULL))
           AND (ps.sub_variant_id = $3 OR ($3 IS NULL AND ps.sub_variant_id IS NULL))
           AND ps.status = 'in_stock'
+          AND (pb.expiry_date IS NULL OR pb.expiry_date >= CURRENT_DATE)
         ORDER BY pb.expiry_date ASC NULLS LAST, ps.received_at ASC
         LIMIT $4
         FOR UPDATE OF ps`,
@@ -362,6 +372,11 @@ async function deductSerialized(
     }
   }
 
+  // One serial covers qty_step of BASE quantity, not necessarily 1. Deriving it as
+  // baseQty / count keeps batch quantities (base units) in step with serial rows
+  // whatever the unit's qty_step is.
+  const perSerialBase = serials.length > 0 ? baseQty / serials.length : 0
+
   for (let i = 0; i < serials.length; i++) {
     const s = serials[i]
     await client.query(
@@ -373,9 +388,9 @@ async function deductSerialized(
     let expiryDate: string | null = null
     if (s.batch_id) {
       const bu = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
-        `UPDATE product_batches SET quantity_remaining = GREATEST(0, quantity_remaining - 1), updated_at = NOW()
+        `UPDATE product_batches SET quantity_remaining = GREATEST(0, quantity_remaining - $2::numeric), updated_at = NOW()
           WHERE id = $1 RETURNING lot_number, expiry_date`,
-        [s.batch_id]
+        [s.batch_id, perSerialBase]
       )
       lotNumber = bu.rows[0]?.lot_number ?? null
       expiryDate = bu.rows[0]?.expiry_date ?? null
@@ -385,7 +400,7 @@ async function deductSerialized(
       variantId: item.variant_id,
       subVariantId: item.sub_variant_id,
       transactionType: 'sale',
-      quantityChange: -1,
+      quantityChange: -perSerialBase,
       referenceType: 'order',
       referenceId: orderId,
       batchId: s.batch_id,

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getClient, queryOne } from '@/lib/db'
+import { getClient, queryOne, query } from '@/lib/db'
 import { syncPerishableStock, upsertShelfStock, syncCentralInventory } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { resolveGrainUnit, serialSlotsForBaseQuantity } from '@/lib/selling-unit'
 
 const assignmentSchema = z.object({
   variant_id: z.string().uuid().nullable().optional(),
@@ -138,7 +139,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // needed comes from the explicit qty when present; else defer to live qty in
       // the write loop (legacy shape) — only enforce the count when qty is explicit.
       if (qty !== null) {
-        const needed = Math.round(qty)
+        // One serial per qty_step of BASE quantity — the same rule the sale and
+        // receive paths use. qty is already a base quantity here.
+        const grainUnit = await resolveGrainUnit({ query }, {
+          productId,
+          variantId: a.variant_id ?? null,
+          subVariantId: a.sub_variant_id ?? null,
+        })
+        // Only whole slots can be labelled; a remainder is written off at commit.
+        const { serials: needed } = serialSlotsForBaseQuantity(qty, grainUnit)
         if (serials.length !== needed) {
           return NextResponse.json(
             { error: `Grain "${grainLabel}" needs ${needed} serial number${needed !== 1 ? 's' : ''}, but ${serials.length} were provided.` },
@@ -156,6 +165,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Collected for the label-printing popup shown after conversion.
     const createdBatchIds: string[] = []
     const createdSerials: string[] = []
+    const skipped: string[] = []
+    // Base units dropped because stock was not a whole multiple of qty_step.
+    const stepWriteOffs: { grain: string; from: number; to: number; written_off: number; qty_step: number }[] = []
 
     for (const a of assignments) {
       const variantId = a.variant_id ?? null
@@ -188,13 +200,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (product.perishable && !a.expiry_date) {
         throw new Error(`Expiry date required for grain ${subVariantId || variantId || 'product'}`)
       }
+      // Stock that is not a whole multiple of qty_step cannot be fully labelled.
+      // Floor to whole slots and write the remainder off, so every base unit in
+      // stock is covered by a serial (serials = baseQty / qty_step holds exactly).
+      let roundingWriteOff = 0
       if (product.serialized) {
-        const needed = Math.round(inventoryQty)
+        const grainUnit = await resolveGrainUnit(client, {
+          productId,
+          variantId,
+          subVariantId,
+        })
+        const { serials: needed, covered, remainder } = serialSlotsForBaseQuantity(inventoryQty, grainUnit)
         const serials = (a.serial_numbers ?? []).filter(Boolean)
         if (serials.length !== needed) {
           throw new Error(`${needed} serial(s) required for a grain, got ${serials.length}`)
         }
+        if (remainder > 0) {
+          roundingWriteOff = remainder
+          stepWriteOffs.push({
+            grain: subVariantId || variantId || 'product',
+            from: inventoryQty,
+            to: covered,
+            written_off: remainder,
+            qty_step: grainUnit?.qty_step ?? 1,
+          })
+          inventoryQty = covered
+        }
       }
+      if (inventoryQty <= 0) continue
 
       // Grains already bootstrapped (idempotent per grain). Count only ACTIVE stock —
       // batches with quantity_remaining > 0 and in-stock serials — so a grain whose
@@ -216,6 +249,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         [productId, variantId, subVariantId]
       )
       const alreadyBootstrapped = (existing?.total ?? 0) > 0
+
+      // The publish that preceded this call may have turned the grain into a parent
+      // (product → variants, variant → sub-variants) or retired it. Stock is held at
+      // leaves only, so such a grain is skipped rather than given phantom stock.
+      const leaf = subVariantId
+        ? await queryOne<{ is_leaf: boolean }>(
+            `SELECT (sv.is_active AND v.is_active) AS is_leaf
+               FROM product_sub_variants sv JOIN product_variants v ON v.id = sv.variant_id
+              WHERE sv.id = $1 AND sv.product_id = $2`, [subVariantId, productId])
+        : variantId
+          ? await queryOne<{ is_leaf: boolean }>(
+              `SELECT (v.is_active AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv
+                        WHERE sv.variant_id = v.id AND sv.is_active = true)) AS is_leaf
+                 FROM product_variants v WHERE v.id = $1 AND v.product_id = $2`, [variantId, productId])
+          : await queryOne<{ is_leaf: boolean }>(
+              `SELECT NOT EXISTS (SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = true) AS is_leaf`,
+              [productId])
+      if (leaf && !leaf.is_leaf) {
+        skipped.push(subVariantId || variantId || 'product')
+        continue
+      }
 
       if (!alreadyBootstrapped) {
         let newBatchId: string | null = null
@@ -248,6 +302,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           notes: 'Bootstrap: assigned existing stock to batch/serials',
           currentStock: inventoryQty,
         })
+
+        if (roundingWriteOff > 0) {
+          const step = stepWriteOffs[stepWriteOffs.length - 1]?.qty_step ?? 1
+          await logStockMovement(client, {
+            productId, variantId, subVariantId,
+            transactionType: 'adjustment', quantityChange: -roundingWriteOff,
+            referenceType: 'manual', referenceId: productId,
+            notes: `Serialization rounding (qty_step ${step}): ${roundingWriteOff} unit(s) written off`,
+            currentStock: inventoryQty,
+          })
+        }
       }
 
       // Place the stock on the shelf + refresh central inventory — ALWAYS, even when
@@ -271,7 +336,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     await client.query('COMMIT')
-    return NextResponse.json({ success: true, batch_ids: createdBatchIds, serial_numbers: createdSerials })
+    return NextResponse.json({ success: true, batch_ids: createdBatchIds, serial_numbers: createdSerials, skipped, step_write_offs: stepWriteOffs })
   } catch (err: any) {
     await client.query('ROLLBACK')
     // Unique-violation on a serial (e.g. a concurrent bootstrap that raced past the

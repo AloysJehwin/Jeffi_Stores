@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, ReactNode, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -23,16 +24,33 @@ async function patchSetting(key: string, value: string | number | boolean): Prom
   return res.ok
 }
 
-export function SectionCard({ title, description, children, columns }: { title: string; description?: string; children: ReactNode; columns?: boolean }) {
+export function SectionCard({ title, description, children, columns, defaultOpen = false }: { title: string; description?: string; children: ReactNode; columns?: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+
   return (
     <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-      <div className="px-5 py-4 border-b border-border-default">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {description && <p className="text-xs text-foreground-muted mt-0.5">{description}</p>}
-      </div>
-      <div className={columns
-        ? 'p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5'
-        : 'p-5 space-y-5'}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`w-full flex items-start justify-between gap-3 text-left px-5 py-4 ${open ? 'border-b border-border-default' : ''}`}
+      >
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-foreground">{title}</span>
+          {description && <span className="block text-xs text-foreground-muted mt-0.5">{description}</span>}
+        </span>
+        <ChevronDown className={`w-4 h-4 shrink-0 mt-0.5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {/* Hidden rather than unmounted: KeyboardShortcutControl registers into a global
+          conflict registry on mount, and unmounting would drop those registrations.
+          `hidden` alone is not enough — Tailwind's grid/space-y set `display`, which beats
+          the attribute — so the layout classes are only applied while open. */}
+      <div
+        className={!open
+          ? 'hidden'
+          : columns
+            ? 'p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5'
+            : 'p-5 space-y-5'}>
         {children}
       </div>
     </section>
@@ -122,16 +140,36 @@ export function NumberControl({
 }: { settingKey: string; label: string; hint?: string; initial: number; prefix?: string; suffix?: string; min?: number; max?: number; step?: number }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
-  const [value, setValue] = useState<number>(initial)
+  // Held as a string so the field can be genuinely empty while typing. Coercing to a number
+  // here would re-render a 0 the moment the last digit is deleted, making it unclearable.
+  const [value, setValue] = useState<string>(String(initial))
+  const [saved, setSaved] = useState<string>(String(initial))
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
 
   async function save() {
+    if (value.trim() === '') {
+      setValue(saved)
+      setDirty(false)
+      return
+    }
     if (!dirty) return
+    const parsed = parseFloat(value)
+    if (!Number.isFinite(parsed)) {
+      setValue(saved)
+      setDirty(false)
+      return
+    }
     setSaving(true)
-    const ok = await patchSetting(settingKey, value)
+    const ok = await patchSetting(settingKey, parsed)
     setSaving(false)
     setDirty(false)
+    if (ok) {
+      setValue(String(parsed))
+      setSaved(String(parsed))
+    } else {
+      setValue(saved)
+    }
     showToast(ok ? 'Saved' : 'Failed to save', ok ? 'success' : 'error')
   }
 
@@ -148,8 +186,8 @@ export function NumberControl({
           min={min}
           max={max}
           step={step}
-          value={Number.isFinite(value) ? value : 0}
-          onChange={e => { setValue(parseFloat(e.target.value) || 0); setDirty(true) }}
+          value={value}
+          onChange={e => { setValue(e.target.value); setDirty(true) }}
           onBlur={save}
           disabled={saving || !canWrite}
           className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-12' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}

@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { GET, POST } from '@/app/api/admin/products/[id]/variants/[variantId]/sub-variants/[subVariantId]/units/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query as dbQuery} from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -43,7 +43,13 @@ function makePostReq(body: unknown) {
   })
 }
 
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+  vi.resetAllMocks()
+  // assertUnitChangeAllowed reads product flags via query(); default to a
+  // non-serialized, non-perishable product so the guard is a no-op unless a
+  // test opts in.
+  vi.mocked(dbQuery).mockResolvedValue({ rows: [{ perishable: false, serialized: false }] } as any)
+})
 
 // ---------------------------------------------------------------------------
 // GET
@@ -210,6 +216,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
   it('accepts valid dimension values', async () => {
     for (const dim of ['count', 'length', 'area', 'volume', 'weight', 'custom']) {
       vi.resetAllMocks()
+      vi.mocked(dbQuery).mockResolvedValue({ rows: [{ perishable: false, serialized: false }] } as any)
       mockAuth.mockResolvedValue(admin)
       mockHasScope.mockReturnValue(true)
       mockQueryOne.mockResolvedValue({ id: 'sv-1' })

@@ -31,35 +31,24 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
     }
   }
 
-  async function clearLogo() {
-    setBusy(true)
-    try {
-      const res = await fetch('/api/admin/site-controls/logo', { method: 'DELETE', credentials: 'include' })
-      if (res.ok) {
-        setUrl('')
-        showToast('Logo cleared — using default', 'success')
-      } else {
-        showToast('Failed to clear', 'error')
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <div>
       <label className="block text-sm font-medium text-foreground mb-1">Store Logo</label>
       <p className="text-xs text-foreground-muted mb-2">
-        Shown in the site header, emails and PDFs. PNG with transparency recommended. Leave empty to use the built-in logo.
+        Shown in the site header, emails and PDFs. PNG with transparency recommended. Required — upload a replacement to change it.
       </p>
       <div className="flex items-center gap-4">
         <div className="h-16 w-40 rounded-lg border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={url || '/images/logo.png'}
-            alt="Store logo"
-            className="max-h-14 max-w-[9rem] object-contain"
-          />
+          {url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={url}
+              alt="Store logo"
+              className="max-h-14 max-w-[9rem] object-contain"
+            />
+          ) : (
+            <span className="text-xs text-foreground-muted px-2 text-center">No logo</span>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={onFile} className="hidden" />
@@ -72,16 +61,6 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
             >
               {busy ? 'Uploading…' : url ? 'Replace logo' : 'Upload logo'}
             </button>
-            {url && (
-              <button
-                type="button"
-                onClick={clearLogo}
-                disabled={busy}
-                className="px-4 py-2 text-sm font-medium bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground-secondary rounded-lg transition-colors disabled:opacity-60"
-              >
-                Use default
-              </button>
-            )}
           </RequireWrite>
         </div>
       </div>

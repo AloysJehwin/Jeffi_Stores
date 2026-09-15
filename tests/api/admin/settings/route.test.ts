@@ -91,11 +91,10 @@ describe('PATCH /api/admin/settings', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
     const deliveryKeys = [
+      'delivery_charges_enabled',
       'delivery_free_threshold',
-      'delivery_discount_percent',
-      'delivery_discount_flat',
-      'delivery_discount_min_subtotal',
-      'delivery_discount_label',
+      'delivery_rate_per_kg',
+      'delivery_free_weight_ceiling_kg',
     ]
 
     for (const key of deliveryKeys) {

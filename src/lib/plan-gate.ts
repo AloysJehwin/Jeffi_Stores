@@ -112,6 +112,20 @@ export async function getTenantPlan(tenantId: string): Promise<{ plan: string; s
 }
 
 /**
+ * A scope the admin's ROLE grants, narrowed by what the tenant's PLAN sells.
+ * The platform's own admin (no tenant in context) is never plan-limited.
+ */
+export async function hasPlanScope(role: string, roleScopes: string[], scopeKey: string): Promise<boolean> {
+  const { hasScope } = await import('./scopes')
+  if (!hasScope(role, roleScopes, scopeKey)) return false
+  const { resolveTenantId } = await import('./tenant-context')
+  const tenantId = await resolveTenantId()
+  if (!tenantId) return true
+  const { scopes } = await getTenantPlan(tenantId)
+  return scopes.has(scopeKey)
+}
+
+/**
  * Invalidate the cache for a tenant — call after plan upgrades/downgrades.
  */
 export function invalidatePlanCache(tenantId: string): void {

@@ -82,6 +82,10 @@ describe('products draft route (POST/PATCH/DELETE)', () => {
     const data = await res.json()
     expect(data.success).toBe(true)
     expect(data.productId).toBe('prod-1')
+    const sql = String(mockQuery.mock.calls[0][0])
+    expect(sql).toContain("jsonb_build_object('sub_variant_type_on'")
+    expect(sql).toContain("- 'inventory_quantity'")
+    expect(sql).not.toContain('_seeded')
   })
 
   it('POST returns 409 when draft already exists', async () => {

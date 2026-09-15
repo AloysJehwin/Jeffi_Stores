@@ -43,14 +43,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
   }
 
+  // Idempotency is enforced by uq_wallet_ledger_tenant_external_ref inside rechargeWallet, not
+  // by a check here: a SELECT-then-INSERT lets two concurrent verifies both pass the check and
+  // credit the same payment twice.
   const noteRef = `Razorpay top-up ${razorpay_payment_id}`
-  const dup = await controlPlanePool().query(
-    `SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND entry_type = 'recharge' AND note = $2 LIMIT 1`,
-    [tenant.tenantId, noteRef],
-  )
-  if (dup.rowCount && dup.rowCount > 0) {
-    return NextResponse.json({ success: true, alreadyCredited: true })
-  }
 
   let amountInr: number
   try {
@@ -65,8 +61,17 @@ export async function POST(request: NextRequest) {
   }
   if (!(amountInr > 0)) return NextResponse.json({ error: 'Top-up amount must be positive' }, { status: 400 })
 
-  const result = await rechargeWallet({ tenantId: tenant.tenantId, amountInr, note: noteRef })
+  const result = await rechargeWallet({
+    tenantId: tenant.tenantId,
+    amountInr,
+    note: noteRef,
+    externalRef: razorpay_payment_id,
+  })
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
 
-  return NextResponse.json({ success: true, balance: result.balance })
+  return NextResponse.json({
+    success: true,
+    balance: result.balance,
+    ...(result.alreadyCredited ? { alreadyCredited: true } : {}),
+  })
 }

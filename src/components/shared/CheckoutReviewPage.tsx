@@ -1043,7 +1043,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                         <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                           {primaryImage ? (
-                            <ImgWithSkeleton src={primaryImage.thumbnail_url || primaryImage.image_url} alt={item.products.name} className="w-full h-full object-cover rounded-lg" />
+                            <ImgWithSkeleton src={primaryImage.thumbnail_url || primaryImage.image_url} alt={item.products.name} blurhash={primaryImage.blurhash} className="w-full h-full object-cover rounded-lg" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">

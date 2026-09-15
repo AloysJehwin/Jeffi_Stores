@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { productLabel } from '@/lib/product-label'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
@@ -172,7 +173,8 @@ export async function POST(
         product_sku: '',
         variant_id: item.variant_id || null,
         sub_variant_id: item.sub_variant_id || null,
-        variant_name: null,
+        variant_name: item.variant_name || null,
+        sub_variant_name: item.sub_variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: rawQty,
@@ -228,7 +230,7 @@ export async function POST(
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`)
+          if (stock < baseQty) insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
@@ -315,15 +317,15 @@ export async function POST(
       for (const item of processedItems) {
         const oir = await client.query<{ id: string }>(
           `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
+            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name, sub_variant_name,
             hsn_code, gst_rate, quantity, buy_unit, buy_mode, mrp, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount,
             sold_unit, sold_unit_factor, base_quantity
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
           RETURNING id`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
+            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null, item.hsn_code, item.gst_rate,
             item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
             item.mrp, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,

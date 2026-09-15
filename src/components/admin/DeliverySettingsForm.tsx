@@ -123,6 +123,12 @@ interface FieldProps {
 }
 
 function Field({ label, hint, prefix, suffix, value, max, onChange, onBlur, saving }: FieldProps) {
+  // Mirrors NumberControl: a string draft so deleting the last digit leaves the field empty
+  // instead of snapping back to 0. Reverts to the last committed value if left blank.
+  const [draft, setDraft] = useState<string>(String(value))
+  const [editing, setEditing] = useState(false)
+  const shown = editing ? draft : String(Number.isFinite(value) ? value : 0)
+
   return (
     <div>
       <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
@@ -134,9 +140,14 @@ function Field({ label, hint, prefix, suffix, value, max, onChange, onBlur, savi
           min={0}
           max={max}
           step={1}
-          value={Number.isFinite(value) ? value : 0}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          onBlur={onBlur}
+          value={shown}
+          onFocus={() => { setDraft(String(Number.isFinite(value) ? value : 0)); setEditing(true) }}
+          onChange={e => {
+            setDraft(e.target.value)
+            const parsed = parseFloat(e.target.value)
+            if (Number.isFinite(parsed)) onChange(parsed)
+          }}
+          onBlur={() => { setEditing(false); onBlur() }}
           disabled={saving}
           className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-9' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
         />

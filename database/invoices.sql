@@ -27,6 +27,7 @@ CREATE TABLE public.cash_sale_items (
     igst_amount numeric DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     sub_variant_id uuid,
+    sub_variant_name character varying,
     buy_unit character varying(20),
     buy_mode character varying(10) DEFAULT 'unit'::character varying
 );
