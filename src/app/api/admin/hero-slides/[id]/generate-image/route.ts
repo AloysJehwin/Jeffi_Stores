@@ -53,10 +53,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const imgRes = await fetch(genUrl)
     if (!imgRes.ok) return NextResponse.json({ error: 'Failed to fetch generated image' }, { status: 502 })
     const buffer = Buffer.from(await imgRes.arrayBuffer())
-    const { url } = await uploadGalleryImage(buffer, `hero-${id}.png`)
+    const { url, blurhash } = await uploadGalleryImage(buffer, `hero-${id}.png`)
+    const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    await query(`UPDATE hero_slides SET ${field} = $1, updated_at = NOW() WHERE id = $2`, [url, id])
-    return NextResponse.json({ url, field })
+    await query(
+      `UPDATE hero_slides SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`,
+      [url, blurhash, id],
+    )
+    return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Image generation failed' }, { status: 500 })
   }

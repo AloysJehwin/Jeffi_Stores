@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { productLabel as grainLabel } from '@/lib/product-label'
 import CopySku from '@/components/ui/CopySku'
 
 interface Props {
@@ -236,7 +237,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                           const recvPu = factor > 1 ? Math.round((recvBase / factor) * 1000) / 1000 : recvBase
                           const puLabel = matchItem?.purchase_unit || matchItem?.base_unit || 'unit'
                           const productLabel = matchItem
-                            ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
+                            ? grainLabel(matchItem)
                             : `Item #${idx + 1}`
                           const taxRate = Number(gi.tax_rate ?? matchItem?.tax_rate) || 0
                           const costPerPu = gi.unit_cost

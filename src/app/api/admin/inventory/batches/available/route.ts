@@ -2,8 +2,35 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
+import {
+  resolveGrainUnit,
+  serialCountForBaseQuantity,
+  type SellingUnit,
+} from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * `required_qty` is BASE units (what batch allocation consumes); `required_serials`
+ * is how many serial rows that covers. They differ whenever qty_step != 1, and
+ * conflating them is what made the picker ask for the wrong count.
+ */
+const unitRunner = {
+  query: async (text: string, params?: unknown[]) => ({ rows: await queryMany(text, params as any[]) }),
+}
+
+function grainUnitCache() {
+  const cache = new Map<string, Promise<SellingUnit | null>>()
+  return (productId: string, variantId: string | null, subVariantId: string | null) => {
+    const key = `${productId}:${variantId || ''}:${subVariantId || ''}`
+    let hit = cache.get(key)
+    if (!hit) {
+      hit = resolveGrainUnit(unitRunner, { productId, variantId, subVariantId })
+      cache.set(key, hit)
+    }
+    return hit
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +44,7 @@ export async function GET(request: NextRequest) {
     const subVariantId = request.nextUrl.searchParams.get('sub_variant_id') || null
     const lineItemId = request.nextUrl.searchParams.get('line_item_id') || 'item'
     const qty = parseFloat(request.nextUrl.searchParams.get('qty') || '1')
+    const unitForGrain = grainUnitCache()
 
     // Direct product lookup (invoice create — no order yet)
     if (productId) {
@@ -26,6 +54,8 @@ export async function GET(request: NextRequest) {
       const variantRow = variantId ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [variantId]) : null
 
       if (productRow?.serialized) {
+        // `qty` arrives already in base units (callers fold in the factor).
+        const unit = await unitForGrain(productId, variantId, subVariantId)
         return NextResponse.json({
           items: [],
           serialized_items: [{
@@ -33,6 +63,8 @@ export async function GET(request: NextRequest) {
             product_name: productRow.name || '',
             variant_name: variantRow?.variant_name || null,
             required_qty: qty,
+            required_serials: serialCountForBaseQuantity(qty, unit),
+            qty_step: unit?.qty_step ?? 1,
             already_assigned: false,
             product_id: productId,
             variant_id: variantId,
@@ -53,11 +85,13 @@ export async function GET(request: NextRequest) {
         ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
       `, [productId, variantId, subVariantId])
 
+      const batchUnit = await unitForGrain(productId, variantId, subVariantId)
       return NextResponse.json({ items: [{
         order_item_id: lineItemId,
         product_name: productRow?.name || '',
         variant_name: variantRow?.variant_name || null,
         required_qty: qty,
+        qty_step: batchUnit?.qty_step ?? 1,
         already_assigned: false,
         batches,
       }], serialized_items: [] })
@@ -108,11 +142,14 @@ export async function GET(request: NextRequest) {
           : (item.base_quantity ? parseFloat(item.base_quantity) : parseFloat(item.quantity))
 
         if (item.serialized) {
+          const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
           qSerializedResult.push({
             order_item_id: item.order_item_id,
             product_name: item.product_name,
             variant_name: item.variant_name || null,
             required_qty: requiredQty,
+            required_serials: serialCountForBaseQuantity(requiredQty, unit),
+            qty_step: unit?.qty_step ?? 1,
             already_assigned: false,
             product_id: item.product_id,
             variant_id: item.variant_id || null,
@@ -131,11 +168,13 @@ export async function GET(request: NextRequest) {
             ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
           `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
 
+          const qBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
           qResult.push({
             order_item_id: item.order_item_id,
             product_name: item.product_name,
             variant_name: item.variant_name || null,
             required_qty: requiredQty,
+            qty_step: qBatchUnit?.qty_step ?? 1,
             already_assigned: false,
             batches,
           })
@@ -185,11 +224,14 @@ export async function GET(request: NextRequest) {
         : parseFloat(item.base_quantity)
 
       if (item.serialized) {
+        const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
         serializedResult.push({
           order_item_id: item.order_item_id,
           product_name: item.product_name,
           variant_name: item.variant_name || null,
           required_qty: requiredQty,
+          required_serials: serialCountForBaseQuantity(requiredQty, unit),
+          qty_step: unit?.qty_step ?? 1,
           already_assigned: !!item.batch_id,
           product_id: item.product_id,
           variant_id: item.variant_id || null,
@@ -214,11 +256,13 @@ export async function GET(request: NextRequest) {
           ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
         `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
 
+        const oBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
         result.push({
           order_item_id: item.order_item_id,
           product_name: item.product_name,
           variant_name: item.variant_name || null,
           required_qty: requiredQty,
+          qty_step: oBatchUnit?.qty_step ?? 1,
           already_assigned: !!item.batch_id,
           batches,
         })

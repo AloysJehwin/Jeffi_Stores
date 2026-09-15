@@ -7,22 +7,14 @@ export { applyDeliveryRules } from './delivery-rules'
 const DEFAULTS: DeliverySettings = {
   enabled: true,
   freeThreshold: 0,
-  discountPercent: 0,
-  discountFlat: 0,
-  discountMinSubtotal: 0,
-  discountLabel: '',
-  baseCharge: 0,
+  ratePerKg: 0,
   freeWeightCeilingKg: 3,
 }
 
 const KEYS = [
   'delivery_charges_enabled',
   'delivery_free_threshold',
-  'delivery_discount_percent',
-  'delivery_discount_flat',
-  'delivery_discount_min_subtotal',
-  'delivery_discount_label',
-  'delivery_base_charge',
+  'delivery_rate_per_kg',
   'delivery_free_weight_ceiling_kg',
 ]
 
@@ -46,11 +38,7 @@ export async function getDeliverySettings(): Promise<DeliverySettings> {
     const result: DeliverySettings = {
       enabled: (map.get('delivery_charges_enabled') ?? 'true').toLowerCase() === 'true',
       freeThreshold: Math.max(0, parseNum(map.get('delivery_free_threshold'), 0)),
-      discountPercent: Math.min(100, Math.max(0, parseNum(map.get('delivery_discount_percent'), 0))),
-      discountFlat: Math.max(0, parseNum(map.get('delivery_discount_flat'), 0)),
-      discountMinSubtotal: Math.max(0, parseNum(map.get('delivery_discount_min_subtotal'), 0)),
-      discountLabel: (map.get('delivery_discount_label') ?? '').trim(),
-      baseCharge: Math.max(0, parseNum(map.get('delivery_base_charge'), 0)),
+      ratePerKg: Math.max(0, parseNum(map.get('delivery_rate_per_kg'), 0)),
       freeWeightCeilingKg: Math.max(0, parseNum(map.get('delivery_free_weight_ceiling_kg'), 3)),
     }
     cache = { value: result, expiresAt: Date.now() + TTL_MS }

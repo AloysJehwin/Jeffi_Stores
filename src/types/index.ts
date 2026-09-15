@@ -70,6 +70,7 @@ export interface ProductImage {
   mime_type?: string
   width?: number
   height?: number
+  blurhash?: string | null
   alt_text?: string
   display_order: number
   is_primary: boolean

@@ -15,7 +15,7 @@ import { settleVariantChangePayment } from '@/lib/variant-change'
 import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { getCurrentTenant } from '@/lib/tenant-context'
-import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
+import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlement } from '@/lib/razorpay-route'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
@@ -57,6 +57,10 @@ export async function POST(request: NextRequest) {
       await handleQrCodeCredited(event.payload.qr_code.entity)
     } else if (eventType === 'transfer.processed') {
       await handleTransferProcessed(event.payload.transfer.entity)
+    } else if (eventType === 'transfer.reversed') {
+      await handleTransferReversed(event.payload.transfer.entity)
+    } else if (eventType === 'refund.created' || eventType === 'refund.processed') {
+      await handleRefund(event.payload.refund.entity)
     }
 
     return NextResponse.json({ status: 'ok' })
@@ -143,7 +147,8 @@ async function fireRouteTransfer(opts: {
   const result = await transferToLinkedAccount({
     paymentId: opts.paymentId,
     grossAmountPaise: Math.round(opts.totalAmountInr * 100),
-    delhiveryChargePaise: Math.round((opts.shippingAmountInr ?? 0) * 100),
+    // Shipping is NOT withheld from the transfer — it is charged once from the prepaid wallet
+    // at the real invoiced amount once the AWB is billed.
     linkedAccountId,
     orderId: opts.orderId,
     tenantSlug: resolved.slug,
@@ -166,6 +171,25 @@ async function fireRouteTransfer(opts: {
 async function handlePaymentCaptured(payment: any) {
   const razorpayOrderId = payment.order_id
   const razorpayPaymentId = payment.id
+
+  // Wallet top-ups are not orders. The browser callback normally credits them, but if it never
+  // fires (tab closed, network drop) the money is captured and the credit lost — this webhook is
+  // the durable fallback. rechargeWallet is idempotent on external_ref, so the two paths racing
+  // credit exactly once.
+  if (payment?.notes?.purpose === 'wallet_topup') {
+    const tenantId = (payment.notes.tenant_id ?? '').toString().trim()
+    const amountInr = (Number(payment.amount) || 0) / 100
+    if (tenantId && amountInr > 0) {
+      const { rechargeWallet } = await import('@/lib/wallet')
+      await rechargeWallet({
+        tenantId,
+        amountInr,
+        note: `Razorpay top-up ${razorpayPaymentId}`,
+        externalRef: razorpayPaymentId,
+      }).catch(() => {})
+    }
+    return
+  }
 
   const paymentRecord = await queryOne(
     `SELECT p.id as payment_id, p.order_id, p.status as payment_record_status,
@@ -411,6 +435,70 @@ async function handleTransferProcessed(transfer: any) {
      WHERE gateway_txn_id = $1 AND status = 'captured'`,
     [transferId]
   ).catch(() => {})
+}
+
+/**
+ * A transfer was reversed — by our own refund paths, or from the Razorpay dashboard.
+ * Marks the tenant transaction refunded so the billing view stops counting the reversed
+ * share as tenant earnings. Idempotent: the WHERE clause no-ops once already refunded.
+ */
+async function handleTransferReversed(transfer: any) {
+  const transferId = (transfer?.id ?? '').toString().trim()
+  if (!transferId) return
+  await controlPlanePool().query(
+    `UPDATE tenant_transactions SET status = 'refunded'
+     WHERE gateway_txn_id = $1 AND status <> 'refunded'`,
+    [transferId]
+  ).catch(() => {})
+}
+
+/**
+ * A refund was issued — possibly from the Razorpay DASHBOARD, bypassing the app entirely.
+ * In that case no reversal was attempted and nothing was recorded, so the tenant silently
+ * keeps their share. Mark the payment refunded and record the shortfall as tenant debt for
+ * the reconciliation to pick up.
+ *
+ * Refunds issued BY the app already recorded themselves; the status guard makes this a no-op
+ * for those rather than double-counting.
+ */
+async function handleRefund(refund: any) {
+  const paymentId = (refund?.payment_id ?? '').toString().trim()
+  if (!paymentId) return
+
+  const updated = await query(
+    `UPDATE payments SET status = 'refunded', updated_at = NOW()
+      WHERE transaction_id = $1 AND status <> 'refunded'
+      RETURNING order_id`,
+    [paymentId]
+  ).catch(() => null)
+
+  const orderId = updated?.rows?.[0]?.order_id
+  if (!orderId) return // already recorded by the in-app refund path
+
+  await query(
+    `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
+    [orderId]
+  ).catch(() => {})
+
+  const order = await queryOne<{ order_number: string }>(
+    `SELECT order_number FROM orders WHERE id = $1`, [orderId]
+  ).catch(() => null)
+  if (!order?.order_number) return
+  // Razorpay hits a fixed URL with no tenant host, so ALS is empty here — the tenant is carried
+  // in the refund's own notes (copied from the payment), same as every other handler in this file.
+  const tenant = await resolveWebhookTenantId(refund, order.order_number).catch(() => null)
+  if (!tenant?.tenantId) return
+
+  // Out-of-band refund: nothing reversed the tenant's share, so the whole amount is owed.
+  const refundedInr = (Number(refund?.amount) || 0) / 100
+  await recordRefundSettlement({
+    tenantId: tenant.tenantId,
+    orderRef: order.order_number,
+    refundedInr,
+    reversedInr: 0,
+    unrecoveredInr: refundedInr,
+    note: 'refunded outside the app (dashboard)',
+  }).catch(() => {})
 }
 
 async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId: string, payment: any) {

@@ -6,7 +6,12 @@ export interface SerialItem {
   order_item_id: string
   product_name: string
   variant_name: string | null
+  /** BASE units this line consumes — what batch allocation draws down. */
   required_qty: number
+  /** Serial rows that covers: base / qty_step. Differs from required_qty
+   *  whenever the grain's selling unit has qty_step != 1. */
+  required_serials?: number
+  qty_step?: number
   already_assigned: boolean
   /** Serials already assigned to this line (e.g. auto-recorded from a serial scan).
    *  The modal pre-fills these as selected and treats them as VALID even if the
@@ -22,6 +27,12 @@ export interface SerialItem {
 export interface SerialAssignment {
   order_item_id: string
   serial_number: string
+}
+
+/** Serial rows a line needs. Falls back to base units for callers that predate
+ *  required_serials, where qty_step is 1 and the two are equal. */
+function serialsNeeded(item: SerialItem): number {
+  return item.required_serials ?? item.required_qty
 }
 
 interface AvailableSerial {
@@ -41,11 +52,16 @@ export function SerialPicker({
   selected,
   onChange,
   scanEnabled = true,
+  autoFill = true,
 }: {
   item: SerialItem
   selected: Set<string>
   onChange: (next: Set<string>) => void
   scanEnabled?: boolean
+  /** Top the line up to the required count from in-stock serials. True for the
+   *  modal (pick-from-list). False inline, where padding a line with serials the
+   *  operator never scanned would silently assign the wrong physical units. */
+  autoFill?: boolean
 }) {
   const [available, setAvailable] = useState<AvailableSerial[]>([])
   const [loading, setLoading] = useState(false)
@@ -66,10 +82,11 @@ export function SerialPicker({
         setAvailable(list)
         // Keep any pre-assigned serials already in `selected` (seeded by the parent
         // from a scan), then auto-fill the REMAINING delta from the in-stock list —
-        // skipping serials already selected. Never exceed required_qty.
+        // skipping serials already selected. Never exceed the required count.
+        if (!autoFill) return
         const keep = new Set(selected)
         for (const s of list) {
-          if (keep.size >= item.required_qty) break
+          if (keep.size >= serialsNeeded(item)) break
           if (!keep.has(s.serial_number)) keep.add(s.serial_number)
         }
         onChange(keep)
@@ -83,14 +100,14 @@ export function SerialPicker({
     if (next.has(sn)) {
       next.delete(sn)
     } else {
-      if (next.size >= item.required_qty) return
+      if (next.size >= serialsNeeded(item)) return
       next.add(sn)
     }
     onChange(next)
   }
 
   // ── Scan mode: N plain fields (one per required unit) ──────────────────────
-  // When scan is on we render `required_qty` text inputs. The scanner types a
+  // When scan is on we render one text input per required serial. The scanner types a
   // serial into the focused field and its trailing Enter advances to the next
   // empty field (same reliable pattern as PO-receive / bootstrap — no global
   // keystroke interception, so it works with any USB/Bluetooth HID scanner).
@@ -128,23 +145,29 @@ export function SerialPicker({
       // Pre-fill the first fields with any pre-assigned serials (editable); the rest
       // are empty for the operator to scan the delta. Keeps `selected` in sync so a
       // fully-preassigned line already confirms without a re-scan.
-      const pre = (item.preassigned ?? []).slice(0, item.required_qty)
-      const seeded = Array.from({ length: item.required_qty }, (_, i) => pre[i] ?? '')
+      // Seed from what this line already holds (scanned serials arrive as
+      // `preassigned`), falling back to the live selection so switching modes
+      // never discards work.
+      const held = (item.preassigned ?? []).length > 0
+        ? (item.preassigned ?? [])
+        : Array.from(selected)
+      const pre = held.slice(0, serialsNeeded(item))
+      const seeded = Array.from({ length: serialsNeeded(item) }, (_, i) => pre[i] ?? '')
       setEntries(seeded)
       dirtyRef.current = {}
       setScanFieldsKey(k => k + 1) // remount fields → reset stale DOM text
       onChange(new Set(pre))
-    } else if (available.length > 0 && selected.size === 0) {
-      const pre = (item.preassigned ?? []).slice(0, item.required_qty)
+    } else if (autoFill && available.length > 0 && selected.size === 0) {
+      const pre = (item.preassigned ?? []).slice(0, serialsNeeded(item))
       const autoSelected = new Set(pre)
       for (const s of available) {
-        if (autoSelected.size >= item.required_qty) break
+        if (autoSelected.size >= serialsNeeded(item)) break
         autoSelected.add(s.serial_number)
       }
       onChange(autoSelected)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanEnabled, item.required_qty, available.length])
+  }, [scanEnabled, item.required_serials, item.required_qty, available.length])
 
   // Put the cursor in the first field once scan mode is active and serials loaded,
   // so the operator can scan immediately without clicking.
@@ -189,8 +212,8 @@ export function SerialPicker({
   }
 
   function focusNextEntry(from: number) {
-    for (let step = 1; step <= item.required_qty; step++) {
-      const idx = (from + step) % item.required_qty
+    for (let step = 1; step <= serialsNeeded(item); step++) {
+      const idx = (from + step) % serialsNeeded(item)
       const el = fieldRefs.current[idx]
       if (el && !el.value) { el.focus(); return }
     }
@@ -236,8 +259,8 @@ export function SerialPicker({
     else batches.push({ lotKey, lotLabel, serials: [s] })
   }
 
-  const isOk = selected.size === item.required_qty
-  const isOver = selected.size > item.required_qty
+  const isOk = selected.size === serialsNeeded(item)
+  const isOver = selected.size > serialsNeeded(item)
 
   return (
     <div>
@@ -258,7 +281,7 @@ export function SerialPicker({
             : isOk  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
             : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
           }`}>
-            {selected.size} / {item.required_qty} selected
+            {selected.size} / {serialsNeeded(item)} selected
           </span>
         </div>
       </div>
@@ -272,7 +295,7 @@ export function SerialPicker({
           {/* Scan mode: one field per required unit. Scan a serial → its Enter jumps
               to the next empty field. Each field validates against the in-stock list. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {Array.from({ length: item.required_qty }, (_, i) => {
+            {Array.from({ length: serialsNeeded(item) }, (_, i) => {
               const val = entries[i] ?? ''
               const trimmed = val.trim()
               const valid = !trimmed || availSet.has(trimmed.toLowerCase())
@@ -356,7 +379,7 @@ export function SerialPicker({
                   </button>
                   {!collapsed && batch.serials.map(s => {
                     const checked = selected.has(s.serial_number)
-                    const disabled = !checked && selected.size >= item.required_qty
+                    const disabled = !checked && selected.size >= serialsNeeded(item)
                     return (
                       <label
                         key={s.serial_number}
@@ -380,7 +403,7 @@ export function SerialPicker({
             })}
           </div>
           <p className="text-xs text-foreground-muted mt-1.5">
-            {available.length} serial{available.length !== 1 ? 's' : ''} in stock across {batches.length} batch{batches.length !== 1 ? 'es' : ''} — select exactly {item.required_qty}
+            {available.length} serial{available.length !== 1 ? 's' : ''} in stock across {batches.length} batch{batches.length !== 1 ? 'es' : ''} — select exactly {serialsNeeded(item)}
           </p>
         </>
       )}
@@ -398,13 +421,13 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
     Object.fromEntries(itemsNeedingEntry.map(i => [
       i.order_item_id,
       // Seed with any pre-assigned serials (e.g. auto-recorded from a scan), capped
-      // at required_qty. The SerialPicker fills the remaining delta.
-      new Set<string>((i.preassigned ?? []).slice(0, i.required_qty)),
+      // at the required serial count. The SerialPicker fills the remaining delta.
+      new Set<string>((i.preassigned ?? []).slice(0, serialsNeeded(i))),
     ]))
   )
 
   const canConfirm = itemsNeedingEntry.every(item =>
-    selections[item.order_item_id]?.size === item.required_qty
+    selections[item.order_item_id]?.size === serialsNeeded(item)
   )
 
   function handleConfirm() {
@@ -423,7 +446,7 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Select Serial Numbers</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Serials grouped by batch — top {itemsNeedingEntry[0]?.required_qty ?? 'N'} pre-selected</p>
+            <p className="text-sm text-foreground-muted mt-0.5">Serials grouped by batch — top {(itemsNeedingEntry[0] ? serialsNeeded(itemsNeedingEntry[0]) : undefined) ?? 'N'} pre-selected</p>
           </div>
           <div className="flex items-center gap-3">
             <button

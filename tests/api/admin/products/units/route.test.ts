@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { GET, POST } from '@/app/api/admin/products/[id]/units/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query as dbQuery} from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -41,7 +41,13 @@ function makePostReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+  // assertUnitChangeAllowed reads product flags via query(); default to a
+  // non-serialized, non-perishable product so the guard is a no-op unless a
+  // test opts in.
+  vi.mocked(dbQuery).mockResolvedValue({ rows: [{ perishable: false, serialized: false }] } as any)
+})
 
 describe('GET /api/admin/products/[id]/units', () => {
   it('returns 401 when unauthenticated', async () => {

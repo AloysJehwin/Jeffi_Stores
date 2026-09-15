@@ -146,6 +146,19 @@ export async function PATCH(request: NextRequest) {
       quantityInUnit = parsed.data.quantity_in_unit
     }
 
+    // Batches and serials are the source of truth for tracked products; a bare
+    // quantity written here would be overwritten at the next sync and could leave
+    // units without serials.
+    const tracked = await queryOne<{ perishable: boolean; serialized: boolean }>(
+      `SELECT perishable, serialized FROM products WHERE id = $1`, [product_id]
+    )
+    if (tracked?.perishable || tracked?.serialized) {
+      return NextResponse.json(
+        { error: 'This product is perishable or serialized. Receive stock through a GRN and remove it by batch or serial.' },
+        { status: 409 }
+      )
+    }
+
     const client = await getClient()
     try {
       await client.query('BEGIN')

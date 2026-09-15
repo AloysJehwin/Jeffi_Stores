@@ -20,7 +20,7 @@ export interface RateBreakdown {
   codFee: number
   totalCharge: number
   zone: string
-  source: 'delhivery' | 'fallback' | 'free' | 'admin_disabled' | 'free_threshold' | 'discounted' | 'unserviceable'
+  source: 'delhivery' | 'fallback' | 'rate_per_kg' | 'free' | 'admin_disabled' | 'free_threshold' | 'unserviceable'
   chargedWeightGrams: number
   cartonCount: number
   cartons?: { weightGrams: number; charge: number; zone: string }[]
@@ -256,10 +256,27 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
   let totalCharge = 0
   let totalChargedWeight = 0
   let zone = ''
-  let source: 'delhivery' | 'fallback' = 'delhivery'
+  let source: 'delhivery' | 'fallback' | 'rate_per_kg' = 'delhivery'
   const cartonBreakdown: RateBreakdown['cartons'] = []
 
-  if (TOKEN) {
+  // An admin per-kg rate replaces the carrier quote outright, so skip the per-carton API calls
+  // rather than paying for a rate that gets discarded.
+  const usingRateOverride = deliverySettings.ratePerKg > 0
+
+  if (usingRateOverride) {
+    // Per-carton charges here are presentational only. applyDeliveryRules recomputes the
+    // authoritative total from the summed charged weight, so summing these rounded shares
+    // into totalCharge would let per-carton rounding drift off that total.
+    source = 'rate_per_kg'
+    for (const c of cartons) {
+      totalChargedWeight += c.chargedWeightGrams
+      cartonBreakdown.push({
+        weightGrams: c.chargedWeightGrams,
+        charge: round2(deliverySettings.ratePerKg * (c.chargedWeightGrams / 1000)),
+        zone: '',
+      })
+    }
+  } else if (TOKEN) {
     try {
       for (const c of cartons) {
         const r = await callDelhiveryForCarton(c, destinationPin, !!isCod, originPin, TOKEN)
@@ -298,11 +315,16 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
     ? Math.round(Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * (typeof subtotal === 'number' ? subtotal : 0)) * 100) / 100
     : 0
 
+  // Carton-derived, so a per-kg rate prices identically whether the carrier quote succeeded,
+  // fell back, or was skipped entirely — unlike totalChargedWeight, which is carrier-reported.
+  const packedChargedWeightGrams = cartons.reduce((s, c) => s + c.chargedWeightGrams, 0)
+
   const ruleResult = applyDeliveryRules({
     baseCharge: round2(totalCharge),
     subtotal: typeof subtotal === 'number' ? subtotal : 0,
     settings: deliverySettings,
     weightGrams: totalWeightGrams,
+    chargedWeightGrams: packedChargedWeightGrams,
   })
 
   // Min/max clamp the FINAL buyer-facing charge, after per-kg surcharge and delivery-rule

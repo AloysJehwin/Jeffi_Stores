@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
+import ImageGalleryEditor from './ImageGalleryEditor'
 import GalleryPicker from './GalleryPicker'
 import AdminSelect from './AdminSelect'
 import ProductSupplierList, { SupplierRow } from './ProductSupplierList'
@@ -14,6 +15,8 @@ import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
+import SubVariantEditor, { emptySubVariantDraft, SubVariantDraft } from './SubVariantEditor'
+import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/selling-unit'
 import { applyDiscount } from '@/lib/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
@@ -81,7 +84,7 @@ interface VariantGroup {
 
 // Bootstrap ("Assign Existing Stock") per-grain types. A grain is one
 // variant / sub-variant (or the bare product) that already holds stock.
-type BsGrain = { variant_id: string|null; sub_variant_id: string|null; label: string; qty: number }
+type BsGrain = { variant_id: string|null; sub_variant_id: string|null; label: string; qty: number; qty_step?: number }
 type BsEntry = { expiry: string; mfg: string; lot: string; location: string; serials: string[]; selected: boolean; assignQty: number }
 
 interface ProductFormProps {
@@ -207,6 +210,9 @@ function lockedInputCls(baseCls: string, isLocked: boolean): string {
   return isLocked ? `${baseCls} bg-surface-secondary text-foreground-muted cursor-not-allowed` : baseCls
 }
 
+const PACKAGE_TYPE_OPTIONS = PACKAGE_TYPES.map(v => ({ value: v, label: PACKAGE_TYPE_LABELS[v] }))
+const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
+
 function exToIncl(exVal: string, rate: number): string {
   if (!exVal) return ''
   const n = parseFloat(exVal)
@@ -263,8 +269,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [productImageDeleting, setProductImageDeleting] = useState<Record<string, boolean>>({})
   const [productImageError, setProductImageError] = useState<string | null>(null)
   const [productGalleryOpen, setProductGalleryOpen] = useState(false)
-  const productImageDragIndex = useRef<number | null>(null)
-  const productImageDragOverIndex = useRef<number | null>(null)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
   const pendingPopupVariantIdRef = useRef<string | null>(null)
@@ -285,8 +289,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantImageError, setVariantImageError] = useState<string | null>(null)
   const [variantImagePendingAdds, setVariantImagePendingAdds] = useState<Record<string, number>>({})
   const [variantImageDeleting, setVariantImageDeleting] = useState<Record<string, boolean>>({})
-  const variantImageDragIndex = useRef<number | null>(null)
-  const variantImageDragOverIndex = useRef<number | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
   const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>(() => {
     const init: Record<string, any[]> = {}
@@ -312,9 +314,9 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     return init
   })
-  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string; weight_grams: string; length_cm: string; breadth_cm: string; height_cm: string; package_type: string }>>({})
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, SubVariantDraft>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
-  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string; weight_grams: string; length_cm: string; breadth_cm: string; height_cm: string; package_type: string } | null>(null)
+  const [subVariantEditDraft, setSubVariantEditDraft] = useState<SubVariantDraft | null>(null)
   const [expandedSvUnits, setExpandedSvUnits] = useState<Set<string>>(new Set())
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [weightGrams, setWeightGrams] = useState<string>(product?.weight_grams != null ? String(product.weight_grams) : '')
@@ -346,11 +348,12 @@ export default function ProductForm({ categories, brands, action, product, produ
       : []
   )
   useEffect(() => {
+    if (!hasInventory) return
     fetch('/api/admin/suppliers/list', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then(setSuppliers)
       .catch(() => {})
-  }, [])
+  }, [hasInventory])
   const [extraDeliveryDays, setExtraDeliveryDays] = useState(
     product?.extra_delivery_days != null ? String(product.extra_delivery_days) : '0'
   )
@@ -526,9 +529,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
         sub_variant_type: v.sub_variant_type || '',
-        sub_variant_type_on: v.sub_variant_type_on != null
-          ? !!v.sub_variant_type_on
-          : (!!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0)),
+        sub_variant_type_on: !!v.sub_variant_type_on || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
         variant_type: v.variant_type || '',
         use_own_images: v.use_own_images != null
           ? !!v.use_own_images
@@ -858,15 +859,11 @@ export default function ProductForm({ categories, brands, action, product, produ
   const showBootstrap = _bsStockTotal > 0 && (_perishablePending || _serializedPending)
   // Lazily build the default entry for a grain (auto lot, open-shelf location).
   const _bsMakeEntry = useCallback((defaultQty = 0): BsEntry => {
-    const skuPart = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-    const today = new Date()
-    const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-    const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
     const open = bsShelfLocations.find((l: any) => l.is_open_shelf)
     return {
       expiry: '',
       mfg: '',
-      lot: `LOT-${skuPart ? skuPart + '-' : ''}${ymd}-${rand}`,
+      lot: generateLotNumber(product?.sku),
       location: open?.id || '',
       serials: [],
       selected: true,
@@ -919,6 +916,21 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   // Move focus to the next EMPTY serial input after the given ref key, wrapping
   // across all grains — identical behaviour to PO receive's focusNextSerial.
+  // One serial per WHOLE qty_step of BASE quantity — the same rule the sale and
+  // receive paths use. A 100-unit grain sold in steps of 10 needs 10 serials, not
+  // 100; 88 units needs 8, and the leftover 8 are written off on confirm.
+  const bsSerialCount = useCallback((g: BsGrain, assignQty: number) => {
+    const step = g.qty_step && g.qty_step > 0 ? g.qty_step : 1
+    return Math.max(0, Math.floor(assignQty / step + 1e-9))
+  }, [])
+
+  // Base units that cannot be labelled because the quantity is not a whole
+  // multiple of qty_step. These are written off on confirm, so show them first.
+  const bsWriteOff = useCallback((g: BsGrain, assignQty: number) => {
+    const step = g.qty_step && g.qty_step > 0 ? g.qty_step : 1
+    return Math.max(0, assignQty - bsSerialCount(g, assignQty) * step)
+  }, [bsSerialCount])
+
   const bsFocusNextSerial = useCallback((afterKey: string) => {
     const keys = Object.keys(bsSerialRefs.current)
       .filter(k => bsSerialRefs.current[k])
@@ -1103,7 +1115,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       for (const v of variants) {
         if (v._isDeleted) continue
         const svs = subVariantsMap[v.id || ''] || []
-        if (v.sub_variant_type_on || svs.length > 0) {
+        if (v.sub_variant_type_on) {
           // Sub-variant leaves. Draft sub-variants have no SKU/stable id (they're
           // DELETE+INSERT on publish), so tag by variant_sku + sub_variant_name —
           // the only keys that survive. Requires the parent variant to have a SKU.
@@ -1459,7 +1471,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (res.ok) {
       const data = await res.json()
       setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', discount_pct: '', stock: '', sku: '', weight_grams: '', length_cm: '', breadth_cm: '', height_cm: '', package_type: '' } }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: emptySubVariantDraft() }))
     }
   }
 
@@ -1477,6 +1489,55 @@ export default function ProductForm({ categories, brands, action, product, produ
     })
     if (!res.ok) { setVariantImageError(`Failed to delete sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`); return }
     setSubVariantsMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((sv: any) => sv.id !== subId) }))
+  }
+
+  function beginSubVariantEdit(sv: any) {
+    const str = (x: any) => (x != null ? String(x) : '')
+    setSubVariantEditId(sv.id)
+    setSubVariantEditDraft({
+      name: sv.sub_variant_name || '', price: str(sv.price), mrp: str(sv.mrp), price_ex_gst: str(sv.price_ex_gst), mrp_ex_gst: str(sv.mrp_ex_gst),
+      discount_pct: str(sv.discount_pct), stock: sv.stock_status || 'In Stock', sku: sv.sku || '',
+      weight_grams: str(sv.weight_grams), length_cm: str(sv.length_cm), breadth_cm: str(sv.breadth_cm), height_cm: str(sv.height_cm), package_type: sv.package_type || '',
+    })
+  }
+
+  async function saveSubVariantEdit(variantId: string, svId: string) {
+    const ed = subVariantEditDraft
+    if (!ed || !productId) return
+    const url = isDraft
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const num = (x: string) => (x ? parseFloat(x) : null)
+    const payload = {
+      id: svId, sub_variant_name: ed.name, price: num(ed.price), mrp: num(ed.mrp), price_ex_gst: num(ed.price_ex_gst), mrp_ex_gst: num(ed.mrp_ex_gst),
+      discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null,
+      weight_grams: ed.weight_grams ? parseInt(ed.weight_grams) : null, length_cm: num(ed.length_cm), breadth_cm: num(ed.breadth_cm), height_cm: num(ed.height_cm),
+      package_type: ed.package_type || null,
+    }
+    const res = await fetch(url, { method: isDraft ? 'PATCH' : 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) {
+      setVariantImageError(`Failed to save sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`)
+      return
+    }
+    const updated = await res.json().catch(() => ({}))
+    setSubVariantsMap(m => ({
+      ...m,
+      [variantId]: (m[variantId] || []).map(s => s.id === svId
+        ? { ...s, ...(updated.sub_variant || { ...payload, sku: payload.sku || s.sku }), product_suppliers: s.product_suppliers || [] }
+        : s),
+    }))
+    setSubVariantEditId(null)
+    setSubVariantEditDraft(null)
+  }
+
+  function inheritedShippingFor(v: VariantRow) {
+    return {
+      weight_grams: v.weight_grams || weightGrams || '',
+      package_type: v.package_type || productPackageType || '',
+      length_cm: v.length_cm || '',
+      breadth_cm: v.breadth_cm || '',
+      height_cm: v.height_cm || '',
+    }
   }
 
   const activeVariants = variants.filter(v => !v._isDeleted)
@@ -1521,8 +1582,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         if (serialized) {
           const serials = (entry?.serials || []).filter(Boolean)
           const filled = serials.length
-          if (filled !== assignQty) {
-            failBootstrap(`Enter all ${assignQty} serial number${assignQty !== 1 ? 's' : ''} for "${g.label}"`); return
+          const needed = bsSerialCount(g, assignQty)
+          if (filled !== needed) {
+            failBootstrap(`Enter all ${needed} serial number${needed !== 1 ? 's' : ''} for "${g.label}"`); return
           }
           // No two serial numbers may be identical — across every grain.
           for (const sn of serials) {
@@ -1546,7 +1608,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         setError(msg)
         setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
       }
-      const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
       const blank = (v: string) => v == null || String(v).trim() === ''
       if (!hasVariants) {
         if (blank(weightGrams) || !(parseFloat(weightGrams) > 0)) {
@@ -1561,13 +1622,31 @@ export default function ProductForm({ categories, brands, action, product, produ
           }
         }
       } else {
+        const filled = (...vals: any[]) => { const hit = vals.find(x => !blank(x)); return hit == null ? '' : String(hit) }
         for (const v of activeVariants) {
+          const vLabel = v.variant_name || v.sku || ''
+          if (v.sub_variant_type_on) {
+            const svs = subVariantsMap[v.id || ''] || []
+            if (svs.length === 0) {
+              failValidation(`Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`); setIsSubmitting(false); return
+            }
+            for (const sv of svs) {
+              if (!(parseFloat(filled(sv.weight_grams, v.weight_grams, weightGrams)) > 0)) {
+                failValidation(`Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`); setIsSubmitting(false); return
+              }
+              const pt = filled(sv.package_type, v.package_type, productPackageType) || 'flat_poly_auto'
+              if (STORED_DIMS_TYPES.includes(pt) && (blank(filled(sv.length_cm, v.length_cm)) || blank(filled(sv.breadth_cm, v.breadth_cm)) || blank(filled(sv.height_cm, v.height_cm)))) {
+                failValidation(`Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`); setIsSubmitting(false); return
+              }
+            }
+            continue
+          }
           if (blank(v.weight_grams) || !(parseFloat(v.weight_grams) > 0)) {
-            failValidation(`Shipping weight is required for variant "${v.variant_name || v.sku || ''}" and must be greater than 0.`); setIsSubmitting(false); return
+            failValidation(`Shipping weight is required for variant "${vLabel}" and must be greater than 0.`); setIsSubmitting(false); return
           }
           const pt = v.package_type || 'flat_poly_auto'
           if (STORED_DIMS_TYPES.includes(pt) && (blank(v.length_cm) || blank(v.breadth_cm) || blank(v.height_cm))) {
-            failValidation(`Dimensions required for this package type (variant "${v.variant_name || v.sku || ''}")`); setIsSubmitting(false); return
+            failValidation(`Dimensions required for this package type (variant "${vLabel}")`); setIsSubmitting(false); return
           }
         }
       }
@@ -1697,8 +1776,9 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
           const grp = groups.find(g => g.pricing_type === v.pricing_type)
-          const stockStatus = v.sub_variant_type_on
-            ? (sumSubVariantStock(subVariantsMap[v.id || '']) > 0 ? 'In Stock' : 'Out of Stock')
+          const svs = subVariantsMap[v.id || ''] || []
+          const stockStatus = v.sub_variant_type_on && svs.length > 0
+            ? (sumSubVariantStock(svs) > 0 ? 'In Stock' : 'Out of Stock')
             : v.stock_status
           return {
             ...v,
@@ -1744,7 +1824,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   manufacture_date: entry?.mfg || null,
                   expiry_date: entry?.expiry || null,
                   location_id: entry?.location || null,
-                  ...(serialized ? { serial_numbers: (entry?.serials || []).filter(Boolean).slice(0, assignQty) } : {}),
+                  ...(serialized ? { serial_numbers: (entry?.serials || []).filter(Boolean).slice(0, bsSerialCount(g, assignQty)) } : {}),
                 }
               })
             const bsRes = await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
@@ -1758,6 +1838,12 @@ export default function ProductForm({ categories, brands, action, product, produ
               // the product page can surface it after navigation instead of losing it.
               const j = await bsRes.json().catch(() => ({}))
               try { sessionStorage.setItem('bootstrap_stock_error', j?.error || 'Failed to assign existing stock (serial/lot conflict).') } catch { /* ignore */ }
+            } else {
+              const j = await bsRes.json().catch(() => ({}))
+              const skipped: string[] = Array.isArray(j?.skipped) ? j.skipped : []
+              if (skipped.length > 0) {
+                try { sessionStorage.setItem('bootstrap_stock_error', `Existing stock was not assigned for ${skipped.length} item(s): after this publish they hold stock at their variants/sub-variants instead. Receive that stock at the new level.`) } catch { /* ignore */ }
+              }
             }
           } catch {
             // network error assigning stock — product was still saved
@@ -2362,74 +2448,21 @@ export default function ProductForm({ categories, brands, action, product, produ
               <div className="space-y-3">
                 <div>
                   <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
-                  <p className="text-xs text-foreground-muted mt-1">Select up to 5 images. First image is shown first on the product page.</p>
+                  <p className="text-xs text-foreground-muted mt-1">Up to 5 images. Drag to reorder, or star one to make it the main image.</p>
                 </div>
-                {productImages.length > 1 && (
-                  <p className="text-xs text-foreground-muted">
-                    <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {productImages.map((img: any, imgIdx: number, arr: any[]) => (
-                    <div
-                      key={img.id}
-                      className="relative group w-24 h-24 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing select-none"
-                      draggable
-                      onDragStart={() => { productImageDragIndex.current = imgIdx }}
-                      onDragEnter={() => { productImageDragOverIndex.current = imgIdx }}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDragEnd={() => {
-                        const from = productImageDragIndex.current
-                        const to = productImageDragOverIndex.current
-                        productImageDragIndex.current = null
-                        productImageDragOverIndex.current = null
-                        if (from === null || to === null || from === to) return
-                        reorderProductImages(from, to)
-                      }}
-                    >
-                      <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
-                      <span className="absolute top-0 right-0 text-[10px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
-                      {img.is_primary && <span className="absolute top-0 left-0 bg-accent-500 text-white px-1 py-0.5 leading-none"><Star className="w-2.5 h-2.5 fill-current" /></span>}
-                      {arr.length > 1 && (
-                        <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
-                          <button type="button" onClick={() => imgIdx > 0 && reorderProductImages(imgIdx, imgIdx - 1)} disabled={imgIdx === 0} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move left" aria-label="Move image left">◀</button>
-                          <button type="button" onClick={() => imgIdx < arr.length - 1 && reorderProductImages(imgIdx, imgIdx + 1)} disabled={imgIdx === arr.length - 1} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move right" aria-label="Move image right">▶</button>
-                        </div>
-                      )}
-                      <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
-                        {!img.is_primary && <button type="button" onClick={() => setProductImagePrimary(img.id)} className="text-yellow-300 hover:text-yellow-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary"><Star className="w-4 h-4" /></button>}
-                        <button type="button" onClick={() => deleteProductImageRow(img.id)} disabled={!!productImageDeleting[img.id]} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50" title="Delete"><X className="w-4 h-4" /></button>
-                      </div>
-                      {productImageDeleting[img.id] && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
-                          <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {Array.from({ length: productImagePendingAdds }).map((_, k) => (
-                    <div key={`pending-${k}`} className="relative w-24 h-24 rounded border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
-                      <div className="absolute inset-0 animate-pulse bg-surface-tertiary/40" />
-                      <svg className="relative w-5 h-5 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                    </div>
-                  ))}
-                  {productImages.length + productImagePendingAdds < 5 && (
-                    <label className={`w-24 h-24 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${productImageUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadProductImageFile(f); e.target.value = '' }} />
-                      {productImageUploading ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                    </label>
-                  )}
-                </div>
-                {productImages.length < 5 && (
-                  <button
-                    type="button"
-                    onClick={openProductGallery}
-                    className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
-                  >
-                    Choose from Gallery
-                  </button>
-                )}
-                {productImageError && <p className="text-xs text-red-500">{productImageError}</p>}
+                <ImageGalleryEditor
+                  images={productImages}
+                  maxImages={5}
+                  uploading={productImageUploading}
+                  pendingAdds={productImagePendingAdds}
+                  deleting={productImageDeleting}
+                  error={productImageError}
+                  onUpload={uploadProductImageFile}
+                  onDelete={deleteProductImageRow}
+                  onSetPrimary={setProductImagePrimary}
+                  onReorder={reorderProductImages}
+                  onOpenGallery={openProductGallery}
+                />
                 {productGalleryOpen && (
                   <GalleryPicker
                     mode="multi"
@@ -2718,9 +2751,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
                       {showBootstrap && (() => {
                         const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-                        const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
-                        const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
-                        const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
+                        const autoSerial = () => generateSerialNumber(sku)
                         const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
                         // Read a grain's entry, materialising the lazy default when absent.
                         // Backfill the newer selected/assignQty fields for entries restored
@@ -2742,10 +2773,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           })
                         }
                         const regenLot = (g: BsGrain) => {
-                          const today = new Date()
-                          const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
-                          const rand = Math.random().toString(36).substring(2,5).toUpperCase()
-                          patchEntry(g, { lot: `LOT-${sku ? sku+'-' : ''}${ymd}-${rand}` })
+                          patchEntry(g, { lot: generateLotNumber(sku) })
                         }
                         const updateSerial = (g: BsGrain, i: number, val: string) => {
                           const key = keyOf(g)
@@ -2757,8 +2785,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           })
                         }
                         const generateAll = (g: BsGrain) => {
-                          const n = entryOf(g).assignQty
-                          patchEntry(g, { serials: Array.from({ length: n }, () => autoSerial()) })
+                          patchEntry(g, { serials: generateSerialRun(sku, bsSerialCount(g, entryOf(g).assignQty)) })
                         }
                         // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
                         const setAssignQty = (g: BsGrain, raw: number) => {
@@ -2766,7 +2793,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
                           setBsEntries(prev => {
                             const base = prev[key] ?? _bsMakeEntry(g.qty)
-                            const serials = (base.serials || []).slice(0, clamped)
+                            const serials = (base.serials || []).slice(0, bsSerialCount(g, clamped))
                             return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
                           })
                         }
@@ -2793,6 +2820,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               const entered = serials.filter(Boolean).length
                               const isSelected = entry.selected !== false
                               const assignQty = entry.assignQty
+                              const serialCount = bsSerialCount(g, assignQty)
                               return (
                                 <div key={keyOf(g)} className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3">
                                   <div className="flex items-center justify-between gap-3">
@@ -2818,6 +2846,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <span className="text-xs text-foreground-muted">/ {g.qty}</span>
                                     </div>
                                   </div>
+
+                                  {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
+                                    <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/10 px-3 py-2">
+                                      <p className="text-xs text-amber-800 dark:text-amber-300">
+                                        Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of {assignQty} units can be
+                                        labelled. <strong>{bsWriteOff(g, assignQty)} unit{bsWriteOff(g, assignQty) !== 1 ? 's' : ''} will be written off</strong> on save,
+                                        leaving {serialCount * (g.qty_step || 1)} in stock.
+                                      </p>
+                                    </div>
+                                  )}
 
                                   {isSelected && _perishablePending && (
                                     <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
@@ -2870,12 +2908,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <div className="flex items-center justify-between mb-3">
                                         <div>
                                           <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
-                                          <span className="text-xs text-foreground-muted">({assignQty} required)</span>
+                                          <span className="text-xs text-foreground-muted">
+                                            ({serialCount} required{g.qty_step && g.qty_step !== 1 ? ` — 1 per ${g.qty_step} units` : ''})
+                                          </span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          {entered === assignQty
-                                            ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{assignQty} entered ✓</span>
-                                            : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{assignQty} entered</span>
+                                          {entered === serialCount
+                                            ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{serialCount} entered ✓</span>
+                                            : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{serialCount} entered</span>
                                           }
                                           <button
                                             type="button"
@@ -2885,7 +2925,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         </div>
                                       </div>
                                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                                        {Array.from({ length: assignQty }, (_, n) => (
+                                        {Array.from({ length: serialCount }, (_, n) => (
                                           <div key={n} className="flex gap-1">
                                             <input
                                               ref={el => { bsSerialRefs.current[`${keyOf(g)}#${n}`] = el }}
@@ -3186,6 +3226,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">ISBN</label>
                                 <input type="text" value={variant.isbn} onChange={(e) => updateVariant(index, 'isbn', e.target.value)} className={inputCls} placeholder="For books" />
                               </div>
+                              {!variant.sub_variant_type_on && (<>
                               <div>
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g) *</label>
                                 <input type="number" step="1" min="1" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
@@ -3222,6 +3263,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                               </div>
                               )}
+                              </>)}
                               <div className="pt-2 border-t border-border-default-default space-y-2">
                                 <div className="flex items-center gap-2">
                                   <button
@@ -3319,7 +3361,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     />
                                   </td>
                                   {variant.sub_variant_type_on ? (
-                                    <td className="py-2 px-3" colSpan={4}>
+                                    <td className="py-2 px-3" colSpan={5}>
                                       <span className="text-xs text-foreground-muted italic">Pricing managed by sub-variants</span>
                                     </td>
                                   ) : (
@@ -3673,33 +3715,36 @@ export default function ProductForm({ categories, brands, action, product, produ
                 )}
 
                 {/* Shipping */}
-                <div>
-                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Shipping</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
-                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
-                      <div className="w-full h-9 flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                        <span className="h-full px-2 text-sm font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate flex items-center justify-center">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                {!popupVariant.sub_variant_type_on && (
+                  <div>
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Shipping</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
+                        <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
+                        <AdminSelect
+                          md
+                          value={popupVariant.package_type || 'flat_poly_auto'}
+                          onChange={(val) => updateVariant(popupIndex, 'package_type', val)}
+                          options={PACKAGE_TYPE_OPTIONS}
+                        />
                       </div>
                     </div>
+                    {STORED_DIMS_TYPES.includes(popupVariant.package_type || 'flat_poly_auto') && (
+                      <div className="mt-3">
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Dimensions (L × B × H cm)</label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <input type="number" step="0.1" min="0" value={popupVariant.length_cm} onChange={(e) => updateVariant(popupIndex, 'length_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
+                          <input type="number" step="0.1" min="0" value={popupVariant.breadth_cm} onChange={(e) => updateVariant(popupIndex, 'breadth_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
+                          <input type="number" step="0.1" min="0" value={popupVariant.height_cm} onChange={(e) => updateVariant(popupIndex, 'height_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(popupVariant.package_type || 'flat_poly_auto') && (
-                    <div className="mt-3">
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Dimensions (L × B × H cm)</label>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <input type="number" step="0.1" min="0" value={popupVariant.length_cm} onChange={(e) => updateVariant(popupIndex, 'length_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
-                        <input type="number" step="0.1" min="0" value={popupVariant.breadth_cm} onChange={(e) => updateVariant(popupIndex, 'breadth_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
-                        <input type="number" step="0.1" min="0" value={popupVariant.height_cm} onChange={(e) => updateVariant(popupIndex, 'height_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {/* Images */}
                 <div>
@@ -3720,95 +3765,23 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   {popupVariant.use_own_images ? (
                     <>
-                      {(variantImagesMap[variantPopupId] || []).length > 1 && (
-                        <p className="text-xs text-foreground-muted mb-2">
-                          <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        {(variantImagesMap[variantPopupId] || []).map((img: any, imgIdx: number, arr: any[]) => (
-                          <div
-                            key={img.id}
-                            className="relative group w-20 h-20 sm:w-16 sm:h-16 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing select-none"
-                            draggable
-                            onDragStart={() => { variantImageDragIndex.current = imgIdx }}
-                            onDragEnter={() => { variantImageDragOverIndex.current = imgIdx }}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDragEnd={() => {
-                              const from = variantImageDragIndex.current
-                              const to = variantImageDragOverIndex.current
-                              variantImageDragIndex.current = null
-                              variantImageDragOverIndex.current = null
-                              if (from === null || to === null || from === to) return
-                              reorderVariantImages(variantPopupId, from, to)
-                            }}
-                          >
-                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
-                            <span className="absolute top-0 right-0 text-[10px] sm:text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
-                            {img.is_primary && <span className="absolute top-0 left-0 bg-accent-500 text-white px-1 py-0.5 leading-none"><Star className="w-2.5 h-2.5 fill-current" /></span>}
-                            {arr.length > 1 && (
-                              <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
-                                <button
-                                  type="button"
-                                  onClick={() => imgIdx > 0 && reorderVariantImages(variantPopupId, imgIdx, imgIdx - 1)}
-                                  disabled={imgIdx === 0}
-                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
-                                  title="Move left"
-                                  aria-label="Move image left"
-                                >
-                                  ◀
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => imgIdx < arr.length - 1 && reorderVariantImages(variantPopupId, imgIdx, imgIdx + 1)}
-                                  disabled={imgIdx === arr.length - 1}
-                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
-                                  title="Move right"
-                                  aria-label="Move image right"
-                                >
-                                  ▶
-                                </button>
-                              </div>
-                            )}
-                            <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
-                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary"><Star className="w-4 h-4" /></button>}
-                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} disabled={!!variantImageDeleting[img.id]} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50" title="Delete"><X className="w-4 h-4" /></button>
-                            </div>
-                            {variantImageDeleting[img.id] && (
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
-                                <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {Array.from({ length: variantImagePendingAdds[variantPopupId] || 0 }).map((_, k) => (
-                          <div key={`pending-${k}`} className="relative w-20 h-20 sm:w-16 sm:h-16 rounded border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
-                            <div className="absolute inset-0 animate-pulse bg-surface-tertiary/40" />
-                            <svg className="relative w-5 h-5 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                          </div>
-                        ))}
-                        {(variantImagesMap[variantPopupId] || []).length + (variantImagePendingAdds[variantPopupId] || 0) < 5 && (
-                          <label className={`w-20 h-20 sm:w-16 sm:h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
-                            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
-                            {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                          </label>
-                        )}
-                      </div>
-                      {productId && (variantImagesMap[variantPopupId] || []).length < 5 && (
-                        <button
-                          type="button"
-                          onClick={openVariantGallery}
-                          className="mt-2 px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
-                        >
-                          Choose from Gallery
-                        </button>
-                      )}
+                      <ImageGalleryEditor
+                        images={variantImagesMap[variantPopupId] || []}
+                        maxImages={5}
+                        size="sm"
+                        uploading={!!variantImageUploading[variantPopupId]}
+                        pendingAdds={variantImagePendingAdds[variantPopupId] || 0}
+                        deleting={variantImageDeleting}
+                        error={variantImageError}
+                        onUpload={(file) => uploadVariantImageFile(variantPopupId, file)}
+                        onDelete={(imageId) => deleteVariantImage(variantPopupId, imageId)}
+                        onSetPrimary={(imageId) => setVariantImagePrimary(variantPopupId, imageId)}
+                        onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
+                        onOpenGallery={productId ? openVariantGallery : undefined}
+                      />
                     </>
                   ) : (
                     <p className="text-xs text-foreground-muted italic">Uses product images</p>
-                  )}
-                  {variantImageError && (
-                    <p className="mt-2 text-xs text-red-500">{variantImageError}</p>
                   )}
                 </div>
 
@@ -3824,21 +3797,24 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Sub-Variants */}
                 {popupVariant.sub_variant_type_on && (
                   <div>
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                        Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
-                      </p>
-                      {popupUnitKey && (
-                        <span
-                          className="text-[10px] font-semibold uppercase tracking-wide bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded border border-accent-500/30"
-                          title={`All sub-variant prices are per this base unit${popupUnitInfo?.inherited ? ' (inherited from product)' : ''}. Configure other units in Variant Units below.`}
-                        >
-                          per {popupUnitInfo?.displayLabel || popupUnitKey}
-                          {popupUnitInfo?.inherited && (
-                            <span className="ml-1 normal-case font-normal text-foreground-muted">(inherited)</span>
-                          )}
-                        </span>
-                      )}
+                    <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                          Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
+                        </p>
+                        {popupUnitKey && (
+                          <span
+                            className="text-[10px] font-semibold uppercase tracking-wide bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded border border-accent-500/30"
+                            title={`All sub-variant prices are per this base unit${popupUnitInfo?.inherited ? ' (inherited from product)' : ''}. Configure other units in Variant Units below.`}
+                          >
+                            per {popupUnitInfo?.displayLabel || popupUnitKey}
+                            {popupUnitInfo?.inherited && (
+                              <span className="ml-1 normal-case font-normal text-foreground-muted">(inherited)</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-foreground-muted">Pricing, stock and shipping are set per sub-variant.</p>
                     </div>
                     {variantPopupId.startsWith('temp-') && (
                       <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-center justify-between gap-3">
@@ -3856,259 +3832,140 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {(subVariantsMap[variantPopupId] || []).length > 0 && (
-                      <div className="overflow-x-auto mb-3">
-                      <table className="w-full text-xs whitespace-nowrap">
-                        <thead>
-                          <tr className="text-left text-foreground-muted border-b border-border-default">
-                            <th className="pb-1 pr-2 font-medium">Name</th>
-                            <th className="pb-1 pr-2 font-medium">MRP (Ex){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Disc %</th>
-                            <th className="pb-1 pr-2 font-medium">MRP (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Price (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Price (Ex){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Stock</th>
-                            <th className="pb-1 pr-2 font-medium">SKU</th>
-                            <th className="pb-1"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
-                            const isEditingSv = subVariantEditId === sv.id
-                            const ed = subVariantEditDraft
-                            const svInputCls = "field-xs border border-accent-500 bg-surface text-foreground focus:ring-1 focus:ring-accent-500 w-16"
-                            return (
-                              <React.Fragment key={sv.id}>
-                              <tr className="border-b border-border-default last:border-0">
-                                {isEditingSv && ed ? (<>
-                                  <td className="py-1 pr-1"><input type="text" value={ed.name} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, name: e.target.value }))} className={`${svInputCls} w-20`} /></td>
-                                  {/* MRP (Ex. GST) — primary input */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp_ex_gst} onChange={e => {
-                                    const v = e.target.value; const mrpExN = parseFloat(v)
-                                    const disc = parseFloat(discountPct || '0')
-                                    const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                                    if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                      const newPriceEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
-                                      const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl }))
-                                    } else {
-                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '' }))
-                                    }
-                                  }} className={svInputCls} /></td>
-                                  {/* Discount % — product-level read-only */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  {/* MRP (incl. GST) — locked */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  {/* Price (incl. GST) — locked */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  {/* Price (Ex. GST) — locked */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  <td className="py-1 pr-1">
-                                    <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden w-28 h-[26px]">
-                                      <button type="button" onClick={() => {
-                                        const opts = ['In Stock', 'Low Stock', 'Out of Stock']
-                                        const i = opts.indexOf(ed.stock || 'In Stock')
-                                        setSubVariantEditDraft(d => d && ({ ...d, stock: opts[(i - 1 + opts.length) % opts.length] }))
-                                      }} className="px-1 h-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors shrink-0">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                                      </button>
-                                      <span className="flex-1 text-center text-xs text-foreground truncate px-0.5">{ed.stock || 'In Stock'}</span>
-                                      <button type="button" onClick={() => {
-                                        const opts = ['In Stock', 'Low Stock', 'Out of Stock']
-                                        const i = opts.indexOf(ed.stock || 'In Stock')
-                                        setSubVariantEditDraft(d => d && ({ ...d, stock: opts[(i + 1) % opts.length] }))
-                                      }} className="px-1 h-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors shrink-0">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                                      </button>
-                                    </div>
-                                  </td>
-                                  <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
-                                  <td className="py-1 pl-1">
-                                    <div className="flex items-center gap-1 mb-1">
-                                    <button type="button" onClick={async () => {
-                                      if (!ed) return
-                                      const svEditUrl = isDraft
-                                        ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantPopupId}`
-                                        : `/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`
-                                      const res = await fetch(svEditUrl, {
-                                        method: isDraft ? 'PATCH' : 'PUT',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null, weight_grams: ed.weight_grams ? parseInt(ed.weight_grams) : null, length_cm: ed.length_cm ? parseFloat(ed.length_cm) : null, breadth_cm: ed.breadth_cm ? parseFloat(ed.breadth_cm) : null, height_cm: ed.height_cm ? parseFloat(ed.height_cm) : null, package_type: ed.package_type || null }),
-                                      })
-                                      if (res.ok) {
-                                        const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? { ...(updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_status: ed.stock || 'In Stock', sku: ed.sku || s.sku }), product_suppliers: s.product_suppliers || [] } : s) }))
-                                      }
-                                      setSubVariantEditId(null); setSubVariantEditDraft(null)
-                                    }} className="text-accent-600 hover:text-accent-700 text-xs font-medium leading-none">Save</button>
-                                    <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground text-xs font-medium leading-none">Cancel</button>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <input type="number" step="1" min="0" placeholder="Wt g" title="Ship weight (blank = inherit variant)" value={ed.weight_grams} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, weight_grams: e.target.value }))} className={`${svInputCls} w-14`} />
-                                      <button type="button" title="Package type" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const i = opts.indexOf(ed.package_type || ''); setSubVariantEditDraft(d => d && ({ ...d, package_type: opts[(i + 1) % opts.length] })) }} className="field-xs border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary transition-colors truncate max-w-[110px]">{ed.package_type ? PACKAGE_TYPE_LABELS[ed.package_type] : 'Inherit pkg'}</button>
-                                    </div>
-                                    {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(ed.package_type) && (
-                                      <div className="flex items-center gap-1 mt-1">
-                                        <input type="number" step="0.1" min="0" placeholder="L" value={ed.length_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, length_cm: e.target.value }))} className={`${svInputCls} w-12`} />
-                                        <input type="number" step="0.1" min="0" placeholder="B" value={ed.breadth_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, breadth_cm: e.target.value }))} className={`${svInputCls} w-12`} />
-                                        <input type="number" step="0.1" min="0" placeholder="H" value={ed.height_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, height_cm: e.target.value }))} className={`${svInputCls} w-12`} />
-                                      </div>
-                                    )}
-                                  </td>
-                                </>) : (<>
-                                  <td className="py-1.5 pr-2">{sv.sub_variant_name}</td>
-                                  <td className="py-1.5 pr-2">{sv.mrp_ex_gst != null ? `₹${sv.mrp_ex_gst}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{discountPct ? `${discountPct}%` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.stock_status || '—'}</td>
-                                  <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
-                                  <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: sv.stock_status || 'In Stock', sku: sv.sku || '', weight_grams: sv.weight_grams != null ? String(sv.weight_grams) : '', length_cm: sv.length_cm != null ? String(sv.length_cm) : '', breadth_cm: sv.breadth_cm != null ? String(sv.breadth_cm) : '', height_cm: sv.height_cm != null ? String(sv.height_cm) : '', package_type: sv.package_type || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
-                                    <button type="button" onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })} className="text-foreground-muted hover:text-accent-500 leading-none text-xs font-medium">Unit</button>
-                                    <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
-                                  </td>
-                                </>)}
+                      <div className="mb-3 rounded-lg border border-border-default overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs whitespace-nowrap">
+                            <thead className="bg-surface-secondary/60">
+                              <tr className="text-left text-foreground-muted">
+                                <th className="px-3 py-2 font-medium">Name</th>
+                                <th className="px-3 py-2 font-medium">MRP (Ex){popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}</th>
+                                <th className="px-3 py-2 font-medium">Disc %</th>
+                                <th className="px-3 py-2 font-medium">MRP (incl){popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}</th>
+                                <th className="px-3 py-2 font-medium">Price (incl){popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}</th>
+                                <th className="px-3 py-2 font-medium">Price (Ex){popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}</th>
+                                <th className="px-3 py-2 font-medium">Stock</th>
+                                <th className="px-3 py-2 font-medium">Shipping</th>
+                                <th className="px-3 py-2"></th>
                               </tr>
-                              {expandedSvUnits.has(sv.id) && productId && !variantPopupId.startsWith('temp-') && (
-                                <tr key={`${sv.id}-unit`}>
-                                  <td colSpan={9} className="px-2 pb-3 pt-1 bg-surface-secondary/50">
-                                    <UnitsManager
-                                      productId={productId}
-                                      variantId={variantPopupId}
-                                      subVariantId={sv.id}
-                                      basePrice={sv.price}
-                                      isDraft={isDraft}
-                                    />
-                                  </td>
-                                </tr>
-                              )}
-                              </React.Fragment>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                      </div>
-                    )}
-                    {/* Suppliers per SUB-VARIANT leaf — same popup, separate section */}
-                    {hasInventory && (subVariantsMap[variantPopupId] || []).length > 0 && (
-                      <div className="mb-3 space-y-3 rounded-lg border border-border-secondary bg-surface-secondary/30 p-3">
-                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Suppliers per Sub-Variant</p>
-                        {(subVariantsMap[variantPopupId] || []).map((sv: any) => (
-                          <div key={`sup-${sv.id}`} className="rounded-lg border border-border-default bg-surface p-2">
-                            <p className="text-xs font-medium text-foreground mb-1.5">{sv.sub_variant_name}{sv.sku ? <span className="ml-2 font-mono text-[10px] text-foreground-muted">{sv.sku}</span> : null}</p>
-                            <ProductSupplierList
-                              suppliers={suppliers}
-                              value={sv.product_suppliers || []}
-                              onChange={(rows) => updateSubVariantSuppliers(variantPopupId, sv.id, rows)}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {(() => {
-                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'',weight_grams:'',length_cm:'',breadth_cm:'',height_cm:'',package_type:'' }
-                      const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
-                      const parentSku = popupVariant?.sku || ''
-                      const autoSku = (name: string) => parentSku ? `${parentSku}-${name.toUpperCase().replace(/[^A-Z0-9]/g, '')}` : ''
-                      const skuIsAuto = !d.sku || d.sku === autoSku(d.name)
-                      const inputCls = "field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                      const lockedCls = `${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`
-                      return (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Name *</label>
-                            <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => {
-                              const name = e.target.value
-                              setSubVariantDrafts(m => {
-                                const cur = m[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'',weight_grams:'',length_cm:'',breadth_cm:'',height_cm:'',package_type:'' }
-                                const wasAuto = !cur.sku || cur.sku === autoSku(cur.name)
-                                return { ...m, [variantPopupId]: { ...cur, name, sku: wasAuto ? autoSku(name) : cur.sku } }
-                              })
-                            }} className={`${inputCls} w-full`} />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (Ex. GST) *{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" placeholder="From catalog" value={d.mrp_ex_gst} onChange={(e) => {
-                              const v = e.target.value; const mrpExN = parseFloat(v)
-                              const disc = parseFloat(discountPct || '0')
-                              const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                              if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
-                                const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl } }))
-                              } else {
-                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '' } }))
-                              }
-                            }} className={`${inputCls} w-full`} />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Discount %</label>
-                            <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className={`${lockedCls} w-full`} />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" value={d.mrp} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Price (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" value={d.price} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Price (Ex. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" value={d.price_ex_gst} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Stock Status</label>
-                            <AdminSelect
-                              value={d.stock || 'In Stock'}
-                              onChange={v => setD('stock', v)}
-                              className="w-full"
-                              md
-                              options={[
-                                { value: 'In Stock', label: 'In Stock' },
-                                { value: 'Low Stock', label: 'Low Stock' },
-                                { value: 'Out of Stock', label: 'Out of Stock' },
-                              ]}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">SKU {skuIsAuto ? '(auto)' : '(manual)'}</label>
-                            <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
-                          </div>
-                          <div className="col-span-2 sm:col-span-4 border-t border-border-default pt-2 mt-1">
-                            <p className="text-[10px] text-foreground-muted mb-1.5">Shipping — leave blank to use the variant&apos;s value</p>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <div>
-                                <label className="block text-xs text-foreground-muted mb-0.5">Ship Wt. (g)</label>
-                                <input type="number" step="1" min="0" placeholder="Inherit" value={d.weight_grams} onChange={(e) => setD('weight_grams', e.target.value)} className={`${inputCls} w-full`} />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-foreground-muted mb-0.5">Package Type</label>
-                                <div className="w-full h-9 flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                                  <button type="button" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const idx = opts.indexOf(d.package_type || ''); setD('package_type', opts[(idx - 1 + opts.length) % opts.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                                  <span className="h-full px-2 text-sm font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate flex items-center justify-center">{d.package_type ? PACKAGE_TYPE_LABELS[d.package_type] : 'Inherit'}</span>
-                                  <button type="button" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const idx = opts.indexOf(d.package_type || ''); setD('package_type', opts[(idx + 1) % opts.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
-                                </div>
-                              </div>
-                            </div>
-                            {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(d.package_type) && (
-                              <div className="mt-1.5">
-                                <label className="block text-xs text-foreground-muted mb-0.5">Dimensions (L × B × H cm)</label>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                  <input type="number" step="0.1" min="0" value={d.length_cm} onChange={(e) => setD('length_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
-                                  <input type="number" step="0.1" min="0" value={d.breadth_cm} onChange={(e) => setD('breadth_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
-                                  <input type="number" step="0.1" min="0" value={d.height_cm} onChange={(e) => setD('height_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
-                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name || variantPopupId.startsWith('temp-')} className="field-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
-                          </div>
+                            </thead>
+                            <tbody>
+                              {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
+                                const isEditingSv = subVariantEditId === sv.id
+                                const stockCls = sv.stock_status === 'Out of Stock'
+                                  ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                                  : sv.stock_status === 'Low Stock'
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                const shippingParts = [
+                                  sv.weight_grams != null && sv.weight_grams !== '' ? `${sv.weight_grams} g` : null,
+                                  sv.package_type ? (PACKAGE_TYPE_LABELS[sv.package_type] || sv.package_type) : null,
+                                ].filter(Boolean)
+                                return (
+                                  <React.Fragment key={sv.id}>
+                                    <tr className={`border-t border-border-default ${isEditingSv ? 'bg-accent-500/5' : ''}`}>
+                                      <td className="px-3 py-2">
+                                        <div className="font-medium text-foreground">{sv.sub_variant_name}</div>
+                                        {sv.sku && <div className="font-mono text-[10px] text-foreground-muted">{sv.sku}</div>}
+                                      </td>
+                                      <td className="px-3 py-2">{sv.mrp_ex_gst != null ? `₹${sv.mrp_ex_gst}` : '—'}</td>
+                                      <td className="px-3 py-2">{discountPct ? `${discountPct}%` : '—'}</td>
+                                      <td className="px-3 py-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
+                                      <td className="px-3 py-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
+                                      <td className="px-3 py-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
+                                      <td className="px-3 py-2">
+                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${stockCls}`}>{sv.stock_status || 'In Stock'}</span>
+                                      </td>
+                                      <td className="px-3 py-2 text-foreground-secondary">
+                                        {shippingParts.length > 0 ? shippingParts.join(' · ') : <span className="italic text-foreground-muted">Inherit</span>}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center justify-end gap-3">
+                                          <button
+                                            type="button"
+                                            onClick={() => { if (isEditingSv) { setSubVariantEditId(null); setSubVariantEditDraft(null) } else beginSubVariantEdit(sv) }}
+                                            className="text-accent-500 hover:text-accent-600 text-xs font-medium leading-none"
+                                          >
+                                            {isEditingSv ? 'Close' : 'Edit'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })}
+                                            className={`text-xs font-medium leading-none ${expandedSvUnits.has(sv.id) ? 'text-accent-600' : 'text-foreground-muted hover:text-accent-500'}`}
+                                          >
+                                            {hasInventory ? 'Units & Suppliers' : 'Units'}
+                                          </button>
+                                          <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Remove sub-variant"><X className="w-3.5 h-3.5" /></button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    {isEditingSv && subVariantEditDraft && (
+                                      <tr>
+                                        <td colSpan={9} className="p-3 bg-surface-secondary/40 border-t border-border-default">
+                                          <SubVariantEditor
+                                            mode="edit"
+                                            value={subVariantEditDraft}
+                                            onChange={next => setSubVariantEditDraft(next)}
+                                            onSubmit={() => saveSubVariantEdit(variantPopupId, sv.id)}
+                                            onCancel={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }}
+                                            parentSku={popupVariant.sku || ''}
+                                            discountPct={discountPct}
+                                            gstRate={gstRate}
+                                            unitKey={popupUnitKey}
+                                            packageTypes={PACKAGE_TYPE_OPTIONS}
+                                            inherited={inheritedShippingFor(popupVariant)}
+                                          />
+                                        </td>
+                                      </tr>
+                                    )}
+                                    {expandedSvUnits.has(sv.id) && productId && !variantPopupId.startsWith('temp-') && (
+                                      <tr>
+                                        <td colSpan={9} className="px-3 pb-3 pt-3 bg-surface-secondary/50 border-t border-border-default">
+                                          <div className="space-y-3">
+                                            {hasInventory && (
+                                              <div className="rounded-lg border border-border-default bg-surface p-3">
+                                                <ProductSupplierList
+                                                  suppliers={suppliers}
+                                                  value={sv.product_suppliers || []}
+                                                  onChange={(rows) => updateSubVariantSuppliers(variantPopupId, sv.id, rows)}
+                                                  note="Sub-variant level. The lowest price is highlighted; the star marks your preferred supplier."
+                                                />
+                                              </div>
+                                            )}
+                                            <UnitsManager
+                                              productId={productId}
+                                              variantId={variantPopupId}
+                                              subVariantId={sv.id}
+                                              basePrice={sv.price}
+                                              isDraft={isDraft}
+                                            />
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                )
+                              })}
+                            </tbody>
+                          </table>
                         </div>
-                      )
-                    })()}
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-dashed border-border-secondary p-3">
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Add Sub-Variant</p>
+                      <SubVariantEditor
+                        mode="add"
+                        value={subVariantDrafts[variantPopupId] || emptySubVariantDraft()}
+                        onChange={next => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: next }))}
+                        onSubmit={() => addSubVariant(variantPopupId)}
+                        parentSku={popupVariant.sku || ''}
+                        discountPct={discountPct}
+                        gstRate={gstRate}
+                        unitKey={popupUnitKey}
+                        packageTypes={PACKAGE_TYPE_OPTIONS}
+                        inherited={inheritedShippingFor(popupVariant)}
+                        disabled={variantPopupId.startsWith('temp-')}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -4126,6 +3983,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                     basePrice={popupVariant?.price || (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)}
                     onUnitLoaded={(info) => { setPopupUnitKey(info.unitKey); setPopupUnitInfo(info) }}
                     isDraft={isDraft}
+                    roleNote={popupVariant?.sub_variant_type_on
+                      ? 'Used by any sub-variant that has no unit of its own.'
+                      : undefined}
                   />
                 </div>
               )}

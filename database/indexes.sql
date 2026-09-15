@@ -1779,7 +1779,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS shelf_stock_uniq_product_only ON public.shelf_
 -- Name: uniq_product_units_one_base_product; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uniq_product_units_one_base_product ON public.product_units USING btree (product_id) WHERE ((is_base = true) AND (variant_id IS NULL));
+CREATE UNIQUE INDEX uniq_product_units_one_base_product ON public.product_units USING btree (product_id) WHERE ((is_base = true) AND (variant_id IS NULL) AND (sub_variant_id IS NULL));
 
 
 
@@ -1787,7 +1787,7 @@ CREATE UNIQUE INDEX uniq_product_units_one_base_product ON public.product_units 
 -- Name: uniq_product_units_one_base_variant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uniq_product_units_one_base_variant ON public.product_units USING btree (variant_id) WHERE ((is_base = true) AND (variant_id IS NOT NULL));
+CREATE UNIQUE INDEX uniq_product_units_one_base_variant ON public.product_units USING btree (variant_id) WHERE ((is_base = true) AND (variant_id IS NOT NULL) AND (sub_variant_id IS NULL));
 
 
 
@@ -1795,7 +1795,7 @@ CREATE UNIQUE INDEX uniq_product_units_one_base_variant ON public.product_units 
 -- Name: uniq_product_units_one_purchase_product; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uniq_product_units_one_purchase_product ON public.product_units USING btree (product_id) WHERE ((is_purchase_default = true) AND (variant_id IS NULL));
+CREATE UNIQUE INDEX uniq_product_units_one_purchase_product ON public.product_units USING btree (product_id) WHERE ((is_purchase_default = true) AND (variant_id IS NULL) AND (sub_variant_id IS NULL));
 
 
 
@@ -1803,7 +1803,7 @@ CREATE UNIQUE INDEX uniq_product_units_one_purchase_product ON public.product_un
 -- Name: uniq_product_units_one_purchase_variant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uniq_product_units_one_purchase_variant ON public.product_units USING btree (variant_id) WHERE ((is_purchase_default = true) AND (variant_id IS NOT NULL));
+CREATE UNIQUE INDEX uniq_product_units_one_purchase_variant ON public.product_units USING btree (variant_id) WHERE ((is_purchase_default = true) AND (variant_id IS NOT NULL) AND (sub_variant_id IS NULL));
 
 
 
@@ -1813,6 +1813,20 @@ CREATE UNIQUE INDEX uniq_product_units_one_purchase_variant ON public.product_un
 
 CREATE UNIQUE INDEX uniq_product_units_product_unit ON public.product_units USING btree (product_id, unit) WHERE (variant_id IS NULL);
 
+
+
+--
+-- Name: uniq_product_units_one_base_sub_variant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uniq_product_units_one_base_sub_variant ON public.product_units USING btree (sub_variant_id) WHERE ((is_base = true) AND (sub_variant_id IS NOT NULL));
+
+
+--
+-- Name: uniq_product_units_one_purchase_sub_variant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uniq_product_units_one_purchase_sub_variant ON public.product_units USING btree (sub_variant_id) WHERE ((is_purchase_default = true) AND (sub_variant_id IS NOT NULL));
 
 
 --
@@ -1874,6 +1888,13 @@ CREATE UNIQUE INDEX idx_auth_sessions_token_hash ON public.auth_sessions USING b
 
 -- hero_slides: active slides ordered for the homepage carousel
 CREATE INDEX idx_hero_slides_active_order ON public.hero_slides USING btree (is_active, display_order) WHERE (is_active = true);
+
+
+--
+-- Name: idx_homepage_sections_active_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_homepage_sections_active_order ON public.homepage_sections USING btree (is_active, display_order) WHERE (is_active = true);
 
 -- Barcode / serial scanning: fast lookup by scannable identifiers
 CREATE INDEX IF NOT EXISTS idx_products_barcode ON public.products USING btree (barcode) WHERE barcode IS NOT NULL;

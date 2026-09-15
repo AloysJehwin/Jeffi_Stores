@@ -12,11 +12,7 @@ const EDITABLE_KEYS = [
   // Delivery (already existed)
   'delivery_charges_enabled',
   'delivery_free_threshold',
-  'delivery_discount_percent',
-  'delivery_discount_flat',
-  'delivery_discount_min_subtotal',
-  'delivery_discount_label',
-  'delivery_base_charge',
+  'delivery_rate_per_kg',
   'delivery_free_weight_ceiling_kg',
   // Store identity
   'business_name',

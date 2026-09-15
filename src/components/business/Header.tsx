@@ -61,7 +61,7 @@ export default function BusinessHeader() {
             {/* Logo */}
             <Link href={bp('/business')} className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
-                <img src={identity.logoUrl || '/images/logo.png'} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />
+                {identity.logoUrl && <img src={identity.logoUrl} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />}
                 <div>
                   <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">{identity.name}</div>
                   <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
@@ -163,7 +163,7 @@ export default function BusinessHeader() {
           >
             <div className="flex items-center justify-between p-4 border-b border-border-default">
               <Link href={bp('/business')} className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                <img src={identity.logoUrl || '/images/logo.png'} alt={identity.name} className="h-10 w-auto" />
+                {identity.logoUrl && <img src={identity.logoUrl} alt={identity.name} className="h-10 w-auto" />}
                 <div>
                   <span className="font-bold text-secondary-500 dark:text-primary-400">{identity.name}</span>
                   <p className="text-xs text-accent-500 font-semibold">Business</p>

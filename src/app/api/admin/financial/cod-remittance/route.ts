@@ -113,8 +113,9 @@ export async function POST(request: NextRequest) {
     const settledOrders = await queryMany<{
       order_number: string; total_amount: string
       delhivery_billed_amount: string | null; shipping_amount: string | null
+      delhivery_billed_at: string | null
     }>(
-      `SELECT order_number, total_amount, delhivery_billed_amount, shipping_amount
+      `SELECT order_number, total_amount, delhivery_billed_amount, shipping_amount, delhivery_billed_at
        FROM orders WHERE id = ANY($1::uuid[])`,
       [remitted.rows.map(r => r.id)]
     ).catch(() => [])
@@ -122,6 +123,9 @@ export async function POST(request: NextRequest) {
       const actualDelhivery = o.delhivery_billed_amount != null
         ? parseFloat(o.delhivery_billed_amount)
         : parseFloat(o.shipping_amount ?? '0')
+      // `delhivery_billed_at` is only stamped once the wallet debit is durable, so it is the
+      // signal that shipping has already been charged. Deducting it here too billed the tenant
+      // twice for the same AWB.
       recordCodSettlement({
         tenantId: tenant.tenantId,
         tenantSlug: tenant.slug ?? '',
@@ -129,6 +133,7 @@ export async function POST(request: NextRequest) {
         grossAmountInr: parseFloat(o.total_amount),
         actualDelhiveryChargeInr: actualDelhivery,
         dailyPayout,
+        walletBilled: o.delhivery_billed_at != null,
       }).catch(() => {})
     }
   }

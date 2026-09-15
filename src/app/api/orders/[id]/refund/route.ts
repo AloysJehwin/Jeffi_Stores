@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
-import { fetchTransferIdForPayment, reverseTransfer } from '@/lib/razorpay-route'
+import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
@@ -97,15 +97,30 @@ export async function POST(
       remaining = Math.round((remaining - thisRefund) * 100) / 100
 
       // For platform-keys tenants the buyer money was Route-transferred to the linked account, so
-      // reverse the tenant's share proportional to this refund. Own-account tenants were never
-      // transferred (platform never held the money), so there is nothing to reverse.
+      // claw back the tenant's share. Own-account tenants were never transferred (the platform never
+      // held the money), so there is nothing to reverse. The helper caps each reversal at the
+      // transfer's own remaining amount and never throws — a failed clawback must not block the
+      // buyer's refund; the shortfall is recorded as tenant debt instead.
       let transferReversal: unknown = null
       if (!ownRazorpay) {
-        const transferId = await fetchTransferIdForPayment(paymentRecord.transaction_id)
-        if (transferId) {
-          transferReversal = await reverseTransfer(transferId, amountInPaise)
-            .then(() => ({ transferId, amountPaise: amountInPaise }))
-            .catch((e: any) => ({ transferId, amountPaise: amountInPaise, error: e?.message || 'reverse failed' }))
+        const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
+        if (outcome.perTransfer.length > 0 || outcome.lookupError) {
+          transferReversal = outcome
+        }
+        if (outcome.unrecoveredPaise > 0) {
+          console.error(
+            `[refund] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
+            `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+          )
+        }
+        if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
+          await recordRefundSettlement({
+            tenantId: tenant.tenantId,
+            orderRef: order.order_number,
+            refundedInr: thisRefund,
+            reversedInr: outcome.reversedPaise / 100,
+            unrecoveredInr: outcome.unrecoveredPaise / 100,
+          })
         }
       }
 

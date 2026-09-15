@@ -140,8 +140,11 @@ describe('publishProductDraft', () => {
     mockClientQuery.mockImplementation(smartClientMock)
 
     await publishProductDraft('prod-1')
+    // Only the DEACTIVATION statement counts. The structural block also emits
+    // `... inventory_quantity = 0 ... WHERE ... is_active = false` against
+    // product_variants, which is a zeroing sweep, not a soft delete.
     const variantDeactivateCalls = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('is_active = false') && sql.includes('product_variants')
+      ([sql]: [string]) => typeof sql === 'string' && /UPDATE product_variants SET is_active = false/.test(sql)
     )
     expect(variantDeactivateCalls.length).toBe(0)
   })
@@ -383,26 +386,27 @@ describe('publishProductDraft', () => {
     mockClientQuery.mockImplementation(router)
   }
 
-  it('handles turnedOffVariants: deactivates variants and cleans tracking rows', async () => {
+  it('handles turnedOffVariants: retires variants, discards their stock and zeroes the product', async () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ has_variants: false }),
       variants: [], images: [], sub_variants: [], units: [],
     }
-    // Live product had variants → toggled off
+    // Live product had one leaf variant → toggled off
     setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: true })
+    mockQueryMany.mockImplementation((sql: string) =>
+      Promise.resolve(typeof sql === 'string' && sql.includes('AS has_subs') ? [{ id: 'v-1', has_subs: false }] : [])
+    )
 
     await publishProductDraft('prod-1')
 
-    const softDeactivateVariants = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_variants SET is_active = false')
-    )
-    expect(softDeactivateVariants.length).toBeGreaterThan(0)
-    const deleteSerials = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('DELETE FROM product_serials')
-    )
-    expect(deleteSerials.length).toBeGreaterThan(0)
-    // turnedOffVariants forces variants=[] so live fallback not used for variants
+    const calls = mockClientQuery.mock.calls as [string, any[]][]
+    const sqls = calls.map(c => String(c[0]))
+    expect(sqls.some(s => s.includes('UPDATE product_variants SET is_active = false'))).toBe(true)
+    const discard = calls.find(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM product_serials WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
+    expect(discard?.[1]).toEqual(['prod-1', 'v-1', null])
+    expect(sqls.some(s => s.includes('SET variant_id = $4'))).toBe(false)
+    expect(sqls.some(s => s.includes('UPDATE products SET inventory_quantity = 0, updated_at = NOW() WHERE id = $1'))).toBe(true)
     expect(mockRecompute).toHaveBeenCalledTimes(1)
   })
 
@@ -665,15 +669,16 @@ describe('publishProductDraft', () => {
       ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_variants SET sell_unit_id = NULL')
     )
     expect(clearVariantSell.length).toBeGreaterThan(0)
-    // cleared sub-variant unit → DELETE + clear sell_unit_id on sub-variant
+    // cleared sub-variant unit → DELETE only. product_sub_variants has no
+    // sell_unit_id column, so there is nothing to clear at that grain.
     const delSubUnit = mockClientQuery.mock.calls.filter(
       ([sql]: [string]) => typeof sql === 'string' && sql.includes('DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2')
     )
     expect(delSubUnit.length).toBeGreaterThan(0)
     const clearSubSell = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_sub_variants SET sell_unit_id = NULL')
+      ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_sub_variants SET sell_unit_id')
     )
-    expect(clearSubSell.length).toBeGreaterThan(0)
+    expect(clearSubSell.length).toBe(0)
   })
 
   it('inserts sub-variant-level unit via savepoint (success path)', async () => {
@@ -841,5 +846,285 @@ describe('publishProductDraft', () => {
       ([sql]: [string]) => typeof sql === 'string' && sql.includes('MAX(total)')
     )
     expect(perGrain.length).toBe(0)
+  })
+
+  it('does not re-apply the entry-seeded snapshot when the toggle is turned OFF', async () => {
+    const draft = {
+      product_id: 'prod-1',
+      fields: baseFields({ has_variants: true }),
+      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: true }],
+      images: [],
+      sub_variants: [
+        { _seeded: true, id: 'sv-live-1', variant_id: 'v1', sub_variant_name: 'Blue', is_active: true },
+        { _seeded: true, id: 'sv-live-2', variant_id: 'v1', sub_variant_name: 'Red', is_active: true },
+      ],
+      units: [],
+    }
+    const router = (sql: string) => {
+      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])')) return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
+      return smartClientMock(sql)
+    }
+    setupPublish(draft, router, { perishable: false, serialized: false, has_variants: true })
+
+    await publishProductDraft('prod-1')
+
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET is_active = false') && s.includes('sku = $2'))).toBe(true)
+    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET') && s.includes('sub_variant_name = $4'))).toBe(false)
+    expect(sqls.some(s => s.includes('INSERT INTO product_sub_variants'))).toBe(false)
+  })
+
+  it('toggle OFF discards staged draft-sv- adds for that variant', async () => {
+    const draft = {
+      product_id: 'prod-1',
+      fields: baseFields({ has_variants: true }),
+      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: true }],
+      images: [],
+      sub_variants: [{ id: 'draft-sv-1', variant_id: 'v1', sub_variant_name: 'Green', is_active: true }],
+      units: [],
+    }
+    const router = (sql: string) => {
+      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])')) return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
+      return smartClientMock(sql)
+    }
+    setupPublish(draft, router, { perishable: false, serialized: false, has_variants: true })
+
+    await publishProductDraft('prod-1')
+
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s.includes('INSERT INTO product_sub_variants'))).toBe(false)
+  })
+
+  it('leaves an untouched entry-seeded snapshot alone when the toggle stays ON', async () => {
+    const draft = {
+      product_id: 'prod-1',
+      fields: baseFields({ has_variants: true }),
+      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: true, use_own_images: true }],
+      images: [],
+      sub_variants: [{ _seeded: true, id: 'sv-live-1', variant_id: 'v1', sub_variant_name: 'Blue', is_active: true }],
+      units: [],
+    }
+    setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: true })
+
+    await publishProductDraft('prod-1')
+
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET is_active = false'))).toBe(false)
+    expect(sqls.some(s => s.includes('sub_variant_name = $4'))).toBe(false)
+    expect(sqls.some(s => s.includes('INSERT INTO product_sub_variants'))).toBe(false)
+  })
+
+  it('resolves a _cleared sentinel that lacks variant_id via original_id', async () => {
+    const draft = {
+      product_id: 'prod-1',
+      fields: baseFields(),
+      variants: [], images: [],
+      sub_variants: [{ _cleared: true, id: 'cleared-1', original_id: '11111111-1111-4111-8111-111111111111' }],
+      units: [],
+    }
+    const router = (sql: string) => {
+      if (typeof sql === 'string' && sql.includes('SELECT variant_id FROM product_sub_variants WHERE id = $1')) {
+        return Promise.resolve({ rows: [{ variant_id: 'v-9' }], rowCount: 1 })
+      }
+      return smartClientMock(sql)
+    }
+    setupPublish(draft, router, { perishable: false, serialized: false, has_variants: false })
+
+    await publishProductDraft('prod-1')
+
+    const retire = mockClientQuery.mock.calls.find(
+      ([sql]: [string]) => typeof sql === 'string' && sql.includes('id <> ALL($2::uuid[])')
+    )
+    expect(retire).toBeDefined()
+    expect(retire![1]).toEqual(['v-9', []])
+  })
+
+  it('normalizes sub_variant_type_on to the presence of active sub-variants', async () => {
+    const draft = { product_id: 'prod-1', fields: baseFields(), variants: [], images: [], sub_variants: [], units: [] }
+    setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: false })
+
+    await publishProductDraft('prod-1')
+
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s.includes('SET sub_variant_type_on = sub.has_subs'))).toBe(true)
+  })
+
+  it('keeps batches and shelf rows when perishable turns OFF on a still-serialized product', async () => {
+    const draft = { product_id: 'prod-1', fields: baseFields({ perishable: false, serialized: true }), variants: [], images: [], sub_variants: [], units: [] }
+    const router = (sql: string) => {
+      if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
+      if (sql.includes('MAX(total)')) return Promise.resolve({ rows: [{ variant_id: null, sub_variant_id: null, total: '4' }], rowCount: 1 })
+      if (sql.includes('has_active_variant')) return Promise.resolve({ rows: [{ has_active_variant: false }], rowCount: 1 })
+      return smartClientMock(sql)
+    }
+    setupPublish(draft, router, { perishable: true, serialized: true, has_variants: false })
+
+    await publishProductDraft('prod-1')
+
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(s => s === 'DELETE FROM product_batches WHERE product_id = $1')).toBe(false)
+    expect(sqls.some(s => s === 'DELETE FROM shelf_stock WHERE product_id = $1')).toBe(false)
+    expect(sqls.some(s => s.includes('UPDATE product_batches SET expiry_date = NULL'))).toBe(true)
+    expect(sqls.some(s => s.includes("DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'"))).toBe(false)
+    expect(sqls.some(s => s.includes('UPDATE products SET inventory_quantity = $1'))).toBe(true)
+  })
+
+  describe('inventory at structural transitions', () => {
+    const liveStructure = (variants: { id: string; has_subs: boolean }[], subs: { id: string; variant_id: string }[] = []) => {
+      mockQueryMany.mockImplementation((sql: string) => {
+        if (typeof sql !== 'string') return Promise.resolve([])
+        if (sql.includes('AS has_subs')) return Promise.resolve(variants)
+        if (sql.includes('SELECT sv.id, sv.variant_id FROM product_sub_variants')) return Promise.resolve(subs)
+        return Promise.resolve([])
+      })
+    }
+    const nowStructure = (variants: { id: string; has_subs: boolean }[], subIds: string[] = []) =>
+      (sql: string) => {
+        if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
+        if (sql.includes('AS has_subs')) return Promise.resolve({ rows: variants, rowCount: variants.length })
+        if (sql.includes('SELECT sv.id FROM product_sub_variants sv')) return Promise.resolve({ rows: subIds.map(id => ({ id })), rowCount: subIds.length })
+        return smartClientMock(sql)
+      }
+    const ZERO_VARIANT = 'UPDATE product_variants SET inventory_quantity = 0, updated_at = NOW() WHERE id = ANY($1::uuid[])'
+    const ZERO_PRODUCT = 'UPDATE products SET inventory_quantity = 0, updated_at = NOW() WHERE id = $1'
+    const calls = () => mockClientQuery.mock.calls as [string, any[]][]
+    const variantRow = (sku: string, subsOn: boolean) => ({
+      sku, variant_name: sku, price: '10', is_active: true, stock_status: 'In Stock', pricing_type: 'unit',
+      discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: subsOn, use_own_images: false,
+    })
+
+    it('never zeroes product-grain stock from a snapshot that does not carry it', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields(), variants: [], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: false })
+
+      await publishProductDraft('prod-1')
+
+      const upd = calls().find(([sql]) => typeof sql === 'string' && sql.includes('UPDATE products SET'))
+      expect(upd?.[0]).toContain("inventory_quantity       = COALESCE(NULLIF(($2::jsonb)->>'inventory_quantity', '')::numeric, inventory_quantity)")
+    })
+
+    it('forward: the first variants discard the product-grain stock', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: false })
+      liveStructure([])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.includes('IS NOT DISTINCT FROM $2::uuid') && sql.startsWith('DELETE') && p[1] === null && p[2] === null)
+      expect(discards.map(c => c[0].split(' ')[2])).toEqual(['product_serials', 'product_batches', 'shelf_stock'])
+      expect(discards[0][0]).toContain("status = 'in_stock'")
+    })
+
+    it('forward: a variant that gains sub-variants discards its own grain', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', true)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-new']), { perishable: false, serialized: false, has_variants: true })
+      liveStructure([{ id: 'v-1', has_subs: false }])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[1] === 'v-1' && p[2] === null)
+      expect(discards).toHaveLength(3)
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
+    })
+
+    it('reverse: retiring every sub-variant discards their stock and zeroes the variant', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: true })
+      liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }, { id: 'sv-2', variant_id: 'v-1' }])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM product_batches WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
+      expect(discards.map(c => c[1])).toEqual([['prod-1', 'v-1', 'sv-1'], ['prod-1', 'v-1', 'sv-2']])
+      const zero = calls().find(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))
+      expect(zero?.[1]).toEqual([['v-1']])
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(false)
+    })
+
+    it('reverse: retiring one sub-variant while a sibling remains discards its stock', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', true)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-1']), { perishable: false, serialized: false, has_variants: true })
+      liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }, { id: 'sv-2', variant_id: 'v-1' }])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[2] === 'sv-2')
+      expect(discards).toHaveLength(3)
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
+    })
+
+    it('reverse: a removed variant with siblings left is discarded, not re-parented', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: true })
+      liveStructure([{ id: 'v-1', has_subs: false }, { id: 'v-2', has_subs: false }])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[1] === 'v-2')
+      expect(discards).toHaveLength(3)
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(false)
+    })
+
+    it('reverse: removing the last variant zeroes the product', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: false }), variants: [], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, nowStructure([]), { perishable: false, serialized: false, has_variants: true })
+      liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }])
+
+      await publishProductDraft('prod-1')
+
+      const discards = calls().filter(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM shelf_stock WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
+      expect(discards.map(c => c[1])).toEqual([['prod-1', 'v-1', 'sv-1'], ['prod-1', 'v-1', null]])
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(true)
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
+    })
+
+    it('retired rows are zeroed and a revived variant restarts at zero', async () => {
+      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
+      setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: true })
+
+      await publishProductDraft('prod-1')
+
+      const sqls = calls().map(c => String(c[0]))
+      expect(sqls.some(s => s.includes('CASE WHEN product_variants.is_active THEN product_variants.inventory_quantity ELSE 0 END'))).toBe(true)
+      expect(sqls.some(s => s.includes('UPDATE product_variants SET inventory_quantity = 0') && s.includes('is_active = false'))).toBe(true)
+      expect(sqls.some(s => s.includes('UPDATE product_sub_variants sv SET inventory_quantity = 0'))).toBe(true)
+    })
+
+    it('re-adding a sub-variant under its retired SKU revives that row instead of inserting', async () => {
+      const draft = {
+        product_id: 'prod-1', fields: baseFields({ has_variants: true }),
+        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }], images: [],
+        sub_variants: [{ id: 'draft-sv-1', variant_id: 'v-1', sub_variant_name: 'Red', sku: 'VAR-1-RED', price: '10' }],
+        units: [],
+      }
+      setupPublish(draft, (sql: string) =>
+        typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
+          ? Promise.resolve({ rows: [{ id: 'sv-old', variant_id: 'v-1', product_id: 'prod-1' }], rowCount: 1 })
+          : smartClientMock(sql),
+        { perishable: false, serialized: false, has_variants: true })
+
+      await publishProductDraft('prod-1')
+
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO product_sub_variants'))).toBe(false)
+      const revive = calls().find(([sql]) => typeof sql === 'string' && sql.includes('UPDATE product_sub_variants SET') && sql.includes('sub_variant_name = $4'))
+      expect(revive?.[1][0]).toBe('sv-old')
+      expect(revive?.[0]).toContain('inventory_quantity = CASE WHEN is_active THEN inventory_quantity ELSE 0 END')
+    })
+
+    it('rejects a sub-variant SKU that belongs to another variant', async () => {
+      const draft = {
+        product_id: 'prod-1', fields: baseFields({ has_variants: true }),
+        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }], images: [],
+        sub_variants: [{ id: 'draft-sv-1', variant_id: 'v-1', sub_variant_name: 'Red', sku: 'OTHER-RED' }],
+        units: [],
+      }
+      setupPublish(draft, (sql: string) =>
+        typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
+          ? Promise.resolve({ rows: [{ id: 'sv-x', variant_id: 'v-9', product_id: 'prod-1' }], rowCount: 1 })
+          : smartClientMock(sql),
+        { perishable: false, serialized: false, has_variants: true })
+
+      await expect(publishProductDraft('prod-1')).rejects.toThrow(/already used by another variant/)
+    })
   })
 })

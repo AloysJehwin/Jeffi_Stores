@@ -28,6 +28,8 @@ interface Props {
   onUnitLoaded?: (info: UnitLoadedInfo) => void
   isDraft?: boolean
   readOnly?: boolean
+  /** Overrides the right-hand hint — used when this unit acts as a fallback for a deeper grain. */
+  roleNote?: string
 }
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
@@ -35,7 +37,7 @@ const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface
 
 type FormMode = 'base' | 'extra' | null
 
-export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false }: Props) {
+export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false, roleNote }: Props) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('inventory')
   const [allUnits, setAllUnits] = useState<ProductUnit[]>([])
@@ -369,11 +371,11 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
         </h4>
         {formMode === null && (
           <span className="text-[10px] text-foreground-muted">
-            {isSubVariantScope
+            {roleNote ?? (isSubVariantScope
               ? inherited ? 'Click Override to set a sub-variant-specific unit.' : 'Sub-variant-specific unit.'
               : isVariantScope
                 ? inherited ? 'Click Override to set a variant-specific unit.' : 'Variant-specific unit.'
-                : 'The unit stock and base price are measured in.'}
+                : 'The unit stock and base price are measured in.')}
           </span>
         )}
       </div>

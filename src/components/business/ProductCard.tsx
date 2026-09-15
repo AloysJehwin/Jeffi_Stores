@@ -20,7 +20,7 @@ interface ProductCardProps {
   mrp: number | null
   mrpDiscount: number
   effectiveStock: number
-  primaryImage?: { image_url: string; thumbnail_url?: string } | null
+  primaryImage?: { image_url: string; thumbnail_url?: string; blurhash?: string | null } | null
   brandName?: string | null
   categoryName?: string | null
   categoryId?: string | null
@@ -122,6 +122,7 @@ export default function ProductCard({
                   <ImgWithSkeleton
                     src={primaryImage.image_url}
                     alt={name}
+                    blurhash={primaryImage.blurhash}
                     className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                   />
                 </div>

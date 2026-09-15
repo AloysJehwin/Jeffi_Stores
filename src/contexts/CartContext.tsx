@@ -44,6 +44,7 @@ interface CartItem {
       thumbnail_url: string
       image_url: string
       is_primary: boolean
+      blurhash?: string | null
     }>
   }
   variant: {

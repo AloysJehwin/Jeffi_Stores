@@ -3,6 +3,7 @@ import path from 'path'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default defineConfig({
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     globals: true,
     environment: 'happy-dom',
@@ -22,7 +23,7 @@ export default defineConfig({
       DELHIVERY_API_KEY: 'test-delhivery-key',
       GOOGLE_CLIENT_ID: 'test-google-client-id',
     },
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary', 'json'],

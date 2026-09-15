@@ -8,6 +8,7 @@ interface ProductImage {
   image_url: string
   thumbnail_url: string
   is_primary: boolean
+  blurhash?: string | null
 }
 
 interface ProductImageGalleryProps {
@@ -90,6 +91,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                 key={currentImage.image_url}
                 src={currentImage.image_url}
                 alt={`${productName} - Image ${selectedImageIndex + 1}`}
+                blurhash={currentImage.blurhash}
                 className="w-full h-full object-contain animate-fade-in"
               />
             </div>
@@ -131,6 +133,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}
+                    blurhash={image.blurhash}
                     className="w-full h-full object-contain bg-surface-secondary rounded-md"
                   />
                 </div>
@@ -167,6 +170,7 @@ export default function ProductImageGallery({ images, productName, variantImages
               <ImgWithSkeleton
                 src={currentImage.image_url}
                 alt={`${productName} - Image ${selectedImageIndex + 1}`}
+                blurhash={currentImage.blurhash}
                 className="max-w-full max-h-[85vh] w-auto h-auto object-contain"
               />
             </div>
@@ -216,6 +220,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
+                    blurhash={image.blurhash}
                     className="w-full h-full object-contain bg-surface-secondary overflow-hidden rounded"
                   />
                 </button>

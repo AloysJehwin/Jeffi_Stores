@@ -10,7 +10,6 @@ import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
 import { getAdminSession } from '@/lib/admin-auth'
-import { hasScope } from '@/lib/scopes'
 
 function triggerEnrichment(productId: string) {
   const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -154,17 +153,53 @@ async function updateProduct(productId: string, formData: FormData) {
       const variantsJsonRaw = formData.get('variants_json') as string | null
       let parsedVariants: any[] = []
       try { parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : [] } catch { parsedVariants = [] }
-      for (const v of parsedVariants) {
-        if (v?._isDeleted) continue
+      const blank = (x: any) => x == null || String(x).trim() === ''
+      const filled = (...vals: any[]) => { const hit = vals.find(x => !blank(x)); return hit == null ? '' : String(hit) }
+      const subsOn = (v: any) => v?.sub_variant_type_on === true || v?.sub_variant_type_on === 'true'
+      const activeParsed = parsedVariants.filter(v => !v?._isDeleted)
+      let draftSubs: any[] = []
+      let liveSubs: any[] = []
+      if (activeParsed.some(subsOn)) {
+        const draftRow = await queryOne<{ sub_variants: any[] | null }>('SELECT sub_variants FROM product_drafts WHERE product_id = $1', [productId])
+        draftSubs = Array.isArray(draftRow?.sub_variants) ? draftRow!.sub_variants : []
+        liveSubs = await queryMany<any>(
+          'SELECT variant_id, sub_variant_name, weight_grams, length_cm, breadth_cm, height_cm, package_type FROM product_sub_variants WHERE product_id = $1 AND is_active = true',
+          [productId]
+        )
+      }
+      for (const v of activeParsed) {
+        const vLabel = v?.variant_name || v?.sku || ''
+        if (subsOn(v)) {
+          const staged = draftSubs.filter(sv => sv?.variant_id === v?.id)
+          const effective = staged.length > 0
+            ? staged.filter(sv => !sv._cleared && sv.sub_variant_name)
+            : liveSubs.filter(sv => sv.variant_id === v?.id)
+          if (effective.length === 0) {
+            errors.push(`Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`)
+            break
+          }
+          for (const sv of effective) {
+            if (!(parseFloat(filled(sv.weight_grams, v?.weight_grams, weightGrams)) > 0)) {
+              errors.push(`Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`)
+              break
+            }
+            const pt = filled(sv.package_type, v?.package_type, packageType) || 'flat_poly_auto'
+            if (STORED_DIMS_TYPES.includes(pt) && (blank(filled(sv.length_cm, v?.length_cm)) || blank(filled(sv.breadth_cm, v?.breadth_cm)) || blank(filled(sv.height_cm, v?.height_cm)))) {
+              errors.push(`Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`)
+              break
+            }
+          }
+          if (errors.length > 0) break
+          continue
+        }
         const w = v?.weight_grams != null && v.weight_grams !== '' ? parseFloat(v.weight_grams) : null
         if (w == null || !(w > 0)) {
-          errors.push(`Shipping weight is required for variant "${v?.variant_name || v?.sku || ''}" and must be greater than 0.`)
+          errors.push(`Shipping weight is required for variant "${vLabel}" and must be greater than 0.`)
           break
         }
         const pt = v?.package_type || 'flat_poly_auto'
-        const blank = (x: any) => x == null || String(x).trim() === ''
         if (STORED_DIMS_TYPES.includes(pt) && (blank(v?.length_cm) || blank(v?.breadth_cm) || blank(v?.height_cm))) {
-          errors.push(`Dimensions required for this package type (variant "${v?.variant_name || v?.sku || ''}")`)
+          errors.push(`Dimensions required for this package type (variant "${vLabel}")`)
           break
         }
       }
@@ -830,8 +865,9 @@ export default async function EditProductPage({ params, searchParams }: { params
   const serializedStockTotal = serialCountRow?.total ?? 0
 
   const session = await getAdminSession()
-  const hasInventory = hasScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
-  const hasReturns = hasScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
+  const { hasPlanScope } = await import('@/lib/plan-gate')
+  const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
+  const hasReturns = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
 
   const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[]; sub_variants: Record<string, unknown>[]; images: Record<string, unknown>[] }>(
     `SELECT product_id, fields, variants, sub_variants, images FROM product_drafts WHERE product_id = $1`,
@@ -858,19 +894,20 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   // Distribute draft sub_variants onto their parent variant so the form's initial
   // render reflects DRAFT sub-variant edits (add/remove/rename), not just live. The
-  // draft column is a complete per-variant snapshot (seeded at draft-entry), so for
-  // any variant present in the draft sub_variants we replace its `.sub_variants`;
-  // variants absent from the draft keep their live sub-variants. Cleared sentinels
-  // and internal markers are stripped.
+  // draft column is a complete per-variant snapshot (seeded at draft-entry), so any
+  // variant with a draft row — including only _cleared sentinels — gets the draft's
+  // (possibly empty) set; variants absent from the draft keep their live sub-variants.
   const draftSubVariants = isDraft && Array.isArray(draftRow?.sub_variants) ? draftRow!.sub_variants : []
   function withDraftSubVariants(variantList: any[]): any[] {
     if (draftSubVariants.length === 0) return variantList
     const byVariant = new Map<string, any[]>()
     for (const sv of draftSubVariants as any[]) {
-      if (sv._cleared || !sv.variant_id || !sv.sub_variant_name) continue
+      if (!sv.variant_id) continue
       const list = byVariant.get(sv.variant_id) || []
-      const { _seeded, _edited, ...clean } = sv
-      list.push(clean)
+      if (!sv._cleared && sv.sub_variant_name) {
+        const { _seeded, _edited, ...clean } = sv
+        list.push(clean)
+      }
       byVariant.set(sv.variant_id, list)
     }
     return (variantList || []).map((v: any) =>
@@ -903,7 +940,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   // deriving grains from productForForm would collapse every qty to 0 and hide the
   // bootstrap capture after the first autosave. Stock is intrinsic to the live
   // product and is not edited by the draft, so compute it here once.
-  const liveStockGrains: { variant_id: string | null; sub_variant_id: string | null; label: string; qty: number }[] = []
+  const liveStockGrains: { variant_id: string | null; sub_variant_id: string | null; label: string; qty: number; qty_step?: number }[] = []
   {
     const p: any = product
     if (p?.has_variants && Array.isArray(p?.product_variants)) {
@@ -922,6 +959,21 @@ export default async function EditProductPage({ params, searchParams }: { params
     } else {
       const qty = parseFloat(p?.inventory_quantity ?? '0') || 0
       if (qty > 0) liveStockGrains.push({ variant_id: null, sub_variant_id: null, label: 'Product', qty })
+    }
+  }
+
+  // Serial capture is one serial per qty_step of BASE quantity, matching the sale and
+  // receive paths. Resolve each grain's step here so the form asks for the right count
+  // instead of one field per base unit.
+  if (liveStockGrains.length > 0) {
+    const { resolveGrainUnit } = await import('@/lib/selling-unit')
+    for (const g of liveStockGrains) {
+      const u = await resolveGrainUnit({ query }, {
+        productId: id,
+        variantId: g.variant_id,
+        subVariantId: g.sub_variant_id,
+      })
+      g.qty_step = u && u.qty_step > 0 ? u.qty_step : 1
     }
   }
 

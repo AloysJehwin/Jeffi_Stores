@@ -14,7 +14,7 @@ export interface StoreIdentity {
   email: string
   phone: string
   web: string
-  logoUrl: string   // '' means "use the static /images/logo.png fallback"
+  logoUrl: string   // '' means "no logo" — render the store name as text
 }
 
 export interface FeatureFlags {
@@ -100,6 +100,9 @@ export interface SiteControls {
   values: BusinessValues
   storefront: StorefrontContent
   shortcuts: KeyboardShortcuts
+  // Whether the current tenant ships on its own Delhivery account. Platform store / no tenant in
+  // scope is treated as true. Drives the COD gate and the admin COD-toggle lock.
+  ownDelhivery: boolean
 }
 
 // Defaults equal the pre-existing hardcoded / env-var values.
@@ -181,6 +184,7 @@ const DEFAULTS: SiteControls = {
     aiAgent: 'mod+shift+a',
     customShortcuts: '[]',
   },
+  ownDelhivery: true,
 }
 
 const KEYS = [
@@ -384,6 +388,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         aiAgent:      str('shortcut_ai_agent',      d.shortcuts.aiAgent),
         customShortcuts: str('shortcut_custom',     d.shortcuts.customShortcuts),
       },
+      ownDelhivery: d.ownDelhivery,
     }
 
     // COD is offered only to tenants shipping on their own Delhivery account (own_delhivery). A
@@ -392,23 +397,25 @@ export async function getSiteControls(): Promise<SiteControls> {
     // Gate it here at the single source that flows to the buyer UI, getFeatureFlags, and the order
     // create/create-direct server checks. The platform's own store (no tenant in scope) is treated as
     // own_delhivery=true and keeps COD on the site flag alone.
-    if (result.flags.codEnabled) {
-      try {
-        const { resolveTenantId } = await import('./tenant-context')
-        const tenantId = await resolveTenantId()
-        if (tenantId) {
-          const { controlPlanePool } = await import('./tenant-registry')
-          const cp = await controlPlanePool().query(
-            `SELECT own_delhivery FROM tenants WHERE id = $1`,
-            [tenantId],
-          )
-          if (!cp.rows[0]?.own_delhivery) result.flags.codEnabled = false
-        }
-      } catch {
-        // Control-plane hiccup: fail closed on COD so a platform-Delhivery tenant can't collect COD
-        // it can't reconcile.
-        result.flags.codEnabled = false
+    try {
+      const { resolveTenantId } = await import('./tenant-context')
+      const tenantId = await resolveTenantId()
+      if (tenantId) {
+        const { controlPlanePool } = await import('./tenant-registry')
+        const cp = await controlPlanePool().query(
+          `SELECT own_delhivery FROM tenants WHERE id = $1`,
+          [tenantId],
+        )
+        result.ownDelhivery = !!cp.rows[0]?.own_delhivery
+        if (!result.ownDelhivery) result.flags.codEnabled = false
+      } else {
+        result.ownDelhivery = true
       }
+    } catch {
+      // Control-plane hiccup: fail closed on COD (and the toggle lock) so a platform-Delhivery tenant
+      // can't collect COD it can't reconcile.
+      result.ownDelhivery = false
+      result.flags.codEnabled = false
     }
 
     // Stock validation is a Growth+ feature. On a tenant whose plan lacks inventory:read the

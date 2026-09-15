@@ -97,6 +97,7 @@ CREATE TABLE public.order_items (
     buy_mode character varying(10) DEFAULT 'unit'::character varying NOT NULL,
     buy_unit character varying(10),
     sub_variant_id uuid,
+    sub_variant_name character varying(255),
     sold_unit character varying(20),
     sold_unit_factor numeric(14,6),
     base_quantity numeric(14,4),
