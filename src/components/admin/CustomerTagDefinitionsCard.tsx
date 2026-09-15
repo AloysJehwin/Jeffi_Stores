@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { SectionCard } from '@/components/admin/site-controls/controls'
 
 interface TagDef {
   id: string
@@ -90,12 +91,8 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
   }
 
   return (
-    <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-      <div className="px-5 py-4 border-b border-border-default">
-        <h2 className="text-sm font-semibold text-foreground">Customer Tags</h2>
-        <p className="text-xs text-foreground-muted mt-0.5">Predefined tags that can be assigned to customers.</p>
-      </div>
-      <div className="p-5 space-y-4">
+    <SectionCard title="Customer Tags" description="Predefined tags that can be assigned to customers.">
+      <div className="space-y-4">
         {/* Existing tags */}
         <div className="flex flex-wrap gap-2">
           {defs.length === 0 ? (
@@ -167,6 +164,6 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
           </div>
         )}
       </div>
-    </section>
+    </SectionCard>
   )
 }

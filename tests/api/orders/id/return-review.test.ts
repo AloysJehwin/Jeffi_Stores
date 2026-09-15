@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn().mockResolvedValue([]),
   withTransaction: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/email', () => ({
   sendReturnStatusEmail: vi.fn().mockResolvedValue(undefined),
@@ -18,7 +19,15 @@ vi.mock('@/lib/inventory', () => ({
 }))
 vi.mock('@/lib/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
+}))
+vi.mock('@/lib/razorpay-route', () => ({
+  reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
+  recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/tenant-registry', () => ({
+  controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
 vi.mock('@/lib/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
@@ -35,6 +44,7 @@ import { POST } from '@/app/api/orders/[id]/return-review/route'
 import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 import * as razorpayLib from '@/lib/razorpay'
+import * as razorpayRoute from '@/lib/razorpay-route'
 import * as inventory from '@/lib/inventory'
 import * as email from '@/lib/email'
 import * as activity from '@/lib/activity'
@@ -244,7 +254,7 @@ describe('POST /api/orders/[id]/return-review', () => {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_123' }) },
     }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -381,6 +391,25 @@ describe('POST /api/orders/[id]/return-review', () => {
     expect(body.refundFailed).toBe(false)
   })
 
+  // Regression: a partial return refunded the buyer but never reversed the tenant's Route
+  // share, so the platform absorbed the whole refund on every returned order.
+  it('claws back the tenant Route share on a return refund', async () => {
+    const razorpayMock = { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_1' }) } }
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
+    vi.mocked(db.resolveRequestTenant).mockResolvedValue({ tenantId: 'tnt-1', slug: 't' } as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({ id: 'rr-1', type: 'refund', status: 'received', order_id: 'order-123' })
+      .mockResolvedValueOnce({ id: 'pmt-1', transaction_id: 'pay_abc', amount: '500', gateway_response: '{}' })
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
+      fn({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
+
+    await POST(makeRequest({ action: 'process' }) as any, PARAMS)
+    expect(razorpayRoute.reverseTransfersForRefund).toHaveBeenCalled()
+  })
+
   // --- process/refund: original_order_id set — fetches payment_status from parent order ---
 
   it('processes refund with original_order_id — looks up parent payment_status', async () => {
@@ -439,7 +468,7 @@ describe('POST /api/orders/[id]/return-review', () => {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_456' }) },
     }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: 'parent-order-1' })
@@ -566,7 +595,7 @@ describe('POST /api/orders/[id]/return-review', () => {
       payments: { refund: vi.fn().mockRejectedValue(new Error('gateway down')) },
     }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
@@ -588,7 +617,7 @@ describe('POST /api/orders/[id]/return-review', () => {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_obj' }) },
     }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
@@ -607,7 +636,7 @@ describe('POST /api/orders/[id]/return-review', () => {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_null' }) },
     }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
@@ -774,7 +803,7 @@ describe('POST /api/orders/[id]/return-review — rejected side-effects hit .cat
   it('process refund (razorpay success path): swallows all rejected side effects', async () => {
     const razorpayMock = { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd' }) } }
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
-    vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid' })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)

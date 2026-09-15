@@ -208,6 +208,10 @@ CREATE TABLE IF NOT EXISTS public.wallet_ledger (
     amount        numeric(12,2) NOT NULL,          -- signed: recharge/adjustment +, debit -
     order_ref     character varying(64),
     awb           character varying(40),
+    -- Gateway reference for a credit (e.g. a Razorpay payment id). The unique index below makes
+    -- the top-up credit idempotent at the DB level; the old check-then-insert on `note` let two
+    -- concurrent verifies both credit the same payment.
+    external_ref  character varying(64),
     note          text,
     occurred_at   timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -228,6 +232,12 @@ CREATE INDEX IF NOT EXISTS idx_wallet_ledger_tenant ON public.wallet_ledger USIN
 CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_ledger_tenant_awb_debit
     ON public.wallet_ledger USING btree (tenant_id, awb)
     WHERE awb IS NOT NULL AND entry_type = 'debit';
+
+-- one credit per (tenant, external_ref): the DB-level guard that makes a wallet top-up
+-- idempotent across concurrent verifies and webhook retries.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_ledger_tenant_external_ref
+    ON public.wallet_ledger USING btree (tenant_id, external_ref)
+    WHERE external_ref IS NOT NULL;
 
 --
 -- instance_state on tenants: tracks RDS running state for the disable toggle.

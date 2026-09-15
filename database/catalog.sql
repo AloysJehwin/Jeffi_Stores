@@ -91,6 +91,7 @@ CREATE TABLE public.gallery_images (
     mime_type character varying(100) DEFAULT 'image/jpeg'::character varying,
     width integer,
     height integer,
+    blurhash character varying(64),
     source_url character varying(1000),
     created_at timestamp with time zone DEFAULT now(),
     custom_name character varying(255),
@@ -115,6 +116,7 @@ CREATE TABLE public.product_images (
     mime_type character varying(100),
     width integer,
     height integer,
+    blurhash character varying(64),
     alt_text character varying(255),
     display_order integer DEFAULT 0,
     is_primary boolean DEFAULT false,
@@ -469,6 +471,7 @@ CREATE TABLE public.variant_images (
     mime_type character varying(100),
     width integer,
     height integer,
+    blurhash character varying(64),
     alt_text character varying(255),
     display_order integer DEFAULT 0,
     is_primary boolean DEFAULT false,
@@ -538,6 +541,8 @@ CREATE TABLE public.hero_slides (
     badge_color character varying(30) DEFAULT 'bg-primary-500'::character varying,
     image_url text,
     image_url_mobile text,
+    blurhash character varying(64),
+    blurhash_mobile character varying(64),
     cta_label character varying(100),
     cta_url text,
     filter_category character varying(255),
@@ -553,4 +558,33 @@ CREATE TABLE public.hero_slides (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT hero_slides_pkey PRIMARY KEY (id)
+);
+
+
+--
+-- Name: homepage_sections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.homepage_sections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    type text NOT NULL,
+    title character varying(255),
+    subtitle character varying(500),
+    eyebrow character varying(100),
+    cta_label character varying(100),
+    cta_url text,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    display_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    starts_at timestamp with time zone,
+    ends_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT homepage_sections_pkey PRIMARY KEY (id),
+    CONSTRAINT homepage_sections_type_check CHECK ((type = ANY (ARRAY[
+        'hero'::text, 'trust_strip'::text, 'category_grid'::text, 'brand_carousel'::text,
+        'product_row'::text, 'category_showcase'::text, 'deal_of_the_day'::text,
+        'promo_banner'::text, 'featured_for_you'::text, 'benefits'::text,
+        'why_us'::text, 'about'::text, 'business_cta'::text]))),
+    CONSTRAINT homepage_sections_window_check CHECK ((ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at))
 );

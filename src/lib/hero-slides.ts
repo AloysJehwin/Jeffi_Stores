@@ -8,6 +8,8 @@ export interface HeroSlide {
   badge_color: string | null
   image_url: string | null
   image_url_mobile: string | null
+  blurhash?: string | null
+  blurhash_mobile?: string | null
   cta_label: string | null
   cta_url: string | null
   filter_category: string | null

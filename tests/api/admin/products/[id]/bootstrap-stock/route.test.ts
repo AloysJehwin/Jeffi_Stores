@@ -11,6 +11,9 @@ vi.mock('@/lib/scopes', () => ({
 vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
   queryOne: vi.fn(),
+  // resolveGrainUnit reads the grain's base unit; no row => qty_step defaults to 1,
+  // which is what these fixtures assume.
+  query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 vi.mock('@/lib/shelf', () => ({
@@ -49,7 +52,13 @@ function makeParams(productId = PRODUCT_ID) {
 function makeMockClient(responses: Record<number, any> = {}) {
   let idx = 0
   return {
-    query: vi.fn().mockImplementation(async () => responses[idx++] ?? { rows: [] }),
+    // resolveGrainUnit runs inside the transaction to read the grain's base unit.
+    // Answer it out-of-band so the positional fixtures below keep their meaning;
+    // no row => qty_step defaults to 1, which is what these fixtures assume.
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (typeof sql === 'string' && /FROM product_units/.test(sql)) return { rows: [] }
+      return responses[idx++] ?? { rows: [] }
+    }),
     release: vi.fn(),
   }
 }
@@ -185,6 +194,21 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     vi.mocked(getClient).mockResolvedValue(client as any)
     const res = await POST(makeReq({ assignments: [{ quantity: 1, serial_numbers: ['SN1'], location_id: LOCATION_ID }] }), makeParams())
     expect(res.status).toBe(200)
+  })
+
+  it('skips a grain that is no longer a leaf after publish', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' } as any)
+      .mockResolvedValueOnce({ total: 0 } as any)       // existing stock
+      .mockResolvedValueOnce({ is_leaf: false } as any) // product now has active variants
+    const client = makeMockClient()
+    vi.mocked(getClient).mockResolvedValue(client as any)
+    const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }), makeParams())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.skipped).toEqual(['product'])
+    expect(json.batch_ids).toEqual([])
+    expect(syncPerishableStock).not.toHaveBeenCalled()
   })
 
   it('returns 500 when BEGIN fails', async () => {

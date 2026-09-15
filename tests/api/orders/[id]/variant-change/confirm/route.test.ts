@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAnyUser: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), query: vi.fn() }))
+vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), query: vi.fn(), resolveRequestTenant: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn(),
+}))
+vi.mock('@/lib/razorpay-route', () => ({
+  reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
+  recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/tenant-registry', () => ({
+  controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
 vi.mock('@/lib/variant-change', () => ({ applyVariantChange: vi.fn() }))
 vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
@@ -96,7 +104,7 @@ describe('POST variant-change confirm', () => {
 
     it('refunds and applies (gateway_response as string)', async () => {
       const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(rzp as any)
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(db.queryOne)
         .mockResolvedValueOnce(BASE_VCR as any)
         .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp', gateway_response: '{"a":1}' } as any)
@@ -110,7 +118,7 @@ describe('POST variant-change confirm', () => {
 
     it('uses original_order_id when present; gateway_response object', async () => {
       const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(rzp as any)
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(db.queryOne)
         .mockResolvedValueOnce({ ...BASE_VCR, original_order_id: 'orig-9' } as any)
         .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp', gateway_response: { existing: true } } as any)
@@ -122,7 +130,7 @@ describe('POST variant-change confirm', () => {
 
     it('409 when apply fails after refund', async () => {
       const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(rzp as any)
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(vc.applyVariantChange).mockResolvedValue({ applied: false, reason: 'order_not_eligible' } as any)
       vi.mocked(db.queryOne)
         .mockResolvedValueOnce(BASE_VCR as any)

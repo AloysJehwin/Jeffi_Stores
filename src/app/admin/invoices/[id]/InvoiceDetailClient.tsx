@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { variantLabel } from '@/lib/product-label'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Pencil, QrCode } from 'lucide-react'
@@ -503,7 +504,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.product_name}</div>
-                    {item.variant_name && <div className="text-xs text-foreground-secondary">{item.variant_name}</div>}
+                    {variantLabel(item) && <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>}
                     {item.product_sku && <div className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></div>}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>

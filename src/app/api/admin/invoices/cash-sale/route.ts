@@ -20,6 +20,7 @@ const cashSaleItemSchema = z.object({
   variant_id: z.string().uuid().nullable().optional(),
   sub_variant_id: z.string().uuid().nullable().optional(),
   variant_name: z.string().optional(),
+  sub_variant_name: z.string().nullish(),
   hsn_code: z.string().optional(),
   gst_rate: z.coerce.number().optional(),
   unit_price: z.coerce.number().min(0),
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest) {
           variant_id: item.variant_id || null,
           sub_variant_id: item.sub_variant_id || null,
           variant_name: item.variant_name || null,
+          sub_variant_name: item.sub_variant_name || null,
           hsn_code: item.hsn_code || null,
           gst_rate: 0,
           quantity: rawQty,
@@ -224,13 +226,13 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO cash_sale_items (
-            sale_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
+            sale_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name, sub_variant_name,
             hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
           [
             saleId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name,
+            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null,
             item.hsn_code, item.gst_rate, item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
             item.unit_price, item.discount_amount,
             item.tax_amount, item.total_price, item.taxable_amount,

@@ -427,7 +427,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
     const res = await POST(makePost({ serial_assignments: [] }), PARAMS)
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toMatch(/Serial numbers required/)
+    expect((await res.json()).error).toMatch(/expected \d+ serial number/)
   })
 
   it('syncs shelf stock for perishable products', async () => {

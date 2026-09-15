@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { variantLabel } from '@/lib/product-label'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 
@@ -196,7 +197,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.product_name}</div>
-                    {item.variant_name && <div className="text-xs text-foreground-secondary">{item.variant_name}</div>}
+                    {variantLabel(item) && <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>

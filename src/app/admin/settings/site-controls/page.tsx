@@ -10,6 +10,9 @@ import { SectionCard, TextControl, TextAreaControl, NumberControl, ToggleControl
 import LogoUploader from '@/components/admin/site-controls/LogoUploader'
 import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
+import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
+import type { HomepageSection } from '@/lib/homepage-sections'
+import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
@@ -105,6 +108,31 @@ async function loadHeroData() {
   }
 }
 
+async function loadSectionOptions(
+  categories: { value: string; label: string }[],
+  brands: { value: string; label: string }[],
+): Promise<SectionOptions> {
+  const counts = await queryOne<{ featured: string; new_arrivals: string; best_sellers: string; on_sale: string }>(
+    `SELECT
+       count(*) FILTER (WHERE is_featured = true)          AS featured,
+       count(*)                                            AS new_arrivals,
+       count(*)                                            AS best_sellers,
+       count(*) FILTER (WHERE mrp IS NOT NULL AND mrp > price) AS on_sale
+     FROM products WHERE is_active = true`
+  ).catch(() => null)
+
+  return {
+    categories,
+    brands,
+    counts: {
+      featured: Number(counts?.featured ?? 0),
+      newArrivals: Number(counts?.new_arrivals ?? 0),
+      bestSellers: Number(counts?.best_sellers ?? 0),
+      onSale: Number(counts?.on_sale ?? 0),
+    },
+  }
+}
+
 export default async function SiteControlsPage() {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
@@ -124,6 +152,12 @@ export default async function SiteControlsPage() {
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
   const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
   const hero = await loadHeroData()
+  const homepageSections = await queryMany<HomepageSection>(
+    `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
+            display_order, is_active, starts_at, ends_at
+     FROM homepage_sections ORDER BY display_order ASC, created_at ASC`
+  ).catch(() => [] as HomepageSection[])
+  const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
 
   let customShortcuts: CustomShortcut[] = []
   try { customShortcuts = JSON.parse(c.shortcuts.customShortcuts || '[]') } catch { /* ignore */ }
@@ -146,7 +180,7 @@ export default async function SiteControlsPage() {
       {/* Full-width single-column stack — each section spans the page. */}
       <div className="space-y-6">
         <div>
-          <SectionCard title="Store Identity" description="Name, logo and contact details used across the site, emails, invoices and documents." columns>
+          <SectionCard title="Store Identity" description="Name, logo and contact details used across the site, emails, invoices and documents." columns defaultOpen>
             <FullSpan><LogoUploader initialUrl={c.identity.logoUrl} /></FullSpan>
             <TextControl settingKey="business_name" label="Store name" hint="Shown in the header, footer, emails ({store_name}) and page titles." initial={c.identity.name} placeholder="Your store name" />
             <TextControl settingKey="business_email" label="Contact email" type="email" initial={c.identity.email} placeholder="hello@jeffistores.in" />
@@ -158,7 +192,14 @@ export default async function SiteControlsPage() {
         <div>
           <SectionCard title="Payments & Tax" description="Toggle online payments and GST. These affect checkout and invoicing — verify after changing." columns>
             <FullSpan><ToggleControl settingKey="feature_razorpay_enabled" label="Online payments (Razorpay)" hint="When off, online card/UPI payment is hidden at checkout. Customers can still use COD if enabled." initial={c.flags.razorpayEnabled} /></FullSpan>
-            <FullSpan><ToggleControl settingKey="feature_cod_enabled" label="Cash on delivery (COD)" hint="Site-level COD switch. COD is offered only when this is on AND the product itself allows COD. When off, COD is hidden everywhere." initial={c.flags.codEnabled} /></FullSpan>
+            <FullSpan><ToggleControl
+              settingKey="feature_cod_enabled"
+              label="Cash on delivery (COD)"
+              hint="Site-level COD switch. COD is offered only when this is on AND the product itself allows COD. When off, COD is hidden everywhere."
+              initial={c.flags.codEnabled}
+              locked={!c.ownDelhivery}
+              lockedHint="COD needs your own Delhivery account. Connect one in onboarding or on the Delhivery page to enable it."
+            /></FullSpan>
             <FullSpan><ToggleControl settingKey="feature_gst_enabled" label="GST calculation" hint="When off, orders and invoices are created without tax lines." initial={c.flags.gstEnabled} /></FullSpan>
             <NumberControl settingKey="cod_surcharge_flat" label="COD surcharge (flat)" prefix="₹" initial={c.values.codSurchargeFlat} />
             <NumberControl settingKey="cod_surcharge_pct" label="COD surcharge (percentage)" suffix="%" step={0.5} initial={c.values.codSurchargePct} />
@@ -227,7 +268,7 @@ export default async function SiteControlsPage() {
           <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds, shipping charge caps and default weights. The default warehouse origin and pickup identity are below (also editable under Delhivery)." columns>
             <FullSpan><DeliverySettingsForm initial={delivery} /></FullSpan>
             <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
-            <NumberControl settingKey="delivery_base_charge" label="Flat base charge override (≤3kg)" hint="Leave 0 to charge the live Delhivery rate. Set a value to override with a flat buyer charge up to the free-weight ceiling." prefix="₹" initial={delivery.baseCharge} />
+            <NumberControl settingKey="delivery_rate_per_kg" label="Shipping rate per kg" hint="Leave 0 to charge the live Delhivery rate. Set a value to price shipping as rate × charged weight instead, where charged weight is the greater of actual and volumetric weight. Still bounded by the min/max charge below." prefix="₹" initial={delivery.ratePerKg} />
             <NumberControl settingKey="delivery_free_weight_ceiling_kg" label="Free-weight ceiling" hint="Weight below which the free-shipping threshold applies." suffix="kg" min={0} step={0.5} initial={delivery.freeWeightCeilingKg} />
             <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
             <NumberControl settingKey="shipping_min_charge" label="Minimum shipping charge" hint="Floor applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMinCharge} />
@@ -257,13 +298,19 @@ export default async function SiteControlsPage() {
         </div>
 
         <div>
-          <SectionCard title="Hero Slides" description="Manage the homepage hero carousel. Upload a banner, set the badge and copy, and assign product filters so the slide links straight to the matching products.">
-            <HeroSlideManager
-              initialSlides={hero.slides}
-              categoryOptions={hero.categoryOptions}
-              brandOptions={hero.brandOptions}
-              gradeOptions={hero.gradeOptions}
-              materialOptions={hero.materialOptions}
+          <SectionCard title="Homepage Sections" description="Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section.">
+            <HomepageSectionManager
+              initial={homepageSections}
+              options={sectionOptions}
+              heroEditor={
+                <HeroSlideManager
+                  initialSlides={hero.slides}
+                  categoryOptions={hero.categoryOptions}
+                  brandOptions={hero.brandOptions}
+                  gradeOptions={hero.gradeOptions}
+                  materialOptions={hero.materialOptions}
+                />
+              }
             />
           </SectionCard>
         </div>

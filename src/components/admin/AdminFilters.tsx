@@ -124,7 +124,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                       <input id={`filter-${searchParam}`} type="text" name={searchParam}
                         defaultValue={searchParams.get(searchParam) || ''}
                         placeholder={searchPlaceholder}
-                        className="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                        className="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
                       />
                       <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500 transition-colors">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -140,7 +140,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
 
           {hasActiveFilters && (
             <button key="clear" type="button" onClick={handleClearAll}
-              className="px-3 py-1.5 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap sm:self-end">
+              className="control-sm border border-transparent font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap sm:self-end">
               Clear Filters
             </button>
           )}

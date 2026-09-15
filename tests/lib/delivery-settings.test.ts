@@ -16,11 +16,7 @@ function makeRows(overrides: Record<string, string> = {}) {
   const defaults: Array<{ key: string; value: string }> = [
     { key: 'delivery_charges_enabled', value: 'true' },
     { key: 'delivery_free_threshold', value: '500' },
-    { key: 'delivery_discount_percent', value: '10' },
-    { key: 'delivery_discount_flat', value: '50' },
-    { key: 'delivery_discount_min_subtotal', value: '200' },
-    { key: 'delivery_discount_label', value: 'Save on delivery' },
-    { key: 'delivery_base_charge', value: '60' },
+    { key: 'delivery_rate_per_kg', value: '60' },
     { key: 'delivery_free_weight_ceiling_kg', value: '3' },
   ]
   return defaults.map(r => ({ key: r.key, value: (overrides as any)[r.key] ?? r.value }))
@@ -37,16 +33,12 @@ describe('getDeliverySettings', () => {
     const s = await getDeliverySettings()
     expect(s.enabled).toBe(true)
     expect(s.freeThreshold).toBe(500)
-    expect(s.discountPercent).toBe(10)
-    expect(s.discountFlat).toBe(50)
-    expect(s.discountMinSubtotal).toBe(200)
-    expect(s.discountLabel).toBe('Save on delivery')
   })
 
   it('parses weight-pricing keys and defaults the ceiling to 3', async () => {
     mockQueryMany.mockResolvedValue(makeRows())
     const s = await getDeliverySettings()
-    expect(s.baseCharge).toBe(60)
+    expect(s.ratePerKg).toBe(60)
     expect(s.freeWeightCeilingKg).toBe(3)
   })
 
@@ -54,7 +46,7 @@ describe('getDeliverySettings', () => {
     mockQueryMany.mockResolvedValue([])
     const s = await getDeliverySettings()
     expect(s.freeWeightCeilingKg).toBe(3)
-    expect(s.baseCharge).toBe(0)
+    expect(s.ratePerKg).toBe(0)
   })
 
   it('parses enabled=false when row value is "false"', async () => {
@@ -65,12 +57,12 @@ describe('getDeliverySettings', () => {
     expect(s.enabled).toBe(false)
   })
 
-  it('clamps discountPercent to [0,100]', async () => {
+  it('floors negative ratePerKg to 0', async () => {
     mockQueryMany.mockResolvedValue(
-      makeRows({ delivery_discount_percent: '150' })
+      makeRows({ delivery_rate_per_kg: '-10' })
     )
     const s = await getDeliverySettings()
-    expect(s.discountPercent).toBe(100)
+    expect(s.ratePerKg).toBe(0)
   })
 
   it('floors negative freeThreshold to 0', async () => {
@@ -86,7 +78,7 @@ describe('getDeliverySettings', () => {
     const s = await getDeliverySettings()
     expect(s.enabled).toBe(true)
     expect(s.freeThreshold).toBe(0)
-    expect(s.discountPercent).toBe(0)
+    expect(s.ratePerKg).toBe(0)
   })
 
   it('returns cached value on second call without re-querying', async () => {
@@ -109,15 +101,7 @@ describe('getDeliverySettings', () => {
     const s = await getDeliverySettings()
     expect(s.enabled).toBe(true)
     expect(s.freeThreshold).toBe(0)
-    expect(s.discountPercent).toBe(0)
-  })
-
-  it('trims whitespace from discountLabel', async () => {
-    mockQueryMany.mockResolvedValue(
-      makeRows({ delivery_discount_label: '  Free shipping  ' })
-    )
-    const s = await getDeliverySettings()
-    expect(s.discountLabel).toBe('Free shipping')
+    expect(s.ratePerKg).toBe(0)
   })
 })
 

@@ -337,20 +337,32 @@ export default function ProductActions({
     : null
 
   const productUnits = productUnitsProp ?? []
-  const effectiveSellUnitId = selectedVariant?.sell_unit_id ?? sellUnitId ?? null
+  // Resolve MOST SPECIFIC GRAIN FIRST. A sell_unit_id pointer only speaks for the
+  // grain that owns it: the variant's own pointer, never the product's standing in
+  // for it. Collapsing the two (variant?.sell_unit_id ?? sellUnitId) made a
+  // sub-variant with its own unit show the PRODUCT's unit, because the variant has
+  // no pointer of its own and the product's matched before the sub-variant was read.
+  const variantSellUnitId = selectedVariant?.sell_unit_id ?? null
   const sellUnit = (() => {
-    if (effectiveSellUnitId) {
-      const u = productUnits.find(u => u.id === effectiveSellUnitId)
-      if (u) return u
-    }
+    // 1. Sub-variant's own unit row — the most specific grain.
     if (selectedSubVariantId) {
       const u = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
         ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
       if (u) return u
     }
+    // 2. Variant's explicit pointer, then its own unit row.
+    if (variantSellUnitId) {
+      const u = productUnits.find(u => u.id === variantSellUnitId)
+      if (u) return u
+    }
     if (selectedVariantId) {
       const u = productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
         ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      if (u) return u
+    }
+    // 3. Product-level pointer, then its own unit row.
+    if (sellUnitId) {
+      const u = productUnits.find(u => u.id === sellUnitId)
       if (u) return u
     }
     return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)

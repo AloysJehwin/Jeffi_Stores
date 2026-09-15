@@ -83,15 +83,15 @@ export async function POST(request: NextRequest, { params }: Params) {
       const image = await queryOne(
         `INSERT INTO variant_images
            (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
-            file_name, file_size, mime_type, width, height, display_order, is_primary)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            file_name, file_size, mime_type, width, height, blurhash, display_order, is_primary)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING *`,
         [
           variantId, imageUrl, thumbnailUrl,
           gimg.s3_bucket || await currentBucket(),
           gimg.s3_key, gimg.s3_thumbnail_key,
           gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-          gimg.width, gimg.height, existing.length, isPrimary,
+          gimg.width, gimg.height, gimg.blurhash ?? null, existing.length, isPrimary,
         ]
       )
       return NextResponse.json({ image })
@@ -106,15 +106,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     const image = await queryOne(
       `INSERT INTO variant_images
          (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
-          file_name, file_size, mime_type, width, height, display_order, is_primary)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          file_name, file_size, mime_type, width, height, blurhash, display_order, is_primary)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
         variantId, result.url, result.thumbnailUrl,
         result.s3Bucket,
         result.s3Key, result.s3ThumbnailKey,
         result.fileName, result.fileSize, result.mimeType,
-        result.width, result.height, existing.length, isPrimary,
+        result.width, result.height, result.blurhash, existing.length, isPrimary,
       ]
     )
     return NextResponse.json({ image })

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { queryOne, withTransaction, query } from '@/lib/db'
+import { assertUnitChangeAllowed, validateSerializedUnitStep, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +11,9 @@ interface Params {
 }
 
 async function ensureUnitOwnership(unitId: string, subVariantId: string) {
-  return queryOne<{ id: string; is_base: boolean }>(
-    `SELECT id, is_base FROM product_units WHERE id = $1 AND sub_variant_id = $2`,
+  return queryOne<{ id: string; unit: string; is_base: boolean; product_id: string; variant_id: string | null; factor: string; dimension: string; qty_step: string; min_qty: string; max_qty: string | null }>(
+    `SELECT id, unit, is_base, product_id, variant_id, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
+       FROM product_units WHERE id = $1 AND sub_variant_id = $2`,
     [unitId, subVariantId]
   )
 }
@@ -29,6 +31,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+
+  const guardErr = await assertUnitChangeAllowed(
+    { query },
+    { productId: existing.product_id, variantId: existing.variant_id, subVariantId, label: existing.unit },
+    changedUnitFields(body, existing)
+  )
+  if (guardErr) return NextResponse.json({ error: guardErr }, { status: 409 })
 
   const updates: string[] = []
   const vals: unknown[] = []
@@ -82,7 +91,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (body.qty_step !== undefined) {
     const v = Number(body.qty_step)
     if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'qty_step must be positive' }, { status: 400 })
+    const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [existing.product_id])
+    if (serialRow?.serialized) {
+      const stepErr = validateSerializedUnitStep(v)
+      if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
+    }
     updates.push(`qty_step = $${i++}`); vals.push(v)
+  }
+
+
+  // Validate the MERGED result: a PATCH that moves only one of the three can
+  // still leave min/max off the qty_step grid.
+  {
+    const mergedStep = body.qty_step !== undefined ? Number(body.qty_step) : parseFloat(existing.qty_step ?? '')
+    const mergedMin = body.min_qty !== undefined ? Number(body.min_qty) : parseFloat(existing.min_qty ?? '')
+    const mergedMax = body.max_qty !== undefined
+      ? (body.max_qty === null ? null : Number(body.max_qty))
+      : (existing.max_qty == null ? null : parseFloat(existing.max_qty))
+    if (Number.isFinite(mergedStep) && Number.isFinite(mergedMin)) {
+      const boundsErr = validateUnitQuantityBounds({ qty_step: mergedStep, min_qty: mergedMin, max_qty: mergedMax })
+      if (boundsErr) return NextResponse.json({ error: boundsErr }, { status: 400 })
+    }
   }
 
   const setBase = body.is_base === true
@@ -135,6 +164,13 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
     }
   }
+
+  const guardErr = await assertUnitChangeAllowed(
+    { query },
+    { productId: existing.product_id, variantId: existing.variant_id, subVariantId, label: existing.unit },
+    { remove: true }
+  )
+  if (guardErr) return NextResponse.json({ error: guardErr }, { status: 409 })
 
   await queryOne(`DELETE FROM product_units WHERE id = $1`, [unitId])
   return NextResponse.json({ ok: true })

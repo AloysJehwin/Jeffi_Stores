@@ -140,11 +140,18 @@ describe('deductOrderStock — serialized (1 serial per qty_step of base qty)', 
       17: { rows: [] }, // UPDATE order_items batch_id
     })
     await deductOrderStock('ord-1', {}, client)
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-1', quantityChange: -1 }))
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-6', quantityChange: -1 }))
+    // Each serial covers qty_step (0.5) of BASE quantity, so the ledger and the batch
+    // move by 0.5 per serial — 6 x 0.5 = the 3 m actually sold. Logging -1 per serial
+    // would have consumed 6 m of stock for a 3 m order.
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-1', quantityChange: -0.5 }))
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-6', quantityChange: -0.5 }))
     // exactly 6 serials sold (3 m / 0.5 qty_step), not 3 base units
     const sold = client.calls.filter((c: any) => /UPDATE product_serials SET status = 'sold'/.test(c.sql))
     expect(sold).toHaveLength(6)
+    // and the batch decrements by the base amount, summing to 3 m
+    const batchUpdates = client.calls.filter((c: any) => /UPDATE product_batches SET quantity_remaining/.test(c.sql))
+    expect(batchUpdates).toHaveLength(6)
+    expect(batchUpdates.reduce((s: number, c: any) => s + Number(c.params[1]), 0)).toBeCloseTo(3, 6)
   })
 
   it('throws when not enough in-stock serials', async () => {
@@ -199,7 +206,26 @@ describe('deductStockForLines — explicit line items (cash-sale / invoice-edit)
     })
     await expect(
       deductStockForLines(client, 'sale-1', [{ id: 'ln1', product_id: 'p1', quantity: 2, buy_unit: 'pc' }], { requireSerialAssignments: true })
-    ).rejects.toThrow(/Serial numbers required/i)
+    ).rejects.toThrow(/expected 2 serial number\(s\).*got 0/i)
+  })
+
+  it('rejects MORE serials than the qty_step count allows', async () => {
+    // qty_step 10 over 100 base units = 10 serials; 12 must not pass silently.
+    const client = makeClient({
+      0: { rows: [{ unit: 'm', factor: '1', dimension: 'length', qty_step: '10', min_qty: '10', max_qty: null }] },
+      1: { rows: [{ perishable: false, serialized: true }] },
+    })
+    await expect(
+      deductStockForLines(
+        client,
+        'sale-1',
+        [{ id: 'ln1', product_id: 'p1', quantity: 100, buy_unit: 'm' }],
+        {
+          requireSerialAssignments: true,
+          serialAssignments: Array.from({ length: 12 }, (_, i) => ({ order_item_id: 'ln1', serial_number: `S${i}` })),
+        }
+      )
+    ).rejects.toThrow(/expected 10 serial number\(s\).*got 12/i)
   })
 })
 
@@ -220,5 +246,39 @@ describe('deductOrderStock — manual assignments (admin picker popup)', () => {
     // No auto-FEFO SELECT of the available batch list
     const fefo = client.calls.find((c: any) => /quantity_remaining > 0/.test(c.sql))
     expect(fefo).toBeUndefined()
+  })
+})
+
+describe('deductOrderStock — expired lots are never auto-picked', () => {
+  const UNIT = { rows: [{ unit: 'pcs', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }] }
+
+  it('excludes expired batches from the FEFO plan', async () => {
+    const client = makeClient({
+      0: { rows: [] },
+      1: { rows: [{ id: 'oi1', product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Milk', variant_name: null, quantity: '2', buy_unit: 'pcs' }] },
+      2: UNIT,
+      3: { rows: [{ perishable: true, serialized: false }] },
+      4: { rows: [{ id: 'b1', quantity_remaining: '5.000' }] },
+      5: { rows: [{ quantity_remaining: '5.000' }] },
+      6: { rows: [{ lot_number: 'L1', expiry_date: '2027-01-01' }] },
+    })
+    await deductOrderStock('ord-1', {}, client)
+    const fefo = client.calls.find((c: any) => /quantity_remaining > 0/.test(c.sql))
+    expect(fefo.sql).toMatch(/expiry_date IS NULL OR expiry_date >= CURRENT_DATE/)
+  })
+
+  it('excludes serials that sit in expired batches when auto-picking', async () => {
+    const client = makeClient({
+      0: { rows: [] },
+      1: { rows: [{ id: 'oi1', product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Drill', variant_name: null, quantity: '1', buy_unit: 'pcs' }] },
+      2: UNIT,
+      3: { rows: [{ perishable: false, serialized: true }] },
+      4: { rows: [{ id: 's1', serial_number: 'SN-1', batch_id: 'b1' }] },
+      5: { rows: [] },
+      6: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+    })
+    await deductOrderStock('ord-1', {}, client)
+    const pick = client.calls.find((c: any) => /FROM product_serials ps/.test(c.sql))
+    expect(pick.sql).toMatch(/pb\.expiry_date IS NULL OR pb\.expiry_date >= CURRENT_DATE/)
   })
 })

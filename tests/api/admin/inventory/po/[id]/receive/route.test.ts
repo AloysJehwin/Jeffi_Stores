@@ -40,6 +40,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
+import { adjustStock, syncPerishableStock } from '@/lib/shelf'
 import { parseBody } from '@/lib/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -398,8 +399,10 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
         query: vi.fn().mockImplementation((sql: string) => {
           if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-s' }] }
           if (sql.includes('perishable, serialized')) return { rows: [{ perishable: false, serialized: true }] }
-          if (sql.includes('COALESCE(vsu.qty_step')) return { rows: [{ qty_step: '0.5' }] }
+          if (sql.includes('FROM product_units')) return { rows: [{ unit: 'm', factor: '1', dimension: 'length', qty_step: '0.5', min_qty: '0.5', max_qty: null }] }
           if (sql.includes('FROM product_serials WHERE product_id')) return { rows: [] } // no dupes
+          if (sql.includes('SUM(quantity_remaining)')) return { rows: [{ total: '0' }] }
+          if (sql.includes('INSERT INTO product_batches')) return { rows: [{ id: 'batch-s' }] }
           if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '100' }] }
           if (sql.includes('FROM purchase_order_items WHERE po_id')) return { rows: [{ quantity: '4', quantity_received: '4' }] }
           return { rows: [] }
@@ -458,7 +461,7 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
       query: vi.fn().mockImplementation((sql: string) => {
         if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-d' }] }
         if (sql.includes('perishable, serialized')) return { rows: [{ perishable: false, serialized: true }] }
-        if (sql.includes('COALESCE(vsu.qty_step')) return { rows: [{ qty_step: '1' }] }
+        if (sql.includes('FROM product_units')) return { rows: [{ unit: 'pc', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }] }
         if (sql.includes('FROM product_serials WHERE product_id')) return { rows: [{ serial_number: 'SN-DUPE' }] }
         if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '10' }] }
         return { rows: [] }
@@ -533,6 +536,43 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
       (c: any[]) => c[0].includes('INSERT INTO product_batches')
     )
     expect(batchInsert).toBeDefined()
+  })
+
+  it('creates a batch for a serialized-only receipt and syncs it through batches', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    const item = {
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 2, unit_cost: 50, purchase_unit_factor: 1,
+      serial_numbers: ['S-1', 'S-2'], location_id: '55555555-5555-4555-8555-555555555555',
+    }
+    mockParseBody.mockReturnValue({ ok: true, data: { items: [item] } } as any)
+    mockQueryOne.mockResolvedValueOnce(mockPO as any).mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-s1' }] }
+        if (sql.includes('perishable, serialized')) return { rows: [{ perishable: false, serialized: true }] }
+        if (sql.includes('FROM product_units')) return { rows: [{ unit: 'pc', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }] }
+        if (sql.includes('FROM product_serials WHERE product_id')) return { rows: [] }
+        if (sql.includes('SUM(quantity_remaining)')) return { rows: [{ total: '0' }] }
+        if (sql.includes('INSERT INTO product_batches')) return { rows: [{ id: 'batch-s1' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) return { rows: [{ quantity: '2', quantity_received: '2' }] }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    const batchInsert = client.query.mock.calls.find((c: any[]) => c[0].includes('INSERT INTO product_batches'))
+    expect(batchInsert).toBeDefined()
+    expect(batchInsert![1][6]).toBeNull()
+    const serialInserts = client.query.mock.calls.filter((c: any[]) => /INSERT INTO product_serials/.test(c[0]))
+    expect(serialInserts).toHaveLength(2)
+    expect(serialInserts.every((c: any[]) => c[1][3] === 'batch-s1')).toBe(true)
+    expect(vi.mocked(syncPerishableStock)).toHaveBeenCalledWith(null, 'prod-1', null, null)
+    expect(vi.mocked(adjustStock)).not.toHaveBeenCalled()
   })
 
   it('skips items where qtyReceived <= 0', async () => {

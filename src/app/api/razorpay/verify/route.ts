@@ -193,7 +193,8 @@ async function fireRouteTransfer(opts: {
     orderId: opts.orderId,
     tenantSlug: tenant.slug ?? '',
     dailyPayout,
-    delhiveryChargePaise: Math.round((opts.shippingAmountInr ?? 0) * 100),
+    // Shipping is NOT withheld from the transfer — it is charged once from the prepaid wallet
+    // at the real invoiced amount once the AWB is billed.
   })
 
   await recordTenantTransaction({

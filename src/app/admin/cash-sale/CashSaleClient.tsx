@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { productLabel, variantLabel } from '@/lib/product-label'
 import { round2 } from '@/lib/gst'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
@@ -15,7 +16,7 @@ import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from 
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/admin-path'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
-import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
+import SerialEntryModal, { type SerialItem, type SerialAssignment, SerialPicker } from '@/components/admin/SerialEntryModal'
 
 interface CashSale {
   id: string
@@ -61,7 +62,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 }
 
-const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
+const inputCls = 'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 function fmt(n: number) {
@@ -148,6 +149,7 @@ export default function CashSaleClient() {
   const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({})
   const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
   const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
+  const [inlineSerialItems, setInlineSerialItems] = useState<Record<string, SerialItem>>({})
 
   // Prune serial assignments whose line was removed or whose product was cleared
   // (LineItemsSection doesn't notify on remove/clear). Keeps assignments in lockstep
@@ -243,6 +245,39 @@ export default function CashSaleClient() {
     }
   }
 
+  // Signature of what actually determines each line's serial requirement.
+  const serialLineKey = items
+    .filter(it => it.product_id && it.serialized)
+    .map(it => `${it.id}:${it.product_id}:${it.variant_id ?? ''}:${it.sub_variant_id ?? ''}:${it.quantity}:${it.sell_unit_factor ?? 1}`)
+    .join('|')
+
+  useEffect(() => {
+    const serialLines = items.filter(it => it.product_id && it.serialized)
+    if (serialLines.length === 0) { setInlineSerialItems({}); return }
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, SerialItem> = {}
+      for (const item of serialLines) {
+        const params = new URLSearchParams({
+          product_id: item.product_id!,
+          line_item_id: item.id,
+          qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
+        })
+        if (item.variant_id) params.set('variant_id', item.variant_id)
+        if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
+        try {
+          const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
+          const data = await res.json()
+          const si = data.serialized_items?.[0]
+          if (si) next[item.id] = si
+        } catch { /* leave the line without an inline panel */ }
+      }
+      if (!cancelled) setInlineSerialItems(next)
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialLineKey])
+
   async function handleStockBadgeClick(item: LineItem) {
     if (!item.product_id) return
     const params = new URLSearchParams({
@@ -298,13 +333,14 @@ export default function CashSaleClient() {
       setFormError('All items must be selected from inventory — free-typed names are not allowed')
       return
     }
-    // Validate serialized items have serial assignments
+    // Serialized lines need assignments. The exact count is base/qty_step, which
+    // this form does not carry — the picker sets it and the server enforces it.
     const missingSerial = items.find(it =>
       it.product_id && it.serialized &&
-      serialAssignments.filter(sa => sa.order_item_id === it.id).length < Number(it.quantity)
+      serialAssignments.filter(sa => sa.order_item_id === it.id).length === 0
     )
     if (missingSerial) {
-      setFormError(`Serial numbers required for "${missingSerial.product_name}${missingSerial.variant_name ? ' / ' + missingSerial.variant_name : ''}" — click the stock badge to assign`)
+      setFormError(`Serial numbers required for "${productLabel(missingSerial)}" — click the stock badge to assign`)
       return
     }
     // Validate perishable items have batch assignments
@@ -313,7 +349,7 @@ export default function CashSaleClient() {
       !batchAssignments[it.id]?.length
     )
     if (missingBatch) {
-      setFormError(`Batch assignment required for "${missingBatch.product_name}${missingBatch.variant_name ? ' / ' + missingBatch.variant_name : ''}" — click the stock badge to assign`)
+      setFormError(`Batch assignment required for "${productLabel(missingBatch)}" — click the stock badge to assign`)
       return
     }
     const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity)
@@ -435,7 +471,7 @@ export default function CashSaleClient() {
                     <tr key={i} className="border-b border-border-default last:border-0">
                       <td className="px-5 py-3">
                         <p className="font-medium text-foreground">{item.product_name}</p>
-                        {item.variant_name && <p className="text-xs text-foreground-muted mt-0.5">{item.variant_name}</p>}
+                        {item.variant_name && <p className="text-xs text-foreground-muted mt-0.5">{variantLabel(item)}</p>}
                         {item.hsn_code && <p className="text-xs text-foreground-muted">HSN: {item.hsn_code}</p>}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground-secondary">{qty}</td>
@@ -536,11 +572,14 @@ export default function CashSaleClient() {
               const lineItem = items.find(it => it.id === Object.keys(byItem)[0])
               if (lineItem?.serialized) {
                 const totalQty = assignments.reduce((s, a) => s + a.qty, 0)
+                const step = batchPickerItem?.qty_step && batchPickerItem.qty_step > 0 ? batchPickerItem.qty_step : 1
                 setSerialPickerItems([{
                   order_item_id: lineItem.id,
                   product_name: lineItem.product_name,
                   variant_name: lineItem.variant_name || null,
                   required_qty: totalQty,
+                  required_serials: Math.round(totalQty / step),
+                  qty_step: step,
                   already_assigned: false,
                   preassigned: serialAssignments.filter(sa => sa.order_item_id === lineItem.id).map(sa => sa.serial_number),
                   product_id: lineItem.product_id || undefined,
@@ -596,7 +635,41 @@ export default function CashSaleClient() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-                <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} onSerialScanned={handleSerialScanned} onQuantityReduced={handleQuantityReduced} />
+                <LineItemsSection
+                  items={items}
+                  onChange={setItems}
+                  onStockBadgeClick={handleStockBadgeClick}
+                  assignedBatchLabels={assignedBatchLabels}
+                  onSerialScanned={handleSerialScanned}
+                  onQuantityReduced={handleQuantityReduced}
+                  lineAssignmentSummary={(item) => {
+                    const si = inlineSerialItems[item.id]
+                    if (!si) return null
+                    const needed = si.required_serials ?? si.required_qty
+                    const have = serialAssignments.filter(sa => sa.order_item_id === item.id).length
+                    return { label: `Serials — ${have} of ${needed} selected`, complete: have === needed }
+                  }}
+                  renderLineAssignment={(item) => {
+                    const si = inlineSerialItems[item.id]
+                    if (!si) return null
+                    const mine = serialAssignments.filter(sa => sa.order_item_id === item.id).map(sa => sa.serial_number)
+                    const selected = new Set(mine)
+                    return (
+                      <SerialPicker
+                        // Scanned serials reach the picker as `preassigned`: they may be
+                        // reserved and so absent from the in-stock list, and scan mode
+                        // seeds its fields from this.
+                        item={{ ...si, preassigned: mine }}
+                        selected={selected}
+                        autoFill={false}
+                        onChange={(next) => setSerialAssignments(prev => [
+                          ...prev.filter(sa => sa.order_item_id !== item.id),
+                          ...Array.from(next).map(sn => ({ order_item_id: item.id, serial_number: sn })),
+                        ])}
+                      />
+                    )
+                  }}
+                />
               </div>
 
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
@@ -712,14 +785,14 @@ export default function CashSaleClient() {
           </div>
           <button
             onClick={() => { setSearchQ(searchInput); syncUrl({ search: searchInput }) }}
-            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors"
+            className="control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white font-medium transition-colors"
           >
             Search
           </button>
           {(searchQ || paymentFilter || fromDate || toDate) && (
             <button
               onClick={() => { setSearchQ(''); setSearchInput(''); setPaymentFilter(''); setFromDate(''); setToDate(''); syncUrl({ search: '', payment: '', from: '', to: '' }) }}
-              className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Clear
             </button>

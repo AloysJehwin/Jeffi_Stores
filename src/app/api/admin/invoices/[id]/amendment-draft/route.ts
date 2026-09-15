@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await client.query(
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id,
-          product_name, product_sku, variant_name,
+          product_name, product_sku, variant_name, sub_variant_name,
           quantity, unit_price, mrp,
           discount_amount, tax_amount, total_price,
           hsn_code, gst_rate,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         )
         SELECT
           $1, product_id, variant_id, sub_variant_id,
-          product_name, product_sku, variant_name,
+          product_name, product_sku, variant_name, sub_variant_name,
           quantity, unit_price, mrp,
           discount_amount, tax_amount, total_price,
           hsn_code, gst_rate,

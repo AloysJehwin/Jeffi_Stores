@@ -300,6 +300,16 @@ describe('PATCH /api/admin/inventory/stock', () => {
     expect(mockLogStockMovement).toHaveBeenCalled()
   })
 
+  it('refuses a manual adjustment on a perishable or serialized product', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValue({ perishable: false, serialized: true } as any)
+    const res = await PATCH(makePatchReq({ product_id: PRODUCT_UUID, new_quantity: 20 }))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/perishable or serialized/)
+    expect(mockLogStockMovement).not.toHaveBeenCalled()
+  })
+
   it('adjusts variant-level stock when variant_id supplied', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
@@ -434,8 +444,10 @@ describe('PATCH /api/admin/inventory/stock', () => {
       { rows: [] },                              // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
-    // Source calls queryOne in order: (1) warehouse+product row, (2) DELETE shelf_stock, (3) product name
+    // Source calls queryOne in order: (1) tracked-guard product row, (2) warehouse+product row,
+    // (3) DELETE shelf_stock, (4) product name
     mockQueryOne
+      .mockResolvedValueOnce({ perishable: false, serialized: false } as any)
       .mockResolvedValueOnce({ code: 'WH01', perishable: false, serialized: false } as any)
       .mockResolvedValueOnce(undefined as any)
       .mockResolvedValueOnce({ name: 'Test Bolt' } as any)
@@ -453,27 +465,22 @@ describe('PATCH /api/admin/inventory/stock', () => {
     )
   })
 
-  it('skips shelf assignment when product is perishable', async () => {
+  // Perishable/serialized products are batch/serial-tracked; a bare quantity PATCH is now
+  // rejected up front (409) rather than silently adjusted while skipping shelf assignment —
+  // stock for these must move through GRN receive or batch/serial removal instead.
+  it('rejects the adjustment outright when product is perishable', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    const client = makeDbClient([
-      { rows: [] },
-      { rows: [{ inventory_quantity: 5 }] },
-      { rows: [] },
-      { rows: [] },
-    ])
-    mockGetClient.mockResolvedValue(client as any)
-    // Source calls: (1) warehouse+product row (perishable=true), (2) product name
-    mockQueryOne
-      .mockResolvedValueOnce({ code: 'WH01', perishable: true, serialized: false } as any)
-      .mockResolvedValueOnce({ name: 'Perishable Product' } as any)
+    // Tracked-guard product row: perishable=true short-circuits before any client work.
+    mockQueryOne.mockResolvedValueOnce({ perishable: true, serialized: false } as any)
 
     const res = await PATCH(makePatchReq({
       product_id: PRODUCT_UUID,
       new_quantity: 10,
       warehouse_id: '00000000-0000-4000-8000-000000000010',
     }))
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(409)
+    expect(mockGetClient).not.toHaveBeenCalled()
     expect(mockUpsertShelfStock).not.toHaveBeenCalled()
   })
 
@@ -487,8 +494,10 @@ describe('PATCH /api/admin/inventory/stock', () => {
       { rows: [] },
     ])
     mockGetClient.mockResolvedValue(client as any)
-    // Source calls: (1) warehouse+product row, (2) DELETE shelf_stock, (3) product name
+    // Source calls: (1) tracked-guard product row, (2) warehouse+product row,
+    // (3) DELETE shelf_stock, (4) product name
     mockQueryOne
+      .mockResolvedValueOnce({ perishable: false, serialized: false } as any)
       .mockResolvedValueOnce({ code: 'WH01', perishable: false, serialized: false } as any)
       .mockResolvedValueOnce(undefined as any)
       .mockResolvedValueOnce({ name: 'Test Product' } as any)

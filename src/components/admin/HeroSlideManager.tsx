@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import AdminImage from '@/components/admin/AdminImage'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
@@ -16,6 +17,8 @@ export interface HeroSlideRow {
   badge_color: string | null
   image_url: string | null
   image_url_mobile: string | null
+  blurhash?: string | null
+  blurhash_mobile?: string | null
   cta_label: string | null
   cta_url: string | null
   filter_category: string | null
@@ -121,7 +124,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
       const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, { method: 'POST', body: form, credentials: 'include' })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.url) {
-        onChange({ [field]: data.url } as Partial<HeroSlideRow>)
+        const hashField = isMobile ? 'blurhash_mobile' : 'blurhash'
+        onChange({ [field]: data.url, [hashField]: data.blurhash ?? null } as Partial<HeroSlideRow>)
         showToast(isMobile ? 'Mobile image updated' : 'Image updated', 'success')
       }
       else showToast(data.error || 'Upload failed', 'error')
@@ -133,7 +137,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
 
   // Clearing falls the slide back to the desktop image on phones.
   function clearMobileImage() {
-    field({ image_url_mobile: null }, { imageUrlMobile: null })
+    field({ image_url_mobile: null, blurhash_mobile: null }, { imageUrlMobile: null })
   }
 
   async function generateImage(promptOverride?: string) {
@@ -148,7 +152,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         body: JSON.stringify({ prompt, field: 'image_url' }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) { onChange({ image_url: data.url }); showToast('Image generated', 'success') }
+      if (res.ok && data.url) { onChange({ image_url: data.url, blurhash: data.blurhash ?? null }); showToast('Image generated', 'success') }
       else showToast(data.error || 'Image generation failed', 'error')
     } catch { showToast('Image generation failed', 'error') } finally { setGenerating(false) }
   }
@@ -205,7 +209,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         {/* Thumbnail (dimmed when hidden) */}
         <div className={`w-16 h-10 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0 ${slide.is_active ? '' : 'opacity-40 grayscale'}`}>
           {slide.image_url
-            ? <img src={slide.image_url} alt="" className="w-full h-full object-cover" />
+            ? <AdminImage src={slide.image_url} alt="" blurhash={slide.blurhash} className="w-full h-full object-cover" />
             : <div className="w-full h-full flex items-center justify-center text-foreground-muted/40 text-[10px]">No image</div>}
         </div>
         <div className={`flex-1 min-w-0 ${slide.is_active ? '' : 'opacity-60'}`}>
@@ -260,7 +264,9 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
               {slide.image_url_mobile && !uploadingMobile
                 ? (
                   <>
-                    <img src={slide.image_url_mobile} alt="" className="w-10 h-10 rounded object-cover border border-border-default" />
+                    <div className="w-10 h-10 rounded overflow-hidden border border-border-default shrink-0">
+                      <AdminImage src={slide.image_url_mobile} alt="" blurhash={slide.blurhash_mobile} className="w-full h-full object-cover" />
+                    </div>
                     {canWrite && (
                       <button type="button" onClick={clearMobileImage}
                         className="text-[11px] text-foreground-muted hover:text-red-500 underline">

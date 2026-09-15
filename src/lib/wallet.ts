@@ -81,7 +81,13 @@ export async function rechargeWallet(opts: {
   tenantId: string
   amountInr: number
   note?: string
-}): Promise<{ ok: true; balance: number } | { ok: false; error: string }> {
+  /**
+   * Gateway reference (e.g. a Razorpay payment id) that makes this credit idempotent.
+   * Guarded by uq_wallet_ledger_tenant_external_ref, so a concurrent retry of the SAME payment
+   * inserts nothing rather than crediting twice. Omit for manual admin credits.
+   */
+  externalRef?: string
+}): Promise<{ ok: true; balance: number; alreadyCredited?: boolean } | { ok: false; error: string }> {
   if (!opts.tenantId) return { ok: false, error: 'tenantId is required.' }
   if (!(opts.amountInr > 0)) return { ok: false, error: 'Recharge amount must be positive.' }
 
@@ -93,11 +99,22 @@ export async function rechargeWallet(opts: {
       `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
       [opts.tenantId],
     )
-    await client.query(
-      `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, note)
-       VALUES ($1, 'recharge', $2, $3)`,
-      [opts.tenantId, opts.amountInr, opts.note ?? 'Wallet recharge'],
+    // ON CONFLICT DO NOTHING + rowCount is the whole guard: the loser of a concurrent race
+    // inserts nothing and must NOT move the balance. A check-then-insert cannot do this.
+    const ins = await client.query(
+      `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, external_ref, note)
+       VALUES ($1, 'recharge', $2, $3, $4)
+       ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
+      [opts.tenantId, opts.amountInr, opts.externalRef ?? null, opts.note ?? 'Wallet recharge'],
     )
+    if (ins.rowCount === 0) {
+      // Already credited for this reference — return the current balance untouched.
+      const cur = await client.query(
+        `SELECT balance FROM tenant_wallets WHERE tenant_id = $1`, [opts.tenantId],
+      )
+      await client.query('COMMIT')
+      return { ok: true, balance: Number(cur.rows[0]?.balance ?? 0), alreadyCredited: true }
+    }
     const upd = await client.query(
       `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now()
         WHERE tenant_id = $1 RETURNING balance`,

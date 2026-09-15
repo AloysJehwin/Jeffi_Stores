@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ getClient: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/db', () => ({ getClient: vi.fn(), queryOne: vi.fn(), query: vi.fn().mockResolvedValue({ rows: [] }) }))
 vi.mock('@/lib/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
   upsertShelfStock: vi.fn().mockResolvedValue(undefined),
@@ -143,7 +143,10 @@ describe('POST bootstrap-stock — serialized-only shelf path', () => {
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '2' } as any)
       .mockResolvedValueOnce(null as any)        // no serial clash
       .mockResolvedValueOnce({ total: 0 } as any) // existing stock
-    const client = makeMockClient({ 0: { rows: [] }, 1: { rows: [{ id: 'batch-s' }] } })
+    // client.query order for a serialized grain: BEGIN(0) -> resolveGrainUnit SELECT(1)
+    // -> INSERT INTO product_batches(2). No product_units row configured -> resolveGrainUnit
+    // falls back to step 1, matching pre-qty_step behaviour (needed = round(qty)).
+    const client = makeMockClient({ 0: { rows: [] }, 1: { rows: [] }, 2: { rows: [{ id: 'batch-s' }] } })
     vi.mocked(getClient).mockResolvedValue(client as any)
     const res = await POST(
       makeReq({ assignments: [{ quantity: 2, location_id: LOCATION_ID, serial_numbers: ['A1', 'A2'] }] }),
