@@ -1,14 +1,17 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import BlurhashCanvas from './BlurhashCanvas'
 
 interface ImgWithSkeletonProps {
   src: string
   alt: string
   className?: string
+  /** Colour placeholder shown while loading. Falls back to the shimmer when absent or invalid. */
+  blurhash?: string | null
 }
 
-export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeletonProps) {
+export default function ImgWithSkeleton({ src, alt, className, blurhash }: ImgWithSkeletonProps) {
   const [loaded, setLoaded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
 
@@ -25,15 +28,19 @@ export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeleton
   return (
     <div className="relative w-full h-full">
       {!loaded && (
-        <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-              animation: 'img-shimmer 1.4s infinite',
-            }}
-          />
-        </div>
+        blurhash
+          ? <BlurhashCanvas hash={blurhash} />
+          : (
+            <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                  animation: 'img-shimmer 1.4s infinite',
+                }}
+              />
+            </div>
+          )
       )}
       <img
         ref={imgRef}

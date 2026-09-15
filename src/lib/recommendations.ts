@@ -32,7 +32,7 @@ export interface RecCard {
   discount_pct: number | null
   extra_delivery_days: number | null
   handling_days: number | null
-  product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }>
+  product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean; blurhash?: string | null }>
   brands: { name: string } | null
   categories: { name: string } | null
 }

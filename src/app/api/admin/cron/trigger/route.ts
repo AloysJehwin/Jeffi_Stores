@@ -11,6 +11,8 @@ const VALID_JOBS: Record<string, { path: string; method: 'GET' | 'POST' }> = {
   run_campaigns: { path: '/api/cron/run-campaigns', method: 'GET' },
   compute_health: { path: '/api/cron/compute-health', method: 'GET' },
   daily_briefing: { path: '/api/cron/daily-briefing', method: 'GET' },
+  retry_reversals: { path: '/api/cron/retry-reversals', method: 'GET' },
+  wallet_drift: { path: '/api/cron/wallet-drift', method: 'GET' },
 }
 
 export async function POST(request: NextRequest) {

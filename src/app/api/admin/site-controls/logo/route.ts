@@ -43,23 +43,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Clear the logo → fall back to the static /images/logo.png everywhere.
-export async function DELETE(request: NextRequest) {
-  try {
-    const admin = await authenticateAdmin(request)
-    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-    await query(
-      `INSERT INTO site_settings (key, value, updated_at)
-       VALUES ('business_logo_url', '', NOW())
-       ON CONFLICT (key) DO UPDATE SET value = '', updated_at = NOW()`,
-      []
-    )
-    invalidateSiteControlsCache()
-    return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Failed to clear logo' }, { status: 500 })
-  }
-}

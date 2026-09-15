@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { productLabel } from '@/lib/product-label'
 import { useBarcodeScanner } from './useBarcodeScanner'
 
 export interface BatchOption {
@@ -16,7 +17,11 @@ export interface BatchPickerItem {
   order_item_id: string
   product_name: string
   variant_name: string | null
+  /** BASE units to allocate across batches. */
   required_qty: number
+  /** Base units per serial slot, for a product that is both perishable and
+   *  serialized: the serial count is the allocated base total / qty_step. */
+  qty_step?: number
   already_assigned: boolean
   batches: BatchOption[]
 }
@@ -112,7 +117,7 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
       return
     }
     toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)
-    setScanMsg({ text: `✓ ${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} — lot ${batch.lot_number || batch.id.slice(0, 6)}`, kind: 'ok' })
+    setScanMsg({ text: `✓ ${productLabel(item)} — lot ${batch.lot_number || batch.id.slice(0, 6)}`, kind: 'ok' })
   }
 
   // Scan-to-select, dynamic by product tracking type:

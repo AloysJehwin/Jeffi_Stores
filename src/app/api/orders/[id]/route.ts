@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { productLabel } from '@/lib/product-label'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
@@ -360,7 +361,7 @@ export async function PATCH(
         const stock = Number(item.inventory_quantity) || 0
         if (stock < baseQty) {
           insufficient.push(
-            `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
+            `${productLabel(item)} (available: ${stock}, required: ${baseQty})`
           )
         }
       }

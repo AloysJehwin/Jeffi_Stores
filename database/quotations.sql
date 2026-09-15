@@ -107,6 +107,8 @@ CREATE TABLE public.quotation_items (
     variant_id uuid,
     created_at timestamp with time zone DEFAULT now(),
     sub_variant_id uuid,
+    variant_name character varying(255),
+    sub_variant_name character varying(255),
     sold_unit character varying(20),
     sold_unit_factor numeric(14,6),
     base_quantity numeric(14,4),

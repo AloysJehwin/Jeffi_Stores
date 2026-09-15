@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveGrainUnit } from '@/lib/selling-unit'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          notes || null]
       )
       const grnId = grnRow.rows[0].id
-      const perishableProductIds = new Set<string>()
+      const batchTrackedProductIds = new Set<string>()
       // Collected for the label-printing popup: batches created + serials received.
       const createdBatchIds: string[] = []
       const createdSerials: string[] = []
@@ -130,7 +131,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         )
         const isPerishable = productRow.rows[0]?.perishable ?? false
         const isSerialised = productRow.rows[0]?.serialized ?? false
-        if (isPerishable) perishableProductIds.add(productId)
+        // Serials hang off a batch and the shelf/central sync is batch-driven, so a
+        // serialized receipt gets a batch even when the product is not perishable.
+        const isTracked = isPerishable || isSerialised
+        if (isTracked) batchTrackedProductIds.add(productId)
 
         // Validate serial numbers upfront (before any inserts)
         const serials = item.serial_numbers ?? []
@@ -138,16 +142,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // Serial count follows the same rule as the sale side: one serial per
           // qty_step of BASE quantity. qtyReceived is already in base units
           // (receive_qty × purchase_unit_factor), so expected = qtyReceived / qty_step.
-          const stepRow = await client.query<{ qty_step: string | null }>(
-            `SELECT COALESCE(vsu.qty_step, psu.qty_step) AS qty_step
-             FROM products p
-             LEFT JOIN product_variants pv ON pv.id = $2
-             LEFT JOIN product_units vsu ON vsu.id = pv.sell_unit_id
-             LEFT JOIN product_units psu ON psu.id = p.sell_unit_id
-             WHERE p.id = $1`,
-            [productId, variantId]
-          )
-          const qtyStep = parseFloat(stepRow.rows[0]?.qty_step ?? '1') || 1
+          // Resolve at the most specific grain that defines a base unit — sub-variant,
+          // then variant, then product. The old lookup went through sell_unit_id, which
+          // sub-variants do not have, so a sub-variant silently used its parent's step.
+          const grainUnit = await resolveGrainUnit(client, { productId, variantId, subVariantId })
+          const qtyStep = grainUnit && grainUnit.qty_step > 0 ? grainUnit.qty_step : 1
           const expectedSerials = Math.round(qtyReceived / (qtyStep > 0 ? qtyStep : 1))
           if (serials.filter(Boolean).length !== expectedSerials) {
             throw new Error(
@@ -169,8 +168,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         let stockBefore = 0
         let newBatchId: string | null = null
 
-        if (isPerishable) {
-          if (!item.expiry_date) {
+        if (isTracked) {
+          if (isPerishable && !item.expiry_date) {
             throw new Error(`Product ${productId} is perishable — expiry_date is required for GRN receive`)
           }
           // Stock lives only in product_batches; read current batch total for ledger
@@ -190,7 +189,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               productId, variantId, subVariantId, grnId,
               item.lot_number || null,
               item.manufacture_date || null,
-              item.expiry_date,
+              item.expiry_date || null,
               qtyReceived,
               item.location_id || null,
             ]
@@ -311,8 +310,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await client.query('COMMIT')
 
       // Update shelf_stock for any item that had a location assigned.
-      // Perishable: recompute shelf_stock from product_batches then sync inventory_quantity.
-      // Non-perishable: increment shelf_stock directly via adjustStock.
+      // Batch-tracked (perishable or serialized): recompute shelf_stock from
+      // product_batches then sync inventory_quantity. Plain: adjustStock directly.
       const syncedPerishable = new Set<string>()
       const shelfWarnings: string[] = []
       for (const item of items) {
@@ -320,7 +319,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const qtyReceived = item.quantity_received * factor
         if (qtyReceived <= 0) continue
         try {
-          if (perishableProductIds.has(item.product_id)) {
+          if (batchTrackedProductIds.has(item.product_id)) {
             const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
             if (!syncedPerishable.has(key)) {
               syncedPerishable.add(key)

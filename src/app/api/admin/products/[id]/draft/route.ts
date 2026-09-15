@@ -40,10 +40,12 @@ export async function POST(req: NextRequest, { params }: Params) {
       `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images)
        SELECT
          p.id,
-         to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count',
-         COALESCE((SELECT json_agg(to_jsonb(v)) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true), '[]'),
+         to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count' - 'inventory_quantity',
+         COALESCE((SELECT json_agg(to_jsonb(v) || jsonb_build_object('sub_variant_type_on',
+                     v.sub_variant_type_on OR EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = v.id AND sv.is_active = true)))
+                   FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true), '[]'),
          COALESCE((SELECT json_agg(to_jsonb(i) ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(sv) || jsonb_build_object('_seeded', true))
+         COALESCE((SELECT json_agg(to_jsonb(sv) ORDER BY sv.created_at, sv.sub_variant_name)
                    FROM product_sub_variants sv
                    JOIN product_variants v ON v.id = sv.variant_id
                    WHERE v.product_id = p.id AND sv.is_active = true), '[]'),

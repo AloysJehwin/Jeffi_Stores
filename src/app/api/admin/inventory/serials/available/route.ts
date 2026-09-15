@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
          AND (ps.variant_id = $2 OR ($2::uuid IS NULL AND ps.variant_id IS NULL))
          AND (ps.sub_variant_id = $3 OR ($3::uuid IS NULL AND ps.sub_variant_id IS NULL))
          AND ps.status = 'in_stock'
+         AND (pb.expiry_date IS NULL OR pb.expiry_date >= CURRENT_DATE)
        ORDER BY pb.expiry_date ASC NULLS LAST, ps.grn_id, ps.receive_seq ASC NULLS LAST, ps.created_at ASC`,
       [productId, variantId, subVariantId]
     )

@@ -18,13 +18,14 @@ interface Props {
   suppliers: { id: string; name: string }[]  // master supplier list
   value: SupplierRow[]
   onChange: (rows: SupplierRow[]) => void
+  note?: string
 }
 
 export function emptySupplierRow(): SupplierRow {
   return { supplier_id: '', unit_cost: '', is_preferred: false, moq: '', lead_time_days: '', notes: '', currency: 'INR' }
 }
 
-export default function ProductSupplierList({ suppliers, value, onChange }: Props) {
+export default function ProductSupplierList({ suppliers, value, onChange, note }: Props) {
   const rows = value
 
   // Index of the cheapest row with a valid price → highlighted as "best price".
@@ -156,7 +157,7 @@ export default function ProductSupplierList({ suppliers, value, onChange }: Prop
         <Plus className="w-4 h-4" /> Add supplier
       </button>
       <p className="text-xs text-foreground-muted mt-1">
-        Product-level — inherited by all variants. The lowest price is highlighted; ★ marks your preferred supplier.
+        {note ?? 'Product-level — inherited by all variants. The lowest price is highlighted; ★ marks your preferred supplier.'}
       </p>
     </div>
   )

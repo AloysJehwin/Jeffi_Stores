@@ -52,6 +52,7 @@ beforeEach(() => {
   mockAuthenticateAdmin.mockResolvedValue(VALID_ADMIN as any)
   mockUploadProductImage.mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
+    blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
     thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
     s3Bucket: 'jeffi-stores-bucket',
     s3Key: 'products/img.jpg',

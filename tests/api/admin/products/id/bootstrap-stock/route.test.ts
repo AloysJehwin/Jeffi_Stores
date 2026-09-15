@@ -16,6 +16,9 @@ vi.mock('@/lib/scopes', () => ({
 vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
   queryOne: vi.fn(),
+  // resolveGrainUnit's pre-transaction validation pass queries via this module-level `query`
+  // (the write-loop's own call goes through client.query, mocked separately per test).
+  query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 vi.mock('@/lib/shelf', () => ({

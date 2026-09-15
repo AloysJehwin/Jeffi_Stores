@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { productLabel as grainLabel } from '@/lib/product-label'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -11,6 +12,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
+import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/selling-unit'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { RequireWrite, useCanWrite } from '@/contexts/AdminScopesContext'
@@ -23,10 +25,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'stock', label: 'Stock Ledger' },
 ]
 
-const inputCls = 'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
+const inputCls = 'w-full field-sm border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
-const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
-const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
+const btnPrimary = 'control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+const btnSecondary = 'control-sm border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
 const PAGE_SIZE = 20
 const STOCK_PAGE_SIZE = 50
@@ -61,7 +63,7 @@ function ClientPagination({ page, total, pageSize, onChange }: { page: number; t
 
   const start = (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
-  const btnCls = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
+  const btnCls = 'control-xs font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
   return (
     <div className="flex items-center justify-between gap-2 px-1 pt-4 border-t border-border-default mt-2">
@@ -163,7 +165,7 @@ function SuppliersTab() {
             value={search}
             onChange={handleSearchChange}
             placeholder="Name, GSTIN, contact..."
-            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="flex flex-col">
@@ -487,11 +489,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const items = (json.items || []).map((it: POItem) => {
       const factor = parseFloat(it.purchase_unit_factor || '1')
       const remaining = Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))
-      const today = new Date()
-      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
-      const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-      const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
+      const autoLot = generateLotNumber(it.sku || it.product_sku)
       return {
         ...it,
         receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
@@ -570,7 +568,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     // Validate perishable items have expiry_date
     const missing = receiveItems.filter(it => parseFloat(it.receive_qty) > 0 && it.perishable && !it.expiry_date)
     if (missing.length > 0) {
-      showToast(`Expiry date required for: ${missing.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      showToast(`Expiry date required for: ${missing.map((it: any) => grainLabel(it)).join(', ')}`, 'error')
       return
     }
     // Validate serialized items have the right number of serial numbers
@@ -580,7 +578,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
       return serials.filter(Boolean).length !== serialsRequired(it)
     })
     if (missingSerials.length > 0) {
-      showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => grainLabel(it)).join(', ')}`, 'error')
       return
     }
     setReceiveSaving(true)
@@ -795,11 +793,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                 type="button"
                                 title="Regenerate lot number"
                                 onClick={() => {
-                                  const today = new Date()
-                                  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-                                  const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
-                                  const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-                                  const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
+                                  const autoLot = generateLotNumber(it.sku || it.product_sku)
                                   setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: autoLot } : r))
                                 }}
                                 className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
@@ -827,10 +821,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     const needed = serialsRequired(it)
                     const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
                     const entered = serials.filter(Boolean).length
-                    const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-                    const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
-                    const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
-                    const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
+                    const serialSku = it.sku || it.product_sku
+                    const autoSerial = () => generateSerialNumber(serialSku)
                     const updateSerial = (slotIdx: number, val: string) =>
                       setReceiveItems(items => items.map((r, i) => {
                         if (i !== idx) return r
@@ -857,7 +849,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                   className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
                                   onClick={() => setReceiveItems(items => items.map((r, i) => {
                                     if (i !== idx) return r
-                                    return { ...r, serial_numbers: Array.from({ length: needed }, () => autoSerial()) }
+                                    return { ...r, serial_numbers: generateSerialRun(serialSku, needed) }
                                   }))}
                                 >
                                   Generate All
@@ -925,7 +917,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         <div className="flex gap-3">
           <button className={btnPrimary} onClick={submitReceive} disabled={receiveSaving}>{receiveSaving ? 'Saving...' : 'Confirm Receipt'}</button>
           <button
-            className="px-4 py-2 rounded-lg text-sm font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            className="control-sm border border-border-default text-foreground-secondary font-medium hover:bg-surface-secondary transition-colors"
             onClick={saveDraftAndExit}
             disabled={receiveSaving}
           >
@@ -1035,7 +1027,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         const recvPu = factor > 1 ? Math.round((recvBase / factor) * 1000) / 1000 : recvBase
                         const puLabel = matchItem?.purchase_unit || poBaseUnitLabel(matchItem || { sell_unit_label: '', sell_unit_dimension: '' })
                         const productLabel = matchItem
-                          ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
+                          ? grainLabel(matchItem)
                           : `Item #${idx + 1}`
                         const taxRate = parseFloat(gi.tax_rate ?? matchItem?.tax_rate ?? '0')
                         const costPerPu = gi.unit_cost
@@ -1367,16 +1359,32 @@ function StockTab() {
     : transactions
 
   // Group by reference_id, preserving order of first appearance
-  const ledgerGroups: { refId: string; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
+  // refId is a COMPOSITE grouping key (reference_id + type [+ timestamp]); it is
+  // not addressable. linkId is the bare reference_id for building URLs.
+  const ledgerGroups: { refId: string; linkId: string | null; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
   for (const tx of sortedTransactions) {
     // Group by reference_id + transaction_type so sale and return events for the
     // same order appear as separate groups instead of netting to 0.
+    // Manual adjustments carry the PRODUCT id as reference_id, so every adjustment
+    // ever made to a product would otherwise collapse into one group across dates —
+    // key those by timestamp instead, which is what one save actually shares.
     // Fall back to tx.id for rows with no reference_id (legacy rows).
-    const groupKey = tx.reference_id ? `${tx.reference_id}::${tx.transaction_type}` : tx.id
+    const groupKey = tx.reference_type === 'manual'
+      ? `${tx.reference_id || tx.id}::${tx.transaction_type}::${tx.created_at}`
+      : tx.reference_id ? `${tx.reference_id}::${tx.transaction_type}` : tx.id
     const existing = ledgerGroups.find(g => g.refId === groupKey)
-    if (existing) { existing.txs.push(tx) }
-    else { ledgerGroups.push({ refId: groupKey, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
+    if (existing) {
+      existing.txs.push(tx)
+      if (tx.created_at > existing.date) existing.date = tx.created_at
+    } else {
+      ledgerGroups.push({ refId: groupKey, linkId: tx.reference_id || null, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] })
+    }
   }
+
+  // The server orders rows by ITS group key, which lumps every manual adjustment for
+  // a product into one block. Splitting those by timestamp above creates groups the
+  // server never ordered, so re-sort by each group's own newest event.
+  if (!ledgerSortCol) ledgerGroups.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
   function handleValSort(col: string, dir: SortDir) { setValSortCol(col || undefined); setValSortDir(col ? dir : undefined); setValPage(1) }
@@ -1520,9 +1528,11 @@ function StockTab() {
     const units: { id: string; unit: string; display_label: string | null; factor: number; dimension: string }[] = []
 
     // We don't have unit IDs in the valuation row — fetch them from the units API
-    const apiPath = p.variant_id
-      ? `/api/admin/products/${p.id}/variants/${p.variant_id}/units`
-      : `/api/admin/products/${p.id}/units`
+    const apiPath = p.sub_variant_id && p.variant_id
+      ? `/api/admin/products/${p.id}/variants/${p.variant_id}/sub-variants/${p.sub_variant_id}/units`
+      : p.variant_id
+        ? `/api/admin/products/${p.id}/variants/${p.variant_id}/units`
+        : `/api/admin/products/${p.id}/units`
 
     // Default: show base-unit qty while units load
     const currentBase = parseFloat(p.inventory_quantity || '0')
@@ -1681,42 +1691,10 @@ function StockTab() {
           <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
           <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
           <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
-          <td className="px-4 py-3 text-right">
-            <div className="flex items-center justify-end gap-1">
+          <td className="px-4 py-3 text-right align-middle">
+            <div className="flex items-center justify-end gap-1 flex-nowrap">
               {isEditing ? (
                 <>
-                  <input
-                    type="text"
-                    placeholder="Note (optional)"
-                    value={editNotes}
-                    onChange={e => setEditNotes(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                    className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                  />
-                  {editWarehouses.length > 0 && (
-                    <AdminSelect
-                      value={editWarehouseId}
-                      onChange={setEditWarehouseId}
-                      xs
-                      className="hidden lg:block w-36"
-                      options={[
-                        { value: '', label: '— warehouse —' },
-                        ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
-                      ]}
-                    />
-                  )}
-                  {editWarehouseId && (
-                    <AdminSelect
-                      value={editLocationId}
-                      onChange={setEditLocationId}
-                      xs
-                      className="hidden lg:block w-40"
-                      options={[
-                        { value: '', label: '— open shelf —' },
-                        ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
-                      ]}
-                    />
-                  )}
                   <button
                     onClick={() => saveEdit(p)}
                     disabled={editSaving || editQty === ''}
@@ -1743,10 +1721,10 @@ function StockTab() {
                     </svg>
                   </Link>
                   <button
-                    onClick={() => !p.perishable && startEdit(p)}
-                    title={p.perishable ? 'Stock managed via batches — use GRN to receive or Remove to deduct' : 'Adjust stock'}
-                    disabled={!!p.perishable}
-                    className={`p-1.5 rounded-lg transition-colors ${p.perishable ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
+                    onClick={() => !(p.perishable || p.serialized) && startEdit(p)}
+                    title={(p.perishable || p.serialized) ? 'Stock managed via batches or serials — use GRN to receive or Remove to deduct' : 'Adjust stock'}
+                    disabled={!!(p.perishable || p.serialized)}
+                    className={`p-1.5 rounded-lg transition-colors ${(p.perishable || p.serialized) ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
                     hidden={!canWrite}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1768,6 +1746,46 @@ function StockTab() {
             </div>
           </td>
         </tr>
+        {isEditing && (
+          <tr className="bg-secondary-50/50 dark:bg-secondary-900/10">
+            <td colSpan={10} className="px-4 pb-3 pt-0">
+              <div className="flex items-center justify-end gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Note (optional)"
+                  value={editNotes}
+                  onChange={e => setEditNotes(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                  className="field-xs w-48 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
+                />
+                {editWarehouses.length > 0 && (
+                  <AdminSelect
+                    value={editWarehouseId}
+                    onChange={setEditWarehouseId}
+                    xs
+                    className="w-40"
+                    options={[
+                      { value: '', label: '— warehouse —' },
+                      ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+                    ]}
+                  />
+                )}
+                {editWarehouseId && (
+                  <AdminSelect
+                    value={editLocationId}
+                    onChange={setEditLocationId}
+                    xs
+                    className="w-44"
+                    options={[
+                      { value: '', label: '— open shelf —' },
+                      ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
+                    ]}
+                  />
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
         {expandedValRows[rowId] !== undefined && (
           <tr className="bg-surface-secondary/30">
             <td colSpan={10} className="px-4 py-3">
@@ -1873,7 +1891,7 @@ function StockTab() {
               <AdminTypeahead type="products" value={search}
                 onChange={v => { setSearch(v); setTxPage(1); syncUrl({ ledger_search: v }) }}
                 placeholder="Name, SKU..."
-                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
+                inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
             </div>
             <div>
               <label className={labelCls}>From</label>
@@ -1920,30 +1938,30 @@ function StockTab() {
                       const txType = group.txs[0].transaction_type
 
                       // Build per-product sub-groups within this reference group
-                      type ProductSubGroup = { key: string; productId: string; variantId: string | null; txs: StockTransaction[] }
+                      type ProductSubGroup = { key: string; productId: string; variantId: string | null; subVariantId: string | null; txs: StockTransaction[] }
                       const productSubGroups: ProductSubGroup[] = []
                       for (const tx of group.txs) {
-                        const pKey = `${tx.product_id}::${tx.variant_id || ''}`
+                        const pKey = `${tx.product_id}::${tx.variant_id || ''}::${tx.sub_variant_id || ''}`
                         const existing = productSubGroups.find(g => g.key === pKey)
                         if (existing) existing.txs.push(tx)
-                        else productSubGroups.push({ key: pKey, productId: tx.product_id, variantId: tx.variant_id, txs: [tx] })
+                        else productSubGroups.push({ key: pKey, productId: tx.product_id, variantId: tx.variant_id, subVariantId: tx.sub_variant_id ?? null, txs: [tx] })
                       }
                       const productCount = productSubGroups.length
 
-                      const refLink = group.refType === 'order' ? (
-                        <Link href={ap(`/admin/invoices/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
-                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                      const refLink = group.refType === 'order' && group.linkId ? (
+                        <Link href={ap(`/admin/invoices/${group.linkId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                          {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                         </Link>
-                      ) : group.refType === 'cash_sale' ? (
-                        <Link href={ap(`/admin/cash-sale/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
-                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                      ) : group.refType === 'cash_sale' && group.linkId ? (
+                        <Link href={ap(`/admin/cash-sale/${group.linkId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                          {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                         </Link>
                       ) : group.refType === 'grn' ? (
                         <Link href={ap(`/admin/financial?tab=grn`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
-                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                          {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                         </Link>
                       ) : (
-                        <span className="font-mono text-foreground-secondary">{group.refType} / {group.refId.slice(0, 8)}…</span>
+                        <span className="font-mono text-foreground-secondary">{group.refType} / {(group.linkId || group.refId).slice(0, 8)}…</span>
                       )
 
                       function fmtChange(n: number) {
@@ -2186,7 +2204,7 @@ function StockTab() {
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
                 onSelect={item => { setValSearch(item.label); setValPage(1); syncUrl({ val_search: item.label }) }}
                 placeholder="Name, SKU, variant..."
-                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
             </div>
             <div className="w-44">
@@ -2266,13 +2284,13 @@ function StockTab() {
                         <SortableHeader label="Product" column="product" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} />
                         <SortableHeader label="Variant" column="variant" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden sm:table-cell" />
                         <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
-                        <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" className="w-[110px]" />
                         <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Sell Unit</th>
                         <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GST %</th>
                         <SortableHeader label="Stock Value (ex-GST)" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock Value (incl. GST)</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide w-[130px]">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">

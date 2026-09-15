@@ -36,11 +36,11 @@ export default function Header() {
             {/* Logo */}
             <Link href="/" className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
-                <img
-                  src={identity.logoUrl || '/images/logo.png'}
+                {identity.logoUrl && <img
+                  src={identity.logoUrl}
                   alt={`${identity.name} Logo`}
                   className="h-8 sm:h-10 lg:h-12 w-auto"
-                />
+                />}
                 <div>
                   <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">{identity.name}</div>
                   {storefront.metaTagline && (

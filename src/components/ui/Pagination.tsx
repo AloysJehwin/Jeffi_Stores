@@ -9,7 +9,7 @@ interface PaginationProps {
 export default function Pagination({ page, totalPages, buildHref }: PaginationProps) {
   if (totalPages <= 1) return null
 
-  const btnCls = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors'
+  const btnCls = 'control-xs font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors'
 
   return (
     <div className="flex items-center justify-between mt-8 mb-4 gap-2">

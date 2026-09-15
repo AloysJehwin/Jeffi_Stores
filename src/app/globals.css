@@ -116,22 +116,64 @@
   }
 }
 
-/* ── Shared form field size tiers ─────────────────────────────────────────
-   Use these on <input>, <textarea>, and pair with AdminSelect size props:
-     .field-normal  →  AdminSelect (default)
-     .field-compact →  AdminSelect sm
-     .field-xs      →  AdminSelect xs
+/* ── Control size tiers ───────────────────────────────────────────────────
+   Every interactive control — input, select trigger, button — picks a tier, and
+   controls that sit next to each other must share one.
+
+   Heights are PINNED, not left to padding. With border-box, a pinned height is
+   the same whether or not the element has a border; padding alone is not, so a
+   bordered input and a borderless button with the same py- differ by 2px. That
+   2px (and the 6px cases) is what these tiers exist to remove.
+
+     .field-md / .control-md   38px   AdminSelect default + md
+     .field-sm / .control-sm   34px   AdminSelect sm
+     .field-xs / .control-xs   26px   AdminSelect xs
+
+   field-* on inputs and textareas, control-* on buttons and links styled as
+   buttons. They are the same size; the two names just read correctly in place.
+   Heights match what the admin already renders, so existing layouts do not move.
+
+   text-sm and text-xs carry fixed line-heights (20px / 16px) even though the
+   font-size is a clamp, so these hold at every breakpoint.
    ──────────────────────────────────────────────────────────────────────── */
 @layer components {
+  .field-md,
   .field-normal {
-    @apply px-3 py-2 text-sm rounded-lg;
+    @apply h-[38px] px-3 py-2 text-sm rounded-lg;
   }
+  .field-sm,
   .field-compact {
-    @apply px-2 py-1.5 text-sm rounded-lg;
+    @apply h-[34px] px-2 py-1.5 text-sm rounded-lg;
   }
   .field-xs {
-    @apply px-1.5 py-1 text-xs rounded h-[26px] leading-none;
+    @apply h-[26px] px-1.5 py-1 text-xs rounded leading-none;
   }
+
+  /* Buttons need the same box plus centring, since they have no text baseline
+     of their own to sit on. */
+  .control-md {
+    @apply h-[38px] inline-flex items-center justify-center gap-2 px-4 text-sm rounded-lg;
+  }
+  .control-sm {
+    @apply h-[34px] inline-flex items-center justify-center gap-1.5 px-3 text-sm rounded-lg;
+  }
+  .control-xs {
+    @apply h-[26px] inline-flex items-center justify-center gap-1 px-2 text-xs rounded leading-none;
+  }
+
+  /* Icon-only: square, so a row of them lines up with the fields beside it. */
+  .control-md.control-icon { @apply w-[38px] px-0; }
+  .control-sm.control-icon { @apply w-[34px] px-0; }
+  .control-xs.control-icon { @apply w-[26px] px-0; }
+}
+
+/* A textarea is the one control that must NOT be pinned — it grows with rows. */
+textarea.field-md,
+textarea.field-normal,
+textarea.field-sm,
+textarea.field-compact,
+textarea.field-xs {
+  height: auto;
 }
 
 /* Toast notification animation */

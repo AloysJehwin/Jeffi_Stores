@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, withTransaction } from '@/lib/db'
-import { validateSerializedUnitStep } from '@/lib/selling-unit'
+import { queryMany, queryOne, withTransaction, query } from '@/lib/db'
+import { validateSerializedUnitStep, assertUnitChangeAllowed, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,11 +87,32 @@ export async function POST(request: NextRequest, { params }: Params) {
   const maxQty = body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty ? Number(body.max_qty) : null
   const qtyStep = body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0 ? Number(body.qty_step) : 1
 
+  // min/max must be reachable multiples of qty_step, or the advertised bounds
+  // describe quantities nobody can actually order.
+  const boundsErr = validateUnitQuantityBounds({ qty_step: qtyStep, min_qty: minQty, max_qty: maxQty })
+  if (boundsErr) return NextResponse.json({ error: boundsErr }, { status: 400 })
+
   // Serialized products need a whole-number qty_step so each step maps to one serial.
   const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [id])
   if (serialRow?.serialized) {
     const stepErr = validateSerializedUnitStep(qtyStep)
     if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
+  }
+
+
+  // An upsert on an existing unit overwrites factor/dimension/qty_step, so it is a
+  // change like any other — refuse it when stock was recorded under the old values.
+  const existingUnit = await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string }>(
+    `SELECT unit, factor::text, dimension, qty_step::text FROM product_units WHERE product_id = $1 AND unit = $2 AND variant_id IS NULL AND sub_variant_id IS NULL`,
+    [id, unit]
+  )
+  if (existingUnit) {
+    const guardErr = await assertUnitChangeAllowed(
+      { query },
+      { productId: id, variantId: null, subVariantId: null, label: unit },
+      changedUnitFields({ factor, dimension, qty_step: qtyStep }, existingUnit)
+    )
+    if (guardErr) return NextResponse.json({ error: guardErr }, { status: 409 })
   }
 
   try {

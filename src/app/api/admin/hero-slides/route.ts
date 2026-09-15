@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne, withTransaction } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
 
@@ -87,8 +87,13 @@ export async function PATCH(request: NextRequest) {
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  for (let i = 0; i < order.length; i++) {
-    await query(`UPDATE hero_slides SET display_order = $1, updated_at = NOW() WHERE id = $2`, [i, order[i]])
-  }
+  await withTransaction(async client => {
+    await client.query(
+      `UPDATE hero_slides s SET display_order = v.ord - 1, updated_at = NOW()
+       FROM unnest($1::uuid[]) WITH ORDINALITY AS v(id, ord)
+       WHERE s.id = v.id`,
+      [order],
+    )
+  })
   return NextResponse.json({ success: true })
 }

@@ -90,7 +90,7 @@ CREATE TABLE public.shelf_stock (
     product_id uuid NOT NULL,
     variant_id uuid,
     sub_variant_id uuid,
-    quantity integer DEFAULT 0 NOT NULL,
+    quantity numeric(14,3) DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 

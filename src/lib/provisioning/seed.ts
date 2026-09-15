@@ -2,6 +2,7 @@ import { Pool } from 'pg'
 import fs from 'fs'
 import path from 'path'
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
+import { DEFAULT_SECTIONS } from '@/lib/homepage-sections'
 
 /**
  * Starter-data seeding for a freshly-provisioned tenant DB.
@@ -74,6 +75,17 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
          VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
         [h.title, h.subtitle, h.badge, h.cta, `/products?category=${cat.categorySlug}`, cat.category, i],
       )
+    }
+
+    const hasSections = await client.query('SELECT 1 FROM homepage_sections LIMIT 1')
+    if (!hasSections.rowCount) {
+      for (const [i, s] of DEFAULT_SECTIONS.entries()) {
+        await client.query(
+          `INSERT INTO homepage_sections (type, title, subtitle, eyebrow, config, display_order, is_active)
+           VALUES ($1,$2,$3,$4,$5,$6,true)`,
+          [s.type, s.title, s.subtitle, s.eyebrow, JSON.stringify(s.config), i],
+        )
+      }
     }
 
     await client.query('COMMIT')

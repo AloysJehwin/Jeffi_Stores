@@ -167,6 +167,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (file upload
     mockQueryMany.mockResolvedValueOnce([])
     mockUploadVariantImage.mockResolvedValue({
       url: 'https://cdn.example.com/v/var-1/img.jpg',
+      blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
       thumbnailUrl: 'https://cdn.example.com/v/var-1/img_thumb.jpg',
       s3Bucket: 'jeffi-stores-bucket',
       s3Key: 'v/var-1/img.jpg',

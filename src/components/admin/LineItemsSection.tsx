@@ -8,6 +8,7 @@ import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
 import { round2 } from '@/lib/gst'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
+import { productLabel, variantLabel } from '@/lib/product-label'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import CopySku from '@/components/ui/CopySku'
 
@@ -30,6 +31,7 @@ export interface LineItem {
   variant_id: string | null
   sub_variant_id: string | null
   variant_name: string
+  sub_variant_name?: string
   hsn_code: string
   gst_rate: string
   quantity: string | number
@@ -56,6 +58,7 @@ interface Suggestion {
   sub_variant_id: string | null
   name: string
   variant_name: string | null
+  sub_variant_name?: string | null
   sku: string
   base_price: number | null
   price_ex_gst: number | null
@@ -93,7 +96,7 @@ export function newLineItem(): LineItem {
 // lands as the first line item. Mirrors the internal buildLineItemFromSuggestion.
 export function seedLineItemFromSuggestion(s: {
   product_id: string; variant_id?: string | null; sub_variant_id?: string | null
-  name: string; variant_name?: string | null; sku: string
+  name: string; variant_name?: string | null; sub_variant_name?: string | null; sku: string
   base_price?: number | null; price_ex_gst?: number | null; mrp?: number | null
   gst_percentage?: number | null; hsn_code?: string | null
   inventory_quantity?: number | null; discount_pct?: number | null; serialized?: boolean | null
@@ -107,11 +110,12 @@ export function seedLineItemFromSuggestion(s: {
   return {
     ...newLineItem(),
     product_id: s.product_id,
-    product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+    product_name: productLabel({ product_name: s.name, variant_name: s.variant_name, sub_variant_name: s.sub_variant_name }, ' — '),
     product_sku: s.sku,
     variant_id: s.variant_id ?? null,
     sub_variant_id: s.sub_variant_id ?? null,
     variant_name: s.variant_name || '',
+    sub_variant_name: s.sub_variant_name || '',
     hsn_code: s.hsn_code || '',
     gst_rate: String(Math.round(gstRate)),
     unit_price,
@@ -209,7 +213,7 @@ function fmt(n: number) {
 
 function decodeLineItemId(encoded: string) {
   const parts = encoded.split('|')
-  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw, discount_pct_raw] = parts
+  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw, discount_pct_raw, variant_name_raw, sub_variant_name_raw] = parts
   const mrp = parseFloat(mrp_raw) || 0
   const basePrice = parseFloat(base_price_raw) || 0
   // unit_price = MRP incl. GST (anchor); fall back to base_price if no MRP
@@ -227,6 +231,8 @@ function decodeLineItemId(encoded: string) {
     gst_percentage: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '18',
     hsn_code: hsn_raw || '',
     inventory_quantity: inv_raw !== undefined && inv_raw !== '' ? parseFloat(inv_raw) : null,
+    variant_name: variant_name_raw || '',
+    sub_variant_name: sub_variant_name_raw || '',
   }
 }
 
@@ -253,15 +259,22 @@ interface LineItemsSectionProps {
   /** Fired when a line's quantity drops below its assigned-serial count, so the
    *  parent can trim the extra assignments. `keep` = new (lower) quantity. */
   onQuantityReduced?: (lineId: string, keep: number) => void
+  /** Renders serial/batch assignment INLINE under a line, in an expandable panel.
+   *  Only the invoice and cash-sale forms pass this; everywhere else the modal
+   *  stays. Return null for a line that needs no assignment. */
+  renderLineAssignment?: (item: LineItem) => React.ReactNode
+  /** Short status for the collapsed row, e.g. "10 of 10 serials". */
+  lineAssignmentSummary?: (item: LineItem) => { label: string; complete: boolean } | null
 }
 
-export default function LineItemsSection({ items, onChange, onStockBadgeClick, assignedBatchLabels, onSerialScanned, onQuantityReduced }: LineItemsSectionProps) {
+export default function LineItemsSection({ items, onChange, onStockBadgeClick, assignedBatchLabels, onSerialScanned, onQuantityReduced, renderLineAssignment, lineAssignmentSummary }: LineItemsSectionProps) {
   const { showToast } = useToast()
   const [scanEnabled, setScanEnabled] = useState(true)
   // Per-line Scanner mode input text, keyed by line id. Predictive-search fields
   // debounce/re-render and drop characters mid-burst; a plain per-line scan field
   // (data-scan-box, ignored by the global wedge hook) doesn't.
   const [scanInputs, setScanInputs] = useState<Record<string, string>>({})
+  const [expandedAssignments, setExpandedAssignments] = useState<Set<string>>(new Set())
   // Serials already scanned onto this line-item set, mapped serial_number → the
   // line id it landed on. Used to REJECT re-scanning the same physical unit, and
   // pruned when a line is removed / its product cleared so the serial frees up.
@@ -367,11 +380,12 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
     return {
       ...it,
       product_id: s.product_id,
-      product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+      product_name: productLabel({ product_name: s.name, variant_name: s.variant_name, sub_variant_name: s.sub_variant_name }, ' — '),
       product_sku: s.sku,
       variant_id: s.variant_id,
       sub_variant_id: s.sub_variant_id,
       variant_name: s.variant_name || '',
+      sub_variant_name: s.sub_variant_name || '',
       hsn_code: s.hsn_code || '',
       gst_rate: String(Math.round(gstRate)),
       unit_price,
@@ -753,6 +767,11 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                   <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
+                      {variantLabel({ variant_name: item.variant_name, sub_variant_name: item.sub_variant_name }) && (
+                        <p className="text-xs text-foreground-secondary truncate">
+                          {variantLabel({ variant_name: item.variant_name, sub_variant_name: item.sub_variant_name })}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.product_sku && <p className="text-xs text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></span></p>}
                         {assignedBatchLabels?.[item.id] ? (
@@ -825,7 +844,8 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                             product_sku: s.sublabel?.split(' · ')[0] ?? '',
                             variant_id: d.variant_id,
                             sub_variant_id: d.sub_variant_id,
-                            variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
+                            variant_name: d.variant_name,
+                            sub_variant_name: d.sub_variant_name,
                             hsn_code: d.hsn_code,
                             gst_rate: d.gst_percentage,
                             unit_price: d.unit_price,
@@ -861,7 +881,8 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                             product_sku: sku,
                             variant_id: d.variant_id,
                             sub_variant_id: d.sub_variant_id,
-                            variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
+                            variant_name: d.variant_name,
+                            sub_variant_name: d.sub_variant_name,
                             hsn_code: d.hsn_code,
                             gst_rate: d.gst_percentage,
                             unit_price: d.unit_price,
@@ -1098,6 +1119,43 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                   <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item, gstEnabled))}</span></span>
                 </div>
               )}
+
+              {hasProduct && renderLineAssignment && (() => {
+                const panel = renderLineAssignment(item)
+                if (!panel) return null
+                const summary = lineAssignmentSummary?.(item) ?? null
+                const open = expandedAssignments.has(item.id)
+                return (
+                  <div className="rounded-lg border border-border-default bg-surface-secondary/40">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAssignments(prev => {
+                        const next = new Set(prev)
+                        if (next.has(item.id)) next.delete(item.id); else next.add(item.id)
+                        return next
+                      })}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+                    >
+                      <span className="text-xs font-medium text-foreground-secondary">
+                        {summary?.label ?? 'Assign serials / batch'}
+                      </span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        {summary && (
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                            summary.complete
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}>
+                            {summary.complete ? 'Ready' : 'Needed'}
+                          </span>
+                        )}
+                        <span className={`text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}>⌄</span>
+                      </span>
+                    </button>
+                    {open && <div className="px-3 pb-3">{panel}</div>}
+                  </div>
+                )
+              })()}
             </div>
           )
         })}

@@ -153,14 +153,16 @@ describe('saveProductImages', () => {
     ]
     await saveProductImages('prod-1', images)
     expect(vi.mocked(query)).toHaveBeenCalledTimes(2)
-    // First image: altText defaults to '', isPrimary = true (i === 0)
+    // Column order: ... width(9), height(10), blurhash(11), alt_text(12), display_order(13), is_primary(14)
+    // First image: no blurhash supplied -> null; altText defaults to '', isPrimary = true (i === 0)
     const firstCall = vi.mocked(query).mock.calls[0][1] as any[]
-    expect(firstCall[11]).toBe('') // altText default
-    expect(firstCall[13]).toBe(true) // isPrimary = i === 0
+    expect(firstCall[11]).toBe(null) // blurhash default
+    expect(firstCall[12]).toBe('') // altText default
+    expect(firstCall[14]).toBe(true) // isPrimary = i === 0
     // Second image: altText = 'Alt text', isPrimary = false (explicit)
     const secondCall = vi.mocked(query).mock.calls[1][1] as any[]
-    expect(secondCall[11]).toBe('Alt text')
-    expect(secondCall[13]).toBe(false)
+    expect(secondCall[12]).toBe('Alt text')
+    expect(secondCall[14]).toBe(false)
   })
 })
 

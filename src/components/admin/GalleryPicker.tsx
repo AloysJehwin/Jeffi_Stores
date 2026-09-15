@@ -16,6 +16,7 @@ export interface GalleryImage {
   file_size?: number | null
   s3_key?: string | null
   s3_thumbnail_key?: string | null
+  blurhash?: string | null
   mime_type?: string | null
   width?: number | null
   height?: number | null
@@ -161,7 +162,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
                       <div className="absolute top-1 right-1 bg-accent-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold z-10">{selIdx + 1}</div>
                     )}
                     <div className="aspect-square">
-                      <ImgWithSkeleton src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
+                      <ImgWithSkeleton src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} blurhash={gimg.blurhash} className="w-full h-full object-cover" />
                     </div>
                     <div className="px-1.5 py-1 bg-surface-secondary">
                       <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>

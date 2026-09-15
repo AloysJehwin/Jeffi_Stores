@@ -367,13 +367,16 @@ export async function syncPerishableStock(
   try {
     if (ownClient) await client.query('BEGIN')
 
-    // Sum quantity_remaining per location from all batches for this product/variant
+    // Sum quantity_remaining per location from the SELLABLE batches of this grain.
+    // Expired lots stay on the shelf and in batch views for disposal, but they no
+    // longer count as stock that can be sold.
     const batchTotalsRes = await client.query(
       `SELECT location_id, COALESCE(SUM(quantity_remaining), 0) AS total
        FROM product_batches
        WHERE product_id = $1
          AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
          AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+         AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
        GROUP BY location_id`,
       [productId, variantId, subVariantId]
     )

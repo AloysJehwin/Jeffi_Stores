@@ -13,6 +13,7 @@ import { StoreConfigProvider, type StoreConfig } from '@/contexts/StoreConfigCon
 import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
+import NumberInputWheelGuard from './NumberInputWheelGuard'
 
 function shouldShowFooter(pathname: string | null): boolean {
   return false
@@ -33,6 +34,7 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
           <AuthProvider meEndpoint={isBusinessPage ? '/api/business/me' : '/api/auth/me'}>
             <ToastProvider>
               <ConfirmProvider>
+                <NumberInputWheelGuard />
                 {children}
                 {isBusinessPage && <PolicyConsentGate />}
               </ConfirmProvider>
@@ -53,6 +55,7 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
             <ToastProvider>
               <ConfirmProvider>
                 <CompareProvider>
+                  <NumberInputWheelGuard />
                   <div className="flex flex-col min-h-[100dvh] bg-surface">
                     <PageTracker />
                     <Header />

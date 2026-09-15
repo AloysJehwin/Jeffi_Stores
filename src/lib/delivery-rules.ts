@@ -3,18 +3,14 @@ import { round2 } from './gst'
 export interface DeliverySettings {
   enabled: boolean
   freeThreshold: number
-  discountPercent: number
-  discountFlat: number
-  discountMinSubtotal: number
-  discountLabel: string
-  baseCharge: number
+  /** Buyer shipping rate in rupees per charged kg. 0 = use the live carrier quote instead. */
+  ratePerKg: number
   freeWeightCeilingKg: number
 }
 
 export type ApplyDeliverySource =
   | 'admin_disabled'
   | 'free_threshold'
-  | 'discounted'
   | 'as_is'
 
 export interface ApplyDeliveryResult {
@@ -23,7 +19,6 @@ export interface ApplyDeliveryResult {
   discountApplied: number
   source: ApplyDeliverySource
   freeThreshold?: number
-  discountLabel?: string
 }
 
 export function applyDeliveryRules(params: {
@@ -31,6 +26,7 @@ export function applyDeliveryRules(params: {
   subtotal: number
   settings: DeliverySettings
   weightGrams?: number
+  chargedWeightGrams?: number
 }): ApplyDeliveryResult {
   const { subtotal, settings } = params
   const weightKg = Math.max(0, (params.weightGrams ?? 0) / 1000)
@@ -40,9 +36,14 @@ export function applyDeliveryRules(params: {
     return { charge: 0, originalCharge: 0, discountApplied: 0, source: 'admin_disabled' }
   }
 
-  // Buyer-facing base is the live Delhivery/fallback quote passed in as params.baseCharge.
-  // settings.baseCharge acts only as an explicit flat-rate override when an admin sets it > 0.
-  const base = settings.baseCharge > 0 ? settings.baseCharge : Math.max(0, params.baseCharge)
+  // Buyer-facing base is the live carrier quote passed in as params.baseCharge. A non-zero
+  // ratePerKg replaces that quote with rate x charged weight, where charged weight is the
+  // volumetric-vs-actual max the carrier itself bills on — so bulky-but-light parcels are not
+  // priced under cost. Falls back to actual weight when no charged weight was supplied.
+  const rateWeightKg = Math.max(0, (params.chargedWeightGrams ?? params.weightGrams ?? 0) / 1000)
+  const base = settings.ratePerKg > 0
+    ? settings.ratePerKg * rateWeightKg
+    : Math.max(0, params.baseCharge)
   const original = Math.max(0, round2(base))
 
   // Free shipping now also requires the parcel to be under the weight ceiling.
@@ -54,24 +55,6 @@ export function applyDeliveryRules(params: {
       source: 'free_threshold',
       freeThreshold: settings.freeThreshold,
     }
-  }
-
-  const hasDiscount = (settings.discountPercent > 0 || settings.discountFlat > 0) && original > 0
-  const meetsMinSubtotal = settings.discountMinSubtotal <= 0 || subtotal >= settings.discountMinSubtotal
-
-  if (hasDiscount && meetsMinSubtotal) {
-    let after = original
-    if (settings.discountPercent > 0) after = round2(after * (1 - settings.discountPercent / 100))
-    if (settings.discountFlat > 0) after = round2(after - settings.discountFlat)
-    after = Math.max(0, after)
-    const result: ApplyDeliveryResult = {
-      charge: after,
-      originalCharge: original,
-      discountApplied: round2(original - after),
-      source: 'discounted',
-    }
-    if (settings.discountLabel) result.discountLabel = settings.discountLabel
-    return result
   }
 
   return { charge: original, originalCharge: original, discountApplied: 0, source: 'as_is' }

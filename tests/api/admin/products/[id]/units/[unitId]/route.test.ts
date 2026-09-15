@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { PATCH, DELETE } from '@/app/api/admin/products/[id]/units/[unitId]/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, query, withTransaction } from '@/lib/db'
+import { queryOne, query, withTransaction, query as dbQuery} from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -44,7 +44,13 @@ function makeDeleteReq() {
   })
 }
 
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+  vi.resetAllMocks()
+  // assertUnitChangeAllowed reads product flags via query(); default to a
+  // non-serialized, non-perishable product so the guard is a no-op unless a
+  // test opts in.
+  vi.mocked(dbQuery).mockResolvedValue({ rows: [{ perishable: false, serialized: false }] } as any)
+})
 
 // ---------------------------------------------------------------------------
 // PATCH

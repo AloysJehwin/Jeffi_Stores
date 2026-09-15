@@ -580,9 +580,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   const inventoryQty = p.has_variants
     ? Number(p.variant_inventory_total || 0)
     : Number(p.inventory_quantity || 0)
-  const listedQty = p.has_variants
-    ? Number(p.variant_stock_total || 0)
-    : (p.stock_status !== 'Out of Stock' ? 1 : 0)
+  const listedQty = Number(p.variant_stock_total || 0)
 
   const stockColor = inventoryQty === 0
     ? 'text-red-600 dark:text-red-400'
@@ -758,7 +756,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                 <span className="text-foreground-secondary">Inventory Stock</span>
                 <span className={`font-semibold ${stockColor}`}>{inventoryQty}{p.has_variants ? ' (variants)' : ''}</span>
               </div>
-              {!p.has_variants && (
+              {p.has_variants && (
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">Listed (Online)</span>
                   <span className="font-semibold text-foreground">{listedQty}</span>
@@ -1120,6 +1118,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                       const svShelf = shelfFor(v.id, sv.id)
                       return (
                         <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
+                          <td className="px-4 py-2" />
                           <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
                           <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell"><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
                           <td className="px-4 py-2 hidden lg:table-cell" />
