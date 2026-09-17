@@ -60,8 +60,10 @@ function StepIcon({ icon, className }: { icon: string; className?: string }) {
 }
 
 // ── Main Wizard ────────────────────────────────────────────────────────────────
-export default function OnboardWizard({ plans, initialDraft, reusingPreviousDetails }: {
+export default function OnboardWizard({ plans, initialDraft, reusingPreviousDetails, ownerName }: {
   plans: Plan[]
+  /** Name on the owner's sign-in account, used only to prefill the editable name field. */
+  ownerName?: string | null
   initialDraft?: { current_step: number; data: Record<string, any> } | null
   /** Opening a second store: the owner's own details were carried over, the previous store's were not. */
   reusingPreviousDetails?: boolean
@@ -121,6 +123,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Step 6 — Branding & Legals
+  const [ownerFullName, setOwnerFullName] = useState<string>(init.ownerName ?? ownerName ?? '')
   const [mobile, setMobile] = useState(init.mobile ?? '')
   const [logoS3Key, setLogoS3Key] = useState(init.logoS3Key ?? '')
   const [logoUrl, setLogoUrl] = useState(init.logoUrl ?? '')
@@ -151,14 +154,14 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(async (nextStep: StepIdx) => {
     setSaving(true)
-    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, razorpayKeyId: rzpKeyId, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restorePreviousData: restoreBackup ? restoreOptIn : false }
+    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, razorpayKeyId: rzpKeyId, bankVerified, mobile, ownerName: ownerFullName, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restorePreviousData: restoreBackup ? restoreOptIn : false }
     await fetch('/api/ecom/onboard/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ step: nextStep, data }),
     }).catch(() => {})
     setSaving(false)
-  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, rzpKeyId, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restoreBackup, restoreOptIn])
+  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, rzpKeyId, bankVerified, mobile, ownerFullName, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restoreBackup, restoreOptIn])
 
   async function goTo(next: StepIdx) {
     await autosave(next)
@@ -234,6 +237,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
           razorpayKeyId: ownRazorpay ? rzpKeyId || undefined : undefined,
           razorpayKeySecret: ownRazorpay ? rzpKeySecret || undefined : undefined,
           razorpayWebhookSecret: ownRazorpay ? rzpWebhookSecret || undefined : undefined,
+          ownerName: ownerFullName.trim(),
           mobile: mobile || undefined,
           logoS3Key: logoS3Key || undefined, sealS3Key: sealS3Key || undefined,
           legalsAccepted,
@@ -287,7 +291,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
         && pinCheck.state !== 'bad'
     }
     if (step === 5) return bankVerified
-    if (step === 6) return /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && !!logoS3Key && legalsAccepted
+    if (step === 6) return ownerFullName.trim().length >= 2 && /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && !!logoS3Key && legalsAccepted
     return true
   }
 
@@ -657,6 +661,13 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
               <p className="text-foreground-muted mb-8">Your logo and seal appear on your storefront and legal documents.</p>
 
               <div className="mb-6">
+                <label className={lbl}>Your full name</label>
+                <input className={inp} placeholder="Name of the store owner" autoComplete="name" maxLength={200}
+                  value={ownerFullName} onChange={(e) => setOwnerFullName(e.target.value)} />
+                <p className="text-xs text-foreground-muted mt-1">Used on your admin access certificate and in emails from us. Your sign-in email stays the same.</p>
+              </div>
+
+              <div className="mb-6">
                 <label className={lbl}>Mobile number</label>
                 <input className={inp} inputMode="numeric" placeholder="10-digit mobile"
                   value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} />
@@ -706,6 +717,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
                   ['Delhivery', ownDelhivery ? 'Own account' : 'Managed by Jeffi'],
                   ['Payments', ownRazorpay ? 'Own Razorpay' : 'Routed via Jeffi'],
+                  ['Owner name', ownerFullName.trim() || '—'],
                   ['Mobile', mobile || '—'],
                   ['Logo', logoS3Key ? 'Uploaded' : 'Not uploaded'],
                   ['Seal', sealS3Key ? 'Uploaded' : 'Not uploaded'],

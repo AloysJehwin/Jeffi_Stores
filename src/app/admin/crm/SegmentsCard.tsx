@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
@@ -64,6 +65,7 @@ interface ModalProps {
 }
 
 function SegmentModal({ segment, onClose }: ModalProps) {
+  const canMail = useHasScope('mailer:write')
   const [customers, setCustomers] = useState<Customer[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -107,7 +109,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
 
         <div className="flex flex-1 min-h-0 divide-x divide-border-default">
           {/* Left: customer list */}
-          <div className="flex flex-col w-2/5 shrink-0 bg-surface-secondary/30">
+          <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'w-2/5 shrink-0' : 'flex-1'}`}>
             <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default">
               <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Customers</h3>
             </div>
@@ -125,6 +127,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
           </div>
 
           {/* Right: mailer panel */}
+          {canMail && (
           <div className="flex flex-col flex-1 min-w-0">
             <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
               <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
@@ -145,6 +148,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
               />
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>,

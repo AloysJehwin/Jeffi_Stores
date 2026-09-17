@@ -1392,6 +1392,19 @@ CREATE INDEX idx_variant_change_requests_status ON public.variant_change_request
 
 CREATE UNIQUE INDEX idx_variant_change_requests_rzp_order ON public.variant_change_requests USING btree (razorpay_order_id) WHERE (razorpay_order_id IS NOT NULL);
 
+--
+-- Name: idx_address_change_requests_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_address_change_requests_order_id ON public.address_change_requests USING btree (order_id);
+
+--
+-- Name: uq_address_change_requests_one_pending; Type: INDEX; Schema: public; Owner: -
+-- At most one pending request per order; the insert relies on this to reject a duplicate.
+--
+
+CREATE UNIQUE INDEX uq_address_change_requests_one_pending ON public.address_change_requests USING btree (order_id) WHERE ((status)::text = 'pending'::text);
+
 
 
 

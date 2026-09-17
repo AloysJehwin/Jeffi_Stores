@@ -1064,6 +1064,18 @@ ALTER TABLE ONLY public.variant_change_requests
     CHECK (status::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text, 'applied'::text, 'rejected'::text, 'cancelled'::text]));
 
 
+--
+-- Name: address_change_requests address_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_status_check
+    CHECK (status::text = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text]));
+
+
 
 --
 -- Name: review_form_submissions review_form_submissions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -2853,6 +2865,14 @@ ALTER TABLE ONLY public.auth_sessions
 
 ALTER TABLE public.auth_sessions
     ADD CONSTRAINT auth_sessions_principal_type_check CHECK (((principal_type)::text = ANY ((ARRAY['admin'::character varying, 'customer'::character varying, 'business'::character varying, 'owner'::character varying])::text[])));
+
+
+--
+-- Name: auth_session_keys auth_session_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.auth_session_keys
+    ADD CONSTRAINT auth_session_keys_pkey PRIMARY KEY (session_id);
 
 
 --

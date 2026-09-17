@@ -11,7 +11,7 @@ import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -509,8 +509,61 @@ function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
   )
 }
 
+function StatusToggle({ active, blockedBy, canWrite, busy, onToggle }: {
+  active: boolean
+  blockedBy: string | null
+  canWrite: boolean
+  busy: boolean
+  onToggle: () => void
+}) {
+  const shownActive = active && !blockedBy
+  return (
+    <div className="inline-flex flex-col items-center gap-0.5">
+      <button
+        type="button"
+        onClick={() => canWrite && !busy && onToggle()}
+        disabled={!canWrite || busy}
+        title={blockedBy ? `Set to ${active ? 'Active' : 'Inactive'}, but hidden because the ${blockedBy} is inactive` : undefined}
+        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${busy ? 'opacity-50' : ''} ${shownActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}
+      >
+        {shownActive ? 'Active' : 'Inactive'}
+      </button>
+      {blockedBy && active && <span className="text-[10px] text-foreground-muted">{blockedBy} inactive</span>}
+    </div>
+  )
+}
+
 export default function ProductDetailClient({ id, hasInventory = true }: { id: string; hasInventory?: boolean }) {
   const [product, setProduct] = useState<any>(null)
+  const canWriteProducts = useCanWrite('products')
+  const canEnrich = useHasScope('catalog_enrichment:read')
+  const canShelving = useHasScope('shelving:read')
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, boolean>>({})
+  const [statusBusy, setStatusBusy] = useState<string | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+
+  const toggleStatus = async (rowId: string, url: string, next: boolean) => {
+    setStatusBusy(rowId)
+    setStatusError(null)
+    setStatusOverrides(prev => ({ ...prev, [rowId]: next }))
+    try {
+      const res = await fetch(url, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: next }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to update status')
+      }
+    } catch (err: any) {
+      setStatusOverrides(prev => ({ ...prev, [rowId]: !next }))
+      setStatusError(err.message)
+    } finally {
+      setStatusBusy(null)
+    }
+  }
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
   const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
@@ -537,11 +590,12 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   useEffect(() => { loadProduct() }, [loadProduct])
 
   useEffect(() => {
+    if (!canShelving) return
     fetch(`/api/admin/shelving/stock?product_id=${id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setShelfStock(d?.locations ?? []))
       .catch(() => {})
-  }, [id])
+  }, [id, canShelving])
 
   if (!loading && (!product || product.error)) {
     return (
@@ -638,6 +692,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
           )}
           <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
+          {canEnrich && (
           <button
             onClick={() => setAiOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
@@ -645,6 +700,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <Sparkles className="w-4 h-4 text-accent-500" />
             AI
           </button>
+          )}
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
@@ -981,6 +1037,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="px-4 py-3 border-b border-border-default">
             <p className="text-sm font-semibold text-foreground">Variants ({variants.length})</p>
+            {statusError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{statusError}</p>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1106,9 +1163,13 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                         </td>
                       )}
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${(!p.is_active || !v.is_active) ? 'bg-surface-secondary text-foreground-secondary' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
-                          {(!p.is_active || !v.is_active) ? 'Inactive' : 'Active'}
-                        </span>
+                        <StatusToggle
+                          active={statusOverrides[v.id] ?? v.is_active}
+                          blockedBy={!p.is_active ? 'product' : null}
+                          canWrite={canWriteProducts}
+                          busy={statusBusy === v.id}
+                          onToggle={() => toggleStatus(v.id, `/api/admin/products/${id}/variants/${v.id}`, !(statusOverrides[v.id] ?? v.is_active))}
+                        />
                       </td>
                     </tr>
                     {hasSubs && subVariants.map((sv: any) => {
@@ -1134,9 +1195,13 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                             </td>
                           )}
                           <td className="px-4 py-2 text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${(!p.is_active || !v.is_active || !sv.is_active) ? 'bg-surface-secondary text-foreground-secondary' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
-                              {(!p.is_active || !v.is_active || !sv.is_active) ? 'Inactive' : 'Active'}
-                            </span>
+                            <StatusToggle
+                              active={statusOverrides[sv.id] ?? sv.is_active}
+                              blockedBy={!p.is_active ? 'product' : !(statusOverrides[v.id] ?? v.is_active) ? 'variant' : null}
+                              canWrite={canWriteProducts}
+                              busy={statusBusy === sv.id}
+                              onToggle={() => toggleStatus(sv.id, `/api/admin/products/${id}/variants/${v.id}/sub-variants/${sv.id}`, !(statusOverrides[sv.id] ?? sv.is_active))}
+                            />
                           </td>
                         </tr>
                       )
@@ -1158,7 +1223,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
         />
       )}
 
-      <ProductStockMovements productId={id} />
+      {hasInventory && <ProductStockMovements productId={id} />}
     </div>
   )
 }

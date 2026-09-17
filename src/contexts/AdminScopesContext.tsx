@@ -24,6 +24,13 @@ export function useCanWrite(scope: string): boolean {
   return hasScope(role, scopes, scope.endsWith(':write') ? scope : `${scope}:write`)
 }
 
+/** True when the admin holds this exact scope. Session scopes are already narrowed to what the
+ * tenant's plan sells, so this also hides features the plan does not include. */
+export function useHasScope(scope: string): boolean {
+  const { role, scopes } = useContext(Ctx)
+  return hasScope(role, scopes, scope)
+}
+
 /** Renders its children only when the admin holds the write scope. */
 export function RequireWrite({ scope, children, fallback = null }: {
   scope: string

@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -162,10 +162,11 @@ export async function POST(request: NextRequest) {
 
     if (subVariantId) {
       const subVariant = await queryOne(
-        'SELECT id, price FROM product_sub_variants WHERE id = $1 AND is_active = true',
+        'SELECT id, price, stock_status FROM product_sub_variants WHERE id = $1 AND is_active = true',
         [subVariantId]
       )
       if (!subVariant) return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
+      if (subVariant.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       if (variantId) {
         const variant = await queryOne(
           'SELECT id, price FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
@@ -178,12 +179,14 @@ export async function POST(request: NextRequest) {
       }
     } else if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, price_ex_gst FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, price_ex_gst, stock_status FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+      if (variant.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       priceAtAddition = variant.price ?? product.base_price
     } else {
+      if (product.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       priceAtAddition = product.price_ex_gst || product.base_price
     }
 

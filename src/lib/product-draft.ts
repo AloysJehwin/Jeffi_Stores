@@ -277,8 +277,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
          breadth_cm = EXCLUDED.breadth_cm, height_cm = EXCLUDED.height_cm,
          package_type = EXCLUDED.package_type, cost_price = EXCLUDED.cost_price,
          -- Stock is managed out-of-band (shelf / batches / serials), never by the draft
-         -- snapshot: an active row keeps its live value, a revived row restarts at 0.
-         inventory_quantity = CASE WHEN product_variants.is_active THEN product_variants.inventory_quantity ELSE 0 END,
+         -- snapshot: an active row keeps its live value, a revived row restarts at 0. A row that
+         -- stays inactive was only switched off from the product page, so it keeps its stock.
+         inventory_quantity = CASE WHEN product_variants.is_active OR NOT EXCLUDED.is_active THEN product_variants.inventory_quantity ELSE 0 END,
          mrp_ex_gst = EXCLUDED.mrp_ex_gst,
          variant_type = EXCLUDED.variant_type, sub_variant_type = EXCLUDED.sub_variant_type,
          sub_variant_type_on = EXCLUDED.sub_variant_type_on,
@@ -497,7 +498,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
                  sku = $3, sub_variant_name = $4, price = $5, mrp = $6,
                  price_ex_gst = $7, mrp_ex_gst = $8, attributes = COALESCE($9, attributes),
                  is_active = $10, discount_pct = $11, stock_status = $12,
-                 inventory_quantity = CASE WHEN is_active THEN inventory_quantity ELSE 0 END,
+                 inventory_quantity = CASE WHEN is_active OR NOT $10::boolean THEN inventory_quantity ELSE 0 END,
                  weight_grams = $13, length_cm = $14, breadth_cm = $15, height_cm = $16, package_type = $17,
                  updated_at = NOW()
                WHERE id = $1 AND product_id = $2`,

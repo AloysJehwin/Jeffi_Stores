@@ -59,6 +59,24 @@ export async function checkPincodeServiceability(pincode: string, tenantId?: str
 // Delhivery has no delete for a client warehouse — the edit endpoint is the only way to retire
 // one, so we flip it inactive rather than removing the address. Keyed by warehouse name (the
 // pickup_location). Best-effort / idempotent: a missing warehouse is treated as already gone.
+export type DelhiveryTokenCheck = 'valid' | 'invalid' | 'unverified'
+
+// Delhivery answers 401 for a token it does not recognise. Anything short of a clear yes or no
+// (network failure, 5xx) is 'unverified', so an outage on their side is never read as a bad token.
+export async function verifyDelhiveryToken(token: string): Promise<DelhiveryTokenCheck> {
+  try {
+    const res = await fetch(
+      'https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=110001',
+      { headers: { Authorization: `Token ${token}`, Accept: 'application/json' }, cache: 'no-store' },
+    )
+    if (res.ok) return 'valid'
+    if (res.status === 401 || res.status === 403) return 'invalid'
+    return 'unverified'
+  } catch {
+    return 'unverified'
+  }
+}
+
 export async function deactivateDelhiveryPickupLocation(name: string, tenantId?: string): Promise<{ ok: boolean; error?: string }> {
   const token = await resolveDelhiveryToken(tenantId)
   if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }

@@ -19,6 +19,8 @@ import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import VariantChangeRequest from '@/components/admin/VariantChangeRequest'
+import AddressChangeReview from '@/components/admin/AddressChangeReview'
+import { listAddressChangeRequests, addressChangeBlockReason } from '@/lib/address-change'
 import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 import MailLogsPanel from '@/components/admin/MailLogsPanel'
 import ExtendEddButton from '@/components/admin/ExtendEddButton'
@@ -68,10 +70,24 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'orders:write')
   const canOverrideStatus = isPlatformOwner(role)
+  // Session scopes are already narrowed to the tenant's plan, so these hide modules the plan
+  // does not include instead of showing controls whose API would refuse them.
+  const canMail = hasScope(role, scopes, 'mailer:write')
+  const canPackingSlips = hasScope(role, scopes, 'packing_slips:read')
+  const canRemitCod = hasScope(role, scopes, 'financial:write')
   const { inventoryValidationEnabled: inventoryFlag } = await getFeatureFlags()
   const inventoryValidationEnabled = inventoryFlag && hasScope(role, scopes, 'inventory:read')
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
+  const addressChangeRequests = (await listAddressChangeRequests(id)).map(r => ({
+    id: r.id,
+    status: r.status,
+    oldAddress: r.old_address_snapshot,
+    newAddress: r.new_address_snapshot,
+    adminNotes: r.admin_notes,
+    createdAt: new Date(r.created_at).toISOString(),
+    reviewedAt: r.reviewed_at ? new Date(r.reviewed_at).toISOString() : null,
+  }))
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
   const refundableAmount = await computeRefundableAmount(order, returnRequest).catch(() => Number(order.total_amount))
   const showRetryEmailButton =
@@ -182,6 +198,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
             {/* Divider between status pills and action buttons */}
             <span className="w-px h-6 bg-border-default hidden sm:block" />
             {/* Packing Slip — download + print combined pill */}
+            {canPackingSlips && (
             <div className="inline-flex rounded-full overflow-hidden border border-secondary-300 dark:border-secondary-700 text-sm font-semibold">
               <a
                 href={`/api/admin/packing-slips/${order.id}`}
@@ -206,6 +223,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                 </svg>
               </a>
             </div>
+            )}
             {/* Shipping Label — download + print combined pill */}
             {order.awb_number && (
               <div className="inline-flex rounded-full overflow-hidden border border-blue-300 dark:border-blue-700 text-sm font-semibold">
@@ -373,7 +391,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
               </div>
 
               {/* COD remittance — shown once a COD order is delivered & cash collected */}
-              {order.payment_mode === 'cod' && order.payment_status === 'cod_collected' && (
+              {canRemitCod && order.payment_mode === 'cod' && order.payment_status === 'cod_collected' && (
                 <div className="mt-4">
                   <CodRemittanceButton
                     orderId={order.id}
@@ -549,6 +567,13 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
+          <AddressChangeReview
+            orderId={order.id}
+            requests={addressChangeRequests}
+            canWrite={canWrite}
+            blockReason={addressChangeBlockReason(order)}
+          />
+
           {order.status === 'confirmed' && !order.awb_number && canWrite && (
             <VariantChangeRequest
               orderId={order.id}
@@ -585,6 +610,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
+          {canMail && (
           <CustomerMailPanel
             orderId={order.id}
             orderNumber={order.order_number || order.id.slice(0, 8)}
@@ -595,6 +621,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
             }
             customerEmail={order.users?.email || order.billing_email || ''}
           />
+          )}
 
           <MailLogsPanel orderId={order.id} />
         </div>

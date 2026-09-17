@@ -149,8 +149,8 @@ export default async function OnboardPage() {
   // their legal entity, warehouse and bank. An in-progress draft is resumed as before.
   const submitted = draft?.status === 'submitted'
   const carried = submitted
-    ? (({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile }: any) =>
-        ({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile }))(draft!.data ?? {})
+    ? (({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile, ownerName }: any) =>
+        ({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile, ownerName }))(draft!.data ?? {})
     : (draft?.data ?? {})
 
   return (
@@ -158,6 +158,7 @@ export default async function OnboardPage() {
       plans={plans}
       initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
       reusingPreviousDetails={submitted}
+      ownerName={owner.name}
     />
   )
 }

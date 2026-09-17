@@ -9,6 +9,8 @@ import SiteReachabilityBadge from '@/components/admin/SiteReachabilityBadge'
 import StoreDashboardTabs from './StoreDashboardTabs'
 import SubdomainList from './SubdomainList'
 import CustomDomains from './CustomDomains'
+import DeliveryAccount from './DeliveryAccount'
+import { hasOwnDelhiveryToken } from '@/lib/integrations/resolve'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +48,8 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
     : null
 
   const isLive = tenant.status === 'active'
+  const ownDelhivery = tenant.own_delhivery === true
+  const delhiveryTokenConnected = ownDelhivery ? await hasOwnDelhiveryToken(tenant.id) : false
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
   const monthly = Number(tenant.monthly_price_inr ?? 0)
   const price = tenant.billing_interval === 'yearly' ? monthly * 12 : monthly
@@ -135,6 +139,12 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
 
         {/* ── Custom domains ── */}
         <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />
+
+        <DeliveryAccount
+          tenantId={tenant.id}
+          ownDelhivery={ownDelhivery}
+          tokenConnected={delhiveryTokenConnected}
+        />
 
         {/* ── Transactions + ledger tabs ── */}
         <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">

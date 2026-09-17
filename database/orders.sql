@@ -324,3 +324,44 @@ ALTER TABLE ONLY public.variant_change_requests
     ADD CONSTRAINT variant_change_requests_requested_by_admin_id_fkey
     FOREIGN KEY (requested_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
 
+--
+-- Name: address_change_requests; Type: TABLE; Schema: public; Owner: -
+-- Customer-initiated delivery address change on a CONFIRMED order (pre-shipment).
+-- An admin approves or rejects; the order's address only changes on approval.
+--
+
+CREATE TABLE public.address_change_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    requested_by_user_id uuid,
+    old_address_id uuid,
+    new_address_id uuid,
+    old_address_snapshot jsonb,
+    new_address_snapshot jsonb NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    admin_notes text,
+    reviewed_by uuid,
+    reviewed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_order_id_fkey
+    FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_requested_by_user_id_fkey
+    FOREIGN KEY (requested_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_old_address_id_fkey
+    FOREIGN KEY (old_address_id) REFERENCES public.addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_new_address_id_fkey
+    FOREIGN KEY (new_address_id) REFERENCES public.addresses(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.address_change_requests
+    ADD CONSTRAINT address_change_requests_reviewed_by_fkey
+    FOREIGN KEY (reviewed_by) REFERENCES public.admins(id) ON DELETE SET NULL;

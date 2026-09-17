@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -40,6 +41,7 @@ interface Props {
 }
 
 export default function OrderDetailModal({ order, onClose }: Props) {
+  const canPackingSlips = useHasScope('packing_slips:read')
   const [detail, setDetail] = useState<{ order: any; items: any[] } | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -257,6 +259,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
           {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
+            {canPackingSlips && (
             <a
               href={`/api/admin/packing-slips/${order.id}`}
               target="_blank"
@@ -268,6 +271,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </svg>
               Packing Slip
             </a>
+            )}
             {o.awb_number && (
             <a
               href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}

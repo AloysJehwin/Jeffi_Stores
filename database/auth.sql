@@ -30,6 +30,27 @@ CREATE TABLE public.auth_sessions (
     tenant_id uuid
 );
 
+--
+-- Name: auth_session_keys; Type: TABLE; Schema: public; Owner: -
+-- The public half of the signing key a browser registered for a session. The private half is
+-- non-extractable in that browser, so a copied session cookie cannot produce valid proofs.
+-- Kept apart from auth_sessions on purpose: the session hot path never depends on this table,
+-- so a database the schema has not reached yet cannot break logins.
+--
+
+CREATE TABLE public.auth_session_keys (
+    session_id uuid NOT NULL,
+    public_jwk jsonb NOT NULL,
+    bind_host character varying(255) NOT NULL,
+    last_refresh_ts bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE ONLY public.auth_session_keys
+    ADD CONSTRAINT auth_session_keys_session_id_fkey
+    FOREIGN KEY (session_id) REFERENCES public.auth_sessions(id) ON DELETE CASCADE;
+
 -- tenant_id (multi-tenant SaaS): the tenant this session belongs to, snapshotted at
 -- login (mirrors role/scopes). Nullable / no default on purpose — the platform's own
 -- flagship store and existing rows stay NULL (single-tenant), so resolveSession() and

@@ -87,6 +87,9 @@ export function uaClearlyDiffers(storedUA: string | null | undefined, currentUA:
 // Per-request signals collected at the edge (see src/lib/session-signals-request.ts).
 // All raw — normalization happens inside the helpers below.
 export interface SessionSignals {
+  // Request context for key binding (see session-binding.ts). Present whenever the signals came
+  // from extractSessionSignals(); absent for callers that only pass a bare user-agent.
+  binding?: import('./session-binding-shared').BindingContext
   userAgent?: string | null
   acceptLanguage?: string | null // raw Accept-Language header
   uaPlatform?: string | null     // raw Sec-CH-UA-Platform client hint (e.g. '"macOS"')
@@ -319,14 +322,14 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   const row = await queryOne<{
     id: string
     principal_type: PrincipalType; principal_id: string
-    revoked_at: string | null; expires_at: string; last_seen_at: string
+    revoked_at: string | null; expires_at: string; last_seen_at: string; created_at: string | null
     role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
     tenant_id: string | null
     user_agent: string | null; accept_lang: string | null; ua_platform: string | null
     ip_net: string | null; fp_hash: string | null
     email: string | null; first_name: string | null; last_name: string | null
   }>(
-    `SELECT s.id, s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at,
+    `SELECT s.id, s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at, s.created_at,
             s.role, s.scopes, s.cert_cn, s.approval_status, s.tenant_id, s.user_agent,
             s.accept_lang, s.ua_platform, s.ip_net, s.fp_hash,
             u.email, u.first_name, u.last_name
@@ -361,6 +364,22 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     if (decision.revoke) {
       query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [row.id]).catch(() => {})
       return null
+    }
+
+    // Key binding: the passive signals above cannot tell two windows of the same browser apart,
+    // so a copied cookie passes them. Any failure in here fails open — it must never break auth.
+    if (sig.binding) {
+      try {
+        const { evaluateKeyBinding } = await import('./session-binding')
+        const verdict = await evaluateKeyBinding({
+          sessionId: row.id,
+          sidHash: lookupValue,
+          principalType: row.principal_type,
+          ctx: sig.binding,
+          sessionCreatedAt: row.created_at ? new Date(row.created_at).getTime() : null,
+        })
+        if (verdict.reject) return null
+      } catch { /* fail open */ }
     }
   }
 

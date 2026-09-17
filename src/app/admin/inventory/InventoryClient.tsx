@@ -15,7 +15,7 @@ import { ap } from '@/lib/admin-path'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/selling-unit'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
-import { RequireWrite, useCanWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -1250,6 +1250,7 @@ type StockTransaction = {
 }
 
 function StockTab() {
+  const canFinancial = useHasScope('financial:read')
   const searchParams = useSearchParams()
   const router = useRouter()
   const { showToast } = useToast()
@@ -1956,7 +1957,7 @@ function StockTab() {
                         <Link href={ap(`/admin/cash-sale/${group.linkId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
                           {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                         </Link>
-                      ) : group.refType === 'grn' ? (
+                      ) : group.refType === 'grn' && canFinancial ? (
                         <Link href={ap(`/admin/financial?tab=grn`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
                           {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                         </Link>

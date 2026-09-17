@@ -4,10 +4,11 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { createTenant, linkOwnerTenant, hasVerifiedBank, saveSubscriptionId,
          listPlans, getOwnerTenants, saveKyc, markDraftSubmitted, getDraft, saveDraft,
-         saveIntegrationCredential } from '@/lib/tenant-registry'
+         saveIntegrationCredential, updateOwnerName } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/ecom-emails'
 import { OnboardSchema } from '@/lib/onboard-schema'
 import { encryptToken } from '@/lib/crypto/token-cipher'
+import { verifyDelhiveryToken } from '@/lib/delhivery'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Please accept the legal terms to continue.' }, { status: 400 })
   }
 
+  // A mistyped Delhivery token would otherwise only surface at the store's first shipment. Only a
+  // positive refusal blocks the submit; if Delhivery cannot be reached the token is accepted, and
+  // the owner can replace it from the dashboard.
+  if (d.ownDelhivery && d.delhiveryToken && (await verifyDelhiveryToken(d.delhiveryToken.trim())) === 'invalid') {
+    return NextResponse.json({ error: 'Delhivery did not accept this API token. Check it and try again.' }, { status: 400 })
+  }
+
   // 1. Create tenant with status='pending_approval' (NOT provisioning yet).
   const result = await createTenant({
     slug: d.slug,
@@ -53,6 +61,9 @@ export async function POST(request: NextRequest) {
 
   // 2. Link owner → tenant.
   await linkOwnerTenant(owner.id, result.tenantId)
+
+  // 2a. Provisioning names the owner admin and addresses the access certificate from owners.name.
+  await updateOwnerName(owner.id, d.ownerName)
 
   // 2b. Own-Razorpay tenant: persist their collection creds, encrypted. This is the ONLY place the
   //     raw key_secret/webhook_secret is handled — it arrives over TLS and is encrypted immediately;
@@ -79,7 +90,7 @@ export async function POST(request: NextRequest) {
       tenantId: result.tenantId,
       provider: 'delhivery',
       label: 'Delhivery',
-      configEnc: encryptToken(JSON.stringify({ token: d.delhiveryToken })),
+      configEnc: encryptToken(JSON.stringify({ token: d.delhiveryToken.trim() })),
       meta: {},
     })
   }
@@ -108,7 +119,7 @@ export async function POST(request: NextRequest) {
   await markDraftSubmitted(owner.id)
 
   // 5. Notify owner + platform admin.
-  sendKycSubmittedEmail({ email: owner.email, name: owner.name }).catch(() => {})
+  sendKycSubmittedEmail({ email: owner.email, name: d.ownerName }).catch(() => {})
 
   return NextResponse.json({
     ok: true,

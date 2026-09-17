@@ -1,5 +1,6 @@
 import './globals.css'
 import ConditionalLayout from '@/components/ConditionalLayout'
+import SessionGuard from '@/components/security/SessionGuard'
 import Script from 'next/script'
 import { getHost } from '@/lib/get-host'
 import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/site-controls'
@@ -83,6 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className="antialiased bg-surface text-foreground m-0 p-0">
+        <SessionGuard />
         <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
         <Script id="gtag-init" strategy="afterInteractive"
           dangerouslySetInnerHTML={{
