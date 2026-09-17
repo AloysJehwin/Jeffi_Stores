@@ -21,9 +21,9 @@ jobs:
     name: Release PR / Tag
     runs-on: ubuntu-latest
     outputs:
-      released: ${{ steps.release.outputs.release_created }}
-      tag: ${{ steps.release.outputs.tag_name }}
-      version: ${{ steps.release.outputs.version }}
+      released: ${{ steps.release.outputs.release_created == 'true' && 'true' || (steps.recover.outputs.tag != '' && 'true' || 'false') }}
+      tag: ${{ steps.release.outputs.tag_name || steps.recover.outputs.tag }}
+      version: ${{ steps.release.outputs.version || steps.recover.outputs.version }}
     steps:
       - uses: googleapis/release-please-action@v5
         id: release
@@ -33,6 +33,47 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
+
+      # Release Please finds the release commit by matching it against the tip of main. Merging
+      # the release PR with a MERGE COMMIT puts the merge on top, so the match fails, it logs
+      # "Expected 1 releases, only found 0" and exits green without tagging — which is how v1.1.0
+      # ended up bumped but never released. This tags whatever the manifest says is unreleased.
+      - name: Tag a release the action could not match
+        id: recover
+        if: steps.release.outputs.release_created != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          set -euo pipefail
+          git clone --depth 50 --no-tags "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}" repo
+          cd repo
+          version=$(jq -r '.["."]' .github/.release-please-manifest.json)
+          tag="v$version"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag already tagged — nothing to do."
+            exit 0
+          fi
+
+          # Tag the commit that set this version, not the merge on top of it.
+          sha=$(git log -1 --format=%H --all --grep='^chore: release' -- .github/.release-please-manifest.json)
+          if [ -z "$sha" ]; then
+            echo "No release commit found for $tag; leaving it to the next run." >&2
+            exit 0
+          fi
+          echo "Tagging $tag at ${sha:0:8}"
+
+          notes=$(awk -v v="$version" '
+            $0 ~ "^## \\[?" v "\\]?" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md)
+
+          gh release create "$tag" --target "$sha" --title "$tag" --notes "${notes:-Release $tag}"
+          {
+            echo "tag=$tag"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
 
   announce:
     name: Summarise release

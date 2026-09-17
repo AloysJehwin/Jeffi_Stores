@@ -42,6 +42,11 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ integrations })
 }
 
+// The Delhivery token decides who pays the courier (own account vs the platform's wallet billing),
+// so only the store owner sets it, from the ecom portal. Removing it here used to leave an
+// own-account tenant shipping on the platform key with no wallet charge.
+const DELHIVERY_OWNER_MANAGED = 'The Delhivery account is managed by the store owner in the ecom portal.'
+
 const PostSchema = z.object({
   provider: z.enum(PROVIDERS),
   config: z.record(z.string(), z.any()),
@@ -76,9 +81,7 @@ export async function POST(request: NextRequest) {
     normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: String(config.merchant_id) }
     meta = { merchant_id: String(config.merchant_id), client_email: sa.client_email }
   } else if (provider === 'delhivery') {
-    if (!config.token) return NextResponse.json({ error: 'token is required' }, { status: 400 })
-    normalized = { token: String(config.token) }
-    meta = {}
+    return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
   } else if (provider === 'razorpay') {
     if (!config.key_id || !config.key_secret) {
       return NextResponse.json({ error: 'key_id and key_secret are required' }, { status: 400 })
@@ -123,6 +126,10 @@ export async function DELETE(request: NextRequest) {
   const raw = await request.json().catch(() => null)
   const parsed = DeleteSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
+
+  if (parsed.data.provider === 'delhivery') {
+    return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
+  }
 
   await deleteIntegrationCredential(gate.tenantId, parsed.data.provider)
   return NextResponse.json({ ok: true })

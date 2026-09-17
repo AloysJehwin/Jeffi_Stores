@@ -32,7 +32,7 @@ function makeReq(method: string, body?: Record<string, unknown>) {
   })
 }
 
-const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
+const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['products:write'] }
 
 describe('PATCH /api/products/[id]', () => {
   beforeEach(() => {

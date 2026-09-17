@@ -72,6 +72,7 @@ const bodySchema = z.object({
   newVariantId: zUuid.nullish(),
   newSubVariantId: zUuid.nullish(),
   adminNotes: z.string().max(1000).optional(),
+  settlePayment: z.boolean().optional(),
 }).refine(d => d.newVariantId || d.newSubVariantId, { message: 'A replacement variant or sub-variant is required' })
 
 // POST /api/admin/orders/[id]/variant-change — admin proposes a variant swap.
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const parsed = parseBody(bodySchema, await request.json())
     if (!parsed.ok) return parsed.response
     const { orderItemId, newVariantId, newSubVariantId, adminNotes } = parsed.data
+    const settlePayment = parsed.data.settlePayment !== false
 
     const order = await queryOne<any>(
       `SELECT o.id, o.order_number, o.status, o.payment_status, o.payment_mode, o.awb_number, o.user_id,
@@ -117,12 +119,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!newV) return NextResponse.json({ error: 'Replacement variant not found or inactive' }, { status: 404 })
 
     const qty = Number(item.quantity) || 1
-    const preview = computeVariantChangePreview({
+    const listPreview = computeVariantChangePreview({
       oldUnitPrice: Number(item.unit_price),
       qty,
       newV,
       gstEnabled,
     })
+    // Admin chose not to settle: the swap is quoted at the current line price, so no refund or
+    // payment request is raised and the order total does not move.
+    const waivedDiff = settlePayment ? 0 : listPreview.priceDiff
+    const preview = settlePayment
+      ? listPreview
+      : { ...listPreview, newUnitPrice: listPreview.oldUnitPrice, priceDiff: 0, settlementType: 'none' as const }
 
     // Settlement type: COD orders adjust the total on delivery; online orders refund/collect.
     const isCod = order.payment_mode === 'cod' || order.payment_status?.startsWith('cod')
@@ -172,8 +180,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         kind: 'variant_change',
         referenceId: orderId,
         referenceType: 'orders',
-        summary: `Variant change requested on #${order.order_number} (${settlementType}, ₹${Math.abs(preview.priceDiff).toFixed(2)})`,
-        metadata: { vcrId: vcr?.id, settlement: settlementType, priceDiff: preview.priceDiff },
+        summary: waivedDiff !== 0
+          ? `Variant change requested on #${order.order_number} (no payment — ₹${Math.abs(waivedDiff).toFixed(2)} difference waived)`
+          : `Variant change requested on #${order.order_number} (${settlementType}, ₹${Math.abs(preview.priceDiff).toFixed(2)})`,
+        metadata: { vcrId: vcr?.id, settlement: settlementType, priceDiff: preview.priceDiff, waivedDiff },
       }).catch(() => {})
     }
 

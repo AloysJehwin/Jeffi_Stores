@@ -74,6 +74,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
   const [done, setDone] = useState<string | null>(null)
   const [history, setHistory] = useState<HistoryRow[]>([])
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [settlePayment, setSettlePayment] = useState(true)
 
   const selectedItem = items.find(i => i.id === itemId)
 
@@ -116,6 +117,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
 
   function openPanel() {
     setOpen(true)
+    setSettlePayment(true)
     if (selectedItem) loadCandidates(selectedItem.productId)
   }
 
@@ -134,6 +136,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
           orderItemId: selectedItem.id,
           newVariantId: selected.kind === 'variant' ? selected.id : null,
           newSubVariantId: selected.kind === 'sub' ? selected.id : null,
+          settlePayment,
         }),
       })
       const data = await res.json()
@@ -200,7 +203,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
         ) : hasPending && !open ? (
           <p className="text-sm text-foreground-muted">A variant change is pending customer action. Cancel it above to raise a new one.</p>
         ) : !open ? (
-          <p className="text-sm text-foreground-muted">Swap an ordered item for a near-dimension variant of the same product. The customer confirms; any price difference is refunded, collected, or adjusted (COD) automatically.</p>
+          <p className="text-sm text-foreground-muted">Swap an ordered item for a near-dimension variant of the same product. The customer confirms; any price difference is refunded, collected, or adjusted (COD) automatically, unless you choose to swap at the current price.</p>
         ) : (
           <>
             <div>
@@ -251,9 +254,40 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                 <div className="flex justify-between"><span className="text-foreground-muted">Current line</span><span>₹{(selectedItem.unitPrice * selectedItem.quantity).toFixed(2)}</span></div>
                 <div className="flex justify-between"><span className="text-foreground-muted">New line</span><span>₹{(selected.price * selectedItem.quantity).toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold mt-1 pt-1 border-t border-border-default">
-                  <span>{priceDiff < 0 ? 'Refund to customer' : priceDiff > 0 ? 'Extra payable by customer' : 'No price change'}</span>
-                  <span className={priceDiff < 0 ? 'text-green-600' : priceDiff > 0 ? 'text-orange-600' : ''}>₹{Math.abs(priceDiff).toFixed(2)}</span>
+                  <span>
+                    {priceDiff === 0 ? 'No price change'
+                      : !settlePayment ? 'Difference waived'
+                      : priceDiff < 0 ? 'Refund to customer' : 'Extra payable by customer'}
+                  </span>
+                  <span className={!settlePayment && priceDiff !== 0 ? 'text-foreground-muted line-through' : priceDiff < 0 ? 'text-green-600' : priceDiff > 0 ? 'text-orange-600' : ''}>₹{Math.abs(priceDiff).toFixed(2)}</span>
                 </div>
+
+                {priceDiff !== 0 && (
+                  <div className="mt-3 pt-3 border-t border-border-default">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-medium text-foreground">Settle the price difference</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={settlePayment}
+                        aria-label="Settle the price difference"
+                        onClick={() => setSettlePayment(v => !v)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${settlePayment ? 'bg-accent-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settlePayment ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-foreground-muted mt-1.5">
+                      {settlePayment
+                        ? (priceDiff < 0
+                            ? `₹${Math.abs(priceDiff).toFixed(2)} is refunded to the customer once they confirm.`
+                            : `The customer is asked to pay ₹${Math.abs(priceDiff).toFixed(2)} more when they confirm (added to the amount due for COD).`)
+                        : (priceDiff < 0
+                            ? `No refund is made. The variant is swapped once the customer confirms, and they keep paying the current price, which is ₹${Math.abs(priceDiff).toFixed(2)} more than this variant's price.`
+                            : `No payment is requested. The variant is swapped once the customer confirms, and you absorb the ₹${Math.abs(priceDiff).toFixed(2)} difference.`)}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

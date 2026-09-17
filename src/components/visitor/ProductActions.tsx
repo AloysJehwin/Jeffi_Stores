@@ -520,9 +520,8 @@ export default function ProductActions({
                             ? 'bg-accent-500 text-white border-accent-500'
                             : variant.stock_status !== 'Out of Stock'
                               ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                              : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                              : 'bg-surface-secondary text-foreground-muted border-dashed border-border-default hover:border-accent-400'
                         }`}
-                        disabled={variant.stock_status === 'Out of Stock'}
                       >
                         {variant.variant_name}
                         {variant.stock_status === 'Out of Stock' && ' (Out of Stock)'}
@@ -564,14 +563,13 @@ export default function ProductActions({
                         <button
                           key={sv.id}
                           type="button"
-                          disabled={sv.stock_status === 'Out of Stock'}
                           onClick={() => setSelectedSubVariantId(sv.id)}
                           className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                             selectedSubVariantId === sv.id
                               ? 'bg-accent-500 text-white border-accent-500'
                               : sv.stock_status !== 'Out of Stock'
                                 ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                                : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                                : 'bg-surface-secondary text-foreground-muted border-dashed border-border-default hover:border-accent-400'
                           }`}
                         >
                           {sv.sub_variant_name}

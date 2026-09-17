@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false, canWrite = false }: Props) {
+  const canLabels = useHasScope('labels:read')
   const confirm = useConfirm()
   const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
@@ -385,6 +387,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     </Link>
                     )
                   )}
+{canLabels && (
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
                     title="Print Label"
@@ -394,6 +397,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
                   </button>
+                  )}
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
                   {isSuperAdmin && canWrite && (
                     <button

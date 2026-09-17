@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
@@ -29,6 +30,7 @@ type Tab = 'pos' | 'expenses' | 'products'
 const VALID_TABS: Tab[] = ['pos', 'expenses', 'products']
 
 export default function SupplierDetailClient({ id }: { id: string }) {
+  const canFinancial = useHasScope('financial:read')
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -337,9 +339,13 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                     {expenses.map((e: any) => (
                       <tr key={e.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={ap(`/admin/financial/payables/${e.id}`)} className="font-mono font-medium text-accent-500 hover:underline">
-                            {e.expense_number}
-                          </Link>
+                          {canFinancial ? (
+                            <Link href={ap(`/admin/financial/payables/${e.id}`)} className="font-mono font-medium text-accent-500 hover:underline">
+                              {e.expense_number}
+                            </Link>
+                          ) : (
+                            <span className="font-mono font-medium text-foreground">{e.expense_number}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary font-mono text-xs">{e.po_number || '—'}</td>
                         <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(e.expense_date)}</td>

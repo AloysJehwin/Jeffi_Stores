@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from './scopes'
 import { resolveSession, type SessionSignals } from './auth-sessions'
-import { extractSessionSignals } from './session-signals-request'
+import { extractSessionSignals, ambientSessionSignals } from './session-signals-request'
 import { adminCookieNameForHost } from './admin-cookie'
 
 // OPAQUE SESSIONS: the auth cookie value is the session id (a uuid), NOT a JWT.
@@ -76,7 +76,7 @@ export async function verifyToken(token: string, current?: string | null | Sessi
   // request's device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip, fp);
   // a bare string is accepted for back-compat and treated as the UA. On a clear multi-signal
   // mismatch resolveSession revokes the session (device binding).
-  const s = await resolveSession(token, current)
+  const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
   if (!s || s.principalType !== 'admin') return null
   return {
     adminId: s.principalId,
@@ -244,13 +244,13 @@ export async function generateReviewToken(payload: ReviewTokenPayload): Promise<
 }
 
 export async function verifyUserToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token, current)
+  const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid: s.sid }
 }
 
 export async function verifyBusinessToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token, current)
+  const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
   if (!s || s.principalType !== 'business') return null
   // Default unknown → 'pending' (fail-closed): the middleware gates pending/rejected, so
   // a session without a snapshotted status must NOT be treated as approved.

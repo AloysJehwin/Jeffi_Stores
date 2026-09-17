@@ -8,6 +8,7 @@ import { OnboardSchema } from '@/lib/onboard-schema'
  */
 const base = {
   planSlug: 'basic',
+  ownerName: 'Asha Rao',
   displayName: 'Acme Tools',
   slug: 'acme-tools',
   businessName: 'Acme Pvt Ltd',

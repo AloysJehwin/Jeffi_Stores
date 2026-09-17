@@ -136,16 +136,17 @@ export async function resolveBuyNowItem(input: {
     base_price: string | number | null
     price_ex_gst: string | number | null
     gst_percentage: string | number | null
+    stock_status: string | null
   }>(
-    `SELECT id, is_active, base_price, price_ex_gst, gst_percentage FROM products WHERE id = $1`,
+    `SELECT id, is_active, base_price, price_ex_gst, gst_percentage, stock_status FROM products WHERE id = $1`,
     [input.productId]
   )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
 
-  let variant: { id: string; price: string | number | null; price_ex_gst: string | number | null } | null = null
+  let variant: { id: string; price: string | number | null; price_ex_gst: string | number | null; stock_status: string | null } | null = null
   if (input.variantId) {
     variant = await queryOne(
-      `SELECT id, price, price_ex_gst
+      `SELECT id, price, price_ex_gst, stock_status
          FROM product_variants
         WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
       [input.variantId, input.productId]
@@ -153,16 +154,20 @@ export async function resolveBuyNowItem(input: {
     if (!variant) return { ok: false, error: 'Variant not found' }
   }
 
-  let subVariant: { id: string; price: string | number | null; price_ex_gst: string | number | null } | null = null
+  let subVariant: { id: string; price: string | number | null; price_ex_gst: string | number | null; stock_status: string | null } | null = null
   if (input.subVariantId) {
     subVariant = await queryOne(
-      `SELECT id, price, price_ex_gst FROM product_sub_variants
+      `SELECT id, price, price_ex_gst, stock_status FROM product_sub_variants
         WHERE id = $1 AND is_active = TRUE
           AND ($2::uuid IS NULL OR variant_id = $2::uuid)`,
       [input.subVariantId, input.variantId || null]
     )
     if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
   }
+
+  // Same rule the product page applies: the most specific selection decides purchasability.
+  const stockStatus = (subVariant ?? variant ?? product).stock_status
+  if (stockStatus === 'Out of Stock') return { ok: false, error: 'This item is currently out of stock' }
 
   // Resolve the unit price honouring the GST flag:
   //  GST ON  → prefer price_ex_gst converted UP to incl-GST (mirrors the product page), else raw incl price.

@@ -122,19 +122,21 @@ export default async function AdminDashboard() {
     getDashboardAnalytics('30d'),
   ])
 
+  // Session scopes are already narrowed to the tenant's plan, so an alert for a module the plan
+  // does not include would only link to a page this admin cannot open.
+  const canInventory = hasScope(role, scopes, 'inventory:read')
+  const canReturns = hasScope(role, scopes, 'returns:read')
   const hasAlerts =
     metrics.funnel.pending > 0 ||
-    analytics.inventory.lowStock > 0 ||
-    analytics.inventory.outOfStock > 0 ||
-    analytics.returns.total > 0 ||
-    analytics.returns.rtoInTransit > 0
+    (canInventory && (analytics.inventory.lowStock > 0 || analytics.inventory.outOfStock > 0)) ||
+    (canReturns && (analytics.returns.total > 0 || analytics.returns.rtoInTransit > 0))
 
   // Only show quick actions the current admin can actually use (super_admin sees all).
   const visibleQuick = QUICK_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
   const visibleMore = MORE_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
 
   // My pending tasks — only if the admin can access the tasks/CRM area.
-  const canSeeTasks = hasScope(role, scopes, 'customers:read')
+  const canSeeTasks = hasScope(role, scopes, 'tasks:read')
   const myTasks = canSeeTasks ? await getMyPendingTasks(adminId) : []
 
   // B/C/D — server-static ops block, passed into the client island as children
@@ -157,10 +159,10 @@ export default async function AdminDashboard() {
         {hasAlerts ? (
           <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
             <AlertChip label="pending orders" count={metrics.funnel.pending} tone="amber" href={ap('/admin/orders?status=pending', host)} />
-            <AlertChip label="low stock" count={analytics.inventory.lowStock} tone="amber" href={ap('/admin/inventory', host)} />
-            <AlertChip label="out of stock" count={analytics.inventory.outOfStock} tone="red" href={ap('/admin/inventory', host)} />
-            <AlertChip label="open returns" count={analytics.returns.total} tone="red" href={ap('/admin/returns', host)} />
-            <AlertChip label="RTO in transit" count={analytics.returns.rtoInTransit} tone="amber" href={ap('/admin/returns', host)} />
+            {canInventory && <AlertChip label="low stock" count={analytics.inventory.lowStock} tone="amber" href={ap('/admin/inventory', host)} />}
+            {canInventory && <AlertChip label="out of stock" count={analytics.inventory.outOfStock} tone="red" href={ap('/admin/inventory', host)} />}
+            {canReturns && <AlertChip label="open returns" count={analytics.returns.total} tone="red" href={ap('/admin/returns', host)} />}
+            {canReturns && <AlertChip label="RTO in transit" count={analytics.returns.rtoInTransit} tone="amber" href={ap('/admin/returns', host)} />}
           </div>
         ) : (
           <div className="flex items-center gap-2.5 py-1 text-foreground-muted">

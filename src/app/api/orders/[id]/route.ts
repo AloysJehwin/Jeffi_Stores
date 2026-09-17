@@ -3,6 +3,7 @@ import { productLabel } from '@/lib/product-label'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { addressChangeBlockReason, hasPendingAddressChange } from '@/lib/address-change'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
@@ -164,6 +165,20 @@ export async function GET(
       [orderId]
     )
 
+    // A tenant database the schema fan-out has not reached yet must not break the order page,
+    // so a failed lookup just hides the address-change feature.
+    let addressChange: any = null
+    let addressChangeAvailable = true
+    try {
+      addressChange = await queryOne<any>(
+        `SELECT id, status, new_address_snapshot, admin_notes, created_at, reviewed_at
+           FROM address_change_requests WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [orderId]
+      )
+    } catch {
+      addressChangeAvailable = false
+    }
+
     const orderDetails = {
       id: order.id,
       orderNumber: order.order_number,
@@ -228,6 +243,15 @@ export async function GET(
         priceDiff: parseFloat(pendingVcr.price_diff),
         settlementType: pendingVcr.settlement_type,
         status: pendingVcr.status,
+      } : null,
+      canChangeAddress: addressChangeAvailable && addressChangeBlockReason(order) === null,
+      addressChange: addressChange ? {
+        id: addressChange.id,
+        status: addressChange.status,
+        newAddress: addressChange.new_address_snapshot,
+        adminNotes: addressChange.admin_notes || null,
+        createdAt: addressChange.created_at,
+        reviewedAt: addressChange.reviewed_at || null,
       } : null,
     }
 
@@ -327,6 +351,13 @@ export async function PATCH(
 
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
+
+    if (!wantsOverride && statusChanged && status === 'processing' && await hasPendingAddressChange(orderId)) {
+      return NextResponse.json(
+        { error: 'The customer has a pending delivery address change request on this order. Approve or reject it before moving the order to processing.' },
+        { status: 409 }
+      )
+    }
 
     // Basic-plan tenants have no inventory module (flag locked off). When off, skip
     // ALL stock validation/deduction/restore so a conversion is never blocked by
