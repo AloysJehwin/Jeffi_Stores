@@ -7,6 +7,7 @@ import { extractSessionSignals } from './lib/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
 import { runWithTenantContext } from './lib/tenant-context'
 import { adminCookieNameForHost } from './lib/admin-cookie'
+import { bindingGate } from './lib/session-binding-gate'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -107,6 +108,9 @@ export async function middleware(request: NextRequest) {
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
   const hostApp = appFromHost(hostname)
+
+  const rebind = bindingGate(request, hostname, hostApp)
+  if (rebind) return addSecurityHeaders(rebind)
   const isAdminSubdomain = hostApp === 'admin'
   const isTenantAdminSubdomain = isAdminSubdomain && /^admin-[^.]+\./.test(hostname)
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')

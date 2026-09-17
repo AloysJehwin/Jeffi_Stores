@@ -10,6 +10,12 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
+// Moving to processing is blocked while an address change is pending; these tests are about
+// inventory, so there is none.
+vi.mock('@/lib/address-change', () => ({
+  hasPendingAddressChange: vi.fn().mockResolvedValue(false),
+  addressChangeBlockReason: vi.fn().mockReturnValue('not_confirmed'),
+}))
 vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
@@ -71,7 +77,7 @@ function makeDeleteRequest() {
 }
 
 const AUTH_USER = { userId: 'user-456', email: 'test@example.com', isBusiness: false }
-const ADMIN_USER = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
+const ADMIN_USER = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const MOCK_ORDER = {

@@ -12,6 +12,9 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\/auth\/verify-otp/,      config: { windowSecs: 60,  max: 10  } },
   { pattern: /^\/api\/auth\/login/,           config: { windowSecs: 60,  max: 10  } },
   { pattern: /^\/api\/auth\/signup/,          config: { windowSecs: 60,  max: 5   } },
+  // Session re-binding runs for every signed-in browser, many of which share one carrier IP.
+  // It does nothing without a valid key signature, so the login-grade limit below is not needed.
+  { pattern: /^\/api\/auth\/rt$/,             config: { windowSecs: 10,  max: 60  } },
   { pattern: /^\/api\/auth\//,                config: { windowSecs: 60,  max: 20  } },
   { pattern: /^\/api\/search/,               config: { windowSecs: 10,  max: 20  } },
   { pattern: /^\/api\/products/,             config: { windowSecs: 10,  max: 30  } },

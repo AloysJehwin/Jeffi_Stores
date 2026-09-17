@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 export async function PATCH(
   request: NextRequest,
@@ -11,6 +12,9 @@ export async function PATCH(
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const body = await request.json()

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import OrderDetailModal from '@/components/admin/OrderDetailModal'
@@ -76,6 +77,7 @@ function CustomerPopover({ order }: { order: any }) {
 }
 
 export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: { orders: any[], backUrl?: string }) {
+  const canPackingSlips = useHasScope('packing_slips:read')
   const [selected, setSelected] = useState<any>(null)
 
   if (!orders.length) {
@@ -175,6 +177,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
+              {canPackingSlips && (
               <a
                 href={`/api/admin/packing-slips/${order.id}`}
                 target="_blank"
@@ -186,6 +189,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </a>
+              )}
               {order.awb_number && (
                 <a
                   href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}

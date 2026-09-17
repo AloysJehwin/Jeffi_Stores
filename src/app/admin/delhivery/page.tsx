@@ -3,24 +3,24 @@ import { getSiteControls } from '@/lib/site-controls'
 import { ap } from '@/lib/admin-path'
 import { resolveTenantId } from '@/lib/tenant-context'
 import { getTenant } from '@/lib/tenant-registry'
-import DelhiveryPageClient from './DelhiveryPageClient'
+import DelhiveryPageClient, { type DeliveryMode } from './DelhiveryPageClient'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// The flagship store runs with no tenant context and ships on the platform's own Delhivery account,
-// so it is always own_delhivery. A provisioned tenant's flag comes from the control-plane row.
-async function resolveOwnDelhivery(): Promise<boolean> {
+// The flagship store runs with no tenant context and ships on the platform's own Delhivery key.
+// A provisioned tenant's mode comes from the control-plane row.
+async function resolveDeliveryMode(): Promise<DeliveryMode> {
   const tenantId = await resolveTenantId()
-  if (!tenantId) return true
+  if (!tenantId) return 'flagship'
   const tenant = await getTenant(tenantId).catch(() => null)
-  return tenant?.own_delhivery ?? false
+  return tenant?.own_delhivery ? 'own' : 'platform'
 }
 
 export default async function DelhiveryPage() {
-  const [c, ownDelhivery] = await Promise.all([
+  const [c, deliveryMode] = await Promise.all([
     getSiteControls(),
-    resolveOwnDelhivery(),
+    resolveDeliveryMode(),
   ])
 
   return (
@@ -36,7 +36,7 @@ export default async function DelhiveryPage() {
       </div>
 
       <DelhiveryPageClient
-        ownDelhivery={ownDelhivery}
+        deliveryMode={deliveryMode}
         defaultWarehouse={{
           pickupLocation: c.values.pickupLocation,
           sellerName: c.values.sellerName,

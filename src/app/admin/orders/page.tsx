@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { hasScope } from '@/lib/scopes'
+import { headers } from 'next/headers'
 import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
@@ -76,6 +78,8 @@ async function OrdersStats() {
 }
 
 async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+  const h = await headers()
+  const canPackingSlips = hasScope(h.get('x-user-role') || '', JSON.parse(h.get('x-user-scopes') || '[]'), 'packing_slips:read')
   const host = await getHost()
   const page = Math.max(1, parseInt(sp(resolvedSearchParams, 'page') || '1', 10))
   const sort = sp(resolvedSearchParams, 'sort')
@@ -190,6 +194,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                 )}
               </Link>
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
+                {canPackingSlips && (
                 <a
                   href={`/api/admin/packing-slips/${order.id}`}
                   target="_blank"
@@ -201,6 +206,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                   </svg>
                   Packing Slip
                 </a>
+                )}
                 {order.awb_number && (
                   <a
                     href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}

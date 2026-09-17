@@ -11,6 +11,7 @@ import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewModal from '@/components/shared/ReviewModal'
+import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
@@ -70,6 +71,8 @@ interface OrderDetails {
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
+  canChangeAddress?: boolean
+  addressChange?: AddressChangeInfo | null
   shippingAddress: {
     full_name: string
     address_line1: string
@@ -1391,6 +1394,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </p>
                   <p className="mt-2 text-foreground-secondary">Phone: {order.shippingAddress.phone}</p>
                 </div>
+                <OrderAddressChange
+                  orderId={order.id}
+                  canChange={!!order.canChangeAddress}
+                  request={order.addressChange ?? null}
+                  currentAddress={order.shippingAddress}
+                  onChanged={fetchOrder}
+                />
               </div>
             )}
 

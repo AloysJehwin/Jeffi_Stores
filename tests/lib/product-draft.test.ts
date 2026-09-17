@@ -1085,7 +1085,7 @@ describe('publishProductDraft', () => {
       await publishProductDraft('prod-1')
 
       const sqls = calls().map(c => String(c[0]))
-      expect(sqls.some(s => s.includes('CASE WHEN product_variants.is_active THEN product_variants.inventory_quantity ELSE 0 END'))).toBe(true)
+      expect(sqls.some(s => s.includes('CASE WHEN product_variants.is_active OR NOT EXCLUDED.is_active THEN product_variants.inventory_quantity ELSE 0 END'))).toBe(true)
       expect(sqls.some(s => s.includes('UPDATE product_variants SET inventory_quantity = 0') && s.includes('is_active = false'))).toBe(true)
       expect(sqls.some(s => s.includes('UPDATE product_sub_variants sv SET inventory_quantity = 0'))).toBe(true)
     })
@@ -1108,7 +1108,7 @@ describe('publishProductDraft', () => {
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO product_sub_variants'))).toBe(false)
       const revive = calls().find(([sql]) => typeof sql === 'string' && sql.includes('UPDATE product_sub_variants SET') && sql.includes('sub_variant_name = $4'))
       expect(revive?.[1][0]).toBe('sv-old')
-      expect(revive?.[0]).toContain('inventory_quantity = CASE WHEN is_active THEN inventory_quantity ELSE 0 END')
+      expect(revive?.[0]).toContain('inventory_quantity = CASE WHEN is_active OR NOT $10::boolean THEN inventory_quantity ELSE 0 END')
     })
 
     it('rejects a sub-variant SKU that belongs to another variant', async () => {
