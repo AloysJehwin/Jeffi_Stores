@@ -178,7 +178,11 @@ export async function applyVariantChange(
     if (!newV) return { applied: false, reason: 'new_variant_unavailable' }
 
     const qty = Number(item.quantity) || 1
-    const unitPrice = round2(pickUnitPrice({ inclusive: newV.price, exGst: newV.price_ex_gst }, gstEnabled))
+    // A 'none' settlement moves no money, so the line keeps the price quoted on the request
+    // (the current price when the admin waived the difference) instead of the catalogue price.
+    const unitPrice = vcr.settlement_type === 'none'
+      ? round2(Number(vcr.new_unit_price))
+      : round2(pickUnitPrice({ inclusive: newV.price, exGst: newV.price_ex_gst }, gstEnabled))
     const itemTotal = round2(unitPrice * qty)
     const gstRate = parseFloat(String(newV.gst_percentage ?? item.gst_rate ?? '0'))
 

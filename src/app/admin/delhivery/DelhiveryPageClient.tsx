@@ -46,107 +46,13 @@ function todayIST(): string {
   return ist.toISOString().slice(0, 10)
 }
 
-function DelhiveryCredentialCard() {
-  const canWrite = useCanWrite('merchant_sync')
-  const [connected, setConnected] = useState<boolean | null>(null)
-  const [open, setOpen] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-  const [token, setToken] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
-
-  const load = () => {
-    fetch('/api/admin/integrations')
-      .then(r => r.json())
-      .then(d => setConnected(!!(d.integrations || []).some((i: { provider: string }) => i.provider === 'delhivery')))
-      .catch(() => setConnected(false))
-  }
-  useEffect(() => { load() }, [])
-
-  const save = async () => {
-    setBusy(true); setToast(null)
-    try {
-      const res = await fetch('/api/admin/integrations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'delhivery', config: { token } }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to save token' }); return }
-      setToast({ ok: true, text: 'Delhivery API token saved.' }); setOpen(false); setToken(''); load()
-    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setBusy(false) }
-  }
-
-  const disconnect = async () => {
-    setBusy(true); setToast(null)
-    try {
-      const res = await fetch('/api/admin/integrations', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'delhivery' }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to disconnect' }); return }
-      setToast({ ok: true, text: 'Delhivery token removed. The platform token will be used.' }); load()
-    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setBusy(false) }
-  }
-
+function OwnDelhiveryNote() {
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
-      <button type="button" onClick={() => setExpanded(e => !e)}
-        className="w-full flex flex-wrap items-center gap-3 px-6 py-4 text-left">
-        <h2 className="text-lg font-semibold text-foreground">Delhivery API Credential</h2>
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${connected
-          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-          : 'bg-surface-secondary text-foreground-muted'}`}>
-          {connected == null ? 'Checking…' : connected ? 'Own token connected' : 'Using platform token'}
-        </span>
-        <svg className={`ml-auto w-4 h-4 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {expanded && (
-      <div className="px-6 pb-5 space-y-4">
-        <p className="text-sm text-foreground-secondary">
-          Connect your own Delhivery account to ship under your token and be billed directly by Delhivery.
-          When no token is connected, shipments use the platform&apos;s Delhivery account.
-        </p>
-        {canWrite && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setOpen(o => !o)}
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
-              {open ? 'Hide' : connected ? 'Replace token' : 'Enter token'}
-            </button>
-            {connected && (
-              <button type="button" onClick={disconnect} disabled={busy}
-                className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 text-sm font-medium transition-colors">
-                {busy ? 'Removing…' : 'Disconnect'}
-              </button>
-            )}
-          </div>
-        )}
-        {toast && (
-          <div className={`rounded-lg border px-4 py-2.5 text-sm ${toast.ok
-            ? 'border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-            : 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
-            {toast.text}
-          </div>
-        )}
-        {open && canWrite && (
-          <div className="space-y-3 rounded-xl border border-border-default bg-surface-secondary/40 p-4">
-            <div>
-              <label className="block text-xs font-medium text-foreground-muted mb-1">Delhivery API token</label>
-              <input value={token} onChange={e => setToken(e.target.value)} type="password" autoComplete="off"
-                placeholder="Paste your Delhivery API token"
-                className="w-full text-sm font-mono rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground" />
-            </div>
-            <button onClick={save} disabled={busy || !token}
-              className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors">
-              {busy ? 'Saving…' : 'Save token'}
-            </button>
-          </div>
-        )}
-      </div>
-      )}
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-6 py-4">
+      <h2 className="text-lg font-semibold text-foreground">Delhivery Account</h2>
+      <p className="text-sm text-foreground-secondary mt-1">
+        This store ships on its own Delhivery account and is billed by Delhivery directly. The store owner manages the API token from the ecom portal.
+      </p>
     </div>
   )
 }
@@ -348,7 +254,9 @@ const STATUS_STYLES: Record<PickupRequest['pickup_status'], string> = {
   failed:    'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
 }
 
-export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: { ownDelhivery: boolean; defaultWarehouse: DefaultWarehouse }) {
+export type DeliveryMode = 'flagship' | 'own' | 'platform'
+
+export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: { deliveryMode: DeliveryMode; defaultWarehouse: DefaultWarehouse }) {
   const canWrite = useCanWrite('delhivery:write')
   const [orders, setOrders] = useState<EligibleOrder[]>([])
   const [pickupHistory, setPickupHistory] = useState<PickupRequest[]>([])
@@ -556,9 +464,11 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
         </div>
       )}
 
-      {/* own_delhivery tenants ship on their own account and manage a credential; platform-token
-          tenants are billed by wallet per AWB, so they get the wallet instead. */}
-      {ownDelhivery ? <DelhiveryCredentialCard /> : <WalletCard />}
+      {/* Platform-Delhivery tenants are billed by wallet per AWB. An own-account tenant is billed by
+          Delhivery and manages its token in the ecom portal. The flagship store ships on the
+          platform key and has no tenant wallet, so it shows neither. */}
+      {deliveryMode === 'platform' && <WalletCard />}
+      {deliveryMode === 'own' && <OwnDelhiveryNote />}
 
       <WarehousesCard defaultWarehouse={defaultWarehouse} />
 
@@ -728,7 +638,6 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                 <tr className="border-b border-border-default bg-surface-secondary">
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Pickup Date</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Request ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Requested At</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
@@ -748,9 +657,6 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                       <td className="px-4 py-3 font-mono text-foreground-secondary">
                         {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary" title={req.id}>
-                        {req.id.slice(0, 8)}…
-                      </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {awbs.map(awb => (
@@ -763,7 +669,7 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                         {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
+                        <span className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
                           {status.replace('_', ' ')}
                         </span>
                       </td>
@@ -829,7 +735,7 @@ export default function DelhiveryPageClient({ ownDelhivery, defaultWarehouse }: 
                     </tr>
                     {addAwbFor === req.id && (
                       <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
-                        <td colSpan={7} className="px-4 py-3">
+                        <td colSpan={6} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
                             <AdminSelect

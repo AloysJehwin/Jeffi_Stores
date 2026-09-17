@@ -15,6 +15,9 @@ export const OnboardSchema = z.object({
   slug: z.string().min(3).max(63),
   productCategories: z.string().optional(),
   // Step 2 — Business
+  // The owner's own name. Sign-in only supplies the name on their email account, which is not
+  // necessarily what belongs on the admin access certificate.
+  ownerName: z.string().trim().min(2, 'Enter your full name').max(200),
   businessName: z.string().min(1).max(200),
   businessType: z.enum(['proprietor', 'partnership', 'pvt_ltd', 'llp', 'other']),
   pan: z.string().min(10).max(10),

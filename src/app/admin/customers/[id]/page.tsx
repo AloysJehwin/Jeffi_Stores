@@ -100,6 +100,7 @@ export default async function CustomerDetailPage({
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'customers:write')
   const hasCrm = hasScope(role, scopes, 'crm:read')
+  const canMail = hasScope(role, scopes, 'mailer:write')
 
   const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
   const initials = [customer.first_name?.[0], customer.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -460,6 +461,7 @@ export default async function CustomerDetailPage({
           </div>
 
           {/* Send Mailer */}
+          {canMail && (
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Send Mailer</h2>
             <CustomerMailerPanel
@@ -475,6 +477,7 @@ export default async function CustomerDetailPage({
               recentOrders={customer.recent_orders ?? []}
             />
           </div>
+          )}
         </div>
       </div>
     </div>

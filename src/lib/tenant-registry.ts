@@ -924,6 +924,12 @@ export async function findOrCreateOwner(email: string, name: string | null): Pro
   return res.rows[0] as Owner
 }
 
+/** Set the owner's name from what they entered at onboarding. Sign-in only fills a blank name,
+ * so this value is not overwritten by a later login. */
+export async function updateOwnerName(ownerId: string, name: string): Promise<void> {
+  await controlPlanePool().query(`UPDATE owners SET name=$1, updated_at=now() WHERE id=$2`, [name, ownerId])
+}
+
 export async function getOwnerById(id: string): Promise<Owner | null> {
   const pool = controlPlanePool()
   const res = await pool.query(`SELECT id, email, name, created_at FROM owners WHERE id=$1`, [id])

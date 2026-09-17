@@ -18,6 +18,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  // Writing to a customer by hand is the mailer module. The route lives under /orders/, which
+  // every plan has, so without this check the plan restriction could be bypassed from here.
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
 
   const raw = await request.json().catch(() => null)
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

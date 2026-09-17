@@ -10,6 +10,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
 import { bp } from '@/lib/business-path'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
@@ -64,6 +65,8 @@ interface OrderDetails {
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
+  canChangeAddress?: boolean
+  addressChange?: AddressChangeInfo | null
   shippingAddress: {
     full_name: string
     address_line1: string
@@ -634,6 +637,14 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                   <p>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postal_code}</p>
                   <p className="mt-2">Phone: {order.shippingAddress.phone}</p>
                 </div>
+                <OrderAddressChange
+                  orderId={order.id}
+                  canChange={!!order.canChangeAddress}
+                  request={order.addressChange ?? null}
+                  currentAddress={order.shippingAddress}
+                  portalHeader="business"
+                  onChanged={fetchOrder}
+                />
               </div>
             )}
 

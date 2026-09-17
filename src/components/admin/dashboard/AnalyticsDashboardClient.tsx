@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { StatCard } from './StatCard'
+import { useHasScope } from '@/contexts/AdminScopesContext'
 import { TrendChart, DonutSplit, RankedBars } from './Charts'
 import { ap } from '@/lib/admin-path'
 import type { DashboardAnalytics, AnalyticsRange } from '@/lib/queries'
@@ -198,6 +199,11 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
   username: string
   children?: ReactNode
 }) {
+  // Session scopes are already narrowed to the tenant's plan: the figures stay, but links into a
+  // module the plan lacks are dropped, and sections that belong to such a module are hidden.
+  const canFinancial = useHasScope('financial:read')
+  const canInventory = useHasScope('inventory:read')
+  const canReturns = useHasScope('returns:read')
   const [data, setData] = useState<DashboardAnalytics>(initial)
   const [range, setRange] = useState<AnalyticsRange>(initial.range)
   const [loading, setLoading] = useState(false)
@@ -251,11 +257,11 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
       <div className={`space-y-4 sm:space-y-6 transition-opacity ${loading ? 'opacity-60' : ''}`}>
         {/* E. KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Revenue" value={rs(k.revenue)} sub={`Prev: ${rs(k.revenuePrev)}`} pct={k.revenuePct} color="bg-accent-500/10 text-accent-600" href={ap('/admin/financial', host)}
+          <StatCard label="Revenue" value={rs(k.revenue)} sub={`Prev: ${rs(k.revenuePrev)}`} pct={k.revenuePct} color="bg-accent-500/10 text-accent-600" href={canFinancial ? ap('/admin/financial', host) : undefined}
             icon={<Icon cls="text-accent-600" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />} />
           <StatCard label="Orders" value={k.orders.toLocaleString('en-IN')} sub={`Prev: ${k.ordersPrev}`} pct={k.ordersPct} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" href={ap('/admin/orders', host)}
             icon={<Icon cls="text-blue-600 dark:text-blue-400" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />} />
-          <StatCard label="Avg Order Value" value={rs(k.aov)} sub={`Prev: ${rs(k.aovPrev)}`} pct={k.aovPct} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" href={ap('/admin/financial', host)}
+          <StatCard label="Avg Order Value" value={rs(k.aov)} sub={`Prev: ${rs(k.aovPrev)}`} pct={k.aovPct} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" href={canFinancial ? ap('/admin/financial', host) : undefined}
             icon={<Icon cls="text-amber-600 dark:text-amber-400" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />} />
           <StatCard label="Customers" value={k.customers.toLocaleString('en-IN')} sub={`Prev: ${k.customersPrev}`} pct={k.customersPct} color="bg-violet-500/10 text-violet-600 dark:text-violet-400" href={ap('/admin/customers', host)}
             icon={<Icon cls="text-violet-600 dark:text-violet-400" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />} />
@@ -280,7 +286,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
             </div>
           </SectionCard>
           <SectionCard>
-            <SectionHeader title="Payment Split" actionLabel="Ledger" href={ap('/admin/financial', host)} />
+            <SectionHeader title="Payment Split" actionLabel="Ledger" href={canFinancial ? ap('/admin/financial', host) : undefined} />
             <DonutSplit
               size={130}
               centerValue={rs(totalPay)}
@@ -297,7 +303,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
             ]} />
             {data.payment.codOutstanding > 0 && (
               <div className="mt-3 pt-3 border-t border-border-default">
-                <MiniStat label={`COD outstanding (${data.payment.codOutstandingCount})`} value={rs(data.payment.codOutstanding)} tone="text-orange-600 dark:text-orange-400" href={ap('/admin/financial', host)} />
+                <MiniStat label={`COD outstanding (${data.payment.codOutstandingCount})`} value={rs(data.payment.codOutstanding)} tone="text-orange-600 dark:text-orange-400" href={canFinancial ? ap('/admin/financial', host) : undefined} />
               </div>
             )}
           </SectionCard>
@@ -369,15 +375,17 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
 
         {/* J. Inventory / Customer split / Returns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {canInventory && (
           <SectionCard>
             <SectionHeader title="Stock Status" actionLabel="Inventory" href={ap('/admin/inventory', host)} />
             <div className="space-y-0.5">
               <MiniStat label="In stock" value={String(data.inventory.inStock)} tone="text-green-600 dark:text-green-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Low stock" value={String(data.inventory.lowStock)} tone="text-yellow-600 dark:text-yellow-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Out of stock" value={String(data.inventory.outOfStock)} tone="text-red-500 dark:text-red-400" href={ap('/admin/inventory', host)} />
-              <MiniStat label="Inventory value" value={rs(data.inventory.stockValue)} href={ap('/admin/financial', host)} />
+              <MiniStat label="Inventory value" value={rs(data.inventory.stockValue)} href={canFinancial ? ap('/admin/financial', host) : undefined} />
             </div>
           </SectionCard>
+          )}
           <SectionCard href={ap('/admin/customers', host)}>
             <SectionHeader title="Customer Split" />
             <DonutSplit
@@ -390,6 +398,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
               ]}
             />
           </SectionCard>
+          {canReturns && (
           <SectionCard>
             <SectionHeader title="Returns & RTO" actionLabel="Returns" href={ap('/admin/returns', host)} />
             <div className="space-y-0.5">
@@ -398,6 +407,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
               <MiniStat label="RTO delivered back" value={String(data.returns.rtoDelivered)} tone="text-red-500 dark:text-red-400" href={ap('/admin/returns', host)} />
             </div>
           </SectionCard>
+          )}
         </div>
       </div>
     </div>
