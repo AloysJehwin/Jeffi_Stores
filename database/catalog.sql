@@ -18,7 +18,8 @@ CREATE TABLE public.brands (
     return_allowed boolean DEFAULT true NOT NULL,
     return_window_days integer DEFAULT 7 NOT NULL,
     replacement_allowed boolean DEFAULT true NOT NULL,
-    replacement_window_days integer DEFAULT 7 NOT NULL
+    replacement_window_days integer DEFAULT 7 NOT NULL,
+    is_draft boolean DEFAULT false NOT NULL
 );
 
 
@@ -58,7 +59,8 @@ CREATE TABLE public.categories (
     replacement_allowed boolean DEFAULT true,
     replacement_window_days integer DEFAULT 7,
     hero_image_mobile text,
-    hero_image_desktop text
+    hero_image_desktop text,
+    is_draft boolean DEFAULT false NOT NULL
 );
 
 

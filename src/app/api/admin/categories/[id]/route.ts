@@ -12,6 +12,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!hasScope(admin.role, admin.scopes, 'categories:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await req.json()
+
+  // Publish a create-draft: flip is_draft = false (+ is_active) without requiring the full body.
+  if (body.is_draft === false && body.name === undefined) {
+    await query(
+      `UPDATE categories SET is_draft = false, is_active = COALESCE($2::boolean, is_active) WHERE id = $1`,
+      [id, typeof body.is_active === 'boolean' ? body.is_active : null]
+    )
+    revalidatePath('/admin/categories')
+    const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
+    return NextResponse.json(updated)
+  }
+
   const {
     name, description, parent_id, display_order, sku_prefix,
     is_active, google_product_category, icon_name,

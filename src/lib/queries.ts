@@ -320,7 +320,7 @@ export async function getProduct(id: string) {
 }
 
 export async function getAllCategories() {
-  return queryMany('SELECT * FROM categories ORDER BY display_order ASC')
+  return queryMany('SELECT * FROM categories WHERE is_draft = false ORDER BY display_order ASC')
 }
 
 export async function getAllBrands() {
@@ -849,6 +849,9 @@ export async function getFilteredCategories(filters: {
   const conditions: string[] = []
   const params: any[] = []
   let i = 1
+
+  // Never-published drafts live only in the Drafts section, never the live list.
+  conditions.push(`is_draft = false`)
 
   if (filters.is_active === 'true' || filters.is_active === 'false') {
     conditions.push(`is_active = $${i++}`)
