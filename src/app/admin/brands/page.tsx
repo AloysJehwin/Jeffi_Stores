@@ -23,6 +23,9 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
   const params: any[] = []
   let i = 1
 
+  // Never-published drafts live only in the Drafts section, never the live list.
+  conditions.push(`is_draft = false`)
+
   if (filters.is_active === 'true' || filters.is_active === 'false') {
     conditions.push(`is_active = $${i++}`)
     params.push(filters.is_active === 'true')
@@ -61,8 +64,9 @@ async function AddBrandButton() {
 
 async function BrandsStats() {
   const host = await getHost()
-  const [allStats, pendingDrafts] = await Promise.all([
+  const [allStats, pendingDrafts, createDrafts] = await Promise.all([
     getFilteredBrands({}),
+    // Edit-drafts: unpublished CHANGES staged against a live brand (brand_drafts).
     queryMany<{ brand_id: string; name: string; updated_at: string }>(
       `SELECT bd.brand_id, b.name, bd.updated_at
        FROM brand_drafts bd
@@ -70,12 +74,16 @@ async function BrandsStats() {
        ORDER BY bd.updated_at DESC
        LIMIT 20`
     ),
+    // Create-drafts: brand-new brands never published to the live list (is_draft = true).
+    queryMany<{ id: string; name: string; created_at: string }>(
+      `SELECT id, name, created_at FROM brands WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+    ),
   ])
 
   const totalBrands = allStats.total
   const activeBrands = allStats.brands?.filter((b: any) => b.is_active).length || 0
   const inactiveBrands = totalBrands - activeBrands
-  const pendingDraftsCount = pendingDrafts.length
+  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -95,15 +103,34 @@ async function BrandsStats() {
       </div>
 
       {pendingDraftsCount > 0 && (
-        <div className="mb-6">
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                Pending Drafts ({pendingDraftsCount})
-              </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
-            </div>
+        <details className="mb-6 group">
+          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              Pending Drafts ({pendingDraftsCount})
+            </span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+          </summary>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {/* Create-drafts: brand-new brands not yet on the live list. Publish activates them. */}
+              {createDrafts.map((d) => (
+                <DraftRowActions
+                  key={`new-${d.id}`}
+                  entityId={d.id}
+                  name={d.name}
+                  subtitle="New brand — not yet published"
+                  updatedAt={d.created_at}
+                  editHref={ap(`/admin/brands/edit/${d.id}`, host)}
+                  publishPath={`/api/admin/brands/${d.id}`}
+                  publishMethod="PATCH"
+                  publishBody={{ is_draft: false, is_active: true }}
+                  publishConfirm={`Publish "${d.name}" to the live brand list?`}
+                  discardPath={`/api/brands/${d.id}`}
+                  discardConfirm={`Delete the draft brand "${d.name}"? This cannot be undone.`}
+                  entityLabel="brand"
+                />
+              ))}
               {pendingDrafts.map((d) => (
                 <DraftRowActions
                   key={d.brand_id}
@@ -118,7 +145,7 @@ async function BrandsStats() {
               ))}
             </div>
           </div>
-        </div>
+        </details>
       )}
     </div>
   )
