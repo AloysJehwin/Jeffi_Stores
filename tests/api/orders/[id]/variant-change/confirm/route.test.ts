@@ -177,7 +177,7 @@ describe('POST variant-change confirm', () => {
 
     it('creates razorpay order + logs activity', async () => {
       const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(rzp as any)
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
       vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_VCR, settlement_type: 'collect', price_diff: 40 } as any)
       const res = await POST(makeReq(), PARAMS)
@@ -195,7 +195,7 @@ describe('POST variant-change confirm', () => {
 
     it('skips activity log when no user_id and swallows log rejection', async () => {
       const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(rzp as any)
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
       vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_VCR, settlement_type: 'collect', price_diff: 40, user_id: null } as any)
       const res = await POST(makeReq(), PARAMS)

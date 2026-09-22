@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
@@ -17,6 +17,7 @@ interface ReturnRequest {
   return_tracking_number?: string | null
   replacement_order_id?: string | null
   rvp_awb_number?: string | null
+  rvp_delivery_charge?: number | string | null
   valuation_status?: string | null
   valuation_condition?: string | null
   valuation_notes?: string | null
@@ -60,14 +61,63 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
   // resubmit with the chosen grains.
   const [variantPick, setVariantPick] = useState<any[] | null>(null)
   const [pickSelections, setPickSelections] = useState<Record<string, string>>({})
+  // Return destination: which warehouse the RVP is directed to.
+  const [warehouses, setWarehouses] = useState<{ value: string; label: string }[]>([])
+  const [pickupLocation, setPickupLocation] = useState('')
+  // RVP delivery charge: reverse legs have no customer quote, so the admin enters it here; saving
+  // debits the tenant wallet keyed to the RVP AWB.
+  const [rvpCharge, setRvpCharge] = useState(
+    returnRequest.rvp_delivery_charge != null ? String(returnRequest.rvp_delivery_charge) : ''
+  )
+  const [rvpChargeSaving, setRvpChargeSaving] = useState(false)
+  const [rvpChargeMsg, setRvpChargeMsg] = useState<string | null>(null)
   const router = useRouter()
+
+  async function handleSaveRvpCharge() {
+    const amount = Number(rvpCharge)
+    if (!(amount >= 0) || !Number.isFinite(amount)) { setRvpChargeMsg('Enter a valid amount.'); return }
+    setRvpChargeSaving(true)
+    setRvpChargeMsg(null)
+    try {
+      const res = await fetch(`/api/admin/returns/${returnRequest.id}/rvp-charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ charge: amount }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to save charge')
+      setRvpChargeMsg(data.walletWarning ? `Saved. ${data.walletWarning}` : 'Charge saved and applied to the wallet.')
+      router.refresh()
+    } catch (e: any) {
+      setRvpChargeMsg(e.message)
+    } finally {
+      setRvpChargeSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    fetch('/api/admin/delhivery/pickup-locations')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const opts = Array.isArray(d?.locations)
+          ? d.locations.map((w: { name: string }) => ({ value: w.name, label: w.name }))
+          : []
+        setWarehouses(opts)
+        if (opts.length > 0) setPickupLocation((prev) => prev || opts[0].value)
+      })
+      .catch(() => {})
+  }, [])
 
   async function handleCreateRVP() {
     setIsSubmitting(true)
     setError(null)
     setSuccess(null)
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}/create-rvp-shipment`, { method: 'POST' })
+      const res = await fetch(`/api/admin/orders/${orderId}/create-rvp-shipment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pickupLocation ? { pickupLocation } : {}),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
       setSuccess(`RVP shipment created. AWB: ${data.awb}`)
@@ -135,9 +185,19 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       } else if (action === 'mark_received') {
         setSuccess('Item marked as received. Customer notified.')
       } else if (action === 'process') {
-        setSuccess(data.replacementOrderNumber
-          ? `Replacement order #${data.replacementOrderNumber} created. Customer notified.`
-          : 'Refund processed. Customer notified.')
+        if (data.replacementOrderNumber) {
+          setSuccess(`Replacement order #${data.replacementOrderNumber} created. Customer notified.`)
+        } else if (typeof data.netRefund === 'number' && data.netRefund <= 0 && Number(data.charge) > 0) {
+          setSuccess(
+            `No refund issued — the ₹${Number(data.charge).toFixed(0)} return charge covers the ₹${Number(data.grossRefund).toFixed(0)} returnable amount. The item was accepted and restocked.`
+          )
+        } else if (typeof data.netRefund === 'number' && Number(data.charge) > 0) {
+          setSuccess(
+            `Refund of ₹${Number(data.netRefund).toFixed(0)} processed (₹${Number(data.grossRefund).toFixed(0)} less ₹${Number(data.charge).toFixed(0)} return charge). Customer notified.`
+          )
+        } else {
+          setSuccess('Refund processed. Customer notified.')
+        }
       }
 
       router.refresh()
@@ -328,19 +388,58 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         <div className="space-y-3 pt-2 border-t border-border-default">
           <div className="pb-1">
             {returnRequest.rvp_awb_number ? (
-              <div className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                <span className="text-foreground-secondary">RVP AWB:</span>
-                <span className="font-mono font-medium text-foreground">{returnRequest.rvp_awb_number}</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                  <span className="text-foreground-secondary">RVP AWB:</span>
+                  <span className="font-mono font-medium text-foreground">{returnRequest.rvp_awb_number}</span>
+                </div>
+                {canWrite && (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1">Reverse delivery charge (Rs)</label>
+                    <div className="flex items-stretch gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rvpCharge}
+                        onChange={e => setRvpCharge(e.target.value)}
+                        placeholder="e.g. 80"
+                        className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveRvpCharge}
+                        disabled={rvpChargeSaving}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                      >
+                        {rvpChargeSaving ? 'Saving...' : 'Save charge'}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-xs text-foreground-muted">Charged to the tenant wallet for the reverse pickup. Re-saving updates the amount.</p>
+                    {rvpChargeMsg && <p className="mt-1 text-xs text-foreground-secondary">{rvpChargeMsg}</p>}
+                  </div>
+                )}
               </div>
             ) : canWrite ? (
-              <button
-                type="button"
-                onClick={handleCreateRVP}
-                disabled={isSubmitting}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
-              >
-                {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
-              </button>
+              <div className="flex items-stretch gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateRVP}
+                  disabled={isSubmitting}
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
+                </button>
+                {warehouses.length > 0 && (
+                  <div className="w-44 shrink-0" title="Warehouse the return is picked up to">
+                    <AdminSelect
+                      value={pickupLocation}
+                      onChange={setPickupLocation}
+                      options={warehouses}
+                    />
+                  </div>
+                )}
+              </div>
             ) : null}
           </div>
           {canWrite && (

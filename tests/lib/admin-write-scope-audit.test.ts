@@ -27,6 +27,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // which is strictly stronger than any :write scope, so a read-only member can never reach them.
   'ecom/[tenantId]/account-mode', 'ecom/[tenantId]/delivery-mode',
   'ecom/[tenantId]/shipments/[orderId]/correct',
+  // Revoke a tenant admin certificate — platform-owner only (isPlatformAdmin), same as the other
+  // ecom/[tenantId] controls above.
+  'ecom/[tenantId]/certs/revoke',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',

@@ -11,6 +11,10 @@ vi.mock('@/lib/db', () => ({
 }))
 vi.mock('@/lib/delhivery', () => ({
   createRVPShipment: vi.fn(),
+  listDelhiveryPickupLocations: vi.fn().mockResolvedValue([]),
+}))
+vi.mock('@/lib/tenant-context', () => ({
+  resolveTenantId: vi.fn().mockResolvedValue(null),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────

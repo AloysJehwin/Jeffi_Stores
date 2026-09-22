@@ -915,9 +915,18 @@ export default async function EditProductPage({ params, searchParams }: { params
     )
   }
 
+  // getProduct now returns inactive variants/sub-variants too (the detail page needs them
+  // for the status toggle). The draft editor treats inactive as soft-deleted, so keep only
+  // active rows here and drop inactive sub-variants nested under an active variant.
+  const liveActiveVariants = ((product as any)?.product_variants || [])
+    .filter((v: any) => v?.is_active !== false)
+    .map((v: any) => ({
+      ...v,
+      sub_variants: Array.isArray(v?.sub_variants) ? v.sub_variants.filter((sv: any) => sv?.is_active !== false) : v?.sub_variants,
+    }))
   const mergedVariants = draftVariants
     ? withDraftSubVariants(draftVariants as any[])
-    : withDraftSubVariants((product as any)?.product_variants || [])
+    : withDraftSubVariants(liveActiveVariants)
 
   // Feed DRAFT images to the form so removals/reorders/primary changes persist across
   // reopen. The draft images carry their real `id` (kept at draft-entry + autosave),
@@ -945,7 +954,8 @@ export default async function EditProductPage({ params, searchParams }: { params
     const p: any = product
     if (p?.has_variants && Array.isArray(p?.product_variants)) {
       for (const v of p.product_variants) {
-        const subs = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+        if (v?.is_active === false) continue
+        const subs = (Array.isArray(v?.sub_variants) ? v.sub_variants : []).filter((sv: any) => sv?.is_active !== false)
         if (subs.length > 0) {
           for (const sv of subs) {
             const qty = parseFloat(sv?.inventory_quantity) || 0

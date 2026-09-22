@@ -253,6 +253,7 @@ CREATE TABLE public.products (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     category_id uuid,
     brand_id uuid,
+    data_source character varying(24) DEFAULT 'manual'::character varying NOT NULL,
     sku character varying(100) NOT NULL,
     name character varying(255) NOT NULL,
     slug character varying(255) NOT NULL,

@@ -78,14 +78,16 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
       await writeDraft(productId, buildFields(group, ids), buildVariants(group), images, [])
       await publishProductDraft(productId)
 
-      // Phase 2: sub-variants need real variant ids (only exist post-publish). Re-read
-      // the persisted variant ids, seed the sub-variants, and republish. Idempotent —
-      // the product+variant fields are unchanged, only sub_variants are added.
-      if (hasSubVariants(group)) {
+      // Phase 2: sub-variants AND variant images need real variant ids (only exist post-publish).
+      // Re-read the persisted variant ids, seed both, and republish. Idempotent — the product +
+      // variant fields are unchanged; only sub_variants and variant_images are added.
+      const hasVariantImages = group.variants.some(v => String((v.values as Record<string, unknown>)?.image_urls ?? '').trim())
+      if (hasSubVariants(group) || hasVariantImages) {
         const variantIdBySku = await variantIdsForProduct(productId)
         const subVariants = buildSubVariants(group, variantIdBySku)
-        if (subVariants.length > 0) {
-          await writeDraft(productId, buildFields(group, ids), buildVariants(group), images, subVariants)
+        const variantImages = await buildVariantImages(group, variantIdBySku, imageProgress, rowResults)
+        if (subVariants.length > 0 || variantImages.length > 0) {
+          await writeDraft(productId, buildFields(group, ids), buildVariants(group), images, subVariants, variantImages)
           await publishProductDraft(productId)
         }
       }
@@ -157,13 +159,19 @@ async function lookup(cache: Map<string, string | null>, name: string, sql: stri
 // Upsert by SKU: existing product -> update; new SKU -> skeleton row (publish then fills
 // every field). Mirrors the skeleton create in the products/draft route.
 async function findOrCreateProduct(group: ProductGroup): Promise<{ productId: string; isNew: boolean }> {
+  // Dedup by SKU regardless of data_source: an existing product with this SKU (manual OR
+  // sheet-sourced) is UPDATED, never duplicated. A found manual product is also promoted to
+  // google_sheet so the sync owns it from now on (and can delete-sweep it when removed from the sheet).
   const existing = await queryOne<{ id: string }>('SELECT id FROM products WHERE sku = $1 LIMIT 1', [group.sku])
-  if (existing) return { productId: existing.id, isNew: false }
+  if (existing) {
+    await query(`UPDATE products SET data_source = 'google_sheet' WHERE id = $1`, [existing.id])
+    return { productId: existing.id, isNew: false }
+  }
 
   const slug = group.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36)
   const created = await queryOne<{ id: string }>(
-    `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, is_active, is_featured, has_variants)
-     VALUES ($1, $2, $3, 0, 0, 18, false, false, false) RETURNING id`,
+    `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, is_active, is_featured, has_variants, data_source)
+     VALUES ($1, $2, $3, 0, 0, 18, false, false, false, 'google_sheet') RETURNING id`,
     [group.name, slug, group.sku],
   )
   if (!created) throw new Error('failed to create product row')
@@ -214,15 +222,60 @@ async function writeDraft(
   variants: Record<string, unknown>[],
   images: DraftImage[],
   subVariants: Record<string, unknown>[],
+  variantImages: Record<string, unknown>[] = [],
 ): Promise<void> {
   await query(
     `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images, updated_at)
-     VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, '[]'::jsonb, '[]'::jsonb, now())
+     VALUES ($1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, '[]'::jsonb, $6::jsonb, now())
      ON CONFLICT (product_id) DO UPDATE SET
        fields = EXCLUDED.fields, variants = EXCLUDED.variants, images = EXCLUDED.images,
-       sub_variants = EXCLUDED.sub_variants, updated_at = now()`,
-    [productId, JSON.stringify(fields), JSON.stringify(variants), JSON.stringify(images), JSON.stringify(subVariants)],
+       sub_variants = EXCLUDED.sub_variants, variant_images = EXCLUDED.variant_images, updated_at = now()`,
+    [productId, JSON.stringify(fields), JSON.stringify(variants), JSON.stringify(images), JSON.stringify(subVariants), JSON.stringify(variantImages)],
   )
+}
+
+// Fetch each variant's image_urls and stage them as draft variant_images rows, tagged with the
+// variant's real id (available only post-publish, phase 2) and a draft-vi- id so the publisher
+// treats them as fresh uploads. Mirrors fetchImages + the variant-image reconcile in product-draft.
+async function buildVariantImages(
+  group: ProductGroup,
+  variantIdBySku: Map<string, string>,
+  progress: ImageProgress,
+  rowResults: RowResult[],
+): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = []
+  for (const v of group.variants) {
+    const variantId = v.sku ? variantIdBySku.get(v.sku) : undefined
+    if (!variantId) continue
+    const raw = String((v.values as Record<string, unknown>)?.image_urls ?? '').trim()
+    if (!raw) continue
+    const urls = raw.split('|').map(u => u.trim()).filter(Boolean)
+    progress.total += urls.length
+    let order = 0
+    for (const url of urls) {
+      try {
+        const buffer = await fetchRemoteImage(url)
+        const r = await uploadGalleryImage(buffer, safeFileName(url))
+        out.push({
+          id: `draft-vi-${variantId}-${order}`,
+          variant_id: variantId,
+          image_url: r.url, thumbnail_url: r.thumbnailUrl,
+          s3_bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+          s3_key: r.s3Key, s3_thumbnail_key: r.s3ThumbnailKey,
+          file_name: r.fileName, file_size: r.fileSize, mime_type: 'image/png',
+          width: r.width, height: r.height,
+          is_primary: order === 0, display_order: order,
+        })
+        progress.fetched++
+        order++
+      } catch (err: unknown) {
+        progress.failed++
+        const msg = err instanceof Error ? err.message : 'fetch failed'
+        rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: 'warning', message: `variant ${v.sku} image ${url}: ${msg}` })
+      }
+    }
+  }
+  return out
 }
 
 function str(v: unknown): string | null {

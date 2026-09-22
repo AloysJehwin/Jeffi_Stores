@@ -22,6 +22,7 @@ import type { TenantContext } from './tenant-context'
 export const RESERVED_LABELS = new Set([
   'admin', 'business', 'forms', 'www', 'ecom', 'invoice', 'quotation',
   'purchaseorder', 'api', 'app', 'mail', 'static', 'assets', 'cdn',
+  'certificate',
 ])
 
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'

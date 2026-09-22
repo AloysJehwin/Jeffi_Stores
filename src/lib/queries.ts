@@ -246,18 +246,18 @@ export async function getProduct(id: string) {
                   'stock_status', sv.stock_status, 'inventory_quantity', sv.inventory_quantity,
                   'is_active', sv.is_active
                 )
-                ORDER BY sv.sub_variant_name
+                ORDER BY sv.is_active DESC, sv.sub_variant_name
               )
-               FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true),
+               FROM product_sub_variants sv WHERE sv.variant_id = pv.id),
               '[]'::json
             ),
             'sub_variant_min_price', (SELECT MIN(sv.price) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.price IS NOT NULL),
             'sub_variant_stock_total', COALESCE((SELECT COUNT(*) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'), 0),
             'sub_variant_inventory_total', COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
           )
-          ORDER BY pv.variant_name
+          ORDER BY pv.is_active DESC, pv.variant_name
         )
-         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+         FROM product_variants pv WHERE pv.product_id = p.id),
         '[]'::json
       ) AS product_variants,
       COALESCE(

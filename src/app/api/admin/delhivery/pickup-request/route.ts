@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
       const shipments: any[] = data?.ShipmentData ?? []
 
       let anyPickedUp = false
+      let rescheduledDate: string | null = null
       for (const entry of shipments) {
         const shipment = entry?.Shipment
         if (!shipment) continue
@@ -76,18 +77,24 @@ export async function GET(request: NextRequest) {
         }))
         const resolved = resolveStatusCode(rawType, scans)
         if (PICKED_UP_TYPES.has(resolved)) { anyPickedUp = true; break }
+        // Delhivery reschedules a pickup to a later day (unpicked, will retry). Surface the new
+        // expected date so a reload shows the pickup was moved rather than looking stuck on pending.
+        const rescheduleScan = [...scans].reverse().find((s: any) =>
+          (s.activity ?? '').toLowerCase().includes('reschedul') || (s.activity ?? '').toLowerCase().includes('pickup rescheduled'))
+        const expected = shipment.ExpectedDate ?? shipment.PickupDate ?? shipment.Status?.StatusDateTime ?? null
+        if (rescheduleScan && expected) rescheduledDate = String(expected).slice(0, 10)
       }
 
       let newStatus = req.pickup_status
       if (anyPickedUp && req.pickup_status === 'pending') {
-        await query(
-          `UPDATE delhivery_pickup_requests SET pickup_status = 'picked_up' WHERE id = $1`,
-          [pollId]
-        )
+        await query(`UPDATE delhivery_pickup_requests SET pickup_status = 'picked_up' WHERE id = $1`, [pollId])
         newStatus = 'picked_up'
+      } else if (rescheduledDate && req.pickup_status === 'pending') {
+        await query(`UPDATE delhivery_pickup_requests SET pickup_status = 'rescheduled' WHERE id = $1`, [pollId])
+        newStatus = 'rescheduled'
       }
 
-      return NextResponse.json({ pickup_status: newStatus, updated: newStatus !== req.pickup_status })
+      return NextResponse.json({ pickup_status: newStatus, rescheduledDate, updated: newStatus !== req.pickup_status })
     }
 
     const [orders, pickupHistory] = await Promise.all([
@@ -133,7 +140,7 @@ export async function PATCH(request: NextRequest) {
 
     if (add_awb_order_id) {
       const order = await queryMany(`
-        SELECT id, awb_number FROM orders
+        SELECT id, awb_number, order_number, shipping_amount FROM orders
         WHERE id = $1
           AND awb_number IS NOT NULL
           AND payment_status = 'paid'
@@ -149,6 +156,16 @@ export async function PATCH(request: NextRequest) {
       }
 
       const awb = (order[0] as any).awb_number as string
+
+      // Delivery is charged at AWB creation, not here — the added order's AWB already paid. Only
+      // gate on the wallet staying above its minimum before adding it to the pickup.
+      const addTenantId = (await resolveTenantId()) ?? undefined
+      if (addTenantId && await walletBlocksShipment(addTenantId).catch(() => false)) {
+        return NextResponse.json(
+          { error: 'Wallet balance is below the minimum. Recharge the wallet before adding to a pickup.' },
+          { status: 402 }
+        )
+      }
 
       await query(
         `UPDATE delhivery_pickup_requests
@@ -182,12 +199,6 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'delhivery:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const tenantId = (await resolveTenantId()) ?? undefined
-    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
-      return NextResponse.json(
-        { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
-        { status: 402 }
-      )
-    }
 
     const token = await resolveDelhiveryToken(tenantId)
     if (!token) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -209,7 +220,7 @@ export async function POST(request: NextRequest) {
     }
 
     const eligible = await queryMany(`
-      SELECT id, awb_number FROM orders
+      SELECT id, awb_number, order_number, shipping_amount FROM orders
       WHERE id = ANY($1::uuid[])
         AND awb_number IS NOT NULL
         AND payment_status = 'paid'
@@ -221,6 +232,15 @@ export async function POST(request: NextRequest) {
     }
 
     const awbList = eligible.map((o: any) => o.awb_number as string)
+
+    // Delivery was charged when each AWB was created (create-shipment). At pickup we only CHECK the
+    // wallet is above its minimum — no second deduction. own_delhivery passes through.
+    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
+      return NextResponse.json(
+        { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
+        { status: 402 }
+      )
+    }
 
     const res = await fetch(DELHIVERY_PICKUP_URL, {
       method: 'POST',
@@ -240,6 +260,9 @@ export async function POST(request: NextRequest) {
     const data = await res.json().catch(() => ({}))
 
     if (!res.ok || data.error) {
+      // NOTE: a rejected pickup does NOT refund. The AWB/shipment still exists and will be picked
+      // up another way, so the estimate stays held (reconciled at delivery). The estimate is only
+      // refunded when the AWB itself is cancelled (see cancel-shipment).
       return NextResponse.json({
         error: 'Delhivery rejected the pickup request',
         details: data.error || data.prepaid || JSON.stringify(data),

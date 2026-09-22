@@ -3,8 +3,9 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { round2 } from '@/lib/gst'
-import { createRVPShipment } from '@/lib/delhivery'
+import { createRVPShipment, listDelhiveryPickupLocations } from '@/lib/delhivery'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { resolveTenantId } from '@/lib/tenant-context'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,10 +14,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const TOKEN = await resolveDelhiveryToken()
+    const tenantId = (await resolveTenantId()) ?? undefined
+    const TOKEN = await resolveDelhiveryToken(tenantId)
     if (!TOKEN) {
       return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
     }
+
+    // Return destination: honour the posted warehouse only if it belongs to this account's
+    // warehouses (cross-validated against the live list); otherwise fall back to the tenant
+    // default, so a bad or foreign warehouse name can never reach Delhivery.
+    const requested = String((await request.json().catch(() => ({})))?.pickupLocation || '').trim()
+    const warehouses = await listDelhiveryPickupLocations(tenantId)
+    const returnWarehouse = (requested && warehouses.find(w => w.name === requested)) || warehouses[0] || undefined
 
     const order = await queryOne<any>(`
       SELECT
@@ -90,6 +99,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       weightKg,
       productDesc: 'Hardware / Fasteners',
       quantity,
+      tenantId,
+      returnWarehouse,
     })
 
     await query(

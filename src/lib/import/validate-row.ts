@@ -63,6 +63,11 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       const errs = [...row.errors]
       if (!sku) errs.push('variant row is missing variant.sku')
       if (!String(row.values.variant_name ?? '').trim()) errs.push('variant row is missing variant.variant_name')
+      // Reject a duplicate variant SKU within the same product — otherwise the publisher throws a
+      // hard "SKU already used" error mid-import. Caught here as a clean per-group message.
+      if (sku && parent.variants.some(v => v.sku === sku)) {
+        errs.push(`duplicate variant.sku "${sku}" under product "${parent.sku}"`)
+      }
       if (errs.length) parent.errors.push(`row ${row.rowNumber}: ${errs.join('; ')}`)
       parent.variants.push({ sku, values: row.values, rowNumber: row.rowNumber, subVariants: [] })
     }

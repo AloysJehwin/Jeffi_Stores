@@ -64,6 +64,8 @@ CREATE TABLE public.delhivery_pickup_locations (
     pin character varying(16) DEFAULT ''::character varying NOT NULL,
     phone character varying(32) DEFAULT ''::character varying NOT NULL,
     address text DEFAULT ''::text NOT NULL,
+    city character varying(128) DEFAULT ''::character varying NOT NULL,
+    state character varying(128) DEFAULT ''::character varying NOT NULL,
     active boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
@@ -234,6 +236,7 @@ CREATE TABLE public.return_requests (
     updated_at timestamp with time zone DEFAULT now(),
     rvp_awb_number character varying(64),
     rvp_created_at timestamp with time zone,
+    rvp_delivery_charge numeric(12,2),
     image_urls text[] DEFAULT '{}'::text[],
     valuation_status character varying(20) DEFAULT NULL::character varying,
     valuation_condition character varying(20) DEFAULT NULL::character varying,

@@ -6,6 +6,7 @@ import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
+import AdminIdleWatcher from '@/components/admin/AdminIdleWatcher'
 import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/site-controls'
@@ -105,7 +106,7 @@ export default async function AdminLayout({
   const usernameInitial = (displayName !== 'Admin' ? displayName : (session?.email || 'A'))[0].toUpperCase()
 
   const logoutForm = (
-    <form action={logoutAction}>
+    <form key="admin-logout" action={logoutAction}>
       <button
         type="submit"
         className="h-9 inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -123,6 +124,7 @@ export default async function AdminLayout({
   return (
     <AdminMobileProvider isMobile={isMobile}>
       <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} role={role} scopes={scopes} />
+      <AdminIdleWatcher host={host} />
       <AdminShell
         brandName={controls.identity.name}
         desktopNavLinks={desktopNavLinks}

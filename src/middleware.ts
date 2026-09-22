@@ -198,6 +198,28 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (hostname.startsWith('certificate.')) {
+    // Admin certificate portal (certificate.jeffistores.in). Non-mTLS host: people arrive here
+    // BECAUSE they don't yet hold a cert. Public: sign-in (/). Protected: the cert list/download,
+    // gated on the portal cookie (a signed JWT of the verified Google email). API under /api/certportal.
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
+    if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())
+    const PORTAL_PROTECTED = ['/certs']
+    if (PORTAL_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+      const portalTok = request.cookies.get('cert_portal')?.value
+      const { verifyPortalToken } = await import('./lib/portal-session')
+      const session = await verifyPortalToken(portalTok).catch(() => null)
+      if (!session) {
+        const res = NextResponse.redirect(new URL('/', request.url))
+        res.cookies.delete('cert_portal')
+        return addSecurityHeaders(res)
+      }
+    }
+    const slug = pathname === '/' ? '' : pathname
+    stripped.set('x-pathname', pathname)
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/certportal${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+  }
+
   if (hostname.startsWith('ecom.')) {
     // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
     // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
