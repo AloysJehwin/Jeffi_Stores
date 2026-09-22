@@ -373,6 +373,7 @@ CREATE TABLE public.products (
     specifications jsonb,
     image_url text,
     supplier_id uuid,
+    is_draft boolean DEFAULT false NOT NULL,
     CONSTRAINT products_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 

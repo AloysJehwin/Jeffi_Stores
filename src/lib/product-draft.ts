@@ -215,6 +215,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          serialized               = (($2::jsonb)->>'serialized')::boolean,
          grade                    = ($2::jsonb)->>'grade',
          specifications           = ($2::jsonb)->'specifications',
+         is_draft                 = false,
          updated_at               = NOW()
        WHERE id = $1`,
       [productId, JSON.stringify(draft.fields)]
