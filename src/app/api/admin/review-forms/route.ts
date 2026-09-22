@@ -19,6 +19,9 @@ export async function GET(request: NextRequest) {
   const params: unknown[] = []
   let i = 1
 
+  // Never-published drafts are excluded from the live listing/search.
+  conditions.push(`rf.is_draft = false`)
+
   if (search) {
     const sc = buildSearchClause(search, ['rf.title', 'rf.slug'], i)
     conditions.push(sc.clause)
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const { title, slug, description, template_type, google_review_url, coupon_id, is_active, custom_fields } = body
+  const { title, slug, description, template_type, google_review_url, coupon_id, custom_fields } = body
 
   if (!title || !slug) {
     return NextResponse.json({ error: 'title and slug are required' }, { status: 400 })
@@ -54,11 +57,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'google_review_url is required for google_review template' }, { status: 400 })
   }
 
+  // Create-as-draft: is_draft = true (+ is_active = false) so the form lives ONLY in the Drafts
+  // section, never the live list or the public /forms/[slug] page. Publish flips both.
   try {
     const result = await queryMany(
-      `INSERT INTO review_forms (title, slug, description, template_type, google_review_url, coupon_id, is_active, custom_fields)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [title, slug.toLowerCase().trim(), description || null, template_type || 'google_review', google_review_url || '', coupon_id || null, is_active ?? true, JSON.stringify(custom_fields || [])]
+      `INSERT INTO review_forms (title, slug, description, template_type, google_review_url, coupon_id, is_active, is_draft, custom_fields)
+       VALUES ($1,$2,$3,$4,$5,$6,false,true,$7) RETURNING *`,
+      [title, slug.toLowerCase().trim(), description || null, template_type || 'google_review', google_review_url || '', coupon_id || null, JSON.stringify(custom_fields || [])]
     )
     return NextResponse.json({ form: result[0] }, { status: 201 })
   } catch (err: unknown) {
