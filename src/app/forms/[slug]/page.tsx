@@ -25,7 +25,7 @@ interface ReviewForm {
 export default async function FormPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const form = await queryOne<ReviewForm>(
-    'SELECT id, title, description, template_type, google_review_url, slug, is_active, coupon_id, custom_fields FROM review_forms WHERE slug = $1',
+    'SELECT id, title, description, template_type, google_review_url, slug, is_active, coupon_id, custom_fields FROM review_forms WHERE slug = $1 AND is_draft = false',
     [slug]
   )
   if (!form) notFound()
