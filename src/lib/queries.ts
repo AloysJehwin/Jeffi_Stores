@@ -519,6 +519,10 @@ export async function getFilteredProducts(filters: {
   const params: any[] = []
   let i = 1
 
+  // Never-published create-drafts live only in the Drafts section, never the live list —
+  // even under the Inactive status filter (a create-draft is is_active=false AND is_draft=true).
+  conditions.push(`p.is_draft = false`)
+
   if (filters.category_id) {
     conditions.push(`p.category_id IN (
       WITH RECURSIVE cat_tree AS (
@@ -1738,6 +1742,7 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
         COUNT(*) FILTER (WHERE is_featured)::int AS featured,
         (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories
       FROM products
+      WHERE is_draft = false
     `),
     // True inventory stock value — reuse the canonical valuation (ex-GST, covers products +
     // variants + sub-variants) so this matches the Stock Ledger → Valuation page exactly.

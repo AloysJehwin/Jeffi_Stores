@@ -40,6 +40,11 @@ async function createProduct(formData: FormData) {
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
   const isActive = intent === 'draft' ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
+  // Create-as-draft: intent 'draft' (or an implicit save) makes a create-draft (is_draft = true,
+  // is_active = false) that lives ONLY in the Drafts section and never the live list/storefront.
+  // 'publish' clears is_draft and activates. Existing is_active=true storefront queries already
+  // exclude drafts, so no storefront query changes are needed.
+  const isDraft = intent !== 'publish'
   const isFeatured = formData.get('is_featured') === 'true'
 
   // Server-side weight & packaging validation — enforced on publish only, so a
@@ -106,16 +111,16 @@ async function createProduct(formData: FormData) {
       `INSERT INTO products (
         ${productId ? 'id, ' : ''}name, slug, sku, description, category_id, brand_id,
         base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code, mpn, gtin,
-        stock_status, weight, dimensions, is_active, is_featured,
+        stock_status, weight, dimensions, is_active, is_draft, is_featured,
         has_variants, variant_type, sub_variant_type,
         weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct, supplier_id
-      ) VALUES (${productId ? '$1, ' : ''}${(productId ? [...Array(30)].map((_, i) => `$${i + 2}`) : [...Array(30)].map((_, i) => `$${i + 1}`)).join(', ')})
+      ) VALUES (${productId ? '$1, ' : ''}${(productId ? [...Array(31)].map((_, i) => `$${i + 2}`) : [...Array(31)].map((_, i) => `$${i + 1}`)).join(', ')})
       RETURNING *`,
       [
         ...(productId ? [productId] : []),
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, mrpExGst, salePrice, gstPercentage, hsnCode, mpn, gtin,
-        stockStatus, weight, dimensions, isActive, isFeatured,
+        stockStatus, weight, dimensions, isActive, isDraft, isFeatured,
         hasVariants, variantType, subVariantType,
         weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice, discountPct, supplierId,
       ]

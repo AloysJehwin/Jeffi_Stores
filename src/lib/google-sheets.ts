@@ -233,6 +233,7 @@ async function fetchAllProducts(limit?: number) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.is_draft = false
     ORDER BY p.created_at DESC
     ${limit ? `LIMIT ${limit}` : ''}
   `)

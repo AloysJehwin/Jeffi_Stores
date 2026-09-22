@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { queryOne, query } from '@/lib/db'
+import { revalidatePath } from 'next/cache'
 import { publishProductDraft, openOrdersForProduct } from '@/lib/product-draft'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +22,30 @@ export async function POST(req: NextRequest, { params }: Params) {
       `SELECT product_id FROM product_drafts WHERE product_id = $1`,
       [id]
     )
-    if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+    if (!draft) {
+      // Create-draft (is_draft=true, no product_drafts edit-draft): publish by flipping the flags
+      // directly, mirroring brands/coupons. Open-order block still applies.
+      const createDraft = await queryOne<{ id: string }>(
+        `SELECT id FROM products WHERE id = $1 AND is_draft = true`, [id]
+      )
+      if (!createDraft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+      const blockingCd = await openOrdersForProduct(id)
+      if (blockingCd.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Cannot publish: ${blockingCd.length} open order(s) (${blockingCd.join(', ')}) are pending/confirmed. Move them past 'confirmed' or cancel them first.`,
+            openOrders: blockingCd,
+          },
+          { status: 409 }
+        )
+      }
+
+      await query(`UPDATE products SET is_draft = false, is_active = true, updated_at = NOW() WHERE id = $1`, [id])
+      revalidatePath('/admin/products')
+      return NextResponse.json({ success: true, productId: id })
+    }
 
     // Block publish while open (pending/confirmed) orders reference this product —
     // publishing could remove variants / rename SKUs and break their stock.
