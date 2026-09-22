@@ -169,11 +169,14 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       )
 
       if (intent === 'publish') {
+        // Publishing clears the draft flag and activates the coupon — a create-draft (is_draft=true)
+        // moves out of the Drafts section onto the live list. is_active is forced true on publish;
+        // the admin can deactivate afterwards from the live list.
         await query(
           `UPDATE coupons SET code=$1, description=$2, discount_type=$3, discount_value=$4,
            min_purchase_amount=$5, max_discount_amount=$6, usage_limit=$7, usage_limit_per_user=$8,
-           valid_from=$9, valid_until=$10, is_active=$11 WHERE id=$12`,
-          [code, description || null, discount_type, isNaN(discount_value) ? 0 : discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, id]
+           valid_from=$9, valid_until=$10, is_active=true, is_draft=false WHERE id=$11`,
+          [code, description || null, discount_type, isNaN(discount_value) ? 0 : discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, id]
         )
         await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
         revalidatePath('/admin/coupons')

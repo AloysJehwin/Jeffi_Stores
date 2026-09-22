@@ -736,6 +736,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                     const resp = typeof p.gateway_response === 'string' ? (() => { try { return JSON.parse(p.gateway_response) } catch { return {} } })() : (p.gateway_response || {})
                     const isVariantChange = resp?.purpose === 'variant_change'
                     const refunded = resp?.refund || resp?.variantChangeRefund
+                    const returnCharge = resp?.returnCharge
                     return (
                       <div key={p.id || idx} className="rounded-lg border border-border-default p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
@@ -778,6 +779,14 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground-secondary">Refund</span>
                             <span className="text-foreground font-mono text-xs">{refunded.id}{refunded.amount ? ` · Rs. ${(Number(refunded.amount) / 100).toFixed(2)}` : ''}</span>
+                          </div>
+                        )}
+                        {!refunded?.id && returnCharge && Number(returnCharge.netRefund) <= 0 && (
+                          <div className="flex justify-between text-sm gap-3">
+                            <span className="text-foreground-secondary">Refund</span>
+                            <span className="text-right text-foreground-muted">
+                              Waived — Rs. {Number(returnCharge.charge).toFixed(2)} return charge covers the Rs. {Number(returnCharge.grossRefund).toFixed(2)} returnable
+                            </span>
                           </div>
                         )}
                       </div>

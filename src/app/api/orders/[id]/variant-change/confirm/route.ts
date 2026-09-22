@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { queryOne, query, resolveRequestTenant } from '@/lib/db'
-import { getRazorpayInstance, getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
 import { applyVariantChange } from '@/lib/variant-change'
 import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
@@ -112,7 +112,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
       const diffPaise = Math.round(Math.abs(priceDiff) * 100)
       if (diffPaise <= 0) return NextResponse.json({ error: 'Nothing to collect.' }, { status: 400 })
-      const razorpay = getRazorpayInstance()
+      // Collect the extra on the tenant's own account (own_razorpay) or the platform account
+      // that carries their Route linked account — never a bare platform instance, which would
+      // take an own-account tenant's buyer payment into Jeffi's account.
+      const collectTenant = await resolveRequestTenant()
+      const { instance: razorpay } = await getRazorpayInstanceFor(collectTenant?.tenantId)
       const rzpOrder = await razorpay.orders.create({
         amount: diffPaise,
         currency: 'INR',

@@ -180,7 +180,7 @@ export async function createDelhiveryPickupLocation(params: {
     if (created || alreadyExists) {
       // Delhivery has no working GET-list API for this token, so we mirror every warehouse we
       // register into our own table and list from there. Upsert keeps re-registration idempotent.
-      await upsertPickupLocation({ name, pin: pincode, phone, address, tenantId: params.tenantId }).catch(() => {})
+      await upsertPickupLocation({ name, pin: pincode, phone, address, city, state, tenantId: params.tenantId }).catch(() => {})
       return { ok: true }
     }
 
@@ -195,15 +195,18 @@ async function upsertPickupLocation(params: {
   pin: string
   phone: string
   address: string
+  city?: string
+  state?: string
   tenantId?: string
 }): Promise<void> {
   const tenantId = params.tenantId ?? null
   await query(
-    `INSERT INTO delhivery_pickup_locations (tenant_id, name, pin, phone, address, active, updated_at)
-     VALUES ($1, $2, $3, $4, $5, true, NOW())
+    `INSERT INTO delhivery_pickup_locations (tenant_id, name, pin, phone, address, city, state, active, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW())
      ON CONFLICT (COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), name)
-     DO UPDATE SET pin = EXCLUDED.pin, phone = EXCLUDED.phone, address = EXCLUDED.address, active = true, updated_at = NOW()`,
-    [tenantId, params.name, params.pin, params.phone, params.address]
+     DO UPDATE SET pin = EXCLUDED.pin, phone = EXCLUDED.phone, address = EXCLUDED.address,
+                   city = EXCLUDED.city, state = EXCLUDED.state, active = true, updated_at = NOW()`,
+    [tenantId, params.name, params.pin, params.phone, params.address, params.city ?? '', params.state ?? '']
   )
 }
 
@@ -212,6 +215,8 @@ export interface DelhiveryPickupLocation {
   pin: string
   phone: string
   address: string
+  city: string
+  state: string
   active: boolean
 }
 
@@ -240,8 +245,8 @@ export async function listDelhiveryPickupLocations(tenantId?: string): Promise<D
     }
 
     const tid = tenantId ?? null
-    const result = await query<{ name: string; pin: string; phone: string; address: string; active: boolean }>(
-      `SELECT name, pin, phone, address, active FROM delhivery_pickup_locations
+    const result = await query<{ name: string; pin: string; phone: string; address: string; city: string; state: string; active: boolean }>(
+      `SELECT name, pin, phone, address, city, state, active FROM delhivery_pickup_locations
        WHERE COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE($1::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
          AND active = true
        ORDER BY (name = $2) DESC, name ASC`,
@@ -253,6 +258,8 @@ export async function listDelhiveryPickupLocations(tenantId?: string): Promise<D
       pin: String(r.pin ?? ''),
       phone: String(r.phone ?? ''),
       address: String(r.address ?? ''),
+      city: String(r.city ?? ''),
+      state: String(r.state ?? ''),
       active: r.active !== false,
     }))
 
@@ -261,7 +268,7 @@ export async function listDelhiveryPickupLocations(tenantId?: string): Promise<D
     // fall through to the default-only fallback below
   }
 
-  return defaultName ? [{ name: defaultName, pin: '', phone: '', address: '', active: true }] : []
+  return defaultName ? [{ name: defaultName, pin: '', phone: '', address: '', city: '', state: '', active: true }] : []
 }
 
 // Promote a stored pickup location to the tenant's default warehouse. Copies the row's full identity
@@ -322,6 +329,15 @@ export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: stri
   }
 
   await query('UPDATE orders SET awb_number = NULL WHERE awb_number = $1', [awbNumber])
+
+  // The AWB is cancelled, so release any wallet delivery charge held for it (forward OR reverse).
+  // own_delhivery never had a debit → no-op. Best-effort: never fail the cancel on a wallet issue.
+  if (tenantId) {
+    try {
+      const { refundEstimateForAwbs } = await import('./wallet')
+      await refundEstimateForAwbs({ tenantId, awbs: [awbNumber] })
+    } catch { /* wallet refund best-effort */ }
+  }
 }
 
 export async function createRVPShipment(params: {
@@ -338,16 +354,23 @@ export async function createRVPShipment(params: {
   productDesc: string
   quantity: number
   tenantId?: string
+  returnWarehouse?: { name: string; pin: string; phone: string; address: string; city: string; state: string }
 }): Promise<string> {
   const token = await resolveDelhiveryToken(params.tenantId)
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
 
   const bv = await getBusinessValues()
-  const ORIGIN_PIN = bv.delhiveryOriginPincode
-  const PICKUP_LOCATION = bv.pickupLocation
-  const SELLER_NAME = bv.sellerName
-  const SELLER_ADD = bv.sellerAddress
-  const SELLER_PHONE = bv.sellerPhone
+  // The return destination is the warehouse the admin picked, falling back to the tenant's
+  // default. City/state come from the warehouse row (empty on older rows — Delhivery routes on
+  // the pincode). No hardcoded location: a tenant's return goes to the tenant's own warehouse.
+  const wh = params.returnWarehouse
+  const PICKUP_LOCATION = wh?.name || bv.pickupLocation
+  const RETURN_NAME = wh?.name || bv.sellerName
+  const RETURN_PIN = wh?.pin || bv.delhiveryOriginPincode
+  const RETURN_ADD = wh?.address || bv.sellerAddress
+  const RETURN_PHONE = wh?.phone || bv.sellerPhone
+  const RETURN_CITY = wh?.city || ''
+  const RETURN_STATE = wh?.state || ''
 
   const {
     consigneeName, address, pin, city, state,
@@ -369,20 +392,20 @@ export async function createRVPShipment(params: {
       order: `RVP-${invoiceRef}`,
       payment_mode: 'Pickup',
       order_type: 'reverse',
-      return_name: SELLER_NAME,
-      return_pin: ORIGIN_PIN,
-      return_city: 'Raipur',
-      return_phone: SELLER_PHONE,
-      return_add: SELLER_ADD,
-      return_state: 'Chhattisgarh',
+      return_name: RETURN_NAME,
+      return_pin: RETURN_PIN,
+      return_city: RETURN_CITY,
+      return_phone: RETURN_PHONE,
+      return_add: RETURN_ADD,
+      return_state: RETURN_STATE,
       return_country: 'India',
       products_desc: productDesc,
       hsn_code: '7318',
       cod_amount: '0',
       order_date: orderDate,
       total_amount: totalAmount,
-      seller_add: SELLER_ADD,
-      seller_name: SELLER_NAME,
+      seller_add: RETURN_ADD,
+      seller_name: RETURN_NAME,
       seller_inv: invoiceRef,
       quantity: String(quantity),
       waybill: '',

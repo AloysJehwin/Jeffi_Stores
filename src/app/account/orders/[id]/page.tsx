@@ -211,6 +211,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }> | null;
   } | null>(null)
   const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
+  const [refundBreakdown, setRefundBreakdown] = useState<{ grossRefund: number; charge: number; netRefund: number } | null>(null)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
   const [returnReason, setReturnReason] = useState('')
@@ -260,6 +261,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           ? { ...retData.returnRequest, items: retData.returnItems || [] }
           : null)
         setMonthlyLimitReached(!!retData.monthlyLimitReached)
+        setRefundBreakdown(retData.refundBreakdown ?? null)
       }
     } catch (err: any) {
       setError(err.message)
@@ -992,6 +994,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       #{returnRequest.replacement_order_number || returnRequest.replacement_order_id.slice(0, 8)}
                     </a>{' '}
                     has been created and confirmed.
+                  </p>
+                ) : refundBreakdown && refundBreakdown.netRefund <= 0 && refundBreakdown.charge > 0 ? (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your return has been accepted. A ₹{refundBreakdown.charge.toLocaleString('en-IN')} return handling
+                    charge applied to the ₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} returnable amount, so no
+                    amount was refunded for this return.
+                  </p>
+                ) : refundBreakdown && refundBreakdown.charge > 0 ? (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN')} has been processed
+                    (₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} less a ₹{refundBreakdown.charge.toLocaleString('en-IN')} return
+                    handling charge). It may take 5–7 business days to reflect in your account.
                   </p>
                 ) : (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">

@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { checkReturnEligibility } from '@/lib/return-policy'
 import { createAdminNotification } from '@/lib/admin-notify'
+import { getBusinessValues } from '@/lib/site-controls'
 
 const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'other']
 
@@ -42,7 +43,18 @@ export async function GET(
     )
     const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)
 
-    return NextResponse.json({ returnRequest: returnRequest || null, returnItems: returnItems || [], monthlyLimitReached })
+    // Refund breakdown so the customer sees the actual amount and, when the return charge covers
+    // it, an explanation instead of a bare "refund processed".
+    let refundBreakdown: { grossRefund: number; charge: number; netRefund: number } | null = null
+    if (returnRequest?.type === 'refund' && Array.isArray(returnItems) && returnItems.length > 0) {
+      const grossRefund = returnItems.reduce((s: number, i: any) => s + (parseFloat(i.refund_amount) || 0), 0)
+      const returnStandardCharge = (await getBusinessValues().catch(() => null))?.returnStandardCharge ?? 0
+      const charge = Math.min(returnStandardCharge, grossRefund)
+      const netRefund = Math.max(0, Math.round((grossRefund - returnStandardCharge) * 100) / 100)
+      refundBreakdown = { grossRefund, charge, netRefund }
+    }
+
+    return NextResponse.json({ returnRequest: returnRequest || null, returnItems: returnItems || [], monthlyLimitReached, refundBreakdown })
   } catch (err) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }

@@ -10,7 +10,10 @@ import { query, queryOne, queryMany } from './db'
 
 export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
 
-export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session
+export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session (non-admin cap)
+export const DEFAULT_ADMIN_IDLE_MINUTES = 8 * 60    // admins with no per-account timeout set
+// Allowed per-admin idle timeouts (minutes). Shared with the team-section toggle + the PATCH guard.
+export const ADMIN_IDLE_TIMEOUT_CHOICES = [60, 120, 240, 480, 1440] as const
 const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at every 5 min
 
 // Matches a v4-style uuid. LEGACY: pre-token cookies were the uuid PK itself; resolveSession
@@ -323,6 +326,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     id: string
     principal_type: PrincipalType; principal_id: string
     revoked_at: string | null; expires_at: string; last_seen_at: string; created_at: string | null
+    idle_timeout_minutes: number | null
     role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
     tenant_id: string | null
     user_agent: string | null; accept_lang: string | null; ua_platform: string | null
@@ -332,6 +336,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     `SELECT s.id, s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at, s.created_at,
             s.role, s.scopes, s.cert_cn, s.approval_status, s.tenant_id, s.user_agent,
             s.accept_lang, s.ua_platform, s.ip_net, s.fp_hash,
+            a.idle_timeout_minutes,
             u.email, u.first_name, u.last_name
      FROM auth_sessions s
      LEFT JOIN admins a ON a.id = s.principal_id AND s.principal_type = 'admin'
@@ -343,7 +348,13 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   if (row.revoked_at) return null
   const now = Date.now()
   if (new Date(row.expires_at).getTime() <= now) return null
-  if (now - new Date(row.last_seen_at).getTime() > IDLE_TIMEOUT_MS) return null
+  // Idle window: admins use their per-account timeout (or the admin default); everyone else the
+  // 24h cap. Enforced here on every request, so a session idle past the window is refused even if
+  // the browser was closed — a returning admin lands on the login page.
+  const idleWindowMs = row.principal_type === 'admin'
+    ? (row.idle_timeout_minutes ?? DEFAULT_ADMIN_IDLE_MINUTES) * 60_000
+    : IDLE_TIMEOUT_MS
+  if (now - new Date(row.last_seen_at).getTime() > idleWindowMs) return null
 
   // Device binding: score the presented signals against the login-time snapshot. A clear
   // replay (>= 2 STABLE signals differ) revokes the whole session (fire-and-forget) and

@@ -3,6 +3,7 @@ import { issueTenantAdminCert } from './tenant-ca'
 import { sendAdminCertificateEmail } from './email'
 import { runWithTenantContext } from './tenant-context'
 import { query, queryOne } from './db'
+import { recordPortalCert } from './portal-certs'
 import { TENANT_SCOPE_KEYS } from './scopes'
 import type { TenantContext } from './tenant-context'
 
@@ -150,6 +151,22 @@ async function createOwnerAdmin(
      ON CONFLICT DO NOTHING`,
     [adminId, cert.serial, certCN, cert.expiresAt, downloadToken, cert.p12Buffer, cert.p12Password]
   )
+
+  // Central portal registry so certificate.jeffistores.in can serve it. Explicitly targets the
+  // control-plane pool (not this tenant's RDS), so it is written even inside runWithTenantContext.
+  // Non-fatal: the cert is still emailed during the transition window.
+  await recordPortalCert({
+    tenantId: opts.tenantId,
+    serial: cert.serial,
+    commonName: certCN,
+    issuedTo: opts.ownerEmail,
+    role: 'super_admin',
+    storeName,
+    p12Buffer: cert.p12Buffer,
+    p12Password: cert.p12Password,
+    expiresAt: cert.expiresAt,
+    downloadToken,
+  })
 
   // 4. Email cert to owner
   await sendAdminCertificateEmail(

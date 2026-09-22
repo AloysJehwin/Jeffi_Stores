@@ -23,11 +23,15 @@ async function createCoupon(formData: FormData) {
   const is_active = formData.get('is_active') === 'true'
   const eligible_user_ids = formData.getAll('eligible_user_ids') as string[]
 
+  // Create-as-draft: is_draft = true (and is_active = false) so the coupon lives ONLY in the
+  // Drafts section, never the live list, and nothing can redeem it. "Publish" flips is_draft =
+  // false + is_active = true to move it to the live list. A coupon that is merely deactivated
+  // (is_draft = false, is_active = false) stays in the live list — distinct from a draft.
   let couponId: string
   try {
     const result = await query<{ id: string }>(
-      `INSERT INTO coupons (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false) RETURNING id`,
+      `INSERT INTO coupons (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, is_draft)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,true) RETURNING id`,
       [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until]
     )
     couponId = result.rows[0].id
@@ -47,7 +51,7 @@ async function createCoupon(formData: FormData) {
 
   revalidatePath('/admin/coupons')
   const host = await getHost()
-  redirect(ap(`/admin/coupons/edit/${couponId}`, host))
+  redirect(ap('/admin/coupons', host))
 }
 
 export default async function AddCouponPage() {

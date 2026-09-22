@@ -3,6 +3,7 @@ import { JWT_MAX_AGE_S } from '@/lib/jwt'
 import { createSession, type SessionSignals } from '@/lib/auth-sessions'
 import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
 import { resolveRequestTenantId } from '@/lib/request-tenant'
+import { query } from '@/lib/db'
 
 export interface AdminSessionAdmin {
   id: string
@@ -39,6 +40,9 @@ export async function issueAdminSession(
     uaPlatform: signals?.uaPlatform || null,
     fpHash: signals?.fpHash || null,
   })
+  // Stamp the real admin login time. Nothing wrote admins.last_login before, so the team page
+  // showed it blank/stale; this is the single choke point every completed admin login passes.
+  await query(`UPDATE admins SET last_login = NOW() WHERE id = $1`, [admin.id]).catch(() => {})
   const response = NextResponse.json({
     success: true,
     admin: { name: displayName, email: admin.email || undefined, role: admin.role },

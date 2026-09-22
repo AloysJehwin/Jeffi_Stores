@@ -9,7 +9,7 @@ import { getBusinessValues } from '@/lib/site-controls'
 import { resolveTenantId } from '@/lib/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/delhivery'
-import { walletBlocksShipment } from '@/lib/wallet'
+import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/wallet'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -236,6 +236,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [awb, id, estimatedDeliveryDate, weightKg]
     )
 
+    // Charge the estimated delivery cost to the wallet NOW, keyed to this AWB (platform-Delhivery
+    // tenants only; own_delhivery exempt). This is the single deduction point for a forward
+    // shipment — pickup no longer deducts. Reconciled to the real invoiced amount at delivery. The
+    // walletBlocksShipment pre-check above already fast-failed a below-minimum wallet before the AWB
+    // was minted; this enforces the balance-stays->=Rs 500-after rule and records the hold. If it
+    // fails now the AWB still stands (refunded only on cancel), so surface it as a warning.
+    let walletCharge: { ok: boolean; error?: string } = { ok: true }
+    if (tenantId) {
+      walletCharge = await chargeDeliveryEstimate({
+        tenantId,
+        items: [{ awb, orderRef: order.order_number, estimateInr: Number(order.shipping_amount) || 0 }],
+      })
+    }
+
     const smsCustomer = await queryOne<{ phone: string | null; notification_channel: string | null }>(
       `SELECT u.phone, u.notification_channel FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
       [id]
@@ -249,6 +263,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       sortCode: pkg.sort_code,
       estimatedDeliveryDate,
       message: `Shipment created. AWB: ${awb}`,
+      walletWarning: walletCharge.ok ? undefined : (walletCharge.error || 'Delivery charge could not be applied to the wallet.'),
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

@@ -15,9 +15,15 @@ interface Props {
   publishPath: string
   discardPath: string
   entityLabel?: string
+  // Defaults suit an edit-draft (POST to publish staged changes). A create-draft overrides these:
+  // publish is a PATCH that activates the row, discard DELETEs the row, and the copy differs.
+  publishMethod?: 'POST' | 'PATCH'
+  publishBody?: Record<string, unknown>
+  publishConfirm?: string
+  discardConfirm?: string
 }
 
-export default function DraftRowActions({ name, subtitle, updatedAt, editHref, publishPath, discardPath, entityLabel = 'item' }: Props) {
+export default function DraftRowActions({ name, subtitle, updatedAt, editHref, publishPath, discardPath, entityLabel = 'item', publishMethod = 'POST', publishBody, publishConfirm, discardConfirm }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [publishing, setPublishing] = useState(false)
@@ -25,12 +31,16 @@ export default function DraftRowActions({ name, subtitle, updatedAt, editHref, p
   const [error, setError] = useState<string | null>(null)
 
   async function handlePublish() {
-    const ok = await confirm({ message: `Apply all staged changes for "${name}" to the live ${entityLabel}?`, confirmLabel: 'Publish' })
+    const ok = await confirm({ message: publishConfirm || `Apply all staged changes for "${name}" to the live ${entityLabel}?`, confirmLabel: 'Publish' })
     if (!ok) return
     setPublishing(true)
     setError(null)
     try {
-      const res = await fetch(publishPath, { method: 'POST', credentials: 'include' })
+      const res = await fetch(publishPath, {
+        method: publishMethod,
+        credentials: 'include',
+        ...(publishBody ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(publishBody) } : {}),
+      })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Publish failed'); return }
       router.refresh()
@@ -39,7 +49,7 @@ export default function DraftRowActions({ name, subtitle, updatedAt, editHref, p
   }
 
   async function handleDiscard() {
-    const ok = await confirm({ message: `Discard all unsaved changes for "${name}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Discard' })
+    const ok = await confirm({ message: discardConfirm || `Discard all unsaved changes for "${name}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Discard' })
     if (!ok) return
     setDiscarding(true)
     setError(null)
