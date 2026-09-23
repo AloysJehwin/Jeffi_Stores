@@ -7,7 +7,6 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/business-path'
-import BusinessPublicHeader from '@/components/business/PublicHeader'
 
 export default function BusinessSignUpWrapper() {
   return (
@@ -272,14 +271,23 @@ function BusinessSignUpPage() {
 
   return (
     <>
-    <BusinessPublicHeader />
-    <div className="min-h-screen grid lg:grid-cols-2 pt-16 lg:pt-20">
+    <div className="relative min-h-screen grid lg:grid-cols-2">
+      {/* Top-right switch action (the public header is intentionally hidden on the auth pages) */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-3">
+        <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">Already have an account?</span>
+        <Link
+          href={bp('/business/signin')}
+          className="inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
+        >
+          Sign in
+        </Link>
+      </div>
       {/* Left — form */}
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <Link href={bp('/business/signin')} className="text-sm text-foreground-muted hover:text-foreground mb-6 flex items-center gap-1">
-              ← Back to sign in
+            <Link href="/" className="text-sm text-foreground-muted hover:text-foreground mb-6 flex items-center gap-1">
+              ← Back to store
             </Link>
             <h1 className="text-3xl font-bold text-foreground">
               {step === 'details' ? 'Business Details' : 'Business Sign Up'}
