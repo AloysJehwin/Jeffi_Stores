@@ -3,6 +3,8 @@
 // in the edge runtime and cause a module evaluation crash if imported at the
 // top level of instrumentation.ts (which Turbopack evaluates in both runtimes).
 
+import { CRON_JOBS } from '@/lib/cron-jobs'
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
@@ -11,11 +13,6 @@ export async function register() {
 
   if (!CRON_SECRET || !APP_URL) return
 
-  const TEN_MIN    = 10 * 60 * 1000
-  const ONE_MIN    =      60 * 1000
-  const THIRTY_MIN = 30 * 60 * 1000
-  const ONE_HOUR   = 60 * 60 * 1000
-  const ONE_DAY    = 24 * 60 * 60 * 1000
 
   const recordRun = async (jobId: string, ok: boolean, errorMsg?: string, detail?: unknown) => {
     try {
@@ -61,69 +58,12 @@ export async function register() {
     }
   }
 
-  setTimeout(() => {
-    callCron('delhivery_sync', '/api/admin/delhivery/sync-statuses', 'POST', TEN_MIN - 30_000)
-    setInterval(() => callCron('delhivery_sync', '/api/admin/delhivery/sync-statuses', 'POST', TEN_MIN - 30_000), TEN_MIN)
-  }, 30_000)
-
-  setTimeout(() => {
-    callCron('cancel_stale_orders', '/api/cron/cancel-stale-orders', 'GET', ONE_MIN - 5_000)
-    setInterval(() => callCron('cancel_stale_orders', '/api/cron/cancel-stale-orders', 'GET', ONE_MIN - 5_000), ONE_MIN)
-  }, 45_000)
-
-  setTimeout(() => {
-    callCron('sweep_auto_tasks', '/api/cron/sweep-auto-tasks', 'GET', THIRTY_MIN - 30_000)
-    setInterval(() => callCron('sweep_auto_tasks', '/api/cron/sweep-auto-tasks', 'GET', THIRTY_MIN - 30_000), THIRTY_MIN)
-  }, 90_000)
-
-  setTimeout(() => {
-    callCron('dispatch_mailer', '/api/cron/dispatch-mailer', 'GET', ONE_MIN - 5_000)
-    setInterval(() => callCron('dispatch_mailer', '/api/cron/dispatch-mailer', 'GET', ONE_MIN - 5_000), ONE_MIN)
-  }, 60_000)
-
-  setTimeout(() => {
-    callCron('run_campaigns', '/api/cron/run-campaigns', 'GET', THIRTY_MIN - 30_000)
-    setInterval(() => callCron('run_campaigns', '/api/cron/run-campaigns', 'GET', THIRTY_MIN - 30_000), THIRTY_MIN)
-  }, 120_000)
-
-  setTimeout(() => {
-    callCron('compute_health', '/api/cron/compute-health', 'GET', THIRTY_MIN - 30_000)
-    setInterval(() => callCron('compute_health', '/api/cron/compute-health', 'GET', THIRTY_MIN - 30_000), THIRTY_MIN)
-  }, 150_000)
-
-  setTimeout(() => {
-    callCron('daily_briefing', '/api/cron/daily-briefing', 'GET', ONE_DAY - 60_000)
-    setInterval(() => callCron('daily_briefing', '/api/cron/daily-briefing', 'GET', ONE_DAY - 60_000), ONE_DAY)
-  }, 180_000)
-
-  // Provisioning worker — advances every active provisioning job one step per tick. The trigger
-  // drives the cheap control-plane steps inline; this worker carries a job across the ~10-min
-  // RDS wait and the remaining steps (a post-response setTimeout self-fetch is unreliable in the
-  // Next server model, so an out-of-band driver is required).
-  const FORTY_FIVE_SEC = 45 * 1000
-  setTimeout(() => {
-    callCron('provisioning_worker', '/api/internal/provisioning/worker', 'GET', FORTY_FIVE_SEC - 5_000)
-    setInterval(() => callCron('provisioning_worker', '/api/internal/provisioning/worker', 'GET', FORTY_FIVE_SEC - 5_000), FORTY_FIVE_SEC)
-  }, 90_000)
-
-  // Bulk-import worker — claims one pending import_jobs row per tick, runs it in the tenant's
-  // context (image fetch + canonical publish), and writes progress back. Mirrors the provisioning
-  // worker's out-of-band driver model so a long image-heavy import keeps advancing.
-  setTimeout(() => {
-    callCron('import_worker', '/api/internal/import/worker', 'GET', FORTY_FIVE_SEC - 5_000)
-    setInterval(() => callCron('import_worker', '/api/internal/import/worker', 'GET', FORTY_FIVE_SEC - 5_000), FORTY_FIVE_SEC)
-  }, 105_000)
-
-  // Provisioning drift sweep — flips any tenant left active with no live infra to suspended.
-  // The only thing needing coarse scheduling beyond the worker above; hourly is fine.
-  setTimeout(() => {
-    callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000)
-    setInterval(() => callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000), ONE_HOUR)
-  }, 210_000)
-
-  // Social auto-posting — publishes due scheduled_social_posts (FB Page / IG feed / Reels).
-  setTimeout(() => {
-    callCron('publish_social_posts', '/api/cron/publish-social-posts', 'GET', ONE_MIN - 5_000)
-    setInterval(() => callCron('publish_social_posts', '/api/cron/publish-social-posts', 'GET', ONE_MIN - 5_000), ONE_MIN)
-  }, 240_000)
+  // One staggered setTimeout per registered job, then its steady interval. The registry is the
+  // single source for ids/paths/intervals so the recorder and status page always agree.
+  for (const job of CRON_JOBS) {
+    setTimeout(() => {
+      callCron(job.id, job.path, job.method, job.lockTtlMs)
+      setInterval(() => callCron(job.id, job.path, job.method, job.lockTtlMs), job.intervalMs)
+    }, job.startDelayMs)
+  }
 }
