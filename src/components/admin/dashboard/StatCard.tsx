@@ -2,11 +2,12 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 /** Up/down trend chip with an SVG arrow. Renders — when value is null. */
-export function PctBadge({ value }: { value: number | null }) {
+export function PctBadge({ value, invert = false }: { value: number | null; invert?: boolean }) {
   if (value === null) return <span className="text-xs text-foreground-muted">—</span>
   const up = value >= 0
+  const good = invert ? !up : up
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+    <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
       <svg className={`w-3 h-3 ${up ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
       </svg>
@@ -20,11 +21,12 @@ export function PctBadge({ value }: { value: number | null }) {
  * wrapped in a link. Extracted from the dashboard page so both the server page
  * and the client analytics shell share one implementation.
  */
-export function StatCard({ label, value, sub, pct, icon, color, href }: {
+export function StatCard({ label, value, sub, pct, invert, icon, color, href }: {
   label: string
   value: string
   sub?: string
   pct?: number | null
+  invert?: boolean
   icon: ReactNode
   color: string
   href?: string
@@ -33,7 +35,7 @@ export function StatCard({ label, value, sub, pct, icon, color, href }: {
     <>
       <div className="flex items-start justify-between">
         <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
-        {pct !== undefined && <PctBadge value={pct ?? null} />}
+        {pct !== undefined && <PctBadge value={pct ?? null} invert={invert} />}
       </div>
       <div>
         <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
