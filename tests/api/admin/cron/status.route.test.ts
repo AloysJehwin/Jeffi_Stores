@@ -62,7 +62,7 @@ describe('GET /api/admin/cron/status', () => {
     expect(body.error).toMatch(/insufficient/i)
   })
 
-  it('returns all 7 jobs with default state when no settings exist', async () => {
+  it('returns all 12 jobs with default state when no settings exist', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as any)
@@ -70,7 +70,7 @@ describe('GET /api/admin/cron/status', () => {
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.jobs).toHaveLength(7)
+    expect(body.jobs).toHaveLength(12)
     for (const job of body.jobs) {
       expect(job.enabled).toBe(true)
       expect(job.lastRun).toBeNull()
