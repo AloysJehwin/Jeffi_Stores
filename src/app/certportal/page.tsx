@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 // (brand panel + form); mobile is a single full-width column. /certs is gated by middleware.
 export default function CertPortalPage() {
   return (
-    <PortalShell navTitle={CERT_PORTAL.navTitle} homeHref={CERT_PORTAL.homeHref} brand={CERT_PORTAL.brand} contentWidth="max-w-sm">
+    <PortalShell navTitle={CERT_PORTAL.navTitle} homeHref={CERT_PORTAL.homeHref} brand={CERT_PORTAL.brand} contentWidth="max-w-sm" hideNav>
       <PortalSignIn config={CERT_PORTAL} />
     </PortalShell>
   )
