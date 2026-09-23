@@ -27,8 +27,9 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
   const isDocumentPage = isDocumentSubdomain || pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
   const isEcomPage = isEcomSubdomain || pathname?.startsWith('/ecom')
   const isCertPortalPage = isCertPortalSubdomain || pathname?.startsWith('/certportal')
+  const isStaffPage = pathname?.startsWith('/staff')
 
-  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage || isCertPortalPage) {
+  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage || isCertPortalPage || isStaffPage) {
     return (
       <StoreConfigProvider initialConfig={initialStoreConfig}>
         <ThemeProvider>

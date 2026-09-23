@@ -62,17 +62,18 @@ function isDedicatedPlan(plan: string | null): boolean {
 }
 
 /**
- * Hostnames a tenant needs pointed at the shared app host, by plan tier. Mirrors the
- * subdomain preview in OnboardWizard (storefront + admin + docs; higher tiers add
- * quotation/purchaseorder/forms/business). Basic = storefront + admin + invoice.
+ * Hostnames a tenant needs pointed at the shared app host, by plan tier. Basic = storefront +
+ * admin + invoice. The host tier for each document app MUST match the plan tier that sells the
+ * feature (seed-plans.sql): review_forms is sold from Growth, so forms-{slug} is a Growth host —
+ * a Growth tenant could otherwise create a form whose shareable link never resolved.
  */
 function tenantHostnames(slug: string, plan: string | null): string[] {
   const hosts = [`${slug}.${ROOT_DOMAIN}`, `admin-${slug}.${ROOT_DOMAIN}`, `invoice-${slug}.${ROOT_DOMAIN}`]
   if (plan && ['growth', 'pro', 'enterprise'].includes(plan)) {
-    hosts.push(`quotation-${slug}.${ROOT_DOMAIN}`, `purchaseorder-${slug}.${ROOT_DOMAIN}`)
+    hosts.push(`quotation-${slug}.${ROOT_DOMAIN}`, `purchaseorder-${slug}.${ROOT_DOMAIN}`, `forms-${slug}.${ROOT_DOMAIN}`)
   }
   if (plan && ['pro', 'enterprise'].includes(plan)) {
-    hosts.push(`forms-${slug}.${ROOT_DOMAIN}`, `${slug}.business.${ROOT_DOMAIN}`)
+    hosts.push(`${slug}.business.${ROOT_DOMAIN}`)
   }
   return hosts
 }

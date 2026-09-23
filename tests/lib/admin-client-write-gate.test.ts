@@ -33,6 +33,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/components/admin/ecom/PurgeCustomerButton.tsx',
   'src/app/admin/ecom/billing/[id]/AccountModeToggle.tsx',
   'src/app/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
+  // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
+  'src/app/admin/ecom/billing/[id]/DnsResyncButton.tsx',
   'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',

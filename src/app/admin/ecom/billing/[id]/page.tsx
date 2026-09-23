@@ -7,6 +7,7 @@ import { resolveRazorpayCreds, hasOwnDelhiveryToken } from '@/lib/integrations/r
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 import AccountModeToggle from './AccountModeToggle'
 import DeliveryModeToggle from './DeliveryModeToggle'
+import DnsResyncButton from './DnsResyncButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,6 +69,7 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
         </div>
         <AccountModeToggle tenantId={id} initial={t.own_razorpay === true} hasOwnCreds={hasOwnCreds} />
         <DeliveryModeToggle tenantId={id} initial={t.own_delhivery === true} hasOwnCreds={hasOwnDelhivery} />
+        <DnsResyncButton tenantId={id} />
       </div>
 
       {/* Transactions with split breakdown */}
