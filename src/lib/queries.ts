@@ -1,3 +1,4 @@
+import { getDashboardInsights, rangeDays, type DashboardInsights } from './dashboard-insights'
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
@@ -1417,6 +1418,7 @@ export interface DashboardAnalytics {
   buyerSplit: { business: number; consumer: number; businessRevenue: number; consumerRevenue: number }
   inventory: { inStock: number; lowStock: number; outOfStock: number; stockValue: number }
   returns: { total: number; rtoInTransit: number; rtoDelivered: number }
+  insights: DashboardInsights
 }
 
 /**
@@ -1439,9 +1441,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       : `NOW() - INTERVAL '${interval}' - INTERVAL '${interval}'`
   const prevEndExpr = range === 'month' ? `date_trunc('month', NOW())` : `NOW() - INTERVAL '${interval}'`
 
-  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow] = await Promise.all([
-    // KPIs: current + previous window
-    queryOne<Record<string, string>>(`
+  const kpiPromise = queryOne<Record<string, string>>(`
       SELECT
         COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${startExpr} AND payment_status = 'paid'), 0) AS rev,
         COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr} AND payment_status = 'paid'), 0) AS rev_prev,
@@ -1450,7 +1450,11 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${startExpr}) AS cust,
         COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}) AS cust_prev
       FROM orders
-    `),
+    `)
+  const paidRevenue = kpiPromise.then(r => ({ revenue: num(r?.rev), revenuePrev: num(r?.rev_prev) }))
+
+  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights] = await Promise.all([
+    kpiPromise,
     // Trend series over the range. Two aggregations joined by bucket so the
     // order_items fan-out doesn't inflate order-level sums (revenue/counts).
     queryMany<Record<string, string>>(`
@@ -1570,6 +1574,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(*) FILTER (WHERE shipment_status = 'rto_delivered') AS rto_delivered
       FROM orders WHERE created_at >= ${startExpr}
     `),
+    getDashboardInsights({ startExpr, prevStartExpr, prevEndExpr, days: rangeDays(range) }, paidRevenue),
   ])
 
   const rev = num(kpiRow?.rev), revPrev = num(kpiRow?.rev_prev)
@@ -1622,6 +1627,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     returns: {
       total: int(retRow?.total_returns), rtoInTransit: int(retRow?.rto_in_transit), rtoDelivered: int(retRow?.rto_delivered),
     },
+    insights,
   }
 }
 
