@@ -294,13 +294,19 @@ export async function createSession(args: {
  * with what was granted), never the full grant. A control-plane blip must not silently expose
  * feature pages a plan never bought; it only keeps the shell + settings reachable.
  */
-async function effectiveScopes(tenantId: string | null, granted: string[]): Promise<string[]> {
+async function effectiveScopes(tenantId: string | null, granted: string[], role: string | null): Promise<string[]> {
   if (!tenantId || granted.length === 0) return granted
   try {
     const { getTenantPlan } = await import('./plan-gate')
-    const { SAFE_CORE_SCOPE_KEYS } = await import('./scopes')
+    const { SAFE_CORE_SCOPE_KEYS, SUPER_ROLES, TENANT_SCOPE_KEYS } = await import('./scopes')
     const { scopes } = await getTenantPlan(tenantId)
     if (scopes.size === 0) return granted.filter(s => SAFE_CORE_SCOPE_KEYS.includes(s))
+    // A tenant OWNER's grant is a snapshot of the plan at provisioning time. Derive it from the
+    // plan live instead, so a scope added to their plan later (or a plan change) takes effect
+    // without re-provisioning. Team members keep the scopes the owner explicitly assigned.
+    if (role && (SUPER_ROLES as readonly string[]).includes(role)) {
+      return TENANT_SCOPE_KEYS.filter(s => scopes.has(s))
+    }
     return granted.filter(s => scopes.has(s))
   } catch {
     const { SAFE_CORE_SCOPE_KEYS } = await import('./scopes')
@@ -405,7 +411,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     principalType: row.principal_type,
     principalId: row.principal_id,
     role: row.role,
-    scopes: await effectiveScopes(row.tenant_id, granted),
+    scopes: await effectiveScopes(row.tenant_id, granted, row.role),
     certCN: row.cert_cn,
     approvalStatus: row.approval_status,
     tenantId: row.tenant_id,
