@@ -1841,6 +1841,54 @@ ALTER TABLE ONLY public.customer_notes
     ADD CONSTRAINT customer_notes_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
+--
+-- Name: customer_notes customer_notes_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_notes
+    ADD CONSTRAINT customer_notes_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: customer_notes customer_notes_return_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_notes
+    ADD CONSTRAINT customer_notes_return_request_id_fkey FOREIGN KEY (return_request_id) REFERENCES public.return_requests(id) ON DELETE SET NULL;
+
+
+--
+-- Name: customer_notes customer_notes_source_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.customer_notes
+    ADD CONSTRAINT customer_notes_source_check CHECK (((source)::text = ANY ((ARRAY['admin_panel'::character varying, 'staff_form'::character varying])::text[])));
+
+
+--
+-- Name: customer_note_attachments customer_note_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_note_attachments
+    ADD CONSTRAINT customer_note_attachments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: customer_note_attachments customer_note_attachments_note_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_note_attachments
+    ADD CONSTRAINT customer_note_attachments_note_id_fkey FOREIGN KEY (note_id) REFERENCES public.customer_notes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: customer_note_attachments customer_note_attachments_kind_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.customer_note_attachments
+    ADD CONSTRAINT customer_note_attachments_kind_check CHECK (((kind)::text = ANY ((ARRAY['image'::character varying, 'audio'::character varying])::text[])));
+
+
 
 --
 -- Name: customer_profiles customer_profiles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

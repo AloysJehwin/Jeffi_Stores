@@ -449,6 +449,34 @@ CREATE INDEX idx_customer_health_trend_30d ON public.customer_health USING btree
 CREATE INDEX idx_customer_notes_user_created ON public.customer_notes USING btree (user_id, created_at DESC);
 
 
+--
+-- Name: idx_customer_notes_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_customer_notes_order ON public.customer_notes USING btree (order_id) WHERE (order_id IS NOT NULL);
+
+
+--
+-- Name: idx_customer_notes_return_request; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_customer_notes_return_request ON public.customer_notes USING btree (return_request_id) WHERE (return_request_id IS NOT NULL);
+
+
+--
+-- Name: idx_customer_notes_shared; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_customer_notes_shared ON public.customer_notes USING btree (user_id, created_at DESC) WHERE (shared_with_customer = true);
+
+
+--
+-- Name: idx_customer_note_attachments_note; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_customer_note_attachments_note ON public.customer_note_attachments USING btree (note_id, display_order);
+
+
 
 --
 -- Name: idx_customer_profiles_user_id; Type: INDEX; Schema: public; Owner: -

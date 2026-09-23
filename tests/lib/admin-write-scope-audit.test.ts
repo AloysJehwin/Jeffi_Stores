@@ -30,6 +30,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Revoke a tenant admin certificate — platform-owner only (isPlatformAdmin), same as the other
   // ecom/[tenantId] controls above.
   'ecom/[tenantId]/certs/revoke',
+  // Re-apply a tenant's DNS host set to its plan tier — platform-admin only (isPlatformAdmin).
+  'ecom/[tenantId]/dns/resync',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',

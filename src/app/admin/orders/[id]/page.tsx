@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation'
+import CustomerNotes from '@/components/admin/CustomerNotes'
+import { listNotes } from '@/lib/customer-notes'
 import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
@@ -607,6 +609,19 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
             <div className="p-4 sm:p-6">
               <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" variant="admin" />
             </div>
+          </div>
+          )}
+
+          {order.user_id && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Order Notes</h2>
+            <CustomerNotes
+              customerId={order.user_id}
+              orderId={order.id}
+              returnRequestId={returnRequest?.id ?? null}
+              initialNotes={await listNotes({ userId: order.user_id, orderId: order.id })}
+              canWrite={canWrite}
+            />
           </div>
           )}
 
