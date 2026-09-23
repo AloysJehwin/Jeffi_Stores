@@ -24,6 +24,7 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\/forms\//,              config: { windowSecs: 60,  max: 10  } },
   // Staff capture surface (email-OTP, no client cert): login-grade limits on auth, normal on the rest.
   { pattern: /^\/api\/staff\/auth\//,        config: { windowSecs: 60,  max: 5   } },
+  { pattern: /^\/api\/certportal\/auth\//,   config: { windowSecs: 60,  max: 5   } },
   { pattern: /^\/api\/staff\//,              config: { windowSecs: 10,  max: 30  } },
   { pattern: /^\/api\/support\//,            config: { windowSecs: 10,  max: 15  } },
   { pattern: /^\/api\/webhooks\//,           config: { windowSecs: 10,  max: 200 } },
