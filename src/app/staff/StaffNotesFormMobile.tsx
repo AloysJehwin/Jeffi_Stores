@@ -1,6 +1,7 @@
 'use client'
 
 import { NOTE_TAGS } from '@/lib/customer-notes-shared'
+import AdminSelect from '@/components/admin/AdminSelect'
 import StaffQrScanner from './StaffQrScanner'
 import StaffCustomerPicker from './StaffCustomerPicker'
 import StaffAttachmentsPicker from './StaffAttachmentsPicker'
@@ -25,13 +26,15 @@ export default function StaffNotesFormMobile({ d, staff }: { d: StaffNoteDraft; 
 
       {d.customer && d.orders.length > 0 && (
         <section className="mt-5">
-          <label className="block text-sm font-medium mb-1.5">Link to an order <span className="text-foreground-muted font-normal">(optional)</span></label>
-          <select value={d.orderId} onChange={e => d.setOrderId(e.target.value)} className={inputClass}>
-            <option value="">No specific order</option>
-            {d.orders.map(o => (
-              <option key={o.id} value={o.id}>{o.orderNumber} · {o.status.replace(/_/g, ' ')} · Rs. {o.total.toLocaleString('en-IN')}{o.returnRequestId ? ' · has return' : ''}</option>
-            ))}
-          </select>
+          <AdminSelect
+            label="Link to an order (optional)"
+            value={d.orderId}
+            onChange={d.setOrderId}
+            options={[
+              { value: '', label: 'No specific order' },
+              ...d.orders.map(o => ({ value: o.id, label: `${o.orderNumber} · ${o.status.replace(/_/g, ' ')} · Rs. ${o.total.toLocaleString('en-IN')}${o.returnRequestId ? ' · has return' : ''}` })),
+            ]}
+          />
         </section>
       )}
 

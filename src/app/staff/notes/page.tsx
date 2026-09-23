@@ -16,7 +16,7 @@ export default async function StaffNotesPage() {
 
   if (!valid) {
     return (
-      <PortalShell navTitle={STAFF_NOTES.navTitle} homeHref={STAFF_NOTES.homeHref} brand={STAFF_NOTES.brand} contentWidth="max-w-sm">
+      <PortalShell navTitle={STAFF_NOTES.navTitle} homeHref={STAFF_NOTES.homeHref} brand={STAFF_NOTES.brand} contentWidth="max-w-sm" hideNav>
         <PortalSignIn config={STAFF_NOTES} />
       </PortalShell>
     )
