@@ -1411,6 +1411,7 @@ export interface DashboardAnalytics {
     customers: number; customersPrev: number; customersPct: number | null
   }
   trend: { bucket: string; label: string; revenue: number; orders: number; paidOrders: number; customers: number; units: number; aov: number }[]
+  trendBucket: 'hour' | 'day' | 'week' | 'month'
   payment: { online: number; cod: number; other: number; codOutstanding: number; codOutstandingCount: number }
   topCategories: { name: string; units: number; revenue: number }[]
   topBrands: { name: string; units: number; revenue: number }[]
@@ -1586,6 +1587,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
   return {
     range,
     rangeLabel: label,
+    trendBucket: bucket,
     kpis: {
       revenue: rev, revenuePrev: revPrev, revenuePct: pctDelta(rev, revPrev),
       orders: ord, ordersPrev: ordPrev, ordersPct: pctDelta(ord, ordPrev),
