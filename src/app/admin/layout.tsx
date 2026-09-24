@@ -6,7 +6,6 @@ import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
-import AdminIdleWatcher from '@/components/admin/AdminIdleWatcher'
 import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/site-controls'
@@ -124,7 +123,6 @@ export default async function AdminLayout({
   return (
     <AdminMobileProvider isMobile={isMobile}>
       <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} role={role} scopes={scopes} />
-      <AdminIdleWatcher host={host} />
       <AdminShell
         brandName={controls.identity.name}
         desktopNavLinks={desktopNavLinks}

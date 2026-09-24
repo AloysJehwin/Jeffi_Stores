@@ -38,6 +38,7 @@ export const CRON_JOBS: readonly CronJob[] = [
   { id: 'provisioning_reconcile', name: 'Provisioning drift sweep', path: '/api/internal/provisioning/reconcile', method: 'POST', intervalMs: HOUR, intervalLabel: 'every 1 h', startDelayMs: 210 * SEC, lockTtlMs: HOUR - MIN, tenantScope: null },
   { id: 'publish_social_posts', name: 'Publish social posts', path: '/api/cron/publish-social-posts', method: 'GET', intervalMs: MIN, intervalLabel: 'every 1 min', startDelayMs: 240 * SEC, lockTtlMs: MIN - 5 * SEC, tenantScope: 'campaigns:read' },
   { id: 'customer_notes_digest', name: 'Customer notes digest', path: '/api/cron/customer-notes-digest', method: 'GET', intervalMs: DAY, intervalLabel: 'every 24 h', startDelayMs: 200 * SEC, lockTtlMs: DAY - MIN, tenantScope: 'customers:read' },
+  { id: 'sweep_idle_sessions', name: 'Sweep idle admin sessions', path: '/api/cron/sweep-sessions', method: 'GET', intervalMs: 5 * MIN, intervalLabel: 'every 5 min', startDelayMs: 75 * SEC, lockTtlMs: 5 * MIN - 30 * SEC, tenantScope: 'dashboard:read' },
 ]
 
 export const CRON_JOB_IDS: readonly string[] = CRON_JOBS.map(j => j.id)
