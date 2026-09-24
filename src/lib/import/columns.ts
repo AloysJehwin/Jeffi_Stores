@@ -249,7 +249,13 @@ export function keyColumnsFor(sheet: SheetName): { header: string; help: string 
   return [{ header: 'sku', help: 'Product SKU this row extends (from the Products sheet)' }]
 }
 
-// Columns for one sheet, in catalog order. Products excludes attribute-sheet columns.
+// Columns for one sheet, in catalog order. Products excludes attribute-sheet columns. The
+// structural link columns (row_type / parent_sku / variant_sku) never appear here: a sheet's
+// identity is its tab, and the links are the key columns keyColumnsFor() prepends.
 export function columnsForSheet(sheet: SheetName): ImportColumn[] {
-  return ALL_COLUMNS.filter(c => c.key !== 'row_type' && sheetFor(c) === sheet)
+  return ALL_COLUMNS.filter(c => !LINK_KEYS.has(c.key) && sheetFor(c) === sheet)
 }
+const LINK_KEYS = new Set(['row_type', 'parent_sku', 'variant_sku'])
+
+export const CORE_SHEETS: readonly SheetName[] = ['Products', 'Variants', 'Sub-variants']
+export const ATTRIBUTE_SHEETS: readonly SheetName[] = SHEET_ORDER.filter(s => !CORE_SHEETS.includes(s))
