@@ -94,6 +94,10 @@ CREATE TABLE public.customer_health_history (
 -- Name: customer_notes; Type: TABLE; Schema: public; Owner: -
 --
 
+-- customer_notes gained source / title / tags / shared_with_customer / return_request_id on
+-- 2026-09-24. Existing tenants receive them through the fan-out's per-table column
+-- reconciliation (src/lib/tenant-migrations-schema.ts), which must run before the CHECK on
+-- source and the partial index on shared_with_customer below.
 CREATE TABLE public.customer_notes (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
