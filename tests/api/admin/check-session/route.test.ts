@@ -137,7 +137,8 @@ describe('GET /api/admin/check-session', () => {
     await GET(makeReq('admin.example.com', 'Safari/iOS'))
     expect(mockResolveSession).toHaveBeenCalledWith(
       'valid-sid',
-      expect.objectContaining({ userAgent: 'Safari/iOS' })
+      expect.objectContaining({ userAgent: 'Safari/iOS' }),
+      { touch: false }
     )
   })
 

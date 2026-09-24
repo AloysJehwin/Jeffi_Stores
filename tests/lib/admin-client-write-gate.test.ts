@@ -17,14 +17,11 @@ import glob from 'fast-glob'
 const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Auth / self-service: the member is proving who they are or acting on themselves.
   'src/app/admin/login/page.tsx',
-  'src/components/admin/SessionGuard.tsx',
+  'src/components/admin/AdminSessionController.tsx',
   'src/components/admin/AccessDenied.tsx',
   'src/components/admin/TwoFactorCard.tsx',
   'src/components/admin/AdminSupportChat.tsx',
   'src/components/admin/AdminAgentModal.tsx',
-  // Idle auto-logout: POSTs /api/admin/logout on the member's own session (logging oneself out is
-  // always allowed) — not a scoped record mutation, so no write gate applies.
-  'src/components/admin/AdminIdleWatcher.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'src/components/admin/NotificationBell.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
-import { revokeSession } from '@/lib/auth-sessions'
+import { revokeSession, revokeAllForPrincipal } from '@/lib/auth-sessions'
 import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
 
 export async function POST() {
@@ -14,8 +14,11 @@ export async function POST() {
     if (existing) {
       try {
         const payload = await verifyToken(existing)
+        const adminId = (payload as any)?.adminId
         const sid = (payload as any)?.sid
-        if (typeof sid === 'string' && sid) await revokeSession(sid)
+        // An explicit logout ends this admin's sessions in every browser, not just this one.
+        if (typeof adminId === 'string' && adminId) await revokeAllForPrincipal('admin', adminId)
+        else if (typeof sid === 'string' && sid) await revokeSession(sid)
       } catch { /* best-effort revoke */ }
     }
 

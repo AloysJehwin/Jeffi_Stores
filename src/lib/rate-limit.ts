@@ -26,6 +26,7 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\/staff\/auth\//,        config: { windowSecs: 60,  max: 5   } },
   { pattern: /^\/api\/certportal\/auth\//,   config: { windowSecs: 60,  max: 5   } },
   { pattern: /^\/api\/staff\//,              config: { windowSecs: 10,  max: 30  } },
+  { pattern: /^\/api\/admin\/session\//,    config: { windowSecs: 60,  max: 30  } },
   { pattern: /^\/api\/support\//,            config: { windowSecs: 10,  max: 15  } },
   { pattern: /^\/api\/webhooks\//,           config: { windowSecs: 10,  max: 200 } },
   { pattern: /^\/api\//,                     config: { windowSecs: 10,  max: 60  } },

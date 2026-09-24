@@ -221,6 +221,8 @@ export interface AuthSessionRow {
 // the session row at login; email/displayName are joined fresh from admins/users.
 export interface ResolvedSession {
   sid: string
+  /** Row id: the stable handle for the event stream, revocation and the active-sessions UI. */
+  sessionId: string
   principalType: PrincipalType
   principalId: string
   role: string | null
@@ -231,6 +233,30 @@ export interface ResolvedSession {
   email: string | null
   displayName: string | null
   expiresAt: string
+  /** When the server will refuse this session next: min(absolute expiry, last activity + idle window). */
+  deadlineAt: string
+  idleWindowMs: number
+}
+
+export interface SessionDeadline { deadlineAt: string; expiresAt: string }
+
+export function idleWindowMsFor(principalType: PrincipalType, idleTimeoutMinutes: number | null | undefined): number {
+  return principalType === 'admin' ? (idleTimeoutMinutes ?? DEFAULT_ADMIN_IDLE_MINUTES) * 60_000 : IDLE_TIMEOUT_MS
+}
+
+export function computeDeadline(expiresAt: string | Date, lastSeenMs: number, idleWindowMs: number): string {
+  const abs = new Date(expiresAt).getTime()
+  return new Date(Math.min(abs, lastSeenMs + idleWindowMs)).toISOString()
+}
+
+let sessionEventsModule: Promise<typeof import('./session-events')> | null = null
+
+async function emitSessionEvent(sessionId: string, event: import('./session-events').SessionEvent): Promise<void> {
+  try {
+    sessionEventsModule ??= import('./session-events')
+    const { publishSessionEvent } = await sessionEventsModule
+    await publishSessionEvent(sessionId, event)
+  } catch { /* events are best-effort; the DB row is the gate */ }
 }
 
 // Create a session row at login/signup. Generates a random opaque token (the cookie value) and
@@ -314,7 +340,7 @@ async function effectiveScopes(tenantId: string | null, granted: string[], role:
   }
 }
 
-export async function resolveSession(sid: string, current?: string | null | SessionSignals): Promise<ResolvedSession | null> {
+export async function resolveSession(sid: string, current?: string | null | SessionSignals, opts?: { touch?: boolean }): Promise<ResolvedSession | null> {
   if (!sid) return null
   // Route the lookup by cookie shape (cheap, pre-DB): token → token_hash; legacy uuid → id.
   let whereCol: 'token_hash' | 'id'
@@ -357,10 +383,9 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   // Idle window: admins use their per-account timeout (or the admin default); everyone else the
   // 24h cap. Enforced here on every request, so a session idle past the window is refused even if
   // the browser was closed — a returning admin lands on the login page.
-  const idleWindowMs = row.principal_type === 'admin'
-    ? (row.idle_timeout_minutes ?? DEFAULT_ADMIN_IDLE_MINUTES) * 60_000
-    : IDLE_TIMEOUT_MS
-  if (now - new Date(row.last_seen_at).getTime() > idleWindowMs) return null
+  const idleWindowMs = idleWindowMsFor(row.principal_type, row.idle_timeout_minutes)
+  let lastSeenMs = new Date(row.last_seen_at).getTime()
+  if (now - lastSeenMs > idleWindowMs) return null
 
   // Device binding: score the presented signals against the login-time snapshot. A clear
   // replay (>= 2 STABLE signals differ) revokes the whole session (fire-and-forget) and
@@ -380,6 +405,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     )
     if (decision.revoke) {
       query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [row.id]).catch(() => {})
+      void emitSessionEvent(row.id, { type: 'logout', reason: 'binding' })
       return null
     }
 
@@ -400,14 +426,17 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     }
   }
 
-  if (now - new Date(row.last_seen_at).getTime() > TOUCH_WINDOW_MS) {
+  // Passive callers (session checks, event streams, bell polls) never count as activity.
+  if (opts?.touch !== false && now - lastSeenMs > TOUCH_WINDOW_MS) {
     query(`UPDATE auth_sessions SET last_seen_at = now() WHERE id = $1`, [row.id]).catch(() => {})
+    lastSeenMs = now
   }
 
   const displayName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || null
   const granted: string[] = Array.isArray(row.scopes) ? row.scopes : []
   return {
     sid,
+    sessionId: row.id,
     principalType: row.principal_type,
     principalId: row.principal_id,
     role: row.role,
@@ -418,7 +447,84 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     email: row.email,
     displayName,
     expiresAt: new Date(row.expires_at).toISOString(),
+    deadlineAt: computeDeadline(row.expires_at, lastSeenMs, idleWindowMs),
+    idleWindowMs,
   }
+}
+
+type DeadlineRow = { id: string; principal_type: PrincipalType; expires_at: string; last_seen_at: string; idle_timeout_minutes: number | null }
+
+function deadlineOf(r: DeadlineRow): SessionDeadline {
+  return {
+    deadlineAt: computeDeadline(r.expires_at, new Date(r.last_seen_at).getTime(), idleWindowMsFor(r.principal_type, r.idle_timeout_minutes)),
+    expiresAt: new Date(r.expires_at).toISOString(),
+  }
+}
+
+/**
+ * Real activity heartbeat: unconditionally moves last_seen_at to now and tells every tab of the
+ * session (all browsers, all instances) the new deadline. Null when the session is already gone.
+ */
+export async function touchSession(sid: string): Promise<SessionDeadline | null> {
+  const match = cookieMatch(sid)
+  if (!match) return null
+  const row = await queryOne<DeadlineRow>(
+    `WITH upd AS (
+       UPDATE auth_sessions SET last_seen_at = now()
+        WHERE ${match.col} = $1 AND revoked_at IS NULL AND expires_at > now()
+        RETURNING id, principal_type, principal_id, expires_at, last_seen_at
+     )
+     SELECT upd.id, upd.principal_type, upd.expires_at, upd.last_seen_at, a.idle_timeout_minutes
+       FROM upd LEFT JOIN admins a ON a.id = upd.principal_id AND upd.principal_type = 'admin'`,
+    [match.value]
+  )
+  if (!row) return null
+  const d = deadlineOf(row)
+  await emitSessionEvent(row.id, { type: 'deadline', ...d })
+  return d
+}
+
+/** Current deadline of a session row, or null when it is revoked, expired or idle past its window. */
+export async function getSessionDeadline(sessionId: string): Promise<SessionDeadline | null> {
+  const row = await queryOne<DeadlineRow & { revoked_at: string | null }>(
+    `SELECT s.id, s.principal_type, s.expires_at, s.last_seen_at, s.revoked_at, a.idle_timeout_minutes
+       FROM auth_sessions s
+       LEFT JOIN admins a ON a.id = s.principal_id AND s.principal_type = 'admin'
+      WHERE s.id = $1`,
+    [sessionId]
+  )
+  if (!row || row.revoked_at) return null
+  const d = deadlineOf(row)
+  if (new Date(d.deadlineAt).getTime() <= Date.now()) return null
+  return d
+}
+
+/** Revoke one session by row id (idle sweep, event-stream deadline) and notify its tabs. */
+export async function revokeSessionById(sessionId: string, reason: import('./session-events').SessionLogoutReason): Promise<boolean> {
+  const res = await query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING id`, [sessionId])
+  const hit = (res?.rowCount || 0) > 0
+  if (hit) await emitSessionEvent(sessionId, { type: 'logout', reason })
+  return hit
+}
+
+/**
+ * Sweeper: mark admin sessions that are past their absolute or idle deadline as revoked and
+ * notify any tab still showing them. resolveSession already refuses these; the sweep makes
+ * the row and the active-sessions list say so too.
+ */
+export async function sweepExpiredAdminSessions(): Promise<string[]> {
+  const res = await query<{ id: string }>(
+    `UPDATE auth_sessions s SET revoked_at = now()
+       FROM admins a
+      WHERE a.id = s.principal_id AND s.principal_type = 'admin' AND s.revoked_at IS NULL
+        AND (s.expires_at <= now()
+             OR s.last_seen_at + make_interval(mins => COALESCE(a.idle_timeout_minutes, $1)) <= now())
+      RETURNING s.id`,
+    [DEFAULT_ADMIN_IDLE_MINUTES]
+  )
+  const ids = (res?.rows || []).map(r => r.id)
+  await Promise.all(ids.map(id => emitSessionEvent(id, { type: 'logout', reason: 'idle' })))
+  return ids
 }
 
 // Thin wrapper over resolveSession — one liveness implementation, no drift.
@@ -457,20 +563,22 @@ export async function revokeSession(sid: string): Promise<void> {
   if (!sid) return
   const match = cookieMatch(sid)
   if (!match) return
-  await query(
-    `UPDATE auth_sessions SET revoked_at = now() WHERE ${match.col} = $1 AND revoked_at IS NULL`,
+  const res = await query<{ id: string }>(
+    `UPDATE auth_sessions SET revoked_at = now() WHERE ${match.col} = $1 AND revoked_at IS NULL RETURNING id`,
     [match.value]
   )
+  await Promise.all((res?.rows || []).map(r => emitSessionEvent(r.id, { type: 'logout', reason: 'logout' })))
 }
 
 // "Log out everywhere" / admin force-logout of an account.
 export async function revokeAllForPrincipal(principalType: PrincipalType, principalId: string): Promise<number> {
-  const res = await query(
+  const res = await query<{ id: string }>(
     `UPDATE auth_sessions SET revoked_at = now()
-     WHERE principal_type = $1 AND principal_id = $2 AND revoked_at IS NULL`,
+     WHERE principal_type = $1 AND principal_id = $2 AND revoked_at IS NULL RETURNING id`,
     [principalType, principalId]
   )
-  return res.rowCount || 0
+  await Promise.all((res?.rows || []).map(r => emitSessionEvent(r.id, { type: 'logout', reason: 'logout' })))
+  return res?.rowCount || 0
 }
 
 // Active (non-revoked, non-expired) sessions for the "active sessions" UI.

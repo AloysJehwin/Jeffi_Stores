@@ -15,6 +15,8 @@ import glob from 'fast-glob'
 const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Pre-auth or self-service: the caller is proving who they are, or acting on themselves.
   'auth/email-otp/start', 'auth/email-otp/verify', 'logout', 'refresh',
+  // Activity heartbeat on the caller's own session: extends its idle window, mutates nothing else.
+  'session/heartbeat',
   'mfa/enroll-start', 'mfa/enroll-confirm', 'mfa/verify', 'mfa/recovery-codes',
   'sessions/[id]/revoke', 'sessions/revoke-all', 'access-request',
   // Self-service: a member marking their own notification bell read, not a scoped action.
