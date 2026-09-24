@@ -479,6 +479,38 @@ describe('email.ts', () => {
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
+
+    it('default (both) mode: the attachment mail also carries the certificate portal link', async () => {
+      delete process.env.CERT_PORTAL_DELIVERY
+      await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'pw', 'SN1', '2027-01-01', 'admin')
+      const opts = mockSendAuditedMail.mock.calls[0][0]
+      expect(opts.attachments?.length).toBeGreaterThan(0)
+      expect(opts.html).toContain('https://certificate.jeffistores.in')
+      expect(opts.html).toContain('admin@example.com')
+    })
+
+    it('email mode: attachment only, no portal link', async () => {
+      process.env.CERT_PORTAL_DELIVERY = 'email'
+      try {
+        await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'pw', 'SN1', '2027-01-01', 'admin')
+        const opts = mockSendAuditedMail.mock.calls[0][0]
+        expect(opts.attachments?.length).toBeGreaterThan(0)
+        expect(opts.html).not.toContain('certificate.jeffistores.in')
+      } finally { delete process.env.CERT_PORTAL_DELIVERY }
+    })
+
+    it('portal mode: sends the invite instead, with no attachment', async () => {
+      process.env.CERT_PORTAL_DELIVERY = 'portal'
+      try {
+        await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'Plain-Text-Pass-9Q', 'SN1', '2027-01-01', 'admin')
+        expect(mockSendAuditedMail).toHaveBeenCalledOnce()
+        const opts = mockSendAuditedMail.mock.calls[0][0]
+        expect(opts.templateName).toBe('admin_cert_invite')
+        expect(opts.attachments).toEqual([])
+        expect(opts.html).toContain('https://certificate.jeffistores.in')
+        expect(opts.html).not.toContain('Plain-Text-Pass-9Q')
+      } finally { delete process.env.CERT_PORTAL_DELIVERY }
+    })
   })
 
   describe('sendNewReviewNotification', () => {
