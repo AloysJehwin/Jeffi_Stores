@@ -26,46 +26,78 @@ export function buildTenantSchemaSql(): string {
   return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
 }
 
+export interface DesiredColumn { name: string; type: string }
+export interface DesiredTable { table: string; columns: DesiredColumn[] }
+
+const CREATE_TABLE_RE = /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?((?:[A-Za-z0-9_]+\.)?[A-Za-z0-9_]+)\s*\(([\s\S]*?)\n\);/gi
+const CONSTRAINT_LEADERS = /^(CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE|LIKE)\b/i
+
+/**
+ * Every `CREATE TABLE public.<name> (...)` in the schema files with the columns it declares.
+ * `--` comment lines inside a body (the hand-written catalog.sql groups columns under them) are
+ * stripped first: an item that started with a comment used to fail the name match and the column
+ * after it silently dropped out of the reconciliation. NOT NULL is removed from the type (adding a
+ * NOT NULL column with no default to a populated table errors); a DEFAULT is kept so it backfills.
+ */
+export function parseCreateTables(sql: string): DesiredTable[] {
+  const out: DesiredTable[] = []
+  let m: RegExpExecArray | null
+  const re = new RegExp(CREATE_TABLE_RE.source, CREATE_TABLE_RE.flags)
+  while ((m = re.exec(sql)) !== null) {
+    const columns: DesiredColumn[] = []
+    const body = m[2].replace(/--[^\n]*/g, '')
+    for (const item of splitTopLevel(body)) {
+      const line = item.trim()
+      if (!line || CONSTRAINT_LEADERS.test(line)) continue
+      const nameMatch = line.match(/^("?[A-Za-z0-9_]+"?)\s+(.*)$/s)
+      if (!nameMatch) continue
+      const type = nameMatch[2].replace(/\bNOT\s+NULL\b/gi, '').replace(/\s+/g, ' ').trim()
+      if (!type) continue
+      columns.push({ name: nameMatch[1], type })
+    }
+    out.push({ table: m[1], columns })
+  }
+  return out
+}
+
+/** table name (without the schema prefix, unquoted) → column names, as the schema files declare them. */
+export function desiredTableColumns(): Map<string, string[]> {
+  const dir = path.join(process.cwd(), 'database')
+  const map = new Map<string, string[]>()
+  for (const file of APPLY_ORDER) {
+    const p = path.join(dir, file)
+    if (!fs.existsSync(p)) continue
+    for (const t of parseCreateTables(fs.readFileSync(p, 'utf8'))) {
+      const bare = t.table.split('.').pop()!.replace(/"/g, '')
+      map.set(bare, t.columns.map(c => c.name.replace(/"/g, '')))
+    }
+  }
+  return map
+}
+
 /**
  * Close the fan-out's column-drift hole.
  *
  * makeCreatesIdempotent() rewrites CREATE TABLE → CREATE TABLE IF NOT EXISTS, which is a no-op
  * for a table that already exists on a tenant. So a column ADDED to an existing table's
- * definition after that tenant was first provisioned never lands — the fan-out records success
- * while the column is silently missing (confirmed live: product_sub_variants shipping-physical
- * columns absent on an existing tenant). There is no ALTER ... ADD COLUMN anywhere in the files.
+ * definition after that tenant was first provisioned never lands (confirmed live: product
+ * sub-variant physicals absent on an existing tenant). There is no ALTER ... ADD COLUMN anywhere
+ * in the files.
  *
- * This pass parses every `CREATE TABLE public.<name> (...)` on the RAW pg_dump text (before the
- * CREATE is rewritten) and appends `ALTER TABLE <name> ADD COLUMN IF NOT EXISTS <col> <type>` for
- * each column it declares. Postgres's ADD COLUMN IF NOT EXISTS is natively idempotent, so this is
- * safe on both fresh and existing tables. NOT NULL is stripped from the type (adding a NOT NULL
- * column with no default to a populated table errors); a DEFAULT is kept so it still backfills.
- * The original CREATE is left in place — this only appends the reconciling ALTERs after it.
+ * This pass emits `ALTER TABLE <name> ADD COLUMN IF NOT EXISTS <col> <type>` for each declared
+ * column DIRECTLY AFTER its CREATE TABLE. It used to append them all at the end of the script,
+ * after constraints.sql and indexes.sql — so a CHECK or partial index on a new column ran before
+ * the column existed and aborted the whole batch ("column source does not exist", live on
+ * 2026-09-24). Postgres's ADD COLUMN IF NOT EXISTS is natively idempotent, so this is safe on
+ * fresh and existing tables alike.
  */
 function syncTableColumns(sql: string): string {
-  const createRe = /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?((?:[A-Za-z0-9_]+\.)?[A-Za-z0-9_]+)\s*\(([\s\S]*?)\n\);/gi
-  const CONSTRAINT_LEADERS = /^(CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE|LIKE)\b/i
-  const alters: string[] = []
-
-  let m: RegExpExecArray | null
-  while ((m = createRe.exec(sql)) !== null) {
-    const table = m[1]
-    const body = m[2]
-    for (const col of splitTopLevel(body)) {
-      const line = col.trim()
-      if (!line || CONSTRAINT_LEADERS.test(line)) continue
-      const nameMatch = line.match(/^("?[A-Za-z0-9_]+"?)\s+(.*)$/s)
-      if (!nameMatch) continue
-      const colName = nameMatch[1]
-      // Drop NOT NULL (unsafe on populated tables); keep everything else incl. DEFAULT.
-      const colType = nameMatch[2].replace(/\bNOT\s+NULL\b/gi, '').replace(/\s+/g, ' ').trim()
-      if (!colType) continue
-      alters.push(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${colName} ${colType};`)
-    }
-  }
-
-  if (alters.length === 0) return sql
-  return `${sql}\n\n-- ==== reconcile columns on pre-existing tables (ADD COLUMN IF NOT EXISTS) ====\n${alters.join('\n')}\n`
+  return sql.replace(CREATE_TABLE_RE, (stmt) => {
+    const [parsed] = parseCreateTables(stmt)
+    if (!parsed || parsed.columns.length === 0) return stmt
+    const alters = parsed.columns.map(c => `ALTER TABLE ${parsed.table} ADD COLUMN IF NOT EXISTS ${c.name} ${c.type};`)
+    return `${stmt}\n-- reconcile columns on a pre-existing ${parsed.table}\n${alters.join('\n')}`
+  })
 }
 
 /**
@@ -169,11 +201,25 @@ function hoistForeignKeys(sql: string): string {
  *
  * to_regclass() keeps the guard from throwing when a table is genuinely absent, so a missing
  * table surfaces where it is created rather than here.
+ *
+ * CHECK constraints are the exception: a check carries no data and nothing depends on it, so
+ * it is dropped and re-added every run. With the existence guard a changed rule never landed
+ * (the same drift the platform schema-diff self-heals with DROP IF EXISTS + ADD).
  */
 function guardNonFkConstraints(sql: string): string {
   const addRe = /ALTER TABLE\s+(?:ONLY\s+)?([A-Za-z0-9_.]+)\s+ADD CONSTRAINT\s+([A-Za-z0-9_]+)\b([^;]*);/gis
   return sql.replace(addRe, (stmt, table, name, rest) => {
     if (/FOREIGN KEY/i.test(rest)) return stmt   // hoisted, already self-guarded
+    if (/\bCHECK\b/i.test(rest)) {
+      return [
+        'DO $$ BEGIN',
+        `  IF to_regclass('${table}') IS NOT NULL THEN`,
+        `    ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${name};`,
+        `    ${stmt.trim()}`,
+        '  END IF;',
+        'END $$;',
+      ].join('\n')
+    }
     return [
       'DO $$ BEGIN',
       `  IF to_regclass('${table}') IS NOT NULL AND NOT EXISTS (`,

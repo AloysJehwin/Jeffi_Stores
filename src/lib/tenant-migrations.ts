@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { Pool } from 'pg'
 import { controlPlanePool } from './tenant-registry'
-import { buildTenantSchemaSql } from './tenant-migrations-schema'
+import { buildTenantSchemaSql, desiredTableColumns } from './tenant-migrations-schema'
 
 /**
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).
@@ -91,6 +91,93 @@ async function recordRun(tenantId: string, gitSha: string, status: 'success' | '
   )
 }
 
+// Connection-level failures that a second attempt can reasonably clear; anything else is a real
+// schema problem and retrying would only repeat it.
+const TRANSIENT_PG_CODES = new Set(['08000', '08001', '08003', '08004', '08006', '08007', '57P01', '57P02', '57P03', '53300', '53400'])
+const TRANSIENT_MESSAGE = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout|Connection terminated|server closed the connection/i
+const RETRY_DELAY_MS = 3000
+
+export function isTransientDbError(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null
+  if (!e) return false
+  if (e.code && TRANSIENT_PG_CODES.has(e.code)) return true
+  return TRANSIENT_MESSAGE.test(String(e.message || ''))
+}
+
+/**
+ * One multi-statement query gives Postgres no way to say WHICH statement failed, so name it
+ * here: `position` is the 1-based character offset the server reports for the failing token
+ * (an error inside a DO block reports the block's inner statement via internalQuery instead).
+ */
+export function describeSqlError(err: unknown, sql: string): string {
+  const e = err as { message?: string; code?: string; position?: string | number; internalQuery?: string; where?: string } | null
+  const base = String(e?.message ?? err)
+  const code = e?.code ? ` (code ${e.code})` : ''
+  const pos = Number(e?.position)
+  let near = ''
+  if (Number.isFinite(pos) && pos > 0 && pos <= sql.length) {
+    const start = Math.max(0, sql.lastIndexOf(';', pos - 2) + 1)
+    const end = sql.indexOf(';', pos - 1)
+    near = sql.slice(start, end === -1 ? undefined : end + 1)
+  } else if (e?.internalQuery) {
+    near = e.internalQuery
+  }
+  near = near.replace(/--[^\n]*/g, '').replace(/\s+/g, ' ').trim()
+  if (near.length > 220) near = `${near.slice(0, 220)}...`
+  return near ? `${base}${code} near: ${near}` : `${base}${code}`
+}
+
+/** Columns the schema files declare that the live database still lacks, as "table.column". */
+export function missingColumns(desired: Map<string, string[]>, live: Map<string, Set<string>>): string[] {
+  const missing: string[] = []
+  for (const [table, cols] of desired) {
+    const have = live.get(table)
+    if (!have) { missing.push(`${table}.*`); continue }
+    for (const c of cols) if (!have.has(c)) missing.push(`${table}.${c}`)
+  }
+  return missing
+}
+
+async function liveColumns(pool: Pool): Promise<Map<string, Set<string>>> {
+  const res = await pool.query<{ table_name: string; column_name: string }>(
+    `SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`
+  )
+  const map = new Map<string, Set<string>>()
+  for (const r of res.rows) {
+    if (!map.has(r.table_name)) map.set(r.table_name, new Set())
+    map.get(r.table_name)!.add(r.column_name)
+  }
+  return map
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+/**
+ * Apply the schema to one tenant and prove it landed. The batch is one implicit transaction
+ * (a multi-statement simple query with no explicit BEGIN/COMMIT), so a failure leaves the
+ * database as it was. A transient connection error gets exactly one retry; a real schema error
+ * is reported with the statement that raised it. Afterwards the live column list is compared
+ * with what the files declare, so a column the reconciliation could not add is a failure here
+ * instead of a silent gap discovered at request time.
+ */
+export async function applySchemaToTenant(pool: Pool, schemaSql: string, desired: Map<string, string[]>): Promise<void> {
+  let attempt = 0
+  for (;;) {
+    attempt++
+    try {
+      await pool.query(schemaSql)
+      break
+    } catch (err) {
+      if (attempt === 1 && isTransientDbError(err)) { await sleep(RETRY_DELAY_MS); continue }
+      throw new Error(describeSqlError(err, schemaSql))
+    }
+  }
+  const missing = missingColumns(desired, await liveColumns(pool))
+  if (missing.length > 0) {
+    throw new Error(`post-apply verification: ${missing.length} column(s) still missing: ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ', ...' : ''}`)
+  }
+}
+
 export interface FanoutResult {
   gitSha: string
   total: number
@@ -108,6 +195,7 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
   const targets = await listActiveTenantTargets()
   const result: FanoutResult = { gitSha, total: targets.length, applied: 0, skipped: 0, failed: 0, failures: [] }
   const schemaSql = buildTenantSchemaSql()
+  const desired = desiredTableColumns()
 
   for (const t of targets) {
     if (await alreadyApplied(t.id, gitSha)) { result.skipped++; continue }
@@ -115,9 +203,7 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
     let pool: Pool | null = null
     try {
       pool = tenantPool({ rdsEndpoint: t.rds_endpoint, rdsPort: t.rds_port || 5432, rdsDb: t.rds_db || 'jeffi_stores' })
-      // Apply the whole schema in one connection. ON_ERROR_STOP semantics via a
-      // single multi-statement query — pg aborts the batch on first error.
-      await pool.query(schemaSql)
+      await applySchemaToTenant(pool, schemaSql, desired)
       await recordRun(t.id, gitSha, 'success')
       result.applied++
     } catch (err: any) {
