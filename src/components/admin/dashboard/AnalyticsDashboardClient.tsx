@@ -125,7 +125,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
           <SectionCard span>
             <SectionHeader title="Revenue & Orders" actionLabel="Orders" href={ap('/admin/orders', host)} />
             <div className="hidden sm:block">
-              <TrendChart points={data.trend} />
+              <TrendChart points={data.trend} bucket={data.trendBucket} />
             </div>
             <div className="sm:hidden flex gap-4 py-2">
               <div className="flex-1 text-center">
