@@ -1,7 +1,7 @@
 // How admin certificates reach the person, during the portal transition.
 //   email  — legacy: attach the .p12 + password in the mail (no portal invite)
-//   both   — transition (DEFAULT): attach the .p12 AND record it in the portal + send an invite,
-//            so nobody is stranded if the portal has an issue
+//   both   — transition (DEFAULT): attach the .p12 AND record it in the portal; the same mail
+//            carries the portal link, so nobody is stranded if the portal has an issue
 //   portal — hard cutover: invite link only; the .p12/password are never attached, returned to the
 //            browser, or shown on screen — the portal is the sole way to obtain the cert
 export type CertDeliveryMode = 'email' | 'both' | 'portal'

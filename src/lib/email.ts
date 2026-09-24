@@ -1164,12 +1164,22 @@ export async function sendAdminCertificateEmail(
   role: string,
   tenant?: { slug: string; storeName: string }
 ) {
-  // Hard-cutover mode: never attach the .p12 or the password — send the portal invite instead.
-  // In 'email'/'both' the attachment behaviour below is unchanged.
-  const { certDeliveryMode } = await import('./cert-delivery')
-  if (certDeliveryMode() === 'portal') {
+  // portal: invite only, never the .p12 or password. both: attachment plus the portal link. email: attachment only.
+  const { certDeliveryMode, certPortalUrl } = await import('./cert-delivery')
+  const mode = certDeliveryMode()
+  if (mode === 'portal') {
     return sendCertInviteEmail(email, displayName, role, tenant)
   }
+  const portalNote = mode === 'both'
+    ? `
+            <div class="info">
+              <strong>Prefer to download it later?</strong>
+              <p style="margin: 8px 0 0 0;">This certificate is also available once from the certificate portal at
+                <a href="${certPortalUrl()}" style="color:#2563eb;">${certPortalUrl()}</a>.
+                Sign in there with <strong>${email}</strong> (Google, or a one-time code sent to this address).</p>
+            </div>
+`
+    : ''
   // Tenant owners are an ecom communication, so they come from ecommerce@; the platform's
   // own admin certs keep the existing admin sender.
   const from = tenant
@@ -1309,6 +1319,7 @@ export async function sendAdminCertificateEmail(
               </ol>
             </div>
 
+${portalNote}
             <p>If you have any questions, contact the super admin.</p>
 
             <div class="footer">
