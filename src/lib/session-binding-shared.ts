@@ -19,7 +19,7 @@ export const BIND_COOKIE: Record<PrincipalType, string> = {
 // one. They still need the short-lived cookie. Matched by exact path, never by a request header,
 // because a header is the caller's to fake and would switch the proof off for any endpoint.
 export const PROOF_EXEMPT_PATHS: ReadonlySet<string> = new Set([
-  '/api/admin/notifications/stream',
+  '/api/admin/events',
   '/api/track',
 ])
 
