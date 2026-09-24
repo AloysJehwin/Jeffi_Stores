@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!hasScope(admin.role, admin.scopes, 'coupons:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const fields = ['code', 'description', 'discount_type', 'discount_value', 'min_purchase_amount', 'max_discount_amount', 'usage_limit', 'usage_limit_per_user', 'valid_from', 'valid_until', 'is_active']
+  const fields = ['code', 'description', 'discount_type', 'discount_value', 'min_purchase_amount', 'max_discount_amount', 'usage_limit', 'usage_limit_per_user', 'valid_from', 'valid_until', 'is_active', 'is_draft']
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1

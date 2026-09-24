@@ -11,7 +11,7 @@ import { productRowKey, sectionLimit, type ProductSource } from '@/lib/homepage-
 export const revalidate = 120
 
 // Replaces the separate featured / new-arrivals / best-sellers queries, which shared this
-// SELECT list and differed only in WHERE and ORDER BY.
+// SELECT list and differed only in WHERE and ORDER BY.w
 async function getProductsForSource(
   source: ProductSource,
   limit: number,

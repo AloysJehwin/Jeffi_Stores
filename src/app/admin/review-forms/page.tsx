@@ -22,6 +22,9 @@ async function getForms(filters: { search?: string; page?: number }) {
   const params: unknown[] = []
   let i = 1
 
+  // Never-published drafts live only in the Drafts section, never the live list.
+  conditions.push(`rf.is_draft = false`)
+
   if (filters.search) {
     conditions.push(`(rf.title ILIKE $${i} OR rf.slug ILIKE $${i})`)
     params.push(`%${filters.search}%`)
@@ -76,27 +79,53 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
 }
 
 async function ReviewFormsDraftsBanner({ host }: { host: string }) {
-  const pendingDrafts = await queryMany<{ form_id: string; name: string; updated_at: string }>(
-    `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
-     FROM review_form_drafts rfd
-     JOIN review_forms rf ON rf.id = rfd.form_id
-     ORDER BY rfd.updated_at DESC
-     LIMIT 20`
-  )
+  const [pendingDrafts, createDrafts] = await Promise.all([
+    // Edit-drafts: unpublished CHANGES staged against a live form (review_form_drafts).
+    queryMany<{ form_id: string; name: string; updated_at: string }>(
+      `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
+       FROM review_form_drafts rfd
+       JOIN review_forms rf ON rf.id = rfd.form_id
+       ORDER BY rfd.updated_at DESC
+       LIMIT 20`
+    ),
+    // Create-drafts: brand-new forms never published to the live list (is_draft = true).
+    queryMany<{ id: string; title: string; created_at: string }>(
+      `SELECT id, title, created_at FROM review_forms WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+    ),
+  ])
 
-  const pendingDraftsCount = pendingDrafts.length
+  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
   if (pendingDraftsCount === 0) return null
 
   return (
-    <div className="mb-6">
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-            Pending Drafts ({pendingDraftsCount})
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
-        </div>
+    <details className="mb-6 group">
+      <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
+        <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+          <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+          Pending Drafts ({pendingDraftsCount})
+        </span>
+        <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+      </summary>
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
         <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          {/* Create-drafts: brand-new forms not yet on the live list. Publish activates them. */}
+          {createDrafts.map((d) => (
+            <DraftRowActions
+              key={`new-${d.id}`}
+              entityId={d.id}
+              name={d.title}
+              subtitle="New form — not yet published"
+              updatedAt={d.created_at}
+              editHref={ap(`/admin/review-forms/edit/${d.id}`, host)}
+              publishPath={`/api/admin/review-forms/${d.id}`}
+              publishMethod="PATCH"
+              publishBody={{ is_draft: false, is_active: true }}
+              publishConfirm={`Publish "${d.title}" to the live form list?`}
+              discardPath={`/api/admin/review-forms/${d.id}`}
+              discardConfirm={`Delete the draft form "${d.title}"? This cannot be undone.`}
+              entityLabel="review form"
+            />
+          ))}
           {pendingDrafts.map((d) => (
             <DraftRowActions
               key={d.form_id}
@@ -111,7 +140,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
           ))}
         </div>
       </div>
-    </div>
+    </details>
   )
 }
 

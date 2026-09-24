@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ap } from '@/lib/admin-path'
+import { subscribeAdminEvents } from '@/lib/admin-events-client'
 
 interface Notification {
   id: string
@@ -98,31 +99,18 @@ export default function NotificationBell() {
       window.Notification.requestPermission().catch(() => {})
     }
 
-    let es: EventSource | null = null
     let poll: ReturnType<typeof setInterval> | null = null
+    const startPolling = () => { if (!poll) poll = setInterval(fetchOnce, 60000) }
+    const stopPolling = () => { if (poll) { clearInterval(poll); poll = null } }
 
-    const startPolling = () => {
-      if (poll) return
-      poll = setInterval(fetchOnce, 15000)
-    }
-
-    try {
-      es = new EventSource(ap('/api/admin/notifications/stream'))
-      es.onmessage = (e) => {
-        try { apply(JSON.parse(e.data)) } catch {}
-      }
-      es.onerror = () => {
-        es?.close()
-        es = null
-        startPolling()
-      }
-    } catch {
-      startPolling()
-    }
+    const unsubscribe = subscribeAdminEvents(
+      frame => { if (frame.kind === 'notifications') apply(frame) },
+      status => { if (status === 'open') { stopPolling(); fetchOnce() } else startPolling() },
+    )
 
     return () => {
-      es?.close()
-      if (poll) clearInterval(poll)
+      unsubscribe()
+      stopPolling()
     }
   }, [fetchOnce, apply])
 

@@ -1,4 +1,5 @@
 import { queryOne, queryMany } from '@/lib/db'
+import { controlPlanePool } from '@/lib/tenant-registry'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
 import { headers } from 'next/headers'
@@ -21,7 +22,7 @@ async function getAdminInfo(adminId: string) {
 async function getAllAdmins() {
   return queryMany(`
     SELECT a.id, a.role, a.scopes, a.is_active, a.created_at, a.last_login,
-      a.mfa_enabled,
+      a.mfa_enabled, a.idle_timeout_minutes,
       (SELECT COUNT(*) FROM admin_mfa_recovery_codes WHERE admin_id = a.id AND used_at IS NULL) AS mfa_recovery_codes_remaining,
       u.first_name, u.last_name,
       COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username,
@@ -52,6 +53,34 @@ function CertBadge({ status }: { status: string }) {
   )
 }
 
+// The portal writes downloaded_at/revoked_at to the CENTRAL portal_certs (control plane), not the
+// store-local admin_certificates. Overlay that central state onto each cert by serial so the team
+// page reflects a portal download/revoke. Best-effort: if the control plane is unreachable, the
+// store-local flags stand.
+async function overlayPortalState(admins: any[]): Promise<void> {
+  const serials = admins.flatMap((a: any) => (a.certificates as any[] | null) || [])
+    .map((c: any) => c?.serial_number).filter(Boolean)
+  if (serials.length === 0) return
+  try {
+    const { rows } = await controlPlanePool().query(
+      `SELECT lower(serial) AS serial, downloaded_at, revoked_at FROM portal_certs
+        WHERE lower(serial) = ANY($1::text[])`,
+      [serials.map((s: string) => s.toLowerCase())]
+    )
+    const byId = new Map(rows.map((r: any) => [r.serial, r]))
+    for (const a of admins) {
+      for (const c of ((a.certificates as any[] | null) || [])) {
+        const central = byId.get(String(c.serial_number).toLowerCase())
+        if (!central) continue
+        if (central.downloaded_at && !c.downloaded_at) c.downloaded_at = central.downloaded_at
+        if (central.revoked_at && !c.is_revoked) c.is_revoked = true
+      }
+    }
+  } catch {
+    // control plane unreachable — keep store-local flags
+  }
+}
+
 function certStatus(admin: any): string {
   const certs = admin.certificates as any[] | null
   if (!certs || certs.length === 0) return 'No Certificate'
@@ -59,6 +88,9 @@ function certStatus(admin: any): string {
   if (latest.is_revoked) return 'Revoked'
   if (new Date(latest.expires_at) < new Date()) return 'Expired'
   if (latest.downloaded_at) return 'Active'
+  // Platform-owner roles (super_admin / administrator) administer directly and are treated as
+  // provisioned — their certificate is not gated on a portal download.
+  if (isPlatformOwner(admin.role)) return 'Active'
   return 'Pending Download'
 }
 
@@ -82,6 +114,7 @@ export default async function TeamPage() {
   if (!isPlatformOwner(adminInfo?.role || '')) redirect(ap('/admin/settings', host))
 
   const allAdmins = await getAllAdmins()
+  await overlayPortalState(allAdmins as any[])
 
   const scopeLabels: Record<string, string> = {}
   ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
@@ -187,11 +220,12 @@ export default async function TeamPage() {
               <tr className="border-b border-border-default bg-surface-secondary/40">
                 <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-48">Member</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Scopes</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider max-w-[260px]">Scopes</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-16">2FA</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-40">Certificate</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Last Login</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-36">Certificate</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Expiry</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider whitespace-nowrap w-40">Last Login</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -220,8 +254,8 @@ export default async function TeamPage() {
                     <td className="px-4 py-3 text-xs text-foreground-secondary capitalize w-28">
                       {admin.role.replace('_', ' ')}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 flex-nowrap">
+                    <td className="px-4 py-3 max-w-[260px]">
+                      <div className="flex items-center gap-1 flex-wrap">
                         {isPlatformOwner(admin.role) ? (
                           <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All</span>
                         ) : scopes.length > 0 ? (
@@ -256,14 +290,14 @@ export default async function TeamPage() {
                         {admin.mfa_enabled ? 'On' : 'Off'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 w-40">
+                    <td className="px-4 py-3 w-36">
                       <CertBadge status={status} />
-                      {cert && !cert.is_revoked && new Date(cert.expires_at) > new Date() && (
-                        <p className="text-xs text-foreground-muted mt-0.5">Exp {new Date(cert.expires_at).toLocaleDateString('en-IN')}</p>
-                      )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-foreground-secondary w-28">
-                      {admin.last_login ? new Date(admin.last_login).toLocaleDateString('en-IN') : '—'}
+                    <td className="px-4 py-3 text-xs text-foreground-secondary w-24 whitespace-nowrap">
+                      {cert && !cert.is_revoked ? new Date(cert.expires_at).toLocaleDateString('en-IN') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-foreground-secondary w-40 whitespace-nowrap">
+                      {admin.last_login ? new Date(admin.last_login).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end">

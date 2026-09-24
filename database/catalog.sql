@@ -18,7 +18,8 @@ CREATE TABLE public.brands (
     return_allowed boolean DEFAULT true NOT NULL,
     return_window_days integer DEFAULT 7 NOT NULL,
     replacement_allowed boolean DEFAULT true NOT NULL,
-    replacement_window_days integer DEFAULT 7 NOT NULL
+    replacement_window_days integer DEFAULT 7 NOT NULL,
+    is_draft boolean DEFAULT false NOT NULL
 );
 
 
@@ -58,7 +59,8 @@ CREATE TABLE public.categories (
     replacement_allowed boolean DEFAULT true,
     replacement_window_days integer DEFAULT 7,
     hero_image_mobile text,
-    hero_image_desktop text
+    hero_image_desktop text,
+    is_draft boolean DEFAULT false NOT NULL
 );
 
 
@@ -253,6 +255,7 @@ CREATE TABLE public.products (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     category_id uuid,
     brand_id uuid,
+    data_source character varying(24) DEFAULT 'manual'::character varying NOT NULL,
     sku character varying(100) NOT NULL,
     name character varying(255) NOT NULL,
     slug character varying(255) NOT NULL,
@@ -370,6 +373,7 @@ CREATE TABLE public.products (
     specifications jsonb,
     image_url text,
     supplier_id uuid,
+    is_draft boolean DEFAULT false NOT NULL,
     CONSTRAINT products_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 

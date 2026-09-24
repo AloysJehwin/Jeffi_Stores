@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { CRON_JOBS } from '@/lib/cron-jobs'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query } from '@/lib/db'
@@ -17,15 +18,7 @@ export async function GET(request: NextRequest) {
     const settings: Record<string, string> = {}
     for (const row of result.rows) settings[row.key] = row.value
 
-    const JOBS = [
-      { id: 'delhivery_sync', name: 'Delhivery status sync', path: '/api/admin/delhivery/sync-statuses', intervalMs: 10 * 60 * 1000, intervalLabel: 'every 10 min' },
-      { id: 'cancel_stale_orders', name: 'Cancel stale orders', path: '/api/cron/cancel-stale-orders', intervalMs: 60 * 1000, intervalLabel: 'every 1 min' },
-      { id: 'sweep_auto_tasks', name: 'Sweep auto tasks', path: '/api/cron/sweep-auto-tasks', intervalMs: 30 * 60 * 1000, intervalLabel: 'every 30 min' },
-      { id: 'dispatch_mailer', name: 'Dispatch mailer', path: '/api/cron/dispatch-mailer', intervalMs: 60 * 1000, intervalLabel: 'every 1 min' },
-      { id: 'run_campaigns', name: 'Run campaigns', path: '/api/cron/run-campaigns', intervalMs: 30 * 60 * 1000, intervalLabel: 'every 30 min' },
-      { id: 'compute_health', name: 'Compute store health', path: '/api/cron/compute-health', intervalMs: 30 * 60 * 1000, intervalLabel: 'every 30 min' },
-      { id: 'daily_briefing', name: 'Daily briefing email', path: '/api/cron/daily-briefing', intervalMs: 24 * 60 * 60 * 1000, intervalLabel: 'every 24 h' },
-    ]
+    const JOBS = CRON_JOBS.map(j => ({ id: j.id, name: j.name, path: j.path, intervalMs: j.intervalMs, intervalLabel: j.intervalLabel, tenantScope: j.tenantScope }))
 
     const jobs = JOBS.map(job => {
       let log: Array<{ t: string; ok: boolean; err?: string }> = []

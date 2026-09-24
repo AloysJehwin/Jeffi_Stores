@@ -77,7 +77,8 @@ CREATE TABLE public.admins (
     is_active boolean DEFAULT true,
     mfa_secret_enc text,
     mfa_enabled boolean DEFAULT false NOT NULL,
-    mfa_enrolled_at timestamp with time zone
+    mfa_enrolled_at timestamp with time zone,
+    idle_timeout_minutes integer
 );
 
 

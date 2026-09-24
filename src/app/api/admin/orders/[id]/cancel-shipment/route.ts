@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { resolveTenantId } from '@/lib/tenant-context'
+import { refundEstimateForAwbs } from '@/lib/wallet'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 
@@ -44,12 +46,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
+    const cancelledAwb = order.awb_number
     await query(
       `UPDATE orders SET awb_number = NULL, updated_at = NOW() WHERE id = $1`,
       [id]
     )
 
-    return NextResponse.json({ success: true, waybill: order.awb_number, raw: data })
+    // The AWB is cancelled, so refund any pickup estimate held for it (platform-Delhivery tenants;
+    // own_delhivery never had a debit → no-op). Reconciliation at delivery can no longer fire for a
+    // cancelled AWB, so this is the release point for that hold. Best-effort — never fail the cancel.
+    const tenantId = (await resolveTenantId().catch(() => null)) ?? undefined
+    if (tenantId) await refundEstimateForAwbs({ tenantId, awbs: [cancelledAwb] }).catch(() => {})
+
+    return NextResponse.json({ success: true, waybill: cancelledAwb, raw: data })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

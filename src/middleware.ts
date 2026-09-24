@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken, verifyBusinessToken } from './lib/jwt'
+import { isPassiveAdminRequest } from './lib/passive-admin-paths'
 import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
@@ -196,6 +197,28 @@ export async function middleware(request: NextRequest) {
         return addSecurityHeaders(NextResponse.redirect(buildRedirectUrl(request, '/')))
       }
     }
+  }
+
+  if (hostname.startsWith('certificate.')) {
+    // Admin certificate portal (certificate.jeffistores.in). Non-mTLS host: people arrive here
+    // BECAUSE they don't yet hold a cert. Public: sign-in (/). Protected: the cert list/download,
+    // gated on the portal cookie (a signed JWT of the verified Google email). API under /api/certportal.
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
+    if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())
+    const PORTAL_PROTECTED = ['/certs']
+    if (PORTAL_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+      const portalTok = request.cookies.get('cert_portal')?.value
+      const { verifyPortalToken } = await import('./lib/portal-session')
+      const session = await verifyPortalToken(portalTok).catch(() => null)
+      if (!session) {
+        const res = NextResponse.redirect(new URL('/', request.url))
+        res.cookies.delete('cert_portal')
+        return addSecurityHeaders(res)
+      }
+    }
+    const slug = pathname === '/' ? '' : pathname
+    stripped.set('x-pathname', pathname)
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/certportal${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('ecom.')) {
@@ -463,7 +486,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await inTenant(() => verifyToken(token, reqSignals))
+    const payload = await inTenant(() => verifyToken(token, reqSignals, { touch: !isPassiveAdminRequest(pathname, request.method) }))
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }

@@ -34,6 +34,9 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   const params: unknown[] = []
   let i = 1
 
+  // Never-published drafts live only in the Drafts section, never the live list.
+  conditions.push(`is_draft = false`)
+
   if (filters.is_active === 'true' || filters.is_active === 'false') {
     conditions.push(`is_active = $${i++}`)
     params.push(filters.is_active === 'true')
@@ -119,8 +122,9 @@ async function CouponsStats() {
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'coupons:write')
-  const [allStats, pendingDrafts] = await Promise.all([
+  const [allStats, editDrafts, createDrafts] = await Promise.all([
     getFilteredCoupons({}),
+    // Edit-drafts: unpublished CHANGES staged against a live coupon (coupon_drafts).
     queryMany<{ coupon_id: string; code: string; updated_at: string }>(
       `SELECT cd.coupon_id, c.code, cd.updated_at
        FROM coupon_drafts cd
@@ -128,13 +132,18 @@ async function CouponsStats() {
        ORDER BY cd.updated_at DESC
        LIMIT 20`
     ),
+    // Create-drafts: brand-new coupons never published to the live list (is_draft = true).
+    queryMany<{ id: string; code: string; created_at: string }>(
+      `SELECT id, code, created_at FROM coupons WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+    ),
   ])
+  const pendingDrafts = editDrafts
+  const pendingDraftsCount = editDrafts.length + createDrafts.length
 
   const totalCoupons = allStats.total
   const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
   const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
   const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
-  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -158,15 +167,41 @@ async function CouponsStats() {
       </div>
 
       {pendingDraftsCount > 0 && (
-        <div className="mb-6">
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                Pending Drafts ({pendingDraftsCount})
-              </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">Changes not yet published to live</p>
-            </div>
+        <details className="mb-6 group">
+          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              Pending Drafts ({pendingDraftsCount})
+            </span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+          </summary>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {/* Create-drafts: brand-new coupons not yet on the live list. Publish activates them. */}
+              {createDrafts.map((d) => (
+                canWrite ? (
+                  <DraftRowActions
+                    key={`new-${d.id}`}
+                    entityId={d.id}
+                    name={d.code}
+                    subtitle="New coupon — not yet published"
+                    updatedAt={d.created_at}
+                    editHref={ap(`/admin/coupons/edit/${d.id}`, host)}
+                    publishPath={`/api/admin/coupons/${d.id}`}
+                    publishMethod="PATCH"
+                    publishBody={{ is_draft: false, is_active: true }}
+                    publishConfirm={`Publish "${d.code}" to the live coupon list?`}
+                    discardPath={`/api/admin/coupons/${d.id}`}
+                    discardConfirm={`Delete the draft coupon "${d.code}"? This cannot be undone.`}
+                    entityLabel="coupon"
+                  />
+                ) : (
+                  <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">{d.code}</p>
+                    <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
+                  </div>
+                )
+              ))}
               {pendingDrafts.map((d) => (
                 canWrite ? (
                   <DraftRowActions
@@ -188,7 +223,7 @@ async function CouponsStats() {
               ))}
             </div>
           </div>
-        </div>
+        </details>
       )}
     </div>
   )

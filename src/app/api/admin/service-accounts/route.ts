@@ -3,6 +3,8 @@ import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany } from '@/lib/db'
 import { generateClientCertificate } from '@/lib/certificates'
+import { issueTenantAdminCert } from '@/lib/tenant-ca'
+import { resolveTenant } from '@/lib/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,9 +64,18 @@ export async function POST(request: NextRequest) {
 
   const cn = `svc-${name}`
 
-  let cert: Awaited<ReturnType<typeof generateClientCertificate>>
+  // Issue from the tenant's own CA on a tenant host (else the service-account cert can't
+  // authenticate against the tenant admin's mTLS), platform CA otherwise. Normalise the two
+  // issuers' return shapes into { serialNumber, p12Buffer, p12Password }.
+  let cert: { serialNumber: string; p12Buffer: Buffer; p12Password: string }
   try {
-    cert = await generateClientCertificate(cn, 'service-account')
+    const tenant = await resolveTenant().catch(() => null)
+    if (tenant?.tenantId) {
+      const c = await issueTenantAdminCert({ tenantId: tenant.tenantId, slug: tenant.slug, commonName: cn, issuedTo: cn })
+      cert = { serialNumber: c.serial, p12Buffer: c.p12Buffer, p12Password: c.p12Password }
+    } else {
+      cert = await generateClientCertificate(cn, 'service-account')
+    }
   } catch {
     return NextResponse.json({ error: 'Certificate generation failed' }, { status: 500 })
   }

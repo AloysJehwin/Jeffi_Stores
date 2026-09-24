@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import { bp } from '@/lib/business-path'
-import BusinessPublicHeader from '@/components/business/PublicHeader'
 
 export default function BusinessSignInWrapper() {
   return (
@@ -347,8 +346,17 @@ function BusinessSignInPage() {
 
   return (
     <>
-    <BusinessPublicHeader />
-    <div className="min-h-screen grid lg:grid-cols-2 pt-16 lg:pt-20">
+    <div className="relative min-h-screen grid lg:grid-cols-2">
+      {/* Top-right switch action (the public header is intentionally hidden on the auth pages) */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10 flex items-center gap-3">
+        <span className="hidden sm:inline-flex items-center text-sm text-foreground-secondary bg-surface/90 backdrop-blur px-3 py-2 rounded-lg border border-border-default">New business partner?</span>
+        <Link
+          href={bp('/business/signup')}
+          className="inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors shadow-sm"
+        >
+          Sign up
+        </Link>
+      </div>
       {/* Left — form */}
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-sm">

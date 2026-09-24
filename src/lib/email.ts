@@ -1164,6 +1164,12 @@ export async function sendAdminCertificateEmail(
   role: string,
   tenant?: { slug: string; storeName: string }
 ) {
+  // Hard-cutover mode: never attach the .p12 or the password — send the portal invite instead.
+  // In 'email'/'both' the attachment behaviour below is unchanged.
+  const { certDeliveryMode } = await import('./cert-delivery')
+  if (certDeliveryMode() === 'portal') {
+    return sendCertInviteEmail(email, displayName, role, tenant)
+  }
   // Tenant owners are an ecom communication, so they come from ecommerce@; the platform's
   // own admin certs keep the existing admin sender.
   const from = tenant
@@ -1331,6 +1337,89 @@ export async function sendAdminCertificateEmail(
       attachments,
       kind: 'admin_notification',
       templateName: 'admin_certificate',
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+// Portal-era delivery: an INVITATION with no attachment and no password. The recipient signs in at
+// certificate.jeffistores.in with this same Google (Gmail) account and downloads the cert once.
+export async function sendCertInviteEmail(
+  email: string,
+  displayName: string,
+  role: string,
+  tenant?: { slug: string; storeName: string }
+) {
+  const { certPortalUrl } = await import('./cert-delivery')
+  const portalUrl = certPortalUrl()
+  const from = tenant
+    ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`
+    : adminMailFrom()
+  const platformDomain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
+  const headerName = tenant ? tenant.storeName : storeName()
+  const subject = `Access your admin certificate for ${headerName}`
+  const esc = (s: string) => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))
+  // Reuse the store's standard admin-email shell (same container/header/info/footer as the
+  // certificate email) so the invite matches the store's branding rather than a bare page.
+  const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .cta { text-align: center; margin: 28px 0; }
+            .cta a { background-color: #2563eb; color: #ffffff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; }
+            .info { background-color: #f0f9ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px; }
+            .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div style="font-size:28px;font-weight:bold;color:#1e293b;letter-spacing:0.5px;">${headerName}</div>
+              <p style="color: #666;">Admin Panel Access</p>
+            </div>
+
+            <h2>You've been added as ${esc(role)} to ${headerName}</h2>
+            <p>To administer the store you need your admin certificate. For security we no longer send
+               it as an attachment. Instead, download it once from the certificate portal.</p>
+
+            <div class="cta">
+              <a href="${portalUrl}">Open the certificate portal</a>
+            </div>
+
+            <div class="info">
+              <strong>How it works</strong>
+              <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+                <li>Sign in with <strong>${esc(email)}</strong> — the Google account this invitation was sent to.</li>
+                <li>You will see your certificate and can download it a single time.</li>
+                <li>Save the <code>.p12</code> file and the import password it shows you somewhere safe.</li>
+              </ol>
+            </div>
+
+            <p style="color:#666;font-size:13px;">If the button doesn't work, go to <a href="${portalUrl}" style="color:#2563eb;">${portalUrl}</a></p>
+
+            <div class="footer">
+              <p><strong>${headerName}</strong></p>
+              ${tenant ? '' : `<p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p>Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}</p>`}
+            </div>
+          </div>
+        </body>
+      </html>`
+  try {
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      attachments: [],
+      kind: 'admin_notification',
+      templateName: 'admin_cert_invite',
     })
     return { success: true, messageId: info.messageId }
   } catch (error) {

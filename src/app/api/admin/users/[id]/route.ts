@@ -6,6 +6,7 @@ import { isPlatformOwner } from '@/lib/scopes'
 import { assignableScopeKeys } from '@/lib/scopes-server'
 import { resolveRequestTenantId } from '@/lib/request-tenant'
 import { revokeAllForPrincipal } from '@/lib/auth-sessions'
+import { revokePortalCerts } from '@/lib/portal-certs'
 
 export async function PATCH(
   request: NextRequest,
@@ -19,7 +20,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { scopes, role, is_active, reset_mfa } = body
+    const { scopes, role, is_active, reset_mfa, idle_timeout_minutes } = body
 
     if (reset_mfa === true) {
       if (id === admin.adminId) {
@@ -62,6 +63,17 @@ export async function PATCH(
       values.push(is_active)
     }
 
+    if (idle_timeout_minutes !== undefined) {
+      // null clears the per-admin override (falls back to the default); otherwise must be one of
+      // the allowed choices.
+      const { ADMIN_IDLE_TIMEOUT_CHOICES } = await import('@/lib/auth-sessions')
+      if (idle_timeout_minutes !== null && !ADMIN_IDLE_TIMEOUT_CHOICES.includes(idle_timeout_minutes)) {
+        return NextResponse.json({ error: 'Invalid idle timeout' }, { status: 400 })
+      }
+      updates.push(`idle_timeout_minutes = $${i++}`)
+      values.push(idle_timeout_minutes)
+    }
+
     if (updates.length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
@@ -84,10 +96,13 @@ export async function PATCH(
     }
 
     if (is_active === false) {
-      await query(
-        `UPDATE admin_certificates SET is_revoked = true, revoked_at = NOW() WHERE admin_id = $1 AND is_revoked = false`,
+      const revoked = await query<{ serial_number: string }>(
+        `UPDATE admin_certificates SET is_revoked = true, revoked_at = NOW()
+          WHERE admin_id = $1 AND is_revoked = false RETURNING serial_number`,
         [id]
       )
+      // Mirror into the central portal registry so certificate.jeffistores.in refuses these serials.
+      await revokePortalCerts((revoked.rows || []).map(r => r.serial_number))
     }
 
     return NextResponse.json({ success: true, admin: updated })
@@ -112,7 +127,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
+    // Read the serials before the hard delete so the central registry can be revoked for them —
+    // otherwise a deleted admin's cert stays downloadable from the portal.
+    const certRows = await query<{ serial_number: string }>(
+      'SELECT serial_number FROM admin_certificates WHERE admin_id = $1', [id]
+    )
     await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
+    await revokePortalCerts((certRows.rows || []).map(r => r.serial_number))
 
     const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, user_id', [id])
 

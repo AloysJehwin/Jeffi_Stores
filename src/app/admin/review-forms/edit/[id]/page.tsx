@@ -11,6 +11,7 @@ interface ReviewForm {
   id: string; title: string; slug: string; description: string | null
   template_type: 'google_review' | 'product_feedback' | 'testimonial'
   google_review_url: string; coupon_id: string | null; is_active: boolean
+  is_draft: boolean
   custom_fields: { id: string; label: string; type: 'text' | 'textarea' | 'image' | 'rating'; required: boolean }[]
 }
 interface Coupon { id: string; code: string; description: string | null }
@@ -28,11 +29,15 @@ export default async function EditReviewFormPage({ params, searchParams }: { par
   ])
   if (!form) notFound()
 
-  // Auto-create draft on first edit visit
-  let draftRow = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
+  // Create-draft form (is_draft = true): edit the row in place — never seed a review_form_drafts
+  // (edit-draft) row for it. Publish flips is_draft = false + is_active = true.
+  const isCreateDraft = !!form.is_draft
+
+  // Auto-create edit-draft on first edit visit (live forms only).
+  let draftRow = isCreateDraft ? null : await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
     `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`, [id]
   )
-  if (!draftRow) {
+  if (!isCreateDraft && !draftRow) {
     await query(
       `INSERT INTO review_form_drafts (form_id, fields)
        SELECT id, to_jsonb(rf) - 'id' - 'created_at' - 'updated_at' - 'submissions_count'
@@ -54,8 +59,15 @@ export default async function EditReviewFormPage({ params, searchParams }: { par
         <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
-        <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Review Form'}</h1>
+        <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{isCreateDraft ? 'Edit Draft Form' : isDraft ? 'Edit Draft' : 'Edit Review Form'}</h1>
       </div>
+
+      {isCreateDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New form — draft</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">This form is not on the live list yet. Save keeps it a draft; Publish makes it live.</p>
+        </div>
+      )}
 
       {isDraft && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
@@ -74,6 +86,7 @@ export default async function EditReviewFormPage({ params, searchParams }: { par
 
       <ReviewFormForm
         isDraft={isDraft}
+        isCreateDraft={isCreateDraft}
         coupons={coupons}
         formId={form.id}
         backUrl={backUrl}

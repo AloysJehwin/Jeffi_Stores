@@ -211,6 +211,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }> | null;
   } | null>(null)
   const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
+  const [refundBreakdown, setRefundBreakdown] = useState<{ grossRefund: number; charge: number; netRefund: number } | null>(null)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
   const [returnReason, setReturnReason] = useState('')
@@ -260,6 +261,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           ? { ...retData.returnRequest, items: retData.returnItems || [] }
           : null)
         setMonthlyLimitReached(!!retData.monthlyLimitReached)
+        setRefundBreakdown(retData.refundBreakdown ?? null)
       }
     } catch (err: any) {
       setError(err.message)
@@ -993,6 +995,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </a>{' '}
                     has been created and confirmed.
                   </p>
+                ) : refundBreakdown && refundBreakdown.netRefund <= 0 && refundBreakdown.charge > 0 ? (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your return has been accepted. A ₹{refundBreakdown.charge.toLocaleString('en-IN')} return handling
+                    charge applied to the ₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} returnable amount, so no
+                    amount was refunded for this return.
+                  </p>
+                ) : refundBreakdown && refundBreakdown.charge > 0 ? (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN')} has been processed
+                    (₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} less a ₹{refundBreakdown.charge.toLocaleString('en-IN')} return
+                    handling charge). It may take 5–7 business days to reflect in your account.
+                  </p>
                 ) : (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
                     Your refund has been processed. It may take 5–7 business days to reflect in your account.
@@ -1373,6 +1387,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {Array.isArray((order as any).sharedNotes) && (order as any).sharedNotes.length > 0 && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6">
+                <h3 className="text-lg font-bold text-foreground mb-1">Notes from the store</h3>
+                <p className="text-xs text-foreground-muted mb-4">Sketches, measurements and messages our team shared with you for this order.</p>
+                <div className="space-y-4">
+                  {(order as any).sharedNotes.map((n: any) => (
+                    <div key={n.id} className="border border-border-default rounded-lg p-4">
+                      {n.title && <p className="font-semibold text-foreground">{n.title}</p>}
+                      {n.body && <p className="text-sm text-foreground-secondary whitespace-pre-wrap mt-1">{n.body}</p>}
+                      {n.attachments?.some((a: any) => a.kind === 'image') && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {n.attachments.filter((a: any) => a.kind === 'image').map((a: any) => (
+                            <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
+                              <img src={a.thumbnailUrl || a.url} alt="" className="w-24 h-24 object-cover rounded-lg border border-border-default" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {n.attachments?.filter((a: any) => a.kind === 'audio').map((a: any) => (
+                        <audio key={a.id} controls preload="none" src={a.url} className="mt-3 w-full" />
+                      ))}
+                      <p className="text-[11px] text-foreground-muted mt-2">{new Date(n.createdAt).toLocaleString('en-IN')}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

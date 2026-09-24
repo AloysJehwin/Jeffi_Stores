@@ -38,6 +38,24 @@ async function updateBrand(brandId: string, formData: FormData) {
 
   const draftFields = { name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days }
 
+  // Create-draft brand (is_draft = true, no brand_drafts row): edit the row in place, never
+  // through brand_drafts. Save keeps it a draft; Publish flips is_draft = false + is_active.
+  const createDraftRow = await queryOne<{ is_draft: boolean }>(
+    `SELECT is_draft FROM brands WHERE id = $1`, [brandId]
+  )
+  if (!hasDraft && createDraftRow?.is_draft) {
+    const publish = intent === 'publish'
+    await query(
+      `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5,
+       is_active=$6, is_draft=$7, return_allowed=$8, return_window_days=$9,
+       replacement_allowed=$10, replacement_window_days=$11 WHERE id=$12`,
+      [name, slug, description, website, logo_url, publish ? true : false, publish ? false : true,
+       return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+    )
+    revalidatePath('/admin/brands')
+    redirect(ap('/admin/brands', host))
+  }
+
   try {
     if (hasDraft || intent === 'draft') {
       if (intent === 'discard') {
@@ -109,7 +127,10 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
     `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
   )
   const isDraft = !!draftRow
-  if (!isDraft) {
+  // A create-draft brand (is_draft = true) has no brand_drafts row but must still render its
+  // edit form (editing in place) rather than bouncing to the detail page.
+  const isCreateDraft = !isDraft && !!(brand as { is_draft?: boolean }).is_draft
+  if (!isDraft && !isCreateDraft) {
     redirect(ap(`/admin/brands/${id}`, host))
   }
 
@@ -144,12 +165,19 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
         </div>
       )}
 
+      {isCreateDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New brand — draft</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">This brand is not on the live list yet. Save keeps it a draft; Publish makes it live.</p>
+        </div>
+      )}
+
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Brand'}</h1>
-        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update brand information'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isCreateDraft ? 'Edit Draft Brand' : isDraft ? 'Edit Draft' : 'Edit Brand'}</h1>
+        <p className="text-foreground-secondary mt-1">{isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update brand information'}</p>
       </div>
 
-      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft} hasReturns={hasReturns} />
+      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft || isCreateDraft} hasReturns={hasReturns} />
     </div>
   )
 }

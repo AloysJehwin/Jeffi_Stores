@@ -441,6 +441,14 @@ async function updateProduct(productId: string, formData: FormData) {
     setClauses.push(`age_min = $${params.length + 1}`, `age_max = $${params.length + 2}`, `target_gender = $${params.length + 3}`, `target_audience = $${params.length + 4}`)
     params.push(ageMin, ageMax, targetGender, targetAudience)
 
+    // Create-draft (is_draft=true, no product_drafts row) editing in place: Publish clears is_draft
+    // (is_active is already set to true via isActive on the publish intent above); Save keeps it a
+    // draft. A live product's is_draft is already false, so writing false is a no-op for it.
+    if (intent === 'publish') {
+      setClauses.push(`is_draft = $${params.length + 1}`)
+      params.push(false)
+    }
+
     params.push(productId)
     const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>('SELECT perishable, serialized FROM products WHERE id = $1', [productId])
     await query(
@@ -874,12 +882,14 @@ export default async function EditProductPage({ params, searchParams }: { params
     [id]
   )
   const isDraft = !!draftRow
+  // A create-draft product (is_draft = true) has no product_drafts row but must still render its
+  // edit form (editing in place via the live-edit path) rather than bouncing to the detail page.
+  const isCreateDraft = (product as { is_draft?: boolean })?.is_draft === true
 
-  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
-  // product with no draft (active or inactive) is blocked — redirect to the detail
-  // page, where the Edit button creates a draft first. This guarantees the live
-  // product is never mutated directly and every edit flows through the draft system.
-  if (!isDraft) {
+  // Editing a LIVE product ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // live product with no draft is blocked — redirect to the detail page, where the Edit button
+  // creates a draft first. Create-drafts are the exception: they edit in place.
+  if (!isDraft && !isCreateDraft) {
     const host = await getHost()
     redirect(ap(`/admin/products/${id}`, host))
   }
@@ -915,9 +925,18 @@ export default async function EditProductPage({ params, searchParams }: { params
     )
   }
 
+  // getProduct now returns inactive variants/sub-variants too (the detail page needs them
+  // for the status toggle). The draft editor treats inactive as soft-deleted, so keep only
+  // active rows here and drop inactive sub-variants nested under an active variant.
+  const liveActiveVariants = ((product as any)?.product_variants || [])
+    .filter((v: any) => v?.is_active !== false)
+    .map((v: any) => ({
+      ...v,
+      sub_variants: Array.isArray(v?.sub_variants) ? v.sub_variants.filter((sv: any) => sv?.is_active !== false) : v?.sub_variants,
+    }))
   const mergedVariants = draftVariants
     ? withDraftSubVariants(draftVariants as any[])
-    : withDraftSubVariants((product as any)?.product_variants || [])
+    : withDraftSubVariants(liveActiveVariants)
 
   // Feed DRAFT images to the form so removals/reorders/primary changes persist across
   // reopen. The draft images carry their real `id` (kept at draft-entry + autosave),
@@ -945,7 +964,8 @@ export default async function EditProductPage({ params, searchParams }: { params
     const p: any = product
     if (p?.has_variants && Array.isArray(p?.product_variants)) {
       for (const v of p.product_variants) {
-        const subs = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+        if (v?.is_active === false) continue
+        const subs = (Array.isArray(v?.sub_variants) ? v.sub_variants : []).filter((sv: any) => sv?.is_active !== false)
         if (subs.length > 0) {
           for (const sv of subs) {
             const qty = parseFloat(sv?.inventory_quantity) || 0

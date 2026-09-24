@@ -50,6 +50,9 @@ export function buildVariants(group: ProductGroup): Record<string, unknown>[] {
   return group.variants.map((v: VariantGroup) => {
     const values = { ...v.values }
     if (v.subVariants.length > 0) values.sub_variant_type_on = true
+    // A variant with its own image_urls uses its own images — otherwise the publisher's
+    // "use_own_images off" branch would delete the staged variant_images on publish.
+    if (String((values as Record<string, unknown>).image_urls ?? '').trim()) values.use_own_images = true
     return values
   })
 }

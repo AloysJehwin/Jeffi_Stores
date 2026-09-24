@@ -24,7 +24,7 @@ export default async function AddReviewFormPage() {
         </div>
       </div>
 
-      <ReviewFormForm submitLabel="Create Form" coupons={coupons} />
+      <ReviewFormForm submitLabel="Save as Draft" coupons={coupons} />
     </div>
   )
 }

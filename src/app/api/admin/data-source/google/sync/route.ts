@@ -3,17 +3,23 @@ import { requireAdminScope } from '@/lib/jwt'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { uploadImportFile } from '@/lib/s3'
 import { parseWorkbook } from '@/lib/import/parse'
+import { SHEET_ORDER } from '@/lib/import/columns'
 import { enqueueImportJob, resolveImportTenantId } from '@/lib/import/jobs'
 import { resolveGoogleSheetsCreds, IntegrationNotConnectedError } from '@/lib/integrations/resolve'
-import { readSheetValues } from '@/lib/google-sheets'
-import { extractSpreadsheetId, valuesToWorkbookBuffer } from '@/lib/import/google-sync'
+import { listSheetTitles, readSheetValues, readSheetValuesBatch, wholeSheetRange } from '@/lib/google-sheets'
+import { extractSpreadsheetId, valuesToWorkbookBuffer, type SheetMatrix } from '@/lib/import/google-sync'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const DEFAULT_RANGE = 'A:DZ' // wide enough for the full ~119-column template
+const LEGACY_RANGE = 'A:DZ'
 
-// Stage the tenant's connected sheet as a workbook and enqueue via the shared upload worker path.
+/**
+ * Stage the tenant's connected sheet as a workbook and enqueue via the shared upload worker path.
+ * A sheet created from the template has a Products tab plus the Variants / Sub-variants /
+ * attribute tabs: every template tab present is read so the sync sees exactly what the .xlsx
+ * upload would. A sheet without a Products tab is read as the legacy single flat grid.
+ */
 export async function POST(request: NextRequest) {
   const admin = await requireAdminScope(request, 'products:write')
   if (admin instanceof NextResponse) return admin
@@ -39,17 +45,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No spreadsheet configured — connect a sheet or pass one' }, { status: 400 })
   }
 
-  let values: string[][]
+  let sheets: SheetMatrix | Record<string, SheetMatrix>
   try {
-    values = await readSheetValues(spreadsheetId, DEFAULT_RANGE, accessToken)
+    const titles = await listSheetTitles(spreadsheetId, accessToken)
+    if (titles.includes('Products')) {
+      const tabs = SHEET_ORDER.filter(t => titles.includes(t))
+      const matrices = await readSheetValuesBatch(spreadsheetId, tabs.map(wholeSheetRange), accessToken)
+      sheets = Object.fromEntries(tabs.map((t, i) => [t, matrices[i]]))
+    } else {
+      sheets = await readSheetValues(spreadsheetId, LEGACY_RANGE, accessToken)
+    }
   } catch (e: unknown) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to read the sheet' }, { status: 502 })
   }
-  if (values.length < 2) {
-    return NextResponse.json({ error: 'Sheet has no data rows under the header' }, { status: 400 })
-  }
 
-  const buf = valuesToWorkbookBuffer(values)
+  const buf = valuesToWorkbookBuffer(sheets)
   const parsed = parseWorkbook(buf)
   if (parsed.fatal) return NextResponse.json({ error: parsed.fatal }, { status: 400 })
 

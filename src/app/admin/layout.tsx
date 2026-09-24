@@ -105,7 +105,7 @@ export default async function AdminLayout({
   const usernameInitial = (displayName !== 'Admin' ? displayName : (session?.email || 'A'))[0].toUpperCase()
 
   const logoutForm = (
-    <form action={logoutAction}>
+    <form key="admin-logout" action={logoutAction}>
       <button
         type="submit"
         className="h-9 inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"

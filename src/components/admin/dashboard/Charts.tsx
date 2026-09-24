@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 interface TrendPoint {
   label: string
@@ -42,18 +42,46 @@ function compact(v: number): string {
   return String(Math.round(v))
 }
 
+export type TrendBucket = 'hour' | 'day' | 'week' | 'month'
+
+function inferBucket(points: TrendPoint[]): TrendBucket {
+  const times = points.map(p => new Date(p.label).getTime()).filter(t => !isNaN(t))
+  if (times.length < 2) return 'day'
+  const gaps = times.slice(1).map((t, i) => t - times[i]).filter(g => g > 0).sort((a, b) => a - b)
+  const g = gaps[Math.floor(gaps.length / 2)] || 0
+  if (g <= 2 * 3600_000) return 'hour'
+  if (g <= 2 * 86400_000) return 'day'
+  if (g <= 20 * 86400_000) return 'week'
+  return 'month'
+}
+
+function formatBucket(iso: string, bucket: TrendBucket, full: boolean): string {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  const day = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  if (bucket === 'hour') {
+    const start = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    return full ? `${day}, ${start}` : start
+  }
+  if (bucket === 'month') return d.toLocaleDateString('en-IN', { month: 'short', year: full ? 'numeric' : '2-digit' })
+  if (bucket === 'week') return full ? `Week of ${day}` : day
+  return full ? d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : day
+}
+
 /**
  * Hand-rolled SVG trend chart (no chart library). Plots several representations
  * of the same order time series in one graph — revenue (area), orders (bars),
  * and paid-orders / AOV / units / customers (lines). Series map to one of TWO
- * shared axes by magnitude: money (₹, left) and counts (right). Series on the
- * same axis overlap meaningfully; the dual scale keeps ₹50k and "12 customers"
- * from being stretched to the same height. Toggle each series via chips.
+ * shared axes by magnitude: money (₹, left) and counts (right). Toggle each
+ * series via chips. Hovering (or arrow keys once focused) snaps a crosshair to
+ * the nearest bucket and shows every visible series' value for it.
  */
-export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; height?: number }) {
+export function TrendChart({ points, height = 240, bucket }: { points: TrendPoint[]; height?: number; bucket?: TrendBucket }) {
   const [active, setActive] = useState<Record<SeriesKey, boolean>>({
     revenue: true, orders: true, paidOrders: false, aov: false, units: false, customers: false,
   })
+  const [hover, setHover] = useState<number | null>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
 
   if (!points.length) {
     return <div className="flex items-center justify-center text-xs text-foreground-muted" style={{ height }}>No data in this range</div>
@@ -61,14 +89,13 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
 
   // Normalized 0..100 coordinate space in BOTH axes so the SVG can stretch to any
   // width/height (preserveAspectRatio="none") and still fill the container fully.
-  // Axis LABELS are rendered as absolutely-positioned HTML (percentages), so they
-  // never distort with the stretch and stay crisp.
+  // Axis labels, markers and the tooltip are HTML positioned by percentage, so they
+  // never distort with the stretch.
   const n = points.length
   const val = (p: TrendPoint, key: SeriesKey) => {
     const v = p[key]
     return typeof v === 'number' && isFinite(v) ? v : 0
   }
-  // Plot inset (as % of the box) — leaves room for the HTML axis gutters.
   const insetT = 3, insetB = 3, insetX = 1
   const px = (i: number) => insetX + (n === 1 ? (100 - insetX * 2) / 2 : (i / (n - 1)) * (100 - insetX * 2))
 
@@ -89,19 +116,41 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
   const slot = (100 - insetX * 2) / Math.max(1, n)
   const barW = Math.min(2.5, Math.max(0.5, slot * 0.45))
 
-  const fmtDate = (iso: string) => {
-    const d = new Date(iso)
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-  }
+  const gran = bucket ?? inferBucket(points)
+  const fmtTick = (iso: string) => formatBucket(iso, gran, false)
+  const fmtFull = (iso: string) => formatBucket(iso, gran, true)
   const fmtVal = (v: number, axis: Axis) => axis === 'money' ? `Rs ${Math.round(v).toLocaleString('en-IN')}` : Math.round(v).toLocaleString('en-IN')
 
-  // ~5 horizontal gridlines; ~7 evenly spaced X ticks (endpoints always shown).
   const GRID = 4
   const xTickCount = Math.min(n, 7)
   const xTickIdx = n <= 1 ? [0] : Array.from(new Set(
     Array.from({ length: xTickCount }, (_, k) => Math.round((k / (xTickCount - 1)) * (n - 1)))
   ))
-  const gridPY = (t: number) => insetT + (1 - t / GRID) * (100 - insetT - insetB)     // % from top
+  const gridPY = (t: number) => insetT + (1 - t / GRID) * (100 - insetT - insetB)
+
+  const nearestIndex = (clientX: number): number | null => {
+    const el = canvasRef.current
+    if (!el) return null
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 0) return null
+    if (n === 1) return 0
+    const xPct = ((clientX - rect.left) / rect.width) * 100
+    const t = (xPct - insetX) / (100 - insetX * 2)
+    return Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))))
+  }
+  const onPointer = (e: React.PointerEvent<HTMLDivElement>) => {
+    const i = nearestIndex(e.clientX)
+    if (i !== null && i !== hover) setHover(i)
+  }
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowRight') { e.preventDefault(); setHover(h => Math.min(n - 1, (h ?? -1) + 1)) }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); setHover(h => Math.max(0, (h ?? n) - 1)) }
+    else if (e.key === 'Escape') setHover(null)
+  }
+  const hp = hover !== null ? points[hover] : null
+  const hx = hover !== null ? px(hover) : 0
+  const tipOnLeft = hx > 55
+  const canvasStyle = { left: hasMoney ? 40 : 4, right: hasCount ? 40 : 4 }
 
   return (
     <div className="w-full">
@@ -112,10 +161,7 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
         ))}
       </div>
 
-      {/* Plot area: full-width relative box. Left/right gutters hold HTML axis
-          labels; the SVG fills the middle and stretches to the whole space. */}
       <div className="relative w-full" style={{ height }}>
-        {/* Left Y-axis labels (money) — column spans exactly the canvas height */}
         {hasMoney && (
           <div className="absolute left-0 top-0 w-9" style={{ bottom: 20 }}>
             {Array.from({ length: GRID + 1 }, (_, t) => (
@@ -125,7 +171,6 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
             ))}
           </div>
         )}
-        {/* Right Y-axis labels (counts) */}
         {hasCount && (
           <div className="absolute right-0 top-0 w-9" style={{ bottom: 20 }}>
             {Array.from({ length: GRID + 1 }, (_, t) => (
@@ -136,9 +181,21 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
           </div>
         )}
 
-        {/* The stretchable chart canvas */}
-        <div className="absolute top-0" style={{ left: hasMoney ? 40 : 4, right: hasCount ? 40 : 4, bottom: 20 }}>
-          <svg viewBox="0 0 100 100" className="w-full h-full block" preserveAspectRatio="none">
+        {/* The stretchable chart canvas, also the hover surface: the whole plot is the hit target. */}
+        <div
+          ref={canvasRef}
+          className="absolute top-0 outline-none rounded focus-visible:ring-2 focus-visible:ring-accent-500/50 touch-none"
+          style={{ ...canvasStyle, bottom: 20 }}
+          role="img"
+          aria-label="Revenue and orders over time. Use the arrow keys to read each point."
+          tabIndex={0}
+          onPointerMove={onPointer}
+          onPointerDown={onPointer}
+          onPointerLeave={() => setHover(null)}
+          onKeyDown={onKey}
+          onBlur={() => setHover(null)}
+        >
+          <svg viewBox="0 0 100 100" className="w-full h-full block" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.22" />
@@ -146,7 +203,6 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
               </linearGradient>
             </defs>
 
-            {/* Gridlines — light gray (adapts to dark mode), sitting behind the data. */}
             {Array.from({ length: GRID + 1 }, (_, t) => (
               <line key={`hg${t}`} x1={0} y1={gridPY(t)} x2={100} y2={gridPY(t)}
                 className="stroke-zinc-200 dark:stroke-zinc-700/60" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
@@ -156,13 +212,12 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
                 className="stroke-zinc-200 dark:stroke-zinc-700/60" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
             ))}
 
-            {/* Bars (behind), areas, then lines */}
             {activeSeries.filter(s => s.kind === 'bar').map(s => {
               const y = pyFor(s)
               return points.map((p, i) => {
                 const yv = y(val(p, s.key))
                 const h = (100 - insetB) - yv
-                return <rect key={`${s.key}${i}`} x={px(i) - barW / 2} y={yv} width={barW} height={Math.max(0, h)} rx={0.4} fill={s.color} fillOpacity={0.35} />
+                return <rect key={`${s.key}${i}`} x={px(i) - barW / 2} y={yv} width={barW} height={Math.max(0, h)} rx={0.4} fill={s.color} fillOpacity={hover === i ? 0.7 : 0.35} />
               })
             })}
             {activeSeries.filter(s => s.kind === 'area').map(s => {
@@ -181,17 +236,41 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
               return <polyline key={s.key} points={line} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             })}
 
-            {/* Invisible hover targets — native tooltip lists all active series */}
-            {points.map((p, i) => (
-              <rect key={`h${i}`} x={px(i) - slot / 2} y={insetT} width={slot} height={100 - insetT - insetB} fill="transparent">
-                <title>{`${fmtDate(p.label)}\n${activeSeries.map(s => `${s.label}: ${fmtVal(val(p, s.key), s.axis)}`).join('\n')}`}</title>
-              </rect>
-            ))}
+            {hover !== null && (
+              <line x1={hx} y1={insetT} x2={hx} y2={100 - insetB}
+                className="stroke-zinc-400 dark:stroke-zinc-500" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+            )}
           </svg>
+
+          {hp && activeSeries.filter(s => s.kind !== 'bar').map(s => (
+            <span key={`m${s.key}`} className="absolute w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 pointer-events-none"
+              style={{ left: `${hx}%`, top: `${pyFor(s)(val(hp, s.key))}%`, transform: 'translate(-50%, -50%)', background: s.color }} />
+          ))}
+
+          {hp && (
+            <div
+              className="absolute top-2 z-10 pointer-events-none min-w-[9rem] rounded-lg bg-surface-elevated ring-1 ring-border-default shadow-lg px-3 py-2 text-xs"
+              style={{ left: `${hx}%`, transform: tipOnLeft ? 'translateX(calc(-100% - 10px))' : 'translateX(10px)' }}
+            >
+              <p className="font-semibold text-foreground mb-1.5 whitespace-nowrap">{fmtFull(hp.label)}</p>
+              {activeSeries.length === 0 ? (
+                <p className="text-foreground-muted whitespace-nowrap">Turn on a series above</p>
+              ) : (
+                <ul className="space-y-1">
+                  {activeSeries.map(s => (
+                    <li key={s.key} className="flex items-center gap-2 whitespace-nowrap">
+                      <span className="w-3 h-0.5 rounded-full shrink-0" style={{ background: s.color }} />
+                      <span className="font-bold tabular-nums text-foreground">{fmtVal(val(hp, s.key), s.axis)}</span>
+                      <span className="text-foreground-muted">{s.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* X-axis date labels (HTML, non-distorting) aligned to the canvas */}
-        <div className="absolute bottom-0 h-5" style={{ left: hasMoney ? 40 : 4, right: hasCount ? 40 : 4 }}>
+        <div className="absolute bottom-0 h-5" style={canvasStyle}>
           {xTickIdx.map((i, k) => (
             <span key={`xt${i}`}
               className="absolute text-[10px] text-foreground-muted whitespace-nowrap"
@@ -199,7 +278,7 @@ export function TrendChart({ points, height = 240 }: { points: TrendPoint[]; hei
                 left: `${px(i)}%`,
                 transform: k === 0 ? 'translateX(0)' : k === xTickIdx.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)',
               }}>
-              {fmtDate(points[i].label)}
+              {fmtTick(points[i].label)}
             </span>
           ))}
         </div>

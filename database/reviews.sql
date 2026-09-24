@@ -85,7 +85,8 @@ CREATE TABLE public.review_forms (
     submissions_count integer DEFAULT 0,
     created_at timestamp with time zone DEFAULT now(),
     custom_fields jsonb DEFAULT '[]'::jsonb,
-    template_type text DEFAULT 'google_review'::text NOT NULL
+    template_type text DEFAULT 'google_review'::text NOT NULL,
+    is_draft boolean DEFAULT false NOT NULL
 );
 
 

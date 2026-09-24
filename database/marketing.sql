@@ -68,6 +68,7 @@ CREATE TABLE public.coupon_usage (
 
 CREATE TABLE public.coupons (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    is_draft boolean DEFAULT false NOT NULL,
     code character varying(50) NOT NULL,
     description text,
     discount_type character varying(20) NOT NULL,

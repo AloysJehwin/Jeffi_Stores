@@ -163,6 +163,19 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const draft = await queryOne<{ variant_images: any[]; images: any[] }>(
       `SELECT variant_images, images FROM product_drafts WHERE product_id = $1`, [id]
     )
+
+    // Create-draft (is_draft=true, no product_drafts edit-draft): discarding means deleting the
+    // product row itself, since it was never published to the live list.
+    if (!draft) {
+      const createDraft = await queryOne<{ id: string }>(
+        `SELECT id FROM products WHERE id = $1 AND is_draft = true`, [id]
+      )
+      if (createDraft) {
+        await query(`DELETE FROM products WHERE id = $1 AND is_draft = true`, [id])
+        return NextResponse.json({ success: true })
+      }
+    }
+
     const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
     for (const vi of stagedVI) {
       if (vi?._staged && vi?.s3_key && String(vi.id).startsWith('draft-vi-')) {
