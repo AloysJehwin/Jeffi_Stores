@@ -505,3 +505,34 @@ export async function createSheetFromWorkbook(
   }
   return String(data.id)
 }
+
+// Tab titles of a spreadsheet, in tab order. Needs only the spreadsheets.readonly scope.
+export async function listSheetTitles(spreadsheetId: string, accessToken: string): Promise<string[]> {
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error?.message || `sheets metadata failed (${res.status})`)
+  const sheets = (data?.sheets as Array<{ properties?: { title?: string } }>) || []
+  return sheets.map(s => String(s.properties?.title || '')).filter(Boolean)
+}
+
+// Several ranges in one round trip; the result is aligned to `ranges` (an unreadable range yields []).
+export async function readSheetValuesBatch(spreadsheetId: string, ranges: string[], accessToken: string): Promise<string[][][]> {
+  if (ranges.length === 0) return []
+  const qs = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&')
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet?${qs}&majorDimension=ROWS`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error?.message || `sheets batch read failed (${res.status})`)
+  const vrs = (data?.valueRanges as Array<{ values?: string[][] }>) || []
+  return ranges.map((_, i) => vrs[i]?.values || [])
+}
+
+// A1 range covering a whole tab, with the title quoted for the Sheets API.
+export function wholeSheetRange(title: string): string {
+  return `'${title.replace(/'/g, "''")}'!A:ZZ`
+}

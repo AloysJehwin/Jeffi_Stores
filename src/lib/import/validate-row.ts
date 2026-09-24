@@ -1,5 +1,7 @@
 import type { ParsedRow } from './parse'
 
+const rowRef = (r: ParsedRow) => (r.sheet ? `${r.sheet} row ${r.rowNumber}` : `row ${r.rowNumber}`)
+
 export interface VariantGroup {
   sku: string
   values: Record<string, unknown>
@@ -68,7 +70,7 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       if (sku && parent.variants.some(v => v.sku === sku)) {
         errs.push(`duplicate variant.sku "${sku}" under product "${parent.sku}"`)
       }
-      if (errs.length) parent.errors.push(`row ${row.rowNumber}: ${errs.join('; ')}`)
+      if (errs.length) parent.errors.push(`${rowRef(row)}: ${errs.join('; ')}`)
       parent.variants.push({ sku, values: row.values, rowNumber: row.rowNumber, subVariants: [] })
     }
   }
@@ -82,12 +84,12 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       }
       const variant = parent.variants.find(v => v.sku && v.sku === row.variantSku)
       if (!variant) {
-        parent.errors.push(`row ${row.rowNumber}: sub_variant references unknown variant_sku "${row.variantSku ?? ''}"`)
+        parent.errors.push(`${rowRef(row)}: sub_variant references unknown variant_sku "${row.variantSku ?? ''}"`)
         continue
       }
       const errs = [...row.errors]
       if (!String(row.values.sub_variant_name ?? '').trim()) errs.push('sub_variant row is missing sub_variant.sub_variant_name')
-      if (errs.length) parent.errors.push(`row ${row.rowNumber}: ${errs.join('; ')}`)
+      if (errs.length) parent.errors.push(`${rowRef(row)}: ${errs.join('; ')}`)
       variant.subVariants.push({ values: row.values, rowNumber: row.rowNumber })
     }
   }
