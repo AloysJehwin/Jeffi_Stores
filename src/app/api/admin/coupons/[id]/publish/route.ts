@@ -20,6 +20,9 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
   const f = draft.fields as any
+  // Edit-draft publish: apply the drafted changes to the existing live coupon (COALESCE keeps
+  // unset fields). Create-drafts are inactive coupons published via the create-draft publish
+  // action, not this edit-draft route.
   await query(
     `UPDATE coupons SET
        code = COALESCE($2, code),
@@ -35,17 +38,11 @@ export async function POST(req: NextRequest, { params }: Params) {
        is_active = COALESCE($12::boolean, is_active)
      WHERE id = $1`,
     [
-      id,
-      f.code || null,
-      f.description ?? null,
-      f.discount_type || null,
+      id, f.code || null, f.description ?? null, f.discount_type || null,
       f.discount_value != null ? f.discount_value : null,
-      f.min_purchase_amount ?? null,
-      f.max_discount_amount ?? null,
-      f.usage_limit ?? null,
-      f.usage_limit_per_user ?? null,
-      f.valid_from || null,
-      f.valid_until || null,
+      f.min_purchase_amount ?? null, f.max_discount_amount ?? null,
+      f.usage_limit ?? null, f.usage_limit_per_user ?? null,
+      f.valid_from || null, f.valid_until || null,
       f.is_active != null ? f.is_active : null,
     ]
   )

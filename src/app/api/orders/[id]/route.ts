@@ -3,6 +3,7 @@ import { productLabel } from '@/lib/product-label'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { listSharedNotesForOrder } from '@/lib/customer-notes'
 import { addressChangeBlockReason, hasPendingAddressChange } from '@/lib/address-change'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
@@ -244,6 +245,7 @@ export async function GET(
         settlementType: pendingVcr.settlement_type,
         status: pendingVcr.status,
       } : null,
+      sharedNotes: order.user_id ? await listSharedNotesForOrder(order.user_id, orderId).catch(() => []) : [],
       canChangeAddress: addressChangeAvailable && addressChangeBlockReason(order) === null,
       addressChange: addressChange ? {
         id: addressChange.id,

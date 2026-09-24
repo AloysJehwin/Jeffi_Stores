@@ -2063,10 +2063,10 @@ function DraftStockPill({ draft }: { draft: any }) {
   return (
     <span className="relative group inline-flex">
       {pill}
-      {/* Hover popup — shown below pill to avoid being clipped at page top */}
-      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
-        w-72 rounded-lg border border-border-default bg-surface shadow-lg p-2
-        opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      {/* Hover popup — hidden (removed from layout) until hover, so it never reserves vertical
+          space inside the table's scroll container. Shown below the pill to avoid top clipping. */}
+      <span className="pointer-events-none hidden group-hover:block absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
+        w-72 rounded-lg border border-border-default bg-surface shadow-lg p-2">
         <span className="block text-xs font-semibold text-foreground mb-1.5">Stock breakdown</span>
         {lines.map((l, i) => {
           const name = l.variant_name ? `${l.product_name} — ${l.variant_name}` : l.product_name

@@ -252,7 +252,7 @@ describe('listDelhiveryPickupLocations', () => {
       .mockResolvedValueOnce({ rows: [] }) // upsert
       .mockRejectedValueOnce(new Error('db down')) // select
     const locs = await listDelhiveryPickupLocations()
-    expect(locs).toEqual([{ name: 'Jeffi Stores', pin: '', phone: '', address: '', active: true }])
+    expect(locs).toEqual([{ name: 'Jeffi Stores', pin: '', phone: '', address: '', city: '', state: '', active: true }])
   })
 
   it('returns [] when there is no default and the table is empty', async () => {

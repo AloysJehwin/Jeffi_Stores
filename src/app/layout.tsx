@@ -44,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isBusinessSubdomain = hostApp === 'business'
   const isAdminSubdomain = hostApp === 'admin'
   const isEcomSubdomain = host.startsWith('ecom.')
+  const isCertPortalSubdomain = host.startsWith('certificate.')
 
   // Read the browser-safe store config on the server so the very first render
   // (SSR + hydration) already has the true DB-backed values — no client fetch
@@ -90,7 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           dangerouslySetInnerHTML={{
             __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');` }}
         />
-        <ConditionalLayout initialStoreConfig={initialStoreConfig} isFormsSubdomain={isFormsSubdomain} isDocumentSubdomain={isDocumentSubdomain} isBusinessSubdomain={isBusinessSubdomain} isAdminSubdomain={isAdminSubdomain} isEcomSubdomain={isEcomSubdomain}>{children}</ConditionalLayout>
+        <ConditionalLayout initialStoreConfig={initialStoreConfig} isFormsSubdomain={isFormsSubdomain} isDocumentSubdomain={isDocumentSubdomain} isBusinessSubdomain={isBusinessSubdomain} isAdminSubdomain={isAdminSubdomain} isEcomSubdomain={isEcomSubdomain} isCertPortalSubdomain={isCertPortalSubdomain}>{children}</ConditionalLayout>
       </body>
     </html>
   )

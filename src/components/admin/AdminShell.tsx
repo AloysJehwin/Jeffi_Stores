@@ -7,7 +7,7 @@ import AdminAgentTrigger from './AdminAgentTrigger'
 import NotificationBell from './NotificationBell'
 import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
-import SessionGuard from './SessionGuard'
+import AdminSessionController from './AdminSessionController'
 import { AdminScopesProvider } from '@/contexts/AdminScopesContext'
 
 const COOKIE_NAME = 'sidebar_collapsed'
@@ -135,7 +135,7 @@ export default function AdminShell({
         </main>
       </div>
 
-      <SessionGuard />
+      <AdminSessionController />
       <ScanActionPopup role={role} scopes={scopes} host={host} />
       <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
     </div>

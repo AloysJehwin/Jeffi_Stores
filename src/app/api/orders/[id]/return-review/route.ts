@@ -221,7 +221,11 @@ export async function POST(
         ? returnItems.reduce((sum: number, i: any) => sum + parseFloat(i.refund_amount), 0)
         : parseFloat(order.total_amount)
 
-      const netRefundAmount = Math.max(0, Math.round((refundAmount - (await getBusinessValues()).returnStandardCharge) * 100) / 100)
+      const returnStandardCharge = (await getBusinessValues()).returnStandardCharge
+      // The charge can only eat what was returnable, never more.
+      const appliedCharge = Math.min(returnStandardCharge, refundAmount)
+      const netRefundAmount = Math.max(0, Math.round((refundAmount - returnStandardCharge) * 100) / 100)
+      const chargeBreakdown = { grossRefund: refundAmount, charge: appliedCharge, netRefund: netRefundAmount }
 
       if (returnRequest.type === 'refund') {
         let refundFailed = false
@@ -231,19 +235,23 @@ export async function POST(
           ? (await queryOne(`SELECT payment_status FROM orders WHERE id = $1`, [paymentOrderId]))?.payment_status
           : order.payment_status
 
-        if (effectivePaymentStatus === 'paid' && (await isRazorpayEnabled())) {
-          // Newest first, not LIMIT 1: an order can carry several completed payments (e.g. a
-          // variant-change top-up collected after the original). Picking one arbitrarily
-          // under-refunds the buyer — the same fix already made in the direct-refund route.
-          const paymentRecord = await queryOne(
+        // When the return standard charge covers the whole returnable amount, netRefundAmount is
+        // 0: no money goes back, so skip the Razorpay call entirely and fall through to the
+        // manual completion below (which leaves payment_status untouched — nothing was refunded).
+        if (netRefundAmount > 0 && effectivePaymentStatus === 'paid' && (await isRazorpayEnabled())) {
+          // Refund EVERY completed Razorpay payment on the order — the initial charge AND any
+          // later top-ups (e.g. a variant-change collection) — spreading netRefundAmount across
+          // them. A single LIMIT 1 refund under-refunds the buyer whenever the return spans more
+          // than one payment. Mirrors the direct-refund route.
+          const paymentRecords = await queryMany<any>(
             `SELECT id, transaction_id, amount, gateway_response FROM payments
              WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
-             ORDER BY created_at DESC
-             LIMIT 1`,
+             ORDER BY created_at DESC`,
             [paymentOrderId]
           )
+          const refundable = (paymentRecords || []).filter((p: any) => p.transaction_id)
 
-          if (paymentRecord && paymentRecord.transaction_id) {
+          if (refundable.length > 0) {
             try {
               // Tenant-aware: an own_razorpay tenant collected on THEIR keys, so refunding from
               // platform keys fails outright.
@@ -255,31 +263,51 @@ export async function POST(
                     .catch(() => false)
                 : false
               const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
-              const amountInPaise = Math.round(netRefundAmount * 100)
-              const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
-                amount: amountInPaise,
-              })
 
-              // Claw back the tenant's share of this PARTIAL return. Without this the buyer was
-              // refunded from platform funds while the tenant kept 100% of their share.
-              if (!ownRazorpay) {
-                const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
-                if (outcome.unrecoveredPaise > 0) {
-                  console.error(
-                    `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
-                    `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
-                  )
+              // Cap the spread at what was actually captured, so we never ask Razorpay to refund
+              // more than a payment holds.
+              const capturedTotal = refundable.reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0)
+              let remaining = Math.min(netRefundAmount, capturedTotal)
+              const perPayment: { record: any; refund: any }[] = []
+              let reversedInr = 0
+              let unrecoveredInr = 0
+
+              for (const paymentRecord of refundable) {
+                if (remaining <= 0) break
+                const captured = parseFloat(paymentRecord.amount) || 0
+                const thisRefund = Math.min(captured, remaining)
+                if (!(thisRefund > 0)) continue
+                const amountInPaise = Math.round(thisRefund * 100)
+                const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
+                  amount: amountInPaise,
+                })
+                perPayment.push({ record: paymentRecord, refund })
+                remaining = Math.round((remaining - thisRefund) * 100) / 100
+
+                // Claw back the tenant's share of this PARTIAL return. Without this the buyer was
+                // refunded from platform funds while the tenant kept 100% of their share.
+                if (!ownRazorpay) {
+                  const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
+                  reversedInr += outcome.reversedPaise / 100
+                  unrecoveredInr += outcome.unrecoveredPaise / 100
+                  if (outcome.unrecoveredPaise > 0) {
+                    console.error(
+                      `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
+                      `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+                    )
+                  }
                 }
-                if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
-                  await recordRefundSettlement({
-                    tenantId: tenant.tenantId,
-                    orderRef: order.order_number,
-                    refundedInr: netRefundAmount,
-                    reversedInr: outcome.reversedPaise / 100,
-                    unrecoveredInr: outcome.unrecoveredPaise / 100,
-                    note: 'return',
-                  })
-                }
+              }
+
+              if (!ownRazorpay && tenant?.tenantId && (reversedInr > 0 || unrecoveredInr > 0)) {
+                await recordRefundSettlement({
+                  tenantId: tenant.tenantId,
+                  orderRef: order.order_number,
+                  refundedInr: netRefundAmount,
+                  reversedInr,
+                  unrecoveredInr,
+                  note: 'return',
+                })
               }
 
               await withTransaction(async (client) => {
@@ -293,10 +321,12 @@ export async function POST(
                     [order.original_order_id]
                   )
                 }
-                await client.query(
-                  `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-                  [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
-                )
+                for (const { record, refund } of perPayment) {
+                  await client.query(
+                    `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
+                    [JSON.stringify({ ...(typeof record.gateway_response === 'string' ? JSON.parse(record.gateway_response) : record.gateway_response || {}), refund }), record.id]
+                  )
+                }
                 await client.query(
                   `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
                   [admin.adminId, returnRequest.id]
@@ -330,7 +360,7 @@ export async function POST(
                 }).catch(() => {})
               }
 
-              return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false, stockWarnings })
+              return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false, stockWarnings, ...chargeBreakdown })
             } catch {
               refundFailed = true
             }
@@ -346,6 +376,16 @@ export async function POST(
             `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
             [admin.adminId, returnRequest.id]
           )
+          // Refund fully absorbed by the return charge: record WHY on the completed payment so
+          // both the admin panel and the customer page can explain the zero refund. payment_status
+          // is deliberately left as 'paid' — no money went back.
+          if (netRefundAmount <= 0 && effectivePaymentStatus === 'paid') {
+            await client.query(
+              `UPDATE payments SET gateway_response = COALESCE(gateway_response, '{}'::jsonb) || $1::jsonb, updated_at = NOW()
+               WHERE order_id = $2 AND payment_gateway = 'razorpay' AND status = 'completed'`,
+              [JSON.stringify({ returnCharge: chargeBreakdown }), paymentOrderId]
+            )
+          }
         })
 
         let stockWarnings: string[] = []
@@ -370,7 +410,7 @@ export async function POST(
           }).catch(() => {})
         }
 
-        return NextResponse.json({ success: true, newStatus: 'returned', refundFailed, stockWarnings })
+        return NextResponse.json({ success: true, newStatus: 'returned', refundFailed, stockWarnings, ...chargeBreakdown })
       }
 
       if (returnRequest.type === 'replacement') {

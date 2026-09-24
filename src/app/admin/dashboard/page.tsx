@@ -1,4 +1,4 @@
-import { getDashboardStats, getDashboardMetrics, getDashboardAnalytics } from '@/lib/queries'
+import { getDashboardMetrics, getDashboardAnalytics } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import { headers, cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
@@ -15,10 +15,7 @@ import { adminCookieName } from '@/lib/admin-cookie'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Quick-action command bar. `icon` is a key into NAV_ICONS (shared with the
-// sidebar) so the tiles use the same iconography. `primary` = accent chip.
-// `scope` gates each action to the admin's permissions (same model as the
-// sidebar). `icon` is a NAV_ICONS key shared with the sidebar; `primary` = accent.
+// `icon` is a NAV_ICONS key shared with the sidebar; `scope` gates each tile like the sidebar does.
 const QUICK_ACTIONS: { label: string; icon: string; path: string; scope: string; primary?: boolean }[] = [
   { label: 'New Product', path: '/admin/products/add', icon: 'Products', scope: 'products:write', primary: true },
   { label: 'Cash Sale', path: '/admin/cash-sale', icon: 'Cash Sale', scope: 'invoices:write' },
@@ -46,9 +43,10 @@ const MORE_ACTIONS: { label: string; path: string; icon: string; scope: string }
   { label: 'Settings', path: '/admin/settings', icon: 'Settings', scope: 'settings:read' },
 ]
 
-// Renders a status chip only when count > 0; returns null otherwise.
-function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: 'amber' | 'red'; href: string }) {
-  if (!count) return null
+type Tone = 'amber' | 'red'
+interface Alert { label: string; count: number; tone: Tone; path: string; scope?: string; group: string }
+
+function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: Tone; href: string }) {
   const tones = {
     amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15',
     red: 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/15',
@@ -72,8 +70,7 @@ interface PendingTask {
   customer_name: string | null
 }
 
-// Top open tasks assigned to the current admin — overdue first, then by
-// priority (urgent→low), then soonest due. Used for the dashboard widget.
+// Overdue first, then urgent to low, then soonest due.
 async function getMyPendingTasks(adminId: string): Promise<PendingTask[]> {
   if (!adminId) return []
   return queryMany<PendingTask>(
@@ -95,12 +92,9 @@ async function getMyPendingTasks(adminId: string): Promise<PendingTask[]> {
 
 export default async function AdminDashboard() {
   const headersList = await headers()
-  // Prefer the admin's full name (first + last) over the username for the greeting.
   const cookieStore = await cookies()
   const token = cookieStore.get(await adminCookieName())?.value
   let displayName = headersList.get('x-username') || 'Admin'
-  // Role + scopes gate which quick actions are shown (same as the sidebar nav).
-  // Prefer the middleware-injected, verified headers; fall back to the JWT.
   let role = headersList.get('x-user-role') || ''
   let adminId = headersList.get('x-user-id') || ''
   let scopes: string[] = []
@@ -114,55 +108,70 @@ export default async function AdminDashboard() {
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
     } catch { /* fall back to x-username */ }
   }
-  const username = displayName
   const host = await getHost()
-  const [stats, metrics, analytics] = await Promise.all([
-    getDashboardStats(),
-    getDashboardMetrics(),
-    getDashboardAnalytics('30d'),
-  ])
+  const can = (scope: string) => hasScope(role, scopes, scope)
+  const [metrics, analytics] = await Promise.all([getDashboardMetrics(), getDashboardAnalytics('30d')])
+  const a = analytics.insights.attention
 
-  // Session scopes are already narrowed to the tenant's plan, so an alert for a module the plan
-  // does not include would only link to a page this admin cannot open.
-  const canInventory = hasScope(role, scopes, 'inventory:read')
-  const canReturns = hasScope(role, scopes, 'returns:read')
-  const hasAlerts =
-    metrics.funnel.pending > 0 ||
-    (canInventory && (analytics.inventory.lowStock > 0 || analytics.inventory.outOfStock > 0)) ||
-    (canReturns && (analytics.returns.total > 0 || analytics.returns.rtoInTransit > 0))
+  const visibleQuick = QUICK_ACTIONS.filter(x => can(x.scope))
+  const visibleMore = MORE_ACTIONS.filter(x => can(x.scope))
 
-  // Only show quick actions the current admin can actually use (super_admin sees all).
-  const visibleQuick = QUICK_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
-  const visibleMore = MORE_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
-
-  // My pending tasks — only if the admin can access the tasks/CRM area.
-  const canSeeTasks = hasScope(role, scopes, 'tasks:read')
+  const canSeeTasks = can('tasks:read')
   const myTasks = canSeeTasks ? await getMyPendingTasks(adminId) : []
 
-  // B/C/D — server-static ops block, passed into the client island as children
-  // so it renders between the range header and the KPIs without refetch coupling.
+  // Session scopes are already narrowed to the plan, so a chip never links into a module this admin cannot open.
+  const candidates: Alert[] = [
+    { group: 'Orders', label: 'pending orders', count: metrics.funnel.pending, tone: 'amber', path: '/admin/orders?status=pending' },
+    { group: 'Orders', label: 'pending over 24 h', count: a.pendingOver24h, tone: 'red', path: '/admin/orders?status=pending' },
+    { group: 'Orders', label: 'unshipped over 48 h', count: a.unshippedOver48h, tone: 'red', path: '/admin/orders?status=processing' },
+    { group: 'Orders', label: 'cancel requests', count: a.cancelRequested, tone: 'amber', path: '/admin/orders?status=cancel_requested' },
+    { group: 'Orders', label: 'delivery attempted', count: a.deliveryAttempted, tone: 'amber', path: '/admin/orders?status=out_for_delivery' },
+    { group: 'Orders', label: 'unpaid online orders', count: a.unpaidOnline, tone: 'amber', path: '/admin/orders' },
+    { group: 'Stock', label: 'low stock', count: analytics.inventory.lowStock, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'out of stock', count: analytics.inventory.outOfStock, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'selling but out of stock', count: a.sellingButOut, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'restock within 7 days', count: a.restockSoon, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'batches expiring in 30 days', count: a.expiringBatches, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'expired batches', count: a.expiredBatches, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Stock', label: 'back-in-stock requests', count: a.backInStockWaitlist, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
+    { group: 'Returns', label: 'open returns', count: a.openReturns, tone: 'red', path: '/admin/returns', scope: 'returns:read' },
+    { group: 'Returns', label: 'RTO in transit', count: analytics.returns.rtoInTransit, tone: 'amber', path: '/admin/returns', scope: 'returns:read' },
+    { group: 'Customers', label: 'open support chats', count: a.supportOpen, tone: 'amber', path: '/admin/crm', scope: 'crm:read' },
+    { group: 'Customers', label: 'reviews awaiting approval', count: a.pendingReviews, tone: 'amber', path: '/admin/reviews', scope: 'reviews:read' },
+    { group: 'Customers', label: 'overdue tasks', count: a.overdueTasks, tone: 'red', path: '/admin/tasks', scope: 'tasks:read' },
+    { group: 'Customers', label: 'high churn risk', count: a.churnHigh, tone: 'amber', path: '/admin/crm', scope: 'crm:read' },
+    { group: 'Business', label: 'pending RFQs', count: a.pendingRfqs, tone: 'amber', path: '/admin/business/rfqs', scope: 'business_rfqs:read' },
+    { group: 'Business', label: 'overdue bills', count: a.overdueBills, tone: 'red', path: '/admin/financial', scope: 'financial:read' },
+  ]
+  const alerts = candidates.filter(x => x.count > 0 && (!x.scope || can(x.scope)))
+  const groups = Array.from(new Set(alerts.map(x => x.group)))
+
   const opsBlock = (
     <div className="space-y-4">
       <SupportRequestsAlert />
-
-      {/* C. Command Bar */}
       <QuickActionBar primary={visibleQuick} more={visibleMore} host={host} />
+    </div>
+  )
 
-      {/* C2. My Pending Tasks — collapsible + paginated client component */}
-      {canSeeTasks && (
-        <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />
-      )}
+  const footerBlock = (
+    <div className="space-y-4">
+      {canSeeTasks && <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />}
 
-      {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}
       <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
-        <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium mb-3">Needs Attention</p>
-        {hasAlerts ? (
-          <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
-            <AlertChip label="pending orders" count={metrics.funnel.pending} tone="amber" href={ap('/admin/orders?status=pending', host)} />
-            {canInventory && <AlertChip label="low stock" count={analytics.inventory.lowStock} tone="amber" href={ap('/admin/inventory', host)} />}
-            {canInventory && <AlertChip label="out of stock" count={analytics.inventory.outOfStock} tone="red" href={ap('/admin/inventory', host)} />}
-            {canReturns && <AlertChip label="open returns" count={analytics.returns.total} tone="red" href={ap('/admin/returns', host)} />}
-            {canReturns && <AlertChip label="RTO in transit" count={analytics.returns.rtoInTransit} tone="amber" href={ap('/admin/returns', host)} />}
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium">Needs Attention</p>
+          {alerts.length > 0 && <span className="text-xs font-semibold bg-surface-secondary text-foreground-secondary px-1.5 py-0.5 rounded-full tabular-nums">{alerts.length}</span>}
+        </div>
+        {alerts.length > 0 ? (
+          <div className="space-y-3">
+            {groups.map(g => (
+              <div key={g} className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted w-20 shrink-0">{g}</span>
+                {alerts.filter(x => x.group === g).map(x => (
+                  <AlertChip key={x.label} label={x.label} count={x.count} tone={x.tone} href={ap(x.path, host)} />
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
@@ -171,7 +180,7 @@ export default async function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </span>
-            <span className="text-sm">All clear — nothing needs your attention right now.</span>
+            <span className="text-sm">All clear. Nothing needs your attention right now.</span>
           </div>
         )}
       </div>
@@ -180,9 +189,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <AnalyticsDashboardClient initial={analytics} metrics={metrics} host={host} username={username}>
-        {opsBlock}
-      </AnalyticsDashboardClient>
+      <AnalyticsDashboardClient initial={analytics} metrics={metrics} host={host} username={displayName} ops={opsBlock} footer={footerBlock} />
     </div>
   )
 }

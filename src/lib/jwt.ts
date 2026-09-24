@@ -22,6 +22,9 @@ export const JWT_EXPIRES_IN = '8h'
 export const JWT_MAX_AGE_S = 8 * 60 * 60
 
 export interface JWTPayload {
+  sessionId?: string
+  deadlineAt?: string
+  expiresAt?: string
   adminId: string
   first_name?: string
   last_name?: string
@@ -67,16 +70,19 @@ export interface AdminJWTPayload {
   role: string
   scopes: string[]
   sid?: string
+  sessionId?: string
+  deadlineAt?: string
+  expiresAt?: string
   [key: string]: any
 }
 
-export async function verifyToken(token: string, current?: string | null | SessionSignals): Promise<JWTPayload | null> {
+export async function verifyToken(token: string, current?: string | null | SessionSignals, opts?: { touch?: boolean }): Promise<JWTPayload | null> {
   // Opaque admin-session resolve (token = the sid). Used by middleware + admin server
   // components. authCertCN comes from the snapshot on the session row. `current` carries the
   // request's device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip, fp);
   // a bare string is accepted for back-compat and treated as the UA. On a clear multi-signal
   // mismatch resolveSession revokes the session (device binding).
-  const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
+  const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current, opts)
   if (!s || s.principalType !== 'admin') return null
   return {
     adminId: s.principalId,
@@ -85,6 +91,9 @@ export async function verifyToken(token: string, current?: string | null | Sessi
     scopes: s.scopes,
     authCertCN: s.certCN || undefined,
     sid: s.sid,
+    sessionId: s.sessionId,
+    deadlineAt: s.deadlineAt,
+    expiresAt: s.expiresAt,
     displayName: s.displayName || undefined,
     tenantId: s.tenantId,
   }
@@ -163,11 +172,12 @@ export async function requireAdminScope(
   return admin
 }
 
-export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {
+/** `passive`: a tab checking in on its own (session check, event stream, bell poll), not the admin acting. */
+export async function authenticateAdmin(request: NextRequest, opts?: { passive?: boolean }): Promise<AdminJWTPayload | null> {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
   const sid = getTokenFromRequest(request, adminCookieNameForHost(host))
   if (!sid) return null
-  const s = await resolveSession(sid, extractSessionSignals(request))
+  const s = await resolveSession(sid, extractSessionSignals(request), { touch: !opts?.passive })
   if (!s || s.principalType !== 'admin') {
     // Fallback: a scoped extension token (standalone JWT) sent via Authorization: Bearer.
     // Bearer-only — a session cookie value must never be reinterpreted as a JWT.
@@ -184,6 +194,9 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
     role: s.role || '',
     scopes: s.scopes,
     sid,
+    sessionId: s.sessionId,
+    deadlineAt: s.deadlineAt,
+    expiresAt: s.expiresAt,
   }
   if (typeof process !== 'undefined' && process.versions?.node) {
     try {

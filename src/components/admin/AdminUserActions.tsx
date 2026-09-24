@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface AdminUser {
   id: string
@@ -19,7 +20,18 @@ interface AdminUser {
   created_at: string
   certificate_status?: string
   cert_expires_at?: string
+  idle_timeout_minutes?: number | null
 }
+
+// value '' = default (null on the server); other values are minutes as strings for AdminSelect.
+const IDLE_CHOICES = [
+  { value: '', label: 'Default (8h)' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+  { value: '240', label: '4 hours' },
+  { value: '480', label: '8 hours' },
+  { value: '1440', label: '24 hours' },
+]
 
 export default function AdminUserActions({
   admin,
@@ -36,6 +48,7 @@ export default function AdminUserActions({
   const [loading, setLoading] = useState(false)
   const [scopes, setScopes] = useState<string[]>(admin.scopes || [])
   const [role, setRole] = useState(admin.role)
+  const [idleTimeout, setIdleTimeout] = useState<number | null>(admin.idle_timeout_minutes ?? null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
@@ -79,6 +92,7 @@ export default function AdminUserActions({
   function openEdit() {
     setScopes(admin.scopes || [])
     setRole(admin.role)
+    setIdleTimeout(admin.idle_timeout_minutes ?? null)
     setError(null)
     setEditing(true)
   }
@@ -94,7 +108,7 @@ export default function AdminUserActions({
       const res = await fetch(`/api/admin/users/${admin.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scopes, role }),
+        body: JSON.stringify({ scopes, role, idle_timeout_minutes: idleTimeout }),
       })
       if (res.ok) {
         setEditing(false)
@@ -297,6 +311,16 @@ export default function AdminUserActions({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Auto-logout after inactivity</label>
+                <AdminSelect
+                  value={idleTimeout === null ? '' : String(idleTimeout)}
+                  onChange={v => setIdleTimeout(v === '' ? null : Number(v))}
+                  options={IDLE_CHOICES}
+                />
+                <p className="mt-1 text-xs text-foreground-muted">The session ends after this much inactivity, even if the browser was left open or closed.</p>
               </div>
 
               <div>

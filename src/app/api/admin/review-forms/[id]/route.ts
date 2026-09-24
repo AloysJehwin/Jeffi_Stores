@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const fields = ['title', 'slug', 'description', 'template_type', 'google_review_url', 'coupon_id', 'is_active', 'custom_fields']
+  const fields = ['title', 'slug', 'description', 'template_type', 'google_review_url', 'coupon_id', 'is_active', 'is_draft', 'custom_fields']
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1

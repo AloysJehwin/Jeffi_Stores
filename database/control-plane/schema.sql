@@ -683,3 +683,38 @@ ALTER TABLE ONLY public.provisioning_step_events
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_provisioning_step_events_job
     ON public.provisioning_step_events USING btree (job_id, created_at);
+
+
+--
+-- portal_certs: the CENTRAL downloadable certificate registry that certificate.jeffistores.in
+-- serves from. Unlike tenant_admin_certs (metadata + revocation only), this row carries the
+-- encrypted .p12 blob and its password so the shared portal host can serve a download without
+-- reaching each store's private RDS. tenant_id NULL = a platform admin cert. Blob + password are
+-- AES-256-GCM encrypted at rest, same scheme/key as tenant_ca.ca_key_pem (TENANT_CA_ENC_KEY).
+-- One-time download is tracked by downloaded_at; revoked_at mirrors the authoritative revocation.
+--
+CREATE TABLE IF NOT EXISTS public.portal_certs (
+    id              uuid NOT NULL DEFAULT uuid_generate_v4(),
+    tenant_id       uuid,
+    serial          character varying(64) NOT NULL,
+    common_name     character varying(128) NOT NULL,
+    issued_to       character varying(255) NOT NULL,   -- verified email the portal matches on
+    role            character varying(32),
+    store_name      character varying(200),
+    p12_data_enc    text NOT NULL,                      -- AES-256-GCM(base64(p12))
+    p12_password_enc text NOT NULL,                     -- AES-256-GCM(password)
+    download_token  character varying(255) NOT NULL,
+    downloaded_at   timestamp with time zone,
+    expires_at      timestamp with time zone NOT NULL,
+    revoked_at      timestamp with time zone,
+    created_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.portal_certs ADD CONSTRAINT portal_certs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.portal_certs ADD CONSTRAINT portal_certs_serial_key UNIQUE (serial);
+ALTER TABLE ONLY public.portal_certs ADD CONSTRAINT portal_certs_download_token_key UNIQUE (download_token);
+ALTER TABLE ONLY public.portal_certs ADD CONSTRAINT portal_certs_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+-- Portal lists a signed-in admin's certs by their verified email; lower() for case-insensitive match.
+CREATE INDEX IF NOT EXISTS idx_portal_certs_issued_to ON public.portal_certs USING btree (lower(issued_to));
+CREATE INDEX IF NOT EXISTS idx_portal_certs_downloadable
+    ON public.portal_certs USING btree (download_token) WHERE revoked_at IS NULL AND downloaded_at IS NULL;

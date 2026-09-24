@@ -1,6 +1,18 @@
 export type RowType = 'product' | 'variant' | 'sub_variant'
 export type Coercer = 'text' | 'number' | 'int' | 'bool' | 'date' | 'csv' | 'json'
 
+// Which worksheet a column lives on in the multi-sheet template. Core sheets carry the identity +
+// pricing of each level; attribute sheets segregate the many optional product fields so no sheet is
+// unwieldy. Attribute sheets are keyed back to their level's SKU.
+export type SheetName =
+  | 'Products'
+  | 'Variants'
+  | 'Sub-variants'
+  | 'Product · Shipping'
+  | 'Product · Compliance'
+  | 'Product · Digital'
+  | 'Product · SEO & Audience'
+
 export interface ImportColumn {
   key: string
   header: string
@@ -11,6 +23,9 @@ export interface ImportColumn {
   // Key into ENUMS (src/lib/import/enums.ts) → renders a dropdown in the template.
   // bool columns get the TRUE/FALSE list automatically; no need to set this.
   enumKey?: string
+  // Which worksheet this column belongs to in the multi-sheet template. Defaults are derived in
+  // sheetFor() from rowTypes + key when not set explicitly here.
+  sheet?: SheetName
 }
 
 // Grouping columns that structure a product + its variants + sub-variants across
@@ -119,6 +134,7 @@ export const PRODUCT_COLUMNS: ImportColumn[] = [
 export const VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'sku', header: 'variant.sku', coerce: 'text', rowTypes: ['variant'], required: true },
   { key: 'variant_name', header: 'variant.variant_name', coerce: 'text', rowTypes: ['variant'], required: true },
+  { key: 'image_urls', header: 'variant.image_urls', coerce: 'text', rowTypes: ['variant'], help: 'Pipe-delimited image URLs for this variant: a.jpg|b.jpg — matches the product-edit variant images' },
   { key: 'price', header: 'variant.price', coerce: 'number', rowTypes: ['variant'] },
   { key: 'mrp', header: 'variant.mrp', coerce: 'number', rowTypes: ['variant'] },
   { key: 'price_ex_gst', header: 'variant.price_ex_gst', coerce: 'number', rowTypes: ['variant'] },
@@ -165,3 +181,81 @@ export const HEADER_ROW: string[] = ALL_COLUMNS.map(c => c.header)
 export function columnByHeader(header: string): ImportColumn | undefined {
   return ALL_COLUMNS.find(c => c.header === header)
 }
+
+// ── Multi-sheet layout ────────────────────────────────────────────────────────
+// The template is a workbook of several sheets instead of one flat grid. Core sheets hold each
+// level's identity + pricing; attribute sheets segregate the many optional PRODUCT fields, keyed
+// back by `sku`. Variant/sub-variant stay on their own single sheets (their column counts are small).
+
+// Product-attribute sheet membership by column key. Anything not listed stays on the Products sheet.
+const PRODUCT_ATTR_SHEET: Record<string, SheetName> = {}
+const assign = (sheet: SheetName, keys: string[]) => keys.forEach(k => { PRODUCT_ATTR_SHEET[k] = sheet })
+
+// Physical / shipping: dimensions, weights, handling, delivery, hazmat flags.
+assign('Product · Shipping', [
+  'weight', 'dimensions', 'weight_grams', 'net_weight_grams', 'volume_ml',
+  'length_cm', 'breadth_cm', 'height_cm', 'package_type', 'volumetric_weight_grams',
+  'extra_delivery_days', 'handling_days', 'shipping_class', 'is_oversized',
+  'fragile', 'hazardous', 'flammable', 'perishable', 'shelf_life_days',
+])
+// Compliance / regulatory / warranty / condition.
+assign('Product · Compliance', [
+  'hsn_code', 'country_of_origin', 'serialized', 'certifications', 'compliance_standard',
+  'safety_rating', 'warranty_months', 'warranty_type', 'condition', 'grade',
+  'tax_class', 'inclusive_tax',
+])
+// Digital / subscription / bundle.
+assign('Product · Digital', [
+  'is_digital', 'download_url', 'license_type', 'file_format', 'platform_compatibility',
+  'is_subscription', 'subscription_interval', 'subscription_price', 'is_bundle',
+])
+// SEO + audience targeting.
+assign('Product · SEO & Audience', [
+  'meta_title', 'meta_description', 'meta_keywords', 'is_searchable',
+  'age_min', 'age_max', 'target_gender', 'target_audience',
+])
+
+// The worksheet a column belongs on. Explicit `col.sheet` wins; else by level, with product
+// attributes routed to their attribute sheet.
+export function sheetFor(col: ImportColumn): SheetName {
+  if (col.sheet) return col.sheet
+  if (col.rowTypes.includes('sub_variant') && !col.rowTypes.includes('product')) return 'Sub-variants'
+  if (col.rowTypes.includes('variant') && !col.rowTypes.includes('product')) return 'Variants'
+  return PRODUCT_ATTR_SHEET[col.key] ?? 'Products'
+}
+
+// Sheets in workbook order (after the README sheet, which the template builder adds first).
+export const SHEET_ORDER: SheetName[] = [
+  'Products',
+  'Product · Shipping',
+  'Product · Compliance',
+  'Product · Digital',
+  'Product · SEO & Audience',
+  'Variants',
+  'Sub-variants',
+]
+
+// The key column(s) that link an attribute/child sheet back to its parent, prepended to that
+// sheet so a row can be matched on sync. Products/attribute sheets key on `sku`; Variants add
+// `parent_sku`; Sub-variants add `parent_sku` + `variant_sku`.
+export function keyColumnsFor(sheet: SheetName): { header: string; help: string }[] {
+  if (sheet === 'Variants') return [{ header: 'parent_sku', help: 'Product SKU this variant belongs to (from the Products sheet)' }]
+  if (sheet === 'Sub-variants') return [
+    { header: 'parent_sku', help: 'Product SKU (from the Products sheet)' },
+    { header: 'variant_sku', help: 'Variant SKU (from the Variants sheet)' },
+  ]
+  if (sheet === 'Products') return [] // sku is already a Products column
+  // attribute sheets key on the product sku
+  return [{ header: 'sku', help: 'Product SKU this row extends (from the Products sheet)' }]
+}
+
+// Columns for one sheet, in catalog order. Products excludes attribute-sheet columns. The
+// structural link columns (row_type / parent_sku / variant_sku) never appear here: a sheet's
+// identity is its tab, and the links are the key columns keyColumnsFor() prepends.
+export function columnsForSheet(sheet: SheetName): ImportColumn[] {
+  return ALL_COLUMNS.filter(c => !LINK_KEYS.has(c.key) && sheetFor(c) === sheet)
+}
+const LINK_KEYS = new Set(['row_type', 'parent_sku', 'variant_sku'])
+
+export const CORE_SHEETS: readonly SheetName[] = ['Products', 'Variants', 'Sub-variants']
+export const ATTRIBUTE_SHEETS: readonly SheetName[] = SHEET_ORDER.filter(s => !CORE_SHEETS.includes(s))

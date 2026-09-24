@@ -229,14 +229,20 @@ async function ProductsStats() {
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
-  const [stats, pendingDrafts] = await Promise.all([
+  const [stats, pendingDrafts, createDrafts] = await Promise.all([
     getProductBreakdowns(),
+    // Edit-drafts: unpublished CHANGES staged against a live product (product_drafts).
     queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
       `SELECT pd.product_id, p.name, p.sku, pd.updated_at
        FROM product_drafts pd
        JOIN products p ON p.id = pd.product_id
+       WHERE p.is_draft = false
        ORDER BY pd.updated_at DESC
        LIMIT 10`
+    ),
+    // Create-drafts: brand-new products never published to the live list (is_draft = true).
+    queryMany<{ id: string; name: string; sku: string; created_at: string }>(
+      `SELECT id, name, sku, created_at FROM products WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
     ),
   ])
 
@@ -244,7 +250,7 @@ async function ProductsStats() {
   const activeCount = stats.activeProducts
   const totalCount = stats.totalProducts
   const categoryCount = stats.categories
-  const pendingDraftsCount = pendingDrafts.length
+  const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -280,15 +286,40 @@ async function ProductsStats() {
         <ProductBreakdownChart byCategory={stats.byCategory} byBrand={stats.byBrand} byStock={stats.byStock} byInventoryValue={stats.byInventoryValue} />
       </div>
       {pendingDraftsCount > 0 && (
-        <div className="mb-6">
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-                Pending Drafts ({pendingDraftsCount})
-              </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
-            </div>
+        <details className="mb-6 group">
+          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              Pending Drafts ({pendingDraftsCount})
+            </span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+          </summary>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {/* Create-drafts: brand-new products not yet on the live list. Publish activates them. */}
+              {createDrafts.map((d) => (
+                canWrite ? (
+                  <DraftRowActions
+                    key={`new-${d.id}`}
+                    entityId={d.id}
+                    name={d.name}
+                    subtitle={`${d.sku} — new product, not yet published`}
+                    updatedAt={d.created_at}
+                    editHref={ap(`/admin/products/edit/${d.id}`, host)}
+                    publishPath={`/api/admin/products/${d.id}/publish`}
+                    publishConfirm={`Publish "${d.name}" to the live product list?`}
+                    discardPath={`/api/admin/products/${d.id}/draft`}
+                    discardConfirm={`Delete the draft product "${d.name}"? This cannot be undone.`}
+                    entityLabel="product"
+                  />
+                ) : (
+                  <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">{d.sku}{d.sku && <CopySku sku={d.sku} />}</p>
+                    <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
+                  </div>
+                )
+              ))}
               {pendingDrafts.map((d) => (
                 canWrite ? (
                   <DraftRowActions
@@ -311,7 +342,7 @@ async function ProductsStats() {
               ))}
             </div>
           </div>
-        </div>
+        </details>
       )}
     </div>
   )

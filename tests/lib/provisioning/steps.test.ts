@@ -278,16 +278,17 @@ describe('provisioning state machine', () => {
       expect(provider.hasDns('quotation-acme.jeffistores.in')).toBe(false)
     })
 
-    it('growth adds quotation + purchaseorder', async () => {
+    it('growth adds quotation + purchaseorder + forms (review_forms is sold from Growth)', async () => {
       reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'growth' })
       const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
       await advanceProvisioningJob(job({ step: 'configure_dns' }), provider)
       expect(provider.hasDns('quotation-acme.jeffistores.in')).toBe(true)
       expect(provider.hasDns('purchaseorder-acme.jeffistores.in')).toBe(true)
-      expect(provider.hasDns('forms-acme.jeffistores.in')).toBe(false)
+      expect(provider.hasDns('forms-acme.jeffistores.in')).toBe(true)
+      expect(provider.hasDns('acme.business.jeffistores.in')).toBe(false)
     })
 
-    it('pro adds forms + business', async () => {
+    it('pro adds business', async () => {
       reg.getTenant.mockResolvedValue({ ...TENANT, plan: 'pro' })
       const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
       await advanceProvisioningJob(job({ step: 'configure_dns' }), provider)
@@ -463,7 +464,7 @@ describe('provisioning state machine', () => {
       expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', expect.any(String))
       // Compute moved → every desired host is repointed at the new target (added = full set).
       const desired = ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in',
-        'quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in']
+        'quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in', 'forms-acme.jeffistores.in']
       expect(out.added).toEqual(desired)
       expect(out.removed).toEqual([])
       expect(ensure).toHaveBeenCalledWith(desired, expect.any(String))

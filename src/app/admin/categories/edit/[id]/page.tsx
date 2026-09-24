@@ -51,6 +51,26 @@ async function updateCategory(categoryId: string, formData: FormData) {
 
   const host = await getHost()
 
+  // Create-draft category (is_draft = true, no category_drafts row): edit the row in place.
+  // Save keeps it a draft; Publish flips is_draft = false + is_active.
+  const createDraftRow = await queryOne<{ is_draft: boolean }>(
+    `SELECT is_draft FROM categories WHERE id = $1`, [categoryId]
+  )
+  if (!hasDraft && createDraftRow?.is_draft) {
+    const publish = intent === 'publish'
+    await query(
+      `UPDATE categories SET name=$1, slug=$2, description=$3, parent_category_id=$4,
+       display_order=$5, sku_prefix=$6, is_active=$7, is_draft=$8, google_product_category=$9,
+       icon_name=$10, return_allowed=$11, return_window_days=$12, replacement_allowed=$13,
+       replacement_window_days=$14, updated_at=NOW() WHERE id=$15`,
+      [name, slug, description, parentCategoryId, displayOrder, skuPrefix,
+       publish ? true : false, publish ? false : true, googleProductCategory, iconName,
+       returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays, categoryId]
+    )
+    revalidatePath('/admin/categories')
+    redirect(ap('/admin/categories', host))
+  }
+
   if (hasDraft || intent === 'draft') {
     if (intent === 'discard') {
       await query(`DELETE FROM category_drafts WHERE category_id = $1`, [categoryId])
@@ -108,7 +128,10 @@ export default async function EditCategoryPage({ params, searchParams }: { param
     `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`, [id]
   )
   const isDraft = !!draftRow
-  if (!isDraft) {
+  // A create-draft category (is_draft = true) has no category_drafts row but must still render
+  // its edit form (editing in place) rather than bouncing to the detail page.
+  const isCreateDraft = !isDraft && !!(category as { is_draft?: boolean }).is_draft
+  if (!isDraft && !isCreateDraft) {
     redirect(ap(`/admin/categories/${id}`, host))
   }
 
@@ -127,8 +150,15 @@ export default async function EditCategoryPage({ params, searchParams }: { param
           Categories
         </a>
         <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Category'}</span>
+        <span className="text-foreground font-medium">{isCreateDraft ? 'Edit Draft Category' : isDraft ? 'Edit Draft' : 'Edit Category'}</span>
       </div>
+
+      {isCreateDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New category — draft</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">This category is not on the live list yet. Save keeps it a draft; Publish makes it live.</p>
+        </div>
+      )}
 
       {isDraft && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
@@ -144,8 +174,8 @@ export default async function EditCategoryPage({ params, searchParams }: { param
       )}
 
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Category'}</h1>
-        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update category information'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isCreateDraft ? 'Edit Draft Category' : isDraft ? 'Edit Draft' : 'Edit Category'}</h1>
+        <p className="text-foreground-secondary mt-1">{isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update category information'}</p>
       </div>
 
       <CategoryForm
@@ -153,7 +183,7 @@ export default async function EditCategoryPage({ params, searchParams }: { param
         category={categoryForForm}
         action={updateCategory.bind(null, id)}
         backUrl={backUrl}
-        isDraft={isDraft}
+        isDraft={isDraft || isCreateDraft}
       />
     </div>
   )

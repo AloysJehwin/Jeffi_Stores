@@ -12,6 +12,7 @@ const {
   mockAp,
   mockVerifyToken,
   mockRevokeSession,
+  mockRevokeAll,
 } = vi.hoisted(() => {
   const mockDelete = vi.fn()
   const mockGet = vi.fn().mockReturnValue(undefined)
@@ -24,6 +25,7 @@ const {
     mockAp: vi.fn(),
     mockVerifyToken: vi.fn().mockResolvedValue(null),
     mockRevokeSession: vi.fn().mockResolvedValue(undefined),
+    mockRevokeAll: vi.fn().mockResolvedValue(1),
   }
 })
 
@@ -51,6 +53,7 @@ vi.mock('@/lib/jwt', () => ({
 
 vi.mock('@/lib/auth-sessions', () => ({
   revokeSession: mockRevokeSession,
+  revokeAllForPrincipal: mockRevokeAll,
 }))
 
 import { logoutAction } from '@/app/admin/logout-action'
@@ -100,7 +103,7 @@ describe('logoutAction', () => {
     expect(mockAp).toHaveBeenCalledWith('/admin/login', '')
   })
 
-  it('revokes the server-side session for the admin_sid cookie sid', async () => {
+  it('ends every admin session of the account behind the admin_sid cookie', async () => {
     mockGet.mockReturnValue({ value: 'the-cookie-sid' })
     mockVerifyToken.mockResolvedValue({
       adminId: 'admin-1',
@@ -110,7 +113,8 @@ describe('logoutAction', () => {
     })
     await logoutAction()
     expect(mockVerifyToken).toHaveBeenCalledWith('the-cookie-sid')
-    expect(mockRevokeSession).toHaveBeenCalledWith('admin-sid')
+    expect(mockRevokeAll).toHaveBeenCalledWith('admin', 'admin-1')
+    expect(mockRevokeSession).not.toHaveBeenCalled()
     expect(mockDelete).toHaveBeenCalledWith('admin_sid')
     expect(mockRedirect).toHaveBeenCalled()
   })

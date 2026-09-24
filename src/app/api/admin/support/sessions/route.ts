@@ -5,7 +5,7 @@ import { queryMany } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await authenticateAdmin(request)
+    const admin = await authenticateAdmin(request, { passive: true })
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 

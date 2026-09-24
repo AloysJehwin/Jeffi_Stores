@@ -19,15 +19,17 @@ function shouldShowFooter(pathname: string | null): boolean {
   return false
 }
 
-export default function ConditionalLayout({ children, initialStoreConfig, isFormsSubdomain, isDocumentSubdomain, isBusinessSubdomain, isAdminSubdomain, isEcomSubdomain }: { children: React.ReactNode; initialStoreConfig?: StoreConfig; isFormsSubdomain?: boolean; isDocumentSubdomain?: boolean; isBusinessSubdomain?: boolean; isAdminSubdomain?: boolean; isEcomSubdomain?: boolean }) {
+export default function ConditionalLayout({ children, initialStoreConfig, isFormsSubdomain, isDocumentSubdomain, isBusinessSubdomain, isAdminSubdomain, isEcomSubdomain, isCertPortalSubdomain }: { children: React.ReactNode; initialStoreConfig?: StoreConfig; isFormsSubdomain?: boolean; isDocumentSubdomain?: boolean; isBusinessSubdomain?: boolean; isAdminSubdomain?: boolean; isEcomSubdomain?: boolean; isCertPortalSubdomain?: boolean }) {
   const pathname = usePathname()
   const isAdminPage = isAdminSubdomain || pathname?.startsWith('/admin')
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
   const isDocumentPage = isDocumentSubdomain || pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
   const isEcomPage = isEcomSubdomain || pathname?.startsWith('/ecom')
+  const isCertPortalPage = isCertPortalSubdomain || pathname?.startsWith('/certportal')
+  const isStaffPage = pathname?.startsWith('/staff')
 
-  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage) {
+  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage || isCertPortalPage || isStaffPage) {
     return (
       <StoreConfigProvider initialConfig={initialStoreConfig}>
         <ThemeProvider>

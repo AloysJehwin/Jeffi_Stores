@@ -413,3 +413,15 @@ export async function getImportFile(key: string): Promise<Buffer> {
   const bytes = await res.Body!.transformToByteArray()
   return Buffer.from(bytes)
 }
+
+/** Raw object put for non-product assets (customer note photos / voice memos). Returns the canonical key. */
+export async function putObjectBuffer(canonicalKey: string, body: Buffer, contentType: string): Promise<string> {
+  const BUCKET_NAME = await resolveBucket()
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${canonicalKey}`, Body: body, ContentType: contentType }))
+  return canonicalKey
+}
+
+export async function deleteObjectKey(canonicalKey: string): Promise<void> {
+  const BUCKET_NAME = await resolveBucket()
+  await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${canonicalKey}` }))
+}

@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation'
+import CustomerNotes from '@/components/admin/CustomerNotes'
+import { listNotes } from '@/lib/customer-notes'
 import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
@@ -610,6 +612,19 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
+          {order.user_id && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Order Notes</h2>
+            <CustomerNotes
+              customerId={order.user_id}
+              orderId={order.id}
+              returnRequestId={returnRequest?.id ?? null}
+              initialNotes={await listNotes({ userId: order.user_id, orderId: order.id })}
+              canWrite={canWrite}
+            />
+          </div>
+          )}
+
           {canMail && (
           <CustomerMailPanel
             orderId={order.id}
@@ -736,6 +751,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                     const resp = typeof p.gateway_response === 'string' ? (() => { try { return JSON.parse(p.gateway_response) } catch { return {} } })() : (p.gateway_response || {})
                     const isVariantChange = resp?.purpose === 'variant_change'
                     const refunded = resp?.refund || resp?.variantChangeRefund
+                    const returnCharge = resp?.returnCharge
                     return (
                       <div key={p.id || idx} className="rounded-lg border border-border-default p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
@@ -778,6 +794,14 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground-secondary">Refund</span>
                             <span className="text-foreground font-mono text-xs">{refunded.id}{refunded.amount ? ` · Rs. ${(Number(refunded.amount) / 100).toFixed(2)}` : ''}</span>
+                          </div>
+                        )}
+                        {!refunded?.id && returnCharge && Number(returnCharge.netRefund) <= 0 && (
+                          <div className="flex justify-between text-sm gap-3">
+                            <span className="text-foreground-secondary">Refund</span>
+                            <span className="text-right text-foreground-muted">
+                              Waived — Rs. {Number(returnCharge.charge).toFixed(2)} return charge covers the Rs. {Number(returnCharge.grossRefund).toFixed(2)} returnable
+                            </span>
                           </div>
                         )}
                       </div>

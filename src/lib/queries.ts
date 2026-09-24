@@ -1,3 +1,4 @@
+import { getDashboardInsights, rangeDays, type DashboardInsights } from './dashboard-insights'
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
@@ -246,18 +247,18 @@ export async function getProduct(id: string) {
                   'stock_status', sv.stock_status, 'inventory_quantity', sv.inventory_quantity,
                   'is_active', sv.is_active
                 )
-                ORDER BY sv.sub_variant_name
+                ORDER BY sv.is_active DESC, sv.sub_variant_name
               )
-               FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true),
+               FROM product_sub_variants sv WHERE sv.variant_id = pv.id),
               '[]'::json
             ),
             'sub_variant_min_price', (SELECT MIN(sv.price) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.price IS NOT NULL),
             'sub_variant_stock_total', COALESCE((SELECT COUNT(*) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'), 0),
             'sub_variant_inventory_total', COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
           )
-          ORDER BY pv.variant_name
+          ORDER BY pv.is_active DESC, pv.variant_name
         )
-         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+         FROM product_variants pv WHERE pv.product_id = p.id),
         '[]'::json
       ) AS product_variants,
       COALESCE(
@@ -320,7 +321,7 @@ export async function getProduct(id: string) {
 }
 
 export async function getAllCategories() {
-  return queryMany('SELECT * FROM categories ORDER BY display_order ASC')
+  return queryMany('SELECT * FROM categories WHERE is_draft = false ORDER BY display_order ASC')
 }
 
 export async function getAllBrands() {
@@ -518,6 +519,10 @@ export async function getFilteredProducts(filters: {
   const conditions: string[] = []
   const params: any[] = []
   let i = 1
+
+  // Never-published create-drafts live only in the Drafts section, never the live list —
+  // even under the Inactive status filter (a create-draft is is_active=false AND is_draft=true).
+  conditions.push(`p.is_draft = false`)
 
   if (filters.category_id) {
     conditions.push(`p.category_id IN (
@@ -849,6 +854,9 @@ export async function getFilteredCategories(filters: {
   const conditions: string[] = []
   const params: any[] = []
   let i = 1
+
+  // Never-published drafts live only in the Drafts section, never the live list.
+  conditions.push(`is_draft = false`)
 
   if (filters.is_active === 'true' || filters.is_active === 'false') {
     conditions.push(`is_active = $${i++}`)
@@ -1403,6 +1411,7 @@ export interface DashboardAnalytics {
     customers: number; customersPrev: number; customersPct: number | null
   }
   trend: { bucket: string; label: string; revenue: number; orders: number; paidOrders: number; customers: number; units: number; aov: number }[]
+  trendBucket: 'hour' | 'day' | 'week' | 'month'
   payment: { online: number; cod: number; other: number; codOutstanding: number; codOutstandingCount: number }
   topCategories: { name: string; units: number; revenue: number }[]
   topBrands: { name: string; units: number; revenue: number }[]
@@ -1410,6 +1419,7 @@ export interface DashboardAnalytics {
   buyerSplit: { business: number; consumer: number; businessRevenue: number; consumerRevenue: number }
   inventory: { inStock: number; lowStock: number; outOfStock: number; stockValue: number }
   returns: { total: number; rtoInTransit: number; rtoDelivered: number }
+  insights: DashboardInsights
 }
 
 /**
@@ -1432,9 +1442,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       : `NOW() - INTERVAL '${interval}' - INTERVAL '${interval}'`
   const prevEndExpr = range === 'month' ? `date_trunc('month', NOW())` : `NOW() - INTERVAL '${interval}'`
 
-  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow] = await Promise.all([
-    // KPIs: current + previous window
-    queryOne<Record<string, string>>(`
+  const kpiPromise = queryOne<Record<string, string>>(`
       SELECT
         COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${startExpr} AND payment_status = 'paid'), 0) AS rev,
         COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr} AND payment_status = 'paid'), 0) AS rev_prev,
@@ -1443,7 +1451,11 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${startExpr}) AS cust,
         COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}) AS cust_prev
       FROM orders
-    `),
+    `)
+  const paidRevenue = kpiPromise.then(r => ({ revenue: num(r?.rev), revenuePrev: num(r?.rev_prev) }))
+
+  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights] = await Promise.all([
+    kpiPromise,
     // Trend series over the range. Two aggregations joined by bucket so the
     // order_items fan-out doesn't inflate order-level sums (revenue/counts).
     queryMany<Record<string, string>>(`
@@ -1563,6 +1575,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(*) FILTER (WHERE shipment_status = 'rto_delivered') AS rto_delivered
       FROM orders WHERE created_at >= ${startExpr}
     `),
+    getDashboardInsights({ startExpr, prevStartExpr, prevEndExpr, days: rangeDays(range) }, paidRevenue),
   ])
 
   const rev = num(kpiRow?.rev), revPrev = num(kpiRow?.rev_prev)
@@ -1574,6 +1587,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
   return {
     range,
     rangeLabel: label,
+    trendBucket: bucket,
     kpis: {
       revenue: rev, revenuePrev: revPrev, revenuePct: pctDelta(rev, revPrev),
       orders: ord, ordersPrev: ordPrev, ordersPct: pctDelta(ord, ordPrev),
@@ -1615,6 +1629,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     returns: {
       total: int(retRow?.total_returns), rtoInTransit: int(retRow?.rto_in_transit), rtoDelivered: int(retRow?.rto_delivered),
     },
+    insights,
   }
 }
 
@@ -1735,6 +1750,7 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
         COUNT(*) FILTER (WHERE is_featured)::int AS featured,
         (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories
       FROM products
+      WHERE is_draft = false
     `),
     // True inventory stock value — reuse the canonical valuation (ex-GST, covers products +
     // variants + sub-variants) so this matches the Stock Ledger → Valuation page exactly.

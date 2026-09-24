@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-const { mockVerifyToken, mockRevokeSession } = vi.hoisted(() => ({
+const { mockVerifyToken, mockRevokeSession, mockRevokeAll } = vi.hoisted(() => ({
   mockVerifyToken: vi.fn().mockResolvedValue(null),
   mockRevokeSession: vi.fn().mockResolvedValue(undefined),
+  mockRevokeAll: vi.fn().mockResolvedValue(1),
 }))
 
 vi.mock('next/headers', () => ({
@@ -19,6 +20,7 @@ vi.mock('@/lib/jwt', () => ({
 }))
 vi.mock('@/lib/auth-sessions', () => ({
   revokeSession: mockRevokeSession,
+  revokeAllForPrincipal: mockRevokeAll,
 }))
 
 import { POST } from '@/app/api/admin/logout/route'
@@ -69,7 +71,7 @@ describe('POST /api/admin/logout', () => {
     expect(setCookieHeader).toContain('Max-Age=0')
   })
 
-  it('revokes the server-side session for the admin_sid cookie sid', async () => {
+  it('ends every session of the admin behind the admin_sid cookie', async () => {
     const setCookie = makeSetFn()
     const get = vi.fn().mockReturnValue({ value: 'cookie-sid' })
     mockCookies.mockResolvedValue({ set: setCookie, get } as any)
@@ -78,7 +80,8 @@ describe('POST /api/admin/logout', () => {
     const res = await POST()
     expect(res.status).toBe(200)
     expect(mockVerifyToken).toHaveBeenCalledWith('cookie-sid')
-    expect(mockRevokeSession).toHaveBeenCalledWith('admin-sid')
+    expect(mockRevokeAll).toHaveBeenCalledWith('admin', 'admin-1')
+    expect(mockRevokeSession).not.toHaveBeenCalled()
     expect(setCookie).toHaveBeenCalled()
   })
 

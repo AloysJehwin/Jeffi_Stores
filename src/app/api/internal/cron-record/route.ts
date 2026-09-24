@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
+import { isCronJobId } from '@/lib/cron-jobs'
 
 export const dynamic = 'force-dynamic'
-
-const VALID_JOB_IDS = ['delhivery_sync', 'cancel_stale_orders', 'sweep_auto_tasks', 'dispatch_mailer', 'run_campaigns', 'compute_health', 'daily_briefing']
 
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json()
   const { jobId, ok, errorMsg, detail } = body
 
-  if (!VALID_JOB_IDS.includes(jobId)) return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 })
+  if (!isCronJobId(jobId)) return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 })
 
   const now = new Date().toISOString()
   const upserts: Array<[string, string]> = [

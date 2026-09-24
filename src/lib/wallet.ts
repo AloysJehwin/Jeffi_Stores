@@ -130,6 +130,138 @@ export async function rechargeWallet(opts: {
   }
 }
 
+export const WALLET_PICKUP_MIN_FLOOR_INR = 500 // balance must stay at/above this after a pickup
+
+export interface PickupEstimateItem { awb: string; orderRef?: string | null; estimateInr: number }
+
+/**
+ * Charge the estimated Delhivery cost for one or more AWBs (platform-Delhivery tenants only). Called
+ * when the AWB is CREATED (forward shipment) or when a reverse/RVP charge is set, NOT at pickup —
+ * pickup only checks the balance. Rules:
+ *   - own_delhivery tenants ship on their own account → { ok:true, skipped:true }, no movement.
+ *   - the balance must stay >= WALLET_PICKUP_MIN_FLOOR_INR AFTER covering the sum of the (not yet
+ *     charged) estimates → else { ok:false } with the shortfall and NO movement.
+ *   - each AWB's estimate is a per-AWB 'debit' (same one-shot (tenant,awb) index), so an AWB already
+ *     charged (re-submit, or added earlier) is not double-charged and is excluded from the required sum.
+ * The real invoiced amount is reconciled at delivery via correctWalletDebitForAwb, which nets the
+ * AWB to the actual — so the estimate here is a hold, not the final charge.
+ * One control-plane transaction: balance and ledger never drift.
+ */
+export async function chargeDeliveryEstimate(opts: {
+  tenantId: string
+  items: PickupEstimateItem[]
+  minFloorInr?: number
+}): Promise<{ ok: true; skipped?: boolean; chargedInr: number; balance: number } | { ok: false; error: string }> {
+  const floor = opts.minFloorInr ?? WALLET_PICKUP_MIN_FLOOR_INR
+  if (!opts.tenantId) return { ok: false, error: 'tenantId is required.' }
+  const items = (opts.items || []).filter(i => i.awb && i.estimateInr > 0)
+
+  const pool = controlPlanePool()
+  const flag = await pool.query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [opts.tenantId]).catch(() => null)
+  if (!flag) return { ok: false, error: 'Failed to read tenant delivery mode.' }
+  if (flag.rows[0]?.own_delhivery) return { ok: true, skipped: true, chargedInr: 0, balance: 0 }
+
+  const client = await pool.connect().catch(() => null)
+  if (!client) return { ok: false, error: 'Failed to open wallet transaction.' }
+  try {
+    await client.query('BEGIN')
+    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [opts.tenantId])
+
+    // AWBs that already carry a debit are not re-charged and don't count toward the required sum.
+    const awbs = items.map(i => i.awb)
+    const existing = await client.query(
+      `SELECT awb FROM wallet_ledger WHERE tenant_id = $1 AND entry_type = 'debit' AND awb = ANY($2::text[])`,
+      [opts.tenantId, awbs],
+    )
+    const already = new Set(existing.rows.map((r: any) => r.awb))
+    const toCharge = items.filter(i => !already.has(i.awb))
+    const sum = Math.round(toCharge.reduce((s, i) => s + Math.abs(i.estimateInr), 0) * 100) / 100
+
+    const balRow = await client.query(`SELECT balance FROM tenant_wallets WHERE tenant_id = $1`, [opts.tenantId])
+    const balance = Number(balRow.rows[0]?.balance ?? 0)
+
+    if (sum === 0) { await client.query('COMMIT'); return { ok: true, chargedInr: 0, balance } }
+
+    if (balance - sum < floor) {
+      await client.query('ROLLBACK')
+      return {
+        ok: false,
+        error: `Insufficient wallet balance. This pickup needs Rs ${sum.toFixed(2)} and your balance must stay at or above Rs ${floor.toFixed(0)} after. Current balance: Rs ${balance.toFixed(2)}. Please recharge.`,
+      }
+    }
+
+    for (const i of toCharge) {
+      await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
+         VALUES ($1, 'debit', $2, $3, $4, $5)
+         ON CONFLICT (tenant_id, awb) WHERE awb IS NOT NULL AND entry_type = 'debit' DO NOTHING`,
+        [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `Pickup estimate — AWB ${i.awb}`],
+      )
+    }
+    const upd = await client.query(
+      `UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1 RETURNING balance`,
+      [opts.tenantId, sum],
+    )
+    await client.query('COMMIT')
+    return { ok: true, chargedInr: sum, balance: Number(upd.rows[0].balance) }
+  } catch {
+    await client.query('ROLLBACK').catch(() => {})
+    return { ok: false, error: 'Wallet charge failed.' }
+  } finally {
+    client.release()
+  }
+}
+
+/**
+ * Refund pickup estimate debits for the given AWBs when the pickup itself failed (Delhivery
+ * rejected it after we charged). Posts a positive 'adjustment' that nets the AWB back to zero and
+ * credits the balance, only for AWBs that currently carry a net debit. Idempotent: an AWB already
+ * netted to zero is skipped. own_delhivery tenants never had a debit → no-op.
+ */
+export async function refundEstimateForAwbs(opts: {
+  tenantId: string
+  awbs: string[]
+}): Promise<{ ok: boolean; refundedInr: number }> {
+  const awbs = (opts.awbs || []).filter(Boolean)
+  if (!opts.tenantId || awbs.length === 0) return { ok: true, refundedInr: 0 }
+  const pool = controlPlanePool()
+  const client = await pool.connect().catch(() => null)
+  if (!client) return { ok: false, refundedInr: 0 }
+  try {
+    await client.query('BEGIN')
+    let refunded = 0
+    for (const awb of awbs) {
+      const net = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS net FROM wallet_ledger
+          WHERE tenant_id = $1 AND awb = $2 AND entry_type IN ('debit', 'adjustment')`,
+        [opts.tenantId, awb],
+      )
+      const currentNet = Number(net.rows[0]?.net ?? 0)
+      if (currentNet >= 0) continue // nothing owed for this AWB
+      const credit = -currentNet // positive, brings net to 0
+      await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, note)
+         VALUES ($1, 'adjustment', $2, $3, $4)`,
+        [opts.tenantId, credit, awb, `Pickup estimate refund — AWB ${awb} (pickup failed)`],
+      )
+      refunded += credit
+    }
+    if (refunded > 0) {
+      await client.query(
+        `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`,
+        [opts.tenantId, refunded],
+      )
+    }
+    await client.query('COMMIT')
+    return { ok: true, refundedInr: refunded }
+  } catch {
+    await client.query('ROLLBACK').catch(() => {})
+    return { ok: false, refundedInr: 0 }
+  } finally {
+    client.release()
+  }
+}
+
 /**
  * Debit the real Delhivery cost for a shipment, keyed to its AWB. The partial-unique index
  * (tenant_id, awb) WHERE entry_type='debit' makes this idempotent: a repeat for the same AWB
@@ -199,6 +331,24 @@ export async function settleDelhiveryCostToWallet(opts: {
   const flag = await pool.query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [opts.tenantId]).catch(() => null)
   if (!flag) return false
   if (flag.rows[0]?.own_delhivery) return true
+
+  // If this AWB was already charged at pickup (a debit exists), the one-shot debitWalletForAwb
+  // would no-op and leave the ESTIMATE on the books forever. Reconcile instead: net the AWB to the
+  // real invoiced amount (refund estimate, debit actual) in one movement. Fresh AWBs (no prior
+  // debit — e.g. own historical flows) take the plain idempotent debit.
+  const existing = await pool.query(
+    `SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'debit' LIMIT 1`,
+    [opts.tenantId, opts.awb],
+  ).catch(() => null)
+  if (existing && (existing.rowCount ?? 0) > 0) {
+    const res = await correctWalletDebitForAwb({
+      tenantId: opts.tenantId,
+      awb: opts.awb,
+      orderRef: opts.orderRef,
+      newAmountInr: opts.amountInr,
+    }).catch(() => ({ ok: false as const, error: 'reconcile failed' }))
+    return res.ok
+  }
   return debitWalletForAwb(opts)
 }
 

@@ -36,7 +36,9 @@ export function openGoogleOAuthPopup({
       //      https://admin-acme.jeffistores.in → https://jeffistores.in
       //      https://ecom.jeffistores.in → https://jeffistores.in
       return origin.replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
-        .replace(/^(https?:\/\/)(business|ecom|admin)\./, '$1')  // legacy fallback for non-jeffistores hosts
+        // Strip app subdomains on non-jeffistores hosts too (e.g. certificate.localhost:3000 →
+        // localhost:3000), so the callback lands on the one registered dev redirect URI.
+        .replace(/^(https?:\/\/)(business|ecom|admin|certificate)\./, '$1')
     }
     const mainOrigin = stripAppSubdomain(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`

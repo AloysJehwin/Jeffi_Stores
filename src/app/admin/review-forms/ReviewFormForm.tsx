@@ -37,6 +37,7 @@ const TEMPLATES: { value: TemplateType; label: string; Icon: LucideIcon; descrip
 interface ReviewFormFormProps {
   submitLabel?: string
   isDraft?: boolean
+  isCreateDraft?: boolean
   coupons: Coupon[]
   formId?: string
   backUrl?: string
@@ -66,7 +67,7 @@ function randomId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
+export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateDraft = false, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
   const router = useRouter()
   const [templateType, setTemplateType] = useState<TemplateType>(d.template_type || 'google_review')
   const [title, setTitle] = useState(d.title || '')
@@ -155,6 +156,22 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
         custom_fields: v.customFields,
       }
 
+      if (isCreateDraft && formId) {
+        // Create-draft: edit the row in place. Save keeps is_draft = true; Publish flips
+        // is_draft = false + is_active = true, moving it to the live list.
+        const intent = (document.activeElement as HTMLButtonElement)?.value || 'draft'
+        const publish = intent === 'publish'
+        const res = await fetch(`/api/admin/review-forms/${formId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, is_active: publish ? true : false, is_draft: publish ? false : true }),
+        })
+        if (!res.ok) { const dd = await res.json(); setError(dd.error || 'Failed to save'); return }
+        router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
+        router.refresh()
+        return
+      }
+
       if (isDraft && formId) {
         // Determine intent from the clicked button
         const intent = (document.activeElement as HTMLButtonElement)?.value || 'draft'
@@ -190,10 +207,11 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
         return
       }
 
-      const data = await res.json()
-      // After creation redirect to edit so draft auto-creates
-      if (!formId && data.form?.id) {
-        router.push(ap(`/admin/review-forms/edit/${data.form.id}`))
+      // Create-as-draft: the new form is a draft (is_draft = true), so return to the list where
+      // it appears in the Drafts section — not to the edit page.
+      if (!formId) {
+        router.push(ap('/admin/review-forms'))
+        router.refresh()
         return
       }
       const destination = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
@@ -348,7 +366,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
             Cancel
           </Link>
           <RequireWrite scope="review_forms:write">
-            {isDraft ? (
+            {isDraft || isCreateDraft ? (
               <>
                 <button type="submit" value="draft" disabled={submitting} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
                   {submitting ? 'Saving…' : 'Save Draft'}

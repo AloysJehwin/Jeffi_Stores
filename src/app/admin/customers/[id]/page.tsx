@@ -10,6 +10,7 @@ import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import CustomerEngagementChips from '@/components/admin/CustomerEngagementChips'
 import CustomerTags from '@/components/admin/CustomerTags'
 import CustomerNotes from '@/components/admin/CustomerNotes'
+import { listNotes } from '@/lib/customer-notes'
 import CustomerTasks from '@/components/admin/CustomerTasks'
 import CustomerTimeline from '@/components/admin/CustomerTimeline'
 import HealthScoreCard from '@/components/admin/HealthScoreCard'
@@ -285,7 +286,7 @@ export default async function CustomerDetailPage({
 
           {/* Internal Notes */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerNotes customerId={customer.id} initialNotes={customer.notes || []} canWrite={canWrite} />
+            <CustomerNotes customerId={customer.id} initialNotes={await listNotes({ userId: customer.id })} canWrite={canWrite} />
           </div>
 
           {/* Tasks */}
