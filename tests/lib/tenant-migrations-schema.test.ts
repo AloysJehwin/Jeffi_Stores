@@ -9,7 +9,7 @@
  * without needing a live Postgres in CI.
  */
 import { describe, it, expect } from 'vitest'
-import { buildTenantSchemaSql } from '@/lib/tenant-migrations-schema'
+import { buildTenantSchemaSql, parseCreateTables, desiredTableColumns } from '@/lib/tenant-migrations-schema'
 
 const sql = buildTenantSchemaSql()
 
@@ -80,11 +80,12 @@ describe('buildTenantSchemaSql — re-apply safety', () => {
 // CREATE TABLE IF NOT EXISTS is a no-op on a table a tenant already has, so a column added to
 // an existing table's definition never lands without an explicit ADD COLUMN. This pass reconciles.
 describe('buildTenantSchemaSql — column reconcile on existing tables', () => {
-  const marker = sql.indexOf('reconcile columns on pre-existing tables')
-  const reconcileTail = marker > 0 ? sql.slice(marker) : ''
+  // Reconciliation now follows each CREATE TABLE (see the ordering suite below), so the whole
+  // script is the haystack rather than a trailing section.
+  const reconcileTail = sql
 
-  it('emits a reconcile section with ADD COLUMN IF NOT EXISTS', () => {
-    expect(marker).toBeGreaterThan(0)
+  it('emits a reconcile block after each table with ADD COLUMN IF NOT EXISTS', () => {
+    expect(sql.indexOf('-- reconcile columns on a pre-existing public.')).toBeGreaterThan(0)
     expect(reconcileTail).toMatch(/ALTER TABLE .* ADD COLUMN IF NOT EXISTS/)
   })
 
@@ -108,5 +109,69 @@ describe('buildTenantSchemaSql — column reconcile on existing tables', () => {
 
   it('does not emit ADD COLUMN for table-level constraints', () => {
     expect(reconcileTail).not.toMatch(/ADD COLUMN IF NOT EXISTS (CONSTRAINT|PRIMARY|FOREIGN|UNIQUE|CHECK)\b/i)
+  })
+})
+
+
+describe('buildTenantSchemaSql — column reconciliation ordering', () => {
+  const firstIndex = (re: RegExp) => { const m = re.exec(sql); return m ? m.index : -1 }
+
+  it('adds every declared column right after its CREATE TABLE, before any constraint or index on it', () => {
+    const tables = [...new Set([...sql.matchAll(/ALTER TABLE (public\.[a-z0-9_]+) ADD COLUMN IF NOT EXISTS/g)].map(m => m[1]))]
+    expect(tables.length).toBeGreaterThan(50)
+    for (const table of tables) {
+      const bare = table.replace('public.', '')
+      const addCol = firstIndex(new RegExp(`ALTER TABLE ${table.replace('.', '\\.')} ADD COLUMN IF NOT EXISTS`))
+      const create = firstIndex(new RegExp(`CREATE TABLE IF NOT EXISTS ${table.replace('.', '\\.')}\\s*\\(`))
+      expect(addCol, table).toBeGreaterThan(create)
+      const firstConstraint = firstIndex(new RegExp(`ALTER TABLE (ONLY )?${table.replace('.', '\\.')}\\s+ADD CONSTRAINT`))
+      const firstIdx = firstIndex(new RegExp(`CREATE (UNIQUE )?INDEX IF NOT EXISTS [a-z0-9_]+ ON ${table.replace('.', '\\.')}`))
+      if (firstConstraint !== -1) expect(addCol, `${bare} constraint before column reconciliation`).toBeLessThan(firstConstraint)
+      if (firstIdx !== -1) expect(addCol, `${bare} index before column reconciliation`).toBeLessThan(firstIdx)
+    }
+  })
+
+  it('reconciles customer_notes.source before the CHECK that references it (the 2026-09-24 live failure)', () => {
+    const addSource = sql.indexOf('ALTER TABLE public.customer_notes ADD COLUMN IF NOT EXISTS source ')
+    const check = sql.indexOf('ADD CONSTRAINT customer_notes_source_check')
+    const partialIdx = sql.indexOf('idx_customer_notes_shared')
+    expect(addSource).toBeGreaterThan(-1)
+    expect(check).toBeGreaterThan(addSource)
+    expect(partialIdx).toBeGreaterThan(addSource)
+  })
+
+  it('does not leave a trailing end-of-script reconciliation block', () => {
+    expect(sql).not.toContain('reconcile columns on pre-existing tables')
+  })
+
+  it('drops and re-adds CHECK constraints so a changed rule lands, while PRIMARY KEYs keep the existence guard', () => {
+    const block = sql.slice(sql.indexOf('DROP CONSTRAINT IF EXISTS customer_notes_source_check'), sql.indexOf('ADD CONSTRAINT customer_notes_source_check'))
+    expect(block.length).toBeGreaterThan(0)
+    expect(block.length).toBeLessThan(200)
+    expect(sql).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM pg_constraint WHERE conname = 'customer_notes_pkey'/)
+    expect(sql).not.toMatch(/DROP CONSTRAINT IF EXISTS customer_notes_pkey/)
+  })
+})
+
+describe('parseCreateTables', () => {
+  it('keeps columns that follow an inline comment line and skips table-level constraints', () => {
+    const [t] = parseCreateTables(`CREATE TABLE public.demo (
+    id uuid NOT NULL,
+    -- Physical attributes
+    color character varying(100),
+    weight numeric(10,2) DEFAULT 0, -- grams
+    CONSTRAINT demo_check CHECK ((weight >= (0)::numeric)),
+    CHECK (id IS NOT NULL)
+);`)
+    expect(t.table).toBe('public.demo')
+    expect(t.columns.map(c => c.name)).toEqual(['id', 'color', 'weight'])
+    expect(t.columns[0].type).toBe('uuid')
+    expect(t.columns[2].type).toBe('numeric(10,2) DEFAULT 0')
+  })
+
+  it('the real catalog: products columns declared under comment headings are reconciled', () => {
+    const cols = desiredTableColumns().get('products') ?? []
+    expect(cols).toEqual(expect.arrayContaining(['sku', 'color', 'barcode', 'fragile', 'meta_title', 'is_draft']))
+    expect(sql).toContain('ALTER TABLE public.products ADD COLUMN IF NOT EXISTS color character varying(100);')
   })
 })

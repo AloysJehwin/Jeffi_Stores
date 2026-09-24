@@ -60,8 +60,12 @@ jobs:
           # control plane silently drifted. .+ covers subdirectories.
           # schema-diff.sh itself counts too: a fix to the differ must actually run, or it
           # sits dormant until the next unrelated schema edit while the drift it repairs
-          # stays live.
-          if echo "$CHANGED" | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh)'; then
+          # stays live. The same holds for the tenant fan-out builder and runner: the 2026-09-24
+          # fan-out failure was fixed in src/lib/tenant-migrations-schema.ts, and without this the
+          # repaired fan-out would not have run until an unrelated .sql edit. A commit message
+          # containing [schema] forces the job as well.
+          if echo "$CHANGED" | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh|src/lib/tenant-migrations(-schema)?\.ts|src/app/api/internal/migrations/)' \
+             || echo "${{ github.event.head_commit.message }}" | grep -q '\[schema\]'; then
             echo "schema_changed=true" >> $GITHUB_OUTPUT
             echo "Entity SQL files changed — will schema-diff against live RDS"
           else
@@ -513,13 +517,51 @@ jobs:
               echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
               exit 1
             fi
-            echo "POST /api/internal/migrations/fanout  (gitSha=$DEPLOY_SHA, 300s timeout)"
-            CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
-              -X POST http://localhost/api/internal/migrations/fanout \
-              -H "Authorization: Bearer $CRON_SECRET" \
-              -H 'Content-Type: application/json' \
-              -H 'Host: jeffistores.in' \
-              -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
+            # The fan-out is idempotent (tenants already recorded at this SHA are skipped, the
+            # batch per tenant is one transaction), so retrying is always safe. Attempts 1-2 go
+            # through nginx on localhost; if that is unreachable (nginx mid-reload right after the
+            # blue-green swap, or an active slot still warming up) attempt 3 calls the app container
+            # directly. A 5xx with a parsable body is a per-tenant failure and gets one more try
+            # after a pause, which clears a transient RDS connection blip without masking a real
+            # schema error.
+            SLOT=$(cat active_slot 2>/dev/null || echo blue)
+            BODY="{\"gitSha\":\"$DEPLOY_SHA\"}"
+            CODE=000
+            for ATTEMPT in 1 2 3; do
+              echo "POST /api/internal/migrations/fanout  (gitSha=$DEPLOY_SHA, attempt $ATTEMPT, 300s timeout)"
+              if [ "$ATTEMPT" -lt 3 ]; then
+                CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
+                  -X POST http://localhost/api/internal/migrations/fanout \
+                  -H "Authorization: Bearer $CRON_SECRET" \
+                  -H 'Content-Type: application/json' \
+                  -H 'Host: jeffistores.in' \
+                  -d "$BODY" || echo 000)
+              else
+                echo "(nginx path unavailable, calling the $SLOT app container directly)"
+                if docker exec jeffi-app-$SLOT wget -q -O /tmp/fanout-inner.json --timeout=300 \
+                     --header="Authorization: Bearer $CRON_SECRET" --header='Content-Type: application/json' \
+                     --header='Host: jeffistores.in' --post-data="$BODY" \
+                     http://localhost:3000/api/internal/migrations/fanout 2>/dev/null; then
+                  CODE=200
+                else
+                  CODE=500
+                fi
+                docker exec jeffi-app-$SLOT cat /tmp/fanout-inner.json > /tmp/fanout.json 2>/dev/null || echo '{}' > /tmp/fanout.json
+              fi
+              case "$CODE" in
+                200) break ;;
+                000|502|503|504) echo "app not reachable yet (HTTP $CODE), retrying in 15s"; sleep 15 ;;
+                500)
+                  if [ "$ATTEMPT" -lt 3 ] && jq -e '.result' /tmp/fanout.json >/dev/null 2>&1; then
+                    echo "fan-out reported failures (HTTP 500), retrying failed tenants in 20s"
+                    jq -r '.result.failures[]? | "  first attempt: \(.slug): \(.error)"' /tmp/fanout.json 2>/dev/null || true
+                    sleep 20
+                  else
+                    break
+                  fi ;;
+                *) break ;;
+              esac
+            done
 
             # The endpoint returns aggregate counts plus a slug+error per failing tenant. The old
             # code just cat'd the raw JSON, so a failed run meant eyeballing an unformatted blob to
