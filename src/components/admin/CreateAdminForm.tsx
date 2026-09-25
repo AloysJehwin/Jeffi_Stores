@@ -150,6 +150,12 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
         ) : (
           <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 px-3 py-2 rounded mt-4">
             The .p12 certificate file has been downloaded. Save the password above — it will not be shown again.
+            {certInfo.portalUrl && (
+              <>
+                {' '}The admin can also fetch it once from{' '}
+                <a href={certInfo.portalUrl} className="underline font-medium" target="_blank" rel="noreferrer">{certInfo.portalUrl.replace('https://', '')}</a>.
+              </>
+            )}
           </p>
         )}
         {!certInfo.emailSent && (
