@@ -38,7 +38,7 @@ describe('planDataNeeds', () => {
   })
 
   it('fetches nothing for an empty page', () => {
-    expect(Object.values(planDataNeeds([]))).toEqual([false, false, false, false, false, false])
+    expect(Object.values(planDataNeeds([]))).toEqual([false, false, false, false, false, false, false])
   })
 })
 

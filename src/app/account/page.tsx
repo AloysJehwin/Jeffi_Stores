@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { AccountMobileTabBar } from '@/components/visitor/AccountMobileHeader'
+import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
 // AccountNavBar is rendered by layout.tsx for all /account/* pages
 
 interface DashboardData {
@@ -596,6 +597,8 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
+
+            <BuyAgainRow />
 
             {/* Sign out — mobile only (desktop handled by sidebar) */}
             <div className="lg:hidden">

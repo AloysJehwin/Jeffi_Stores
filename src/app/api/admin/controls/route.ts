@@ -4,6 +4,8 @@ import { round2 } from '@/lib/gst'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/s3'
+import { buildAttributeFilterClauses } from '@/lib/product-attribute-filters.server'
+import { buildProductSearchClause } from '@/lib/search'
 
 type SnapshotRow = {
   id: string
@@ -44,9 +46,11 @@ function applyPct(val: number, pct: number) {
 // ── filter query builder ──────────────────────────────────────────────────────
 
 function buildFilterQuery(filters: Record<string, string>) {
-  const conditions: string[] = [
-    filters.is_active === 'false' ? 'p.is_active = false' : 'p.is_active = true',
-  ]
+  const conditions: string[] = ['p.is_draft = false']
+  if (filters.is_active === 'false') conditions.push('p.is_active = false')
+  else if (filters.is_active !== 'any') conditions.push('p.is_active = true')
+  if (filters.stock === 'low') conditions.push(`p.stock_status = 'Low Stock'`)
+  else if (filters.stock === 'out') conditions.push(`p.stock_status = 'Out of Stock'`)
   const params: unknown[] = []
 
   function add(clause: string, val: unknown) {
@@ -60,16 +64,14 @@ function buildFilterQuery(filters: Record<string, string>) {
     conditions.push(`p.category_id = ANY(SELECT id FROM categories WHERE id = $${n}::uuid UNION SELECT id FROM categories WHERE parent_category_id = $${n}::uuid)`)
   }
   if (filters.brand_id)       add('p.brand_id = ?::uuid', filters.brand_id)
-  if (filters.grade)          add('p.grade ILIKE ?', `%${filters.grade}%`)
-  if (filters.condition)      add('p.condition = ?', filters.condition)
-  if (filters.target_gender)  add('p.target_gender = ?', filters.target_gender)
-  if (filters.shipping_class) add('p.shipping_class = ?', filters.shipping_class)
-  if (filters.tax_class)      add('p.tax_class = ?', filters.tax_class)
-  if (filters.hsn_code)       add('p.hsn_code = ?', filters.hsn_code)
-  if (filters.is_featured === 'true')    conditions.push('p.is_featured = true')
-  if (filters.is_featured === 'false')   conditions.push('p.is_featured = false')
-  if (filters.is_searchable === 'true')  conditions.push('p.is_searchable = true')
-  if (filters.is_searchable === 'false') conditions.push('p.is_searchable = false')
+  const attr = buildAttributeFilterClauses(filters, params.length + 1)
+  conditions.push(...attr.conditions)
+  params.push(...attr.params)
+  if (filters.search) {
+    const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', params.length + 1)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+  }
   if (filters.product_ids) {
     const ids = filters.product_ids.split(',').filter(Boolean)
     if (ids.length) { params.push(ids); conditions.push(`p.id = ANY($${params.length}::uuid[])`) }

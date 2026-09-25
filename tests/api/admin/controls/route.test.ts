@@ -119,6 +119,30 @@ describe('GET /api/admin/controls', () => {
     expect(res.status).toBe(200)
   })
 
+  it('lists active and inactive products together, never unpublished drafts', async () => {
+    await GET(makeGet({ is_active: 'any', brand_id: 'brand-1' }))
+    const [sql] = vi.mocked(queryMany).mock.calls[0]
+    expect(sql).toContain('p.is_draft = false')
+    expect(sql).not.toContain('p.is_active = true')
+    expect(sql).not.toContain('p.is_active = false')
+  })
+
+  it('filters by stock level and searches name or SKU', async () => {
+    await GET(makeGet({ stock: 'low', search: 'hex bolt' }))
+    const [sql, params] = vi.mocked(queryMany).mock.calls[0]
+    expect(sql).toContain("p.stock_status = 'Low Stock'")
+    expect(sql).toContain('p.is_active = true')
+    expect((params as unknown[]).length).toBeGreaterThan(0)
+  })
+
+  it('filters by several picked values and by technical specs', async () => {
+    const res = await GET(makeGet({ category_id: 'cat-1', grade: '8.8|10.9', 'spec.thread_type': 'BSW' }))
+    expect(res.status).toBe(200)
+    const [sql, params] = vi.mocked(queryMany).mock.calls[0]
+    expect(sql).toContain('lower(s.val) IN (lower($2), lower($3))')
+    expect(params).toEqual(['cat-1', '8.8', '10.9', 'grade', 'material grade', 'BSW', 'thread type'])
+  })
+
   it('filters by is_featured=true', async () => {
     const res = await GET(makeGet({ is_featured: 'true' }))
     expect(res.status).toBe(200)

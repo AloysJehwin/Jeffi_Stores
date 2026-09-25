@@ -3,6 +3,7 @@ import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 import { getStockValuation } from './inventory'
+import { buildAttributeFilterClauses, type FilterParams } from './product-attribute-filters.server'
 
 export const VARIANT_STOCK_TOTAL_SQL = `
   COALESCE((SELECT COUNT(*) FROM product_variants pv
@@ -511,6 +512,7 @@ export async function getFilteredProducts(filters: {
   hazardous?: string
   perishable?: string
   serialized?: string
+  attributes?: FilterParams
   page?: number
   limit?: number
   sort?: string
@@ -554,62 +556,10 @@ export async function getFilteredProducts(filters: {
   } else if (filters.stock === 'out') {
     conditions.push(`p.stock_status = 'Out of Stock'`)
   }
-  if (filters.is_featured === 'true' || filters.is_featured === 'false') {
-    conditions.push(`p.is_featured = $${i++}`)
-    params.push(filters.is_featured === 'true')
-  }
-  if (filters.has_variants === 'true' || filters.has_variants === 'false') {
-    conditions.push(`p.has_variants = $${i++}`)
-    params.push(filters.has_variants === 'true')
-  }
-  if (filters.price_min) {
-    conditions.push(`COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price) >= $${i++}::numeric`)
-    params.push(filters.price_min)
-  }
-  if (filters.price_max) {
-    conditions.push(`COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price) <= $${i++}::numeric`)
-    params.push(filters.price_max)
-  }
-  if (filters.gst_percentage) {
-    conditions.push(`p.gst_percentage = $${i++}::numeric`)
-    params.push(filters.gst_percentage)
-  }
-  if (filters.condition) {
-    conditions.push(`p.condition = $${i++}`)
-    params.push(filters.condition)
-  }
-  if (filters.grade) {
-    conditions.push(`p.grade = $${i++}`)
-    params.push(filters.grade)
-  }
-  if (filters.is_digital === 'true' || filters.is_digital === 'false') {
-    conditions.push(`p.is_digital = $${i++}`)
-    params.push(filters.is_digital === 'true')
-  }
-  if (filters.is_bundle === 'true' || filters.is_bundle === 'false') {
-    conditions.push(`p.is_bundle = $${i++}`)
-    params.push(filters.is_bundle === 'true')
-  }
-  if (filters.is_cod_allowed === 'true' || filters.is_cod_allowed === 'false') {
-    conditions.push(`p.is_cod_allowed = $${i++}`)
-    params.push(filters.is_cod_allowed === 'true')
-  }
-  if (filters.shipping_class) {
-    conditions.push(`p.shipping_class = $${i++}`)
-    params.push(filters.shipping_class)
-  }
-  if (filters.is_oversized === 'true' || filters.is_oversized === 'false') {
-    conditions.push(`p.is_oversized = $${i++}`)
-    params.push(filters.is_oversized === 'true')
-  }
-  if (filters.country_of_origin) {
-    conditions.push(`p.country_of_origin = $${i++}`)
-    params.push(filters.country_of_origin.toUpperCase())
-  }
-  if (filters.fragile === 'true') { conditions.push(`p.fragile = true`) }
-  if (filters.hazardous === 'true') { conditions.push(`p.hazardous = true`) }
-  if (filters.perishable === 'true') { conditions.push(`p.perishable = true`) }
-  if (filters.serialized === 'true') { conditions.push(`p.serialized = true`) }
+  const attr = buildAttributeFilterClauses({ ...filters, ...filters.attributes }, i)
+  conditions.push(...attr.conditions)
+  params.push(...attr.params)
+  i = attr.nextIdx
   let rankExpr = '0::int'
   if (filters.search) {
     const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)

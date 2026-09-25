@@ -1,5 +1,6 @@
 import { queryMany, queryOne } from './db'
 import { aiChat, AiClientError } from './ai-client'
+import { mailShell } from './mail-template'
 
 export interface OrderSummary {
   count: number
@@ -253,9 +254,23 @@ export async function narrate(data: BriefingData): Promise<string> {
   }
 }
 
-const FROM = `"Jeffi Store's Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
+const BRIEFING_BRAND = "Jeffi Store's"
+const FROM = `"${BRIEFING_BRAND} Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 const ADMIN_URL = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
+
+const BRIEFING_CSS = `
+  .section { margin: 24px 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+  .kpi-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .kpi-value { font-size: 28px; font-weight: 700; color: #111827; }
+  .kpi-note { font-size: 13px; color: #6b7280; }
+  table.rows th { font-size: 11px; }
+  table.rows td { font-size: 13px; }
+  table.rows .num { text-align: right; }
+  .grey { color: #6b7280; }
+  .red { color: #dc2626; }
+  .green { color: #16a34a; }
+`
 
 function fmtINR(n: number): string {
   return `₹${Math.round(n).toLocaleString('en-IN')}`
@@ -274,25 +289,25 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
 
   const stuckRows = data.stuck_shipments.map(s => `
     <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-family:ui-monospace,monospace;font-size:13px;">${s.order_number}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${s.customer_name || '—'}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#dc2626;">${s.days_since_shipped}d</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;">${fmtINR(s.total_amount)}</td>
+      <td class="mono">${s.order_number}</td>
+      <td>${s.customer_name || '—'}</td>
+      <td class="red">${s.days_since_shipped}d</td>
+      <td class="num">${fmtINR(s.total_amount)}</td>
     </tr>`).join('')
 
   const topProductRows = data.top_products.map((p, i) => `
     <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#6b7280;width:24px;">${i + 1}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${p.product_name}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;color:#6b7280;">${p.qty}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;font-weight:600;">${fmtINR(p.revenue)}</td>
+      <td class="grey" style="width:24px;">${i + 1}</td>
+      <td>${p.product_name}</td>
+      <td class="num grey">${p.qty}</td>
+      <td class="num" style="font-weight:600;">${fmtINR(p.revenue)}</td>
     </tr>`).join('')
 
   const lowStockRows = data.low_stock.map(p => `
     <tr>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${p.name}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:12px;font-family:ui-monospace,monospace;color:#6b7280;">${p.sku || '—'}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;color:${p.inventory_quantity === 0 ? '#dc2626' : '#ea580c'};font-weight:600;">${p.inventory_quantity}</td>
+      <td>${p.name}</td>
+      <td class="mono grey" style="font-size:12px;">${p.sku || '—'}</td>
+      <td class="num" style="color:${p.inventory_quantity === 0 ? '#dc2626' : '#ea580c'};font-weight:600;">${p.inventory_quantity}</td>
     </tr>`).join('')
 
   const campaignRows = data.campaign_perf_24h.map(c => {
@@ -300,102 +315,83 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
     const clickRate = c.sent > 0 ? Math.round((c.clicked / c.sent) * 100) : 0
     return `
     <tr>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${c.campaign_kind}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;">${c.sent}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;color:#6b7280;">${openRate}%</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;color:#6b7280;">${clickRate}%</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;color:#16a34a;">${c.converted}</td>
+      <td>${c.campaign_kind}</td>
+      <td class="num">${c.sent}</td>
+      <td class="num grey">${openRate}%</td>
+      <td class="num grey">${clickRate}%</td>
+      <td class="num green">${c.converted}</td>
     </tr>`
   }).join('')
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1f2937;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:24px 12px;">
-  <tr><td align="center">
-    <table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
-      <tr><td style="background:#1a3a4a;padding:18px 28px;border-radius:8px 8px 0 0;">
-        <span style="color:#ffffff;font-size:16px;font-weight:700;letter-spacing:0.5px;">JEFFI STORE'S — DAILY OPS BRIEFING</span>
-        <span style="color:#9ca3af;font-size:13px;float:right;">${data.briefing_date}</span>
-      </td></tr>
+  const html = mailShell({
+    brand: BRIEFING_BRAND,
+    kicker: 'Daily Ops Briefing',
+    title: data.briefing_date,
+    documentTitle: subject,
+    extraCss: BRIEFING_CSS,
+    content: `
+      ${narration ? `<div class="info"><p style="margin:0;">${narration}</p></div>` : ''}
 
-      ${narration ? `
-      <tr><td style="background:#fff7ed;padding:14px 28px;border-left:3px solid #e07b3f;">
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#1f2937;">${narration}</p>
-      </td></tr>` : ''}
-
-      <tr><td style="background:#ffffff;padding:24px 28px;">
-        <h2 style="margin:0 0 14px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b7280;">Yesterday</h2>
+      <h3 class="section">Yesterday</h3>
+      <div class="card">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td style="padding:0 12px 0 0;width:50%;">
-              <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Revenue</div>
-              <div style="font-size:28px;font-weight:700;color:#111827;">${fmtINR(data.yesterday.revenue)}${deltaBadge(data.delta_vs_avg.revenue_pct)}</div>
+              <div class="kpi-label">Revenue</div>
+              <div class="kpi-value">${fmtINR(data.yesterday.revenue)}${deltaBadge(data.delta_vs_avg.revenue_pct)}</div>
             </td>
             <td style="padding:0 0 0 12px;width:50%;">
-              <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Orders</div>
-              <div style="font-size:28px;font-weight:700;color:#111827;">${data.yesterday.count}${deltaBadge(data.delta_vs_avg.orders_pct)}</div>
+              <div class="kpi-label">Orders</div>
+              <div class="kpi-value">${data.yesterday.count}${deltaBadge(data.delta_vs_avg.orders_pct)}</div>
             </td>
           </tr>
           <tr>
-            <td style="padding:14px 12px 0 0;font-size:13px;color:#6b7280;">
+            <td class="kpi-note" style="padding:14px 12px 0 0;">
               <span style="color:#16a34a;font-weight:600;">${data.yesterday.paid_count} paid</span> ·
               <span style="color:#dc2626;">${data.yesterday.cancelled_count} cancelled</span> ·
               <span>${data.yesterday.pending_count} pending</span>
             </td>
-            <td style="padding:14px 0 0 12px;font-size:13px;color:#6b7280;">
+            <td class="kpi-note" style="padding:14px 0 0 12px;">
               AOV: <span style="font-weight:600;color:#111827;">${fmtINR(data.yesterday.avg_order_value)}</span>
             </td>
           </tr>
         </table>
-      </td></tr>
+      </div>
 
       ${data.stuck_shipments.length > 0 ? `
-      <tr><td style="background:#ffffff;padding:0 28px 24px;">
-        <h2 style="margin:0 0 10px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#dc2626;">Stuck shipments (${data.stuck_shipments.length})</h2>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
-          <tr style="background:#f9fafb;"><th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Order</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Customer</th><th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Stuck</th><th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Total</th></tr>
-          ${stuckRows}
-        </table>
-      </td></tr>` : ''}
+      <h3 class="section" style="color:#dc2626;">Stuck shipments (${data.stuck_shipments.length})</h3>
+      <table class="rows">
+        <tr><th>Order</th><th>Customer</th><th>Stuck</th><th class="num">Total</th></tr>
+        ${stuckRows}
+      </table>` : ''}
 
       ${data.top_products.length > 0 ? `
-      <tr><td style="background:#ffffff;padding:0 28px 24px;">
-        <h2 style="margin:0 0 10px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b7280;">Top products yesterday</h2>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
-          <tr style="background:#f9fafb;"><th style="padding:8px 12px;font-size:11px;color:#6b7280;font-weight:600;width:24px;"></th><th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Product</th><th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Qty</th><th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Revenue</th></tr>
-          ${topProductRows}
-        </table>
-      </td></tr>` : ''}
+      <h3 class="section">Top products yesterday</h3>
+      <table class="rows">
+        <tr><th style="width:24px;"></th><th>Product</th><th class="num">Qty</th><th class="num">Revenue</th></tr>
+        ${topProductRows}
+      </table>` : ''}
 
       ${data.low_stock.length > 0 ? `
-      <tr><td style="background:#ffffff;padding:0 28px 24px;">
-        <h2 style="margin:0 0 10px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#ea580c;">Low stock (${data.low_stock.length})</h2>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
-          <tr style="background:#f9fafb;"><th style="padding:6px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Product</th><th style="padding:6px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">SKU</th><th style="padding:6px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Stock</th></tr>
-          ${lowStockRows}
-        </table>
-      </td></tr>` : ''}
+      <h3 class="section" style="color:#ea580c;">Low stock (${data.low_stock.length})</h3>
+      <table class="rows">
+        <tr><th>Product</th><th>SKU</th><th class="num">Stock</th></tr>
+        ${lowStockRows}
+      </table>` : ''}
 
       ${data.campaign_perf_24h.length > 0 ? `
-      <tr><td style="background:#ffffff;padding:0 28px 24px;">
-        <h2 style="margin:0 0 10px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b7280;">Campaigns (last 24h)</h2>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
-          <tr style="background:#f9fafb;"><th style="padding:6px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;">Campaign</th><th style="padding:6px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Sent</th><th style="padding:6px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Open%</th><th style="padding:6px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Click%</th><th style="padding:6px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;">Conv</th></tr>
-          ${campaignRows}
-        </table>
-      </td></tr>` : ''}
+      <h3 class="section">Campaigns (last 24h)</h3>
+      <table class="rows">
+        <tr><th>Campaign</th><th class="num">Sent</th><th class="num">Open%</th><th class="num">Click%</th><th class="num">Conv</th></tr>
+        ${campaignRows}
+      </table>` : ''}
 
-      <tr><td style="background:#ffffff;padding:0 28px 24px;border-radius:0 0 8px 8px;">
-        <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-          Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>
-          &nbsp;·&nbsp;
-          <a href="${ADMIN_URL}/admin" style="color:#e07b3f;text-decoration:none;">Open admin →</a>
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>`
+      <p class="muted" style="text-align:center;margin-top:24px;">
+        Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>
+        &nbsp;·&nbsp;
+        <a href="${ADMIN_URL}/admin" style="color:#2563eb;text-decoration:none;">Open admin →</a>
+      </p>`,
+  })
 
   return { subject, html }
 }

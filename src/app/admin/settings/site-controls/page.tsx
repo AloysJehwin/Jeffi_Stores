@@ -9,10 +9,6 @@ import { getHost } from '@/lib/get-host'
 import { SectionCard, TextControl, TextAreaControl, NumberControl, ToggleControl, FullSpan, KeyboardShortcutControl } from '@/components/admin/site-controls/controls'
 import LogoUploader from '@/components/admin/site-controls/LogoUploader'
 import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
-import HeroSlideManager from '@/components/admin/HeroSlideManager'
-import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
-import type { HomepageSection } from '@/lib/homepage-sections'
-import type { SectionOptions } from '@/components/admin/homepage/editors/fields'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
@@ -83,56 +79,6 @@ async function loadInvoiceKeys(): Promise<Record<string, string>> {
   return m
 }
 
-async function loadHeroData() {
-  const [slides, cats, brands, grades, materials] = await Promise.all([
-    queryMany<any>(`SELECT * FROM hero_slides ORDER BY display_order ASC, created_at ASC`),
-    queryMany<{ slug: string; name: string }>(
-      `SELECT slug, name FROM categories WHERE is_active = true AND slug IS NOT NULL ORDER BY name`
-    ),
-    queryMany<{ id: string; name: string }>(
-      `SELECT id, name FROM brands WHERE is_active = true ORDER BY name`
-    ),
-    queryMany<{ grade: string }>(
-      `SELECT DISTINCT grade FROM products WHERE grade IS NOT NULL AND grade != '' AND is_active = true ORDER BY grade`
-    ),
-    queryMany<{ material: string }>(
-      `SELECT DISTINCT material FROM products WHERE material IS NOT NULL AND material != '' AND is_active = true ORDER BY material`
-    ),
-  ])
-  return {
-    slides,
-    categoryOptions: cats.map(c => ({ value: c.slug, label: c.name })),
-    brandOptions: brands.map(b => ({ value: b.id, label: b.name })),
-    gradeOptions: grades.map(g => ({ value: g.grade, label: g.grade })),
-    materialOptions: materials.map(m => ({ value: m.material, label: m.material })),
-  }
-}
-
-async function loadSectionOptions(
-  categories: { value: string; label: string }[],
-  brands: { value: string; label: string }[],
-): Promise<SectionOptions> {
-  const counts = await queryOne<{ featured: string; new_arrivals: string; best_sellers: string; on_sale: string }>(
-    `SELECT
-       count(*) FILTER (WHERE is_featured = true)          AS featured,
-       count(*)                                            AS new_arrivals,
-       count(*)                                            AS best_sellers,
-       count(*) FILTER (WHERE mrp IS NOT NULL AND mrp > price) AS on_sale
-     FROM products WHERE is_active = true`
-  ).catch(() => null)
-
-  return {
-    categories,
-    brands,
-    counts: {
-      featured: Number(counts?.featured ?? 0),
-      newArrivals: Number(counts?.new_arrivals ?? 0),
-      bestSellers: Number(counts?.best_sellers ?? 0),
-      onSale: Number(counts?.on_sale ?? 0),
-    },
-  }
-}
-
 export default async function SiteControlsPage() {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
@@ -151,13 +97,6 @@ export default async function SiteControlsPage() {
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
   const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
-  const hero = await loadHeroData()
-  const homepageSections = await queryMany<HomepageSection>(
-    `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
-            display_order, is_active, starts_at, ends_at
-     FROM homepage_sections ORDER BY display_order ASC, created_at ASC`
-  ).catch(() => [] as HomepageSection[])
-  const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
 
   let customShortcuts: CustomShortcut[] = []
   try { customShortcuts = JSON.parse(c.shortcuts.customShortcuts || '[]') } catch { /* ignore */ }
@@ -292,26 +231,8 @@ export default async function SiteControlsPage() {
           <SectionCard title="Storefront Content" description="Homepage layout and copy." columns>
             <NumberControl settingKey="storefront_featured_limit" label="Featured products count" min={1} max={24} initial={c.storefront.featuredLimit} />
             <NumberControl settingKey="storefront_new_arrivals_limit" label="New arrivals count" min={1} max={24} initial={c.storefront.newArrivalsLimit} />
-            <FullSpan><TextAreaControl settingKey="storefront_about_copy" label="About section copy" hint="Body text for the homepage 'About' section. Leave empty for the default." initial={c.storefront.aboutCopy} rows={4} /></FullSpan>
-            <FullSpan><TextAreaControl settingKey="storefront_stats_json" label="Homepage stats (JSON)" hint={`Array like [{"label":"Years in Business","value":"10+"}]. Leave empty for defaults.`} initial={c.storefront.statsJson} rows={4} /></FullSpan>
-          </SectionCard>
-        </div>
-
-        <div>
-          <SectionCard title="Homepage Sections" description="Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section.">
-            <HomepageSectionManager
-              initial={homepageSections}
-              options={sectionOptions}
-              heroEditor={
-                <HeroSlideManager
-                  initialSlides={hero.slides}
-                  categoryOptions={hero.categoryOptions}
-                  brandOptions={hero.brandOptions}
-                  gradeOptions={hero.gradeOptions}
-                  materialOptions={hero.materialOptions}
-                />
-              }
-            />
+            <FullSpan><TextAreaControl settingKey="storefront_about_copy" label="About section copy" hint="Default story for the homepage About section; Settings > Homepage > About can replace it. Leave empty for the default." initial={c.storefront.aboutCopy} rows={4} /></FullSpan>
+            <FullSpan><TextAreaControl settingKey="storefront_stats_json" label="Homepage stats (JSON)" hint={`Default About stats, an array like [{"label":"Years in Business","value":"10+"}]; Settings > Homepage > About can replace them. Leave empty for defaults.`} initial={c.storefront.statsJson} rows={4} /></FullSpan>
           </SectionCard>
         </div>
 

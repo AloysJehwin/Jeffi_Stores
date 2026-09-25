@@ -469,4 +469,11 @@ WHERE pf.plan_id = p.id
     WHERE d.plan_slug = p.slug AND d.scope_key = pf.scope_key
   );
 
+-- Platform sentinel tenant (also in schema.sql, which the pipeline only structure-diffs, so its row
+-- never reached live). Flagship writes keyed to the NIL uuid (import_jobs, tenant_integration_credentials)
+-- FK to tenants(id) and fail without it.
+INSERT INTO public.tenants (id, slug, display_name, status)
+VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active')
+ON CONFLICT DO NOTHING;
+
 COMMIT;

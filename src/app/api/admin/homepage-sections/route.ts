@@ -1,29 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
-import { authenticateAdmin } from '@/lib/jwt'
+import { randomUUID } from 'crypto'
+import { authenticateAdmin, type AdminJWTPayload } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, withTransaction } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
-import { SECTION_TYPES } from '@/lib/homepage-sections'
+import { SECTION_TYPES, type SectionType } from '@/lib/homepage-sections'
+import {
+  applyDraftOrder, endsBeforeStart, getEditableHomepage, nextDisplayOrder, withHomepageDraft, type DraftSection,
+} from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
-async function guard(request: NextRequest) {
+async function guard(request: NextRequest): Promise<AdminJWTPayload | NextResponse> {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  return null
+  return admin
 }
 
 export async function GET(request: NextRequest) {
-  const denied = await guard(request)
-  if (denied) return denied
-  const sections = await queryMany(
-    `SELECT * FROM homepage_sections ORDER BY display_order ASC, created_at ASC`
-  )
+  const admin = await guard(request)
+  if (admin instanceof NextResponse) return admin
+  const { sections } = await getEditableHomepage()
   return NextResponse.json({ sections })
 }
 
@@ -41,52 +41,52 @@ const bodySchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  const denied = await guard(request)
-  if (denied) return denied
+  const admin = await guard(request)
+  if (admin instanceof NextResponse) return admin
 
   const parsed = parseBody(bodySchema, await request.json())
   if (!parsed.ok) return parsed.response
   const d = parsed.data
+  if (endsBeforeStart(d.startsAt, d.endsAt)) {
+    return NextResponse.json({ error: 'The end time must be after the start time' }, { status: 400 })
+  }
 
-  const orderRow = await queryOne<{ next: number }>(
-    `SELECT COALESCE(MAX(display_order), -1) + 1 AS next FROM homepage_sections`
-  )
+  const section = await withHomepageDraft(admin.adminId, draft => {
+    const now = new Date().toISOString()
+    const row: DraftSection = {
+      id: randomUUID(),
+      type: d.type as SectionType,
+      title: d.title ?? null,
+      subtitle: d.subtitle ?? null,
+      eyebrow: d.eyebrow ?? null,
+      cta_label: d.ctaLabel ?? null,
+      cta_url: d.ctaUrl ?? null,
+      config: d.config ?? {},
+      display_order: nextDisplayOrder(draft.sections),
+      is_active: d.isActive ?? true,
+      starts_at: d.startsAt ?? null,
+      ends_at: d.endsAt ?? null,
+      created_at: now,
+      updated_at: now,
+    }
+    draft.sections.push(row)
+    return row
+  })
 
-  const section = await queryOne(
-    `INSERT INTO homepage_sections
-       (type, title, subtitle, eyebrow, cta_label, cta_url, config, display_order, is_active, starts_at, ends_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     RETURNING *`,
-    [
-      d.type, d.title ?? null, d.subtitle ?? null, d.eyebrow ?? null,
-      d.ctaLabel ?? null, d.ctaUrl ?? null, JSON.stringify(d.config ?? {}),
-      orderRow?.next ?? 0, d.isActive ?? true, d.startsAt ?? null, d.endsAt ?? null,
-    ]
-  )
-
-  revalidatePath('/')
   return NextResponse.json({ section })
 }
 
-// Bulk reorder. One atomic statement rather than N sequential updates, so an interrupted
-// request cannot leave the page half-reordered.
 export async function PATCH(request: NextRequest) {
-  const denied = await guard(request)
-  if (denied) return denied
+  const admin = await guard(request)
+  if (admin instanceof NextResponse) return admin
 
   const body = await request.json().catch(() => ({}))
   const order: string[] = Array.isArray(body?.order) ? body.order : []
   if (order.length === 0) return NextResponse.json({ error: 'order[] required' }, { status: 400 })
 
-  await withTransaction(async client => {
-    await client.query(
-      `UPDATE homepage_sections s SET display_order = v.ord - 1, updated_at = NOW()
-       FROM unnest($1::uuid[]) WITH ORDINALITY AS v(id, ord)
-       WHERE s.id = v.id`,
-      [order],
-    )
+  await withHomepageDraft(admin.adminId, draft => {
+    draft.sections = applyDraftOrder(draft.sections, order)
   })
 
-  revalidatePath('/')
   return NextResponse.json({ success: true })
 }

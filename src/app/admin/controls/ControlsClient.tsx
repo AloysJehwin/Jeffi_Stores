@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import GalleryPicker from '@/components/admin/GalleryPicker'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
+import AdminFilters from '@/components/admin/AdminFilters'
+import AdvancedFilterPanel, { type AdvancedFilterField } from '@/components/admin/AdvancedFilterPanel'
+import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/product-attribute-filters'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
 type OperationSnapshot = {
@@ -49,23 +53,6 @@ function fmt(v: string | null) {
   return isNaN(n) ? '—' : `₹${n.toFixed(2)}`
 }
 
-// ── filter definitions ────────────────────────────────────────────────────────
-type FilterKey = 'category_id' | 'brand_id' | 'grade' | 'condition' | 'target_gender' | 'shipping_class' | 'tax_class' | 'hsn_code' | 'is_featured' | 'is_searchable' | 'is_active'
-
-const FILTER_OPTIONS: { key: FilterKey; label: string; type: 'select' | 'text'; options?: { value: string; label: string }[] }[] = [
-  { key: 'category_id', label: 'Category', type: 'select' },
-  { key: 'brand_id', label: 'Brand', type: 'select' },
-  { key: 'grade', label: 'Grade', type: 'text' },
-  { key: 'condition', label: 'Condition', type: 'select', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
-  { key: 'target_gender', label: 'Target Gender', type: 'select', options: [{ value: 'unisex', label: 'Unisex' }, { value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }] },
-  { key: 'shipping_class', label: 'Shipping Class', type: 'select', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
-  { key: 'tax_class', label: 'Tax Class', type: 'select', options: [{ value: 'standard', label: 'Standard' }, { value: 'reduced', label: 'Reduced' }, { value: 'zero', label: 'Zero' }, { value: 'exempt', label: 'Exempt' }] },
-  { key: 'hsn_code', label: 'HSN Code', type: 'text' },
-  { key: 'is_featured', label: 'Featured', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-  { key: 'is_searchable', label: 'Searchable', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-  { key: 'is_active', label: 'Active', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-]
-
 // ── operation definitions ─────────────────────────────────────────────────────
 type OpKey = 'inflate_price' | 'set_discount' | 'set_mrp_ex_gst' | 'set_tax_class' | 'set_condition' | 'set_shipping_class' | 'set_handling_days' | 'set_warranty_months' | 'set_target_gender' | 'set_grade' | 'set_hsn_code' | 'set_country_of_origin' | 'set_featured' | 'set_searchable' | 'set_active' | 'set_selling_unit' | 'set_images'
 
@@ -100,13 +87,19 @@ const OPERATIONS: OpDef[] = [
 
 const inputCls = 'w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
 
-export default function ControlsClient({ categories, brands }: { categories: Category[]; brands: Brand[] }) {
+export default function ControlsClient({ categories, brands, specFields }: { categories: Category[]; brands: Brand[]; specFields: AdvancedFilterField[] }) {
   const confirm = useConfirm()
   const canWrite = useCanWrite('controls:write')
 
   // ── filters ───────────────────────────────────────────────────────────────
-  const [activeFilters, setActiveFilters] = useState<Partial<Record<FilterKey, string>>>({})
-  const [addingFilter, setAddingFilter] = useState<FilterKey | ''>('')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const activeFilters = useMemo(() => {
+    const out: Record<string, string> = {}
+    searchParams.forEach((v, k) => { if (v && k !== 'page' && k !== '_adv') out[k] = v })
+    return out
+  }, [searchParams])
 
   // ── product list ──────────────────────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([])
@@ -298,16 +291,14 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   })
   const brandOptions: SelectOption[] = brands.map(b => ({ value: b.id, label: b.name }))
 
-  const availableFilters = FILTER_OPTIONS.filter(f => !(f.key in activeFilters))
-
   // ── load products ─────────────────────────────────────────────────────────
-  const loadProducts = useCallback(async (filters: Partial<Record<FilterKey, string>>, keepSuccess = false) => {
+  const loadProducts = useCallback(async (filters: Record<string, string>, keepSuccess = false) => {
     if (Object.keys(filters).length === 0) { setProducts([]); setSelectedIds(new Set()); return }
     setLoading(true)
     setLoadError(null)
     if (!keepSuccess) setApplySuccess(null)
     try {
-      const params = new URLSearchParams(filters as Record<string, string>)
+      const params = new URLSearchParams(filters)
       const res = await fetch(`/api/admin/controls?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load')
@@ -322,19 +313,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
     }
   }, [])
 
-  function setFilter(key: FilterKey, value: string) {
-    const next = { ...activeFilters, [key]: value }
-    setActiveFilters(next)
-    setAddingFilter('')
-    loadProducts(next)
-  }
-
-  function removeFilter(key: FilterKey) {
-    const next = { ...activeFilters }
-    delete next[key]
-    setActiveFilters(next)
-    loadProducts(next)
-  }
+  useEffect(() => { loadProducts(activeFilters) }, [activeFilters, loadProducts])
 
   function toggleProduct(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -450,7 +429,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   }
 
   function handleReset() {
-    setActiveFilters({})
+    router.push(pathname)
     setProducts([])
     setSelectedIds(new Set())
     setOpKey('')
@@ -515,70 +494,24 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">1</span>
           <h2 className="text-sm font-semibold text-foreground flex-1">Filter products</h2>
           {Object.keys(activeFilters).length > 0 && (
-            <button type="button" onClick={() => { setActiveFilters({}); setProducts([]); setSelectedIds(new Set()) }}
+            <button type="button" onClick={() => router.push(pathname)}
               className="text-xs text-foreground-muted hover:text-red-500 transition-colors">Clear all</button>
           )}
         </div>
         <div className="p-4 space-y-3">
 
-        {/* active filter chips */}
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(activeFilters).map(([key, value]) => {
-            const fd = FILTER_OPTIONS.find(f => f.key === key)!
-            const displayVal = fd.options?.find(o => o.value === value)?.label
-              ?? (key === 'category_id' ? categories.find(c => c.id === value)?.name : null)
-              ?? (key === 'brand_id' ? brands.find(b => b.id === value)?.name : null)
-              ?? value
-            return (
-              <span key={key} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 text-xs font-medium border border-accent-200 dark:border-accent-700">
-                <span className="text-accent-500">{fd.label}:</span> {displayVal}
-                <button type="button" onClick={() => removeFilter(key as FilterKey)} className="text-accent-400 hover:text-accent-700 dark:hover:text-accent-200 leading-none">×</button>
-              </span>
-            )
-          })}
-
-          {/* add filter */}
-          {availableFilters.length > 0 && (
-            addingFilter ? (
-              <div className="flex items-center gap-2 flex-wrap">
-                {(() => {
-                  const fd = FILTER_OPTIONS.find(f => f.key === addingFilter)!
-                  if (addingFilter === 'category_id') return (
-                    <div className="w-56">
-                      <AdminSelect value="" placeholder="Pick category…" options={categoryOptions}
-                        onChange={v => v && setFilter('category_id', v)} />
-                    </div>
-                  )
-                  if (addingFilter === 'brand_id') return (
-                    <div className="w-48">
-                      <AdminSelect value="" placeholder="Pick brand…" options={brandOptions}
-                        onChange={v => v && setFilter('brand_id', v)} />
-                    </div>
-                  )
-                  if (fd.type === 'select' && fd.options) return (
-                    <div className="w-44">
-                      <AdminSelect value="" placeholder={`Pick ${fd.label}…`}
-                        options={fd.options.map(o => ({ value: o.value, label: o.label }))}
-                        onChange={v => v && setFilter(addingFilter, v)} />
-                    </div>
-                  )
-                  return (
-                    <input autoFocus type="text" placeholder={`Enter ${fd.label}…`}
-                      className="px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                      onKeyDown={e => { if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value.trim(); if (v) setFilter(addingFilter, v) } if (e.key === 'Escape') setAddingFilter('') }} />
-                  )
-                })()}
-                <button type="button" onClick={() => setAddingFilter('')} className="text-xs text-foreground-muted hover:text-foreground">cancel</button>
-              </div>
-            ) : (
-              <div className="w-44">
-                <AdminSelect value="" placeholder="+ Add filter…"
-                  options={availableFilters.map(f => ({ value: f.key, label: f.label }))}
-                  onChange={v => v && setAddingFilter(v as FilterKey)} />
-              </div>
-            )
-          )}
-        </div>
+        <AdminFilters
+          bare
+          filters={[
+            { name: 'category_id', label: 'Category', options: categoryOptions },
+            { name: 'brand_id', label: 'Brand', options: brandOptions },
+            { name: 'is_active', label: 'Status', allLabel: 'Active', options: [{ value: 'false', label: 'Inactive' }, { value: 'any', label: 'Active and inactive' }] },
+            { name: 'stock', label: 'Stock', options: [{ value: 'low', label: 'Low Stock' }, { value: 'out', label: 'Out of Stock' }] },
+          ]}
+          searchPlaceholder="Search by name or SKU..."
+          searchParam="search"
+          advancedContent={<AdvancedFilterPanel fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} mode="content" forceExpanded valuesEndpoint="/api/admin/controls/attribute-values" />}
+        />
 
         {loadError && <p className="text-xs text-red-500">{loadError}</p>}
         </div>

@@ -8,6 +8,7 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
 
 export interface HeroSlideRow {
   id: string
@@ -104,6 +105,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         body: JSON.stringify(patch),
       })
       if (!res.ok) { showToast('Failed to save', 'error'); return }
+      notifyHomepageDraftChanged()
     } catch { showToast('Failed to save', 'error') } finally { setSaving(false) }
   }, [slide.id, showToast])
 
@@ -126,7 +128,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
       if (res.ok && data.url) {
         const hashField = isMobile ? 'blurhash_mobile' : 'blurhash'
         onChange({ [field]: data.url, [hashField]: data.blurhash ?? null } as Partial<HeroSlideRow>)
-        showToast(isMobile ? 'Mobile image updated' : 'Image updated', 'success')
+        showToast(isMobile ? 'Mobile image saved to draft' : 'Image saved to draft', 'success')
+        notifyHomepageDraftChanged()
       }
       else showToast(data.error || 'Upload failed', 'error')
     } catch { showToast('Upload failed', 'error') } finally {
@@ -152,7 +155,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         body: JSON.stringify({ prompt, field: 'image_url' }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) { onChange({ image_url: data.url, blurhash: data.blurhash ?? null }); showToast('Image generated', 'success') }
+      if (res.ok && data.url) { onChange({ image_url: data.url, blurhash: data.blurhash ?? null }); showToast('Image generated and saved to draft', 'success'); notifyHomepageDraftChanged() }
       else showToast(data.error || 'Image generation failed', 'error')
     } catch { showToast('Image generation failed', 'error') } finally { setGenerating(false) }
   }
@@ -472,7 +475,7 @@ export default function HeroSlideManager({ initialSlides, categoryOptions, brand
         body: JSON.stringify({ title: 'New slide', badgeColor: 'bg-primary-500' }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.slide) { setSlides(prev => [...prev, data.slide]); showToast('Slide added', 'success') }
+      if (res.ok && data.slide) { setSlides(prev => [...prev, data.slide]); showToast('Slide added to draft', 'success'); notifyHomepageDraftChanged() }
       else showToast(data.error || 'Failed to add slide', 'error')
     } catch { showToast('Failed to add slide', 'error') } finally { setCreating(false) }
   }
@@ -484,13 +487,13 @@ export default function HeroSlideManager({ initialSlides, categoryOptions, brand
   function deleteSlide(id: string) {
     showConfirm({
       title: 'Delete slide?',
-      message: 'This will permanently remove the hero slide.',
+      message: 'The slide will be removed from the draft. It stays live until you publish.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
         const res = await fetch(`/api/admin/hero-slides/${id}`, { method: 'DELETE', credentials: 'include' })
-        if (res.ok) { setSlides(prev => prev.filter(s => s.id !== id)); showToast('Slide deleted', 'success') }
+        if (res.ok) { setSlides(prev => prev.filter(s => s.id !== id)); showToast('Slide removed from draft', 'success'); notifyHomepageDraftChanged() }
         else showToast('Failed to delete', 'error')
       },
     })
@@ -503,10 +506,11 @@ export default function HeroSlideManager({ initialSlides, categoryOptions, brand
     const next = [...slides]
     ;[next[idx], next[target]] = [next[target], next[idx]]
     setSlides(next)
-    await fetch('/api/admin/hero-slides', {
+    const res = await fetch('/api/admin/hero-slides', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({ order: next.map(s => s.id) }),
-    }).catch(() => {})
+    }).catch(() => null)
+    if (res?.ok) notifyHomepageDraftChanged()
   }
 
   return (

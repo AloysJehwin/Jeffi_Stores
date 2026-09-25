@@ -1,10 +1,11 @@
 'use client'
 
-import { Grid, Note, Text, useSectionBinding, type EditorProps } from './fields'
+import { Grid, Note, Text, copyHint, sectionCopy, useSectionBinding, type EditorProps } from './fields'
 
 export default function FeaturedForYouEditor(props: EditorProps) {
   const { section, canWrite } = props
   const b = useSectionBinding(props)
+  const d = sectionCopy(props)
 
   return (
     <Grid>
@@ -14,10 +15,9 @@ export default function FeaturedForYouEditor(props: EditorProps) {
       </Note>
       <Text
         label="Heading"
-        value={section.title ?? ''}
+        value={section.title ?? d.title ?? ''}
         disabled={!canWrite}
-        placeholder="Featured for you"
-        hint="Optional — overrides the default heading."
+        hint={copyHint(section.title == null && !!d.title)}
         onCommit={b.title}
       />
     </Grid>

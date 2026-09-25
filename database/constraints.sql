@@ -733,6 +733,17 @@ ALTER TABLE ONLY public.amazon_refresh_meta
     ADD CONSTRAINT amazon_refresh_meta_singleton CHECK (id = 1);
 
 
+--
+-- Name: homepage_drafts homepage_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.homepage_drafts
+    ADD CONSTRAINT homepage_drafts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.homepage_drafts
+    ADD CONSTRAINT homepage_drafts_singleton CHECK (id);
+
+
 
 
 --

@@ -8,6 +8,7 @@ import { sendAuditedMail } from '@/lib/mail-audit'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
+import { mailShell } from '@/lib/mail-template'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +82,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
   const brand = await currentBrandNameAsync()
   try {
@@ -154,34 +155,21 @@ export async function PATCH(
         const readableDate = new Date(d.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
         const from = `"${brand}" <${process.env.SES_FROM_EMAIL}>`
         const subject = `Your delivery date has been updated — Order #${order.order_number}`
-        const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
-    <tr><td align="center">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:20px 28px;">
-          <div style="font-size:22px;font-weight:700;color:#f97316;letter-spacing:0.5px;">${brand}</div>
-        </td></tr>
-        <tr><td style="padding:28px;font-size:15px;line-height:1.6;">
-          <p style="margin:0 0 16px;">Hi ${order.first_name || 'there'},</p>
-          <p style="margin:0 0 16px;">We have updated the expected delivery date for your order <strong>#${order.order_number}</strong>.</p>
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:20px 0;background:#f0fdf4;border-left:4px solid #16a34a;border-radius:4px;">
-            <tr><td style="padding:16px;">
-              <p style="margin:0;font-size:14px;color:#374151;">New expected delivery date</p>
-              <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#15803d;">${readableDate}</p>
-            </td></tr>
-          </table>
-          <p style="margin:0 0 16px;">Our team is working hard to deliver your order as soon as possible. We appreciate your patience.</p>
-          <p style="margin:24px 0 0;color:#475569;">Thank you for shopping with us,<br>The ${brand} team</p>
-        </td></tr>
-        <tr><td style="padding:18px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">
-          ${storeName}<br>${contactLine}
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
+        const html = mailShell({
+          brand,
+          kicker: `Order #${order.order_number}`,
+          title: 'Your delivery date has been updated',
+          content: `
+          <p>Hi ${order.first_name || 'there'},</p>
+          <p>We have updated the expected delivery date for your order <strong>#${order.order_number}</strong>.</p>
+          <div class="success">
+            <p style="margin:0;font-size:14px;color:#374151;">New expected delivery date</p>
+            <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#15803d;">${readableDate}</p>
+          </div>
+          <p>Our team is working hard to deliver your order as soon as possible. We appreciate your patience.</p>
+          <p style="margin:24px 0 0;color:#666;">Thank you for shopping with us,<br>The ${brand} team</p>`,
+          footerLines: [storeName !== brand ? storeName : '', contactLine],
+        })
 
         await sendAuditedMail({
           from,

@@ -3,6 +3,7 @@ import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
 import { customerMailFromAsync, adminMailFrom, currentBrandName, currentBrandNameAsync, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeAddressLine, storeBaseUrlAsync } from './brand'
 import { createAdminNotification } from './admin-notify'
+import { mailShell } from './mail-template'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -43,97 +44,32 @@ async function getAdminNotificationEmails(): Promise<string> {
 }
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const subject = `Your Verification Code - ${brand}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .otp-box {
-              background-color: #2563eb;
-              color: white;
-              font-size: 32px;
-              font-weight: bold;
-              text-align: center;
-              padding: 20px;
-              border-radius: 8px;
-              letter-spacing: 8px;
-              margin: 24px 0;
-            }
-            .info {
-              background-color: #fff3cd;
-              border-left: 4px solid #ffc107;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your ${brand} OTP is ${otp} — valid for 10 minutes. Do not share.</span>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Verification Code',
+    title: 'Email Verification',
+    preheader: `Your ${brand} OTP is ${otp} — valid for 10 minutes. Do not share.`,
+    content: `
+      <p>Hello ${name || 'Customer'},</p>
+      <p>Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:</p>
 
-            <h2>Email Verification</h2>
-            <p>Hello ${name || 'Customer'},</p>
-            <p>Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:</p>
+      <div class="code-box">${otp}</div>
 
-            <div class="otp-box">${otp}</div>
+      <div class="warning">
+        <strong>This OTP will expire in 10 minutes.</strong>
+        <br>
+        <small>Please do not share this code with anyone.</small>
+      </div>
 
-            <div class="info">
-              <strong>This OTP will expire in 10 minutes.</strong>
-              <br>
-              <small>Please do not share this code with anyone.</small>
-            </div>
-
-            <p>If you didn't request this verification code, please ignore this email or contact our support team.</p>
-
-            <div class="footer">
-              <p><strong>${brand}</strong></p>
-              ${address ? `<p>${address}</p>` : ''}
-                            ${contactLine}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you didn't request this verification code, please ignore this email or contact our support team.</p>
+    `,
+    footerLines: [address, contactLine],
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -157,108 +93,25 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
   const from = adminMailFrom()
   const brand = await currentBrandNameAsync()
   const subject = `Admin sign-in code — ${brand}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-              line-height: 1.6;
-              color: #e2e8f0;
-              background-color: #0b1120;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #111827;
-              border-radius: 12px;
-              padding: 32px;
-              border: 1px solid #1f2937;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 28px;
-            }
-            .brand {
-              font-size: 20px;
-              font-weight: bold;
-              color: #f8fafc;
-              letter-spacing: 0.5px;
-              margin-top: 8px;
-            }
-            .kicker {
-              display: inline-block;
-              margin-top: 6px;
-              font-size: 11px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-              color: #f87171;
-            }
-            h2 {
-              color: #f8fafc;
-            }
-            .otp-box {
-              background-color: #0f172a;
-              color: #38bdf8;
-              font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-              font-size: 34px;
-              font-weight: bold;
-              text-align: center;
-              padding: 22px;
-              border-radius: 10px;
-              letter-spacing: 10px;
-              border: 1px solid #334155;
-              margin: 24px 0;
-            }
-            .security {
-              background-color: #1e1b12;
-              border-left: 4px solid #f87171;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-              color: #fcd34d;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #1f2937;
-              color: #94a3b8;
-              font-size: 13px;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#0b1120;max-height:0;overflow:hidden;mso-hide:all;">${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.</span>
-          <div class="container" style="background-color:#111827;border-radius:12px;padding:32px;border:1px solid #1f2937;">
-            <div class="header" style="text-align:center;margin-bottom:28px;">
-              <div class="brand" style="color:#f8fafc;">${brand}</div>
-              <span class="kicker" style="color:#f87171;">Admin Access</span>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Admin Access',
+    title: 'Verify your admin sign-in',
+    preheader: `${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.`,
+    content: `
+      <p>Hello ${name || 'Admin'},</p>
+      <p>Use this one-time code to complete sign-in to the admin dashboard:</p>
 
-            <h2 style="color:#f8fafc;">Verify your admin sign-in</h2>
-            <p style="color:#e2e8f0;">Hello ${name || 'Admin'},</p>
-            <p style="color:#e2e8f0;">Use this one-time code to complete sign-in to the admin dashboard:</p>
+      <div class="code-box mono">${otp}</div>
 
-            <div class="otp-box" style="background-color:#0f172a;color:#38bdf8;">${otp}</div>
-
-            <div class="security" style="color:#fcd34d;">
-              <strong style="color:#fcd34d;">This code authorizes staff access. It expires in 10 minutes.</strong>
-              <br>
-              <small style="color:#fcd34d;">If you didn't try to sign in, ignore this email and rotate your credentials.</small>
-            </div>
-
-            <div class="footer" style="color:#94a3b8;">
-              <p style="color:#94a3b8;"><strong style="color:#cbd5e1;">${brand}</strong> — administrative access</p>
-              <p style="color:#94a3b8;">This is an automated security message. Do not reply.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <div class="danger">
+        <strong>This code authorizes staff access. It expires in 10 minutes.</strong>
+        <br>
+        <small>If you didn't try to sign in, ignore this email and rotate your credentials.</small>
+      </div>
+    `,
+    footerLines: [`${brand} — administrative access`, 'This is an automated security message. Do not reply.'],
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -280,95 +133,38 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
 
 export async function sendWelcomeEmail(email: string, name: string) {
   const baseUrl = await storeBaseUrlAsync()
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const subject = `Welcome to ${brand}!`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .button {
-              display: inline-block;
-              background-color: #f97316;
-              color: #ffffff !important;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 5px;
-              margin: 20px 0;
-              font-weight: bold;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to ${brand}! Your account is ready.</span>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Your account is ready',
+    title: `Welcome to ${brand}!`,
+    preheader: `Welcome to ${brand}! Your account is ready.`,
+    content: `
+      <p>Hello ${name},</p>
+      <p>Thank you for creating an account with us. We're excited to have you on board!</p>
 
-            <h2>Welcome to ${brand}!</h2>
-            <p>Hello ${name},</p>
-            <p>Thank you for creating an account with us. We're excited to have you on board!</p>
+      <p>With your account you can:</p>
+      <ul>
+        <li>Browse our full catalogue</li>
+        <li>Track your orders</li>
+        <li>Check out faster</li>
+        <li>Get expert service and support</li>
+      </ul>
 
-            <p>With your account you can:</p>
-            <ul>
-              <li>Browse our full catalogue</li>
-              <li>Track your orders</li>
-              <li>Check out faster</li>
-              <li>Get expert service and support</li>
-            </ul>
+      <div class="cta">
+        <a href="${baseUrl}/products" class="button" style="color:#ffffff;">
+          Start Shopping
+        </a>
+      </div>
 
-            <div style="text-align: center;">
-              <a href="${baseUrl}/products" class="button" style="color:#ffffff;">
-                Start Shopping
-              </a>
-            </div>
-
-            <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
-
-            <div class="footer">
-              <p><strong>${brand}</strong></p>
-              ${address ? `<p>${address}</p>` : ''}
-                                          ${contactLine}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
+    `,
+    footerLines: [address, contactLine],
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -391,145 +187,76 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const subject = `Order Received - ${order.order_number}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .order-box {
-              background-color: #e3f2fd;
-              border: 2px solid #2563eb;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 20px 0;
-            }
-            th, td {
-              padding: 12px;
-              text-align: left;
-              border-bottom: 1px solid #ddd;
-            }
-            th {
-              background-color: #f0f0f0;
-              font-weight: bold;
-            }
-            .total {
-              background-color: #fff3cd;
-              padding: 15px;
-              border-radius: 5px;
-              margin: 20px 0;
-              text-align: right;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Order confirmed! We've received your order and will keep you updated on dispatch.</span>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Order Confirmation',
+    title: 'Order Received!',
+    preheader: `Order confirmed! We've received your order and will keep you updated on dispatch.`,
+    extraCss: `
+      .order-box { background-color: #e3f2fd; border: 2px solid #2563eb; padding: 20px; border-radius: 8px; margin: 20px 0; }
+      .total { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: right; }
+    `,
+    content: `
+      <p>Hello ${order.customer_name},</p>
+      <p>Thank you for your order! We've received your order and payment — our team is preparing it and will keep you updated on dispatch.</p>
 
-            <h2>Order Received!</h2>
-            <p>Hello ${order.customer_name},</p>
-            <p>Thank you for your order! We've received your order and payment — our team is preparing it and will keep you updated on dispatch.</p>
+      <div class="order-box">
+        <h3 style="margin-top: 0;">Order Details</h3>
+        <p><strong>Order Number:</strong> ${order.order_number}</p>
+        <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })}</p>
+        <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">CONFIRMED</span></p>
+        ${order.taxable_amount > 0 ? `
+        <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
+        ` : ''}
+      </div>
 
-            <div class="order-box">
-              <h3 style="margin-top: 0;">Order Details</h3>
-              <p><strong>Order Number:</strong> ${order.order_number}</p>
-              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              })}</p>
-              <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">CONFIRMED</span></p>
-              ${order.taxable_amount > 0 ? `
-              <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
-              ` : ''}
-            </div>
+      <h3>Order Items</h3>
+      <table class="rows">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${orderItems.map(item => `
+            <tr>
+              <td>${item.product_name}</td>
+              <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
+              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
 
-            <h3>Order Items</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qty</th>
-                  <th>Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${orderItems.map(item => `
-                  <tr>
-                    <td>${item.product_name}</td>
-                    <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>                    <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+      <div class="total">
+        ${order.taxable_amount > 0 ? `
+        <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+        ${order.is_igst
+          ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+          : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+             <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+        }
+        <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
+        ` : ''}
+        <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+      </div>
 
-            <div class="total">
-              ${order.taxable_amount > 0 ? `
-              <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-              ${order.is_igst
-                ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
-                : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-                   <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
-              }
-              <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
-              ` : ''}
-              <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
-            </div>
+      <div class="success">
+        <h4 style="margin-top: 0;">What happens next?</h4>
+        <p style="margin: 5px 0;">Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way.</p>
+      </div>
 
-            <div style="background-color: #dcfce7; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
-              <h4 style="margin-top: 0;">What happens next?</h4>
-              <p style="margin: 5px 0;">Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way.</p>
-            </div>
-
-            <p>If you have any questions, feel free to contact us:</p>
-                                        ${contactLine}
-
-            <div class="footer">
-              <p><strong>${brand}</strong></p>
-              ${address ? `<p>${address}</p>` : ''}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you have any questions, feel free to contact us:</p>
+      ${contactLine}
+    `,
+    footerLines: [address],
+  })
   try {
     const info = await sendAuditedMail({
       from,
@@ -564,121 +291,72 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
   }).catch(() => {})
 
   const from = adminMailFrom()
+  const brand = await currentBrandNameAsync()
   const subject = `New Order - ${order.order_number}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 700px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .alert {
-              background-color: #d4edda;
-              border: 2px solid #28a745;
-              padding: 20px;
-              border-radius: 8px;
-              margin-bottom: 20px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 20px 0;
-              background-color: white;
-            }
-            th, td {
-              padding: 12px;
-              text-align: left;
-              border: 1px solid #ddd;
-            }
-            th {
-              background-color: #2563eb;
-              color: white;
-              font-weight: bold;
-            }
-            .info-box {
-              background-color: white;
-              padding: 15px;
-              border-radius: 5px;
-              margin: 15px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="alert">
-              <h2 style="margin-top: 0;">New Order Received!</h2>
-              <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Admin Notification',
+    title: 'New Order Received!',
+    content: `
+      <div class="success">
+        <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
+      </div>
 
-            <div class="info-box">
-              <h3>Customer Information</h3>
-              <p><strong>Name:</strong> ${order.customer_name}</p>
-              <p><strong>Email:</strong> ${order.customer_email}</p>
-              <p><strong>Phone:</strong> ${order.customer_phone || 'Not provided'}</p>
-            </div>
+      <div class="card">
+        <h3>Customer Information</h3>
+        <p><strong>Name:</strong> ${order.customer_name}</p>
+        <p><strong>Email:</strong> ${order.customer_email}</p>
+        <p><strong>Phone:</strong> ${order.customer_phone || 'Not provided'}</p>
+      </div>
 
-            <div class="info-box">
-              <h3>Order Information</h3>
-              <p><strong>Order Number:</strong> ${order.order_number}</p>
-              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString('en-IN')}</p>
-              <p><strong>Status:</strong> PENDING</p>
-              ${order.notes ? `<p><strong>Customer Notes:</strong> ${order.notes}</p>` : ''}
-            </div>
+      <div class="card">
+        <h3>Order Information</h3>
+        <p><strong>Order Number:</strong> ${order.order_number}</p>
+        <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString('en-IN')}</p>
+        <p><strong>Status:</strong> PENDING</p>
+        ${order.notes ? `<p><strong>Customer Notes:</strong> ${order.notes}</p>` : ''}
+      </div>
 
-            <h3>Order Items</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>SKU</th>
-                  <th>Qty</th>
-                  <th>Unit Price</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${orderItems.map(item => `
-                  <tr>
-                    <td>${item.product_name}</td>
-                    <td>${item.product_sku}</td>
-                    <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>                    <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                `).join('')}
-                <tr style="background-color: #fff3cd; font-weight: bold;">
-                  <td colspan="4" style="text-align: right;">Total:</td>
-                  <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                </tr>
-              </tbody>
-            </table>
+      <h3>Order Items</h3>
+      <table class="rows">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${orderItems.map(item => `
+            <tr>
+              <td>${item.product_name}</td>
+              <td>${item.product_sku}</td>
+              <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
+              <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            </tr>
+          `).join('')}
+          <tr style="background-color: #fff3cd; font-weight: bold;">
+            <td colspan="4" style="text-align: right;">Total:</td>
+            <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          </tr>
+        </tbody>
+      </table>
 
-            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
-              <h4 style="margin-top: 0;">Action Required</h4>
-              <p>Please contact the customer within 24 hours to confirm the order and payment details.</p>
-            </div>
+      <div class="warning">
+        <h4 style="margin-top: 0;">Action Required</h4>
+        <p>Please contact the customer within 24 hours to confirm the order and payment details.</p>
+      </div>
 
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${currentAdminBaseUrl()}/orders/${order.id}"
-                 style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                View Order in Admin Panel
-              </a>
-            </p>
-          </div>
-        </body>
-      </html>
-    `
+      <div class="cta">
+        <a href="${currentAdminBaseUrl()}/orders/${order.id}" class="button">
+          View Order in Admin Panel
+        </a>
+      </div>
+    `,
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -709,7 +387,7 @@ export async function sendOrderStatusUpdate(
   cancellationNote?: string,
 ) {
   const baseUrl = await storeBaseUrlAsync()
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
@@ -768,147 +446,67 @@ export async function sendOrderStatusUpdate(
 
   const from = await customerMailFromAsync()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .status-badge {
-              background-color: ${statusInfo.color};
-              color: white;
-              font-size: 18px;
-              font-weight: bold;
-              text-align: center;
-              padding: 15px 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-              text-transform: uppercase;
-            }
-            .info-box {
-              background-color: #f0f9ff;
-              border-left: 4px solid #2563eb;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .order-details {
-              background-color: white;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-            .button {
-              display: inline-block;
-              background-color: #2563eb;
-              color: #ffffff !important;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 5px;
-              font-weight: bold;
-              margin: 20px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}</span>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Order Update',
+    title: statusInfo.title,
+    preheader: `${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}`,
+    extraCss: `
+      .status-badge { background-color: ${statusInfo.color}; color: white; font-size: 18px; font-weight: bold; text-align: center; padding: 15px 20px; border-radius: 8px; margin: 20px 0; text-transform: uppercase; }
+    `,
+    content: `
+      <p>Hello ${customerName},</p>
+      <p>${statusInfo.message}</p>
 
-            <h2>${statusInfo.title}</h2>
-            <p>Hello ${customerName},</p>
-            <p>${statusInfo.message}</p>
+      ${cancellationNote ? `
+      <div class="danger">
+        <h4 style="margin-top: 0; color: #b91c1c;">Reason</h4>
+        <p style="margin: 0;">${cancellationNote}</p>
+      </div>
+      ` : ''}
 
-            ${cancellationNote ? `
-            <div class="info-box" style="background-color: #fef2f2; border-left-color: #ef4444;">
-              <h4 style="margin-top: 0; color: #b91c1c;">Reason</h4>
-              <p style="margin: 0;">${cancellationNote}</p>
-            </div>
-            ` : ''}
+      <div class="status-badge">${newStatus}</div>
 
-            <div class="status-badge">${newStatus}</div>
+      <div class="card">
+        <h3 style="margin-top: 0;">Order Details</h3>
+        <p><strong>Order Number:</strong> ${orderNumber}</p>
+        <p><strong>Order ID:</strong> ${orderId}</p>
+        ${previousStatus ? `<p><strong>Previous Status:</strong> ${previousStatus}</p>` : ''}
+        <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', {
+          dateStyle: 'long',
+          timeStyle: 'short'
+        })}</p>
+      </div>
 
-            <div class="order-details">
-              <h3 style="margin-top: 0;">Order Details</h3>
-              <p><strong>Order Number:</strong> ${orderNumber}</p>
-              <p><strong>Order ID:</strong> ${orderId}</p>
-              ${previousStatus ? `<p><strong>Previous Status:</strong> ${previousStatus}</p>` : ''}
-              <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', { 
-                dateStyle: 'long', 
-                timeStyle: 'short' 
-              })}</p>
-            </div>
+      ${newStatus === 'shipped' ? `
+        <div class="info">
+          <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
+          <p>Track your shipment live by visiting your order page:</p>
+          <p style="text-align: center; margin: 0;">
+            <a href="${baseUrl}/account/orders/${orderId}" class="button" style="padding: 10px 24px; font-size: 14px;">
+              Track Your Order
+            </a>
+          </p>
+        </div>
+      ` : ''}
 
-            ${newStatus === 'shipped' ? `
-              <div class="info-box" style="background-color: #f0f9ff; border-left-color: #2563eb;">
-                <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
-                <p>Track your shipment live by visiting your order page:</p>
-                <p style="text-align: center; margin: 0;">
-                  <a href="${baseUrl}/account/orders/${orderId}"
-                     style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 14px;">
-                    Track Your Order
-                  </a>
-                </p>
-              </div>
-            ` : ''}
+      ${newStatus === 'delivered' ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Thank You!</h4>
+          <p>We hope you're satisfied with your purchase. If you have any questions or concerns, please don't hesitate to contact us.</p>
+        </div>
+      ` : ''}
 
-            ${newStatus === 'delivered' ? `
-              <div class="info-box">
-                <h4 style="margin-top: 0;">Thank You!</h4>
-                <p>We hope you're satisfied with your purchase. If you have any questions or concerns, please don't hesitate to contact us.</p>
-              </div>
-            ` : ''}
+      <div class="cta">
+        <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
+          View Order Details
+        </a>
+      </div>
 
-            <p style="text-align: center;">
-              <a href="${baseUrl}/account/orders/${orderId}"
-                 class="button" style="color:#ffffff;">
-                View Order Details
-              </a>
-            </p>
-
-            <p>If you have any questions about your order, please feel free to contact us.</p>
-
-            <div class="footer">
-              <p><strong>${brand}</strong></p>
-              ${address ? `<p>${address}</p>` : ''}
-                            ${contactLine}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you have any questions about your order, please feel free to contact us.</p>
+    `,
+    footerLines: [address, contactLine],
+  })
   const attachments = invoicePdfBuffer ? [{
     filename: `Invoice-${orderNumber}.pdf`,
     content: invoicePdfBuffer,
@@ -942,7 +540,7 @@ export async function sendPaymentStatusUpdate(
   orderTotal: number
 ) {
   const baseUrl = await storeBaseUrlAsync()
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const paymentMessages: Record<string, { title: string; message: string; color: string }> = {
@@ -976,166 +574,77 @@ export async function sendPaymentStatusUpdate(
 
   const from = await customerMailFromAsync()
   const subject = `${paymentInfo.title} - Order ${orderNumber}`
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .payment-badge {
-              background-color: ${paymentInfo.color};
-              color: white;
-              font-size: 18px;
-              font-weight: bold;
-              text-align: center;
-              padding: 15px 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-              text-transform: uppercase;
-            }
-            .amount-box {
-              background-color: white;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-              text-align: center;
-            }
-            .amount {
-              font-size: 32px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .order-details {
-              background-color: white;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-            }
-            .info-box {
-              background-color: #f0f9ff;
-              border-left: 4px solid #2563eb;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-            .button {
-              display: inline-block;
-              background-color: #2563eb;
-              color: #ffffff !important;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 5px;
-              font-weight: bold;
-              margin: 20px 0;
-            }
-          </style>
-        </head>
-        <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}</span>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
+  const html = mailShell({
+    brand,
+    kicker: 'Payment Update',
+    title: paymentInfo.title,
+    preheader: `${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}`,
+    extraCss: `
+      .payment-badge { background-color: ${paymentInfo.color}; color: white; font-size: 18px; font-weight: bold; text-align: center; padding: 15px 20px; border-radius: 8px; margin: 20px 0; text-transform: uppercase; }
+      .amount-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+      .amount { font-size: 32px; font-weight: bold; color: #2563eb; }
+    `,
+    content: `
+      <p>Hello ${customerName},</p>
+      <p>${paymentInfo.message}</p>
 
-            <h2>${paymentInfo.title}</h2>
-            <p>Hello ${customerName},</p>
-            <p>${paymentInfo.message}</p>
+      <div class="payment-badge">${newPaymentStatus}</div>
 
-            <div class="payment-badge">${newPaymentStatus}</div>
+      <div class="amount-box">
+        <p style="margin: 0; color: #666;">Order Amount</p>
+        <div class="amount">₹${orderTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+      </div>
 
-            <div class="amount-box">
-              <p style="margin: 0; color: #666;">Order Amount</p>
-              <div class="amount">₹${orderTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
+      <div class="card">
+        <h3 style="margin-top: 0;">Order Details</h3>
+        <p><strong>Order Number:</strong> ${orderNumber}</p>
+        <p><strong>Order ID:</strong> ${orderId}</p>
+        <p><strong>Payment Status:</strong> ${newPaymentStatus}</p>
+        <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', {
+          dateStyle: 'long',
+          timeStyle: 'short'
+        })}</p>
+      </div>
 
-            <div class="order-details">
-              <h3 style="margin-top: 0;">Order Details</h3>
-              <p><strong>Order Number:</strong> ${orderNumber}</p>
-              <p><strong>Order ID:</strong> ${orderId}</p>
-              <p><strong>Payment Status:</strong> ${newPaymentStatus}</p>
-              <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', { 
-                dateStyle: 'long', 
-                timeStyle: 'short' 
-              })}</p>
-            </div>
+      ${newPaymentStatus === 'paid' ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Payment Confirmed</h4>
+          <p>Your order will now be processed and shipped as per the delivery schedule.</p>
+        </div>
+      ` : ''}
 
-            ${newPaymentStatus === 'paid' ? `
-              <div class="info-box">
-                <h4 style="margin-top: 0;">Payment Confirmed</h4>
-                <p>Your order will now be processed and shipped as per the delivery schedule.</p>
-              </div>
-            ` : ''}
+      ${newPaymentStatus === 'pending' ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Action Required</h4>
+          <p>Please complete your payment to avoid order cancellation. Contact us if you need assistance.</p>
+        </div>
+      ` : ''}
 
-            ${newPaymentStatus === 'pending' ? `
-              <div class="info-box">
-                <h4 style="margin-top: 0;">Action Required</h4>
-                <p>Please complete your payment to avoid order cancellation. Contact us if you need assistance.</p>
-              </div>
-            ` : ''}
+      ${newPaymentStatus === 'refunded' ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Refund Processed</h4>
+          <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
+        </div>
+      ` : ''}
 
-            ${newPaymentStatus === 'refunded' ? `
-              <div class="info-box">
-                <h4 style="margin-top: 0;">Refund Processed</h4>
-                <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
-              </div>
-            ` : ''}
+      ${newPaymentStatus === 'failed' ? `
+        <div class="danger">
+          <h4 style="margin-top: 0; color: #ef4444;">Action Required &mdash; 10 Minute Window</h4>
+          <p>You have <strong>10 minutes</strong> from when the order was placed to complete payment. After that, the order will be automatically cancelled and items returned to your cart.</p>
+          <p>Click the button below to retry payment now.</p>
+        </div>
+      ` : ''}
 
-            ${newPaymentStatus === 'failed' ? `
-              <div class="info-box" style="background-color: #fef2f2; border-left-color: #ef4444;">
-                <h4 style="margin-top: 0; color: #ef4444;">Action Required &mdash; 10 Minute Window</h4>
-                <p>You have <strong>10 minutes</strong> from when the order was placed to complete payment. After that, the order will be automatically cancelled and items returned to your cart.</p>
-                <p>Click the button below to retry payment now.</p>
-              </div>
-            ` : ''}
+      <div class="cta">
+        <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
+          View Order Details
+        </a>
+      </div>
 
-            <p style="text-align: center;">
-              <a href="${baseUrl}/account/orders/${orderId}"
-                 class="button" style="color:#ffffff;">
-                View Order Details
-              </a>
-            </p>
-
-            <p>If you have any questions about this payment update, please contact us.</p>
-
-            <div class="footer">
-              <p><strong>${brand}</strong></p>
-              ${address ? `<p>${address}</p>` : ''}
-                            ${contactLine}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you have any questions about this payment update, please contact us.</p>
+    `,
+    footerLines: [address, contactLine],
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -1196,141 +705,62 @@ export async function sendAdminCertificateEmail(
   const adminUrl = tenant
     ? `https://admin-${tenant.slug}.${platformDomain}/admin/login`
     : `${currentAdminBaseUrl()}/login`
-  // The header sits on the container's near-white #f9f9f9, so it must never be light.
   const headerName = tenant ? tenant.storeName : storeName()
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .logo {
-              font-size: 28px;
-              font-weight: bold;
-              color: #2563eb;
-            }
-            .credential-box {
-              background-color: #1e293b;
-              color: #e2e8f0;
-              padding: 20px;
-              border-radius: 8px;
-              margin: 20px 0;
-              font-family: monospace;
-            }
-            .credential-box .label {
-              color: #94a3b8;
-              font-size: 12px;
-              text-transform: uppercase;
-              margin-bottom: 4px;
-            }
-            .credential-box .value {
-              color: #38bdf8;
-              font-size: 16px;
-              font-weight: bold;
-              word-break: break-all;
-            }
-            .credential-box hr {
-              border: none;
-              border-top: 1px solid #334155;
-              margin: 12px 0;
-            }
-            .warning {
-              background-color: #fef3c7;
-              border-left: 4px solid #f59e0b;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .info {
-              background-color: #f0f9ff;
-              border-left: 4px solid #2563eb;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 30px;
-              padding-top: 20px;
-              border-top: 1px solid #e0e0e0;
-              color: #666;
-              font-size: 14px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#1e293b;letter-spacing:0.5px;">${headerName}</div>
-              <p style="color: #666;">Admin Panel Access</p>
-            </div>
+  const html = mailShell({
+    brand: headerName,
+    kicker: 'Admin Panel Access',
+    title: `Welcome, ${displayName}!`,
+    extraCss: `
+      .credential-box { background-color: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; margin: 20px 0; font-family: monospace; }
+      .credential-box .label { color: #94a3b8; font-size: 12px; text-transform: uppercase; margin-bottom: 4px; }
+      .credential-box .value { color: #38bdf8; font-size: 16px; font-weight: bold; word-break: break-all; }
+      .credential-box hr { border: none; border-top: 1px solid #334155; margin: 12px 0; }
+    `,
+    content: `
+      <p>You have been added as an <strong>${role}</strong> on the ${headerName} admin panel. Your client certificate is attached to this email.</p>
 
-            <h2>Welcome, ${displayName}!</h2>
-            <p>You have been added as an <strong>${role}</strong> on the ${headerName} admin panel. Your client certificate is attached to this email.</p>
+      <div class="credential-box">
+        <div class="label">Email</div>
+        <div class="value">${email}</div>
+        <hr>
+        <div class="label">Certificate Password</div>
+        <div class="value">${p12Password}</div>
+        <hr>
+        <div class="label">Certificate Serial</div>
+        <div class="value" style="font-size: 11px;">${serialNumber}</div>
+        <hr>
+        <div class="label">Expires On</div>
+        <div class="value">${new Date(expiresAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      </div>
 
-            <div class="credential-box">
-              <div class="label">Email</div>
-              <div class="value">${email}</div>
-              <hr>
-              <div class="label">Certificate Password</div>
-              <div class="value">${p12Password}</div>
-              <hr>
-              <div class="label">Certificate Serial</div>
-              <div class="value" style="font-size: 11px;">${serialNumber}</div>
-              <hr>
-              <div class="label">Expires On</div>
-              <div class="value">${new Date(expiresAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-            </div>
+      <div class="warning">
+        <strong>Important Security Notice</strong>
+        <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>The attached <code>.p12</code> certificate file is required to access the admin panel.</li>
+          <li>Install it in your browser or system keychain using the password above.</li>
+          <li>Do <strong>not</strong> share this certificate or password with anyone.</li>
+          <li>This certificate is valid for 365 days from issuance.</li>
+        </ul>
+      </div>
 
-            <div class="warning">
-              <strong>Important Security Notice</strong>
-              <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                <li>The attached <code>.p12</code> certificate file is required to access the admin panel.</li>
-                <li>Install it in your browser or system keychain using the password above.</li>
-                <li>Do <strong>not</strong> share this certificate or password with anyone.</li>
-                <li>This certificate is valid for 365 days from issuance.</li>
-              </ul>
-            </div>
-
-            <div class="info">
-              <strong>How to install:</strong>
-              <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-                <li>Download the attached <code>${certFileSlug}-admin-cert.p12</code> file.</li>
-                <li>Double-click the file to open it in your system's certificate manager.</li>
-                <li>Enter the certificate password shown above when prompted.</li>
-                <li>Navigate to <a href="${adminUrl}" style="color:#2563eb;"><strong>${adminUrl}</strong></a> to access the admin panel.</li>
-              </ol>
-            </div>
+      <div class="info">
+        <strong>How to install:</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Download the attached <code>${certFileSlug}-admin-cert.p12</code> file.</li>
+          <li>Double-click the file to open it in your system's certificate manager.</li>
+          <li>Enter the certificate password shown above when prompted.</li>
+          <li>Navigate to <a href="${adminUrl}" style="color:#2563eb;"><strong>${adminUrl}</strong></a> to access the admin panel.</li>
+        </ol>
+      </div>
 
 ${portalNote}
-            <p>If you have any questions, contact the super admin.</p>
-
-            <div class="footer">
-              <p><strong>${headerName}</strong></p>
-              ${tenant ? '' : `<p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}</p>`}
-            </div>
-          </div>
-        </body>
-      </html>
-    `
+      <p>If you have any questions, contact the super admin.</p>
+    `,
+    footerLines: tenant ? [] : [
+      'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
+      `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
+    ],
+  })
   const attachments = [
     {
       filename: `${certFileSlug}-admin-cert.p12`,
@@ -1372,56 +802,34 @@ export async function sendCertInviteEmail(
   const headerName = tenant ? tenant.storeName : storeName()
   const subject = `Access your admin certificate for ${headerName}`
   const esc = (s: string) => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))
-  // Reuse the store's standard admin-email shell (same container/header/info/footer as the
-  // certificate email) so the invite matches the store's branding rather than a bare page.
-  const html = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .cta { text-align: center; margin: 28px 0; }
-            .cta a { background-color: #2563eb; color: #ffffff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; }
-            .info { background-color: #f0f9ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px; }
-            .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#1e293b;letter-spacing:0.5px;">${headerName}</div>
-              <p style="color: #666;">Admin Panel Access</p>
-            </div>
+  const html = mailShell({
+    brand: headerName,
+    kicker: 'Admin Panel Access',
+    title: `You've been added as ${role} to ${headerName}`,
+    content: `
+      <p>To administer the store you need your admin certificate. For security we no longer send
+         it as an attachment. Instead, download it once from the certificate portal.</p>
 
-            <h2>You've been added as ${esc(role)} to ${headerName}</h2>
-            <p>To administer the store you need your admin certificate. For security we no longer send
-               it as an attachment. Instead, download it once from the certificate portal.</p>
+      <div class="cta">
+        <a href="${portalUrl}" class="button">Open the certificate portal</a>
+      </div>
 
-            <div class="cta">
-              <a href="${portalUrl}">Open the certificate portal</a>
-            </div>
+      <div class="info">
+        <strong>How it works</strong>
+        <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+          <li>Sign in with <strong>${esc(email)}</strong> — the Google account this invitation was sent to.</li>
+          <li>You will see your certificate and can download it a single time.</li>
+          <li>Save the <code>.p12</code> file and the import password it shows you somewhere safe.</li>
+        </ol>
+      </div>
 
-            <div class="info">
-              <strong>How it works</strong>
-              <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-                <li>Sign in with <strong>${esc(email)}</strong> — the Google account this invitation was sent to.</li>
-                <li>You will see your certificate and can download it a single time.</li>
-                <li>Save the <code>.p12</code> file and the import password it shows you somewhere safe.</li>
-              </ol>
-            </div>
-
-            <p style="color:#666;font-size:13px;">If the button doesn't work, go to <a href="${portalUrl}" style="color:#2563eb;">${portalUrl}</a></p>
-
-            <div class="footer">
-              <p><strong>${headerName}</strong></p>
-              ${tenant ? '' : `<p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}</p>`}
-            </div>
-          </div>
-        </body>
-      </html>`
+      <p class="muted">If the button doesn't work, go to <a href="${portalUrl}" style="color:#2563eb;">${portalUrl}</a></p>
+    `,
+    footerLines: tenant ? [] : [
+      'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
+      `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
+    ],
+  })
   try {
     const info = await sendAuditedMail({
       from,
@@ -1446,156 +854,79 @@ export async function sendNewReviewNotification(review: any, user: any, product:
     from: adminMailFrom(),
     to: adminEmail,
     subject: `New Review Pending Approval - ${product.name}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .header {
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-              padding: 20px;
-              border-radius: 10px;
-              text-align: center;
-              margin-bottom: 30px;
-            }
-            .content {
-              background-color: white;
-              padding: 20px;
-              border-radius: 8px;
-              margin-bottom: 20px;
-            }
-            .review-box {
-              background-color: #fff3cd;
-              border-left: 4px solid #ffc107;
-              padding: 15px;
-              margin: 20px 0;
-            }
-            .stars {
-              color: #ffc107;
-              font-size: 20px;
-              margin: 10px 0;
-            }
-            .info-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 10px 0;
-              border-bottom: 1px solid #eee;
-            }
-            .info-label {
-              font-weight: bold;
-              color: #555;
-            }
-            .button {
-              display: inline-block;
-              padding: 12px 30px;
-              background-color: #28a745;
-              color: #ffffff !important;
-              text-decoration: none;
-              border-radius: 5px;
-              margin: 10px 5px;
-              font-weight: bold;
-            }
-            .button.delete {
-              background-color: #dc3545;
-            }
-            .footer {
-              text-align: center;
-              color: #666;
-              font-size: 12px;
-              margin-top: 30px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1 style="margin: 0;">New Review Submitted</h1>
-              <p style="margin: 10px 0 0 0; opacity: 0.9;">Action Required: Pending Approval</p>
-            </div>
+    html: mailShell({
+      brand,
+      kicker: 'Action Required: Pending Approval',
+      title: 'New Review Submitted',
+      extraCss: `
+        .stars { color: #ffc107; font-size: 20px; margin: 10px 0; }
+      `,
+      content: `
+        <div class="card">
+          <h3 style="margin-top: 0;">Review Details</h3>
 
-            <div class="content">
-              <h2 style="color: #667eea; margin-top: 0;">Review Details</h2>
-              
-              <div class="info-row">
-                <span class="info-label">Product:</span>
-                <span>${product.name}</span>
-              </div>
-              
-              <div class="info-row">
-                <span class="info-label">Customer:</span>
-                <span>${user.first_name} ${user.last_name}</span>
-              </div>
-              
-              <div class="info-row">
-                <span class="info-label">Email:</span>
-                <span>${user.email}</span>
-              </div>
-              
-              <div class="info-row">
-                <span class="info-label">Rating:</span>
-                <span class="stars">${review.rating}/5</span>
-              </div>
-              
-              ${review.is_verified_purchase ? `
-              <div class="info-row">
-                <span class="info-label">Status:</span>
-                <span style="color: #28a745; font-weight: bold;">Verified Purchase</span>
-              </div>
-              ` : ''}
-              
-              <div class="info-row">
-                <span class="info-label">Submitted:</span>
-                <span>${new Date(review.created_at).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</span>
-              </div>
-
-              ${review.title ? `
-              <div style="margin-top: 20px;">
-                <strong>Review Title:</strong>
-                <p style="margin: 5px 0; font-size: 16px;">${review.title}</p>
-              </div>
-              ` : ''}
-
-              <div class="review-box">
-                <strong>Review Comment:</strong>
-                <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${review.comment}</p>
-              </div>
-            </div>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${currentAdminBaseUrl()}/reviews" class="button" style="color:#ffffff;">
-                Approve / Reject Review
-              </a>
-            </div>
-
-            <div class="footer">
-              <p>This is an automated notification from ${brand} Admin Panel</p>
-              <p>Please review and approve/reject this review from the admin dashboard</p>
-            </div>
+          <div class="info-row">
+            <span class="info-label">Product:</span>
+            <span>${product.name}</span>
           </div>
-        </body>
-      </html>
-    `,
+
+          <div class="info-row">
+            <span class="info-label">Customer:</span>
+            <span>${user.first_name} ${user.last_name}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">Email:</span>
+            <span>${user.email}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="info-label">Rating:</span>
+            <span class="stars">${review.rating}/5</span>
+          </div>
+
+          ${review.is_verified_purchase ? `
+          <div class="info-row">
+            <span class="info-label">Status:</span>
+            <span style="color: #28a745; font-weight: bold;">Verified Purchase</span>
+          </div>
+          ` : ''}
+
+          <div class="info-row">
+            <span class="info-label">Submitted:</span>
+            <span>${new Date(review.created_at).toLocaleString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</span>
+          </div>
+
+          ${review.title ? `
+          <div style="margin-top: 20px;">
+            <strong>Review Title:</strong>
+            <p style="margin: 5px 0; font-size: 16px;">${review.title}</p>
+          </div>
+          ` : ''}
+
+          <div class="warning">
+            <strong>Review Comment:</strong>
+            <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${review.comment}</p>
+          </div>
+        </div>
+
+        <div class="cta">
+          <a href="${currentAdminBaseUrl()}/reviews" class="button" style="color:#ffffff;">
+            Approve / Reject Review
+          </a>
+        </div>
+      `,
+      footerLines: [
+        `This is an automated notification from ${brand} Admin Panel`,
+        'Please review and approve/reject this review from the admin dashboard',
+      ],
+    }),
   }
 
   try {
@@ -1631,88 +962,47 @@ export async function sendPaymentFailedAdminNotification(
     scope: 'orders:read',
   }).catch(() => {})
 
+  const brand = await currentBrandNameAsync()
   const mailOptions = {
     from: adminMailFrom(),
     to: adminEmail,
     subject: `[Payment Failed] Order ${order.order_number}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 700px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            .container {
-              background-color: #f9f9f9;
-              border-radius: 10px;
-              padding: 30px;
-              border: 1px solid #e0e0e0;
-            }
-            .alert {
-              background-color: #fef2f2;
-              border: 2px solid #ef4444;
-              padding: 20px;
-              border-radius: 8px;
-              margin-bottom: 20px;
-            }
-            .info-box {
-              background-color: white;
-              padding: 15px;
-              border-radius: 5px;
-              margin: 15px 0;
-            }
-            .warning-box {
-              background-color: #fff3cd;
-              border-left: 4px solid #ffc107;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="alert">
-              <h2 style="margin-top: 0; color: #ef4444;">Payment Failed</h2>
-              <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
-            </div>
+    html: mailShell({
+      brand,
+      kicker: 'Admin Notification',
+      title: 'Payment Failed',
+      content: `
+        <div class="danger">
+          <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
+        </div>
 
-            <div class="info-box">
-              <h3>Customer Information</h3>
-              <p><strong>Name:</strong> ${order.customer_name}</p>
-              <p><strong>Email:</strong> ${order.customer_email}</p>
-              ${order.customer_phone ? `<p><strong>Phone:</strong> ${order.customer_phone}</p>` : ''}
-            </div>
+        <div class="card">
+          <h3>Customer Information</h3>
+          <p><strong>Name:</strong> ${order.customer_name}</p>
+          <p><strong>Email:</strong> ${order.customer_email}</p>
+          ${order.customer_phone ? `<p><strong>Phone:</strong> ${order.customer_phone}</p>` : ''}
+        </div>
 
-            <div class="info-box">
-              <h3>Payment Details</h3>
-              <p><strong>Order Amount:</strong> ₹${parseFloat(String(order.total_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-              <p><strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">FAILED</span></p>
-              ${errorDescription ? `<p><strong>Reason:</strong> ${errorDescription}</p>` : ''}
-              <p><strong>Time:</strong> ${new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</p>
-            </div>
+        <div class="card">
+          <h3>Payment Details</h3>
+          <p><strong>Order Amount:</strong> ₹${parseFloat(String(order.total_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p><strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">FAILED</span></p>
+          ${errorDescription ? `<p><strong>Reason:</strong> ${errorDescription}</p>` : ''}
+          <p><strong>Time:</strong> ${new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</p>
+        </div>
 
-            <div class="warning-box">
-              <h4 style="margin-top: 0;">Auto-Cancel in 10 Minutes</h4>
-              <p>The customer has been notified and given a <strong>10-minute window</strong> to retry payment. If payment is not completed, the order will be automatically cancelled and stock restored.</p>
-            </div>
+        <div class="warning">
+          <h4 style="margin-top: 0;">Auto-Cancel in 10 Minutes</h4>
+          <p>The customer has been notified and given a <strong>10-minute window</strong> to retry payment. If payment is not completed, the order will be automatically cancelled and stock restored.</p>
+        </div>
 
-            <p style="text-align: center; margin-top: 30px;">
-              <a href="${currentAdminBaseUrl()}/orders/${order.id}"
-                 style="display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                View Order in Admin Panel
-              </a>
-            </p>
-          </div>
-        </body>
-      </html>
-    `,
+        <div class="cta">
+          <a href="${currentAdminBaseUrl()}/orders/${order.id}" class="button">
+            View Order in Admin Panel
+          </a>
+        </div>
+      `,
+    }),
   }
 
   try {
@@ -1736,7 +1026,7 @@ export async function sendAdminContactEmail(
   message: string,
   opts: { isHtml?: boolean; entityType?: string; entityId?: string } = {}
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const messageHtml = opts.isHtml
@@ -1746,34 +1036,20 @@ export async function sendAdminContactEmail(
     from: await customerMailFromAsync(),
     to: email,
     subject,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-            .header { text-align: center; padding-bottom: 20px; margin-bottom: 30px; }
-            .logo { font-size: 28px; font-weight: bold; color: #f97316; }
-            .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
-            .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-            </div>
-            <div class="message-box">${messageHtml}</div>
-            <div class="footer">
-              <p>This message was sent by the ${brand} team. Please do not reply directly to this email.</p>
-              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
-              ${contactLine}
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Message from our team',
+      title: subject,
+      extraCss: `
+        .message-box { background-color: #fff; border-left: 4px solid #2563eb; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
+      `,
+      content: `<div class="message-box">${messageHtml}</div>`,
+      footerLines: [
+        `This message was sent by the ${brand} team. Please do not reply directly to this email.`,
+        address,
+        contactLine,
+      ],
+    }),
   }
 
   try {
@@ -1807,33 +1083,22 @@ export async function sendSupportEscalationEmail(
     from: await customerMailFromAsync(),
     to: recipients.join(', '),
     subject: `Support Request from ${customerName}`,
-    html: `
-      <!DOCTYPE html><html><head><style>
-        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-        .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-        .header{background:#f97316;padding:24px;text-align:center}
-        .logo{font-size:24px;font-weight:bold;color:#fff}
-        .body{padding:28px}
-        .info-box{background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0}
-        .cta{display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;margin-top:16px}
-        .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-      </style></head>
-      <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-        <div class="body">
-          <p style="font-size:16px;font-weight:bold;color:#1f2937;">New Support Chat Request</p>
-          <p>A customer has requested to connect with a support agent.</p>
-          <div class="info-box">
-            <p style="margin:0 0 6px"><strong>Name:</strong> ${customerName}</p>
-            <p style="margin:0 0 6px"><strong>Email:</strong> ${customerEmail}</p>
-            <p style="margin:0"><strong>Session ID:</strong> ${sessionId}</p>
-          </div>
-          <p>Click below to open the customer profile and join the chat:</p>
-          <a href="${chatLink}" class="cta">Open Support Chat</a>
+    html: mailShell({
+      brand,
+      kicker: 'Admin Notification',
+      title: 'New Support Chat Request',
+      content: `
+        <p>A customer has requested to connect with a support agent.</p>
+        <div class="info">
+          <p style="margin:0 0 6px"><strong>Name:</strong> ${customerName}</p>
+          <p style="margin:0 0 6px"><strong>Email:</strong> ${customerEmail}</p>
+          <p style="margin:0"><strong>Session ID:</strong> ${sessionId}</p>
         </div>
-        <div class="footer"><p>${brand} Admin Notification — do not reply to this email.</p></div>
-      </div></body></html>
-    `,
+        <p>Click below to open the customer profile and join the chat:</p>
+        <div class="cta"><a href="${chatLink}" class="button">Open Support Chat</a></div>
+      `,
+      footerLines: [`${brand} Admin Notification — do not reply to this email.`],
+    }),
   }
 
   try {
@@ -1861,32 +1126,21 @@ export async function sendAgentConnectedEmail(
     from: await customerMailFromAsync(),
     to: customerEmail,
     subject: `A support agent has joined your chat`,
-    html: `
-      <!DOCTYPE html><html><head><style>
-        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-        .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-        .header{background:#f97316;padding:24px;text-align:center}
-        .logo{font-size:24px;font-weight:bold;color:#fff}
-        .body{padding:28px}
-        .info-box{background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0}
-        .cta{display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;margin-top:16px}
-        .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-      </style></head>
-      <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-        <div class="body">
-          <p style="font-size:16px;font-weight:bold;color:#1f2937;">Hi ${customerName}, your support agent is here!</p>
-          <p>A support agent has joined your chat and is ready to help you.</p>
-          <div class="info-box">
-            <p style="margin:0"><strong>Agent:</strong> ${agentName}</p>
-          </div>
-          <p>Click below to return to the chat:</p>
-          <a href="${chatLink}" class="cta">Return to Chat</a>
-          <p style="margin-top:24px;font-size:13px;color:#6b7280;">If you no longer need assistance, you can close the chat from the support page.</p>
+    html: mailShell({
+      brand,
+      kicker: 'Support',
+      title: `Hi ${customerName}, your support agent is here!`,
+      content: `
+        <p>A support agent has joined your chat and is ready to help you.</p>
+        <div class="info">
+          <p style="margin:0"><strong>Agent:</strong> ${agentName}</p>
         </div>
-        <div class="footer"><p>${brand} Support — do not reply to this email.</p></div>
-      </div></body></html>
-    `,
+        <p>Click below to return to the chat:</p>
+        <div class="cta"><a href="${chatLink}" class="button">Return to Chat</a></div>
+        <p class="muted">If you no longer need assistance, you can close the chat from the support page.</p>
+      `,
+      footerLines: [`${brand} Support — do not reply to this email.`],
+    }),
   }
 
   try {
@@ -1925,64 +1179,56 @@ export async function sendReturnStatusEmail(
 
   const bodies: Record<ReturnEmailEvent, string> = {
     requested_admin: `
-      <p style="font-size:15px;font-weight:bold;color:#1f2937;">New Return / Replacement Request</p>
       <p>A customer has submitted a return/replacement request for order <strong>#${orderNumber}</strong>.</p>
-      <div style="background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0">
+      <div class="info">
         <p style="margin:0 0 6px"><strong>Customer:</strong> ${recipientName}</p>
         <p style="margin:0 0 6px"><strong>Type:</strong> ${extra?.returnType || 'N/A'}</p>
         <p style="margin:0"><strong>Reason:</strong> ${extra?.reason || 'N/A'}</p>
       </div>
-      <a href="${currentAdminBaseUrl()}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
+      <div class="cta"><a href="${currentAdminBaseUrl()}/orders/${orderId}" class="button">Review Request</a></div>
     `,
     approved: `
       <p>Your return/replacement request for order <strong>#${orderNumber}</strong> has been <strong style="color:#16a34a;">approved</strong>.</p>
       <p>Please ship the item(s) back to us. Our team will contact you with the return shipping address and instructions shortly.</p>
       <p>Once we receive and inspect the item, we will process your ${extra?.returnType === 'replacement' ? 'replacement shipment' : 'refund'} promptly.</p>
-      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+      <div class="cta"><a href="${orderLink}" class="button">View Order</a></div>
     `,
     rejected: `
       <p>We have reviewed your return/replacement request for order <strong>#${orderNumber}</strong>.</p>
       <p>Unfortunately, we are unable to approve this request at this time.</p>
-      ${extra?.adminNotes ? `<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px;border-radius:4px;margin:16px 0"><p style="margin:0"><strong>Reason:</strong> ${extra.adminNotes}</p></div>` : ''}
+      ${extra?.adminNotes ? `<div class="danger"><p style="margin:0"><strong>Reason:</strong> ${extra.adminNotes}</p></div>` : ''}
       <p>If you have questions, please contact our support team.</p>
-      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+      <div class="cta"><a href="${orderLink}" class="button">View Order</a></div>
     `,
     received: `
       <p>We have received your returned item(s) for order <strong>#${orderNumber}</strong>.</p>
       <p>Our team is now inspecting the item and will process your ${extra?.returnType === 'replacement' ? 'replacement shipment' : 'refund'} shortly. You will receive another notification once it is done.</p>
-      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+      <div class="cta"><a href="${orderLink}" class="button">View Order</a></div>
     `,
     replacement_created: `
       <p>Great news! Your replacement order has been created for original order <strong>#${orderNumber}</strong>.</p>
       ${extra?.replacementOrderNumber ? `<p>Your new order number is <strong>#${extra.replacementOrderNumber}</strong>. It has been confirmed and will be processed shortly.</p>` : ''}
-      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Original Order</a>
+      <div class="cta"><a href="${orderLink}" class="button">View Original Order</a></div>
     `,
   }
 
   const brand = await currentBrandNameAsync()
+  const title = event === 'requested_admin' ? 'New Return / Replacement Request' : subjects[event]
 
   const mailOptions = {
     from: await customerMailFromAsync(),
     to,
     subject: subjects[event],
-    html: `
-      <!DOCTYPE html><html><head><style>
-        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-        .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-        .header{background:#5a8a00;padding:24px;text-align:center}
-        .logo{font-size:24px;font-weight:bold;color:#fff}
-        .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-        .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-      </style></head>
-      <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-        <div class="body">
-          ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
-          ${bodies[event]}
-        </div>
-        <div class="footer"><p>${brand} — do not reply to this email.</p></div>
-      </div></body></html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Return Update',
+      title,
+      content: `
+        ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
+        ${bodies[event]}
+      `,
+      footerLines: [`${brand} — do not reply to this email.`],
+    }),
   }
 
   try {
@@ -2011,36 +1257,19 @@ export async function sendPaymentRetryEmail(
   const brand = await currentBrandNameAsync()
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
 
-  const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-  .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-  .hdr{background:#1a3a4a;padding:20px 32px}
-  .hdr a{color:#fff;font-size:20px;font-weight:700;text-decoration:none}
-  .body{padding:32px}
-  .badge{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center}
-  .badge p{margin:0;color:#dc2626;font-weight:700;font-size:18px}
-  .badge small{color:#6b7280;font-size:13px}
-  .amount{font-size:28px;font-weight:900;color:#1a3a4a;display:block;margin:8px 0 0}
-  .cta{display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:13px 28px;border-radius:6px;font-weight:700;font-size:15px;margin:24px 0 8px}
-  .note{color:#6b7280;font-size:13px;line-height:1.6;margin:16px 0 0}
-  .ftr{background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 32px;text-align:center;font-size:12px;color:#9ca3af}
-</style></head>
-<body>
-<div class="wrap">
-  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-  <div class="body">
-    <p style="color:#333;font-size:16px;margin:0 0 8px">Hi ${customerName},</p>
-    <p style="color:#555;line-height:1.6;margin:0 0 16px">We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
-    <p style="color:#555;line-height:1.6;margin:0 0 16px">No worries — simply visit our store and place a new order whenever you're ready. Your cart items are still available.</p>
-    <a href="${shopUrl}" class="cta">Shop Again →</a>
-    <p class="note">If you need any help or have questions, just reply to this email and we'll be happy to assist.</p>
-  </div>
-  <div class="ftr">© ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#9ca3af">${brand}</a></div>
-</div>
-</body></html>`
+  const html = mailShell({
+    brand,
+    kicker: 'Payment Update',
+    title: `Sorry your order didn't go through`,
+    content: `
+      <p>Hi ${customerName},</p>
+      <p>We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
+      <p>No worries — simply visit our store and place a new order whenever you're ready. Your cart items are still available.</p>
+      <div class="cta"><a href="${shopUrl}" class="button">Shop Again →</a></div>
+      <p class="muted">If you need any help or have questions, just reply to this email and we'll be happy to assist.</p>
+    `,
+    footerLines: [`© ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}">${brand}</a>`],
+  })
 
   try {
     await sendAuditedMail({
@@ -2076,43 +1305,24 @@ export async function sendInvoiceFinalizedEmail(
     from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Invoice ${invoiceNumber} from ${brand}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-            .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-            .header{background:#1a3a4a;padding:24px;text-align:center}
-            .logo{font-size:22px;font-weight:bold;color:#fff}
-            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-            .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
-            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-            <div class="body">
-              <p>Dear ${customerName},</p>
-              <p>Thank you for your purchase! Your invoice has been generated.</p>
-              <div class="box">
-                <p style="margin:0 0 6px"><strong>Invoice No.:</strong> ${invoiceNumber}</p>
-                ${orderNumber ? `<p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>` : ''}
-                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
-              </div>
-              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
-              <p>For any queries, please contact us.</p>
-              ${contactLine}
-            </div>
-            <div class="footer">
-              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Invoice',
+      title: `Invoice ${invoiceNumber}`,
+      content: `
+        <p>Dear ${customerName},</p>
+        <p>Thank you for your purchase! Your invoice has been generated.</p>
+        <div class="success">
+          <p style="margin:0 0 6px"><strong>Invoice No.:</strong> ${invoiceNumber}</p>
+          ${orderNumber ? `<p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>` : ''}
+          <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+        </div>
+        ${viewUrl ? `<div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
+        <p>For any queries, please contact us.</p>
+        ${contactLine}
+      `,
+      footerLines: [address],
+    }),
   }
   try {
     const info = await sendAuditedMail({
@@ -2153,51 +1363,29 @@ export async function sendPurchaseOrderEmail(
     from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Purchase Order ${poNumber} from ${brand}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-            .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-            .header{background:#1a3a4a;padding:24px;text-align:center}
-            .logo{font-size:22px;font-weight:bold;color:#fff}
-            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-            .box{background:#eff6ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
-            table{width:100%;border-collapse:collapse;margin-top:16px}
-            thead{background:#f3f4f6}
-            th{padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
-            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-            <div class="body">
-              <p>Dear ${contactName || supplierName},</p>
-              <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
-              <div class="box">
-                <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
-                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
-              </div>
-              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Purchase Order</a></p>` : ''}
-              <table>
-                <thead><tr>
-                  <th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th>
-                </tr></thead>
-                <tbody>${itemRows}</tbody>
-              </table>
-              <p style="margin-top:20px">For any questions, please contact us.</p>
-              ${contactLine}
-            </div>
-            <div class="footer">
-              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Purchase Order',
+      title: `Purchase Order ${poNumber}`,
+      content: `
+        <p>Dear ${contactName || supplierName},</p>
+        <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
+        <div class="info">
+          <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
+          <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+        </div>
+        ${viewUrl ? `<div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Purchase Order</a></div>` : ''}
+        <table class="rows">
+          <thead><tr>
+            <th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th>
+          </tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <p style="margin-top:20px">For any questions, please contact us.</p>
+        ${contactLine}
+      `,
+      footerLines: [address],
+    }),
   }
   try {
     const info = await sendAuditedMail({
@@ -2238,50 +1426,29 @@ export async function sendPOReceiveNotificationEmail(
     from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-            .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-            .header{background:#1a3a4a;padding:24px;text-align:center}
-            .logo{font-size:22px;font-weight:bold;color:#fff}
-            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-            .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
-            table{width:100%;border-collapse:collapse;margin-top:16px}
-            thead{background:#f3f4f6}
-            th{padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
-            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-            <div class="body">
-              <p>Dear ${contactName || supplierName},</p>
-              <p>We have recorded receipt of goods against your purchase order.</p>
-              <div class="box">
-                <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
-                <p style="margin:0 0 6px"><strong>GRN Number:</strong> ${grnNumber}</p>
-                <p style="margin:0"><strong>Status:</strong> ${statusLabel}</p>
-              </div>
-              <table>
-                <thead><tr>
-                  <th>Product</th><th style="text-align:right">Qty Received</th><th style="text-align:right">Unit Cost</th>
-                </tr></thead>
-                <tbody>${itemRows}</tbody>
-              </table>
-              <p style="margin-top:20px">Thank you for your supply.</p>
-              ${contactLine}
-            </div>
-            <div class="footer">
-              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Purchase Order',
+      title: 'Goods Receipt Confirmation',
+      content: `
+        <p>Dear ${contactName || supplierName},</p>
+        <p>We have recorded receipt of goods against your purchase order.</p>
+        <div class="success">
+          <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
+          <p style="margin:0 0 6px"><strong>GRN Number:</strong> ${grnNumber}</p>
+          <p style="margin:0"><strong>Status:</strong> ${statusLabel}</p>
+        </div>
+        <table class="rows">
+          <thead><tr>
+            <th>Product</th><th style="text-align:right">Qty Received</th><th style="text-align:right">Unit Cost</th>
+          </tr></thead>
+          <tbody>${itemRows}</tbody>
+        </table>
+        <p style="margin-top:20px">Thank you for your supply.</p>
+        ${contactLine}
+      `,
+      footerLines: [address],
+    }),
   }
   try {
     const info = await sendAuditedMail({
@@ -2313,42 +1480,23 @@ export async function sendQuotationFinalizedEmail(
     from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Quotation ${quoteNumber} from ${brand}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-            .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-            .header{background:#1a3a4a;padding:24px;text-align:center}
-            .logo{font-size:22px;font-weight:bold;color:#fff}
-            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-            .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
-            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
-            <div class="body">
-              <p>Dear ${consigneeName},</p>
-              <p>Please find your quotation from ${brand}.</p>
-              <div class="box">
-                <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
-                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
-              </div>
-              <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
-              <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
-              ${contactLine}
-            </div>
-            <div class="footer">
-              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Quotation',
+      title: `Quotation ${quoteNumber}`,
+      content: `
+        <p>Dear ${consigneeName},</p>
+        <p>Please find your quotation from ${brand}.</p>
+        <div class="info">
+          <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
+          <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+        </div>
+        <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
+        <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
+        ${contactLine}
+      `,
+      footerLines: [address],
+    }),
   }
   try {
     const info = await sendAuditedMail({
@@ -2374,7 +1522,7 @@ export async function sendOrderAutoCancelledEmail(
   orderTotal: number,
   redirectPath: string
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine()
   const baseUrl = await storeBaseUrlAsync()
   const brand = await currentBrandNameAsync()
   const isDirect = orderType === 'direct'
@@ -2387,53 +1535,36 @@ export async function sendOrderAutoCancelledEmail(
     from: await customerMailFromAsync(),
     to: customerEmail,
     subject: `Order Cancelled - ${orderNumber}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .logo { font-size: 28px; font-weight: bold; color: #2563eb; }
-            .badge { background-color: #ef4444; color: white; font-size: 18px; font-weight: bold; text-align: center; padding: 15px 20px; border-radius: 8px; margin: 20px 0; text-transform: uppercase; }
-            .amount-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
-            .amount { font-size: 28px; font-weight: bold; color: #2563eb; }
-            .info-box { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 15px; }
-            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">${brand}</div>
-            </div>
-            <p>Dear ${customerName},</p>
-            <div class="badge">Order Auto-Cancelled</div>
-            <p>${bodyMessage}</p>
-            <div class="amount-box">
-              <p style="margin:0;color:#666;">Order Number</p>
-              <div style="font-size:18px;font-weight:bold;">${orderNumber}</div>
-              <p style="margin:10px 0 0;color:#666;">Amount</p>
-              <div class="amount">₹${orderTotal.toFixed(2)}</div>
-            </div>
-            <div class="info-box">
-              <strong>What happened?</strong><br>
-              Payment for this order was not received within 10 minutes of placing it, so the order was automatically cancelled and stock was released.
-            </div>
-            <div style="text-align:center;">
-              <a href="${baseUrl}${redirectPath}" class="button" style="color:#ffffff;">${ctaLabel}</a>
-            </div>
-            <p style="margin-top:25px;">If you completed the payment but still received this email, please contact us so we can reconcile your transaction.</p>
-            <div class="footer">
-              ${contactLine || '<p>Need help? Reply to this email.</p>'}
-              <p>&copy; ${new Date().getFullYear()} ${brand}</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Order Update',
+      title: 'Order Cancelled',
+      extraCss: `
+        .badge { background-color: #ef4444; color: white; font-size: 18px; font-weight: bold; text-align: center; padding: 15px 20px; border-radius: 8px; margin: 20px 0; text-transform: uppercase; }
+        .amount-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+        .amount { font-size: 28px; font-weight: bold; color: #2563eb; }
+      `,
+      content: `
+        <p>Dear ${customerName},</p>
+        <div class="badge">Order Auto-Cancelled</div>
+        <p>${bodyMessage}</p>
+        <div class="amount-box">
+          <p style="margin:0;color:#666;">Order Number</p>
+          <div style="font-size:18px;font-weight:bold;">${orderNumber}</div>
+          <p style="margin:10px 0 0;color:#666;">Amount</p>
+          <div class="amount">₹${orderTotal.toFixed(2)}</div>
+        </div>
+        <div class="warning">
+          <strong>What happened?</strong><br>
+          Payment for this order was not received within 10 minutes of placing it, so the order was automatically cancelled and stock was released.
+        </div>
+        <div class="cta">
+          <a href="${baseUrl}${redirectPath}" class="button" style="color:#ffffff;">${ctaLabel}</a>
+        </div>
+        <p style="margin-top:25px;">If you completed the payment but still received this email, please contact us so we can reconcile your transaction.</p>
+      `,
+      footerLines: [contactLine || 'Need help? Reply to this email.', `&copy; ${new Date().getFullYear()} ${brand}`],
+    }),
   }
 
   try {
@@ -2466,45 +1597,36 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
   }).catch(() => {})
   const baseUrl = currentAdminBaseUrl()
   const total = parseFloat(order.total_amount || 0)
+  const brand = await currentBrandNameAsync()
 
   const mailOptions = {
     from: adminMailFrom(),
     to: adminEmail,
     subject: `[Auto-Cancelled] Order ${order.order_number}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-            .badge { background-color: #ef4444; color: white; font-size: 16px; font-weight: bold; text-align: center; padding: 12px; border-radius: 8px; margin: 15px 0; }
-            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            td { padding: 8px; border-bottom: 1px solid #e0e0e0; }
-            td.label { color: #666; width: 40%; }
-            .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 10px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2 style="margin-top:0;">Order Auto-Cancelled (Payment Timeout)</h2>
-            <div class="badge">10-MINUTE PAYMENT WINDOW EXPIRED</div>
-            <p>An order was automatically cancelled because the customer did not complete payment within 10 minutes.</p>
-            <table>
-              <tr><td class="label">Order Number</td><td><strong>${order.order_number}</strong></td></tr>
-              <tr><td class="label">Customer</td><td>${order.customer_name || ''} &lt;${order.customer_email || ''}&gt;</td></tr>
-              <tr><td class="label">Order Type</td><td>${order.order_type || 'cart'}</td></tr>
-              <tr><td class="label">Amount</td><td>₹${total.toFixed(2)}</td></tr>
-              <tr><td class="label">Customer Redirected To</td><td>${redirectPath}</td></tr>
-            </table>
-            <p>Stock has been released. ${order.order_type === 'direct' ? 'Items were not restored to a cart (direct order).' : 'Items were restored to the customer cart.'}</p>
-            <div style="text-align:center;margin-top:20px;">
-              <a href="${baseUrl}/admin/orders/${order.id}" class="button" style="color:#ffffff;">View Order in Admin</a>
-            </div>
-          </div>
-        </body>
-      </html>
-    `,
+    html: mailShell({
+      brand,
+      kicker: 'Admin Notification',
+      title: 'Order Auto-Cancelled (Payment Timeout)',
+      extraCss: `
+        .badge { background-color: #ef4444; color: white; font-size: 16px; font-weight: bold; text-align: center; padding: 12px; border-radius: 8px; margin: 15px 0; }
+        td.label { color: #666; width: 40%; }
+      `,
+      content: `
+        <div class="badge">10-MINUTE PAYMENT WINDOW EXPIRED</div>
+        <p>An order was automatically cancelled because the customer did not complete payment within 10 minutes.</p>
+        <table class="rows">
+          <tr><td class="label">Order Number</td><td><strong>${order.order_number}</strong></td></tr>
+          <tr><td class="label">Customer</td><td>${order.customer_name || ''} &lt;${order.customer_email || ''}&gt;</td></tr>
+          <tr><td class="label">Order Type</td><td>${order.order_type || 'cart'}</td></tr>
+          <tr><td class="label">Amount</td><td>₹${total.toFixed(2)}</td></tr>
+          <tr><td class="label">Customer Redirected To</td><td>${redirectPath}</td></tr>
+        </table>
+        <p>Stock has been released. ${order.order_type === 'direct' ? 'Items were not restored to a cart (direct order).' : 'Items were restored to the customer cart.'}</p>
+        <div class="cta">
+          <a href="${baseUrl}/admin/orders/${order.id}" class="button" style="color:#ffffff;">View Order in Admin</a>
+        </div>
+      `,
+    }),
   }
 
   try {
@@ -2532,26 +1654,20 @@ export async function sendOrderDelayNotification(args: {
   const dayLabel = delayDays === 1 ? 'day' : 'days'
   const brand = await currentBrandNameAsync()
   const subject = `Update on your ${brand} order ${orderNumber}`
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${subject}</title></head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
-    <tr><td align="center">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">${brand}</td></tr>
-        <tr><td style="padding:28px 28px 8px;font-size:16px;line-height:1.5;">
-          <p style="margin:0 0 16px;">Hi ${customerName},</p>
-          <p style="margin:0 0 16px;">We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
-          <p style="margin:0 0 16px;"><strong>Reason:</strong> ${reason}</p>
-          <p style="margin:0 0 16px;">We're sorry for the inconvenience. We'll send you another update as soon as the situation changes, and your order is on its way.</p>
-          <p style="margin:0 0 16px;">If you have any questions, just reply to this email and we'll get back to you.</p>
-          <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The ${brand} team</p>
-        </td></tr>
-        <tr><td style="padding:20px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.</td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
+  const html = mailShell({
+    brand,
+    kicker: 'Order Update',
+    title: subject,
+    content: `
+      <p>Hi ${customerName},</p>
+      <p>We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+      <p>We're sorry for the inconvenience. We'll send you another update as soon as the situation changes, and your order is on its way.</p>
+      <p>If you have any questions, just reply to this email and we'll get back to you.</p>
+      <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The ${brand} team</p>
+    `,
+    footerLines: [`This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.`],
+  })
   const text = `Hi ${customerName},
 
 Your order ${orderNumber} will be delayed by approximately ${delayDays} ${dayLabel}.
@@ -2625,24 +1741,18 @@ export async function sendProductAnnouncementEmail(args: {
       </tr>
     </table>`).join('')
 
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:24px 0;">
-    <tr><td align="center">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">${brand}</td></tr>
-        <tr><td style="padding:24px 20px 8px;">
-          <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>
-          ${cards}
-          <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Visit <a href="${siteUrl}" style="color:#1a3a4a;">${escapeHtml(brand)}</a> for the full catalogue.</p>
-        </td></tr>
-        <tr><td style="padding:18px 24px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;">You are receiving this because you opted in to product updates from ${escapeHtml(brand)}. To stop receiving these, reply to this email with "unsubscribe".</td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`
+  const html = mailShell({
+    brand,
+    kicker: 'Product Updates',
+    title: subject,
+    content: `
+      <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>
+      ${cards}
+      <p class="muted">Visit <a href="${siteUrl}" style="color:#2563eb;">${escapeHtml(brand)}</a> for the full catalogue.</p>
+    `,
+    footerLines: [`You are receiving this because you opted in to product updates from ${escapeHtml(brand)}. To stop receiving these, reply to this email with "unsubscribe".`],
+  })
 
   const textProducts = products.map(p => `• ${p.name} — ₹${p.price}\n  ${siteUrl}/products/${p.slug}`).join('\n\n')
   const text = `Hi ${customerName || 'there'},\n\n${cleanIntro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— ${brand}`
@@ -2679,6 +1789,7 @@ export async function sendVariantChangeRequestedEmail(params: {
   newTotal: number
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
   const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
   const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
   const diffLine = params.settlementType === 'refund'
@@ -2690,23 +1801,24 @@ export async function sendVariantChangeRequestedEmail(params: {
         : `There is no change to your total.`
 
   const subject = `Action needed: variant change on order ${params.orderNumber}`
-  const html = `<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;background:#f4f4f5;margin:0;padding:24px;color:#111827;">
-    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
-      <div style="background:#111827;color:#fff;padding:20px 24px;"><h2 style="margin:0;font-size:18px;">Variant change requested</h2></div>
-      <div style="padding:24px;">
-        <p style="margin-top:0;">Hi ${params.customerName || 'there'},</p>
-        <p>For your order <strong>${params.orderNumber}</strong>, we'd like to substitute an item with a near-equivalent variant. Please review and confirm:</p>
-        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
-          <p style="margin:0 0 6px;"><span style="color:#6b7280;">Current:</span> ${params.oldVariantName || '&#8212;'}</p>
-          <p style="margin:0;"><span style="color:#6b7280;">Proposed:</span> <strong>${params.newVariantName || '&#8212;'}</strong></p>
-        </div>
-        <p>${diffLine}</p>
-        <p style="text-align:center;margin:24px 0 8px;">
-          <a href="${orderUrl}" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 28px;border-radius:6px;font-weight:bold;text-decoration:none;">Review &amp; Confirm</a>
-        </p>
-        <p style="font-size:12px;color:#6b7280;text-align:center;">The change is applied only after you confirm. You can also decline it.</p>
+  const html = mailShell({
+    brand,
+    kicker: 'Order Update',
+    title: 'Variant change requested',
+    content: `
+      <p>Hi ${params.customerName || 'there'},</p>
+      <p>For your order <strong>${params.orderNumber}</strong>, we'd like to substitute an item with a near-equivalent variant. Please review and confirm:</p>
+      <div class="card">
+        <p style="margin:0 0 6px;"><span style="color:#6b7280;">Current:</span> ${params.oldVariantName || '&#8212;'}</p>
+        <p style="margin:0;"><span style="color:#6b7280;">Proposed:</span> <strong>${params.newVariantName || '&#8212;'}</strong></p>
       </div>
-    </div></body></html>`
+      <p>${diffLine}</p>
+      <div class="cta">
+        <a href="${orderUrl}" class="button">Review &amp; Confirm</a>
+      </div>
+      <p class="muted" style="text-align:center;">The change is applied only after you confirm. You can also decline it.</p>
+    `,
+  })
 
   try {
     const info = await sendAuditedMail({
@@ -2760,29 +1872,24 @@ export async function sendOperationalReport(opts: {
        ${errs.length > shown.length ? `<p style="color:#6b7280;font-size:12px">…and ${errs.length - shown.length} more.</p>` : ''}`
     : `<p style="color:#059669;font-size:13px;margin:18px 0 0">No errors.</p>`
 
-  const accent = errs.length ? '#b91c1c' : '#059669'
-
   await sendAuditedMail({
     to: (await import('./brand')).platformAdminEmail(),
     from: adminMailFrom(),
     subject: `[${storeName()}] ${opts.title}${errs.length ? ` — ${errs.length} error(s)` : ''}`,
     kind: opts.kind ?? 'operational_report',
-    html: `<!DOCTYPE html><html><body style="margin:0;padding:20px;background:#f5f5f5;font-family:Arial,sans-serif">
-      <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
-        <div style="background:${accent};padding:18px 24px">
-          <div style="font-size:18px;font-weight:bold;color:#ffffff">${esc(opts.title)}</div>
-        </div>
-        <div style="padding:22px 24px">
-          <table style="border-collapse:collapse;font-size:13px">
-            ${opts.startedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Started</td><td style="padding:4px 0;color:#111827">${esc(opts.startedAt)}</td></tr>` : ''}
-            ${opts.finishedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Finished</td><td style="padding:4px 0;color:#111827">${esc(opts.finishedAt)}</td></tr>` : ''}
-            ${rows}
-          </table>
-          ${errorBlock}
-        </div>
-        <div style="padding:14px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px">
-          Automated report from ${esc(storeName())}.
-        </div>
-      </div></body></html>`,
+    html: mailShell({
+      brand: storeName(),
+      kicker: 'Operational Report',
+      title: opts.title,
+      content: `
+        <table style="border-collapse:collapse;font-size:13px">
+          ${opts.startedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Started</td><td style="padding:4px 0;color:#111827">${esc(opts.startedAt)}</td></tr>` : ''}
+          ${opts.finishedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Finished</td><td style="padding:4px 0;color:#111827">${esc(opts.finishedAt)}</td></tr>` : ''}
+          ${rows}
+        </table>
+        ${errorBlock}
+      `,
+      footerLines: [`Automated report from ${esc(storeName())}.`],
+    }),
   })
 }

@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       LEFT JOIN products p ON ci.product_id = p.id
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
-      WHERE ci.user_id = $1
+      WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = FALSE
     `, [cartUserId])
 
     if (!cartItems || cartItems.length === 0) {

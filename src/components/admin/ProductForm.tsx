@@ -90,7 +90,7 @@ type BsEntry = { expiry: string; mfg: string; lot: string; location: string; ser
 interface ProductFormProps {
   categories: Category[]
   brands: Brand[]
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => Promise<{ error?: string } | void>
   product?: any
   productId?: string
   backUrl?: string
@@ -1798,7 +1798,13 @@ export default function ProductForm({ categories, brands, action, product, produ
       // an explicit Save-as-Draft/Publish does not wipe what autosave persisted.
       formData.set('bs_entries_json', JSON.stringify(bsEntries))
 
-      await action(formData)
+      const result = await action(formData)
+      if (result && typeof result === 'object' && 'error' in result && result.error) {
+        setError(result.error)
+        setIsSubmitting(false)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
       localStorage.removeItem(draftKey)
       pendingPopupVariantIdRef.current = null
     } catch (err: any) {

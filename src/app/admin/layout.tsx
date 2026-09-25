@@ -88,6 +88,7 @@ export default async function AdminLayout({
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
     { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
     { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', ownerOnly: true },
+    { href: '/admin/settings/homepage', label: 'Homepage', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]

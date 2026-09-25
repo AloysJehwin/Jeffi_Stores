@@ -566,6 +566,45 @@ CREATE TABLE public.hero_slides (
 
 
 --
+-- Name: product_offers; Type: TABLE; Schema: public; Owner: -
+-- Marketing offers (e.g. Diwali) shown as a home-page slider; each links to /products?offer=<slug>.
+
+CREATE TABLE public.product_offers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    slug character varying(255) NOT NULL,
+    title character varying(255) NOT NULL,
+    subtitle character varying(500),
+    badge_text character varying(100),
+    badge_color character varying(30) DEFAULT 'bg-primary-500'::character varying,
+    image_url text,
+    image_url_mobile text,
+    blurhash character varying(64),
+    blurhash_mobile character varying(64),
+    cta_label character varying(100),
+    starts_at timestamp with time zone,
+    ends_at timestamp with time zone,
+    display_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_offers_pkey PRIMARY KEY (id),
+    CONSTRAINT product_offers_slug_key UNIQUE (slug)
+);
+
+
+--
+-- Name: product_offer_items; Type: TABLE; Schema: public; Owner: -
+-- Join: which products belong to a marketing offer.
+
+CREATE TABLE public.product_offer_items (
+    offer_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_offer_items_pkey PRIMARY KEY (offer_id, product_id)
+);
+
+
+--
 -- Name: homepage_sections; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -586,9 +625,27 @@ CREATE TABLE public.homepage_sections (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT homepage_sections_pkey PRIMARY KEY (id),
     CONSTRAINT homepage_sections_type_check CHECK ((type = ANY (ARRAY[
-        'hero'::text, 'trust_strip'::text, 'category_grid'::text, 'brand_carousel'::text,
+        'hero'::text, 'offer_slider'::text, 'trust_strip'::text, 'category_grid'::text, 'brand_carousel'::text,
         'product_row'::text, 'category_showcase'::text, 'deal_of_the_day'::text,
         'promo_banner'::text, 'featured_for_you'::text, 'benefits'::text,
-        'why_us'::text, 'about'::text, 'business_cta'::text]))),
+        'why_us'::text, 'about'::text, 'business_cta'::text,
+        'countdown_deal'::text, 'testimonials'::text, 'recently_viewed'::text, 'category_tabs'::text,
+        'bundle_spotlight'::text, 'back_in_stock'::text, 'blog_teaser'::text, 'social_strip'::text,
+        'value_stats'::text]))),
     CONSTRAINT homepage_sections_window_check CHECK ((ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at))
+);
+
+
+--
+-- Name: homepage_drafts; Type: TABLE; Schema: public; Owner: -
+-- Single-row unpublished copy of homepage_sections + hero_slides; Publish copies it to the live tables.
+--
+
+CREATE TABLE public.homepage_drafts (
+    id boolean DEFAULT true NOT NULL,
+    sections jsonb DEFAULT '[]'::jsonb NOT NULL,
+    hero_slides jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );

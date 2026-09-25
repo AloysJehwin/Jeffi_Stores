@@ -147,7 +147,9 @@ CREATE TABLE public.customer_profiles (
     customer_type character varying(50) DEFAULT 'retail'::character varying,
     credit_limit numeric(12,2) DEFAULT 0,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    ai_summary text,
+    ai_summary_at timestamp with time zone
 );
 
 

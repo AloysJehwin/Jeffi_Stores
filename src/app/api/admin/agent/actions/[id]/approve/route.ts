@@ -9,6 +9,7 @@ import { logActivity } from '@/lib/activity'
 import { logStockMovement } from '@/lib/inventory'
 import type { CampaignKind } from '@/lib/marketing'
 import { sendAuditedMail } from '@/lib/mail-audit'
+import { mailShell } from '@/lib/mail-template'
 
 const APPROVE_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
 
@@ -381,7 +382,9 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
         return { result: null, error: `Unknown audience: ${audience}` }
       }
       const { currentBrandNameAsync } = await import('@/lib/brand')
-      const fromHeader = `"${(fromName || await currentBrandNameAsync()).replace(/"/g, '')}" <${process.env.SES_FROM_EMAIL}>`
+      const brandName = await currentBrandNameAsync()
+      const fromHeader = `"${(fromName || brandName).replace(/"/g, '')}" <${process.env.SES_FROM_EMAIL}>`
+      const isFullDocument = /<(?:!doctype|html)\b/i.test(body)
       let sent = 0, failed = 0
       for (const r of recipients) {
         try {
@@ -389,7 +392,7 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
           await sendAuditedMail({
             kind: 'agent_action',
             from: fromHeader, to: r.email, subject,
-            html: personalised,
+            html: isFullDocument ? personalised : mailShell({ brand: brandName, kicker: `Message from ${brandName}`, content: personalised }),
             text: personalised.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),
           })
           sent++

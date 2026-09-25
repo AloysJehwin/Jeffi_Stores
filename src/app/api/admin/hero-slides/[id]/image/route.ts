@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
 import { uploadGalleryImage } from '@/lib/s3'
+import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp']
 const MAX = 5 * 1024 * 1024
 
-// POST /api/admin/hero-slides/[id]/image — upload a slide banner image.
+// POST /api/admin/hero-slides/[id]/image — upload a slide banner image onto the draft slide.
 // FormData: file, plus optional field=image_url|image_url_mobile (default image_url).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,8 +20,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const slide = await queryOne<{ id: string }>(`SELECT id FROM hero_slides WHERE id = $1`, [id])
-    if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
+    const { heroSlides } = await getEditableHomepage()
+    if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -34,10 +34,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { url, blurhash } = await uploadGalleryImage(buffer, file.name)
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    await query(
-      `UPDATE hero_slides SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`,
-      [url, blurhash, id],
-    )
+    const saved = await withHomepageDraft(admin.adminId, draft => {
+      const slide = draft.heroSlides.find(s => s.id === id)
+      if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
+      return !!slide
+    })
+    if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to upload image' }, { status: 500 })

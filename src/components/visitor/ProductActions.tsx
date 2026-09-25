@@ -10,6 +10,8 @@ import { pickUnitPrice } from '@/lib/pricing'
 import QuantityInput from '@/components/shared/QuantityInput'
 import { round2 } from '@/lib/gst'
 import { resolveEdd } from '@/lib/edd-cache'
+import StickyAddToCartBar from './pdp/StickyAddToCartBar'
+import { PDP_BUY_BUTTONS_ID, PDP_OPTIONS_ID, stickyBarAction } from './pdp/pdp'
 
 interface VariantImage {
   id: string
@@ -87,6 +89,7 @@ interface ProductActionsProps {
   launchDate?: string | null
   discontinueDate?: string | null
   isCodAllowed?: boolean | null
+  stickyImage?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -117,7 +120,7 @@ export default function ProductActions({
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
   extraDeliveryDays = 0, handlingDays = 2, is_active = true,
-  launchDate, discontinueDate, isCodAllowed,
+  launchDate, discontinueDate, isCodAllowed, stickyImage,
 }: ProductActionsProps) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const isPreLaunch = !!launchDate && new Date(launchDate) > today
@@ -470,7 +473,7 @@ export default function ProductActions({
     <div className="space-y-4">
 
       {hasVariants && (
-        <div className="space-y-3">
+        <div id={PDP_OPTIONS_ID} className="space-y-3">
           {hasMultipleModes && (
             <div>
               <label className="block text-sm font-medium text-foreground-secondary mb-2">
@@ -871,7 +874,7 @@ export default function ProductActions({
         </div>
       )}
 
-      <div className="space-y-3">
+      <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
         <button
           onClick={handleBuyNow}
           disabled={!is_active || effectiveStock === 0 || isBuyingNow || isPreLaunch || isDiscontinued}
@@ -897,6 +900,11 @@ export default function ProductActions({
         </button>
       </div>
 
+      <StickyAddToCartBar
+        name={productName} image={selectedVariant?.variant_images?.[0]?.thumbnail_url || stickyImage} quantity={quantity} adding={isAddingToCart} onAdd={handleAddToCart}
+        price={effectivePrice} mrp={effectiveMrp} unitLabel={showPerUnit ? perUnitLabel : null}
+        action={stickyBarAction({ purchasable: is_active && !isPreLaunch && !isDiscontinued, hasVariants, variants, selectionInStock: effectiveStock > 0, needsChoice: !selectedVariant || (!!selectedVariant.sub_variants?.length && !selectedSubVariantId) })}
+      />
     </div>
   )
 }

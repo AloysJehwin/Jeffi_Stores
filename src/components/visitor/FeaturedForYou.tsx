@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
 import BusinessProductCard from '@/components/business/ProductCard'
+import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.featured_for_you
 
 interface CardProps {
   id: string
@@ -34,7 +37,8 @@ export default function FeaturedForYou({
   href = '/products',
   compact = false,
   limit,
-}: { variant?: 'visitor' | 'business'; href?: string; compact?: boolean; limit?: number } = {}) {
+  title,
+}: { variant?: 'visitor' | 'business'; href?: string; compact?: boolean; limit?: number; title?: string | null } = {}) {
   const [products, setProducts] = useState<CardProps[]>([])
   const Card = variant === 'business' ? BusinessProductCard : ProductCard
 
@@ -62,8 +66,8 @@ export default function FeaturedForYou({
       <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em]">Picked for you</p>
-            <h3 className="text-lg font-bold text-foreground">Featured For You</h3>
+            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em]">{COPY.eyebrow}</p>
+            <h3 className="text-lg font-bold text-foreground">{title || COPY.title}</h3>
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -80,8 +84,8 @@ export default function FeaturedForYou({
       <div className="container mx-auto px-4">
         <div className="flex items-end justify-between mb-7">
           <div>
-            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Picked for you</p>
-            <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Featured For You</h2>
+            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{COPY.eyebrow}</p>
+            <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{title || COPY.title}</h2>
           </div>
           <Link href={href} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
             Explore more

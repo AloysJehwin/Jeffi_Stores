@@ -148,17 +148,19 @@ export function Chip({ children, tone = 'neutral' }: { children: ReactNode; tone
 }
 
 /** 24 thin bars, one per hour of the day, busiest hour highlighted. */
-export function HourBars({ counts }: { counts: number[] }) {
+export function HourBars({ counts, tone = 'accent', unit = 'orders' }: { counts: number[]; tone?: 'accent' | 'sky'; unit?: string }) {
   const max = Math.max(1, ...counts)
   const peak = counts.indexOf(max)
   const total = counts.reduce((s, n) => s + n, 0)
+  const barPeak = tone === 'sky' ? 'bg-sky-500' : 'bg-accent-500'
+  const barRest = tone === 'sky' ? 'bg-sky-500/40' : 'bg-accent-500/45'
   return (
     <div>
       <div className="flex items-end gap-[3px] h-16">
         {counts.map((n, h) => (
-          <div key={h} className="flex-1 flex flex-col justify-end h-full" title={`${String(h).padStart(2, '0')}:00  ${n} orders`}>
+          <div key={h} className="flex-1 flex flex-col justify-end h-full" title={`${String(h).padStart(2, '0')}:00  ${n} ${unit}`}>
             <div
-              className={`w-full rounded-sm ${total > 0 && h === peak ? 'bg-accent-500' : 'bg-accent-500/35'}`}
+              className={`w-full rounded-sm ${total > 0 && h === peak ? barPeak : barRest}`}
               style={{ height: `${Math.max(n > 0 ? 6 : 2, Math.round((n / max) * 100))}%` }}
             />
           </div>
@@ -168,7 +170,9 @@ export function HourBars({ counts }: { counts: number[] }) {
         <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
       </div>
       <p className="text-xs text-foreground-secondary mt-2">
-        {total > 0 ? `Busiest hour ${String(peak).padStart(2, '0')}:00 to ${String(peak + 1).padStart(2, '0')}:00 with ${max} orders (IST)` : 'No orders in this range.'}
+        {total > 0
+          ? `Busiest hour ${String(peak).padStart(2, '0')}:00 to ${String(peak + 1).padStart(2, '0')}:00 with ${numStr(max)} ${unit} (IST)`
+          : `No ${unit} in this range.`}
       </p>
     </div>
   )

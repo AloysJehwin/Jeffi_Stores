@@ -8,6 +8,7 @@ import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from '@/components/admin/dashboard/AnalyticsDashboardClient'
 import QuickActionBar from '@/components/admin/dashboard/QuickActionBar'
 import PendingTasksCard from '@/components/admin/dashboard/PendingTasksCard'
+import CollapsibleSection from '@/components/admin/CollapsibleSection'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { adminCookieName } from '@/lib/admin-cookie'
@@ -157,11 +158,11 @@ export default async function AdminDashboard() {
     <div className="space-y-4">
       {canSeeTasks && <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />}
 
-      <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium">Needs Attention</p>
-          {alerts.length > 0 && <span className="text-xs font-semibold bg-surface-secondary text-foreground-secondary px-1.5 py-0.5 rounded-full tabular-nums">{alerts.length}</span>}
-        </div>
+      <CollapsibleSection
+        title="Needs Attention"
+        count={alerts.length}
+        className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5"
+      >
         {alerts.length > 0 ? (
           <div className="space-y-3">
             {groups.map(g => (
@@ -183,7 +184,7 @@ export default async function AdminDashboard() {
             <span className="text-sm">All clear. Nothing needs your attention right now.</span>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
     </div>
   )
 

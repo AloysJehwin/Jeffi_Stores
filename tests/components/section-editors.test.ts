@@ -96,7 +96,9 @@ describe('editor coverage', () => {
     for (const type of [
       'about', 'benefits', 'brand_carousel', 'business_cta', 'category_grid',
       'category_showcase', 'deal_of_the_day', 'featured_for_you', 'product_row',
-      'promo_banner', 'trust_strip',
+      'promo_banner', 'trust_strip', 'why_us',
+      'countdown_deal', 'testimonials', 'recently_viewed', 'category_tabs', 'bundle_spotlight',
+      'back_in_stock', 'blog_teaser', 'social_strip', 'value_stats',
     ]) {
       expect(config).toContain(`${type}:`)
     }

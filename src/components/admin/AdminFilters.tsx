@@ -16,6 +16,7 @@ interface FilterConfig {
   name: string
   label: string
   options: FilterOption[]
+  allLabel?: string
 }
 
 interface AdminFiltersProps {
@@ -24,9 +25,10 @@ interface AdminFiltersProps {
   searchParam?: string
   suggestType?: string
   advancedContent?: React.ReactNode // advanced filters — revealed below card via chevron toggle
+  bare?: boolean
 }
 
-export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedContent }: AdminFiltersProps) {
+export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedContent, bare = false }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -63,7 +65,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
   const handleClearAll = () => { router.push(pathname) }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-[200]">
+    <div className={bare ? '' : 'bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-[200]'}>
       {/* Mobile toggle */}
       <button type="button" onClick={() => setMobileOpen(o => !o)}
         className="sm:hidden w-full flex items-center justify-between text-sm font-medium text-foreground">
@@ -93,8 +95,8 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                 sm
                 id={`filter-${filter.name}`}
                 value={searchParams.get(filter.name) || ''}
-                placeholder="All"
-                options={[{ value: '', label: 'All' }, ...filter.options]}
+                placeholder={filter.allLabel ?? 'All'}
+                options={[{ value: '', label: filter.allLabel ?? 'All' }, ...filter.options]}
                 onChange={(val) => handleFilterChange(filter.name, val)}
               />
             </div>

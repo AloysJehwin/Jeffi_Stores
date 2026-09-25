@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
+import { getCrmInsights } from '@/lib/crm-insights'
+import CrmInsights from './CrmInsights'
+import AttentionQueueCard from './AttentionQueueCard'
 import HealthDistributionCard from './HealthDistributionCard'
 import ChurnRisksCard from './ChurnRisksCard'
 import BiggestDropsCard from './BiggestDropsCard'
@@ -28,8 +31,15 @@ export default async function CrmDashboardPage() {
   }
 
   let data: Awaited<ReturnType<typeof getCrmDashboardData>>
+  let insights: Awaited<ReturnType<typeof getCrmInsights>> | null = null
   try {
-    data = await getCrmDashboardData(adminId)
+    [data, insights] = await Promise.all([
+      getCrmDashboardData(adminId),
+      getCrmInsights({ range: '30d', segment: 'all' }).catch(err => {
+        console.error('getCrmInsights failed', err)
+        return null
+      }),
+    ])
   } catch {
     return (
       <div className="p-6">
@@ -45,6 +55,8 @@ export default async function CrmDashboardPage() {
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">CRM</h1>
         <p className="text-foreground-secondary text-sm mt-1">{s.total.toLocaleString('en-IN')} customers · {data.leadsThisWeek} new this week without an order</p>
       </div>
+
+      {insights && <AttentionQueueCard items={insights.attention} />}
 
       {/* Tasks summary */}
       {data.tasks && (data.tasks.open > 0 || data.tasks.mine > 0) && (
@@ -124,6 +136,8 @@ export default async function CrmDashboardPage() {
           )}
         </div>
       </div>
+
+      {insights && <CrmInsights initial={insights} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <RecentTagsCard items={data.recentTags} />

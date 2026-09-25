@@ -7,14 +7,22 @@ import FilterSidebar from '@/components/visitor/FilterSidebar'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
 import { buildProductFilterClauses, getFilterFacets } from '@/lib/product-filters'
+import { getOfferBySlug, listActiveOffers, listFilterOffers } from '@/lib/product-offers'
 import Pagination from '@/components/ui/Pagination'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
+import RecentlyViewed from '@/components/visitor/RecentlyViewed'
+import QuickFilterChips from '@/components/visitor/listing/QuickFilterChips'
+import ListingPromoBanner, { pickPromoOffer } from '@/components/visitor/listing/ListingPromoBanner'
+import {
+  categoryChipScope, rankChips, splitList, type CategoryNode, type ChipCountRow,
+} from '@/components/visitor/listing/quick-filters'
 
 const PAGE_SIZE = 60
+const QUICK_CHIPS = 4
 
-async function getProducts(searchParams: any) {
+function buildListingConditions(searchParams: any) {
   const conditions: string[] = ['p.is_active = true']
   const params: any[] = []
   let paramIndex = 1
@@ -63,6 +71,12 @@ async function getProducts(searchParams: any) {
     params.push(...sc.params)
     paramIndex = sc.nextIdx
   }
+
+  return { conditions, params, paramIndex }
+}
+
+async function getProducts(searchParams: any) {
+  const { conditions, params, paramIndex } = buildListingConditions(searchParams)
 
   const sortBy = searchParams.sort || 'created_at'
   const sortOrder = searchParams.order === 'asc' ? 'ASC' : 'DESC'
@@ -217,10 +231,43 @@ async function getCategoryBanners(gstEnabled: boolean) {
   return withProducts.filter(c => c.products.length >= 2)
 }
 
+// Each group is counted without its own filter so sibling brands/categories stay selectable.
+async function getQuickFilters(searchParams: Record<string, string | undefined>, categories: CategoryNode[]) {
+  const selectedCategories = splitList(searchParams.category)
+  const scope = categoryChipScope(selectedCategories, categories)
+  const brandBase = buildListingConditions({ ...searchParams, brand: undefined })
+  const categoryBase = buildListingConditions({ ...searchParams, category: undefined })
+  const categoryParams: unknown[] = [...categoryBase.params]
+  if (scope) categoryParams.push(scope)
+
+  const [brandRows, categoryRows] = await Promise.all([
+    queryMany<ChipCountRow>(
+      `SELECT b.id, b.slug, b.name, COUNT(*)::int AS count
+         FROM products p JOIN brands b ON b.id = p.brand_id AND b.is_active = true
+        WHERE ${brandBase.conditions.join(' AND ')}
+        GROUP BY b.id, b.slug, b.name`,
+      brandBase.params,
+    ),
+    queryMany<ChipCountRow>(
+      `SELECT c.id, c.slug, c.name, COUNT(*)::int AS count
+         FROM products p JOIN categories c ON c.id = p.category_id AND c.is_active = true
+        WHERE ${categoryBase.conditions.join(' AND ')}
+          ${scope ? `AND p.category_id = ANY($${categoryParams.length}::uuid[])` : ''}
+        GROUP BY c.id, c.slug, c.name`,
+      categoryParams,
+    ),
+  ])
+  return {
+    brands: rankChips(brandRows, splitList(searchParams.brand), QUICK_CHIPS),
+    categories: rankChips(categoryRows, selectedCategories, QUICK_CHIPS),
+  }
+}
+
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
   if (searchParams.brand)    params.set('brand',    searchParams.brand)
+  if (searchParams.offer)    params.set('offer',    searchParams.offer)
   if (searchParams.search)   params.set('search',   searchParams.search)
   if (searchParams.sort)     params.set('sort',     searchParams.sort)
   if (searchParams.order)    params.set('order',    searchParams.order)
@@ -285,6 +332,22 @@ export default async function ProductsPage({
   }
   const facets = await getFilterFacets(facetBaseConditions, facetBaseParams)
 
+  const [liveOffers, activeOffer, activeOffers, quickFilters] = await Promise.all([
+    listFilterOffers(),
+    resolvedSearchParams.offer ? getOfferBySlug(String(resolvedSearchParams.offer)) : Promise.resolve(null),
+    listActiveOffers(),
+    getQuickFilters(resolvedSearchParams, categories as CategoryNode[]),
+  ])
+  const promoOffer = pickPromoOffer(activeOffers, {
+    page,
+    activeSlug: resolvedSearchParams.offer ?? null,
+    eligibleSlugs: new Set(liveOffers.map(o => o.slug)),
+  })
+  // A selected offer that has ended or emptied stays listed so the shopper can see and clear it.
+  const filterOffers = activeOffer && !liveOffers.some(o => o.slug === activeOffer.slug)
+    ? [...liveOffers, { slug: activeOffer.slug, title: activeOffer.title }]
+    : liveOffers
+
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, total)
 
@@ -298,7 +361,7 @@ export default async function ProductsPage({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar Filters — desktop only */}
           <aside className="hidden lg:block lg:col-span-1 py-6 sticky top-0 self-start max-h-screen overflow-y-auto">
-            <FilterSidebar facets={facets} categories={allCats} />
+            <FilterSidebar facets={facets} categories={allCats} offers={filterOffers} />
           </aside>
 
           {/* Products area */}
@@ -321,10 +384,17 @@ export default async function ProductsPage({
               resultCount={total}
             />
 
+            <QuickFilterChips
+              showInStock={total > 0 && facets.inStockCount > 0}
+              showOnSale={total > 0 && facets.onSaleCount > 0}
+              categories={quickFilters.categories}
+              brands={quickFilters.brands}
+            />
+
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
-                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} filterSlot={<MobileFilterSheet categories={allCats} brands={brands as any[]} facets={facets} />} />
+                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} filterSlot={<MobileFilterSheet key="mobile-filters" categories={allCats} brands={brands as any[]} facets={facets} offers={filterOffers} />} promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined} />
                 <Pagination
                   page={page}
                   totalPages={totalPages}
@@ -348,6 +418,8 @@ export default async function ProductsPage({
                 </Link>
               </div>
             )}
+
+            <RecentlyViewed title="Recently viewed" minItems={2} limit={6} />
           </div>
         </div>
       </div>

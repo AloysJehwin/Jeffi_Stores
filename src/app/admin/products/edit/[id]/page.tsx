@@ -205,16 +205,16 @@ async function updateProduct(productId: string, formData: FormData) {
       }
     }
     if (errors.length > 0) {
-      throw new Error(errors[0])
+      return { error: errors[0] }
     }
 
     // Block publish while open (pending/confirmed) orders reference this product —
     // publishing could remove variants / rename SKUs and break their committed stock.
     const blockingOrders = await openOrdersForProduct(productId)
     if (blockingOrders.length > 0) {
-      throw new Error(
-        `Cannot publish: ${blockingOrders.length} open order(s) (${blockingOrders.join(', ')}) are pending/confirmed. Move them past 'confirmed' or cancel them before publishing.`
-      )
+      return {
+        error: `Cannot publish: ${blockingOrders.length} open order(s) (${blockingOrders.join(', ')}) are pending/confirmed. Move them past 'confirmed' or cancel them before publishing.`,
+      }
     }
   }
   const uploadedImagesJson = formData.get('uploaded_images') as string
@@ -838,7 +838,8 @@ async function updateProduct(productId: string, formData: FormData) {
     redirect(ap(back && back.startsWith('/admin/products') ? back : '/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-    throw new Error(err?.message || 'Failed to update product')
+    console.error('[product-edit] updateProduct failed for', productId, 'intent=', intent, err)
+    return { error: err?.message || 'Failed to update product' }
   }
 }
 
@@ -846,7 +847,10 @@ export default async function EditProductPage({ params, searchParams }: { params
   const { id } = await params
   const { back } = await searchParams
   const host = await getHost()
-  const product = await getProduct(id).catch(() => null)
+  const product = await getProduct(id).catch(err => {
+    console.error('[product-edit] getProduct failed for', id, err)
+    return null
+  })
 
   if (!product) {
     notFound()

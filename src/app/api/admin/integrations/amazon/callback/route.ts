@@ -4,7 +4,7 @@ import { resolveTenantId } from '@/lib/tenant-context'
 import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState } from '@/app/api/admin/integrations/state'
+import { verifyAdminState, returnToAdmin } from '@/app/api/admin/integrations/state'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,28 +17,28 @@ export async function GET(request: NextRequest) {
   const backTo = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
 
   const err = params.get('error')
-  if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
+  if (err) return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
 
   const code = params.get('spapi_oauth_code')
   const rawState = params.get('state')
-  if (!code || !rawState) return NextResponse.redirect(`${backTo}?connected=0&error=missing_params`)
+  if (!code || !rawState) return returnToAdmin(`${backTo}?connected=0&error=missing_params`)
 
   const state = verifyAdminState(rawState)
   if (!state || state.provider !== 'amazon_seller') {
-    return NextResponse.redirect(`${backTo}?connected=0&error=bad_state`)
+    return returnToAdmin(`${backTo}?connected=0&error=bad_state`)
   }
 
   const admin = await requireAdminScope(request, 'merchant_sync:write')
-  if (admin instanceof NextResponse) return NextResponse.redirect(`${backTo}?connected=0&error=not_authorized`)
+  if (admin instanceof NextResponse) return returnToAdmin(`${backTo}?connected=0&error=not_authorized`)
   const tenantId = await resolveTenantId()
   if (tenantId !== state.tenantId) {
-    return NextResponse.redirect(`${backTo}?connected=0&error=tenant_mismatch`)
+    return returnToAdmin(`${backTo}?connected=0&error=tenant_mismatch`)
   }
 
   try {
     const clientId = process.env.AMAZON_LWA_APP_CLIENT_ID
     const clientSecret = process.env.AMAZON_LWA_APP_CLIENT_SECRET
-    if (!clientId || !clientSecret) return NextResponse.redirect(`${backTo}?connected=0&error=not_configured`)
+    if (!clientId || !clientSecret) return returnToAdmin(`${backTo}?connected=0&error=not_configured`)
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code', code,
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.refresh_token) {
       const reason = data?.error_description || data?.error || 'exchange_failed'
-      return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
+      return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
     }
 
     const sellerId = params.get('selling_partner_id') || ''
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
       meta: { seller_id: sellerId, marketplace_id: marketplaceId, connected_via: 'oauth' },
     })
 
-    return NextResponse.redirect(`${backTo}?connected=amazon`)
+    return returnToAdmin(`${backTo}?connected=amazon`)
   } catch (e: any) {
-    return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
   }
 }

@@ -14,6 +14,8 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import ReviewSummaryLink from './pdp/ReviewSummaryLink'
+import type { ReviewSummary } from './pdp/review-summary'
 
 interface ProductImage {
   id: string
@@ -150,6 +152,7 @@ interface ProductDetailClientProps {
   }
   initialSkuParam?: string
   freeShippingThreshold?: number
+  reviewSummary?: ReviewSummary | null
 }
 
 interface PolicyProps {
@@ -403,7 +406,7 @@ const PincodeChecker = ({ pincode, setPincode, pincodeResult, setPincodeResult, 
   </div>
 )
 
-export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500 }: ProductDetailClientProps) {
+export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500, reviewSummary }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
@@ -470,6 +473,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const primaryImage = product.product_images?.find(img => img.is_primary) ?? product.product_images?.[0]
   const displayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
   // Keep the MRP on the same basis as the shown price so the discount % is honest.
   const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
@@ -594,6 +598,8 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
           </div>
         </div>
 
+        {reviewSummary && <ReviewSummaryLink summary={reviewSummary} className="-mt-2 mb-4" />}
+
         <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
 
         {/* Low stock urgency + notify me for out-of-stock */}
@@ -656,6 +662,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
           sellUnitId={product.sell_unit_id ?? null}
           launchDate={product.launch_date ?? null}
           discontinueDate={product.discontinue_date ?? null}
+          stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
         />
 
         <RazorpayOffers />

@@ -5,7 +5,7 @@ import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveTenantSocialAccount } from '@/lib/tenant-registry'
 import { exchangeCodeForToken, getLongLivedToken, getPageAndIgAccounts } from '@/lib/meta'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState } from '@/app/api/admin/integrations/state'
+import { verifyAdminState, returnToAdmin } from '@/app/api/admin/integrations/state'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,20 +18,20 @@ export async function GET(request: NextRequest) {
   const backTo = `${await currentAdminBaseUrlAsync()}/admin/social-posts`
 
   const err = params.get('error')
-  if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
+  if (err) return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
 
   const code = params.get('code')
   const rawState = params.get('state')
-  if (!code || !rawState) return NextResponse.redirect(`${backTo}?connected=0&error=missing_params`)
+  if (!code || !rawState) return returnToAdmin(`${backTo}?connected=0&error=missing_params`)
 
   const state = verifyAdminState(rawState)
-  if (!state) return NextResponse.redirect(`${backTo}?connected=0&error=bad_state`)
+  if (!state) return returnToAdmin(`${backTo}?connected=0&error=bad_state`)
 
   const admin = await requireAdminScope(request, 'campaigns:write')
-  if (admin instanceof NextResponse) return NextResponse.redirect(`${backTo}?connected=0&error=not_authorized`)
+  if (admin instanceof NextResponse) return returnToAdmin(`${backTo}?connected=0&error=not_authorized`)
   const tenantId = await resolveTenantId()
   if (tenantId !== state.tenantId) {
-    return NextResponse.redirect(`${backTo}?connected=0&error=tenant_mismatch`)
+    return returnToAdmin(`${backTo}?connected=0&error=tenant_mismatch`)
   }
 
   try {
@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return NextResponse.redirect(`${backTo}?connected=meta`)
+    return returnToAdmin(`${backTo}?connected=meta`)
   } catch (e: any) {
-    return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
   }
 }

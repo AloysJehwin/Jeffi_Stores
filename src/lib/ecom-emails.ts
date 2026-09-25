@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { sendAuditedMail } from './mail-audit'
 import { platformAdminEmail, tenantNoReplyAddress, tenantCampaignAddress } from './brand'
+import { mailShell } from './mail-template'
 
 // Ecom onboarding transactional email.
 // Platform sender: ecommerce@jeffistores.in — every platform/tenant communication.
@@ -20,8 +21,9 @@ const transporter = nodemailer.createTransport({
   },
 })
 
+const PLATFORM_BRAND = 'Jeffi Commerce'
 const PLATFORM_ADDRESS = process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'
-const PLATFORM_FROM = `"Jeffi Commerce" <${PLATFORM_ADDRESS}>`
+const PLATFORM_FROM = `"${PLATFORM_BRAND}" <${PLATFORM_ADDRESS}>`
 // Was a personal gmail hardcoded as the default, so any environment without ADMIN_EMAIL set
 // mailed platform notifications to an individual instead of the administrative mailbox.
 const PLATFORM_ADMIN = platformAdminEmail()
@@ -43,65 +45,37 @@ export function tenantCampaignEmail(slug: string, displayName?: string | null): 
   return `"${senderName(slug, displayName)}" <${tenantCampaignAddress(slug)}>`
 }
 
-const INK = '#111827'
-const MUTED = '#6b7280'
-const LINE = '#e5e7eb'
-const ACCENT = '#15803d'
-
 interface Row { label: string; value: string }
 
-/** Definition table. Tables + inline styles: many clients strip <style> blocks. */
 function detailTable(rows: Row[]): string {
   const cells = rows.map(({ label, value }) => `
-    <tr>
-      <td style="padding:10px 0;border-bottom:1px solid ${LINE};color:${MUTED};font-size:13px;width:38%;vertical-align:top;">${label}</td>
-      <td style="padding:10px 0;border-bottom:1px solid ${LINE};color:${INK};font-size:14px;font-weight:600;">${value}</td>
-    </tr>`).join('')
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin:20px 0;">${cells}</table>`
+    <tr><th>${label}</th><td>${value}</td></tr>`).join('')
+  return `<table class="rows" cellpadding="0" cellspacing="0" width="100%">${cells}</table>`
 }
 
 function button(href: string, label: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
-    <tr><td style="background:${ACCENT};border-radius:6px;">
-      <a href="${href}" style="display:inline-block;padding:12px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${label}</a>
-    </td></tr></table>`
+  return `<div class="cta"><a href="${href}" class="button" style="color:#ffffff;">${label}</a></div>`
 }
 
 function notice(text: string, tone: 'info' | 'warn' = 'info'): string {
-  const bg = tone === 'warn' ? '#fef2f2' : '#f9fafb'
-  const border = tone === 'warn' ? '#fecaca' : LINE
-  const color = tone === 'warn' ? '#991b1b' : INK
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:20px 0;">
-    <tr><td style="background:${bg};border:1px solid ${border};border-left:3px solid ${tone === 'warn' ? '#dc2626' : ACCENT};border-radius:4px;padding:14px 16px;color:${color};font-size:14px;line-height:1.6;">${text}</td></tr>
-  </table>`
+  return `<div class="${tone === 'warn' ? 'danger' : 'info'}">${text}</div>`
 }
+
+const FOOTER_LINES = [
+  `<a href="https://ecom.jeffistores.in" style="color:#666;">ecom.jeffistores.in</a>`,
+  `Questions? Reply to this email or write to <a href="mailto:${SUPPORT_ADDRESS}" style="color:#666;">${SUPPORT_ADDRESS}</a>.`,
+]
 
 /** Preheader = the preview line clients show next to the subject. */
-function baseHtml(preheader: string, body: string): string {
-  return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light"></head>
-<body style="margin:0;padding:0;background:#f3f4f6;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
-<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f3f4f6;padding:32px 12px;">
-<tr><td align="center">
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#ffffff;border:1px solid ${LINE};border-radius:8px;">
-    <tr><td style="padding:24px 32px;border-bottom:1px solid ${LINE};">
-      <span style="font-size:16px;font-weight:700;color:${INK};letter-spacing:-0.01em;">Jeffi Commerce</span>
-    </td></tr>
-    <tr><td style="padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${INK};font-size:15px;line-height:1.65;">
-      ${body}
-    </td></tr>
-    <tr><td style="padding:20px 32px;border-top:1px solid ${LINE};color:${MUTED};font-size:12px;line-height:1.6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-      Jeffi Commerce &middot; <a href="https://ecom.jeffistores.in" style="color:${MUTED};">ecom.jeffistores.in</a><br>
-      Questions? Reply to this email or write to <a href="mailto:${SUPPORT_ADDRESS}" style="color:${MUTED};">${SUPPORT_ADDRESS}</a>.
-    </td></tr>
-  </table>
-</td></tr></table></body></html>`
-}
-
-function heading(text: string): string {
-  return `<h1 style="margin:0 0 18px;font-size:19px;font-weight:700;color:${INK};line-height:1.35;">${text}</h1>`
+function baseHtml(preheader: string, title: string, body: string): string {
+  return mailShell({
+    brand: PLATFORM_BRAND,
+    kicker: 'Merchant Onboarding',
+    title,
+    content: body,
+    footerLines: FOOTER_LINES,
+    preheader,
+  })
 }
 
 /** Crude HTML-to-text for the multipart alternative — improves deliverability. */
@@ -136,8 +110,7 @@ async function send(to: string, subject: string, html: string) {
 
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('We have received your application and started the review.', `
-    ${heading('Your application is under review')}
+  const html = baseHtml('We have received your application and started the review.', 'Your application is under review', `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details and GST certificate, and our team has started the verification.</p>
     ${notice('Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.')}
@@ -145,8 +118,7 @@ export async function sendKycSubmittedEmail(owner: { email: string; name: string
   `)
   await send(owner.email, 'Your Jeffi Commerce application is under review', html)
 
-  const adminHtml = baseHtml('A new merchant application needs review.', `
-    ${heading('New merchant application')}
+  const adminHtml = baseHtml('A new merchant application needs review.', 'New merchant application', `
     ${detailTable([
       { label: 'Applicant', value: owner.name ?? '—' },
       { label: 'Email', value: owner.email },
@@ -163,8 +135,7 @@ export async function sendKycApprovedEmail(
   checkoutUrl: string
 ) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('Your application is approved. Complete payment to launch your store.', `
-    ${heading('Your application has been approved')}
+  const html = baseHtml('Your application is approved. Complete payment to launch your store.', 'Your application has been approved', `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Your GST certificate has been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
     ${detailTable([
@@ -173,7 +144,7 @@ export async function sendKycApprovedEmail(
     ])}
     <p style="margin:0 0 14px;">Complete your subscription payment to launch. You will be taken to Razorpay's secure checkout.</p>
     ${button(checkoutUrl, 'Complete payment')}
-    <p style="margin:0;color:${MUTED};font-size:13px;">Your store is provisioned automatically once payment is confirmed, and is usually ready within a few minutes.</p>
+    <p class="muted" style="margin:0;">Your store is provisioned automatically once payment is confirmed, and is usually ready within a few minutes.</p>
   `)
   await send(owner.email, 'Approved: complete your payment to launch your store', html)
 }
@@ -183,8 +154,7 @@ export async function sendKycRejectedEmail(
   reason: string
 ) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('We could not verify your application. Action is required.', `
-    ${heading('We could not verify your application')}
+  const html = baseHtml('We could not verify your application. Action is required.', 'We could not verify your application', `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">We were unable to verify the details submitted with your application.</p>
     ${notice(`<strong>Reason:</strong> ${reason}`, 'warn')}
@@ -199,8 +169,7 @@ export async function sendPaymentConfirmedEmail(
   tenant: { display_name: string; slug: string; plan: string | null; billing_interval: string }
 ) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('Payment confirmed. Your store is being provisioned.', `
-    ${heading('Payment confirmed')}
+  const html = baseHtml('Payment confirmed. Your store is being provisioned.', 'Payment confirmed', `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">We have received your subscription payment for <strong>${tenant.display_name}</strong>. Your store is being provisioned now.</p>
     ${detailTable([
@@ -221,13 +190,12 @@ export async function sendStoreLiveEmail(
   const name = owner.name ?? 'there'
   const adminUrl = `https://admin-${tenant.slug}.jeffistores.in`
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
-  const html = baseHtml(`${tenant.display_name} is live. Here are your store links.`, `
-    ${heading(`${tenant.display_name} is now live`)}
+  const html = baseHtml(`${tenant.display_name} is live. Here are your store links.`, `${tenant.display_name} is now live`, `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Your store has been provisioned and is ready to use.</p>
     ${detailTable([
-      { label: 'Storefront', value: `<a href="${storeUrl}" style="color:${ACCENT};">${storeUrl}</a>` },
-      { label: 'Admin panel', value: `<a href="${adminUrl}" style="color:${ACCENT};">${adminUrl}</a>` },
+      { label: 'Storefront', value: `<a href="${storeUrl}" style="color:#2563eb;">${storeUrl}</a>` },
+      { label: 'Admin panel', value: `<a href="${adminUrl}" style="color:#2563eb;">${adminUrl}</a>` },
       { label: 'Plan', value: tenant.plan ?? 'Basic' },
       { label: 'Sign-in email', value: owner.email },
     ])}

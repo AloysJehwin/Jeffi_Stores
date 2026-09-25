@@ -1,4 +1,5 @@
 import IconByName from './IconByName'
+import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 
 export interface BenefitItem {
   icon: string
@@ -12,11 +13,7 @@ interface BenefitsProps {
   items?: BenefitItem[] | null
 }
 
-const DEFAULT_ITEMS: BenefitItem[] = [
-  { icon: 'Receipt', title: 'Save up to 18% with GST', sub: 'Claim input tax credit on every purchase with a valid GSTIN invoice' },
-  { icon: 'CreditCard', title: 'Bulk order discounts', sub: 'Special pricing for businesses ordering in volume — contact us for a quote' },
-  { icon: 'Clock', title: 'Dedicated account manager', sub: 'Registered businesses get priority support and a personal account manager' },
-]
+const DEFAULT_ITEMS: BenefitItem[] = SECTION_TILE_DEFAULTS.benefits
 
 export default function Benefits({ title, eyebrow, items }: BenefitsProps = {}) {
   const tiles = items && items.length > 0 ? items : DEFAULT_ITEMS

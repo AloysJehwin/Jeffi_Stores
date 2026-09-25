@@ -101,6 +101,23 @@ describe('GET /api/wishlist', () => {
     const body = await res.json()
     expect(body.items).toEqual([])
   })
+
+  it('returns the snapshot and the current stock on the snapshot basis, not the raw row', async () => {
+    vi.mocked(queryMany).mockResolvedValue([
+      { id: 'wi-1', product_id: PRODUCT_ID, snapshot_price: '500.00', snapshot_in_stock: false, inventory_in_stock: true, products: { id: PRODUCT_ID } },
+    ])
+    const res = await GET(makeRequest('GET', 'http://localhost/api/wishlist') as any)
+    const body = await res.json()
+    expect(body.items[0]).toMatchObject({ snapshot_price: '500.00', snapshot_in_stock: false, inventory_in_stock: true })
+
+    const [sql, params] = vi.mocked(queryMany).mock.calls[0]
+    expect(sql).toContain('wi.snapshot_price')
+    expect(sql).toContain('wi.snapshot_in_stock')
+    expect(sql).toContain('(p.inventory_quantity > 0) AS inventory_in_stock')
+    expect(sql).toContain("'base_price', p.base_price")
+    expect(sql).not.toContain('wi.*')
+    expect(params).toEqual([USER_ID])
+  })
 })
 
 describe('POST /api/wishlist — add item', () => {

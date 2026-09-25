@@ -10,20 +10,29 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { SECTION_META, SECTION_TYPES, type HomepageSection, type SectionType } from '@/lib/homepage-sections'
 import SectionConfigFields from './SectionConfigFields'
+import SectionPreview from './SectionPreview'
+import OfferSliderControl from './OfferSliderControl'
+import { notifyHomepageDraftChanged } from './draft-events'
 import type { SectionOptions } from './editors/fields'
+
+/** Persist a partial config merge onto a section, updating local state and the API. */
+export type SaveSectionConfig = (config: Record<string, unknown>) => void
 
 interface Props {
   initial: HomepageSection[]
   options?: SectionOptions
   /** Rendered inside the expanded `hero` row — the slide editor lives there. */
   heroEditor?: React.ReactNode
+  /** Render every section's editor open and non-collapsible (dedicated Homepage page). */
+  alwaysExpanded?: boolean
 }
 
-export default function HomepageSectionManager({ initial, options, heroEditor }: Props) {
+export default function HomepageSectionManager({ initial, options, heroEditor, alwaysExpanded = false }: Props) {
   const { showToast, showConfirm } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [sections, setSections] = useState(initial)
   const [picking, setPicking] = useState(false)
+  const [addedId, setAddedId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const usedSingletons = new Set(
@@ -37,11 +46,18 @@ export default function HomepageSectionManager({ initial, options, heroEditor }:
       credentials: 'include',
       body: JSON.stringify(body),
     })
-    showToast(res.ok ? 'Saved' : 'Failed to save', res.ok ? 'success' : 'error')
+    showToast(res.ok ? 'Saved to draft' : 'Failed to save', res.ok ? 'success' : 'error')
+    if (res.ok) notifyHomepageDraftChanged()
   }
 
   function update(id: string, patchObj: Partial<HomepageSection>) {
     setSections(prev => prev.map(s => (s.id === id ? { ...s, ...patchObj } : s)))
+  }
+
+  function saveConfigFor(section: HomepageSection, config: Record<string, unknown>) {
+    const next = { ...(section.config ?? {}), ...config }
+    update(section.id, { config: next })
+    patch(section.id, { config: next })
   }
 
   async function addSection(type: SectionType) {
@@ -54,20 +70,23 @@ export default function HomepageSectionManager({ initial, options, heroEditor }:
     })
     if (!res.ok) { showToast('Failed to add section', 'error'); return }
     const { section } = await res.json()
+    setAddedId(section.id)
     setSections(prev => [...prev, section])
-    showToast('Section added', 'success')
+    showToast('Section added to draft', 'success')
+    notifyHomepageDraftChanged()
   }
 
   async function removeSection(section: HomepageSection) {
     const ok = await showConfirm({
       title: 'Remove section?',
-      message: `"${section.title || SECTION_META[section.type].label}" will be removed from the homepage.`,
+      message: `"${section.title || SECTION_META[section.type].label}" will be removed from the draft. It stays live until you publish.`,
     })
     if (!ok) return
     const res = await fetch(`/api/admin/homepage-sections/${section.id}`, { method: 'DELETE', credentials: 'include' })
     if (!res.ok) { showToast('Failed to remove', 'error'); return }
     setSections(prev => prev.filter(s => s.id !== section.id))
-    showToast('Section removed', 'success')
+    showToast('Section removed from draft', 'success')
+    notifyHomepageDraftChanged()
   }
 
   async function onDragEnd(event: DragEndEvent) {
@@ -89,7 +108,9 @@ export default function HomepageSectionManager({ initial, options, heroEditor }:
     if (!res.ok) {
       setSections(previous)
       showToast('Failed to reorder', 'error')
+      return
     }
+    notifyHomepageDraftChanged()
   }
 
   return (
@@ -107,7 +128,15 @@ export default function HomepageSectionManager({ initial, options, heroEditor }:
                 onChange={update}
                 onSave={patch}
                 onRemove={removeSection}
-                extra={section.type === 'hero' ? heroEditor : undefined}
+                alwaysExpanded={alwaysExpanded}
+                defaultOpen={section.id === addedId}
+                extra={
+                  section.type === 'hero'
+                    ? heroEditor
+                    : section.type === 'offer_slider'
+                    ? <OfferSliderControl section={section} saveConfig={config => saveConfigFor(section, config)} />
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -167,12 +196,16 @@ interface RowProps {
   onSave: (id: string, body: Record<string, unknown>) => Promise<void>
   onRemove: (section: HomepageSection) => void
   extra?: React.ReactNode
+  alwaysExpanded?: boolean
+  /** Open on mount, e.g. a section the admin just added. */
+  defaultOpen?: boolean
 }
 
-function SectionRow({ section, position, canWrite, options, onChange, onSave, onRemove, extra }: RowProps) {
-  const [expanded, setExpanded] = useState(false)
+function SectionRow({ section, position, canWrite, options, onChange, onSave, onRemove, extra, alwaysExpanded = false, defaultOpen = false }: RowProps) {
+  const [expanded, setExpanded] = useState(alwaysExpanded || defaultOpen)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
   const meta = SECTION_META[section.type]
+  const open = alwaysExpanded || expanded
 
   return (
     <div
@@ -196,21 +229,33 @@ function SectionRow({ section, position, canWrite, options, onChange, onSave, on
 
         <span className="w-5 text-xs tabular-nums text-foreground-muted shrink-0">{position}</span>
 
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          aria-expanded={expanded}
-          className="flex-1 flex items-center gap-2 text-left min-w-0"
-        >
-          <span className="text-sm font-medium text-foreground truncate">{section.title || meta.label}</span>
-          <span className="text-xs text-foreground-muted shrink-0 hidden sm:inline">{meta.label}</span>
-          {!section.is_active && (
-            <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted shrink-0">
-              Hidden
-            </span>
-          )}
-          <ChevronDown className={`w-4 h-4 ml-auto shrink-0 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        </button>
+        {alwaysExpanded ? (
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-foreground truncate">{section.title || meta.label}</span>
+            <span className="text-xs text-foreground-muted shrink-0 hidden sm:inline">{meta.label}</span>
+            {!section.is_active && (
+              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted shrink-0">
+                Hidden
+              </span>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            aria-expanded={expanded}
+            className="flex-1 flex items-center gap-2 text-left min-w-0"
+          >
+            <span className="text-sm font-medium text-foreground truncate">{section.title || meta.label}</span>
+            <span className="text-xs text-foreground-muted shrink-0 hidden sm:inline">{meta.label}</span>
+            {!section.is_active && (
+              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted shrink-0">
+                Hidden
+              </span>
+            )}
+            <ChevronDown className={`w-4 h-4 ml-auto shrink-0 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
 
         <Toggle
           checked={section.is_active}
@@ -219,7 +264,8 @@ function SectionRow({ section, position, canWrite, options, onChange, onSave, on
         />
       </div>
 
-      <div className={expanded ? 'px-3 pb-3 pt-1 space-y-3 border-t border-border-default' : 'hidden'}>
+      <div className={open ? 'px-3 pb-3 pt-1 space-y-3 border-t border-border-default' : 'hidden'}>
+        {open && <SectionPreview section={section} />}
         {extra}
         <SectionConfigFields
           section={section}

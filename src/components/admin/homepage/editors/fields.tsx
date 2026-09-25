@@ -3,13 +3,26 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
-import { sectionLayout, sectionLimit, type HomepageSection } from '@/lib/homepage-sections'
+import Toggle from '@/components/ui/Toggle'
+import {
+  sectionLayout, sectionLimit, sectionCopyDefaults,
+  type HomepageSection, type SectionCopy, type SectionType,
+} from '@/lib/homepage-sections'
 
 /** Live catalogue data loaded server-side, so an editor never shows an empty picker. */
 export interface SectionOptions {
   categories: { value: string; label: string }[]
   brands: { value: string; label: string }[]
-  counts: { featured: number; newArrivals: number; bestSellers: number; onSale: number }
+  /** Top-level categories by id, for sections that pick whole departments (category tabs). */
+  topCategories?: { value: string; label: string }[]
+  counts: {
+    featured: number; newArrivals: number; bestSellers: number; onSale: number
+    bundles?: number; approvedReviews?: number
+  }
+  /** Store-specific storefront defaults, e.g. the About story from the store settings. */
+  copyDefaults?: Partial<Record<SectionType, SectionCopy>>
+  /** Store-specific built-in tiles, e.g. the About stats from the store settings. */
+  tileDefaults?: Partial<Record<SectionType, Record<string, string>[]>>
 }
 
 export interface EditorProps {
@@ -183,6 +196,24 @@ export function DateTimeField({ label, value, disabled, hint, placeholder, onCom
   )
 }
 
+export function ToggleField({ label, checked, disabled, hint, onChange }: {
+  label: string
+  checked: boolean
+  disabled: boolean
+  hint?: string
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 min-h-[38px]">
+        <span className={`${LABEL_CLASS} mb-0`}>{label}</span>
+        <Toggle checked={checked} disabled={disabled} onChange={onChange} />
+      </div>
+      {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
+    </div>
+  )
+}
+
 export function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>
 }
@@ -210,6 +241,9 @@ export function useSectionBinding({ section, onChange, onSave }: EditorProps) {
     onSave(section.id, body)
   }
 
+  // A cleared field is stored as null so the storefront falls back to its default copy.
+  const text = (v: string) => (v.trim() ? v : null)
+
   return {
     cfg,
     saveConfig,
@@ -217,32 +251,76 @@ export function useSectionBinding({ section, onChange, onSave }: EditorProps) {
     str: (key: string) => String(cfg[key] ?? ''),
     limit: sectionLimit(section),
     layout: sectionLayout(section),
-    eyebrow: (v: string) => saveColumn({ eyebrow: v }, { eyebrow: v }),
-    title: (v: string) => saveColumn({ title: v }, { title: v }),
-    subtitle: (v: string) => saveColumn({ subtitle: v }, { subtitle: v }),
-    ctaLabel: (v: string) => saveColumn({ cta_label: v }, { ctaLabel: v }),
-    ctaUrl: (v: string) => saveColumn({ cta_url: v }, { ctaUrl: v }),
+    eyebrow: (v: string) => saveColumn({ eyebrow: text(v) }, { eyebrow: text(v) }),
+    title: (v: string) => saveColumn({ title: text(v) }, { title: text(v) }),
+    subtitle: (v: string) => saveColumn({ subtitle: text(v) }, { subtitle: text(v) }),
+    ctaLabel: (v: string) => saveColumn({ cta_label: text(v) }, { ctaLabel: text(v) }),
+    ctaUrl: (v: string) => saveColumn({ cta_url: text(v) }, { ctaUrl: text(v) }),
   }
+}
+
+/** The copy the storefront shows for this section when a field is left empty. */
+export function sectionCopy({ section, options }: EditorProps): SectionCopy {
+  return { ...sectionCopyDefaults(section.type), ...options?.copyDefaults?.[section.type] }
+}
+
+/** Hint for a field that is showing the storefront default rather than a saved value. */
+export function copyHint(showingDefault: boolean, hint?: string): string | undefined {
+  if (!showingDefault) return hint
+  const note = 'Live default. Edit to change it; clear it to restore the default.'
+  return hint ? `${hint} ${note}` : note
 }
 
 export function HeadingFields({ props, eyebrowHint }: { props: EditorProps; eyebrowHint?: string }) {
   const b = useSectionBinding(props)
+  const d = sectionCopy(props)
   const { section, canWrite } = props
   return (
     <>
-      <Text label="Eyebrow" value={section.eyebrow ?? ''} disabled={!canWrite} hint={eyebrowHint} onCommit={b.eyebrow} />
-      <Text label="Heading" value={section.title ?? ''} disabled={!canWrite} onCommit={b.title} />
+      <Text
+        label="Eyebrow"
+        value={section.eyebrow ?? d.eyebrow ?? ''}
+        disabled={!canWrite}
+        hint={copyHint(section.eyebrow == null && !!d.eyebrow, eyebrowHint)}
+        onCommit={b.eyebrow}
+      />
+      <Text
+        label="Heading"
+        value={section.title ?? d.title ?? ''}
+        disabled={!canWrite}
+        hint={copyHint(section.title == null && !!d.title)}
+        onCommit={b.title}
+      />
     </>
   )
 }
 
-export function CtaFields({ props, hint }: { props: EditorProps; hint?: string }) {
+export function CtaFields({ props, hint, urlPlaceholder = '/products' }: {
+  props: EditorProps
+  hint?: string
+  urlPlaceholder?: string
+}) {
   const b = useSectionBinding(props)
+  const d = sectionCopy(props)
   const { section, canWrite } = props
   return (
     <>
-      <Text label="Button label" value={section.cta_label ?? ''} disabled={!canWrite} placeholder="Shop all" onCommit={b.ctaLabel} />
-      <Text label="Button link" value={section.cta_url ?? ''} disabled={!canWrite} placeholder="/products" hint={hint} onCommit={b.ctaUrl} />
+      <Text
+        label="Button label"
+        value={section.cta_label ?? d.ctaLabel ?? ''}
+        disabled={!canWrite}
+        placeholder="Shop all"
+        hint={copyHint(section.cta_label == null && !!d.ctaLabel)}
+        onCommit={b.ctaLabel}
+      />
+      <Text
+        label="Button link"
+        value={section.cta_url ?? d.ctaUrl ?? ''}
+        disabled={!canWrite}
+        placeholder={urlPlaceholder}
+        hint={copyHint(section.cta_url == null && !!d.ctaUrl, hint)}
+        onCommit={b.ctaUrl}
+      />
     </>
   )
 }

@@ -7,7 +7,7 @@ import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_M
 import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { pickUnitPrice } from '@/lib/pricing'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
-import CopySku from '@/components/ui/CopySku'
+import ProductSpecifications from '@/components/visitor/pdp/ProductSpecifications'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/visitor/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
@@ -15,6 +15,11 @@ import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
 import ProductPitchLine from '@/components/on-device/ProductPitchLine'
+import { cardPropsFor } from '@/lib/product-cards'
+import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtTogether'
+import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
+import { getApprovedReviewSummary } from '@/components/visitor/pdp/review-summary.server'
+import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
 
 const getProductBySlug = cache(async (slug: string) => {
   const { gstEnabled } = await getFeatureFlags()
@@ -314,11 +319,12 @@ export default async function ProductDetailPage({
 
   const { gstEnabled } = await getFeatureFlags()
 
-  const [relatedProducts, deliverySettings] = await Promise.all([
+  const [relatedProducts, deliverySettings, reviewSummary] = await Promise.all([
     getRelatedProducts(product.id, product.category_id, product.name),
     // Use the authoritative delivery setting (same one checkout uses), not the
     // stale separate 'free_shipping_threshold' key.
     (await import('@/lib/delivery-settings')).getDeliverySettings(),
+    getApprovedReviewSummary(product.id),
   ])
   const freeShippingThreshold = deliverySettings.freeThreshold
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
@@ -393,130 +399,17 @@ export default async function ProductDetailPage({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+      <div className="container mx-auto px-4 pt-4 sm:pt-6 lg:pt-8 pb-20">
         {/* Product Details */}
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
-            <ProductDetailClient product={product} initialSkuParam={skuParam} freeShippingThreshold={freeShippingThreshold} />
+            <ProductDetailClient product={product} initialSkuParam={skuParam} freeShippingThreshold={freeShippingThreshold} reviewSummary={reviewSummary} />
           </div>
         </div>
 
-        {/* Specifications card */}
-        {(() => {
-          const p = product as any
-          const primarySpecs = [
-            p.brands            && { label: 'Brand',              value: p.brands.name },
-            p.sku               && { label: 'SKU',                value: p.sku },
-            p.material          && { label: 'Material',           value: p.material },
-            p.finish            && { label: 'Finish',             value: p.finish },
-            p.color             && { label: 'Color',              value: p.color },
-            p.size              && { label: 'Size',               value: p.size },
-            p.variant_type      && { label: 'Variant Type',       value: p.variant_type },
-            p.sub_variant_type  && { label: 'Sub-Variant Type',   value: p.sub_variant_type },
-            p.dimensions        && { label: 'Dimensions',         value: `${p.dimensions} cm` },
-            p.weight != null    && { label: 'Weight',             value: p.weight_unit ? `${p.weight} ${p.weight_unit}` : `${p.weight} kg` },
-            p.weight_grams      && { label: 'Net Weight',         value: `${p.weight_grams} g` },
-            p.net_weight_grams  && { label: 'Net Weight',         value: `${p.net_weight_grams} g` },
-            p.volume_ml         && { label: 'Volume',             value: `${p.volume_ml} ml` },
-            (p.length_cm || p.breadth_cm || p.height_cm) && {
-              label: 'Package Dimensions',
-              value: [p.length_cm, p.breadth_cm, p.height_cm].filter((v: any) => v != null).join(' × ') + (p.length_unit ? ` ${p.length_unit}` : ' cm'),
-            },
-            p.package_type      && { label: 'Package Type',      value: p.package_type },
-            p.country_of_origin && { label: 'Origin',            value: p.country_of_origin },
-            p.brand_part_number && { label: 'Part Number',       value: p.brand_part_number },
-            p.warranty_months   && { label: 'Warranty',          value: `${p.warranty_months} month${p.warranty_months > 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` },
-            p.compliance_standard && { label: 'Compliance',      value: p.compliance_standard },
-            p.safety_rating     && { label: 'Safety Rating',     value: p.safety_rating },
-            p.barcode           && { label: 'Barcode',           value: p.barcode },
-            p.isbn              && { label: 'ISBN',              value: p.isbn },
-            p.asin              && { label: 'ASIN',              value: p.asin },
-            (p.age_min || p.age_max) && {
-              label: 'Age Range',
-              value: p.age_min && p.age_max ? `${p.age_min}–${p.age_max} years` : p.age_min ? `${p.age_min}+ years` : `Up to ${p.age_max} years`,
-            },
-            p.target_gender && p.target_gender !== 'unisex' && { label: 'For', value: p.target_gender.charAt(0).toUpperCase() + p.target_gender.slice(1) },
-          ].filter(Boolean) as { label: string; value: string }[]
+        <FrequentlyBoughtTogether current={cardPropsFor([product], gstEnabled)[0]} launchDate={product.launch_date} discontinueDate={product.discontinue_date} />
 
-          const generalSpecs = [
-            p.categories        && { label: 'Category',          value: p.categories.name },
-            p.mpn               && { label: 'MPN',               value: p.mpn },
-            p.gtin              && { label: 'GTIN / EAN',        value: p.gtin },
-            p.hsn_code          && { label: 'HSN Code',          value: p.hsn_code },
-            p.gst_percentage != null && { label: 'GST',          value: `${parseFloat(String(p.gst_percentage))}%` },
-            p.currency          && { label: 'Currency',          value: p.currency },
-          ].filter(Boolean) as { label: string; value: string }[]
-
-          const hazards = [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean) as string[]
-          const certList = (p.certifications as string[] | null) ?? []
-          const audienceList = (p.target_audience as string[] | null) ?? []
-
-          if (primarySpecs.length === 0 && generalSpecs.length === 0 && hazards.length === 0 && certList.length === 0 && audienceList.length === 0) return null
-
-          return (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
-              <h2 className="text-xl font-bold text-foreground mb-6">Specifications</h2>
-
-              {/* Hazard badges */}
-              {hazards.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {p.fragile && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">⚠ Fragile</span>}
-                  {p.hazardous && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">☢ Hazardous</span>}
-                  {p.flammable && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">🔥 Flammable</span>}
-                </div>
-              )}
-
-              {primarySpecs.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5 mb-6">
-                  {primarySpecs.map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                      <p className="font-semibold text-foreground text-sm">{value}{label === 'SKU' && value && <CopySku sku={String(value)} className="ml-1" />}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Certifications */}
-              {certList.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs text-foreground-muted mb-2">Certifications</p>
-                  <div className="flex flex-wrap gap-2">
-                    {certList.map((c: string, i: number) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{c}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Target audience */}
-              {audienceList.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs text-foreground-muted mb-2">Target Audience</p>
-                  <div className="flex flex-wrap gap-2">
-                    {audienceList.map((a: string, i: number) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{a}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {generalSpecs.length > 0 && (
-                <>
-                  {(primarySpecs.length > 0 || certList.length > 0 || audienceList.length > 0) && <div className="border-t border-border-default mb-6" />}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
-                    {generalSpecs.map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                        <p className="font-semibold text-foreground text-sm">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })()}
+        <ProductSpecifications product={product} />
 
         {/* Features & Use Cases (AI-enriched) */}
         {(() => {
@@ -685,10 +578,14 @@ export default async function ProductDetailPage({
         )}
 
         {/* Product Reviews */}
-        <ProductReviews productId={product.id} productName={product.name} />
+        <div id={PDP_REVIEWS_ID} className="scroll-mt-16 lg:scroll-mt-20">
+          <ProductReviews productId={product.id} productName={product.name} />
+        </div>
+
+        <CustomersAlsoViewed productId={product.id} />
 
         {/* Recently Viewed */}
-        <RecentlyViewed excludeId={product.id} />
+        <RecentlyViewed excludeId={product.id} minItems={2} />
 
         {/* Personalised picks */}
         <FeaturedForYou />

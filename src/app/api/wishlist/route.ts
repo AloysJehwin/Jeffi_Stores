@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
 
     const wishlistItems = await queryMany(`
       SELECT
-        wi.*,
+        wi.id, wi.product_id, wi.created_at,
+        wi.snapshot_price, wi.snapshot_in_stock,
+        (p.inventory_quantity > 0) AS inventory_in_stock,
         json_build_object(
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,

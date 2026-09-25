@@ -146,6 +146,28 @@ export async function latestJobBySource(tenantId: string, source: ImportSource):
   return (res.rows[0] as ImportJob) || null
 }
 
+/** A 'running' row with no progress write for 15 minutes is dead: a worker lost to a restart never updates it again. */
+export async function isSheetSyncRunning(tenantId: string): Promise<boolean> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT 1 FROM import_jobs
+     WHERE tenant_id=$1 AND source='google_sheet' AND status='running' AND updated_at > now() - interval '15 minutes'
+     LIMIT 1`,
+    [tenantId],
+  )
+  return res.rows.length > 0
+}
+
+export async function cancelPendingSheetSyncs(tenantId: string, reason: string): Promise<number> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `UPDATE import_jobs SET status='failed', last_error=$2, finished_at=now(), updated_at=now()
+     WHERE tenant_id=$1 AND source='google_sheet' AND status='pending'`,
+    [tenantId, reason],
+  )
+  return res.rowCount ?? 0
+}
+
 export interface GsheetSyncSummary {
   id: string
   status: ImportStatus

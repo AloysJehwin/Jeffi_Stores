@@ -158,6 +158,30 @@ describe('POST /api/cart — upsert (same item again)', () => {
   })
 })
 
+describe('POST /api/cart — item currently saved for later', () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(queryOne).mockResolvedValue({
+      id: PRODUCT_ID,
+      name: 'Test Product',
+      base_price: 100,
+      price_ex_gst: 90,
+      is_active: true,
+    } as any)
+    vi.mocked(query).mockResolvedValue({ rows: [{ quantity: 1, inserted: false }], rowCount: 1 } as any)
+  })
+
+  it('moves the saved row back into the cart as a fresh add instead of growing the saved row', async () => {
+    const res = await POST(makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 1 }) as any)
+    expect(res.status).toBe(200)
+    const sql = vi.mocked(query).mock.calls[0]![0] as string
+    expect(sql).toContain('saved_for_later = FALSE')
+    expect(sql).toContain('saved_at = NULL')
+    expect(sql).toContain('CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END')
+    expect(sql).toContain('CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END')
+  })
+})
+
 describe('POST /api/cart — null variantId upsert', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)

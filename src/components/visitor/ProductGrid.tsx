@@ -60,6 +60,7 @@ interface Props {
   start?: number
   end?: number
   filterSlot?: React.ReactNode
+  promoSlot?: React.ReactNode
 }
 
 type ViewMode = 'grid' | 'table'
@@ -210,8 +211,11 @@ function TableRow({ product, gstEnabled, stripe }: { product: ProductItem; gstEn
 
 // How often to inject a category banner row (every N cards)
 const BANNER_EVERY = 9
+// A multiple of both grid widths (2 and 3 columns) and ahead of the first category banner row,
+// so the full-width promo never leaves a hole in the row above it.
+const PROMO_AFTER = 6
 
-export default function ProductGrid({ products, gstEnabled, categoryBanners = [], filterSlot }: Props) {
+export default function ProductGrid({ products, gstEnabled, categoryBanners = [], filterSlot, promoSlot }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -312,6 +316,7 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
                 {group.items.map((product, idx) => {
                   const { primaryImage, hasVariants, displayPrice, effectiveStock, mrp, mrpDiscount } = resolve(product, gstEnabled)
                   const specs = [product.grade, product.material, product.finish, product.compliance_standard].filter(Boolean) as string[]
+                  const showPromo = !grouped && idx === PROMO_AFTER && promoSlot != null
                   const showBanner = !grouped && idx > 0 && idx % BANNER_EVERY === 0 && categoryBanners.length > 0
                   const bannerSlot = Math.floor(idx / BANNER_EVERY)
                   // Rotate which 4 categories we show in each banner row
@@ -323,6 +328,7 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
 
                   return (
                     <Fragment key={product.id}>
+                      {showPromo && <div className="col-span-full">{promoSlot}</div>}
                       {showBanner && rotatedBanners.length > 0 && (
                         <CategoryBannerRow banners={rotatedBanners} gstEnabled={gstEnabled} slot={bannerSlot} />
                       )}

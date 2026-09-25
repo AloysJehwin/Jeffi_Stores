@@ -3,31 +3,49 @@
 import type { SectionType } from '@/lib/homepage-sections'
 import { DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
 import AboutEditor from './editors/AboutEditor'
+import BackInStockEditor from './editors/BackInStockEditor'
 import BenefitsEditor from './editors/BenefitsEditor'
+import BlogTeaserEditor from './editors/BlogTeaserEditor'
 import BrandCarouselEditor from './editors/BrandCarouselEditor'
+import BundleSpotlightEditor from './editors/BundleSpotlightEditor'
 import BusinessCtaEditor from './editors/BusinessCtaEditor'
 import CategoryGridEditor from './editors/CategoryGridEditor'
 import CategoryShowcaseEditor from './editors/CategoryShowcaseEditor'
+import CategoryTabsEditor from './editors/CategoryTabsEditor'
+import CountdownDealEditor from './editors/CountdownDealEditor'
 import DealOfTheDayEditor from './editors/DealOfTheDayEditor'
 import FeaturedForYouEditor from './editors/FeaturedForYouEditor'
 import ProductRowEditor from './editors/ProductRowEditor'
 import PromoBannerEditor from './editors/PromoBannerEditor'
+import RecentlyViewedEditor from './editors/RecentlyViewedEditor'
+import SocialStripEditor from './editors/SocialStripEditor'
+import TestimonialsEditor from './editors/TestimonialsEditor'
 import TrustStripEditor from './editors/TrustStripEditor'
+import ValueStatsEditor from './editors/ValueStatsEditor'
 import WhyUsEditor from './editors/WhyUsEditor'
 
 // `hero` is absent: its slides are edited by HeroSlideManager, which the settings page embeds.
 const EDITORS: Partial<Record<SectionType, (props: EditorProps) => React.ReactElement>> = {
   about: AboutEditor,
+  back_in_stock: BackInStockEditor,
   benefits: BenefitsEditor,
+  blog_teaser: BlogTeaserEditor,
   brand_carousel: BrandCarouselEditor,
+  bundle_spotlight: BundleSpotlightEditor,
   business_cta: BusinessCtaEditor,
   category_grid: CategoryGridEditor,
   category_showcase: CategoryShowcaseEditor,
+  category_tabs: CategoryTabsEditor,
+  countdown_deal: CountdownDealEditor,
   deal_of_the_day: DealOfTheDayEditor,
   featured_for_you: FeaturedForYouEditor,
   product_row: ProductRowEditor,
   promo_banner: PromoBannerEditor,
+  recently_viewed: RecentlyViewedEditor,
+  social_strip: SocialStripEditor,
+  testimonials: TestimonialsEditor,
   trust_strip: TrustStripEditor,
+  value_stats: ValueStatsEditor,
   why_us: WhyUsEditor,
 }
 

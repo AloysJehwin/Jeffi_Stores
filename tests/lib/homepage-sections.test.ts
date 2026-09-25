@@ -13,12 +13,25 @@ const make = (over: Partial<HomepageSection> = {}): HomepageSection => ({
 })
 
 describe('defaults', () => {
-  it('reproduces the current homepage order so an unconfigured store is unchanged', () => {
+  it('starts a store on the classic layout plus the engagement sections that need no setup', () => {
     expect(DEFAULT_SECTIONS.map(s => s.type)).toEqual([
       'hero', 'trust_strip', 'category_grid', 'product_row', 'brand_carousel',
-      'product_row', 'category_showcase', 'featured_for_you', 'product_row',
-      'benefits', 'why_us', 'about', 'business_cta',
+      'product_row', 'category_showcase', 'featured_for_you', 'recently_viewed', 'product_row',
+      'category_tabs', 'back_in_stock', 'testimonials', 'benefits', 'why_us', 'value_stats',
+      'about', 'business_cta',
     ])
+  })
+
+  it('leaves out sections that need content before they can show anything', () => {
+    const types = DEFAULT_SECTIONS.map(s => s.type)
+    for (const t of ['countdown_deal', 'blog_teaser', 'social_strip', 'bundle_spotlight', 'promo_banner'] as const) {
+      expect(types).not.toContain(t)
+    }
+  })
+
+  it('badges recently launched products on the default New Arrivals row', () => {
+    const newArrivals = DEFAULT_SECTIONS.find(s => s.config.source === 'new_arrivals')
+    expect(newArrivals?.config.justLanded).toBe(true)
   })
 
   it('assigns a contiguous display order', () => {

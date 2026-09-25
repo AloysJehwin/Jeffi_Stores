@@ -11,7 +11,7 @@ import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { bp } from '@/lib/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
-import CopySku from '@/components/ui/CopySku'
+import ProductSpecifications from '@/components/visitor/pdp/ProductSpecifications'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/business/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
@@ -403,119 +403,7 @@ export default async function ProductDetailPage({
           </div>
         </div>
 
-        {/* Specifications card */}
-        {(() => {
-          const p = product as any
-          const primarySpecs = [
-            p.brands            && { label: 'Brand',              value: p.brands.name },
-            p.sku               && { label: 'SKU',                value: p.sku },
-            p.material          && { label: 'Material',           value: p.material },
-            p.finish            && { label: 'Finish',             value: p.finish },
-            p.color             && { label: 'Color',              value: p.color },
-            p.size              && { label: 'Size',               value: p.size },
-            p.variant_type      && { label: 'Variant Type',       value: p.variant_type },
-            p.sub_variant_type  && { label: 'Sub-Variant Type',   value: p.sub_variant_type },
-            p.dimensions        && { label: 'Dimensions',         value: `${p.dimensions} cm` },
-            p.weight != null    && { label: 'Weight',             value: p.weight_unit ? `${p.weight} ${p.weight_unit}` : `${p.weight} kg` },
-            p.weight_grams      && { label: 'Net Weight',         value: `${p.weight_grams} g` },
-            p.net_weight_grams  && { label: 'Net Weight',         value: `${p.net_weight_grams} g` },
-            p.volume_ml         && { label: 'Volume',             value: `${p.volume_ml} ml` },
-            (p.length_cm || p.breadth_cm || p.height_cm) && {
-              label: 'Package Dimensions',
-              value: [p.length_cm, p.breadth_cm, p.height_cm].filter((v: any) => v != null).join(' × ') + (p.length_unit ? ` ${p.length_unit}` : ' cm'),
-            },
-            p.package_type      && { label: 'Package Type',      value: p.package_type },
-            p.country_of_origin && { label: 'Origin',            value: p.country_of_origin },
-            p.brand_part_number && { label: 'Part Number',       value: p.brand_part_number },
-            p.warranty_months   && { label: 'Warranty',          value: `${p.warranty_months} month${p.warranty_months > 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` },
-            p.compliance_standard && { label: 'Compliance',      value: p.compliance_standard },
-            p.safety_rating     && { label: 'Safety Rating',     value: p.safety_rating },
-            p.barcode           && { label: 'Barcode',           value: p.barcode },
-            p.isbn              && { label: 'ISBN',              value: p.isbn },
-            p.asin              && { label: 'ASIN',              value: p.asin },
-            (p.age_min || p.age_max) && {
-              label: 'Age Range',
-              value: p.age_min && p.age_max ? `${p.age_min}–${p.age_max} years` : p.age_min ? `${p.age_min}+ years` : `Up to ${p.age_max} years`,
-            },
-            p.target_gender && p.target_gender !== 'unisex' && { label: 'For', value: p.target_gender.charAt(0).toUpperCase() + p.target_gender.slice(1) },
-          ].filter(Boolean) as { label: string; value: string }[]
-
-          const generalSpecs = [
-            p.categories        && { label: 'Category',          value: p.categories.name },
-            p.mpn               && { label: 'MPN',               value: p.mpn },
-            p.gtin              && { label: 'GTIN / EAN',        value: p.gtin },
-            p.hsn_code          && { label: 'HSN Code',          value: p.hsn_code },
-            p.gst_percentage != null && { label: 'GST',          value: `${parseFloat(String(p.gst_percentage))}%` },
-            p.currency          && { label: 'Currency',          value: p.currency },
-          ].filter(Boolean) as { label: string; value: string }[]
-
-          const hazards = [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean) as string[]
-          const certList = (p.certifications as string[] | null) ?? []
-          const audienceList = (p.target_audience as string[] | null) ?? []
-
-          if (primarySpecs.length === 0 && generalSpecs.length === 0 && hazards.length === 0 && certList.length === 0 && audienceList.length === 0) return null
-
-          return (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
-              <h2 className="text-xl font-bold text-foreground mb-6">Specifications</h2>
-
-              {hazards.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {p.fragile && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">⚠ Fragile</span>}
-                  {p.hazardous && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">☢ Hazardous</span>}
-                  {p.flammable && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">🔥 Flammable</span>}
-                </div>
-              )}
-
-              {primarySpecs.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5 mb-6">
-                  {primarySpecs.map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                      <p className="font-semibold text-foreground text-sm">{value}{label === 'SKU' && value && <CopySku sku={String(value)} className="ml-1" />}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {certList.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs text-foreground-muted mb-2">Certifications</p>
-                  <div className="flex flex-wrap gap-2">
-                    {certList.map((c: string, i: number) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{c}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {audienceList.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs text-foreground-muted mb-2">Target Audience</p>
-                  <div className="flex flex-wrap gap-2">
-                    {audienceList.map((a: string, i: number) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{a}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {generalSpecs.length > 0 && (
-                <>
-                  {(primarySpecs.length > 0 || certList.length > 0 || audienceList.length > 0) && <div className="border-t border-border-default mb-6" />}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
-                    {generalSpecs.map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                        <p className="font-semibold text-foreground text-sm">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })()}
+        <ProductSpecifications product={product} />
 
         {/* Features & Use Cases (AI-enriched) */}
         {(() => {

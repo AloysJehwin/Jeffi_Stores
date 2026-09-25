@@ -29,7 +29,16 @@ export function trackRecentlyViewed(product: RecentProduct) {
   } catch {}
 }
 
-export default function RecentlyViewed({ excludeId, basePath = '/products' }: { excludeId?: string; basePath?: string }) {
+export default function RecentlyViewed({
+  excludeId, basePath = '/products', title = 'Recently Viewed', limit = 6, minItems = 6, className = 'mt-10',
+}: {
+  excludeId?: string
+  basePath?: string
+  title?: string
+  limit?: number
+  minItems?: number
+  className?: string
+}) {
   const { user } = useAuth()
   const [products, setProducts] = useState<RecentProduct[]>([])
   const [quickView, setQuickView] = useState<RecentProduct | null>(null)
@@ -39,9 +48,9 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
   useEffect(() => {
     try {
       const stored: RecentProduct[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-      setProducts(stored.filter(p => p.id !== excludeId).slice(0, 6))
+      setProducts(stored.filter(p => p.id !== excludeId).slice(0, limit))
     } catch {}
-  }, [excludeId])
+  }, [excludeId, limit])
 
   useEffect(() => {
     if (!quickView) return
@@ -63,12 +72,12 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
-  if (products.length < 6) return null
+  if (products.length === 0 || products.length < minItems) return null
 
   return (
     <>
-    <div className="mt-10">
-      <h2 className="text-2xl font-bold text-foreground mb-6">Recently Viewed</h2>
+    <div className={className}>
+      <h2 className="text-2xl font-bold text-foreground mb-6">{title}</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {products.map(product => {
           const discountPct = product.categoryId ? (user?.businessDiscountMap?.[product.categoryId] ?? 0) : 0

@@ -6,7 +6,9 @@ import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import { getHost } from '@/lib/get-host'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/homepage-data'
-import { productRowKey, sectionLimit, type ProductSource } from '@/lib/homepage-sections'
+import { loadSectionExtras } from '@/lib/homepage-extras'
+import { productRowKey, sectionLimit, defaultAboutCopy, resolveAboutStats, type ProductSource } from '@/lib/homepage-sections'
+import { listActiveOffers, listOffersByIds } from '@/lib/product-offers'
 
 export const revalidate = 120
 
@@ -170,34 +172,31 @@ export default async function HomePage() {
   const storefront = await getStorefrontContent()
   const { gstEnabled } = await getFeatureFlags()
 
-  // Homepage stats tiles — admin-editable JSON, fall back to defaults.
-  const DEFAULT_STATS = [
-    { value: '10+', label: 'Years in Business' },
-    { value: '1000+', label: 'Happy Customers' },
-  ]
-  let stats: { value: string; label: string }[] = DEFAULT_STATS
-  if (storefront.statsJson.trim()) {
-    try {
-      const parsed = JSON.parse(storefront.statsJson)
-      if (Array.isArray(parsed) && parsed.length && parsed.every(s => s && typeof s.value === 'string' && typeof s.label === 'string')) {
-        stats = parsed
-      }
-    } catch { /* keep defaults */ }
-  }
+  const stats = resolveAboutStats(storefront.statsJson)
   // The flagship's own copy now lives in site-controls and is withheld from tenants, so an
   // unset value here means a tenant that has not written one yet — name it rather than
   // describing someone else's trade.
   const identity = await getStoreIdentity()
-  const aboutCopy = storefront.aboutCopy.trim() ||
-    `${identity.name} brings you a curated range of quality products, delivered across India.`
+  const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
 
   const sections = await getConfiguredSections()
   const needs = planDataNeeds(sections)
   const rowPlan = planProductRows(sections)
 
-  const [mainCategories, heroSlides, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] = await Promise.all([
+  // Honor the offer-slider section's picked offers (config.offerIds); fall back to all active.
+  const offerSection = sections.find(s => s.type === 'offer_slider')
+  const rawOfferIds = offerSection?.config?.offerIds
+  const pickedOfferIds = Array.isArray(rawOfferIds)
+    ? rawOfferIds.filter((id): id is string => typeof id === 'string')
+    : []
+
+  const extrasPromise = loadSectionExtras(sections, gstEnabled)
+  const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] = await Promise.all([
     needs.mainCategories ? getMainCategories() : Promise.resolve([]),
     needs.heroSlides ? getHeroSlides() : Promise.resolve([]),
+    needs.offerSlider
+      ? (pickedOfferIds.length > 0 ? listOffersByIds(pickedOfferIds) : listActiveOffers())
+      : Promise.resolve([]),
     needs.categoryShowcase ? getCategoryShowcase() : Promise.resolve([]),
     needs.topBrands ? getTopBrands() : Promise.resolve([]),
     needs.dealOfTheDay ? getDealOfTheDay(gstEnabled) : Promise.resolve([]),
@@ -212,6 +211,7 @@ export default async function HomePage() {
     })
   )
   const rowsByKey = new Map(rowResults)
+  const extras = await extrasPromise
   const productRows = new Map<string, any[]>()
   for (const s of sections) {
     if (s.type !== 'product_row') continue
@@ -233,6 +233,7 @@ export default async function HomePage() {
           rowIndex={sections.slice(0, i).filter(s => s.type === 'product_row').length}
           data={{
             heroSlides,
+            offers,
             mainCategories,
             topBrands,
             categoryShowcase,
@@ -245,6 +246,7 @@ export default async function HomePage() {
             storeName: identity.name,
             businessLandingUrl,
             businessSignupUrl,
+            extras,
           }}
         />
       ))}

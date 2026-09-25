@@ -96,6 +96,25 @@ export async function removeSheetLinks(
   )
 }
 
+// On disconnect: links and pending removals are what flag products for deletion, so dropping both
+// means a sheet connected later only ever manages the rows it lists.
+export async function forgetSheetOwnership(tenantId: string): Promise<number> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE import_jobs SET pending_deletions = '[]'::jsonb, updated_at = now()
+     WHERE tenant_id = $1 AND source = 'google_sheet' AND pending_deletions <> '[]'::jsonb`,
+    [tenantId],
+  )
+  const res = await pool.query(`DELETE FROM sheet_product_links WHERE tenant_id = $1`, [tenantId])
+  return res.rowCount ?? 0
+}
+
+// Runs in the caller's tenant store-DB context.
+export async function releaseSheetProducts(): Promise<number> {
+  const res = await query(`UPDATE products SET data_source = 'manual' WHERE data_source = 'google_sheet'`)
+  return res.rowCount ?? 0
+}
+
 async function removeSheetLink(tenantId: string, spreadsheetId: string, productId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(

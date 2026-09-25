@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
     const tenantId = await resolveTenantId()
     const name = [admin.first_name, admin.last_name].filter(Boolean).join(' ') || identity.name || null
-    const token = await issueStaffToken({ adminId: admin.id, tenantId, email: admin.email, name, role: admin.role, scopes: admin.scopes })
+    const token = await issueStaffToken({ adminId: admin.id, tenantId, email: admin.email, name })
     return setStaffCookie(NextResponse.json({ ok: true, name }), token)
   } catch {
     return NextResponse.json({ error: 'Sign-in failed' }, { status: 500 })

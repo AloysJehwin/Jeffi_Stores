@@ -10,7 +10,7 @@ const SOURCE_LABELS: Record<string, string> = { online: 'Online store', offline:
 const sourceLabel = (s: string) => SOURCE_LABELS[s] || s.replace(/_/g, ' ')
 
 export default function GrowthInsights({ data, host }: { data: DashboardAnalytics; host: string }) {
-  const { conversion: cv, engagement: e, promotions: p, carts: k, health: h, cash, attention: a, byHour, bySource, topStates } = data.insights
+  const { conversion: cv, engagement: e, promotions: p, carts: k, health: h, cash, attention: a, byHour, trafficByHour, bySource, topStates } = data.insights
   const canCustomers = useHasScope('customers:read')
   const canCoupons = useHasScope('coupons:read')
   const canFinancial = useHasScope('financial:read')
@@ -87,8 +87,17 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <SectionCard>
-          <SectionHeader title="Peak Order Hours" actionLabel="Orders" href={ap('/admin/orders', host)} />
-          <HourBars counts={byHour} />
+          <SectionHeader title="Peak Hours" actionLabel="Orders" href={ap('/admin/orders', host)} />
+          <div className="space-y-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-1.5">Orders by hour</p>
+              <HourBars counts={byHour} unit="orders" />
+            </div>
+            <div className="pt-3 border-t border-border-default/70">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-1.5">Traffic by hour</p>
+              <HourBars counts={trafficByHour} tone="sky" unit="visits" />
+            </div>
+          </div>
         </SectionCard>
 
         <SectionCard>

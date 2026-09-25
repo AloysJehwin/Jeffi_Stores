@@ -12,6 +12,9 @@ import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
 import CartInsightPanel from '@/components/on-device/CartInsightPanel'
+import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
+import CartUpsellRow from '@/components/visitor/cart/CartUpsellRow'
+import CouponNudge from '@/components/visitor/cart/CouponNudge'
 
 interface AppliedCoupon {
   couponId: string
@@ -144,8 +147,9 @@ export default function CartPage() {
   const discount = appliedCoupon?.discountAmount ?? 0
   const finalTotal = Math.max(0, total - discount)
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode.trim()) return
+  const handleApplyCoupon = async (codeArg?: string) => {
+    const code = (codeArg ?? couponCode).trim()
+    if (!code) return
     setCouponLoading(true)
     setCouponError('')
     try {
@@ -153,7 +157,7 @@ export default function CartPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ code: couponCode.trim(), subtotal: total }),
+        body: JSON.stringify({ code, subtotal: total }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -183,6 +187,7 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2">
+            <FreeShippingProgress subtotal={total} />
             {cartItems.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center">
                 <svg aria-hidden="true" className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -531,6 +536,8 @@ export default function CartPage() {
               qty: Number(i.quantity),
             }))} />
 
+            <CartUpsellRow cartProductIds={cartItems.map(i => i.product_id)} savedProductIds={savedItems.map(i => i.product_id)} />
+
             <FeaturedForYou compact limit={4} />
           </div>
 
@@ -564,7 +571,7 @@ export default function CartPage() {
                         className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
                       />
                       <button
-                        onClick={handleApplyCoupon}
+                        onClick={() => handleApplyCoupon()}
                         disabled={couponLoading || !couponCode.trim()}
                         className="px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
@@ -572,6 +579,7 @@ export default function CartPage() {
                       </button>
                     </div>
                     {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                    <CouponNudge subtotal={total} signedIn={!!user} applying={couponLoading} onApply={handleApplyCoupon} />
                   </div>
                 )}
               </div>

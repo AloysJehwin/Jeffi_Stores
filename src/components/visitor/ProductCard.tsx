@@ -28,13 +28,14 @@ interface ProductCardProps {
   fragile?: boolean | null
   hazardous?: boolean | null
   flammable?: boolean | null
+  badge?: string | null
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
   extraDeliveryDays = 0, handlingDays = 2,
-  fragile, hazardous, flammable,
+  fragile, hazardous, flammable, badge,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -170,9 +171,18 @@ export default function ProductCard({
               </div>
             )}
 
-            {mrpDiscount > 0 && (
-              <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
-                {mrpDiscount}% off
+            {(mrpDiscount > 0 || badge) && (
+              <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+                {mrpDiscount > 0 && (
+                  <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                    {mrpDiscount}% off
+                  </div>
+                )}
+                {badge && (
+                  <div className="bg-primary-500 dark:bg-primary-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                    {badge}
+                  </div>
+                )}
               </div>
             )}
 
