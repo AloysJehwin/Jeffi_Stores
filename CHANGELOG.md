@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.2.0](https://github.com/AloysJehwin/Jeffi_Stores/compare/v1.1.0...v1.2.0) (2026-09-25)
+
+
+### Features
+
+* **auth:** server-driven admin session expiry with event stream, activity heartbeat, cross-tab sync and idle sweep; explicit logout ends all admin sessions ([bb6f2b7](https://github.com/AloysJehwin/Jeffi_Stores/commit/bb6f2b761d7256cd75e0c47081177807af6ad885))
+* bind sessions to a browser-held key, plus address change, plan gating and Delhivery fixes ([7a35a29](https://github.com/AloysJehwin/Jeffi_Stores/commit/7a35a29427feef8280082dacb3f7dd2c840f442c))
+* **business:** drop the public header on sign-in and sign-up; top-right switch action (Sign up / Sign in) ([fa8eb86](https://github.com/AloysJehwin/Jeffi_Stores/commit/fa8eb86d3943c5a74e286f67cfd72d4335b29a7d))
+* cert portal, per-admin idle logout, wallet delivery charging, sheet template, coupon draft-first ([0906b16](https://github.com/AloysJehwin/Jeffi_Stores/commit/0906b166f7208888871fca288e89c3fb79984a59))
+* **dashboard:** hover crosshair and value popup on the revenue and orders trend chart; bucket-aware axis labels ([37d9f2a](https://github.com/AloysJehwin/Jeffi_Stores/commit/37d9f2af2eb2c83ea17921b181c1284e1b21f60a))
+* **dashboard:** KPI refactor with margin, conversion, fulfilment, product, growth and cash insights; tasks and needs-attention move to the bottom ([72ce713](https://github.com/AloysJehwin/Jeffi_Stores/commit/72ce713db5092fe9469470cf1969a9c327fec7fd))
+* draft-first create flow for brands and categories ([38df34a](https://github.com/AloysJehwin/Jeffi_Stores/commit/38df34a5ba4886f5fe5c2345547246561fd83f99))
+* draft-first create flow for products ([415de76](https://github.com/AloysJehwin/Jeffi_Stores/commit/415de768462a985bdc4fd9f3db8fe0bf37c17cd3))
+* draft-first create flow for review forms ([0c69b86](https://github.com/AloysJehwin/Jeffi_Stores/commit/0c69b86e07972918d214601d575a9bd43dbd41df))
+* draft-first creates, staff notes, portal UI, dashboard KPIs, server-driven admin sessions, template import, k8s plan ([51f7cf7](https://github.com/AloysJehwin/Jeffi_Stores/commit/51f7cf70ebed6f830965c09663f1b9340fad2274))
+* fix tenant forms host DNS tier; add staff customer-notes capture with attachments ([fd126fa](https://github.com/AloysJehwin/Jeffi_Stores/commit/fd126fa642af3a608b645bb35bd97e6ee53a2c18))
+* homepage draft/publish, product attribute filters, PDP specifications, storefront engagement sections, product offers [schema] ([3916bea](https://github.com/AloysJehwin/Jeffi_Stores/commit/3916bea48c342b1f0e93c8ead85c86f984de1092))
+* key-bound sessions, address change approval, plan gating and Delhivery fixes ([728271d](https://github.com/AloysJehwin/Jeffi_Stores/commit/728271d7abc613e06e695ca4b504109190f562bb))
+* **portal:** hide top nav on sign-in pages; AdminSelect for the staff order picker ([47a2cb3](https://github.com/AloysJehwin/Jeffi_Stores/commit/47a2cb3358082978ecf496f19224a2093d7b9dbe))
+* shared portal UI for the certificate portal and staff notes (Google + email code, mobile/desktop trees) ([4dcc44c](https://github.com/AloysJehwin/Jeffi_Stores/commit/4dcc44c4fcdabee63813814905d8f43696c84aaa))
+
+
+### Bug Fixes
+
+* **admin-certs:** point new admins at the certificate portal in the default delivery mode ([5f08dec](https://github.com/AloysJehwin/Jeffi_Stores/commit/5f08dec1af8f16006298f09c9dc7e6fa8d3b83f1))
+* **admin-certs:** point new admins at the certificate portal in the default delivery mode ([9e564c6](https://github.com/AloysJehwin/Jeffi_Stores/commit/9e564c6660b7f8cee0b73610613a62e701de3b3f))
+* cron-record 400 for unregistered jobs; single cron registry; audit log on Basic ([2bc775b](https://github.com/AloysJehwin/Jeffi_Stores/commit/2bc775b0e96393d4b172657956ab3db34d4015ed))
+* **import:** parse the multi-sheet product template from uploads and Google Sheets; read every template tab on sync; drop duplicated key columns on the Sub-variants tab ([1bfce1f](https://github.com/AloysJehwin/Jeffi_Stores/commit/1bfce1f3783115f94e1e5b6df5f001cca9623963))
+* **migrations:** reconcile tenant columns right after each CREATE TABLE so new-column constraints and indexes apply; self-heal CHECK constraints; verify columns after apply; retry transient DB errors with the failing statement named; pipeline retries the fan-out and re-runs it when the builder changes ([e54de71](https://github.com/AloysJehwin/Jeffi_Stores/commit/e54de71962136caae26926b2a20087ca349406b2))
+* **migrations:** tenant schema fan-out reconciles columns before constraints and indexes; verified, retried, pipeline hardened [schema] ([41fbd30](https://github.com/AloysJehwin/Jeffi_Stores/commit/41fbd306e895e683fbf3145b9ada8e4bf99bf60c))
+* **notes:** owner note alerts and the daily digest use the shared admin email template and audited send path ([320f20f](https://github.com/AloysJehwin/Jeffi_Stores/commit/320f20fed0eec6d858e808acadc7ffe55f439396))
+* **release:** relabel the merged release PR when the fallback step tags it ([fe7c35e](https://github.com/AloysJehwin/Jeffi_Stores/commit/fe7c35ea2e3826b9c0265c9a147cd275171db566))
+* tenant owners derive scopes from the plan live, not the provisioning snapshot ([5650efa](https://github.com/AloysJehwin/Jeffi_Stores/commit/5650efa925cbeea4e956d49bf81b62b8be2f091a))
+
 ## [1.1.0](https://github.com/AloysJehwin/Jeffi_Stores/compare/v1.0.0...v1.1.0) (2026-09-15)
 
 
