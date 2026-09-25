@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { NextResponse } from 'next/server'
 
 // Signed OAuth state for the store-admin connect flows. HMAC-signs a compact JSON payload with
 // CRON_SECRET (a server-only secret) so the callback can trust the tenantId it receives — the
@@ -41,4 +42,17 @@ export function verifyAdminState(state: string): AdminOAuthState | null {
   } catch {
     return null
   }
+}
+
+// The admin cookie is SameSite=Strict and withheld for the whole redirect chain that began at the
+// provider, so a plain redirect lands on /login. Navigating from this page makes the last hop same-site.
+export function returnToAdmin(url: string): NextResponse {
+  const attr = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const js = JSON.stringify(url).replace(/</g, '\\u003c')
+  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">'
+    + `<meta http-equiv="refresh" content="0;url=${attr}"><title>Returning to admin</title></head>`
+    + `<body><script>location.replace(${js})</script><a href="${attr}">Continue to admin</a></body></html>`
+  return new NextResponse(html, {
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+  })
 }

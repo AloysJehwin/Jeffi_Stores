@@ -248,7 +248,13 @@ export async function POST(request: NextRequest) {
          COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid),
          buy_mode
        )
-       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()
+       DO UPDATE SET
+         quantity = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END,
+         price_at_addition = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END,
+         buy_unit = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.buy_unit ELSE cart_items.buy_unit END,
+         saved_for_later = FALSE,
+         saved_at = NULL,
+         updated_at = NOW()
        RETURNING quantity, (xmax = 0) AS inserted`,
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { currentAdminBaseUrl, platformOAuthBaseUrl } from '@/lib/brand'
 import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState } from '@/app/api/admin/integrations/state'
+import { verifyAdminState, returnToAdmin } from '@/app/api/admin/integrations/state'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,22 +18,22 @@ export async function GET(request: NextRequest) {
   let backTo = `${currentAdminBaseUrl()}/admin/data-source`
 
   const err = params.get('error')
-  if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
+  if (err) return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(err)}`)
 
   const code = params.get('code')
   const rawState = params.get('state')
-  if (!code || !rawState) return NextResponse.redirect(`${backTo}?connected=0&error=missing_params`)
+  if (!code || !rawState) return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=missing_params`)
 
   const state = verifyAdminState(rawState)
   if (!state || state.provider !== 'google_sheets') {
-    return NextResponse.redirect(`${backTo}?connected=0&error=bad_state`)
+    return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=bad_state`)
   }
   if (state.returnBase) backTo = `${state.returnBase}/admin/data-source`
 
   try {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-    if (!clientId || !clientSecret) return NextResponse.redirect(`${backTo}?connected=0&error=not_configured`)
+    if (!clientId || !clientSecret) return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=not_configured`)
 
     const redirectUri = `${platformOAuthBaseUrl()}/api/admin/data-source/google/callback`
     const body = new URLSearchParams({
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         has_access_token: Boolean(data?.access_token), has_refresh_token: Boolean(data?.refresh_token),
       })
       const reason = data?.error_description || data?.error || 'exchange_failed'
-      return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
+      return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
     }
 
     // Keep a previously-stored spreadsheet id if this connect didn't carry one.
@@ -76,9 +76,9 @@ export async function GET(request: NextRequest) {
       meta: { connected_via: 'oauth', ...(spreadsheetId ? { spreadsheet_id: spreadsheetId } : { needs_spreadsheet_id: true }) },
     })
 
-    return NextResponse.redirect(`${backTo}?connected=google_sheets`)
+    return returnToAdmin(`${backTo}?tab=google_sheet&connected=google_sheets`)
   } catch (e: any) {
     console.error('[data-source/google/callback] failed', { message: e?.message })
-    return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
   }
 }

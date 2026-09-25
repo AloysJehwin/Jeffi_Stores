@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { hasScope } from '@/lib/scopes'
-import OffersClient from './OffersClient'
+import OffersTabs from './OffersTabs'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,11 +12,11 @@ export default async function OffersPage() {
 
   return (
     <div className="p-6 w-full max-w-full min-w-0">
-      <h1 className="text-2xl font-bold text-foreground">Bank Offers</h1>
+      <h1 className="text-2xl font-bold text-foreground">Offers</h1>
       <p className="text-sm text-foreground-muted mt-1 mb-6">
-        Razorpay offers shown on product pages
+        Razorpay bank offers shown on product pages, and your own product offers with their titles, dates, images, and assigned products.
       </p>
-      <OffersClient canWrite={canWrite} />
+      <OffersTabs canWrite={canWrite} />
     </div>
   )
 }

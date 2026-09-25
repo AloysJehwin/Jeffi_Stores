@@ -4,6 +4,8 @@ import type { NextRequest, NextResponse } from 'next/server'
 // Staff capture surface ({slug}.jeffistores.in/staff): an admin proves their email via OTP
 // (no client certificate — this is for phones) and gets a short-lived signed JWT cookie.
 // Host-scoped on purpose: it must never be valid on the mTLS admin host or any other tenant.
+// The cookie carries identity only. Role and scopes are read from the admin record per request:
+// an owner's scope list made the Set-Cookie header overflow nginx's header buffer (502).
 
 export const STAFF_COOKIE = 'staff_sid'
 const STAFF_TTL_S = 8 * 60 * 60
@@ -14,24 +16,33 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(s)
 }
 
-export interface StaffSession {
+export interface StaffTokenClaims {
   adminId: string
   tenantId: string | null
   email: string
   name: string | null
+}
+
+export interface StaffSession extends StaffTokenClaims {
   role: string
   scopes: string[]
 }
 
-export async function issueStaffToken(s: StaffSession): Promise<string> {
-  return new SignJWT({ ...s, email: s.email.toLowerCase(), type: 'staff' })
+export async function issueStaffToken(c: StaffTokenClaims): Promise<string> {
+  return new SignJWT({
+    adminId: c.adminId,
+    tenantId: c.tenantId,
+    email: c.email.toLowerCase(),
+    name: c.name,
+    type: 'staff',
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${STAFF_TTL_S}s`)
     .sign(secret())
 }
 
-export async function verifyStaffToken(token: string | undefined | null): Promise<StaffSession | null> {
+export async function verifyStaffToken(token: string | undefined | null): Promise<StaffTokenClaims | null> {
   if (!token) return null
   try {
     const { payload } = await jwtVerify(token, secret())
@@ -41,16 +52,14 @@ export async function verifyStaffToken(token: string | undefined | null): Promis
       tenantId: typeof payload.tenantId === 'string' ? payload.tenantId : null,
       email: payload.email,
       name: typeof payload.name === 'string' ? payload.name : null,
-      role: typeof payload.role === 'string' ? payload.role : '',
-      scopes: Array.isArray(payload.scopes) ? (payload.scopes as string[]) : [],
     }
   } catch {
     return null
   }
 }
 
-/** Session from the request cookie, bound to the tenant of the current host. */
-export async function staffSessionFromRequest(req: NextRequest, currentTenantId: string | null): Promise<StaffSession | null> {
+/** Claims from the request cookie, bound to the tenant of the current host. */
+export async function staffSessionFromRequest(req: NextRequest, currentTenantId: string | null): Promise<StaffTokenClaims | null> {
   const s = await verifyStaffToken(req.cookies.get(STAFF_COOKIE)?.value)
   if (!s) return null
   if ((s.tenantId ?? null) !== (currentTenantId ?? null)) return null

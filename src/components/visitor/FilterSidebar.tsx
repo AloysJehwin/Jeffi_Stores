@@ -13,6 +13,7 @@ type BrandFacet = { id: string; name: string; count: number }
 interface FilterSidebarProps {
   basePath?: string
   categories?: CategoryItem[]
+  offers?: { slug: string; title: string }[]
   facets: {
     brands: BrandFacet[]
     colors: ColorFacet[]
@@ -124,7 +125,7 @@ function CheckboxRow({
 const STORAGE_KEY = 'filter_sidebar_sections_v2'
 const DEFAULT_OPEN_SECTIONS = ['Categories', 'Price Range', 'Availability', 'Offers', 'Brand', 'Color']
 
-export default function FilterSidebar({ basePath = '/products', categories = [], facets }: FilterSidebarProps) {
+export default function FilterSidebar({ basePath = '/products', categories = [], facets, offers = [] }: FilterSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -216,6 +217,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
   // ---- Current state reads ----
   const inStockOnly = searchParams.get('inStock') === '1'
   const onSaleActive = searchParams.get('onSale') === '1'
+  const currentOffer = searchParams.get('offer') || ''
   const currentRating = searchParams.get('minRating') || ''
   const currentVariantType = searchParams.get('variantType') || ''
   const currentVariantValue = searchParams.get('variantValue') || ''
@@ -224,7 +226,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
 
   const FILTER_PARAMS = [
     'brand', 'color',
-    'minPrice', 'maxPrice', 'inStock', 'onSale', 'minRating',
+    'minPrice', 'maxPrice', 'inStock', 'onSale', 'offer', 'minRating',
     'grade', 'material', 'finish', 'compliance', 'origin',
     'variantType', 'variantValue', 'specKey', 'specValue',
   ]
@@ -457,6 +459,18 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
             <span className="text-xs text-foreground-muted">({facets.onSaleCount})</span>
           )}
         </button>
+        {offers.length > 0 && (
+          <div className="mt-3 space-y-0.5">
+            {offers.map(o => (
+              <CheckboxRow
+                key={o.slug}
+                label={o.title}
+                active={currentOffer === o.slug}
+                onToggle={() => apply({ offer: currentOffer === o.slug ? null : o.slug })}
+              />
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* 4. Brand */}

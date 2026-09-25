@@ -13,6 +13,8 @@ import CustomerNotes from '@/components/admin/CustomerNotes'
 import { listNotes } from '@/lib/customer-notes'
 import CustomerTasks from '@/components/admin/CustomerTasks'
 import CustomerTimeline from '@/components/admin/CustomerTimeline'
+import CustomerAiSummary from '@/components/admin/CustomerAiSummary'
+import CustomerConversations from '@/components/admin/CustomerConversations'
 import HealthScoreCard from '@/components/admin/HealthScoreCard'
 
 export const dynamic = 'force-dynamic'
@@ -253,7 +255,7 @@ export default async function CustomerDetailPage({
         <div className="space-y-5">
           {/* Engagement chips + Health Score — CRM/WhatsApp requires Growth plan */}
           {hasCrm && (
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <div id="engagement" className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerEngagementChips
               customerId={customer.id}
               phone={customer.phone}
@@ -392,6 +394,12 @@ export default async function CustomerDetailPage({
         {/* Right column: Timeline + Orders table (spans 2 cols) */}
         <div className="lg:col-span-2 space-y-5">
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerAiSummary customerId={customer.id} canWrite={canWrite} />
+          </div>
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerConversations customerId={customer.id} email={customer.email} phone={customer.phone} canWrite={canWrite} isBusiness={customer.user_type === 'business'} />
+          </div>
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerTimeline customerId={customer.id} />
           </div>
           <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -463,7 +471,7 @@ export default async function CustomerDetailPage({
 
           {/* Send Mailer */}
           {canMail && (
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <div id="mailer" className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Send Mailer</h2>
             <CustomerMailerPanel
               customerId={customer.id}

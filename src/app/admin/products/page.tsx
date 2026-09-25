@@ -26,6 +26,8 @@ import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/admin-cookie'
+import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/product-attribute-filters'
+import { getSpecFilterFields } from '@/lib/product-attribute-filters.server'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -47,23 +49,7 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
       is_active: resolvedSearchParams.is_active,
       stock: resolvedSearchParams.stock,
       search: resolvedSearchParams.search,
-      is_featured: resolvedSearchParams.is_featured,
-      has_variants: resolvedSearchParams.has_variants,
-      price_min: resolvedSearchParams.price_min,
-      price_max: resolvedSearchParams.price_max,
-      gst_percentage: resolvedSearchParams.gst_percentage,
-      condition: resolvedSearchParams.condition,
-      grade: resolvedSearchParams.grade,
-      is_digital: resolvedSearchParams.is_digital,
-      is_bundle: resolvedSearchParams.is_bundle,
-      is_cod_allowed: resolvedSearchParams.is_cod_allowed,
-      shipping_class: resolvedSearchParams.shipping_class,
-      is_oversized: resolvedSearchParams.is_oversized,
-      country_of_origin: resolvedSearchParams.country_of_origin,
-      fragile: resolvedSearchParams.fragile,
-      hazardous: resolvedSearchParams.hazardous,
-      perishable: resolvedSearchParams.perishable,
-      serialized: resolvedSearchParams.serialized,
+      attributes: resolvedSearchParams,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -76,33 +62,16 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
   // 6-featured limit in FeaturedToggleButton / ProductsTableClient).
   const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
 
-  const currentListUrl = (() => {
+  const listParams = (p: number) => {
     const params = new URLSearchParams()
-    if (resolvedSearchParams.category_id) params.set('category_id', resolvedSearchParams.category_id)
-    if (resolvedSearchParams.brand_id) params.set('brand_id', resolvedSearchParams.brand_id)
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.stock) params.set('stock', resolvedSearchParams.stock)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/products${qs ? `?${qs}` : ''}`
-  })()
-
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.category_id) params.set('category_id', resolvedSearchParams.category_id)
-    if (resolvedSearchParams.brand_id) params.set('brand_id', resolvedSearchParams.brand_id)
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.stock) params.set('stock', resolvedSearchParams.stock)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
+    for (const [k, v] of Object.entries(resolvedSearchParams)) {
+      if (k !== 'page' && k !== '_adv' && typeof v === 'string' && v) params.set(k, v)
+    }
     if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/products${qs ? `?${qs}` : ''}`, host)
+    return params.toString()
   }
+  const currentListUrl = `/admin/products${listParams(page) ? `?${listParams(page)}` : ''}`
+  const buildUrl = (p: number) => ap(`/admin/products${listParams(p) ? `?${listParams(p)}` : ''}`, host)
 
   return (
     <ResponsiveList
@@ -367,9 +336,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
 
-  const [categories, brands] = await Promise.all([
+  const [categories, brands, specFields] = await Promise.all([
     getAllCategories(),
     getAllBrands(),
+    getSpecFilterFields(),
   ])
 
   const allCats: any[] = categories || []
@@ -415,26 +385,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
         suggestType="products"
-        advancedContent={<AdvancedFilterPanel fields={[
-          { name: 'is_featured', label: 'Featured', type: 'boolean', section: 'Product Type' },
-          { name: 'has_variants', label: 'Has Variants', type: 'boolean', section: 'Product Type' },
-          { name: 'is_digital', label: 'Digital Product', type: 'boolean', section: 'Product Type' },
-          { name: 'is_bundle', label: 'Bundle', type: 'boolean', section: 'Product Type' },
-          { name: 'condition', label: 'Condition', type: 'toggle', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
-          { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
-          { name: 'gst_percentage', label: 'GST %', type: 'multi-select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
-          { name: 'is_cod_allowed', label: 'COD Allowed', type: 'boolean', section: 'Pricing & Tax' },
-          { name: 'shipping_class', label: 'Shipping Class', type: 'multi-select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
-          { name: 'is_oversized', label: 'Oversized', type: 'boolean', section: 'Logistics' },
-          { name: 'country_of_origin', label: 'Country of Origin', type: 'value-help', section: 'Logistics', placeholder: 'Any country' },
-          { name: 'fragile', label: 'Fragile', type: 'boolean', section: 'Product Flags' },
-          { name: 'hazardous', label: 'Hazardous', type: 'boolean', section: 'Product Flags' },
-          { name: 'perishable', label: 'Perishable', type: 'boolean', section: 'Product Flags' },
-          { name: 'serialized', label: 'Serialized', type: 'boolean', section: 'Product Flags' },
-          { name: 'grade', label: 'Grade', type: 'value-help', section: 'Specifications', placeholder: 'Any grade' },
-          { name: 'compliance_standard', label: 'Compliance Standard', type: 'value-help', section: 'Specifications', placeholder: 'Any standard' },
-          { name: 'safety_rating', label: 'Safety Rating', type: 'value-help', section: 'Specifications', placeholder: 'Any rating' },
-        ]} mode="content" forceExpanded />}
+        advancedContent={<AdvancedFilterPanel fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} mode="content" forceExpanded />}
       />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />

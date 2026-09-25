@@ -1,8 +1,8 @@
 'use client'
 
-import { productSource } from '@/lib/homepage-sections'
+import { configNumber, productSource } from '@/lib/homepage-sections'
 import {
-  CtaFields, Grid, HeadingFields, LayoutField, LimitField, Note, Select,
+  CtaFields, Grid, HeadingFields, LayoutField, LimitField, Note, NumberField, Select, ToggleField,
   useSectionBinding, type EditorProps, type SectionOptions,
 } from './fields'
 
@@ -65,6 +65,22 @@ export default function ProductRowEditor(props: EditorProps) {
 
       <LimitField props={props} />
       <LayoutField props={props} />
+
+      <ToggleField
+        label="Just Landed badge"
+        checked={section.config?.justLanded === true}
+        disabled={!canWrite}
+        hint="Marks recently launched products with a New badge. Uses the launch date, else the date added."
+        onChange={v => b.saveConfig({ justLanded: v })}
+      />
+      {section.config?.justLanded === true ? (
+        <NumberField
+          label="Counts as new for (days)"
+          value={configNumber(section, 'newWithinDays', 30, 365)}
+          disabled={!canWrite}
+          onCommit={v => b.saveConfig({ newWithinDays: Math.min(v, 365) })}
+        />
+      ) : <div />}
 
       <HeadingFields props={props} eyebrowHint="Small line above the heading, e.g. Handpicked." />
       <CtaFields props={props} />

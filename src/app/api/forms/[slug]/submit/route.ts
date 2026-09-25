@@ -5,6 +5,7 @@ import { PoolClient } from 'pg'
 import nodemailer from 'nodemailer'
 import { sendAuditedMail } from '@/lib/mail-audit'
 import { currentBrandNameAsync } from '@/lib/brand'
+import { mailShell } from '@/lib/mail-template'
 
 interface CustomField {
   id: string
@@ -44,36 +45,29 @@ async function couponEmail(coupon: Coupon, email: string) {
     ? `${coupon.discount_value}% off`
     : `₹${coupon.discount_value} off`
   const validLine = coupon.valid_until
-    ? `<p style="color:#999;font-size:13px;margin:8px 0 0;">Valid until ${new Date(coupon.valid_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>`
+    ? `<p class="muted" style="margin:8px 0 0;">Valid until ${new Date(coupon.valid_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>`
     : ''
-  const body = `
-    <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi there,</p>
-    <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 16px;">Thank you for your Google review!</h2>
-    <p style="color:#555;line-height:1.6;margin:0 0 20px;">Here&apos;s your reward coupon. Use it on your next order at ${brand}:</p>
-    <div style="background:#f5f5f5;border:2px dashed #e07b3f;border-radius:8px;padding:20px 24px;text-align:center;margin:0 0 20px;">
-      <p style="font-size:13px;color:#777;margin:0 0 4px;">${discountText} on your next order</p>
-      <p style="font-size:28px;font-weight:900;letter-spacing:4px;color:#1a3a4a;margin:0;">${coupon.code}</p>
-      ${coupon.description ? `<p style="font-size:13px;color:#555;margin:8px 0 0;">${coupon.description}</p>` : ''}
-      ${validLine}
-    </div>
-    <a href="${BASE_URL}/products" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;margin:0 0 16px;">Shop Now at ${brand}</a>
-  `
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-      <tr><td style="background:#1a3a4a;padding:20px 32px;border-radius:8px 8px 0 0;">
-        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">${brand}</a>
-      </td></tr>
-      <tr><td style="background:#ffffff;padding:32px;border-radius:0 0 8px 8px;">${body}</td></tr>
-      <tr><td style="padding:16px 0;text-align:center;font-size:12px;color:#999;">
-        &copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#999;">jeffistores.in</a>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>`
+  const html = mailShell({
+    brand,
+    kicker: 'Your reward coupon',
+    title: 'Thank you for your Google review!',
+    content: `
+      <p>Hi there,</p>
+      <p>Here&apos;s your reward coupon. Use it on your next order at ${brand}:</p>
+      <div class="coupon">
+        <p class="muted" style="margin:0 0 4px;">${discountText} on your next order</p>
+        <p class="coupon-code">${coupon.code}</p>
+        ${coupon.description ? `<p style="font-size:13px;color:#555;margin:8px 0 0;">${coupon.description}</p>` : ''}
+        ${validLine}
+      </div>
+      <div class="cta"><a href="${BASE_URL}/products" class="button">Shop Now at ${brand}</a></div>
+    `,
+    footerLines: [`&copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#666;">jeffistores.in</a>`],
+    extraCss: `
+      .coupon { background-color: white; border: 2px dashed #2563eb; border-radius: 8px; padding: 20px 24px; text-align: center; margin: 20px 0; }
+      .coupon-code { font-size: 28px; font-weight: 900; letter-spacing: 4px; color: #2563eb; margin: 0; }
+    `,
+  })
   return { subject: `Your reward coupon from ${brand} — ${coupon.code}`, html }
 }
 

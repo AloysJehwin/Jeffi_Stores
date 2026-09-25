@@ -1930,6 +1930,11 @@ CREATE UNIQUE INDEX idx_auth_sessions_token_hash ON public.auth_sessions USING b
 -- hero_slides: active slides ordered for the homepage carousel
 CREATE INDEX idx_hero_slides_active_order ON public.hero_slides USING btree (is_active, display_order) WHERE (is_active = true);
 
+-- product_offers: active offers ordered for the homepage slider
+CREATE INDEX idx_product_offers_active_order ON public.product_offers USING btree (is_active, display_order) WHERE (is_active = true);
+-- product_offer_items: membership lookups both directions
+CREATE INDEX idx_product_offer_items_product ON public.product_offer_items USING btree (product_id);
+
 
 --
 -- Name: idx_homepage_sections_active_order; Type: INDEX; Schema: public; Owner: -

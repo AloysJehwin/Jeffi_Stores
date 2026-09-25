@@ -11,10 +11,14 @@ import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { wishlistBadges } from '@/components/visitor/account/wishlist-badges'
 
 interface WishlistItem {
   id: string
   product_id: string
+  snapshot_price: number | string | null
+  snapshot_in_stock: boolean | null
+  inventory_in_stock: boolean | null
   products: {
     id: string
     name: string
@@ -200,6 +204,15 @@ function WishlistInner() {
               ? Math.round(((mrp - inclPrice) / mrp) * 100)
               : 0
             const isAddingToCart = addingToCart.has(item.product_id)
+            const badges = wishlistBadges({
+              hasVariants,
+              shownPrice: Number(price),
+              shownInStock: isInStock,
+              basePrice: item.products.base_price,
+              inventoryInStock: item.inventory_in_stock,
+              snapshotPrice: item.snapshot_price,
+              snapshotInStock: item.snapshot_in_stock,
+            })
 
             return (
               <div key={item.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow group">
@@ -230,6 +243,18 @@ function WishlistInner() {
                   {mrpDiscount > 0 && (
                     <div className="absolute top-3 right-3 bg-accent-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
                       {mrpDiscount}% off
+                    </div>
+                  )}
+                  {(badges.backInStock || badges.priceDrop) && (
+                    <div className="absolute top-3 left-3 flex flex-col items-start gap-1">
+                      {badges.backInStock && (
+                        <span className="bg-emerald-600 text-white px-2 py-1 rounded-full text-xs font-semibold">Back in stock</span>
+                      )}
+                      {badges.priceDrop && (
+                        <span className="bg-rose-600 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                          Price dropped {badges.priceDrop.pct}%
+                        </span>
+                      )}
                     </div>
                   )}
                 </Link>
@@ -263,6 +288,14 @@ function WishlistInner() {
                         </span>
                       )}
                     </div>
+                    {badges.priceDrop && (
+                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium mb-1">
+                        Was{' '}
+                        <span className="line-through">
+                          ₹{badges.priceDrop.was.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </p>
+                    )}
                     <p className="text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
 
                     <div className="flex items-center justify-between mb-3">

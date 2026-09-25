@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { pickUnitPrice } from '@/lib/pricing'
+import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.category_showcase
 
 interface CategoryShowcaseProps {
   items: any[]
@@ -14,8 +17,8 @@ export default function CategoryShowcase({ items, gstEnabled = false, title, eye
       <div className="container mx-auto px-4">
         <div className="flex items-end justify-between mb-6">
           <div>
-            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow ?? 'Shop by Category'}</p>
-            <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{title ?? 'Top Categories'}</h2>
+            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow ?? COPY.eyebrow}</p>
+            <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
           </div>
           <Link href="/categories" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
             All categories

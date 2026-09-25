@@ -66,7 +66,8 @@ export default function AdminImage({
         alt={alt}
         loading="lazy"
         decoding="async"
-        className={`${className ?? ''} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        // Painted above the placeholder instead of faded in on onLoad: a missed load event would leave a loaded image invisible.
+        className={`${className ?? ''} relative`}
         onLoad={() => setLoaded(true)}
         onError={() => { setErrored(true); setLoaded(true) }}
       />

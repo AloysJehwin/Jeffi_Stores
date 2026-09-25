@@ -244,7 +244,7 @@ async function handlePaymentCaptured(payment: any) {
     )
 
     if (paymentRecord.user_id) {
-      await client.query('DELETE FROM cart_items WHERE user_id = $1', [paymentRecord.user_id])
+      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [paymentRecord.user_id])
     }
   })
 
@@ -350,7 +350,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
     )
 
     if (order.user_id) {
-      await client.query('DELETE FROM cart_items WHERE user_id = $1', [order.user_id])
+      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [order.user_id])
     }
   })
 

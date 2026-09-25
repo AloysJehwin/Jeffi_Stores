@@ -28,3 +28,22 @@ export function productCardProps(product: any, gstEnabled: boolean) {
     discountPct: Number(product.discount_pct ?? 0),
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0) }
 }
+
+export type CardProps = ReturnType<typeof productCardProps>
+
+/**
+ * ProductCard props for rows headed to a client component or a public API: product_images rows
+ * carry storage keys, so only the display fields of the primary image are kept.
+ */
+export function cardPropsFor(rows: any[], gstEnabled: boolean): CardProps[] {
+  return rows.map(row => {
+    const card = productCardProps(row, gstEnabled)
+    const img = card.primaryImage as { image_url?: string; thumbnail_url?: string; blurhash?: string | null } | null
+    return {
+      ...card,
+      primaryImage: img?.image_url
+        ? { image_url: img.image_url, thumbnail_url: img.thumbnail_url, blurhash: img.blurhash ?? null }
+        : null,
+    }
+  })
+}

@@ -18,6 +18,7 @@ export interface ProductFilterParams {
   variantValue?: string
   specKey?: string
   specValue?: string
+  offer?: string
 }
 
 export interface FilterClauses {
@@ -88,6 +89,16 @@ export function buildProductFilterClauses(params: ProductFilterParams, paramInde
   if (params.specKey && params.specValue) {
     conditions.push(`p.specifications @> jsonb_build_object($${i}::text, $${i + 1}::text)`)
     bound.push(params.specKey, params.specValue); i += 2
+  }
+
+  if (params.offer != null && params.offer !== '') {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM product_offer_items poi
+      JOIN product_offers po ON po.id = poi.offer_id
+      WHERE poi.product_id = p.id AND po.is_active = true
+        AND (po.slug = $${i} OR po.id::text = $${i})
+    )`)
+    bound.push(params.offer); i++
   }
 
   return { conditions, params: bound, nextIdx: i }

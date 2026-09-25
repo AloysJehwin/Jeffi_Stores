@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
+import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.brand_carousel
 
 interface BrandCarouselProps {
   brands: { id: string; name: string; slug: string; product_count: number }[]
@@ -25,15 +28,15 @@ export default function BrandCarousel({ brands, title, eyebrow, carousel = false
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">{eyebrow ?? 'Trusted Names'}</p>
-            <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">{title ?? 'Shop by Brand'}</h2>
+            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">{eyebrow ?? COPY.eyebrow}</p>
+            <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
           </div>
           <Link href="/brands" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
             All brands <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
           </Link>
         </div>
         {carousel ? (
-          <SectionCarousel ariaLabel={title ?? 'Shop by Brand'} itemClassName="w-[22%] sm:w-[12%]">
+          <SectionCarousel ariaLabel={title ?? COPY.title} itemClassName="w-[22%] sm:w-[12%]">
             {items}
           </SectionCarousel>
         ) : (

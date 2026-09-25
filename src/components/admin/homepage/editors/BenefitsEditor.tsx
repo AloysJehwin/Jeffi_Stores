@@ -2,6 +2,7 @@
 
 import { Grid, HeadingFields, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
+import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 
 const KEYS = ['icon', 'title', 'sub']
 
@@ -14,8 +15,8 @@ export default function BenefitsEditor(props: EditorProps) {
       <HeadingFields props={props} eyebrowHint="Optional — leave both empty to show the tiles with no heading." />
       <TileListEditor
         label="Tiles"
-        hint="Leave empty to keep the built-in GST / bulk discount / account manager tiles."
         tiles={readTiles(b.cfg.items, KEYS)}
+        defaults={SECTION_TILE_DEFAULTS.benefits}
         fields={[
           { key: 'title', label: 'Title', placeholder: 'Bulk order discounts' },
           { key: 'sub', label: 'Description', kind: 'textarea' },

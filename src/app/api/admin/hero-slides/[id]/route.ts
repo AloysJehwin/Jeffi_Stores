@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
+import { applyDraftPatch, withHomepageDraft } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +36,7 @@ const COLUMN_MAP: Record<string, string> = {
   filterInStock: 'filter_in_stock', filterOnSale: 'filter_on_sale', isActive: 'is_active',
 }
 
-// PATCH /api/admin/hero-slides/[id] — update one slide (partial).
+// PATCH /api/admin/hero-slides/[id] — update one draft slide (partial).
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -49,20 +49,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!parsed.ok) return parsed.response
   const d = parsed.data as Record<string, unknown>
 
-  const sets: string[] = []
-  const vals: unknown[] = []
-  let i = 1
+  const updates: Record<string, unknown> = {}
   for (const [key, col] of Object.entries(COLUMN_MAP)) {
-    if (key in d) {
-      sets.push(`${col} = $${i++}`)
-      vals.push(d[key] ?? null)
-    }
+    if (key in d) updates[col] = d[key] ?? null
   }
-  if (sets.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
-  vals.push(id)
+  if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
-  await query(`UPDATE hero_slides SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals)
-  const slide = await queryOne(`SELECT * FROM hero_slides WHERE id = $1`, [id])
+  const slide = await withHomepageDraft(admin.adminId, draft => {
+    const row = draft.heroSlides.find(s => s.id === id)
+    if (row) applyDraftPatch(row, updates)
+    return row ?? null
+  })
   if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
   return NextResponse.json({ slide })
 }
@@ -75,6 +72,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  await query(`DELETE FROM hero_slides WHERE id = $1`, [id])
+  await withHomepageDraft(admin.adminId, draft => {
+    draft.heroSlides = draft.heroSlides.filter(s => s.id !== id)
+  })
   return NextResponse.json({ success: true })
 }

@@ -63,6 +63,14 @@ export function buildProductRowSql(
   deps: ProductRowQueryDeps,
 ): string {
   const { where, orderBy } = sourceClause(source, categorySlug)
+  return buildProductCardSql({ where, orderBy, limit: '$1' }, deps)
+}
+
+/** The card-ready SELECT every product row uses, for any WHERE / ORDER BY / LIMIT placeholder. */
+export function buildProductCardSql(
+  { where, orderBy, limit }: { where: string; orderBy: string; limit: string },
+  deps: ProductRowQueryDeps,
+): string {
   return `
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -81,7 +89,7 @@ export function buildProductRowSql(
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE ${where}
     ORDER BY ${orderBy}
-    LIMIT $1
+    LIMIT ${limit}
   `
 }
 
@@ -107,6 +115,7 @@ export function planDataNeeds(sections: HomepageSection[]) {
   const types = new Set(sections.map(s => s.type))
   return {
     heroSlides: types.has('hero'),
+    offerSlider: types.has('offer_slider'),
     mainCategories: types.has('category_grid'),
     topBrands: types.has('brand_carousel'),
     categoryShowcase: types.has('category_showcase'),

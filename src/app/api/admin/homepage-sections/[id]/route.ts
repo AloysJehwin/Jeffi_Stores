@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { revalidatePath } from 'next/cache'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin, type AdminJWTPayload } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
+import { applyDraftPatch, endsBeforeStart, withHomepageDraft, type DraftSection } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,51 +33,55 @@ const patchSchema = z.object({
   endsAt: z.string().datetime().nullish(),
 })
 
-async function guard(request: NextRequest) {
+async function guard(request: NextRequest): Promise<AdminJWTPayload | NextResponse> {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  return null
+  return admin
 }
 
+type PatchOutcome = { section: DraftSection } | { error: string; status: 400 | 404 }
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await guard(request)
-  if (denied) return denied
+  const admin = await guard(request)
+  if (admin instanceof NextResponse) return admin
   const { id } = await params
 
   const parsed = parseBody(patchSchema, await request.json())
   if (!parsed.ok) return parsed.response
 
-  const sets: string[] = []
-  const values: unknown[] = []
+  const updates: Record<string, unknown> = {}
   for (const [key, column] of Object.entries(COLUMN_MAP)) {
     if (!(key in parsed.data)) continue
     const raw = (parsed.data as Record<string, unknown>)[key]
-    sets.push(`${column} = $${values.length + 1}`)
-    values.push(column === 'config' ? JSON.stringify(raw ?? {}) : raw ?? null)
+    updates[column] = column === 'config' ? raw ?? {} : raw ?? null
   }
-  if (sets.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+  if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
-  values.push(id)
-  const section = await queryOne(
-    `UPDATE homepage_sections SET ${sets.join(', ')}, updated_at = NOW()
-     WHERE id = $${values.length} RETURNING *`,
-    values,
-  )
-  if (!section) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const outcome = await withHomepageDraft<PatchOutcome>(admin.adminId, draft => {
+    const section = draft.sections.find(s => s.id === id)
+    if (!section) return { error: 'Not found', status: 404 }
+    const next = { ...section, ...updates }
+    if (endsBeforeStart(next.starts_at, next.ends_at)) {
+      return { error: 'The end time must be after the start time', status: 400 }
+    }
+    applyDraftPatch(section, updates)
+    return { section }
+  })
+  if ('error' in outcome) return NextResponse.json({ error: outcome.error }, { status: outcome.status })
 
-  revalidatePath('/')
-  return NextResponse.json({ section })
+  return NextResponse.json({ section: outcome.section })
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await guard(request)
-  if (denied) return denied
+  const admin = await guard(request)
+  if (admin instanceof NextResponse) return admin
   const { id } = await params
 
-  await query(`DELETE FROM homepage_sections WHERE id = $1`, [id])
-  revalidatePath('/')
+  await withHomepageDraft(admin.adminId, draft => {
+    draft.sections = draft.sections.filter(s => s.id !== id)
+  })
   return NextResponse.json({ success: true })
 }

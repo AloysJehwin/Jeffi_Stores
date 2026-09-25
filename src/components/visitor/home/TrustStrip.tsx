@@ -1,4 +1,5 @@
 import IconByName from './IconByName'
+import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 
 export interface TrustStripItem {
   icon: string
@@ -10,18 +11,9 @@ interface TrustStripProps {
   items?: TrustStripItem[] | null
 }
 
-function defaultItems(freeShippingThreshold: number): TrustStripItem[] {
-  return [
-    { icon: 'Truck', label: `Free delivery above ₹${freeShippingThreshold.toLocaleString('en-IN')}` },
-    { icon: 'Receipt', label: 'GST invoice on every order' },
-    { icon: 'Boxes', label: '10,000+ products in stock' },
-    { icon: 'CreditCard', label: 'Cash on delivery available' },
-  ]
-}
-
 export default function TrustStrip({ freeShippingThreshold, items }: TrustStripProps) {
   const amount = `₹${freeShippingThreshold.toLocaleString('en-IN')}`
-  const tiles = (items && items.length > 0 ? items : defaultItems(freeShippingThreshold))
+  const tiles = (items && items.length > 0 ? items : SECTION_TILE_DEFAULTS.trust_strip)
     .map(item => ({ ...item, label: item.label.replace(/\{amount\}/g, amount) }))
 
   return (

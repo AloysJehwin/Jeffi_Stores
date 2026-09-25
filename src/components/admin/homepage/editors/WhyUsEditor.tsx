@@ -2,6 +2,7 @@
 
 import { Grid, HeadingFields, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
+import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 
 const KEYS = ['icon', 'title', 'desc', 'color']
 
@@ -20,8 +21,8 @@ export default function WhyUsEditor(props: EditorProps) {
       <HeadingFields props={props} eyebrowHint="Small line above the heading, e.g. Why us." />
       <TileListEditor
         label="Cards"
-        hint="Leave empty to keep the built-in Fast Delivery / Wide Range / 24-7 Support cards."
         tiles={readTiles(b.cfg.items, KEYS)}
+        defaults={SECTION_TILE_DEFAULTS.why_us}
         fields={[
           { key: 'title', label: 'Title', placeholder: 'Fast Delivery' },
           { key: 'desc', label: 'Description', kind: 'textarea' },

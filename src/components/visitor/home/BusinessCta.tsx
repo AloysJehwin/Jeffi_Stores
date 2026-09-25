@@ -1,9 +1,19 @@
+import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.business_cta
+
 interface BusinessCtaProps {
   businessLandingUrl: string
   businessSignupUrl: string
+  title?: string | null
+  subtitle?: string | null
+  ctaLabel?: string | null
+  ctaUrl?: string | null
 }
 
-export default function BusinessCta({ businessLandingUrl, businessSignupUrl }: BusinessCtaProps) {
+export default function BusinessCta({
+  businessLandingUrl, businessSignupUrl, title, subtitle, ctaLabel, ctaUrl,
+}: BusinessCtaProps) {
   return (
     <div className="px-3 sm:px-6 md:px-8 py-3 md:py-6 bg-surface">
       <div className="relative rounded-2xl overflow-hidden shadow-2xl min-h-[340px] md:min-h-[400px]" style={{ background: '#0d0d0d' }}>
@@ -24,15 +34,15 @@ export default function BusinessCta({ businessLandingUrl, businessSignupUrl }: B
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
-            For Business
+            {COPY.eyebrow}
           </div>
 
-          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white leading-tight">
-            Buying for<br />a business?
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white leading-tight text-balance">
+            {title || COPY.title}
           </h2>
 
           <p className="text-white/60 text-xs sm:text-sm leading-relaxed">
-            Bulk discounts, GSTIN invoicing, and a dedicated account manager. Trusted by 500+ businesses across India.
+            {subtitle || COPY.subtitle}
           </p>
 
           <div className="flex flex-col gap-2 pt-1">
@@ -52,10 +62,10 @@ export default function BusinessCta({ businessLandingUrl, businessSignupUrl }: B
 
           <div className="flex flex-wrap gap-3 pt-1 pointer-events-auto">
             <a
-              href={businessSignupUrl}
+              href={ctaUrl || businessSignupUrl}
               className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-accent-500/25"
             >
-              Register Now
+              {ctaLabel || COPY.ctaLabel}
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>

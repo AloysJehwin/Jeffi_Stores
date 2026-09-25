@@ -18,6 +18,7 @@ interface ProductRowSectionProps {
   inlineViewAllArrow?: boolean
   footerCta?: { href: string; label: string }
   carousel?: boolean
+  badgeFor?: (product: any) => string | null
 }
 
 export default function ProductRowSection({
@@ -35,6 +36,7 @@ export default function ProductRowSection({
   inlineViewAllArrow = false,
   footerCta,
   carousel = false,
+  badgeFor,
 }: ProductRowSectionProps) {
   const heading = (
     <div>
@@ -44,7 +46,7 @@ export default function ProductRowSection({
   )
 
   const cards = products.map((product: any) => (
-    <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} />
+    <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} badge={badgeFor?.(product) ?? null} />
   ))
 
   return (
@@ -57,20 +59,22 @@ export default function ProductRowSection({
               {heading}
             </div>
           ) : heading}
-          <Link href={viewAllHref} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
-            {inlineViewAllArrow ? (
-              <>
-                {viewAllLabel} <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-              </>
-            ) : (
-              <>
-                {viewAllLabel}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </>
-            )}
-          </Link>
+          {viewAllHref && (
+            <Link href={viewAllHref} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+              {inlineViewAllArrow ? (
+                <>
+                  {viewAllLabel} <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </>
+              ) : (
+                <>
+                  {viewAllLabel}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </>
+              )}
+            </Link>
+          )}
         </div>
 
         {carousel ? (

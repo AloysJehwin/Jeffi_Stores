@@ -55,6 +55,7 @@ export interface DashboardInsights {
     openQuotes: number; openQuotesValue: number; openPos: number; openPosValue: number
   }
   byHour: number[]
+  trafficByHour: number[]
   bySource: { source: string; orders: number; revenue: number }[]
   topStates: { state: string; orders: number; revenue: number }[]
 }
@@ -85,7 +86,7 @@ export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | P
   const days = Math.max(1, Math.floor(w.days))
   const prevWindow = `created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}`
 
-  const [money, conv, ful, ret, promo, coupons, cart, eng, zero, health, cat, viewed, margins, hours, sources, states, cash] = await Promise.all([
+  const [money, conv, ful, ret, promo, coupons, cart, eng, zero, health, cat, viewed, margins, hours, traffic, sources, states, cash] = await Promise.all([
     queryOne<Record<string, string>>(`
       WITH items AS (
         SELECT o.created_at, o.payment_status, oi.quantity,
@@ -272,6 +273,10 @@ export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | P
         FROM orders WHERE created_at >= ${startExpr} GROUP BY 1
     `),
     queryMany<Record<string, string>>(`
+      SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Kolkata')::int AS h, COUNT(*) AS n
+        FROM page_events WHERE created_at >= ${startExpr} GROUP BY 1
+    `),
+    queryMany<Record<string, string>>(`
       SELECT COALESCE(NULLIF(source, ''), 'online') AS source, COUNT(*) AS n,
              COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue
         FROM orders WHERE created_at >= ${startExpr} GROUP BY 1 ORDER BY n DESC
@@ -313,6 +318,8 @@ export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | P
 
   const byHour = Array.from({ length: 24 }, () => 0)
   for (const r of hours) { const h = int(r.h); if (h >= 0 && h < 24) byHour[h] = int(r.n) }
+  const trafficByHour = Array.from({ length: 24 }, () => 0)
+  for (const r of traffic) { const h = int(r.h); if (h >= 0 && h < 24) trafficByHour[h] = int(r.n) }
 
   return {
     money: {
@@ -380,6 +387,7 @@ export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | P
       openQuotes: int(cash?.open_quotes), openQuotesValue: num(cash?.open_quotes_value), openPos: int(cash?.open_pos), openPosValue: num(cash?.open_pos_value),
     },
     byHour,
+    trafficByHour,
     bySource: sources.map(s => ({ source: s.source, orders: int(s.n), revenue: num(s.revenue) })),
     topStates: states.map(s => ({ state: s.state, orders: int(s.n), revenue: num(s.revenue) })),
   }

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
 import { uploadGalleryImage } from '@/lib/s3'
+import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -12,7 +12,7 @@ const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
 // POST /api/admin/hero-slides/[id]/generate-image
 // Body: { prompt: string, field?: 'image_url' | 'image_url_mobile' }
-// Generates a hero banner with Flux, persists it to S3, and saves the URL on the slide.
+// Generates a hero banner with Flux, persists it to S3, and saves the URL on the draft slide.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -25,8 +25,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Image generation is not configured (REPLICATE_API_TOKEN missing).' }, { status: 500 })
     }
 
-    const slide = await queryOne<{ id: string }>(`SELECT id FROM hero_slides WHERE id = $1`, [id])
-    if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
+    const { heroSlides } = await getEditableHomepage()
+    if (!heroSlides.some(s => s.id === id)) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
 
     const body = await request.json().catch(() => ({}))
     const rawPrompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
@@ -56,10 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { url, blurhash } = await uploadGalleryImage(buffer, `hero-${id}.png`)
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    await query(
-      `UPDATE hero_slides SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`,
-      [url, blurhash, id],
-    )
+    const saved = await withHomepageDraft(admin.adminId, draft => {
+      const slide = draft.heroSlides.find(s => s.id === id)
+      if (slide) applyDraftPatch(slide, { [field]: url, [hashField]: blurhash ?? null })
+      return !!slide
+    })
+    if (!saved) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
     return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Image generation failed' }, { status: 500 })

@@ -1,5 +1,6 @@
 import { sendAuditedMail } from './mail-audit'
 import { customerMailFromAsync, currentBrandNameAsync, platformAdminEmail, storeContactLine, resolveCurrentTenant } from './brand'
+import { mailShell } from './mail-template'
 
 const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 
@@ -13,24 +14,10 @@ async function businessUrl(): Promise<string> {
   return t?.slug ? `https://${t.slug}.business.${PLATFORM_DOMAIN}` : `https://business.${PLATFORM_DOMAIN}`
 }
 
-async function baseLayout(body: string) {
+async function baseLayout(title: string, body: string) {
   const brand = await currentBrandNameAsync()
   const contact = await storeContactLine()
-  return `<!DOCTYPE html><html>
-<head><style>
-  body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
-  .c{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-  .h{background:#1a3a4a;padding:24px;text-align:center}
-  .b{padding:28px;color:#374151;font-size:14px;line-height:1.6}
-  .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
-  .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
-  .f{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
-</style></head>
-<body><div class="c">
-  <div class="h"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">${brand}</div></div>
-  <div class="b">${body}</div>
-  <div class="f"><p><strong>${brand}</strong></p>${contact ? `<p>${contact}</p>` : ''}</div>
-</div></body></html>`
+  return mailShell({ brand, kicker: 'Business Portal', title, content: body, footerLines: [contact] })
 }
 
 async function send(
@@ -63,23 +50,23 @@ export async function sendRfqSubmittedEmail(
   name: string,
   rfqNumber: string,
 ) {
-  const userHtml = await baseLayout(`
+  const userHtml = await baseLayout(`RFQ ${rfqNumber} submitted`, `
     <p>Dear ${name},</p>
     <p>Your Request for Quotation has been submitted successfully. Our team will review it and send you a quotation shortly.</p>
-    <div class="box">
+    <div class="info">
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
     </div>
     <p>You can track the status of your RFQ by logging into your account.</p>
-    <p style="text-align:center"><a href="${await businessUrl()}/rfqs" class="btn" style="color:#ffffff;">View My RFQs</a></p>
+    <div class="cta"><a href="${await businessUrl()}/rfqs" class="button" style="color:#ffffff;">View My RFQs</a></div>
   `)
 
-  const adminHtml = await baseLayout(`
+  const adminHtml = await baseLayout(`New RFQ ${rfqNumber}`, `
     <p>A new RFQ has been submitted.</p>
-    <div class="box">
+    <div class="info">
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
       <p style="margin:0"><strong>Submitted By:</strong> ${name} (${toEmail})</p>
     </div>
-    <p style="text-align:center"><a href="https://admin.jeffistores.in/admin/business/rfqs" class="btn" style="color:#ffffff;">View RFQs</a></p>
+    <div class="cta"><a href="https://admin.jeffistores.in/admin/business/rfqs" class="button" style="color:#ffffff;">View RFQs</a></div>
   `)
 
   const brand = await currentBrandNameAsync()
@@ -103,14 +90,14 @@ export async function sendRfqConvertedToQuotationEmail(
   viewUrl: string,
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = await baseLayout(`
+  const html = await baseLayout(`Quotation ${quoteNumber} ready`, `
     <p>Dear ${name},</p>
     <p>Your RFQ <strong>${rfqNumber}</strong> has been reviewed and a quotation has been prepared for you.</p>
-    <div class="box">
+    <div class="info">
       <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
       <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
     </div>
-    <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
+    <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
     <p>Please review the quotation. If you have any questions, contact us at +91 96853 54099.</p>
   `)
   const brand = await currentBrandNameAsync()
@@ -125,11 +112,11 @@ export async function sendBusinessAccountApprovedEmail(
   name: string,
   companyName: string,
 ) {
-  const html = await baseLayout(`
+  const html = await baseLayout('Business account approved', `
     <p>Dear ${name},</p>
     <p>We are pleased to inform you that your business account for <strong>${companyName}</strong> has been <strong>approved</strong>.</p>
     <p>You can now log in and start placing RFQs and orders.</p>
-    <p style="text-align:center"><a href="${await businessUrl()}/signin" class="btn" style="color:#ffffff;">Log In to Business Portal</a></p>
+    <div class="cta"><a href="${await businessUrl()}/signin" class="button" style="color:#ffffff;">Log In to Business Portal</a></div>
   `)
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Business account approved — ${brand}`, html, {
@@ -145,10 +132,10 @@ export async function sendBusinessAccountRejectedEmail(
   rejectionNote?: string | null,
 ) {
   const contact = await storeContactLine()
-  const html = await baseLayout(`
+  const html = await baseLayout('Business account application update', `
     <p>Dear ${name},</p>
     <p>We regret to inform you that your business account application for <strong>${companyName}</strong> could not be approved at this time.</p>
-    ${rejectionNote ? `<div class="box"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
+    ${rejectionNote ? `<div class="info"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
     <p>If you believe this is an error or would like to reapply, please contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   const brand = await currentBrandNameAsync()
@@ -168,15 +155,15 @@ export async function sendBusinessInvoiceGeneratedEmail(
 ) {
   const contact = await storeContactLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = await baseLayout(`
+  const html = await baseLayout(`Invoice ${invoiceNumber}`, `
     <p>Dear ${name},</p>
     <p>Your invoice has been generated. Please find the details below.</p>
-    <div class="box">
+    <div class="info">
       <p style="margin:0 0 6px"><strong>Invoice No.:</strong> ${invoiceNumber}</p>
       <p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>
       <p style="margin:0"><strong>Amount Due:</strong> ₹${formatted}</p>
     </div>
-    <p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>
+    <div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>
     <p>For payment enquiries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   const brand = await currentBrandNameAsync()
@@ -201,10 +188,10 @@ export async function sendBusinessOrderStatusEmail(
     cancelled: 'Cancelled',
   }
   const label = statusLabel[status] || status
-  const html = await baseLayout(`
+  const html = await baseLayout(`Order ${orderNumber} — ${label}`, `
     <p>Dear ${name},</p>
     <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
-    ${invoiceViewUrl ? `<p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
+    ${invoiceViewUrl ? `<div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
     <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   const brand = await currentBrandNameAsync()

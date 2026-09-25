@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
+import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.category_grid
 
 interface CategoryGridProps {
   categories: any[]
@@ -29,8 +32,8 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
       <div className="container mx-auto px-4">
         <div className="flex items-end justify-between mb-7">
           <div>
-            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">{eyebrow ?? 'Explore'}</p>
-            <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title ?? 'Shop by Category'}</h2>
+            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">{eyebrow ?? COPY.eyebrow}</p>
+            <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
           </div>
           <Link href="/categories" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
             View All
@@ -41,7 +44,7 @@ export default function CategoryGrid({ categories, title, eyebrow, carousel = fa
         </div>
 
         {carousel ? (
-          <SectionCarousel ariaLabel={title ?? 'Shop by Category'} itemClassName="w-[45%] sm:w-[22%] lg:w-[12%]">
+          <SectionCarousel ariaLabel={title ?? COPY.title} itemClassName="w-[45%] sm:w-[22%] lg:w-[12%]">
             {items}
           </SectionCarousel>
         ) : (

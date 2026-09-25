@@ -3,6 +3,7 @@ import { query, queryMany, queryOne } from './db'
 import { sendAuditedMail } from './mail-audit'
 import { buildVarMap, substituteVars } from './template-vars'
 import { getStoreIdentity } from './site-controls'
+import { mailShell } from './mail-template'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -19,22 +20,12 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 type TemplateData = Record<string, string>
 
 function baseLayout(title: string, body: string, baseUrl: string = BASE_URL) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-      <tr><td style="background:#1a3a4a;padding:20px 32px;border-radius:8px 8px 0 0;">
-        <a href="${baseUrl}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">{store_name}</a>
-      </td></tr>
-      <tr><td style="background:#ffffff;padding:32px;border-radius:0 0 8px 8px;">${body}</td></tr>
-      <tr><td style="padding:16px 0;text-align:center;font-size:12px;color:#999;">
-        &copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${baseUrl}" style="color:#999;">{store_web}</a>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>`
+  return mailShell({
+    brand: '{store_name}',
+    documentTitle: title,
+    content: body,
+    footerLines: [`&copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${baseUrl}" style="color:#666;">{store_web}</a>`],
+  })
 }
 
 function ctaButton(text: string, url: string) {

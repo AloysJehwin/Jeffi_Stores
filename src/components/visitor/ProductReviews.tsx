@@ -320,14 +320,15 @@ export default function ProductReviews({ productId, productName }: ProductReview
     }
   }
 
-  const avg = reviews.length > 0
-    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+  const approved = reviews.filter(r => r.is_approved)
+  const avg = approved.length > 0
+    ? approved.reduce((s, r) => s + r.rating, 0) / approved.length
     : 0
   const avgDisplay = avg.toFixed(1)
 
   const ratingCounts = [5, 4, 3, 2, 1].map(star => ({
     star,
-    count: reviews.filter(r => r.rating === star).length,
+    count: approved.filter(r => r.rating === star).length,
   }))
 
   const filteredReviews = filterStar
@@ -451,13 +452,13 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 {[1,2,3,4,5].map(i => <div key={i} className="h-2 bg-surface-secondary rounded" />)}
               </div>
             </div>
-          ) : reviews.length > 0 ? (
+          ) : approved.length > 0 ? (
             <div className="bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-5xl font-black text-foreground leading-none">{avgDisplay}</span>
                 <div>
                   <StarRow rating={Math.round(avg)} size="md" />
-                  <p className="text-xs text-foreground-muted mt-1">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
+                  <p className="text-xs text-foreground-muted mt-1">{approved.length} {approved.length === 1 ? 'review' : 'reviews'}</p>
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -466,7 +467,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                     key={star}
                     star={star}
                     count={count}
-                    total={reviews.length}
+                    total={approved.length}
                     isActive={filterStar === star}
                     onClick={() => { setFilterStar(filterStar === star ? null : star); setVisibleCount(5) }}
                   />

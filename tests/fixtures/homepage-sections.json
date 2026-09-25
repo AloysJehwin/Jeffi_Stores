@@ -85,7 +85,8 @@
         "cta_label": null,
         "cta_url": null,
         "config": {
-            "source": "new_arrivals"
+            "source": "new_arrivals",
+            "justLanded": true
         },
         "display_order": 5,
         "is_active": true,
@@ -121,6 +122,20 @@
         "ends_at": null
     },
     {
+        "id": "7bc1aaa0-a4c4-4160-be6c-773b2dde9025",
+        "type": "recently_viewed",
+        "title": null,
+        "subtitle": null,
+        "eyebrow": null,
+        "cta_label": null,
+        "cta_url": null,
+        "config": {},
+        "display_order": 8,
+        "is_active": true,
+        "starts_at": null,
+        "ends_at": null
+    },
+    {
         "id": "1dfc715d-f63b-4e54-91b5-e2877e107b28",
         "type": "product_row",
         "title": "Best Sellers",
@@ -131,7 +146,49 @@
         "config": {
             "source": "best_sellers"
         },
-        "display_order": 8,
+        "display_order": 9,
+        "is_active": true,
+        "starts_at": null,
+        "ends_at": null
+    },
+    {
+        "id": "2a457078-cb24-43e8-bde5-09c8ea2dd97e",
+        "type": "category_tabs",
+        "title": null,
+        "subtitle": null,
+        "eyebrow": null,
+        "cta_label": null,
+        "cta_url": null,
+        "config": {},
+        "display_order": 10,
+        "is_active": true,
+        "starts_at": null,
+        "ends_at": null
+    },
+    {
+        "id": "a287d44b-46bd-4ec2-879f-ad33203b16aa",
+        "type": "back_in_stock",
+        "title": null,
+        "subtitle": null,
+        "eyebrow": null,
+        "cta_label": null,
+        "cta_url": null,
+        "config": {},
+        "display_order": 11,
+        "is_active": true,
+        "starts_at": null,
+        "ends_at": null
+    },
+    {
+        "id": "a5d17f60-278f-4f6b-ad38-54de2a9fbefd",
+        "type": "testimonials",
+        "title": null,
+        "subtitle": null,
+        "eyebrow": null,
+        "cta_label": null,
+        "cta_url": null,
+        "config": {},
+        "display_order": 12,
         "is_active": true,
         "starts_at": null,
         "ends_at": null
@@ -145,7 +202,7 @@
         "cta_label": null,
         "cta_url": null,
         "config": {},
-        "display_order": 9,
+        "display_order": 13,
         "is_active": true,
         "starts_at": null,
         "ends_at": null
@@ -159,7 +216,21 @@
         "cta_label": null,
         "cta_url": null,
         "config": {},
-        "display_order": 10,
+        "display_order": 14,
+        "is_active": true,
+        "starts_at": null,
+        "ends_at": null
+    },
+    {
+        "id": "d35ac5e4-469c-4837-975a-08820d69e84d",
+        "type": "value_stats",
+        "title": null,
+        "subtitle": null,
+        "eyebrow": null,
+        "cta_label": null,
+        "cta_url": null,
+        "config": {},
+        "display_order": 15,
         "is_active": true,
         "starts_at": null,
         "ends_at": null
@@ -173,7 +244,7 @@
         "cta_label": null,
         "cta_url": null,
         "config": {},
-        "display_order": 11,
+        "display_order": 16,
         "is_active": true,
         "starts_at": null,
         "ends_at": null
@@ -187,7 +258,7 @@
         "cta_label": null,
         "cta_url": null,
         "config": {},
-        "display_order": 12,
+        "display_order": 17,
         "is_active": true,
         "starts_at": null,
         "ends_at": null

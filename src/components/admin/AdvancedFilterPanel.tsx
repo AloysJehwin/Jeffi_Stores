@@ -7,6 +7,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
 import AdminSelect from './AdminSelect'
+import { splitFilterValues } from '@/lib/product-attribute-filters'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
 
@@ -25,6 +26,7 @@ interface Props {
   paramNames?: string[]
   mode?: 'trigger' | 'content' | 'both'
   forceExpanded?: boolean
+  valuesEndpoint?: string
 }
 
 function fieldParamNames(f: AdvancedFilterField): string[] {
@@ -54,7 +56,7 @@ function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
     return `${f.label}: ${opt?.label || val}`
   }
   if (f.type === 'value-help') {
-    const vals = params.get(name)?.split(',').filter(Boolean) || []
+    const vals = splitFilterValues(params.get(name))
     return `${f.label}: ${vals.join(', ')}`
   }
   return `${f.label}: ${params.get(name)}`
@@ -162,7 +164,7 @@ export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { act
   )
 }
 
-export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both', forceExpanded }: Props) {
+export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both', forceExpanded, valuesEndpoint }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const expanded = forceExpanded ?? (searchParams.get('_adv') === '1')
@@ -215,6 +217,29 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
   }
 
   const inputCls = 'w-full px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors placeholder:text-foreground-muted'
+
+  // Scrolls on its own: the filter card is sticky, and the spec sections can outgrow the screen.
+  const sectionList = () => (
+    <div className="max-h-[50vh] overflow-y-auto overscroll-contain space-y-1.5 pr-1">
+      {sections.map(section => {
+        const sectionFields = fields.filter(f => (f.section || 'General') === section)
+        const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
+        return (
+          <FilterSection key={section} title={section} activeCount={sectionActive}>
+            {sectionFields.map((f, i) => {
+              const isWide = f.type === 'range' || f.type === 'date-range'
+              return (
+                <div key={i} className={isWide ? 'col-span-2' : ''}>
+                  <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
+                  {renderField(f)}
+                </div>
+              )
+            })}
+          </FilterSection>
+        )
+      })}
+    </div>
+  )
 
   function renderField(f: AdvancedFilterField) {
     const name = Array.isArray(f.name) ? f.name[0] : f.name
@@ -274,7 +299,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
       )
     }
     if (f.type === 'text') return <input type="text" className={inputCls} placeholder={f.placeholder || `Filter by ${f.label}`} value={local[name] || ''} onChange={e => setLocalVal(name, e.target.value)} />
-    if (f.type === 'value-help') return <FilterValueHelp field={name} label={f.label} value={local[name] || ''} onChange={v => setLocalVal(name, v)} placeholder={f.placeholder} multi />
+    if (f.type === 'value-help') return <FilterValueHelp field={name} label={f.label} value={local[name] || ''} onChange={v => setLocalVal(name, v)} placeholder={f.placeholder} multi endpoint={valuesEndpoint} />
     return null
   }
 
@@ -302,23 +327,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
           </div>
         )}
         {expanded && <>
-          {sections.map(section => {
-            const sectionFields = fields.filter(f => (f.section || 'General') === section)
-            const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
-            return (
-              <FilterSection key={section} title={section} activeCount={sectionActive}>
-                {sectionFields.map((f, i) => {
-                  const isWide = f.type === 'range' || f.type === 'date-range'
-                  return (
-                    <div key={i} className={isWide ? 'col-span-2' : ''}>
-                      <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
-                      {renderField(f)}
-                    </div>
-                  )
-                })}
-              </FilterSection>
-            )
-          })}
+          {sectionList()}
           <div className="flex items-center justify-end gap-3">
             <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
             <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
@@ -348,23 +357,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
             </div>
           )}
           {expanded && <>
-            {sections.map(section => {
-              const sectionFields = fields.filter(f => (f.section || 'General') === section)
-              const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
-              return (
-                <FilterSection key={section} title={section} activeCount={sectionActive}>
-                  {sectionFields.map((f, i) => {
-                    const isWide = f.type === 'range' || f.type === 'date-range'
-                    return (
-                      <div key={i} className={isWide ? 'col-span-2' : ''}>
-                        <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
-                        {renderField(f)}
-                      </div>
-                    )
-                  })}
-                </FilterSection>
-              )
-            })}
+            {sectionList()}
             <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
               <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>

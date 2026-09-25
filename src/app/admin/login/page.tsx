@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
@@ -12,9 +12,10 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
 export default function AdminLogin() {
   const { name: storeName, web: storeWeb } = useStoreConfig().identity
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || ap('/admin/dashboard')
+  const requested = searchParams.get('callbackUrl') || ''
+  // Same-site paths only; a full URL here would turn the login page into an open redirect.
+  const callbackUrl = /^\/(?![/\\])/.test(requested) ? requested : ap('/admin/dashboard')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
   const [otpSent, setOtpSent] = useState(false)
@@ -43,7 +44,8 @@ export default function AdminLogin() {
             : 'not_found'
         )
         if (data.authenticated) {
-          router.push(callbackUrl)
+          // A full load, not router.push: the shell-less login layout would otherwise persist into the panel.
+          window.location.replace(callbackUrl)
           return
         }
       } catch {
@@ -52,7 +54,7 @@ export default function AdminLogin() {
       setCheckingSession(false)
     }
     checkSession()
-  }, [router])
+  }, [callbackUrl])
 
   // Shared: both identity factors (email-OTP, Google) return {mfa_required|enroll_required, ticket}.
   const handleIdentityResult = async (data: { mfa_required?: boolean; enroll_required?: boolean; ticket?: string }) => {

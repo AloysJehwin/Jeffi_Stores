@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Search } from 'lucide-react'
+import { joinFilterValues, splitFilterValues } from '@/lib/product-attribute-filters'
 
 interface ValueRow {
   value: string
@@ -11,31 +12,32 @@ interface ValueRow {
 interface Props {
   field: string
   label: string
-  value: string          // comma-separated selected values
+  value: string
   onChange: (v: string) => void
   placeholder?: string
   multi?: boolean
+  endpoint?: string
 }
 
-export default function FilterValueHelp({ field, label, value, onChange, placeholder, multi = true }: Props) {
+export default function FilterValueHelp({ field, label, value, onChange, placeholder, multi = true, endpoint = '/api/admin/products/attribute-values' }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<ValueRow[]>([])
   const [loading, setLoading] = useState(false)
-  const selected = value ? value.split(',').filter(Boolean) : []
+  const selected = splitFilterValues(value)
   const searchRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchValues = useCallback(async (q: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/products/attribute-values?field=${field}&search=${encodeURIComponent(q)}`, { credentials: 'include' })
+      const res = await fetch(`${endpoint}?field=${encodeURIComponent(field)}&search=${encodeURIComponent(q)}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setRows(data.values || [])
       }
     } finally { setLoading(false) }
-  }, [field])
+  }, [field, endpoint])
 
   useEffect(() => {
     if (!open) return
@@ -53,11 +55,11 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
   function toggle(v: string) {
     if (!multi) { onChange(v === value ? '' : v); setOpen(false); return }
     const next = selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]
-    onChange(next.join(','))
+    onChange(joinFilterValues(next))
   }
 
   function removeTag(v: string) {
-    onChange(selected.filter(s => s !== v).join(','))
+    onChange(joinFilterValues(selected.filter(s => s !== v)))
   }
 
   return (

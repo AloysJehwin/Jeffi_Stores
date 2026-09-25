@@ -22,9 +22,7 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'No admin account found for this email.' }, { status: 404 })
     const tenantId = await resolveTenantId()
     const name = [admin.first_name, admin.last_name].filter(Boolean).join(' ') || null
-    const token = await issueStaffToken({
-      adminId: admin.id, tenantId, email: admin.email, name, role: admin.role, scopes: admin.scopes,
-    })
+    const token = await issueStaffToken({ adminId: admin.id, tenantId, email: admin.email, name })
     return setStaffCookie(NextResponse.json({ ok: true, name }), token)
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

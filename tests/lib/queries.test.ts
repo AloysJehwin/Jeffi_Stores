@@ -654,6 +654,16 @@ describe('getFilteredProducts', () => {
     expect(args).toContain('new')
     expect(args).toContain('A')
   })
+
+  it('applies attribute filters passed through from the query string', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ attributes: { 'spec.thread_type': 'BSW', material: 'Alloy Steel|Carbon Steel', page: '2' } })
+    const sql = mockQueryMany.mock.calls[0][0] as string
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(sql).toContain('jsonb_array_elements_text')
+    expect(args).toEqual(expect.arrayContaining(['BSW', 'thread type', 'Alloy Steel', 'Carbon Steel']))
+  })
 })
 
 // ---------------------------------------------------------------------------

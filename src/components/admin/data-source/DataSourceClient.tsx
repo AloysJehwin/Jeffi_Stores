@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 
 interface RowResult {
   row: number
@@ -52,9 +54,13 @@ const ACTIVE = new Set(['pending', 'running'])
 
 type Tab = 'import' | 'google_sheet' | 'history'
 
+const TAB_KEYS: Tab[] = ['import', 'google_sheet', 'history']
+
 export default function DataSourceClient({ initialGsheet }: { initialGsheet?: GsheetStatus }) {
   const canWrite = useCanWrite('products')
-  const [tab, setTab] = useState<Tab>('import')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<ImportJob[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [detail, setDetail] = useState<ImportJob | null>(null)
@@ -68,6 +74,31 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const [syncing, setSyncing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [reconciling, setReconciling] = useState(false)
+
+  const requestedTab = searchParams.get('tab') as Tab | null
+  const tab: Tab = requestedTab && TAB_KEYS.includes(requestedTab) && (requestedTab !== 'google_sheet' || gsheet.enabled)
+    ? requestedTab
+    : 'import'
+
+  function selectTab(next: Tab) {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', next)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  // The Google connect flow returns here with ?connected=…; show the outcome once, then drop it.
+  useEffect(() => {
+    const connected = searchParams.get('connected')
+    if (connected === null) return
+    const error = searchParams.get('error')
+    setNotice(connected === '0'
+      ? { kind: 'err', text: `Google connection failed${error ? `: ${error}` : '.'}` }
+      : { kind: 'ok', text: 'Google account connected.' })
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('connected')
+    params.delete('error')
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
   const loadJobs = useCallback(async () => {
     const res = await fetch('/api/admin/data-source/jobs', { credentials: 'include' })
     if (res.ok) setJobs((await res.json()).jobs ?? [])
@@ -154,6 +185,12 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     }
   }
 
+  const onDisconnected = async (result: { kind: 'ok' | 'err'; text: string }) => {
+    setNotice(result)
+    if (result.kind === 'ok') setSheetInput('')
+    await Promise.all([loadJobs(), loadGsheet()])
+  }
+
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -191,7 +228,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
         {tabs.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => selectTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === t.key
                 ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400'
@@ -208,12 +245,12 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
       )}
 
       {tab === 'import' && (
-        <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Import products</h2>
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={downloadTemplate}
-              className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-background-secondary"
+              className="inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary"
             >
               Download template (.xlsx)
             </button>
@@ -248,7 +285,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
       )}
 
       {tab === 'google_sheet' && gsheet.enabled && (
-        <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-foreground">Google Sheet sync</h2>
             <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${gsheet.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
@@ -286,7 +323,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
           </dl>
 
           {gsheet.lastSync ? (
-            <div className="rounded-md border border-border bg-background-secondary/40 p-4 space-y-2">
+            <div className="rounded-md border border-border-default bg-surface-secondary/40 p-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-foreground">Last sync</span>
                 <StatusPill status={gsheet.lastSync.status} />
@@ -341,7 +378,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   <button
                     onClick={() => reconcile('keep')}
                     disabled={reconciling}
-                    className={`inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-background-secondary'}`}
+                    className={`inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
                   >
                     Keep
                   </button>
@@ -357,12 +394,12 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 value={sheetInput}
                 onChange={e => setSheetInput(e.target.value)}
                 placeholder="Google Sheet URL or ID"
-                className="w-full max-w-xl rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                className="w-full max-w-xl rounded-md border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
               />
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={connectSheet}
-                  className="inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-background-secondary"
+                  className="inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary"
                 >
                   {gsheet.connected ? 'Reconnect Google' : 'Connect Google'}
                 </button>
@@ -370,7 +407,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   <button
                     onClick={createSheet}
                     disabled={creating}
-                    className={`inline-flex items-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground ${creating ? 'opacity-60 cursor-wait' : 'hover:bg-background-secondary'}`}
+                    className={`inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground ${creating ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
                   >
                     {creating ? 'Creating…' : 'Create sheet from template'}
                   </button>
@@ -382,6 +419,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 >
                   {syncing ? 'Syncing…' : 'Sync now'}
                 </button>
+                {gsheet.connected && <GoogleSheetDisconnect onDone={onDisconnected} />}
               </div>
             </div>
           ) : (
@@ -391,14 +429,14 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
       )}
 
       {tab === 'history' && (
-        <section className="space-y-3">
+        <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
           <h2 className="text-lg font-semibold text-foreground">Import history</h2>
           {jobs.length === 0 ? (
             <p className="text-sm text-foreground-secondary">No imports yet.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border">
+            <div className="overflow-x-auto rounded-lg border border-border-default">
               <table className="w-full text-sm">
-                <thead className="bg-background-secondary text-left text-foreground-secondary">
+                <thead className="bg-surface-secondary text-left text-foreground-secondary">
                   <tr>
                     <th className="px-3 py-2 font-medium">When</th>
                     <th className="px-3 py-2 font-medium">Source</th>
@@ -438,7 +476,7 @@ function RowGroup({ job, expanded, detail, onToggle }: {
   const rows = detail?.row_results ?? job.row_results ?? []
   return (
     <>
-      <tr className="border-t border-border">
+      <tr className="border-t border-border-default">
         <td className="px-3 py-2 text-foreground-secondary">{new Date(job.created_at).toLocaleString()}</td>
         <td className="px-3 py-2">{job.source === 'google_sheet' ? 'Google Sheet' : 'Upload'}</td>
         <td className="px-3 py-2"><StatusPill status={job.status} /></td>
@@ -452,7 +490,7 @@ function RowGroup({ job, expanded, detail, onToggle }: {
         </td>
       </tr>
       {expanded && (
-        <tr className="border-t border-border bg-background-secondary/40">
+        <tr className="border-t border-border-default bg-surface-secondary/40">
           <td colSpan={9} className="px-3 py-3">
             {job.last_error && <p className="text-sm text-red-600 mb-2">Job error: {job.last_error}</p>}
             {rows.length === 0 ? (
@@ -465,7 +503,7 @@ function RowGroup({ job, expanded, detail, onToggle }: {
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
-                      <tr key={i} className="border-t border-border/60">
+                      <tr key={i} className="border-t border-border-default/60">
                         <td className="px-2 py-1">{r.row}</td>
                         <td className="px-2 py-1">{r.sku ?? '—'}</td>
                         <td className="px-2 py-1"><OutcomePill outcome={r.outcome} /></td>

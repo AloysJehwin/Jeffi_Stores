@@ -1,4 +1,7 @@
 import IconByName from './IconByName'
+import { SECTION_COPY_DEFAULTS, SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
+
+const COPY = SECTION_COPY_DEFAULTS.why_us
 
 export interface WhyUsItem {
   icon: string
@@ -13,26 +16,7 @@ interface WhyUsProps {
   items?: WhyUsItem[] | null
 }
 
-const DEFAULT_ITEMS: WhyUsItem[] = [
-  {
-    icon: 'Zap',
-    title: 'Fast Delivery',
-    desc: 'Prompt dispatch and reliable delivery to your doorstep across India.',
-    color: 'primary',
-  },
-  {
-    icon: 'Boxes',
-    title: 'Wide Range',
-    desc: 'Fasteners, power tools, electrical, welding, and hundreds of industrial categories.',
-    color: 'accent',
-  },
-  {
-    icon: 'Clock',
-    title: '24/7 Support',
-    desc: 'Expert team always available to help you source the right product fast.',
-    color: 'secondary',
-  },
-]
+const DEFAULT_ITEMS: WhyUsItem[] = SECTION_TILE_DEFAULTS.why_us
 
 export default function WhyUs({ title, eyebrow, items }: WhyUsProps = {}) {
   const tiles = items && items.length > 0 ? items : DEFAULT_ITEMS
@@ -41,8 +25,8 @@ export default function WhyUs({ title, eyebrow, items }: WhyUsProps = {}) {
     <section className="py-12 md:py-20 bg-surface-secondary">
       <div className="container mx-auto px-4">
         <div className="text-center mb-10">
-          <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{eyebrow || 'Why us'}</p>
-          <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title || 'Built for Industry'}</h2>
+          <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{eyebrow || COPY.eyebrow}</p>
+          <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title || COPY.title}</h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">

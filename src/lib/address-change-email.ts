@@ -1,5 +1,6 @@
 import { sendAuditedMail } from '@/lib/mail-audit'
-import { customerMailFromAsync, storeBaseUrlAsync } from '@/lib/brand'
+import { customerMailFromAsync, currentBrandNameAsync, storeBaseUrlAsync } from '@/lib/brand'
+import { mailShell } from '@/lib/mail-template'
 import type { AddressSnapshot } from '@/lib/address-change'
 
 const esc = (v: unknown) => String(v ?? '')
@@ -28,6 +29,7 @@ export async function sendAddressChangeDecisionEmail(params: {
 }): Promise<{ success: boolean; error?: unknown }> {
   const approved = params.decision === 'approved'
   const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
   const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
   const subject = approved
     ? `Delivery address updated for order ${params.orderNumber}`
@@ -39,19 +41,17 @@ export async function sendAddressChangeDecisionEmail(params: {
     ? ''
     : `<p>${params.adminNotes ? `Reason: ${esc(params.adminNotes)}` : ''}</p><p>Your order will be delivered to the original address.</p>`
 
-  const html = `<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;background:#f4f4f5;margin:0;padding:24px;color:#111827;">
-    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
-      <div style="background:#111827;color:#fff;padding:20px 24px;"><h2 style="margin:0;font-size:18px;">${approved ? 'Delivery address updated' : 'Address change declined'}</h2></div>
-      <div style="padding:24px;">
-        <p style="margin-top:0;">Hi ${esc(params.customerName) || 'there'},</p>
-        <p>${intro}</p>
-        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">${addressBlock(params.newAddress)}</div>
-        ${outro}
-        <p style="text-align:center;margin:24px 0 8px;">
-          <a href="${orderUrl}" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 28px;border-radius:6px;font-weight:bold;text-decoration:none;">View Order</a>
-        </p>
-      </div>
-    </div></body></html>`
+  const html = mailShell({
+    brand,
+    kicker: 'Order Update',
+    title: approved ? 'Delivery address updated' : 'Address change declined',
+    content: `
+      <p>Hi ${esc(params.customerName) || 'there'},</p>
+      <p>${intro}</p>
+      <div class="card">${addressBlock(params.newAddress)}</div>
+      ${outro}
+      <div class="cta"><a href="${orderUrl}" class="button" style="color:#ffffff;">View Order</a></div>`,
+  })
 
   try {
     await sendAuditedMail({

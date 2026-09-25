@@ -2,6 +2,7 @@
 
 import { Grid, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
+import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 
 const KEYS = ['icon', 'label']
 
@@ -13,8 +14,9 @@ export default function TrustStripEditor(props: EditorProps) {
     <Grid>
       <TileListEditor
         label="Strip items"
-        hint="Leave empty to keep the built-in delivery, GST, stock and payment items. Write {amount} in a label to insert the free-delivery threshold."
+        hint="Write {amount} in a label to insert the free-delivery threshold."
         tiles={readTiles(b.cfg.items, KEYS)}
+        defaults={SECTION_TILE_DEFAULTS.trust_strip}
         fields={[
           { key: 'label', label: 'Label', placeholder: 'Free delivery above {amount}' },
         ]}

@@ -81,11 +81,13 @@ export default function MobileFilterSheet({
   brands,
   facets = EMPTY_FACETS,
   basePath = '/products',
+  offers = [],
 }: {
   categories: Category[]
   brands: Brand[]
   facets?: FilterFacets
   basePath?: string
+  offers?: { slug: string; title: string }[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -111,6 +113,7 @@ export default function MobileFilterSheet({
   const [pendingMaxPrice,   setPendingMaxPrice]   = useState(searchParams.get('maxPrice') || '')
   const [pendingInStock,    setPendingInStock]    = useState(searchParams.get('inStock') === '1')
   const [pendingOnSale,     setPendingOnSale]     = useState(searchParams.get('onSale') === '1')
+  const [pendingOffer,      setPendingOffer]      = useState(searchParams.get('offer') || '')
   const [pendingMinRating,  setPendingMinRating]  = useState(searchParams.get('minRating') || '')
   const [pendingColors,     setPendingColors]     = useState<string[]>(searchParams.get('color')?.split(',').filter(Boolean) || [])
   const [pendingGrades,     setPendingGrades]     = useState<string[]>(searchParams.get('grade')?.split(',').filter(Boolean) || [])
@@ -134,6 +137,7 @@ export default function MobileFilterSheet({
       setPendingMaxPrice(searchParams.get('maxPrice') || '')
       setPendingInStock(searchParams.get('inStock') === '1')
       setPendingOnSale(searchParams.get('onSale') === '1')
+      setPendingOffer(searchParams.get('offer') || '')
       setPendingMinRating(searchParams.get('minRating') || '')
       setPendingColors(searchParams.get('color')?.split(',').filter(Boolean) || [])
       setPendingGrades(searchParams.get('grade')?.split(',').filter(Boolean) || [])
@@ -155,7 +159,7 @@ export default function MobileFilterSheet({
   const activeFilterCount = [
     currentCategory, currentBrand, currentSort,
     searchParams.get('minPrice'), searchParams.get('maxPrice'),
-    searchParams.get('inStock'), searchParams.get('onSale'),
+    searchParams.get('inStock'), searchParams.get('onSale'), searchParams.get('offer'),
     searchParams.get('minRating'), searchParams.get('grade'),
     searchParams.get('color'), searchParams.get('material'), searchParams.get('finish'),
     searchParams.get('compliance'), searchParams.get('origin'),
@@ -172,6 +176,7 @@ export default function MobileFilterSheet({
     if (pendingMaxPrice)           params.set('maxPrice',    pendingMaxPrice)
     if (pendingInStock)            params.set('inStock',     '1')
     if (pendingOnSale)             params.set('onSale',      '1')
+    if (pendingOffer)              params.set('offer',       pendingOffer)
     if (pendingMinRating)          params.set('minRating',   pendingMinRating)
     if (pendingColors.length)      params.set('color',       pendingColors.join(','))
     if (pendingGrades.length)      params.set('grade',       pendingGrades.join(','))
@@ -197,7 +202,7 @@ export default function MobileFilterSheet({
     setPendingCategories([]); setPendingBrands([])
     setPendingSort(''); setPendingOrder('')
     setPendingMinPrice(''); setPendingMaxPrice('')
-    setPendingInStock(false); setPendingOnSale(false)
+    setPendingInStock(false); setPendingOnSale(false); setPendingOffer('')
     setPendingMinRating('')
     setPendingColors([])
     setPendingGrades([]); setPendingMaterials([]); setPendingFinishes([])
@@ -329,6 +334,26 @@ export default function MobileFilterSheet({
                   </button>
                 </div>
               </div>
+
+              {offers.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground mb-3">Offers</h3>
+                  <div className="space-y-2">
+                    {offers.map(o => {
+                      const active = pendingOffer === o.slug
+                      return (
+                        <button key={o.slug} onClick={() => setPendingOffer(active ? '' : o.slug)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${active ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}>
+                          <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${active ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}>
+                            {active && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                          {o.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Rating */}
               {facets.hasRatings && (
