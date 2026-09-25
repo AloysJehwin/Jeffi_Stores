@@ -50,8 +50,19 @@ jobs:
           version=$(jq -r '.["."]' .github/.release-please-manifest.json)
           tag="v$version"
 
+          # Release Please opens no new release PR while a merged one is still labelled pending
+          # ("untagged, merged release PRs outstanding - aborting"), and it relabels only the
+          # releases it tags itself, so a release tagged here has to be relabelled here too.
+          mark_tagged() {
+            gh label create "autorelease: tagged" --repo "${{ github.repository }}" --color ededed --force >/dev/null
+            for pr in $(gh pr list --repo "${{ github.repository }}" --state merged --label "autorelease: pending" --json number --jq '.[].number'); do
+              gh pr edit "$pr" --repo "${{ github.repository }}" --remove-label "autorelease: pending" --add-label "autorelease: tagged"
+            done
+          }
+
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "$tag already tagged — nothing to do."
+            echo "$tag already tagged."
+            mark_tagged
             exit 0
           fi
 
@@ -70,6 +81,7 @@ jobs:
           ' CHANGELOG.md)
 
           gh release create "$tag" --target "$sha" --title "$tag" --notes "${notes:-Release $tag}"
+          mark_tagged
           {
             echo "tag=$tag"
             echo "version=$version"
