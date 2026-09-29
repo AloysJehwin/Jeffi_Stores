@@ -4,8 +4,8 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
 import { Package, Plus, Check, Tag, Boxes, ImageIcon, Rocket, Store } from 'lucide-react'
-import { BrowserFrame } from '../../BrowserFrame'
-import ProductArt from '../../demo/ProductArt'
+import { BrowserFrame } from '@/app/ecom/BrowserFrame'
+import ProductArt from '@/app/ecom/_demo/ProductArt'
 
 // Standalone interactive mock of the Products & variants admin flow. In-memory only, no network.
 // Mirrors the real ProductForm: name, SKU, base_price/mrp, GST, HSN, stock_status, variants, publish.

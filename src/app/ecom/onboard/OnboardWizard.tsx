@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckMark } from '../Shapes'
+import { CheckMark } from '@/app/ecom/Shapes'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan { slug: string; name: string; tier: number; monthly_price_inr: string }

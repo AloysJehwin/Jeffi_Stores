@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { findApp } from '../../apps'
-import { CheckMark } from '../../Shapes'
-import AppIcon from '../AppIcon'
+import { findApp } from '@/app/ecom/apps'
+import { CheckMark } from '@/app/ecom/Shapes'
+import AppIcon from '@/app/ecom/apps/AppIcon'
 
 export const dynamic = 'force-dynamic'
 

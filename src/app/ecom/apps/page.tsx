@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { APP_GROUPS } from '../apps'
+import { APP_GROUPS } from '@/app/ecom/apps'
 import AppIcon from './AppIcon'
 
 export const dynamic = 'force-dynamic'

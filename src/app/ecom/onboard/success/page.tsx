@@ -5,7 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
 import { getSubscription } from '@/lib/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
-import { CheckMark } from '../../Shapes'
+import { CheckMark } from '@/app/ecom/Shapes'
 
 export const dynamic = 'force-dynamic'
 
