@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// pdfkit, qrcode and bwip-js are all mocked globally in tests/lib/__pdf-mocks.ts
+// pdfkit, qrcode and bwip-js are all mocked globally in tests/helpers/pdf-mocks.ts
 // which is auto-loaded via setupFiles + the mock in tests/setup.ts.
 // We add qrcode.toBuffer and bwip-js.toBuffer mocks here since label-pdf uses those.
 
