@@ -1,0 +1,69 @@
+name: Bug report
+description: Something is broken or behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here; follow SECURITY.md instead.
+        Do not paste secrets, tokens, or customer or order data.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Storefront
+        - Store admin
+        - Platform admin
+        - E-com portal (ecom.jeffistores.in)
+        - Tenant provisioning
+        - Payments
+        - Delivery / shipping
+        - Data sources (Google Sheets / CSV)
+        - AI features
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: tenant
+    attributes:
+      label: Store / host
+      description: Which host this happened on (for example a tenant subdomain or admin.jeffistores.in).
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - Desktop
+        - Mobile
+        - Both
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      options:
+        - Light
+        - Dark
+        - Not relevant
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs
+      description: Redact personal data and secrets.

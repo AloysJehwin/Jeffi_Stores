@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose an improvement or a new capability
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve, and for whom (shopper, store owner, platform admin)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
