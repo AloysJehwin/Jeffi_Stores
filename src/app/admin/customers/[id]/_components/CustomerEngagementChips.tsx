@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Phone } from 'lucide-react'
-import AdminSupportChat from './AdminSupportChat'
-import WhatsAppEngagement from './WhatsAppEngagement'
+import AdminSupportChat from '@/components/admin/AdminSupportChat'
+import WhatsAppEngagement from '@/components/admin/WhatsAppEngagement'
 
 interface Props {
   customerId: string

@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminSelect from './AdminSelect'
-import BatchPickerModal, { BatchPickerItem, BatchAssignment } from './BatchPickerModal'
-import SerialEntryModal, { SerialItem, SerialAssignment } from './SerialEntryModal'
-import Toggle from '../ui/Toggle'
+import AdminSelect from '@/components/admin/AdminSelect'
+import BatchPickerModal, { BatchPickerItem, BatchAssignment } from '@/components/admin/BatchPickerModal'
+import SerialEntryModal, { SerialItem, SerialAssignment } from '@/components/admin/SerialEntryModal'
+import Toggle from '@/components/ui/Toggle'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface UpdateOrderStatusProps {
