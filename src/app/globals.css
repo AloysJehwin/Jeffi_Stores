@@ -54,6 +54,23 @@
     --accent-600: #5a8a00;
   }
 
+  /* Ecom marketing demo: white/near-black scope with a single indigo accent.
+     Redefines the same tokens .light-scope does; touches nothing outside .ecom-clean. */
+  .ecom-clean {
+    --color-surface: #FFFFFF;
+    --color-surface-elevated: #FFFFFF;
+    --color-surface-secondary: #F5F6F8;
+    --color-foreground: #0B0D12;
+    --color-foreground-secondary: #3A3F4B;
+    --color-foreground-muted: #6B7280;
+    --color-border: #E5E7EB;
+    --color-border-secondary: #D1D5DB;
+    --primary-500: #f59e0b;
+    --primary-600: #d97706;
+    --accent-500: #7cb900;
+    --accent-600: #5a8a00;
+  }
+
   /* Remap brand utility classes to CSS vars so they shift with theme */
   .bg-primary-500 { background-color: var(--primary-500) !important; }
   .bg-primary-600 { background-color: var(--primary-600) !important; }
@@ -72,6 +89,43 @@
   .border-b-accent-500 { border-bottom-color: var(--accent-500) !important; }
   .focus\:ring-accent-500:focus { --tw-ring-color: var(--accent-500) !important; }
   .group:hover .group-hover\:text-accent-600 { color: var(--accent-600) !important; }
+
+  /* Ecom demo: one restrained blue accent for primary buttons + active states */
+  .ecom-accent-bg { background-color: #2563eb !important; }
+  .ecom-accent-bg:hover { background-color: #1d4ed8 !important; }
+  .ecom-accent-text { color: #2563eb; }
+  .ecom-accent-border { border-color: #2563eb; }
+  .ecom-accent-ring:focus { --tw-ring-color: #2563eb; }
+
+  /* Ecom pages: recolor the brand accent (green) to a professional blue, scoped to .ecom-scope
+     on the ecom layout so the rest of the app keeps its green. */
+  .ecom-scope .bg-accent-600 { background-color:#1d4ed8 !important; }
+  .ecom-scope .text-accent-600 { color:#1d4ed8 !important; }
+  .ecom-scope .bg-accent-500 { background-color:#2563eb !important; }
+  .ecom-scope .text-accent-400 { color:#60a5fa !important; }
+  .ecom-scope .bg-accent-700 { background-color:#1e40af !important; }
+  .ecom-scope .to-accent-500 { --tw-gradient-to:#2563eb var(--tw-gradient-to-position) !important; }
+  .ecom-scope .border-accent-500 { border-color:#2563eb !important; }
+  .ecom-scope .bg-accent-900 { background-color:#172554 !important; }
+  .ecom-scope .bg-accent-50 { background-color:#eff6ff !important; }
+  .ecom-scope .text-accent-700 { color:#1e40af !important; }
+  .ecom-scope .text-accent-300 { color:#93c5fd !important; }
+  .ecom-scope .ring-accent-500 { --tw-ring-color:#2563eb !important; }
+  .ecom-scope .border-accent-400 { border-color:#60a5fa !important; }
+  .ecom-scope .border-accent-300 { border-color:#93c5fd !important; }
+  .ecom-scope .shadow-accent-600 { --tw-shadow-color:#1d4ed8 !important; }
+  .ecom-scope .from-accent-600 { --tw-gradient-from:#1d4ed8 var(--tw-gradient-from-position) !important; --tw-gradient-to:rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+  .ecom-scope .border-accent-600 { border-color:#1d4ed8 !important; }
+  .ecom-scope .text-accent-500 { color:#2563eb !important; }
+  .ecom-scope .from-accent-500 { --tw-gradient-from:#2563eb var(--tw-gradient-from-position) !important; --tw-gradient-to:rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+  .ecom-scope .border-accent-800 { border-color:#1e3a8a !important; }
+  .ecom-scope .border-accent-700 { border-color:#1e40af !important; }
+  .ecom-scope .border-accent-200 { border-color:#bfdbfe !important; }
+  .ecom-scope .bg-accent-100 { background-color:#dbeafe !important; }
+  .ecom-scope .hover\:bg-accent-500:hover { background-color:#2563eb !important; }
+  .ecom-scope .hover\:bg-accent-600:hover { background-color:#1d4ed8 !important; }
+  .ecom-scope .hover\:bg-accent-700:hover { background-color:#1e40af !important; }
+  .ecom-scope .group:hover .group-hover\:text-accent-600 { color:#1d4ed8 !important; }
 
   * {
     @apply box-border;
