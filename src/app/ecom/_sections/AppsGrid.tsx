@@ -10,7 +10,7 @@ import {
   Users, LayoutDashboard, Bot, UserCog, Activity,
   LayoutGrid,
 } from 'lucide-react'
-import { APP_GROUPS } from '../apps'
+import { APP_GROUPS } from '@/app/ecom/apps'
 
 type IconType = ComponentType<{ className?: string }>
 

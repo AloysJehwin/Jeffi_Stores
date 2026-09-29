@@ -1,11 +1,11 @@
 import Link from 'next/link'
 import { PhoneMock, Gear, Coin, TrendUp, Dots } from './Shapes'
-import DemoStage from './demo/DemoStage'
-import LandingFeatures from './demo/LandingFeatures'
-import HowItWorks from './sections/HowItWorks'
-import Faq from './sections/Faq'
-import AppsGrid from './sections/AppsGrid'
-import FeatureGrid from './sections/FeatureGrid'
+import DemoStage from './_demo/DemoStage'
+import LandingFeatures from './_demo/LandingFeatures'
+import HowItWorks from './_sections/HowItWorks'
+import Faq from './_sections/Faq'
+import AppsGrid from './_sections/AppsGrid'
+import FeatureGrid from './_sections/FeatureGrid'
 
 export const dynamic = 'force-dynamic'
 

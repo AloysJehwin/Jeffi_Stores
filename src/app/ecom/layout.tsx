@@ -3,6 +3,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import EcomNav from './EcomNav'
 import EcomMain from './EcomMain'
+import './ecom.css'
 
 export const dynamic = 'force-dynamic'
 
