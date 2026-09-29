@@ -7,7 +7,7 @@ import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 const ICON_OPTIONS = [
   'Anchor', 'Anvil', 'Aperture', 'Axe', 'Battery', 'BatteryCharging',
@@ -207,7 +207,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               <div className="flex flex-col gap-1.5">
                 <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
                 <div className="flex items-center gap-2">
-                  <RequireWrite scope="categories:write">
+                  <RequireAi scope="categories:write">
                     <button
                       type="button"
                       onClick={handleGenerate}
@@ -226,7 +226,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
                         </>
                       )}
                     </button>
-                  </RequireWrite>
+                  </RequireAi>
                   <button
                     type="button"
                     onClick={() => setShowPicker(v => !v)}
@@ -351,6 +351,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               fieldLabel="Description"
               value={description}
               onChange={setDescription}
+              scope="categories:write"
               context={`Category: ${categoryName}`}
               multiline
             >

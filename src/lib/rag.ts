@@ -78,33 +78,14 @@ export async function queryManyReplica<T = Record<string, unknown>>(
 }
 
 export async function embed(text: string): Promise<number[]> {
-  const url = process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434'
-  const model = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
-
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 5000)
-
-  let res: Response
-  try {
-    res = await fetch(`${url}/api/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt: text }),
-      signal: controller.signal,
-    })
-  } finally {
-    clearTimeout(timer)
+  // Embeddings now go through the ai-platform gateway (queue + cache + provider), not
+  // Ollama directly. The gateway owns the model + host selection.
+  const { aiEmbed } = await import('@/lib/ai-client')
+  const [vector] = await aiEmbed(text)
+  if (!vector || !Array.isArray(vector)) {
+    throw new Error('Gateway embed response missing embedding array')
   }
-
-  if (!res.ok) {
-    throw new Error(`Ollama embed failed: ${res.status} ${res.statusText}`)
-  }
-
-  const data = (await res.json()) as { embedding?: number[] }
-  if (!data.embedding || !Array.isArray(data.embedding)) {
-    throw new Error('Ollama embed response missing embedding array')
-  }
-  return data.embedding
+  return vector
 }
 
 export async function findSimilar(

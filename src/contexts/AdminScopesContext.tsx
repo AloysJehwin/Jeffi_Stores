@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 import { hasScope } from '@/lib/scopes'
+import { canUseAi } from '@/lib/ai-scope'
 
 interface AdminScopes {
   role: string
@@ -29,6 +30,21 @@ export function useCanWrite(scope: string): boolean {
 export function useHasScope(scope: string): boolean {
   const { role, scopes } = useContext(Ctx)
   return hasScope(role, scopes, scope)
+}
+
+/** True when the plan includes AI and the admin may write `scope`; AI tools are hidden otherwise. */
+export function useCanUseAi(scope: string): boolean {
+  const { role, scopes } = useContext(Ctx)
+  return canUseAi(role, scopes, scope.endsWith(':write') ? scope : `${scope}:write`)
+}
+
+/** Renders its children only when useCanUseAi(scope) holds. */
+export function RequireAi({ scope, children, fallback = null }: {
+  scope: string
+  children: ReactNode
+  fallback?: ReactNode
+}) {
+  return useCanUseAi(scope) ? <>{children}</> : <>{fallback}</>
 }
 
 /** Renders its children only when the admin holds the write scope. */

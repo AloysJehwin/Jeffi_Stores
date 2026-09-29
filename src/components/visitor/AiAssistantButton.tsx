@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import CustomerChatModal from './CustomerChatModal'
 
 export default function AiAssistantButton() {
   const { user } = useAuth()
+  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled
   const [open, setOpen] = useState(false)
 
-  if (!user) return null
+  if (!user || !aiEnabled) return null
 
   return (
     <>

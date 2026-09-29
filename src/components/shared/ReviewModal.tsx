@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 const TAGS = [
   'Great quality',
@@ -72,6 +73,8 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [globalError, setGlobalError] = useState('')
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled && !aiOff
   const fileRefs = useRef<(HTMLInputElement | null)[]>([])
 
   useEffect(() => {
@@ -104,6 +107,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
         credentials: 'include',
         body: JSON.stringify({ productName: items[i].productName, rating: s.rating, tags: s.selectedTags }),
       })
+      if (res.status === 403) { setAiOff(true); return }
       const data = await res.json()
       if (data.review) update(i, { comment: data.review })
     } finally {
@@ -244,18 +248,20 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                 </div>
 
                 {/* AI generate */}
-                <button
-                  type="button"
-                  onClick={() => handleGenerate(i)}
-                  disabled={!s.rating || s.isGenerating}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 text-accent-600 dark:text-accent-400 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-900/20 disabled:opacity-40 transition-colors mb-4"
-                >
-                  {s.isGenerating ? (
-                    <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Generating…</>
-                  ) : (
-                    <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate with AI</>
-                  )}
-                </button>
+                {aiEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => handleGenerate(i)}
+                    disabled={!s.rating || s.isGenerating}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 text-accent-600 dark:text-accent-400 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-900/20 disabled:opacity-40 transition-colors mb-4"
+                  >
+                    {s.isGenerating ? (
+                      <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Generating…</>
+                    ) : (
+                      <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate with AI</>
+                    )}
+                  </button>
+                )}
 
                 {/* Title */}
                 <div className="mb-4">

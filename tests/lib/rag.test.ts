@@ -19,20 +19,14 @@ vi.mock('pg', () => {
   return { Pool }
 })
 
+vi.mock('@/lib/ai-client', () => ({ aiEmbed: vi.fn() }))
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/rag'
+import { aiEmbed } from '@/lib/ai-client'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function mockFetch(response: { ok: boolean; status?: number; statusText?: string; json?: () => Promise<unknown> }) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok: response.ok,
-    status: response.status ?? 200,
-    statusText: response.statusText ?? 'OK',
-    json: response.json ?? (() => Promise.resolve({ embedding: [0.1, 0.2, 0.3] })),
-  }))
-}
+const mockAiEmbed = vi.mocked(aiEmbed)
 
 const MOCK_VEC = [0.1, 0.2, 0.3]
 
@@ -41,25 +35,26 @@ const MOCK_VEC = [0.1, 0.2, 0.3]
 describe('embed', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns embedding array on success', async () => {
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: MOCK_VEC }) })
+  it('returns the gateway embedding on success', async () => {
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
     const result = await embed('hello')
     expect(result).toEqual(MOCK_VEC)
+    expect(mockAiEmbed).toHaveBeenCalledWith('hello')
   })
 
-  it('throws when response is not ok', async () => {
-    mockFetch({ ok: false, status: 500, statusText: 'Internal Server Error' })
-    await expect(embed('hello')).rejects.toThrow('Ollama embed failed: 500 Internal Server Error')
+  it('propagates a gateway error', async () => {
+    mockAiEmbed.mockRejectedValue(new Error('AI gateway embed HTTP 500'))
+    await expect(embed('hello')).rejects.toThrow('AI gateway embed HTTP 500')
   })
 
-  it('throws when embedding field is missing', async () => {
-    mockFetch({ ok: true, json: () => Promise.resolve({ result: [] }) })
-    await expect(embed('hello')).rejects.toThrow('Ollama embed response missing embedding array')
+  it('throws when the gateway returns no embedding', async () => {
+    mockAiEmbed.mockResolvedValue([])
+    await expect(embed('hello')).rejects.toThrow('Gateway embed response missing embedding array')
   })
 
-  it('throws when embedding is not an array', async () => {
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: 'not-array' }) })
-    await expect(embed('hello')).rejects.toThrow('Ollama embed response missing embedding array')
+  it('throws when the embedding is not an array', async () => {
+    mockAiEmbed.mockResolvedValue(['not-array' as unknown as number[]])
+    await expect(embed('hello')).rejects.toThrow('Gateway embed response missing embedding array')
   })
 })
 
@@ -68,7 +63,7 @@ describe('embed', () => {
 describe('findSimilar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: MOCK_VEC }) })
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
   })
 
   it('returns empty array when no results', async () => {
@@ -137,7 +132,7 @@ describe('findSimilar', () => {
 describe('findSimilarProducts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: MOCK_VEC }) })
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
     mockClientQuery.mockResolvedValue({ rows: [] })
   })
 
@@ -157,7 +152,7 @@ describe('findSimilarProducts', () => {
 describe('findSimilarProductIds', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: MOCK_VEC }) })
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
   })
 
   it('returns empty array when no results', async () => {
@@ -268,7 +263,7 @@ describe('findSimilarProductIds', () => {
 describe('findSimilarCustomers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch({ ok: true, json: () => Promise.resolve({ embedding: MOCK_VEC }) })
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
     mockClientQuery.mockResolvedValue({ rows: [] })
   })
 

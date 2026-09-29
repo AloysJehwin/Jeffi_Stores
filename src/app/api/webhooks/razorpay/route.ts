@@ -430,11 +430,16 @@ async function handlePaymentLinkExpired(paymentLink: any) {
 async function handleTransferProcessed(transfer: any) {
   const transferId = (transfer?.id ?? '').toString().trim()
   if (!transferId || transfer?.status !== 'processed' || transfer?.on_hold === true) return
-  await controlPlanePool().query(
-    `UPDATE tenant_transactions SET status = 'settled'
-     WHERE gateway_txn_id = $1 AND status = 'captured'`,
+  // Resolve the tenant for this transfer, then settle idempotently (flips status AND writes the
+  // prepaid settlement ledger). If the tenant_transactions row hasn't been inserted yet (the race),
+  // recordTenantTransaction's own post-insert self-check settles it once it lands.
+  const owner = await controlPlanePool().query(
+    `SELECT tenant_id FROM tenant_transactions WHERE gateway_txn_id = $1 LIMIT 1`,
     [transferId]
-  ).catch(() => {})
+  ).then(r => r.rows[0]).catch(() => null)
+  if (!owner) return
+  const { settleTenantTransaction } = await import('@/lib/razorpay-route')
+  await settleTenantTransaction({ tenantId: owner.tenant_id, transferId }).catch(() => {})
 }
 
 /**

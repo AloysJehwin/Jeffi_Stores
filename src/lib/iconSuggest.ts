@@ -1,4 +1,5 @@
-import OpenAI from 'openai'
+import { aiChat } from '@/lib/ai-client'
+import { parseAiJson } from '@/lib/ai-scope'
 
 export const ICON_OPTIONS = [
   'Wrench', 'Bolt', 'Drill', 'Hammer', 'Nut', 'Scissors', 'Anchor', 'Link',
@@ -13,23 +14,13 @@ export const ICON_OPTIONS = [
   'Tractor', 'Unplug', 'Warehouse', 'Weight',
 ]
 
-let client: OpenAI | null = null
-
-function getClient(): OpenAI {
-  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  return client
-}
-
-export function __resetClientForTests(): void {
-  client = null
-}
-
 export async function suggestIcon(categoryName: string): Promise<string> {
   try {
-    const openai = getClient()
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+    const response = await aiChat({
+      modelHint: 'fast',
+      jsonMode: true,
+      temperature: 0,
+      maxTokens: 30,
       messages: [
         {
           role: 'system',
@@ -40,14 +31,9 @@ export async function suggestIcon(categoryName: string): Promise<string> {
           content: categoryName,
         },
       ],
-      response_format: { type: 'json_object' },
-      max_tokens: 30,
-      temperature: 0,
     })
 
-    const raw = response.choices[0]?.message?.content ?? '{}'
-    const parsed = JSON.parse(raw) as { iconName?: string }
-    const suggested = parsed.iconName?.trim() ?? ''
+    const suggested = parseAiJson<{ iconName?: string }>(response.content)?.iconName?.trim() ?? ''
     return ICON_OPTIONS.includes(suggested) ? suggested : 'Package'
   } catch (err) {
     console.error('[route]', err)

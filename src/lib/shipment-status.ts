@@ -202,11 +202,22 @@ export function shipmentStatusToStep(s: ShipmentStatus | null): number {
   }
 }
 
-/** Map our internal ShipmentStatus to the 0-based reverse (RVP) timeline step index */
+/**
+ * Map our internal ShipmentStatus to the 0-based reverse (RVP) timeline step index.
+ *
+ * A customer return pickup (RVP) travels a FORWARD-shaped journey from the buyer's address back to
+ * the warehouse, so Delhivery reports it with forward statuses (picked_up / in_transit /
+ * out_for_delivery / delivered), NOT rto_*. Both are mapped here so the reverse stepper advances
+ * whether the leg is an RVP or a true RTO. Reverse stages: 0 Pickup Scheduled, 1 Picked Up,
+ * 2 In Transit, 3 Out for Return, 4 Received.
+ */
 export function shipmentStatusToReverseStep(s: ShipmentStatus | null): number {
   switch (s) {
+    case 'delivered':
     case 'rto_delivered':      return 4
+    case 'out_for_delivery':
     case 'rto_out_for_return': return 3
+    case 'in_transit':
     case 'rto_in_transit':     return 2
     case 'rto_initiated':
     case 'picked_up':          return 1

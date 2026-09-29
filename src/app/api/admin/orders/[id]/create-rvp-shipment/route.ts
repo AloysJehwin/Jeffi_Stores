@@ -6,6 +6,7 @@ import { round2 } from '@/lib/gst'
 import { createRVPShipment, listDelhiveryPickupLocations } from '@/lib/delhivery'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { resolveTenantId } from '@/lib/tenant-context'
+import { assertWalletCanCreateRvp } from '@/lib/wallet'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,6 +64,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (returnRequest.rvp_awb_number) {
       return NextResponse.json({ error: 'RVP shipment already created', awb: returnRequest.rvp_awb_number }, { status: 409 })
+    }
+
+    // Platform-Delhivery tenants must hold the minimum wallet balance before an RVP is created —
+    // the reverse leg's charge is debited from the wallet once the admin sets it (rvp-charge).
+    if (tenantId) {
+      const walletErr = await assertWalletCanCreateRvp(tenantId)
+      if (walletErr) return NextResponse.json({ error: walletErr }, { status: 402 })
     }
 
     const consigneeName = order.full_name || 'Customer'

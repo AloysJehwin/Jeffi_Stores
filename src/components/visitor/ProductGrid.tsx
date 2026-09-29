@@ -354,7 +354,7 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
                         />
                         {specs.length > 0 && (
                           <div className="absolute bottom-0 left-0 right-0 pointer-events-none overflow-hidden rounded-b-lg">
-                            <div className="translate-y-full group-hover:translate-y-0 transition-transform duration-200 bg-foreground/85 dark:bg-surface-elevated/95 backdrop-blur-sm px-3 py-2.5">
+                            <div className="translate-y-full group-hover:translate-y-0 transition-transform duration-200 bg-foreground dark:bg-surface-elevated px-3 py-2.5">
                               <div className="flex flex-wrap gap-x-3 gap-y-1">
                                 {specs.map(s => (
                                   <span key={s} className="text-[11px] text-white dark:text-foreground">{s}</span>

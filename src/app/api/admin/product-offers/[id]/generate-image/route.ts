@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { aiDenial } from '@/lib/ai-scope'
 import { query, queryOne } from '@/lib/db'
 import { uploadGalleryImage } from '@/lib/s3'
 
@@ -18,9 +18,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'coupons:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const denied = aiDenial(admin.role, admin.scopes, 'coupons:write')
+    if (denied) return NextResponse.json({ error: denied }, { status: 403 })
     if (!process.env.REPLICATE_API_TOKEN) {
       return NextResponse.json({ error: 'Image generation is not configured (REPLICATE_API_TOKEN missing).' }, { status: 500 })
     }
@@ -33,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (rawPrompt.length < 3) return NextResponse.json({ error: 'Describe the scene you want (a few words at least).' }, { status: 400 })
     const field = body?.field === 'image_url_mobile' ? 'image_url_mobile' : 'image_url'
 
-    const prompt = `${rawPrompt}. Professional promotional offer banner, cinematic studio lighting, dark near-black background, subject composed toward the right side leaving negative space on the left for text, high detail, photorealistic, industrial catalog quality, 16:9 wide banner.`
+    const prompt = `${rawPrompt}. Professional promotional offer banner, cinematic studio lighting, dark near-black background, subject composed toward the right side leaving negative space on the left for text, high detail, photorealistic, 16:9 wide banner.`
 
     const output = await replicate.run('black-forest-labs/flux-dev', {
       input: { prompt, width: 1440, height: 640, num_outputs: 1, aspect_ratio: '16:9' },

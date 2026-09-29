@@ -6,7 +6,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminImage from '@/components/admin/AdminImage'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
-import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import { useCanWrite, RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
 
@@ -178,6 +178,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
             { name: 'subtitle', label: 'Supporting line, one concise sentence', type: 'text' },
             { name: 'badge_text', label: 'Tiny uppercase promo badge, 1-2 words e.g. New Arrivals', type: 'text' },
           ],
+          scope: 'settings:write',
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -281,7 +282,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 : <span className="text-[11px] text-foreground-muted">Falls back to the desktop image</span>}
             </div>
             {/* AI generation — one scenario fills every field */}
-            <RequireWrite scope="settings:write">
+            <RequireAi scope="settings:write">
             <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
@@ -306,14 +307,14 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
               </div>
               <p className="mt-1.5 text-[11px] text-violet-500/80 dark:text-violet-400/80">Image generation can take up to a minute.</p>
             </div>
-            </RequireWrite>
+            </RequireAi>
           </div>
 
           {/* Title + Subtitle */}
           <div className="grid grid-cols-1 gap-3">
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Title</label>
-              <AIEnrichButton fieldLabel="Hero slide title" value={slide.title}
+              <AIEnrichButton fieldLabel="Hero slide title" value={slide.title} scope="settings:write"
                 context={`Homepage hero banner for the ${slide.filter_category || 'store'} category. Keep it punchy, 1-3 words.`}
                 onChange={v => field({ title: v }, { title: v })}>
                 <input type="text" value={slide.title}
@@ -325,7 +326,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
             </div>
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Subtitle</label>
-              <AIEnrichButton fieldLabel="Hero slide subtitle" value={slide.subtitle ?? ''}
+              <AIEnrichButton fieldLabel="Hero slide subtitle" value={slide.subtitle ?? ''} scope="settings:write"
                 context={`Short supporting line under the hero title "${slide.title}" for the ${slide.filter_category || 'store'} category. One concise sentence.`}
                 onChange={v => field({ subtitle: v }, { subtitle: v })}>
                 <input type="text" value={slide.subtitle ?? ''}
@@ -341,7 +342,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Badge text</label>
-              <AIEnrichButton fieldLabel="Hero slide badge" value={slide.badge_text ?? ''}
+              <AIEnrichButton fieldLabel="Hero slide badge" value={slide.badge_text ?? ''} scope="settings:write"
                 context={`Tiny uppercase promo badge (1-2 words) for the ${slide.filter_category || 'store'} hero slide, e.g. "New Arrivals", "Top Picks".`}
                 onChange={v => field({ badge_text: v }, { badgeText: v })}>
                 <input type="text" value={slide.badge_text ?? ''}

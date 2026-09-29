@@ -135,11 +135,26 @@ export function invalidatePlanCache(tenantId: string): void {
 
 /**
  * Convenience: get plan from the current TenantContext (for storefront API routes).
- * Falls back to 'basic' if no tenant in context.
+ * The platform's own store is never plan-limited; a tenant host whose tenant cannot be
+ * resolved is denied rather than treated as the platform.
  */
 export async function currentTenantPlanGate(scopeKey: string): Promise<PlanGateResult> {
   const { resolveTenantId } = await import('./tenant-context')
   const tenantId = await resolveTenantId()
-  if (!tenantId) return { allowed: true, plan: 'platform', upgradeRequired: null }
+  if (!tenantId) {
+    if (await isTenantHostRequest()) return { allowed: false, plan: 'unknown', upgradeRequired: null }
+    return { allowed: true, plan: 'platform', upgradeRequired: null }
+  }
   return planGate(tenantId, scopeKey)
+}
+
+// Middleware sets these headers only for hosts it resolved to a tenant.
+async function isTenantHostRequest(): Promise<boolean> {
+  try {
+    const { headers } = await import('next/headers')
+    const h = await headers()
+    return !!(h.get('x-tenant-slug') || h.get('x-tenant-id'))
+  } catch {
+    return false
+  }
 }

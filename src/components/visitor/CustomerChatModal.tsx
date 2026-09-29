@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Send, ThumbsUp, ThumbsDown, X, Bot, User } from 'lucide-react'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -18,9 +19,9 @@ interface Props {
 type Verdict = 'helpful' | 'not_helpful'
 
 const SAMPLE_PROMPTS = [
-  "I'm building a wooden shelf — what fasteners do I need?",
-  "Setting up shelving in my workshop, need brackets and bolts",
-  "Need stainless screws for outdoor use",
+  "Help me find a gift",
+  "What's new this week?",
+  "What's popular right now?",
   "Show me my recent orders",
   "Recommend products based on what I've bought",
 ]
@@ -144,6 +145,8 @@ let idCounter = 0
 function uid() { return `msg-${++idCounter}-${Date.now()}` }
 
 export default function CustomerChatModal({ isOpen, onClose }: Props) {
+  const { flags, identity } = useStoreConfig()
+  const aiEnabled = flags.aiStorefrontEnabled
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -212,6 +215,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         credentials: 'include',
         body: JSON.stringify({ message: q, history }),
       })
+      if (res.status === 403) {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'The assistant is not available right now.', id: uid() }])
+        return
+      }
       const data = await res.json()
       // Prefer the assistant message. Never render a raw server `error` string to
       // the customer — fall back to a fixed friendly line for any failure.
@@ -229,6 +236,8 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
       setLoading(false)
     }
   }
+
+  if (!aiEnabled) return null
 
   return (
     <>
@@ -258,7 +267,7 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Jeffi Assistant</p>
+              <p className="text-sm font-semibold text-foreground">{identity.name ? `${identity.name} Assistant` : 'Shopping Assistant'}</p>
               <p className="text-[11px] text-foreground-muted">Products · Orders · Recommendations</p>
             </div>
             <button

@@ -22,6 +22,10 @@ vi.mock('@/lib/ai-client', () => ({
 vi.mock('@/lib/rag', () => ({
   findSimilar: vi.fn().mockResolvedValue([]),
 }))
+vi.mock('@/lib/tenant-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+  resolveTenantId: vi.fn(async () => null),
+}))
 
 vi.mock('@/lib/admin-agent/tools', () => ({
   TOOLS: [
@@ -1126,6 +1130,28 @@ describe('POST /api/admin/agent/chat', () => {
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.message).toBe('still ok')
+  })
+
+  it('never puts the platform RAG index into a tenant admin prompt', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    const { resolveTenantId } = await import('@/lib/tenant-context')
+    vi.mocked(resolveTenantId).mockResolvedValue('tenant-1')
+    const { findSimilar } = await import('@/lib/rag')
+    vi.mocked(findSimilar).mockResolvedValue([
+      { source_table: 'users', source_id: 'u1', content: 'Flagship Customer | a@b.c' } as any,
+    ])
+
+    mockAiChat.mockResolvedValue({ content: 'ok', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const res = await POST(makePost({ message: 'who are my customers' }))
+    expect(res.status).toBe(200)
+    expect(findSimilar).not.toHaveBeenCalled()
+    const systemMsg = mockAiChat.mock.calls[0][0].messages.find((m: any) => m.role === 'system')
+    expect(systemMsg!.content).not.toMatch(/STORE DATA CONTEXT/)
+    expect(systemMsg!.content).not.toMatch(/Flagship Customer/)
   })
 
   // ── Sanitised 502 for provider/billing internals ─────────────────────────────

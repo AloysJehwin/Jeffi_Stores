@@ -12,7 +12,7 @@ import { GET } from '@/app/api/admin/diag-embeddings/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { embed, runWithHnswTuning, queryManyReplica } from '@/lib/rag'
 
-const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: [] }
+const ADMIN = { adminId: 'a1', role: 'administrator', scopes: [] }
 
 const COUNTS = [
   { source_table: 'products', cnt: '100' },
@@ -43,6 +43,14 @@ describe('GET /api/admin/diag-embeddings', () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
     const res = await GET(makeReq())
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 for a tenant owner (super_admin) and never embeds', async () => {
+    vi.mocked(authenticateAdmin).mockResolvedValue({ ...ADMIN, role: 'super_admin' } as any)
+    const res = await GET(makeReq({ q: 'bolt' }))
+    expect(res.status).toBe(403)
+    expect(embed).not.toHaveBeenCalled()
+    expect(queryManyReplica).not.toHaveBeenCalled()
   })
 
   it('returns results on happy path', async () => {

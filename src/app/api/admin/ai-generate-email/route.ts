@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { aiChat } from '@/lib/ai-client'
+import { aiDenial } from '@/lib/ai-scope'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
-
-const OLLAMA_URL = () =>
-  (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-// Email copy prefers the fast gemma3:4b — it returns complete, valid JSON in ~6s.
-// The larger gemma4:12b (OLLAMA_COPY_MODEL) is slow (10-90s) and, with a capped
-// num_predict, tends to truncate the HTML mid-JSON string → unparseable → "empty
-// result". Allow an explicit override via OLLAMA_EMAIL_MODEL only.
-const OLLAMA_MODEL = () => process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
-
-// Hard ceiling below maxDuration so we fail cleanly instead of hanging when the
-// upstream (Razer) is slow or the model stalls.
-const GENERATE_TIMEOUT_MS = 90_000
 
 const SYSTEM_PROMPT = (store: string, storeUrl: string) => `You write marketing/support emails for ${store}.
 Return ONLY valid JSON: {"html":"<email body html>"}
@@ -47,9 +36,8 @@ Sign off referencing the {store_name} team. Do not fabricate customer names or o
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
+  const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   let body: { scenario?: string; subject?: string }
   try { body = await request.json() } catch {
@@ -66,47 +54,31 @@ export async function POST(request: NextRequest) {
     scenario,
   ].filter(Boolean).join('\n')
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
   try {
     const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/brand')
     const [descriptor, storeUrl] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync()])
-    const res = await fetch(`${OLLAMA_URL()}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: OLLAMA_MODEL(),
-        prompt: `${SYSTEM_PROMPT(descriptor, storeUrl)}\n\nUser: ${userPrompt}\n\nAssistant:`,
-        stream: false,
-        format: 'json',
-        // Room to finish the HTML — a low cap truncates the JSON string and
-        // makes the whole response unparseable.
-        options: { temperature: 0.3, num_predict: 1500 },
-      }),
+    // 'email' hint = the fast model: the large copy model truncates the HTML mid-JSON.
+    const r = await aiChat({
+      modelHint: 'email',
+      jsonMode: true,
+      temperature: 0.3,
+      maxTokens: 1500,
+      noCache: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT(descriptor, storeUrl) },
+        { role: 'user', content: userPrompt },
+      ],
     })
 
-    if (!res.ok) {
-      return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
-    }
-
-    const data = await res.json() as { response?: string }
-    const raw = (data.response || '').trim()
-
-    const html = extractHtml(raw)
+    const html = extractHtml(r.content.trim())
     if (!html) {
       return NextResponse.json({ error: 'AI returned empty result' }, { status: 502 })
     }
 
     return NextResponse.json({ html })
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      return NextResponse.json({ error: 'AI request timed out' }, { status: 504 })
-    }
     const msg = err instanceof Error ? err.message : 'unknown'
     return NextResponse.json({ error: `AI error: ${msg}` }, { status: 503 })
-  } finally {
-    clearTimeout(timeout)
   }
 }
 

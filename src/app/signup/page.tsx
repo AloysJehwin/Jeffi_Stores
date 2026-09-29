@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { Suspense } from 'react'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
 export default function SignupPageWrapper() {
   return (
@@ -74,12 +75,12 @@ function SignupPage() {
   )
   const redirectTo = ['/login', '/signup'].some(p => rawRedirectTo.startsWith(p)) ? '/' : rawRedirectTo
 
-  const { signup, googleLoginWithAccessToken } = useAuth()
+  const { signup, googleLoginWithAccessToken, logout } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
   const config = useStoreConfig()
 
-  const [step, setStep] = useState<'details' | 'otp' | 'phone'>('details')
+  const [step, setStep] = useState<'details' | 'otp'>('details')
   const [email, setEmail] = useState(prefillEmail)
   const [otp, setOtp] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -92,6 +93,7 @@ function SignupPage() {
   const [error, setError] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
 
@@ -114,9 +116,9 @@ function SignupPage() {
     googleLoginWithAccessToken(accessToken)
       .then(async (loggedInUser) => {
         await refreshCart()
-        const needsPhone = !loggedInUser?.phone
+        const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
         const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
-        if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setPolicyAccepted(false); setStep('phone') }
+        if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setPolicyAccepted(false); setShowPhoneVerify(true) }
         else router.push(redirectTo)
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
@@ -150,12 +152,12 @@ function SignupPage() {
     try {
       const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      const needsPhone = !loggedInUser?.phone
+      const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
       const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
       if (needsPhone || needsPolicy) {
         setPhoneRequiresPolicy(needsPolicy)
         setPolicyAccepted(false)
-        setStep('phone')
+        setShowPhoneVerify(true)
       } else {
         router.push(redirectTo)
       }
@@ -278,45 +280,6 @@ function SignupPage() {
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
       showToast('OTP sent successfully!', 'success')
       setTimeout(() => otpInputRef.current?.focus(), 0)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleSavePhone = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!phone || phone.length !== 10) {
-      setError('Enter a valid 10-digit mobile number')
-      return
-    }
-    if (phoneRequiresPolicy && !policyAccepted) {
-      setError('Please accept the Privacy Policy and Terms & Conditions')
-      return
-    }
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/user/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ phone }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.error || 'Failed to save phone number')
-      }
-      if (phoneRequiresPolicy && policyAccepted) {
-        await fetch('/api/user/accept-policies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({}),
-        }).catch(() => {})
-      }
-      router.push(redirectTo)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -557,60 +520,6 @@ function SignupPage() {
             </form>
           )}
 
-          {/* Step: phone collection after Google OAuth */}
-          {step === 'phone' && (
-            <form onSubmit={handleSavePhone} className="space-y-6">
-              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
-                <p className="text-sm text-blue-800 dark:text-blue-300">
-                  One last step — add your mobile number{phoneRequiresPolicy ? ' and accept our policies' : ''} so we can keep you updated on your orders.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="phone-google" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Mobile Number *
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
-                    +91
-                  </span>
-                  <input
-                    id="phone-google" type="tel" inputMode="numeric" maxLength={10} value={phone} required autoFocus
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="00000 00000"
-                  />
-                </div>
-                {phone.length > 0 && phone.length !== 10 && (
-                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
-                )}
-              </div>
-              {phoneRequiresPolicy && (
-                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={policyAccepted}
-                    onChange={e => setPolicyAccepted(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                  />
-                  <span>
-                    I agree to the{' '}
-                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                  </span>
-                </label>
-              )}
-              <button
-                type="submit"
-                disabled={isLoading || phone.length !== 10 || (phoneRequiresPolicy && !policyAccepted)}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {isLoading ? (
-                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
-                ) : 'Save & Continue'}
-              </button>
-            </form>
-          )}
-
           <div className="mt-6 text-center text-sm text-foreground-secondary">
             Already have an account?{' '}
             <Link href="/login" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
@@ -619,6 +528,15 @@ function SignupPage() {
           </div>
         </div>
       </div>
+
+      {showPhoneVerify && (
+        <PhoneVerifyModal
+          requiresPolicy={phoneRequiresPolicy}
+          title={phoneRequiresPolicy ? 'Almost there' : undefined}
+          onVerified={() => { setShowPhoneVerify(false); router.push(redirectTo) }}
+          onCancel={() => { setShowPhoneVerify(false); logout() }}
+        />
+      )}
     </div>
   )
 }

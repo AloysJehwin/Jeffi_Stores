@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -95,6 +96,8 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled && !aiOff
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedReview, setExpandedReview] = useState<Review | null>(null)
   const [editingReview, setEditingReview] = useState<Review | null>(null)
@@ -307,6 +310,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productName, rating, tags: selectedTags }),
       })
+      if (res.status === 403) { setAiOff(true); return }
       const data = await res.json()
       if (res.ok && data.review) {
         setComment(data.review)
@@ -695,7 +699,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 />
               </div>
 
-              {!editingReview && (
+              {!editingReview && aiEnabled && (
                 <div>
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     What stands out? <span className="text-foreground-muted font-normal">(pick up to 4)</span>
