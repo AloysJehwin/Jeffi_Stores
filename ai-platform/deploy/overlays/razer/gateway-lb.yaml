@@ -1,0 +1,12 @@
+# Publishes the gateway on the node's :8080 through k3s ServiceLB (tailnet: 100.82.208.8:8080).
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway-lb
+  namespace: ai-platform
+spec:
+  type: LoadBalancer
+  selector: { app: ai-gateway }
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -1,0 +1,30 @@
+# NVIDIA k8s device plugin — exposes the Razer GPU as nvidia.com/gpu so the Ollama pod can
+# request it. Requires the NVIDIA container toolkit + driver on the node. On cloud, the managed
+# GPU node pool provides this; drop this manifest from the cloud overlay if the pool ships it.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels: { name: nvidia-device-plugin-ds }
+  template:
+    metadata:
+      labels: { name: nvidia-device-plugin-ds }
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nvidia-device-plugin-ctr
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.16.2
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: device-plugin
+          hostPath: { path: /var/lib/kubelet/device-plugins }

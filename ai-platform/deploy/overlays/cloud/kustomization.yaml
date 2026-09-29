@@ -1,0 +1,22 @@
+# Cloud (EKS/GKE) overlay. Same base; the differences are managed backing services and a
+# cloud ingress/GPU node pool. Deploy with:
+#   kubectl apply -k ai-platform/deploy/overlays/cloud
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  # Use managed Redis + managed pgvector: point env at them and drop the in-cluster Redis.
+  - target: { kind: ConfigMap, name: ai-gateway-config }
+    patch: |
+      - op: replace
+        path: /data/REDIS_URL
+        value: "redis://MANAGED_REDIS_ENDPOINT:6379"
+  # The managed GPU node pool ships its own device plugin.
+  - target: { kind: DaemonSet, name: nvidia-device-plugin-daemonset }
+    patch: |
+      - op: replace
+        path: /metadata/annotations
+        value: { cloud.jeffi/managed: "true" }
+# Note: in cloud, remove redis.yaml from the base kustomization (or scale ai-redis to 0) and
+# provision Redis/pgvector via the cloud provider; set AI_CACHE_PG_URL in the Secret.

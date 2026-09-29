@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ai-redis-data
+  namespace: ai-platform
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ai-redis
+  namespace: ai-platform
+spec:
+  serviceName: ai-redis
+  replicas: 1
+  selector:
+    matchLabels: { app: ai-redis }
+  template:
+    metadata:
+      labels: { app: ai-redis }
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # AOF on so the durable job queue survives a restart -> admin requests are never lost.
+          args: ["--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            exec: { command: ["redis-cli", "ping"] }
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ai-redis-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-redis
+  namespace: ai-platform
+spec:
+  selector: { app: ai-redis }
+  ports:
+    - port: 6379
+      targetPort: 6379

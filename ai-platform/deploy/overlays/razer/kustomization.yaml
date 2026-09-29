@@ -1,0 +1,72 @@
+# Razer (k3s, single GPU box) overlay. Deploy with:
+#   kubectl apply -k deploy/overlays/razer
+# k3s runs with --disable traefik (the host nginx owns :80) and --default-runtime nvidia.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - gateway-lb.yaml
+patches:
+  # Images are built on the box into containerd (k8s.io); never resolve them from a registry.
+  - target: { kind: Deployment, name: ai-gateway }
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  # Ollama replaces the host's systemd service: same user, same model store, same 0.0.0.0:11434,
+  # so callers that still hit the host port directly keep working.
+  - target: { kind: Deployment, name: ollama }
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 0
+      - op: add
+        path: /spec/template/spec/hostNetwork
+        value: true
+      - op: add
+        path: /spec/template/spec/dnsPolicy
+        value: ClusterFirstWithHostNet
+      - op: add
+        path: /spec/template/spec/securityContext
+        value: { runAsUser: 999, runAsGroup: 999, supplementalGroups: [44, 110] }
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: ollama/ollama:0.30.8
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: OLLAMA_HOST, value: "0.0.0.0:11434" }
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value: { name: HOME, value: /home/ollama }
+      - op: replace
+        path: /spec/template/spec/containers/0/volumeMounts/0/mountPath
+        value: /home/ollama/.ollama
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value: { name: models, hostPath: { path: /usr/share/ollama/.ollama, type: Directory } }
+  # Ollama currently runs as the host's systemd service (managed alongside other GPU work), so
+  # the gateway targets whatever serves the node's :11434 rather than the in-cluster pod.
+  - target: { kind: ConfigMap, name: ai-gateway-config }
+    patch: |
+      - op: replace
+        path: /data/OLLAMA_BASE_URL
+        value: "http://aloysjehwin-blade-18-rz09-0484:11434"
+  - patch: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: { name: ollama-models, namespace: ai-platform }
+      $patch: delete
+  # No PaddleOCR image exists yet; vision falls back to the Ollama vision model.
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: paddleocr, namespace: ai-platform }
+      $patch: delete
+  - patch: |
+      apiVersion: v1
+      kind: Service
+      metadata: { name: paddleocr, namespace: ai-platform }
+      $patch: delete
