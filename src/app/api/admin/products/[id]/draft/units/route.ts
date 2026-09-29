@@ -2,10 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query, queryMany } from '@/lib/db'
+import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
 interface Params { params: Promise<{ id: string }> }
+
+// Live base unit at a scope, or null. Used to detect a real base-unit CHANGE so
+// the block only fires when load-bearing fields differ from what stock was recorded under.
+async function liveBaseUnit(productId: string, variantId: string | null, subVariantId: string | null) {
+  return queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; display_label: string | null }>(
+    `SELECT unit, factor::text, dimension, qty_step::text, display_label
+       FROM product_units
+      WHERE product_id = $1 AND is_base = true
+        AND variant_id IS NOT DISTINCT FROM $2::uuid
+        AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+      LIMIT 1`,
+    [productId, variantId, subVariantId]
+  )
+}
 
 async function getAllDraftUnits(productId: string): Promise<any[]> {
   const row = await queryOne<{ units: any[] }>(
@@ -77,9 +92,27 @@ export async function POST(req: NextRequest, { params }: Params) {
   const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
 
   const body = await req.json()
+  const override = body.override === true
+
+  // Block a base-unit change when stock recorded under the current unit would be
+  // reinterpreted — unless the admin overrides (which schedules a stock wipe on publish).
+  if (body.is_base && !override) {
+    const live = await liveBaseUnit(id, variantId || null, subVariantId || null)
+    if (live) {
+      const reason = await assertUnitChangeAllowed(
+        { query },
+        { productId: id, variantId: variantId || null, subVariantId: subVariantId || null, label: live.display_label || live.unit },
+        changedUnitFields({ factor: body.factor, dimension: body.dimension, qty_step: body.qty_step }, live)
+      )
+      if (reason) return NextResponse.json({ error: reason, canOverride: true }, { status: 409 })
+    }
+  }
+
   const all = await getAllDraftUnits(id)
   const newUnit = {
     ...body,
+    override: undefined,
+    ...(override ? { _reset_stock_on_publish: true } : {}),
     id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     variant_id: variantId || null,
     sub_variant_id: subVariantId || null,
