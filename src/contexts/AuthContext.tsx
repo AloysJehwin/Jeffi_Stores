@@ -9,6 +9,7 @@ interface User {
   firstName: string
   lastName: string | null
   phone: string | null
+  phoneVerified?: boolean
   createdAt: string
   avatarUrl: string | null
   isBusiness?: boolean

@@ -6,6 +6,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { AccountMobileTabBar } from '@/components/visitor/AccountMobileHeader'
 import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
+import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 // AccountNavBar is rendered by layout.tsx for all /account/* pages
 
 interface DashboardData {
@@ -68,6 +69,7 @@ export default function AccountPage() {
   const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '' })
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false)
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -112,15 +114,27 @@ export default function AccountPage() {
       setMessage('Enter a valid 10-digit mobile number')
       return
     }
+    const currentPhone = (user?.phone || '').replace(/^\+91/, '')
+    const phoneChanged = formData.phone !== currentPhone
+    const phoneNeedsVerify = !!formData.phone && (phoneChanged || !user?.phoneVerified)
+
     setIsSaving(true)
     setMessage('')
     try {
+      // Name always saves directly; a new/changed mobile number is verified via OTP
+      // (the verify route persists it), so it is not sent through the plain update.
       const response = await fetch('/api/user/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ firstName: formData.firstName, lastName: formData.lastName }),
       })
       if (!response.ok) throw new Error()
+
+      if (phoneNeedsVerify) {
+        setShowPhoneVerify(true)
+        return
+      }
+
       setMessage('Profile updated successfully!')
       setIsEditing(false)
       window.location.reload()
@@ -697,6 +711,15 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showPhoneVerify && (
+        <PhoneVerifyModal
+          title="Verify Mobile Number"
+          initialPhone={formData.phone}
+          onVerified={() => { setShowPhoneVerify(false); setIsEditing(false); window.location.reload() }}
+          onCancel={() => { setShowPhoneVerify(false); setMessage('Mobile number not verified. Your name was saved.') }}
+        />
       )}
     </div>
   )

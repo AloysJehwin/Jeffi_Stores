@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     if (!userPayload) return NextResponse.json({ user: null })
 
     const user = await queryOne<any>(
-      `SELECT id, email, first_name, last_name, phone, created_at, avatar_url, policies_accepted_version
+      `SELECT id, email, first_name, last_name, phone, phone_verified, created_at, avatar_url, policies_accepted_version
        FROM users WHERE id = $1 AND user_type != 'business'`,
       [userPayload.userId]
     )
@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         firstName: user.first_name,
         lastName: user.last_name,
         phone: user.phone,
+        phoneVerified: user.phone_verified,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url || null,
         policiesAcceptedVersion: user.policies_accepted_version,

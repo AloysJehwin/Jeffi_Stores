@@ -1668,6 +1668,14 @@ CREATE INDEX idx_users_phone_trgm ON public.users USING gin (phone public.gin_tr
 
 
 --
+-- Name: idx_users_phone_verified_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_users_phone_verified_unique ON public.users USING btree (phone, user_type) WHERE (phone_verified = true AND phone IS NOT NULL);
+
+
+
+--
 -- Name: idx_users_policies_accepted_version; Type: INDEX; Schema: public; Owner: -
 --
 
