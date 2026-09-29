@@ -13,14 +13,8 @@ import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
-import QuickFilterChips from '@/components/visitor/listing/QuickFilterChips'
 import ListingPromoBanner, { pickPromoOffer } from '@/components/visitor/listing/ListingPromoBanner'
-import {
-  categoryChipScope, rankChips, splitList, type CategoryNode, type ChipCountRow,
-} from '@/components/visitor/listing/quick-filters'
-
 const PAGE_SIZE = 60
-const QUICK_CHIPS = 4
 
 function buildListingConditions(searchParams: any) {
   const conditions: string[] = ['p.is_active = true']
@@ -232,37 +226,6 @@ async function getCategoryBanners(gstEnabled: boolean) {
 }
 
 // Each group is counted without its own filter so sibling brands/categories stay selectable.
-async function getQuickFilters(searchParams: Record<string, string | undefined>, categories: CategoryNode[]) {
-  const selectedCategories = splitList(searchParams.category)
-  const scope = categoryChipScope(selectedCategories, categories)
-  const brandBase = buildListingConditions({ ...searchParams, brand: undefined })
-  const categoryBase = buildListingConditions({ ...searchParams, category: undefined })
-  const categoryParams: unknown[] = [...categoryBase.params]
-  if (scope) categoryParams.push(scope)
-
-  const [brandRows, categoryRows] = await Promise.all([
-    queryMany<ChipCountRow>(
-      `SELECT b.id, b.slug, b.name, COUNT(*)::int AS count
-         FROM products p JOIN brands b ON b.id = p.brand_id AND b.is_active = true
-        WHERE ${brandBase.conditions.join(' AND ')}
-        GROUP BY b.id, b.slug, b.name`,
-      brandBase.params,
-    ),
-    queryMany<ChipCountRow>(
-      `SELECT c.id, c.slug, c.name, COUNT(*)::int AS count
-         FROM products p JOIN categories c ON c.id = p.category_id AND c.is_active = true
-        WHERE ${categoryBase.conditions.join(' AND ')}
-          ${scope ? `AND p.category_id = ANY($${categoryParams.length}::uuid[])` : ''}
-        GROUP BY c.id, c.slug, c.name`,
-      categoryParams,
-    ),
-  ])
-  return {
-    brands: rankChips(brandRows, splitList(searchParams.brand), QUICK_CHIPS),
-    categories: rankChips(categoryRows, selectedCategories, QUICK_CHIPS),
-  }
-}
-
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
@@ -332,11 +295,10 @@ export default async function ProductsPage({
   }
   const facets = await getFilterFacets(facetBaseConditions, facetBaseParams)
 
-  const [liveOffers, activeOffer, activeOffers, quickFilters] = await Promise.all([
+  const [liveOffers, activeOffer, activeOffers] = await Promise.all([
     listFilterOffers(),
     resolvedSearchParams.offer ? getOfferBySlug(String(resolvedSearchParams.offer)) : Promise.resolve(null),
     listActiveOffers(),
-    getQuickFilters(resolvedSearchParams, categories as CategoryNode[]),
   ])
   const promoOffer = pickPromoOffer(activeOffers, {
     page,
@@ -382,13 +344,6 @@ export default async function ProductsPage({
                 .filter((c: any) => resolvedSearchParams.category?.split(',').includes(String(c.id)) || resolvedSearchParams.category?.split(',').includes(c.slug))
                 .map((c: any) => c.name)}
               resultCount={total}
-            />
-
-            <QuickFilterChips
-              showInStock={total > 0 && facets.inStockCount > 0}
-              showOnSale={total > 0 && facets.onSaleCount > 0}
-              categories={quickFilters.categories}
-              brands={quickFilters.brands}
             />
 
             {/* Products Grid */}
