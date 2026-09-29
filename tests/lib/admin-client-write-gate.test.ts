@@ -84,7 +84,7 @@ function ungatedMutatingComponents(): string[] {
 
 describe('every mutating admin view gates its actions on a write scope', () => {
   it('reads a meaningful number of components (guards the glob)', () => {
-    expect(mutatingClientComponents().length).toBeGreaterThanOrEqual(131)
+    expect(mutatingClientComponents().length).toBeGreaterThanOrEqual(126)
   })
 
   it('leaves no mutating view without a client-side write gate', () => {

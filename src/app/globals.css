@@ -95,7 +95,6 @@
   .ecom-accent-bg:hover { background-color: #1d4ed8 !important; }
   .ecom-accent-text { color: #2563eb; }
   .ecom-accent-border { border-color: #2563eb; }
-  .ecom-accent-ring:focus { --tw-ring-color: #2563eb; }
 
   /* Ecom pages: recolor the brand accent (green) to a professional blue, scoped to .ecom-scope
      on the ecom layout so the rest of the app keeps its green. */

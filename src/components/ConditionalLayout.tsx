@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import Header from './visitor/Header'
-import Footer from './visitor/Footer'
 import { CartProvider } from '@/contexts/CartContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -14,10 +13,6 @@ import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 import NumberInputWheelGuard from './NumberInputWheelGuard'
-
-function shouldShowFooter(pathname: string | null): boolean {
-  return false
-}
 
 export default function ConditionalLayout({ children, initialStoreConfig, isFormsSubdomain, isDocumentSubdomain, isBusinessSubdomain, isAdminSubdomain, isEcomSubdomain, isCertPortalSubdomain }: { children: React.ReactNode; initialStoreConfig?: StoreConfig; isFormsSubdomain?: boolean; isDocumentSubdomain?: boolean; isBusinessSubdomain?: boolean; isAdminSubdomain?: boolean; isEcomSubdomain?: boolean; isCertPortalSubdomain?: boolean }) {
   const pathname = usePathname()
@@ -47,8 +42,6 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
     )
   }
 
-  const showFooter = shouldShowFooter(pathname)
-
   return (
     <StoreConfigProvider initialConfig={initialStoreConfig}>
       <ThemeProvider>
@@ -64,7 +57,6 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
                     <main className="flex-1 bg-surface pt-16 lg:pt-20">
                       {children}
                     </main>
-                    {showFooter && <Footer />}
                   </div>
                   <CompareBar />
                   <PolicyConsentGate />
