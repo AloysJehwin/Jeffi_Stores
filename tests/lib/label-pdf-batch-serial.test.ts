@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// pdfkit is mocked globally via tests/lib/__pdf-mocks.ts (setupFiles). qrcode &
+// pdfkit is mocked globally via tests/helpers/pdf-mocks.ts (setupFiles). qrcode &
 // bwip-js need per-file mocks because label-pdf uses toBuffer. label-pdf.ts loads
 // them via eval('require')(...), so the SAME fn must back both default and named
 // exports — otherwise vi.mocked(default.toBuffer) wouldn't be the fn used.
