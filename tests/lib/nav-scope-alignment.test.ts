@@ -18,7 +18,7 @@ function navLinks(): { href: string; scope: string }[] {
  */
 describe('a nav link is gated on the same scope as the page it points at', () => {
   it('reads a meaningful number of links (guards the regex)', () => {
-    expect(navLinks().length).toBeGreaterThan(20)
+    expect(navLinks().length).toBeGreaterThanOrEqual(47)
   })
 
   it('never gates a link on a different scope than its own route', () => {

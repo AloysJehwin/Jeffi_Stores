@@ -26,6 +26,6 @@ describe('every setting the admin UI renders is writable through the API', () =>
   })
 
   it('reads a non-trivial number of controls (guards the regex)', () => {
-    expect(keysRenderedByPage().length).toBeGreaterThan(20)
+    expect(keysRenderedByPage().length).toBeGreaterThanOrEqual(64)
   })
 })

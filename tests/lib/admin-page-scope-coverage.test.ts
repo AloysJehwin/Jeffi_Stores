@@ -23,7 +23,7 @@ function adminPages(): string[] {
 
 describe('every admin page resolves to a scope middleware can enforce', () => {
   it('finds the admin pages (guards the glob)', () => {
-    expect(adminPages().length).toBeGreaterThan(50)
+    expect(adminPages().length).toBeGreaterThanOrEqual(93)
   })
 
   it('leaves no page ungated', () => {
