@@ -14,7 +14,7 @@ async function createProduct(formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
-  const categoryId = formData.get('category_id') as string
+  const categoryId = (formData.get('category_id') as string || '').trim() || null
   const brandId = formData.get('brand_id') as string
   const hasVariants = formData.get('has_variants') === 'true'
   const variantType = formData.get('variant_type') as string || null
@@ -81,7 +81,7 @@ async function createProduct(formData: FormData) {
       }
     }
     if (errors.length > 0) {
-      throw new Error(errors[0])
+      return { error: errors[0] }
     }
   }
   const productId = (formData.get('product_id') as string) || null
@@ -260,7 +260,16 @@ async function createProduct(formData: FormData) {
   redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-    throw new Error(err?.message || 'Failed to create product')
+    const raw = err?.message || ''
+    let message = raw || 'Failed to create product'
+    if (err?.code === '23505' || /duplicate key/i.test(raw)) {
+      if (/products_sku_key/.test(raw)) message = 'A product with this SKU already exists. Use a different SKU.'
+      else if (/products_slug_key/.test(raw)) message = 'A product with this name already exists. Use a different name.'
+      else message = 'A product with these details already exists.'
+    } else if (/invalid input syntax for type uuid/i.test(raw)) {
+      message = 'Please select a valid category before saving.'
+    }
+    return { error: message }
   }
 }
 export default async function AddProductPage() {

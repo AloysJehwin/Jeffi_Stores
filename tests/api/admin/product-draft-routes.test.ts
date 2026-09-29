@@ -204,6 +204,8 @@ describe('products draft units route', () => {
   })
 
   it('POST adds unit to draft', async () => {
+    // liveBaseUnit() runs first for the base-change guard; null = no live base, guard skipped.
+    mockQueryOne.mockResolvedValueOnce(null)
     mockQueryOne.mockResolvedValueOnce({ units: [] })
     mockQuery.mockResolvedValueOnce({})
     const res = await unitsPost(req('POST', { unit: 'pc', factor: 1, is_base: true }), { params: idParams })
