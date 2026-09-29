@@ -4,7 +4,7 @@ import { sendOTPEmail } from '@/lib/email'
 import { sendOTPSMS } from '@/lib/sms'
 import { sendOTPWhatsApp } from '@/lib/whatsapp'
 import { queryOne } from '@/lib/db'
-import { POLICY_VERSION } from '@/app/legal/policies'
+import { POLICY_VERSION } from '@/lib/legals/policies'
 
 function normalizeIndianPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '')

@@ -5,7 +5,7 @@ import {
   POLICY_VERSION,
   CONSENT_POLICIES,
   getPolicyBySlug,
-} from '@/app/legal/policies'
+} from '@/lib/legals/policies'
 
 describe('policies constants', () => {
   it('POLICY_VERSION is a date-like string', () => {

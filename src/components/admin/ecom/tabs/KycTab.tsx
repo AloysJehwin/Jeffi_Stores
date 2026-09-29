@@ -1,6 +1,6 @@
 import type { TenantDetail, TenantKyc } from '@/lib/tenant-registry'
 import { Field, Mono, Section } from '../EcomUI'
-import KycActionButtons from '@/app/admin/ecom/kyc/KycActionButtons'
+import KycActionButtons from './KycActionButtons'
 
 const BORDER: Record<string, string> = {
   pending:  'border-yellow-300 dark:border-yellow-700',

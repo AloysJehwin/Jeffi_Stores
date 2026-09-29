@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { queryMany } from '@/lib/db'
-import type { AdvancedFilterField } from '@/components/admin/AdvancedFilterPanel'
+import type { AdvancedFilterField } from '@/lib/product-attribute-filters'
 import {
   ALIASED_SPEC_KEYS, COLUMN_SPEC_ALIASES, SPEC_JUNK_SQL, specKeySql, specLabel,
 } from '@/lib/product-specs'

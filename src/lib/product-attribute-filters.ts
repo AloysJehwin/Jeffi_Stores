@@ -1,4 +1,14 @@
-import type { AdvancedFilterField } from '@/components/admin/AdvancedFilterPanel'
+export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
+
+export interface AdvancedFilterField {
+  name: string | [string, string]
+  label: string
+  type: AdvancedFilterFieldType
+  options?: { value: string; label: string }[]
+  section?: string
+  placeholder?: string
+  unit?: string
+}
 
 // Value-help picks are joined with a pipe: standards and specs often contain commas.
 const VALUE_SEPARATOR = '|'

@@ -1,5 +1,5 @@
-import type { Policy, Section } from '@/app/legal/policies'
-import { policies, POLICY_VERSION } from '@/app/legal/policies'
+import type { Policy, Section } from '@/lib/legals/policies'
+import { policies, POLICY_VERSION } from '@/lib/legals/policies'
 import { generatePolicyPDF } from '@/lib/policy-pdf'
 import { tenantNoReplyAddress } from '../brand'
 

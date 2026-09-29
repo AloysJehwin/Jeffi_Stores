@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/jwt'
 import { platformOAuthBaseUrl, currentAdminBaseUrl } from '@/lib/brand'
-import { signAdminState } from '@/app/api/admin/integrations/state'
+import { signAdminState } from '@/lib/oauth-state'
 import { extractSpreadsheetId } from '@/lib/import/google-sync'
 import { resolveImportTenantId } from '@/lib/import/jobs'
 

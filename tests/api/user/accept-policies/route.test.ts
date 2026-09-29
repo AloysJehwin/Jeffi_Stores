@@ -7,7 +7,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
 }))
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: '2026-06-14',
 }))
 

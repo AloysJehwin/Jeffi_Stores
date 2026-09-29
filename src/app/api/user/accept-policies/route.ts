@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser, authenticateBusiness } from '@/lib/jwt'
 import { query } from '@/lib/db'
-import { POLICY_VERSION } from '@/app/legal/policies'
+import { POLICY_VERSION } from '@/lib/legals/policies'
 
 export const dynamic = 'force-dynamic'
 

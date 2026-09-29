@@ -364,3 +364,19 @@ export function withDefaults(rows: HomepageSection[]): HomepageSection[] {
     ends_at: null,
   }))
 }
+
+export interface PickerProduct {
+  id: string
+  name: string
+  sku: string | null
+  image_url: string | null
+  is_bundle: boolean
+}
+
+export interface PreviewItem {
+  id: string
+  name: string
+  image_url: string | null
+  price?: number | null
+  value?: string
+}

@@ -1,4 +1,4 @@
-import { CheckMark } from '@/app/ecom/Shapes'
+import CheckMark from '@/components/ui/CheckMark'
 
 export interface BrandPanelProps {
   badge: string

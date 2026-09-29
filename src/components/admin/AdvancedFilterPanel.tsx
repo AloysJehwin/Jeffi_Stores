@@ -7,19 +7,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
 import AdminSelect from './AdminSelect'
-import { splitFilterValues } from '@/lib/product-attribute-filters'
-
-export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
-
-export interface AdvancedFilterField {
-  name: string | [string, string]
-  label: string
-  type: AdvancedFilterFieldType
-  options?: { value: string; label: string }[]
-  section?: string
-  placeholder?: string
-  unit?: string
-}
+import { splitFilterValues, type AdvancedFilterField } from '@/lib/product-attribute-filters'
 
 interface Props {
   fields: AdvancedFilterField[]
