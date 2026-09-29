@@ -6,7 +6,6 @@ import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
-import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/site-controls'
 import { getHost } from '@/lib/get-host'
@@ -29,8 +28,6 @@ export default async function AdminLayout({
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
   const cookieStore = await cookies()
-  const ua = headersList.get('user-agent') || ''
-  const isMobile = /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
 
   const session = await getAdminSession()
 
@@ -122,7 +119,7 @@ export default async function AdminLayout({
   const [controls, host] = await Promise.all([getSiteControls(), getHost()])
 
   return (
-    <AdminMobileProvider isMobile={isMobile}>
+    <>
       <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} role={role} scopes={scopes} />
       <AdminShell
         brandName={controls.identity.name}
@@ -140,6 +137,6 @@ export default async function AdminLayout({
         <DesktopRequiredBanner />
         {children}
       </AdminShell>
-    </AdminMobileProvider>
+    </>
   )
 }

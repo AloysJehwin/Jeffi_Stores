@@ -1,6 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('./db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
 import { listOffersByIds } from '@/lib/product-offers'
