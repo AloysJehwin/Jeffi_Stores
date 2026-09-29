@@ -3,6 +3,7 @@ import { query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { suggestIcon } from '@/lib/iconSuggest'
+import { canUseAi } from '@/lib/ai-scope'
 import { revalidatePath } from 'next/cache'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +36,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const skuPrefix = (sku_prefix || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
-  const iconToUse = icon_name?.trim() || await suggestIcon(name.trim())
+  const iconToUse = icon_name?.trim()
+    || (canUseAi(admin.role, admin.scopes, 'categories:write') ? await suggestIcon(name.trim()) : 'Package')
 
   const retAllowed   = return_allowed   == null ? null : !!return_allowed
   const retDays      = return_allowed   == null ? null : Math.max(1, parseInt(return_window_days) || 7)

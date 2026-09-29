@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSiteControls } from '@/lib/site-controls'
+import { storefrontAiAllowed } from '@/lib/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 // Contains NO secrets — only display identity, feature toggles, storefront limits.
 export async function GET() {
   const c = await getSiteControls()
+  const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
   return NextResponse.json(
     {
       identity: {
@@ -27,6 +29,7 @@ export async function GET() {
         ondeviceSummaryDesktopEnabled: c.flags.ondeviceSummaryDesktopEnabled,
         ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
         ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
+        aiStorefrontEnabled,
       },
       orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
       storefront: {

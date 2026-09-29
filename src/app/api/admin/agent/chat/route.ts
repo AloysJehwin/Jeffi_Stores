@@ -5,6 +5,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { aiChat, AiClientError, type AiToolDef, type AiChatMessage } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
 import { findSimilar } from '@/lib/rag'
+import { resolveTenantId } from '@/lib/tenant-context'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -77,7 +78,8 @@ function buildToolsDef(userMessage?: string): AiToolDef[] {
 
 async function buildSystemPromptWithDynamic(userMessage?: string): Promise<string> {
   let ragContext = ''
-  if (userMessage) {
+  // The RAG index holds only the platform store's records; a tenant's prompt must never carry them.
+  if (userMessage && !(await resolveTenantId())) {
     try {
       const results = await findSimilar(userMessage, { limit: 12, minSimilarity: 0.3 })
       if (results.length > 0) {
@@ -123,7 +125,7 @@ ${dynamicList}
 ## DOMAIN RULES
 
 Data queries:
-- search_products → natural language ("hex bolts for steel"). NOT for filters like featured/low-stock/top-sellers — use run_sql_readonly for those (or list_featured_products for featured).
+- search_products → natural language describing the product or its use. NOT for filters like featured/low-stock/top-sellers — use run_sql_readonly for those (or list_featured_products for featured).
 - run_sql_readonly → ad-hoc SELECTs. Use describe_schema first if unsure of column names. Tables: products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent.
 - Time-based customer/order queries (joined today, last 48h, recent orders) MUST use run_sql_readonly with a WHERE created_at >= NOW() - INTERVAL filter. Exclude guest accounts: AND email NOT LIKE 'guest\_%@temporary.local'.
 - Products with has_variants=true: stock lives in product_variants, not inventory_quantity. Price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).

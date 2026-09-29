@@ -63,12 +63,22 @@ describe('POST /api/admin/campaigns/generate', () => {
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
 
-  it('returns 403 when scope missing', async () => {
+  it('returns 403 when the plan or role has no AI entitlement', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
     const res = await POST(makeRequest({ prompt: 'cart abandon' }))
     expect(res.status).toBe(403)
+    expect((await res.json()).error).toBe('AI tools are not available for your plan or role')
+    expect(mockAiChat).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 when AI is available but mailer:write is missing', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockImplementation((_r, _s, scope) => scope !== 'mailer:write')
+    const res = await POST(makeRequest({ prompt: 'cart abandon' }))
+    expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
+    expect(mockAiChat).not.toHaveBeenCalled()
   })
 
   it('returns 400 when prompt is empty', async () => {

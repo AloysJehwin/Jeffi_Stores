@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { dueSocialPosts } from '@/lib/tenant-registry'
+import { dueSocialPosts, lookupTenantContextById, updateSocialPost } from '@/lib/tenant-registry'
+import { runWithTenantContext } from '@/lib/tenant-context'
 import { publishScheduledPost } from '@/lib/social/publisher'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,19 @@ export async function GET(request: NextRequest) {
   const due = await dueSocialPosts(20)
   const results: Array<{ id: string; ok: boolean; error?: string }> = []
   for (const post of due) {
-    const r = await publishScheduledPost(post)
+    // Due posts span every tenant: product DB, caption plan gate and AI cache must be the post's own.
+    let r: { ok: boolean; error?: string }
+    if (post.tenant_id) {
+      const ctx = await lookupTenantContextById(post.tenant_id)
+      if (!ctx) {
+        await updateSocialPost(post.id, { status: 'failed', lastError: 'tenant not active' })
+        results.push({ id: post.id, ok: false, error: 'tenant not active' })
+        continue
+      }
+      r = await runWithTenantContext(ctx, () => publishScheduledPost(post))
+    } else {
+      r = await publishScheduledPost(post)
+    }
     results.push({ id: post.id, ok: r.ok, error: r.error })
   }
   return NextResponse.json({ success: true, published: results.filter((r) => r.ok).length, total: due.length, results })

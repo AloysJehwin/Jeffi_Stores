@@ -3,9 +3,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('pdf-to-img', () => ({
   pdf: vi.fn(),
 }))
+vi.mock('@/lib/ai-client', () => ({ aiVision: vi.fn() }))
+vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
 import { ocrImage, ocrPdfPages, isVisionConfigured } from '@/lib/admin-agent/vision'
 import * as pdfToImg from 'pdf-to-img'
+import { aiVision } from '@/lib/ai-client'
+
+const mockAiVision = vi.mocked(aiVision)
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
@@ -16,6 +21,7 @@ describe('vision', () => {
     delete process.env.PADDLE_OCR_URL
     delete process.env.OLLAMA_BASE_URL
     delete process.env.AI_PROVIDER
+    mockAiVision.mockResolvedValue({ ok: false, text: '', model: '', error: 'vision not configured' })
   })
 
   describe('isVisionConfigured', () => {
@@ -40,66 +46,35 @@ describe('vision', () => {
   })
 
   describe('ocrImage', () => {
-    it('uses PaddleOCR when PADDLE_OCR_URL is set and returns text', async () => {
-      process.env.PADDLE_OCR_URL = 'http://paddle:8866'
+    it('returns the gateway OCR text, prompting with the store descriptor', async () => {
+      mockAiVision.mockResolvedValueOnce({ ok: true, text: 'Hello from PaddleOCR', model: 'PP-OCRv5' })
       const imageBuffer = Buffer.from('fake-image')
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ ok: true, text: 'Hello from PaddleOCR' }),
-      })
 
       const result = await ocrImage(imageBuffer, 'image/jpeg')
       expect(result.ok).toBe(true)
       expect((result as any).text).toBe('Hello from PaddleOCR')
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8866/ocr',
-        expect.objectContaining({ method: 'POST' })
-      )
+      expect((result as any).model).toBe('PP-OCRv5')
+      const [images, prompt] = mockAiVision.mock.calls[0]
+      expect(images).toEqual([imageBuffer.toString('base64')])
+      expect(prompt).toContain('Test Store, an online store')
+      expect(prompt).not.toMatch(/hardware|industrial/i)
     })
 
-    it('falls back to Ollama when PaddleOCR fails', async () => {
-      process.env.PADDLE_OCR_URL = 'http://paddle:8866'
-      process.env.OLLAMA_BASE_URL = 'http://ollama:11434'
-      const imageBuffer = Buffer.from('fake-image')
+    it('returns the gateway reason and hint when vision fails', async () => {
+      mockAiVision.mockResolvedValueOnce({ ok: false, text: '', model: '', error: 'vision model down', hint: 'retry later' })
 
-      mockFetch
-        .mockRejectedValueOnce(new Error('paddle down'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            message: { content: 'Ollama extracted text' },
-          }),
-        })
-
-      const result = await ocrImage(imageBuffer, 'image/png')
-      expect(result.ok).toBe(true)
-      expect((result as any).text).toContain('Ollama extracted text')
+      const result = await ocrImage(Buffer.from('fake-image'), 'image/png')
+      expect(result.ok).toBe(false)
+      expect((result as any).reason).toBe('vision model down')
+      expect((result as any).hint).toBe('retry later')
     })
 
-    it('uses Ollama directly when no PADDLE_OCR_URL', async () => {
-      process.env.OLLAMA_BASE_URL = 'http://ollama:11434'
-      const imageBuffer = Buffer.from('fake-image')
+    it('treats NO_ITEMS_FOUND as no quotation items', async () => {
+      mockAiVision.mockResolvedValueOnce({ ok: true, text: '  NO_ITEMS_FOUND  ', model: 'm' })
 
-      // Code always tries paddle first (frozen localhost:8866), then falls back to Ollama
-      mockFetch
-        .mockRejectedValueOnce(new Error('paddle unreachable'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            message: { content: 'Direct ollama response' },
-          }),
-        })
-
-      const result = await ocrImage(imageBuffer, 'image/jpeg')
-      expect(result.ok).toBe(true)
-      expect((result as any).text).toContain('Direct ollama response')
-      // OLLAMA_BASE_URL is captured as a module-level const at import time,
-      // so it uses the frozen default host (Tailscale IP) + /api/chat endpoint.
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/chat'),
-        expect.any(Object)
-      )
+      const result = await ocrImage(Buffer.from('fake-image'), 'image/jpeg')
+      expect(result.ok).toBe(false)
+      expect((result as any).reason).toMatch(/no quotation items/i)
     })
 
     it('returns empty string when PaddleOCR response has no text', async () => {

@@ -74,11 +74,11 @@ export interface CustomerToolDef {
 export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   {
     name: 'recommend_for_project',
-    description: 'Find products for a described project or use-case using semantic vector search. Use when the user describes what they are building or doing — e.g. "I need fasteners for a wooden shelf". Returns ranked products with price and stock. Always prefer this over search_products for project-style queries.',
+    description: 'Find products for a described need, occasion or use-case using semantic vector search. Use when the user describes what they need or what it is for — e.g. "I need a gift for a friend who loves cooking". Returns ranked products with price and stock. Always prefer this over search_products for need-style queries.',
     inputSchema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Description of the project or use-case. Max 500 chars.', maximum: 500 },
+        query: { type: 'string', description: 'Description of the need or use-case. Max 500 chars.', maximum: 500 },
         limit: { type: 'integer', default: 8, minimum: 1, maximum: 12 },
       },
       required: ['query'],

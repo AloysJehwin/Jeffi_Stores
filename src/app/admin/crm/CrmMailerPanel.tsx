@@ -320,6 +320,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
               fieldLabel="Email Subject"
               value={subject}
               onChange={setSubject}
+              scope="mailer:write"
               context={aiContext}
             >
               <input
@@ -339,6 +340,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
               fieldLabel="Email Headline"
               value={headline}
               onChange={setHeadline}
+              scope="mailer:write"
               context={aiContext}
             >
               <input

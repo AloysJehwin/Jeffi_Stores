@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { aiDenial } from '@/lib/ai-scope'
 import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/customer-conversations-ai'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +20,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  const denied = aiDenial(admin.role, admin.scopes, 'customers:write')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   if (!aiProfileConfigured()) return NextResponse.json({ error: 'AI profile generation is not configured.' }, { status: 503 })
 

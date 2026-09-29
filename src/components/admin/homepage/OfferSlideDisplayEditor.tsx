@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import AdminImage from '@/components/admin/AdminImage'
 import { useToast } from '@/contexts/ToastContext'
-import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useCanWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export interface OfferSlide {
@@ -36,6 +36,7 @@ export default function OfferSlideDisplayEditor({ offer, onChange }: {
 }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('coupons:write')
+  const canUseAi = useCanUseAi('coupons:write')
   const storeName = useStoreConfig().identity.name || 'an online store'
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -117,7 +118,7 @@ export default function OfferSlideDisplayEditor({ offer, onChange }: {
           </button>
         </div>
 
-        {canWrite && (
+        {canUseAi && (
           <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
             <div className="flex items-center gap-1.5 mb-2">
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>

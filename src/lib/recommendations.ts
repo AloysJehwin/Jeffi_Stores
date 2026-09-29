@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/db'
 import { findSimilarProductIds } from '@/lib/rag'
 import { aiChat, AiClientError } from '@/lib/ai-client'
+import { storefrontAiAllowed } from '@/lib/storefront-ai'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
@@ -222,7 +223,7 @@ export async function getCandidates(
   // Ollama box or vector store is unreachable. Raced against a hard deadline so
   // an unreachable RAG store degrades fast (~6s) instead of hanging on pg
   // connect timeouts and blocking the homepage.
-  if (seedQuery) {
+  if (seedQuery && await storefrontAiAllowed().catch(() => false)) {
     try {
       const similar = await withTimeout(findSimilarProductIds(seedQuery, limit), 6000)
       const excl = new Set(excludeIds)
@@ -344,6 +345,7 @@ async function curate(
 ): Promise<{ ids: string[]; curated: boolean; model?: string; responseMs?: number; promptTokens?: number; completionTokens?: number }> {
   const fallback = candidates.slice(0, want).map(c => c.id)
   if (candidates.length <= want) return { ids: fallback, curated: false }
+  if (!(await storefrontAiAllowed().catch(() => false))) return { ids: fallback, curated: false }
 
   const interest = [
     signals.seedNames.length ? `Recently interested in: ${signals.seedNames.slice(0, 6).join(', ')}.` : '',

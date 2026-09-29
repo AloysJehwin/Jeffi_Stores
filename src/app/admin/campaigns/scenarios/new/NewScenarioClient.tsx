@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/admin-path'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface Validation {
   ok: boolean
@@ -43,12 +43,14 @@ export default function NewScenarioClient() {
   const [description, setDescription] = useState('')
 
   const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [dryRunning, setDryRunning] = useState(false)
   const [saving, setSaving] = useState(false)
 
   async function generate() {
     if (!aiPrompt.trim()) return
     setGenerating(true)
+    setGenerateError(null)
     try {
       const res = await fetch('/api/admin/campaigns/scenarios/generate', {
         method: 'POST',
@@ -58,7 +60,7 @@ export default function NewScenarioClient() {
       })
       const data = await res.json()
       if (!res.ok) {
-        showToast(data.error || 'Generation failed', 'error')
+        setGenerateError(data.error || 'Generation failed')
         return
       }
       setSql(data.sql || '')
@@ -72,6 +74,8 @@ export default function NewScenarioClient() {
       setDryRunCount(null)
       setDryRunSample([])
       setStep('review_sql')
+    } catch {
+      setGenerateError('Generation failed — please try again')
     } finally {
       setGenerating(false)
     }
@@ -194,6 +198,7 @@ export default function NewScenarioClient() {
 
           <div className="flex items-center gap-2">
             <RequireWrite scope="campaigns:write">
+              <RequireAi scope="mailer:write" fallback={<span className="text-xs text-foreground-muted">AI tools are not available for your plan or role.</span>}>
               <button
                 type="button"
                 onClick={generate}
@@ -202,8 +207,10 @@ export default function NewScenarioClient() {
               >
                 {generating ? 'Generating…' : 'Generate SQL with AI'}
               </button>
+              </RequireAi>
             </RequireWrite>
             <Link href={ap('/admin/campaigns/scenarios')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Cancel</Link>
+            {generateError && <span className="text-xs text-red-600 dark:text-red-400">{generateError}</span>}
           </div>
         </div>
       )}
@@ -292,6 +299,7 @@ export default function NewScenarioClient() {
               >
                 {dryRunning ? 'Running…' : (dryRunCount !== null ? 'Re-run dry run' : 'Run dry run')}
               </button>
+              <RequireAi scope="mailer:write">
               <button
                 type="button"
                 onClick={generate}
@@ -300,7 +308,9 @@ export default function NewScenarioClient() {
               >
                 {generating ? 'Regenerating…' : 'Regenerate SQL'}
               </button>
+              </RequireAi>
             </RequireWrite>
+            {generateError && <span className="text-xs text-red-600 dark:text-red-400">{generateError}</span>}
           </div>
 
           {dryRunCount !== null && (

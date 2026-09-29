@@ -4,6 +4,7 @@ import SessionGuard from '@/components/security/SessionGuard'
 import Script from 'next/script'
 import { getHost } from '@/lib/get-host'
 import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/site-controls'
+import { storefrontAiAllowed } from '@/lib/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
 
@@ -50,6 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // (SSR + hydration) already has the true DB-backed values — no client fetch
   // flash on price/GST. Mirrors the /api/store-config payload shape.
   const c = await getSiteControls()
+  const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
   const initialStoreConfig: StoreConfig = {
     identity: {
       name: c.identity.name,
@@ -68,6 +70,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       ondeviceSummaryDesktopEnabled: c.flags.ondeviceSummaryDesktopEnabled,
       ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
       ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
+      aiStorefrontEnabled,
     },
     orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
     storefront: {

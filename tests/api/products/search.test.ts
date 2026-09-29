@@ -6,14 +6,17 @@ vi.mock('@/lib/rag', () => ({
   embed: vi.fn(),
   runWithHnswTuning: vi.fn(),
 }))
+vi.mock('@/lib/storefront-ai', () => ({ storefrontAiAllowed: vi.fn() }))
 
 import { GET } from '@/app/api/products/search/route'
 import { queryMany } from '@/lib/db'
 import { embed, runWithHnswTuning } from '@/lib/rag'
+import { storefrontAiAllowed } from '@/lib/storefront-ai'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockEmbed = vi.mocked(embed)
 const mockRunWithHnswTuning = vi.mocked(runWithHnswTuning)
+const mockStorefrontAiAllowed = vi.mocked(storefrontAiAllowed)
 
 const PRODUCTS = [
   { id: 'p1', name: 'Widget A', slug: 'widget-a' },
@@ -30,6 +33,7 @@ function makeReq(params: Record<string, string> = {}) {
 describe('GET /api/products/search', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    mockStorefrontAiAllowed.mockResolvedValue(true)
   })
 
   it('returns empty array when q is too short (< 2 chars)', async () => {
@@ -148,6 +152,16 @@ describe('GET /api/products/search', () => {
 
     const res = await GET(makeReq({ q: 'bolt' }))
     expect(res.status).toBe(200)
+  })
+
+  it('skips the semantic fallback when the store plan has no storefront AI', async () => {
+    mockQueryMany.mockResolvedValueOnce([PRODUCTS[0]] as any)
+    mockStorefrontAiAllowed.mockResolvedValue(false)
+
+    const res = await GET(makeReq({ q: 'wid' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual([PRODUCTS[0]])
+    expect(mockEmbed).not.toHaveBeenCalled()
   })
 
   it('returns empty when semantic throws', async () => {
