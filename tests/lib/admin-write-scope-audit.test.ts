@@ -78,6 +78,6 @@ describe('an admin action is never reachable with read-only access', () => {
   })
 
   it('reads a meaningful number of routes (guards the glob)', () => {
-    expect(glob.sync('src/app/api/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThan(100)
+    expect(glob.sync('src/app/api/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(340)
   })
 })
