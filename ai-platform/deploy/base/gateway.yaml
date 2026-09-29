@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-gateway
+  namespace: ai-platform
+spec:
+  # 2+ replicas: if one restarts, the other keeps draining the queue -> no lost requests.
+  replicas: 2
+  selector:
+    matchLabels: { app: ai-gateway }
+  template:
+    metadata:
+      labels: { app: ai-gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: jeffi/ai-gateway:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: ai-gateway-config }
+            - secretRef: { name: ai-gateway-secret }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "200m", memory: 256Mi }
+            limits: { cpu: "1", memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-gateway
+  namespace: ai-platform
+spec:
+  selector: { app: ai-gateway }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ai-gateway
+  namespace: ai-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ai-gateway
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
