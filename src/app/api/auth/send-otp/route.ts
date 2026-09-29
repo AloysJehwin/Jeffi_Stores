@@ -6,17 +6,48 @@ import { sendOTPWhatsApp } from '@/lib/whatsapp'
 import { queryOne } from '@/lib/db'
 import { POLICY_VERSION } from '@/app/legal/policies'
 
+function normalizeIndianPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '')
+  const cleaned = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits
+  return cleaned.length === 10 ? cleaned : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, isSignup, userType, phone, channel } = body
-
-    if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    }
+    const { identifier, isSignup, userType, phone, channel } = body
+    let { email } = body
 
     const resolvedChannel: string = channel || 'email'
-    if (['sms', 'whatsapp'].includes(resolvedChannel) && !phone) {
+
+    // Login can identify an account by email OR verified mobile number. When the
+    // supplied identifier is a phone (login-by-phone), resolve it to the account's
+    // email so the rest of the flow (OTP store, verify, login) stays email-keyed.
+    let deliveryPhone: string | null = phone || null
+    if (!isSignup && !email && identifier) {
+      const asPhone = normalizeIndianPhone(String(identifier))
+      if (asPhone) {
+        const byPhone = await queryOne<any>(
+          userType === 'business'
+            ? "SELECT email, phone FROM users WHERE phone = $1 AND phone_verified = true AND user_type = 'business' LIMIT 1"
+            : "SELECT email, phone FROM users WHERE phone = $1 AND phone_verified = true AND user_type != 'business' LIMIT 1",
+          [asPhone]
+        )
+        if (!byPhone) {
+          return NextResponse.json({ error: 'No account found with this mobile number. Please sign up first.', userNotFound: true }, { status: 404 })
+        }
+        email = byPhone.email
+        deliveryPhone = deliveryPhone || byPhone.phone
+      } else {
+        email = String(identifier).trim()
+      }
+    }
+
+    if (!email) {
+      return NextResponse.json({ error: 'Email or mobile number is required' }, { status: 400 })
+    }
+
+    if (['sms', 'whatsapp'].includes(resolvedChannel) && !deliveryPhone) {
       return NextResponse.json({ error: 'Phone number is required for SMS/WhatsApp OTP' }, { status: 400 })
     }
 
@@ -69,10 +100,10 @@ export async function POST(request: NextRequest) {
 
     let sendResult: { success: boolean }
     if (resolvedChannel === 'sms') {
-      const ok = await sendOTPSMS({ phone, otp })
+      const ok = await sendOTPSMS({ phone: deliveryPhone, otp })
       sendResult = { success: ok }
     } else if (resolvedChannel === 'whatsapp') {
-      const ok = await sendOTPWhatsApp({ phone, otp })
+      const ok = await sendOTPWhatsApp({ phone: deliveryPhone, otp })
       sendResult = { success: ok }
     } else {
       sendResult = await sendOTPEmail(email, otp)
@@ -90,6 +121,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: `OTP sent successfully via ${resolvedChannel}`,
       email: email.toLowerCase(),
+      resolvedEmail: email.toLowerCase(),
       nextCooldown: rateLimit.nextCooldown,
       requiresPolicyAcceptance,
       policyVersion: POLICY_VERSION,

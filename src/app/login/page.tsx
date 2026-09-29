@@ -8,6 +8,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
 export default function LoginPageWrapper() {
   return (
@@ -22,12 +23,13 @@ function LoginPage() {
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/'
   const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
-  const { user, isLoading: authLoading, login, googleLoginWithAccessToken, refreshUser } = useAuth()
+  const { user, isLoading: authLoading, login, googleLoginWithAccessToken, logout } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
   const config = useStoreConfig()
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
+  const [identifier, setIdentifier] = useState('')
   const [email, setEmail] = useState('')
   const [loginPhone, setLoginPhone] = useState('')
   const [selectedChannel, setSelectedChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
@@ -42,10 +44,6 @@ function LoginPage() {
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
   const [showPhoneModal, setShowPhoneModal] = useState(false)
-  const [phone, setPhone] = useState('')
-  const [phoneSaving, setPhoneSaving] = useState(false)
-  const [phoneError, setPhoneError] = useState('')
-  const [phonePolicyAccepted, setPhonePolicyAccepted] = useState(false)
   const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
 
   useEffect(() => {
@@ -70,7 +68,7 @@ function LoginPage() {
     googleLoginWithAccessToken(accessToken)
       .then(async (loggedInUser) => {
         await refreshCart()
-        const needsPhone = !loggedInUser?.phone
+        const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
         const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
         if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setShowPhoneModal(true) }
         else router.push(redirect)
@@ -105,7 +103,7 @@ function LoginPage() {
     try {
       const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      const needsPhone = !loggedInUser?.phone
+      const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
       const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
       if (needsPhone || needsPolicy) {
         setPhoneRequiresPolicy(needsPolicy)
@@ -120,10 +118,24 @@ function LoginPage() {
     }
   }
 
+  const identifierIsPhone = /^\d/.test(identifier.trim())
+
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (selectedChannel !== 'email' && loginPhone.length !== 10) {
+    const idTrimmed = identifier.trim()
+    if (!idTrimmed) {
+      setError('Enter your email or mobile number')
+      return
+    }
+    // When identifying by phone, that same number receives the OTP; otherwise a
+    // separate mobile number is needed for SMS/WhatsApp delivery.
+    const deliveryPhone = identifierIsPhone ? idTrimmed.replace(/\D/g, '') : loginPhone
+    if (identifierIsPhone && deliveryPhone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
+    if (!identifierIsPhone && selectedChannel !== 'email' && loginPhone.length !== 10) {
       setError('Enter a valid 10-digit mobile number')
       return
     }
@@ -134,7 +146,12 @@ function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, phone: `+91${loginPhone}`, channel: selectedChannel, isSignup: false }),
+        body: JSON.stringify({
+          identifier: idTrimmed,
+          phone: deliveryPhone.length === 10 ? `+91${deliveryPhone}` : undefined,
+          channel: selectedChannel,
+          isSignup: false,
+        }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -144,11 +161,17 @@ function LoginPage() {
           throw new Error(data.error || 'Please wait before requesting another OTP')
         }
         if (data.userNotFound) {
-          router.push(`/signup?email=${encodeURIComponent(email)}&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
+          if (identifierIsPhone) {
+            router.push(`/signup?from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
+          } else {
+            router.push(`/signup?email=${encodeURIComponent(idTrimmed)}&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
+          }
           return
         }
         throw new Error(data.error || 'Failed to send OTP')
       }
+      setEmail(data.resolvedEmail || idTrimmed)
+      if (identifierIsPhone) setLoginPhone(deliveryPhone)
       setStep('otp')
       setRequiresPolicy(!!data.requiresPolicyAcceptance)
       setPolicyAccepted(false)
@@ -232,45 +255,6 @@ function LoginPage() {
     }
   }
 
-  const handleSavePhone = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setPhoneError('')
-    if (!phone || phone.length !== 10) {
-      setPhoneError('Enter a valid 10-digit mobile number')
-      return
-    }
-    if (phoneRequiresPolicy && !phonePolicyAccepted) {
-      setPhoneError('Please accept the Privacy Policy and Terms & Conditions')
-      return
-    }
-    setPhoneSaving(true)
-    try {
-      const res = await fetch('/api/user/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ phone }),
-      })
-      if (!res.ok) {
-        const d = await res.json()
-        throw new Error(d.error || 'Failed to save phone number')
-      }
-      if (phoneRequiresPolicy && phonePolicyAccepted) {
-        await fetch('/api/user/accept-policies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({}),
-        }).catch(() => {})
-      }
-      await refreshUser()
-      router.push(redirect)
-    } catch (err: any) {
-      setPhoneError(err.message)
-    } finally {
-      setPhoneSaving(false)
-    }
-  }
 
   const [smsEnabled, setSmsEnabled] = useState(process.env.NEXT_PUBLIC_SMS_DISABLED !== 'true')
   const [whatsappEnabled, setWhatsappEnabled] = useState(process.env.NEXT_PUBLIC_WHATSAPP_DISABLED !== 'true')
@@ -358,7 +342,7 @@ function LoginPage() {
                   <div className="w-full border-t border-border-default" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-3 bg-surface-elevated text-foreground-muted">or continue with email</span>
+                  <span className="px-3 bg-surface-elevated text-foreground-muted">or continue with email or mobile</span>
                 </div>
               </div>
             </>
@@ -367,14 +351,15 @@ function LoginPage() {
           {step === 'email' && (
             <form onSubmit={handleSendOTP} className="space-y-5">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Email Address
+                <label htmlFor="identifier" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Email or Mobile Number
                 </label>
                 <input
-                  id="email" type="email" required value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  id="identifier" type="text" required value={identifier}
+                  autoComplete="username"
+                  onChange={e => setIdentifier(e.target.value)}
                   className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                  placeholder="your@email.com"
+                  placeholder="your@email.com or 10-digit number"
                 />
               </div>
 
@@ -402,8 +387,8 @@ function LoginPage() {
                 </div>
               </div>
 
-              {/* Conditional phone input */}
-              {(selectedChannel === 'sms' || selectedChannel === 'whatsapp') && (
+              {/* Conditional phone input — only when identifying by email and delivering via SMS/WhatsApp */}
+              {!identifierIsPhone && (selectedChannel === 'sms' || selectedChannel === 'whatsapp') && (
                 <div>
                   <label htmlFor="login-phone" className="block text-sm font-medium text-foreground-secondary mb-2">
                     Mobile Number
@@ -509,72 +494,12 @@ function LoginPage() {
       </div>
 
       {showPhoneModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-surface-elevated rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              {phoneRequiresPolicy ? 'Almost there' : 'Add Mobile Number'}
-            </h3>
-            <p className="text-sm text-foreground-secondary mb-6">
-              Add your mobile number{phoneRequiresPolicy ? ' and accept our policies' : ''} so we can keep you updated on your orders.
-            </p>
-            {phoneError && (
-              <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg text-sm">
-                {phoneError}
-              </div>
-            )}
-            <form onSubmit={handleSavePhone} className="space-y-4">
-              <div>
-                <label htmlFor="phone-modal" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Mobile Number *
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
-                    +91
-                  </span>
-                  <input
-                    id="phone-modal"
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={phone}
-                    required
-                    autoFocus
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="00000 00000"
-                  />
-                </div>
-                {phone.length > 0 && phone.length !== 10 && (
-                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
-                )}
-              </div>
-              {phoneRequiresPolicy && (
-                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={phonePolicyAccepted}
-                    onChange={e => setPhonePolicyAccepted(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                  />
-                  <span>
-                    I agree to the{' '}
-                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                  </span>
-                </label>
-              )}
-              <button
-                type="submit"
-                disabled={phoneSaving || phone.length !== 10 || (phoneRequiresPolicy && !phonePolicyAccepted)}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {phoneSaving ? (
-                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
-                ) : 'Save & Continue'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <PhoneVerifyModal
+          requiresPolicy={phoneRequiresPolicy}
+          title={phoneRequiresPolicy ? 'Almost there' : undefined}
+          onVerified={() => { setShowPhoneModal(false); router.push(redirect) }}
+          onCancel={() => { setShowPhoneModal(false); logout() }}
+        />
       )}
     </div>
   )
