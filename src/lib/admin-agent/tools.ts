@@ -1,7 +1,7 @@
-import { Pool } from 'pg'
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne, getClient } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
-import { embed, findSimilarCustomers, queryManyReplica } from '@/lib/rag'
+import { embed, findSimilarCustomers } from '@/lib/rag'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { SALES_TOOLS } from './tools/sales'
 import { MARKETING_TOOLS } from './tools/marketing'
 import { CATALOG_TOOLS } from './tools/catalog'
@@ -21,6 +21,8 @@ const FORBIDDEN_TABLES = [
   'razorpay_webhooks',
   'webhook_events',
   'schema_migrations',
+  'ai_cache',
+  'embeddings',
 ]
 const FORBIDDEN_COLUMNS = ['password_hash', 'password', 'totp_secret', 'reset_token', 'razorpay_signature']
 const SQL_BLOCKLIST_RE = new RegExp(
@@ -28,25 +30,6 @@ const SQL_BLOCKLIST_RE = new RegExp(
   'i'
 )
 const SQL_DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
-
-let _readonlyPool: Pool | null = null
-function getReadonlyPool(): Pool {
-  if (!_readonlyPool) {
-    const password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
-    _readonlyPool = new Pool({
-      host: process.env.RAG_PG_HOST || '100.82.208.8',
-      port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
-      user: process.env.RAG_PG_USER || 'postgres',
-      password,
-      database: process.env.RAG_PG_DB || 'jeffi_replica',
-      max: 2,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    })
-    _readonlyPool.on('error', () => {})
-  }
-  return _readonlyPool
-}
 
 export interface ToolInputSchema {
   type: 'object'
@@ -217,8 +200,8 @@ export const TOOLS: ToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
       const queryStr = String(q || '').trim()
 
-      // Try semantic search via replica RAG pool first
-      const similar = await findSimilarCustomers(queryStr, lim).catch(() => [])
+      // The RAG replica indexes only the platform store's customers, so tenants go straight to SQL.
+      const similar = (await resolveTenantId()) ? [] : await findSimilarCustomers(queryStr, lim).catch(() => [])
       const ids = similar.map(r => r.source_id)
 
       if (ids.length > 0) {
@@ -233,7 +216,7 @@ export const TOOLS: ToolDef[] = [
       }
 
       // Fallback: SQL ILIKE on name / email / phone
-      const out = await queryManyReplica(
+      const out = await queryMany(
         `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders,
                 COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS lifetime_value
@@ -261,7 +244,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ days, limit }) => {
       const d = clamp(typeof days === 'number' ? days : 7, 1, 90)
       const lim = clamp(typeof limit === 'number' ? limit : 20, 1, 100)
-      const rows = await queryManyReplica(
+      const rows = await queryMany(
         `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders
          FROM users u
@@ -540,8 +523,7 @@ export const TOOLS: ToolDef[] = [
       if (SQL_BLOCKLIST_RE.test(raw)) throw new Error('query references a forbidden table or column')
 
       const guarded = `${raw} LIMIT 100`
-      const pool = getReadonlyPool()
-      const client = await pool.connect()
+      const client = await getClient()
       try {
         await client.query('BEGIN READ ONLY')
         await client.query("SET LOCAL statement_timeout = '5s'")
@@ -563,7 +545,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'find_customer_orders',
-    description: 'Look up a customer by name or email and return their orders, ordered by most recent first. Use when the user references "Aloys Jehwin\'s recent order" without an order number — call this first, then ask the admin to pick an order via the disambiguation flow.',
+    description: 'Look up a customer by name or email and return their orders, ordered by most recent first. Use when the user references "a customer\'s recent order" by name without an order number — call this first, then ask the admin to pick an order via the disambiguation flow.',
     inputSchema: {
       type: 'object',
       properties: {

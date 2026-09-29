@@ -2,14 +2,12 @@ export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { aiChat } from '@/lib/ai-client'
+import { resolveAiScope, parseAiJson, aiDenial } from '@/lib/ai-scope'
+import { storeDescriptorForPrompt } from '@/lib/brand'
 
-const OLLAMA_URL = () =>
-  (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-const OLLAMA_MODEL = () =>
-  process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
-
-const SYSTEM_PROMPT = `You are a form-filling assistant for an Indian B2B/B2C hardware and tools store (jeffistores.com).
+function systemPrompt(store: string): string {
+  return `You are a form-filling assistant for ${store}.
 Given a scenario description and a list of form fields with their types, return a JSON object with values for each field.
 Rules:
 - Return ONLY a JSON object where keys are the field names provided and values are the filled content.
@@ -18,21 +16,25 @@ Rules:
 - For boolean fields return true or false (not strings).
 - For number fields return a number (not a string).
 - For text/description fields: 1-3 clear sentences max.
+- Do not assume a product category or industry the store has not described.
 - Strict JSON only. No explanation, no markdown, no extra keys.`
+}
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
 
-  let body: { scenario?: string; fields?: { name: string; type: string; label: string }[] }
+  let body: { scenario?: string; fields?: { name: string; type: string; label: string }[]; scope?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
+
+  const scope = resolveAiScope(body.scope)
+  if (!scope) return NextResponse.json({ error: 'Invalid AI scope' }, { status: 400 })
+  const denied = aiDenial(admin.role, admin.scopes, scope)
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   const { scenario, fields } = body
   if (!scenario || typeof scenario !== 'string' || scenario.trim().length < 3) {
@@ -54,44 +56,20 @@ Return JSON matching this schema exactly:
 ${schema}`
 
   try {
-    const res = await fetch(`${OLLAMA_URL()}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL(),
-        stream: false,
-        format: 'json',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        options: { temperature: 0.3 },
-      }),
-      signal: AbortSignal.timeout(60000),
+    const r = await aiChat({
+      modelHint: 'enrich',
+      jsonMode: true,
+      temperature: 0.3,
+      noCache: true,
+      messages: [
+        { role: 'system', content: systemPrompt(await storeDescriptorForPrompt()) },
+        { role: 'user', content: userPrompt },
+      ],
     })
-
-    if (!res.ok) {
-      return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
-    }
-
-    const data = await res.json() as { message?: { content?: string } }
-    const raw = data.message?.content || ''
-
-    let obj: Record<string, unknown>
-    try {
-      obj = JSON.parse(raw)
-    } catch {
-      const m = raw.match(/\{[\s\S]*\}/)
-      if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
-      obj = JSON.parse(m[0])
-    }
-
+    const obj = parseAiJson(r.content)
+    if (!obj) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
     return NextResponse.json({ fields: obj })
   } catch (err: unknown) {
-    const isTimeout = err instanceof Error && err.name === 'TimeoutError'
-    return NextResponse.json(
-      { error: isTimeout ? 'AI request timed out' : 'AI service error' },
-      { status: 503 }
-    )
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'AI service error' }, { status: 503 })
   }
 }

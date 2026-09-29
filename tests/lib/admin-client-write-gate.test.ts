@@ -7,7 +7,7 @@ import glob from 'fast-glob'
  * A read-only member must not be offered an action they cannot take. The endpoints already
  * refuse the write (admin-write-scope-audit), so this is the UX half: every admin client
  * component that fires a mutating request gates its controls through AdminScopesContext
- * (useCanWrite / RequireWrite).
+ * (useCanWrite / RequireWrite, or useCanUseAi / RequireAi, which also require the write scope).
  *
  * The allowlist is for components where a tenant :write scope is the wrong gate — a member
  * acting on their own identity or session, the owner-only team/service-account surfaces, and
@@ -32,6 +32,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
   'src/app/admin/ecom/billing/[id]/DnsResyncButton.tsx',
+  'src/app/admin/ecom/billing/[id]/ReconcileButton.tsx',
   'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',
@@ -76,7 +77,7 @@ function ungatedMutatingComponents(): string[] {
     .filter(f => !ALLOWED_WITHOUT_CLIENT_GATE.has(f))
     .filter(f => {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
-      return !/useCanWrite\(|RequireWrite\b/.test(src)
+      return !/useCanWrite\(|RequireWrite\b|useCanUseAi\(|RequireAi\b/.test(src)
     })
     .sort()
 }

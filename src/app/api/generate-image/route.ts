@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
+import { authenticateAdmin } from '@/lib/jwt'
+import { aiDenial } from '@/lib/ai-scope'
 
 export const dynamic = 'force-dynamic'
 
 const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN })
 
 export async function POST(req: NextRequest) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const denied = aiDenial(admin.role, admin.scopes, 'settings:write')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
+
   if (!process.env.REPLICATE_API_TOKEN) {
     return NextResponse.json({ error: 'REPLICATE_API_TOKEN not configured' }, { status: 500 })
   }

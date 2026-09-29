@@ -20,6 +20,8 @@ export interface StoreConfig {
     ondeviceSummaryDesktopEnabled: boolean
     ondeviceFinetuneMobileEnabled: boolean
     ondeviceFinetuneDesktopEnabled: boolean
+    /** The store's plan includes storefront AI (ai:storefront). Hide AI features when false. */
+    aiStorefrontEnabled: boolean
   }
   orderAutoCancelMinutes: number
   storefront: {
@@ -56,6 +58,7 @@ const DEFAULT_CONFIG: StoreConfig = {
     ondeviceSummaryMobileEnabled: false,
     ondeviceFinetuneDesktopEnabled: false,
     ondeviceFinetuneMobileEnabled: false,
+    aiStorefrontEnabled: false,
   },
   orderAutoCancelMinutes: 10,
   storefront: {

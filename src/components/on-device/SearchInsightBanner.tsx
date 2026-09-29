@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { readUserProfile } from '@/lib/on-device/user-profile'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Props {
   activeBrands: string[]   // brand names active in current results
@@ -10,9 +11,11 @@ interface Props {
 }
 
 export default function SearchInsightBanner({ activeBrands, activeCategories, resultCount }: Props) {
+  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled
   const [matches, setMatches] = useState<string[]>([])
 
   useEffect(() => {
+    if (!aiEnabled) return
     const profile = readUserProfile()
     if (!profile.purchaseCount) return
 
@@ -24,9 +27,9 @@ export default function SearchInsightBanner({ activeBrands, activeCategories, re
 
     const all = [...matchedBrands, ...matchedCats]
     if (all.length) setMatches(all.slice(0, 3))
-  }, [activeBrands, activeCategories])
+  }, [aiEnabled, activeBrands, activeCategories])
 
-  if (!matches.length || resultCount === 0) return null
+  if (!aiEnabled || !matches.length || resultCount === 0) return null
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg">

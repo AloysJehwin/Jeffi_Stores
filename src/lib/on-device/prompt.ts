@@ -134,7 +134,7 @@ export function buildRecapPrompt(sig: SessionSignals): string {
 export function buildCartInsightPrompt(sig: SessionSignals): string {
   const instruction =
     'You are a friendly shopping assistant for an online store. ' +
-    'In one short sentence (max 20 words), describe what the customer is building or working on based on their cart. ' +
+    'In one short sentence (max 20 words), describe what the customer appears to be shopping for based on their cart. ' +
     'Be specific and practical. Do not mention prices.'
   return `${instruction}\n\n${serializeSignals(sig)}\n### Insight`
 }

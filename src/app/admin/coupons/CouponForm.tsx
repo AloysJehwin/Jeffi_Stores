@@ -80,7 +80,8 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
           { name: 'is_active', label: 'Active', type: 'boolean' },
         ]}
         onFill={handleAIFill}
-        context="Indian B2B/B2C hardware and tools store coupon"
+        scope="coupons:write"
+        context="Discount coupon for this store"
       />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 space-y-5">
@@ -183,6 +184,7 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
               fieldLabel="Coupon Description"
               value={couponDescription}
               onChange={setCouponDescription}
+              scope="coupons:write"
               context={`Coupon code: ${d.code ?? 'new coupon'}`}
               multiline
             >

@@ -79,7 +79,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
   {
     key: 'catalog_enrichment:write',
     label: 'AI Enrichment (Write)',
-    description: 'Run, approve and reject AI-powered catalog enrichment in bulk',
+    description: 'Use AI tools (field enrichment, AI fill, email and campaign copy, images) and run bulk catalog enrichment',
     routes: ['/admin/catalog-enrichment'],
     group: 'Catalogue',
   },

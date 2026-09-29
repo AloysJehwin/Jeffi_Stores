@@ -1,12 +1,10 @@
 // AI caption generation for social posts left blank at publish time — used by
 // publisher.ts so scheduled/cron posts get a real caption even with no admin present
-// to click the AIEnrichButton in the composer. Mirrors ai-generate-email's Ollama
-// call shape (single /api/generate prompt, JSON mode, truncation-tolerant parse).
+// to click the AIEnrichButton in the composer. Goes through the ai-platform gateway
+// (JSON mode, truncation-tolerant parse).
 
-const OLLAMA_URL = () =>
-  (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-const OLLAMA_MODEL = () => process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
-const GENERATE_TIMEOUT_MS = 30_000
+import { aiChat } from '@/lib/ai-client'
+import { AI_ADMIN_SCOPE } from '@/lib/ai-scope'
 
 const SYSTEM_PROMPT = (store: string) => `You write short social media captions for ${store}.
 Return ONLY valid JSON: {"caption":"<caption text>"}
@@ -14,7 +12,7 @@ Return ONLY valid JSON: {"caption":"<caption text>"}
 RULES:
 - 1-3 short sentences, friendly and direct, no corporate tone.
 - No hashtags (added separately).
-- No markdown, no emoji spam — at most one emoji if it fits naturally.
+- No markdown and no emojis.
 - Mention the product name naturally in the text.
 - Do not invent specs, prices, or claims not given to you.`
 
@@ -25,30 +23,23 @@ export async function generateSocialCaption(opts: { productName: string; product
     opts.productDescription ? `Description: ${opts.productDescription}` : null,
   ].filter(Boolean).join('\n')
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
   try {
+    const { currentTenantPlanGate } = await import('@/lib/plan-gate')
+    if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) return ''
     const { storeDescriptorForPrompt } = await import('@/lib/brand')
-    const systemPrompt = SYSTEM_PROMPT(await storeDescriptorForPrompt())
-    const res = await fetch(`${OLLAMA_URL()}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: OLLAMA_MODEL(),
-        prompt: `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`,
-        stream: false,
-        format: 'json',
-        options: { temperature: 0.4, num_predict: 300 },
-      }),
+    const r = await aiChat({
+      modelHint: 'email',
+      jsonMode: true,
+      temperature: 0.4,
+      maxTokens: 300,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT(await storeDescriptorForPrompt()) },
+        { role: 'user', content: userPrompt },
+      ],
     })
-    if (!res.ok) return ''
-    const data = await res.json() as { response?: string }
-    return extractCaption((data.response || '').trim())
+    return extractCaption(r.content.trim())
   } catch {
     return ''
-  } finally {
-    clearTimeout(timeout)
   }
 }
 

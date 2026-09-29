@@ -1,3 +1,7 @@
+// App-side AI client. Model host/selection now lives behind the ai-platform gateway
+// (see /ai-platform); this file is a thin, signature-preserving HTTP client to it, so the
+// 11 AI consumers are unchanged. Durability (queue/retry) and LLM caching are the gateway's job.
+
 export interface AiChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
@@ -7,11 +11,7 @@ export interface AiChatMessage {
 
 export interface AiToolDef {
   type: 'function'
-  function: {
-    name: string
-    description: string
-    parameters: Record<string, unknown>
-  }
+  function: { name: string; description: string; parameters: Record<string, unknown> }
 }
 
 export interface AiChatRequest {
@@ -19,15 +19,15 @@ export interface AiChatRequest {
   temperature?: number
   maxTokens?: number
   jsonMode?: boolean
-  modelHint?: 'sql' | 'copy' | 'agent' | 'fast'
+  modelHint?: 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email'
   forceProvider?: 'openai' | 'ollama'
   tools?: AiToolDef[]
+  noCache?: boolean
+  /** Cache partition. Defaults to the current tenant; background jobs must pass it explicitly. */
+  cacheNamespace?: string
 }
 
-export interface AiToolCall {
-  name: string
-  arguments: Record<string, unknown>
-}
+export interface AiToolCall { name: string; arguments: Record<string, unknown> }
 
 export interface AiChatResponse {
   content: string
@@ -36,6 +36,7 @@ export interface AiChatResponse {
   model: string
   latencyMs: number
   fallbackUsed: boolean
+  cache?: 'kv' | 'semantic' | null
 }
 
 export class AiClientError extends Error {
@@ -45,150 +46,74 @@ export class AiClientError extends Error {
   }
 }
 
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-const OLLAMA_HEALTH_TIMEOUT_MS = 2000
-// Per-request Ollama timeout. Kept modest so a hung/unreachable Ollama (e.g. the
-// Razer laptop asleep) fails fast and the OpenAI fallback can trigger within the
-// web request budget instead of hanging the whole request. Override via env.
-const OLLAMA_REQUEST_TIMEOUT_MS = Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 60_000
+const GATEWAY_URL = (process.env.AI_GATEWAY_URL || 'http://100.82.208.8:8080').replace(/\/$/, '')
+const GATEWAY_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS) || 130_000
 
-async function isOllamaReachable(): Promise<boolean> {
-  try {
-    const ctrl = new AbortController()
-    const t = setTimeout(() => ctrl.abort(), OLLAMA_HEALTH_TIMEOUT_MS)
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { signal: ctrl.signal })
-    clearTimeout(t)
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
-async function callOllama(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
-  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'gemma3:4b'
-  // 'fast' → small low-latency model (gemma3:4b). The larger copy model (gemma4:12b)
-  // can take 90s+ for long JSON bodies, which blows past web-request/dev-server
-  // timeouts. Use 'fast' for latency-sensitive JSON copy (e.g. campaign templates).
-  const fastModel = process.env.OLLAMA_EMAIL_MODEL || process.env.OLLAMA_FAST_MODEL || 'gemma3:4b'
-  const model = req.modelHint === 'sql'
-    ? (process.env.OLLAMA_SQL_MODEL || agentModel)
-    : req.modelHint === 'agent'
-      ? agentModel
-      : req.modelHint === 'fast'
-        ? fastModel
-        : (process.env.OLLAMA_COPY_MODEL || agentModel)
+export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
+  const cacheNamespace = req.cacheNamespace ?? await (async () => {
+    try {
+      const { resolveTenantId } = await import('@/lib/tenant-context')
+      return (await resolveTenantId()) ?? 'platform'
+    } catch {
+      return 'platform'
+    }
+  })()
   const ctrl = new AbortController()
-  const t = setTimeout(() => ctrl.abort(), OLLAMA_REQUEST_TIMEOUT_MS)
+  const t = setTimeout(() => ctrl.abort(), GATEWAY_TIMEOUT_MS)
   try {
-    const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    const res = await fetch(`${GATEWAY_URL}/v1/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: ctrl.signal,
-      body: JSON.stringify({
-        model,
-        messages: req.messages,
-        tools: req.tools,
-        stream: false,
-        think: false,
-        format: req.jsonMode ? 'json' : undefined,
-        options: {
-          temperature: req.temperature ?? 0.2,
-          num_predict: req.maxTokens ?? 2000,
-          num_ctx: 8192,
-        },
-      }),
+      body: JSON.stringify({ ...req, cacheNamespace }),
     })
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      throw new AiClientError(`Ollama HTTP ${res.status}: ${body}`, 'ollama')
+      throw new AiClientError(`AI gateway HTTP ${res.status}: ${body}`, 'gateway')
     }
-    const data = await res.json()
-    const msg = data?.message ?? {}
-
-    // Native tool calls (Ollama tools API)
-    if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
-      const toolCalls: AiToolCall[] = msg.tool_calls.map((tc: any) => ({
-        name: tc.function?.name ?? '',
-        arguments: typeof tc.function?.arguments === 'string'
-          ? JSON.parse(tc.function.arguments)
-          : (tc.function?.arguments ?? {}),
-      }))
-      return { content: '', toolCalls, model }
-    }
-
-    let content = msg.content
-    // Qwen3 extended-thinking mode returns content in a separate 'thinking' field with empty content
-    if ((typeof content !== 'string' || content.trim() === '') && typeof msg.thinking === 'string') {
-      content = msg.thinking
-    }
-    if (typeof content !== 'string') throw new AiClientError('Ollama response missing message.content', 'ollama')
-    // Strip <think>...</think> reasoning blocks emitted by Qwen3 and similar models
-    content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart()
-    return { content, model }
+    return (await res.json()) as AiChatResponse
+  } catch (err) {
+    if (err instanceof AiClientError) throw err
+    throw new AiClientError(err instanceof Error ? err.message : 'AI gateway request failed', 'gateway', err)
   } finally {
     clearTimeout(t)
   }
 }
 
-async function callOpenAi(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new AiClientError('OPENAI_API_KEY not configured', 'openai')
-  const openaiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: openaiModel,
-      messages: req.messages,
-      temperature: req.temperature ?? 0.2,
-      max_tokens: req.maxTokens ?? 2000,
-      response_format: req.jsonMode ? { type: 'json_object' } : undefined,
-      tools: req.tools,
-      tool_choice: req.tools?.length ? 'auto' : undefined,
-    }),
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new AiClientError(body?.error?.message || `OpenAI HTTP ${res.status}`, 'openai')
-  }
-  const data = await res.json()
-  const choice = data?.choices?.[0]
-  const msg = choice?.message
-
-  // Handle tool calls from OpenAI
-  if (Array.isArray(msg?.tool_calls) && msg.tool_calls.length > 0) {
-    const toolCalls: AiToolCall[] = msg.tool_calls.map((tc: any) => ({
-      name: tc.function?.name ?? '',
-      arguments: typeof tc.function?.arguments === 'string'
-        ? JSON.parse(tc.function.arguments)
-        : (tc.function?.arguments ?? {}),
-    }))
-    return { content: '', toolCalls, model: openaiModel }
-  }
-
-  const content = msg?.content
-  if (typeof content !== 'string') throw new AiClientError('OpenAI response missing choices[0].message.content', 'openai')
-  return { content, model: openaiModel }
-}
-
-export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
-  const start = Date.now()
-  // Ollama-only: default to Ollama and never fall back to OpenAI. A caller can
-  // still force OpenAI explicitly via forceProvider (kept for edge cases/testing),
-  // but the ambient AI_PROVIDER default is Ollama and there is no auto-fallback.
-  const provider = (req.forceProvider ?? process.env.AI_PROVIDER ?? 'ollama').toLowerCase() as 'openai' | 'ollama'
-
-  if (provider === 'ollama') {
-    const reachable = await isOllamaReachable()
-    if (!reachable) throw new AiClientError('Ollama is not reachable', 'ollama')
-    const r = await callOllama(req)
-    return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
-  }
-
-  const r = await callOpenAi(req)
-  return { content: r.content, toolCalls: r.toolCalls, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
-}
-
 export function getAiProvider(): 'openai' | 'ollama' {
   return (process.env.AI_PROVIDER || 'ollama').toLowerCase() as 'openai' | 'ollama'
+}
+
+/** Embeddings via the gateway (used by RAG). Returns one vector per input. */
+export async function aiEmbed(input: string | string[], model?: string): Promise<number[][]> {
+  const res = await fetch(`${GATEWAY_URL}/v1/embed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input, model }),
+  })
+  if (!res.ok) throw new AiClientError(`AI gateway embed HTTP ${res.status}`, 'gateway')
+  const data = await res.json()
+  return data.embeddings as number[][]
+}
+
+export interface AiVisionResult { ok: boolean; text: string; model: string; pages?: number; error?: string; hint?: string }
+
+/** Vision/OCR via the gateway. `images` are base64 (no data: prefix). */
+export async function aiVision(images: string[], prompt: string, model?: string): Promise<AiVisionResult> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), GATEWAY_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${GATEWAY_URL}/v1/vision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({ images, prompt, model }),
+    })
+    if (!res.ok) return { ok: false, text: '', model: model || '', error: `AI gateway vision HTTP ${res.status}` }
+    return (await res.json()) as AiVisionResult
+  } catch (err) {
+    return { ok: false, text: '', model: model || '', error: err instanceof Error ? err.message : 'vision request failed' }
+  } finally {
+    clearTimeout(t)
+  }
 }

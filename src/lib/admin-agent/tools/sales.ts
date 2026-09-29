@@ -323,7 +323,7 @@ const match_quotation_items: ToolDef = {
     properties: {
       lines: {
         type: 'string',
-        description: 'JSON array string: [{"requestedText":"M27 structural bolt","qty":50}, {"requestedText":"flat washer 8mm","qty":200}]. Each line.qty must be > 0.',
+        description: 'JSON array string: [{"requestedText":"<item as the customer wrote it>","qty":50}, {"requestedText":"<another item>","qty":200}]. Each line.qty must be > 0.',
       },
     },
     required: ['lines'],

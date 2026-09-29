@@ -1,4 +1,5 @@
 import { aiChat } from '../ai-client'
+import { AI_ADMIN_SCOPE } from '../ai-scope'
 import { searchHashtagReach } from '../meta'
 import { withProductLink } from './product-url'
 
@@ -21,25 +22,28 @@ export interface ProductForPost {
 
 export { productUrl, withProductLink } from './product-url'
 
-/** Compose a short marketing caption. Falls back to a deterministic caption if the LLM is down. */
+/** Compose a short marketing caption. Falls back to a deterministic caption if the LLM is down or the plan has no AI. */
 export async function generateCaption(product: ProductForPost, brandName: string): Promise<string> {
+  const fallback = withProductLink(`${product.name} — now available at ${brandName}. Shop today!`, product.slug)
   const attrs = product.attributes
     ? Object.entries(product.attributes).map(([k, v]) => `${k}: ${v}`).join(', ')
     : ''
   try {
+    const { currentTenantPlanGate } = await import('../plan-gate')
+    if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) return fallback
     const res = await aiChat({
       modelHint: 'copy',
       temperature: 0.7,
       maxTokens: 180,
       messages: [
-        { role: 'system', content: `You write punchy, upbeat social-media captions for an online store (${brandName}). 1–2 short sentences, a light emoji or two, no hashtags (those are added separately). Never invent specs.` },
+        { role: 'system', content: `You write punchy, upbeat social-media captions for an online store (${brandName}). 1–2 short sentences, no emojis, no hashtags (those are added separately). Never invent specs.` },
         { role: 'user', content: `Product: ${product.name}\nCategory: ${product.category ?? '—'}\nBrand: ${product.brand ?? '—'}\n${attrs ? `Details: ${attrs}\n` : ''}${product.description ? `About: ${product.description.slice(0, 300)}` : ''}` },
       ],
     })
     const text = res.content.trim()
     if (text) return withProductLink(text, product.slug)
   } catch { /* fall through to deterministic caption */ }
-  return withProductLink(`${product.name} — now available at ${brandName}. Shop today!`, product.slug)
+  return fallback
 }
 
 export interface HashtagProvider {

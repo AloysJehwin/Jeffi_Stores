@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { embed, runWithHnswTuning } from '@/lib/rag'
+import { storefrontAiAllowed } from '@/lib/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 
@@ -155,6 +156,7 @@ export async function GET(req: NextRequest) {
   `
   const rows = await queryMany(sql, params)
   if (rows.length >= 3) return NextResponse.json(rows)
+  if (!(await storefrontAiAllowed().catch(() => false))) return NextResponse.json(rows)
   // Semantic fallback when ILIKE finds too few results
   const semantic = await semanticSearch(q, limit, excludeId)
   if (!semantic.length) return NextResponse.json(rows)

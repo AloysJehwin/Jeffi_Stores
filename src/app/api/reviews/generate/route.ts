@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { aiChat } from '@/lib/ai-client'
+import { storefrontAiGate } from '@/lib/storefront-ai'
 import { parseBody } from '@/lib/validate'
 
 const Schema = z.object({
@@ -19,6 +20,9 @@ const RATING_FEEL: Record<number, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const blocked = await storefrontAiGate()
+    if (blocked) return blocked
+
     const body = await request.json()
     const parsed = parseBody(Schema, body)
     if (!parsed.ok) return parsed.response
@@ -44,6 +48,7 @@ Rules:
       temperature: 0.9,
       maxTokens: 150,
       modelHint: 'copy',
+      noCache: true,
     })
 
     return NextResponse.json({ review: result.content.trim() })

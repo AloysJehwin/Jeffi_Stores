@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import glob from 'fast-glob'
+import { AI_ACTION_SCOPES } from '@/lib/ai-scope'
 
 /**
  * Every mutating admin endpoint must gate on a :write scope, so an action is never reachable
@@ -34,6 +35,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'ecom/[tenantId]/certs/revoke',
   // Re-apply a tenant's DNS host set to its plan tier — platform-admin only (isPlatformAdmin).
   'ecom/[tenantId]/dns/resync',
+  // Settle a tenant's captured-but-unsettled payments — platform-admin only (isPlatformAdmin).
+  'ecom/[tenantId]/reconcile-settlements',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',
@@ -53,8 +56,10 @@ function mutatingRoutesWithoutWriteScope(): string[] {
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
     if (!/export async function (POST|PATCH|PUT|DELETE)\b/.test(src)) continue
-    // Two helpers gate writes: hasScope(...) and requireAdminScope(req, '...:write').
-    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)/.test(src)) continue
+    // Gates: hasScope(...), requireAdminScope(req, '...:write'), and aiDenial(role, scopes, '...:write'),
+    // or aiDenial on a resolveAiScope() result, which only yields AI_ACTION_SCOPES (all :write).
+    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)/.test(src)) continue
+    if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
     if (/CRON_SECRET|authenticateServiceAccount/.test(src)) continue
     const route = f.replace('src/app/api/admin/', '').replace('/route.ts', '')
     if (ALLOWED_WITHOUT_WRITE_SCOPE.has(route)) continue
@@ -66,6 +71,10 @@ function mutatingRoutesWithoutWriteScope(): string[] {
 describe('an admin action is never reachable with read-only access', () => {
   it('gates every mutating endpoint on a :write scope', () => {
     expect(mutatingRoutesWithoutWriteScope()).toEqual([])
+  })
+
+  it('only allows :write scopes for client-chosen AI field scopes', () => {
+    expect(AI_ACTION_SCOPES.filter(s => !s.endsWith(':write'))).toEqual([])
   })
 
   it('reads a meaningful number of routes (guards the glob)', () => {

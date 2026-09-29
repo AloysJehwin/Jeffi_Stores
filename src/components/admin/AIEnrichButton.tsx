@@ -1,18 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireAi } from '@/contexts/AdminScopesContext'
+import type { AiActionScope } from '@/lib/ai-scope'
 
 interface Props {
   fieldLabel: string
   value: string
   onChange: (value: string) => void
+  scope: AiActionScope
   context?: string
   multiline?: boolean
   children: React.ReactNode // the raw <input> or <textarea>
 }
 
-export default function AIEnrichButton({ fieldLabel, value, onChange, context, multiline, children }: Props) {
+export default function AIEnrichButton({ fieldLabel, value, onChange, scope, context, multiline, children }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [prev, setPrev] = useState<string | null>(null)
@@ -25,7 +27,7 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, context, m
       const res = await fetch('/api/admin/ai-enrich-field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldLabel, value, context }),
+        body: JSON.stringify({ fieldLabel, value, context, scope }),
       })
       const data = await res.json() as { result?: string; error?: string }
       if (!res.ok || !data.result) {
@@ -53,7 +55,7 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, context, m
     <div className="space-y-1">
       <div className={`relative ${multiline ? '' : 'flex items-center'}`}>
         {children}
-        <RequireWrite scope="catalog_enrichment:write">
+        <RequireAi scope={scope}>
           <div className={`${multiline ? 'absolute bottom-2 right-2' : 'absolute right-2'} flex items-center gap-1`}>
             {prev !== null && (
               <button
@@ -86,7 +88,7 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, context, m
               )}
             </button>
           </div>
-        </RequireWrite>
+        </RequireAi>
       </div>
       {error && (
         <p className="text-[11px] text-red-500 dark:text-red-400">{error}</p>

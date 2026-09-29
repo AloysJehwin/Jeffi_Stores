@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { aiChat, type AiToolDef, type AiChatMessage } from '@/lib/ai-client'
+import { storefrontAiGate } from '@/lib/storefront-ai'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
@@ -105,7 +106,7 @@ function formatToolResult(toolName: string, out: Record<string, unknown>): strin
   }
   if (toolName === 'recommend_for_project') {
     const products = (out.products as ProductRow[]) || []
-    return formatProductList(products, 'Here are products that match your project:', note)
+    return formatProductList(products, 'Here are products that match what you described:', note)
   }
   if (toolName === 'search_products') {
     const products = (out.products as ProductRow[]) || []
@@ -133,6 +134,9 @@ const SELF_FORMATTING_TOOLS = new Set([
 export async function POST(req: NextRequest) {
   const user = await authenticateUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const blocked = await storefrontAiGate()
+  if (blocked) return blocked
 
   const body = (await req.json().catch(() => ({}))) as { message?: string; history?: unknown }
   const parsed = parseBody(postSchema, { message: body.message, history: body.history ?? [] })

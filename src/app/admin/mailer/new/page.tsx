@@ -9,7 +9,7 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { ap } from '@/lib/admin-path'
 import { formsHostForHost } from '@/lib/forms-host'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
   { value: 'review_form_share', label: 'Review Form Share', description: 'Send customers a link to your review incentive form with a coupon reward' },
@@ -70,6 +70,7 @@ export default function NewCampaignPage() {
   const [scenarioPrompt, setScenarioPrompt] = useState('')
   const [scenarioLoading, setScenarioLoading] = useState(false)
   const [scenarioError, setScenarioError] = useState<string | null>(null)
+  const canUseAi = useCanUseAi('mailer:write')
 
   // Draft state
   const [draftId, setDraftId] = useState<string | null>(null)
@@ -427,6 +428,7 @@ export default function NewCampaignPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
           <div className="space-y-5">
             {/* AI Assist — available for all templates */}
+            {canUseAi && (
             <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
@@ -456,6 +458,7 @@ export default function NewCampaignPage() {
                 {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
               </div>
             </div>
+            )}
 
             <div>
               <label className={labelClass}>Campaign Title (internal)</label>
@@ -463,7 +466,7 @@ export default function NewCampaignPage() {
             </div>
             <div>
               <label className={labelClass}>Email Subject *</label>
-              <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} context={`Template: ${templateKey}`}>
+              <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} scope="mailer:write" context={`Template: ${templateKey}`}>
                 <input value={subject} onChange={e => setSubject(e.target.value)} className={`${inputClass} pr-8`} placeholder="Subject line customers will see" required />
               </AIEnrichButton>
             </div>
@@ -498,13 +501,13 @@ export default function NewCampaignPage() {
               <>
                 <div>
                   <label className={labelClass}>Headline *</label>
-                  <AIEnrichButton fieldLabel="Headline" value={templateData.headline || ''} onChange={v => setField('headline', v)} context={`Template: ${templateKey}`}>
+                  <AIEnrichButton fieldLabel="Headline" value={templateData.headline || ''} onChange={v => setField('headline', v)} scope="mailer:write" context={`Template: ${templateKey}`}>
                     <input value={templateData.headline || ''} onChange={e => setField('headline', e.target.value)} className={`${inputClass} pr-8`} placeholder="e.g. 20% Off Storewide This Weekend!" />
                   </AIEnrichButton>
                 </div>
                 <div>
                   <label className={labelClass}>Body *</label>
-                  <AIEnrichButton fieldLabel="Body" value={templateData.body || ''} onChange={v => setField('body', v)} context={`Subject: ${subject}; Template: ${templateKey}`} multiline>
+                  <AIEnrichButton fieldLabel="Body" value={templateData.body || ''} onChange={v => setField('body', v)} scope="mailer:write" context={`Subject: ${subject}; Template: ${templateKey}`} multiline>
                     <textarea value={templateData.body || ''} onChange={e => setField('body', e.target.value)} rows={4} className={`${textareaClass} pr-8`} placeholder="Email body text..." />
                   </AIEnrichButton>
                 </div>
@@ -523,7 +526,7 @@ export default function NewCampaignPage() {
                 <div><label className={labelClass}>Event Date</label><input value={templateData.eventDate || ''} onChange={e => setField('eventDate', e.target.value)} className={inputClass} placeholder="e.g. Saturday, 10 May 2025, 10am–8pm" /></div>
                 <div>
                   <label className={labelClass}>Event Details *</label>
-                  <AIEnrichButton fieldLabel="Event Details" value={templateData.eventDetails || ''} onChange={v => setField('eventDetails', v)} context={`Event: ${templateData.eventName || ''}; Date: ${templateData.eventDate || ''}`} multiline>
+                  <AIEnrichButton fieldLabel="Event Details" value={templateData.eventDetails || ''} onChange={v => setField('eventDetails', v)} scope="mailer:write" context={`Event: ${templateData.eventName || ''}; Date: ${templateData.eventDate || ''}`} multiline>
                     <textarea value={templateData.eventDetails || ''} onChange={e => setField('eventDetails', e.target.value)} rows={4} className={`${textareaClass} pr-8`} placeholder="Tell customers what to expect..." />
                   </AIEnrichButton>
                 </div>
@@ -535,9 +538,9 @@ export default function NewCampaignPage() {
               <div>
                 <label className={labelClass}>Email Body</label>
                 <p className="text-[11px] text-foreground-muted mb-2">
-                  Use the AI Assist above to generate, or write your own. AI uses tags like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> replaced per recipient at send time.
+                  {canUseAi ? 'Use the AI Assist above to generate, or write your own. AI uses tags' : 'Use tags'} like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> replaced per recipient at send time.
                 </p>
-                <RichTextEditor value={templateData.htmlBody || ''} onChange={v => setField('htmlBody', v)} placeholder="Click 'Generate content' above, or write your own here." minHeight={360} />
+                <RichTextEditor value={templateData.htmlBody || ''} onChange={v => setField('htmlBody', v)} placeholder={canUseAi ? "Click 'Generate content' above, or write your own here." : 'Write your email here.'} minHeight={360} />
               </div>
             )}
 

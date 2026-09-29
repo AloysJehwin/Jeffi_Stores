@@ -2433,6 +2433,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               fieldLabel="Description"
               value={description}
               onChange={setDescription}
+              scope="products:write"
               context={`Product: ${productName}`}
               multiline
             >

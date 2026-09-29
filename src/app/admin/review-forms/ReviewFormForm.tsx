@@ -236,20 +236,19 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
       <div className="xl:col-span-2">
-        <RequireWrite scope="review_forms:write">
-          <AIFillForm
-            fields={[
-              { name: 'title', label: 'Form Title', type: 'text' },
-              { name: 'slug', label: 'URL Slug', type: 'text' },
-              { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
-              { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
-              { name: 'description', label: 'Description', type: 'textarea' },
-              { name: 'is_active', label: 'Active', type: 'boolean' },
-            ]}
-            onFill={handleAIFill}
-            context="Review form for jeffistores.com hardware store"
-          />
-        </RequireWrite>
+        <AIFillForm
+          fields={[
+            { name: 'title', label: 'Form Title', type: 'text' },
+            { name: 'slug', label: 'URL Slug', type: 'text' },
+            { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
+            { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
+            { name: 'description', label: 'Description', type: 'textarea' },
+            { name: 'is_active', label: 'Active', type: 'boolean' },
+          ]}
+          onFill={handleAIFill}
+          scope="review_forms:write"
+          context="Customer review form for this store"
+        />
       </div>
       <div className="space-y-5">
         <div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
 import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiDenial } from '@/lib/ai-scope'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -27,9 +27,8 @@ function tryParse(text: string): { name?: string; kind?: string; subject_templat
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
+  const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
@@ -97,6 +96,7 @@ Match tone to the trigger context given by the user (cart abandon = warm urgency
         jsonMode: true,
         temperature: 0.6,
         maxTokens: 2000,
+        noCache: true,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

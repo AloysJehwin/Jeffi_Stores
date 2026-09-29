@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
 import { query } from '@/lib/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiDenial } from '@/lib/ai-scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,9 +85,8 @@ Example for an audience-only scenario (no products): omit product_sql entirely o
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
+  const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   const body = await req.json().catch(() => ({}))
   const userPrompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
@@ -106,6 +105,7 @@ export async function POST(req: NextRequest) {
       jsonMode: true,
       temperature: 0.2,
       maxTokens: 1500,
+      noCache: true,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
