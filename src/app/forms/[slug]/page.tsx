@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { queryOne } from '@/lib/db'
 import FormClient from './FormClient'
-import FormsTopNav from '@/components/forms/FormsTopNav'
+import FormsTopNav from './FormsTopNav'
 
 interface CustomField {
   id: string

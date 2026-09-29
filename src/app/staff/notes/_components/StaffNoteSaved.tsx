@@ -1,6 +1,6 @@
 'use client'
 
-import type { StaffNoteDraft } from './useStaffNoteDraft'
+import type { StaffNoteDraft } from '@/app/staff/notes/_lib/useStaffNoteDraft'
 
 export default function StaffNoteSaved({ d, wide = false }: { d: StaffNoteDraft; wide?: boolean }) {
   return (
