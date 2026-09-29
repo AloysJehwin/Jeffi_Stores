@@ -1,5 +1,6 @@
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query } from '@/lib/db'
 import { recomputeStockStatusForProduct } from '@/lib/inventory'
+import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/selling-unit'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -35,6 +36,185 @@ export class OpenOrdersBlockError extends Error {
     this.name = 'OpenOrdersBlockError'
     this.orderNumbers = orderNumbers
   }
+}
+
+/** Thrown by publishProductDraft when a selling-unit change is blocked by existing stock. */
+export class UnitChangeBlockedError extends Error {
+  constructor(reason: string) {
+    super(reason)
+    this.name = 'UnitChangeBlockedError'
+  }
+}
+
+/**
+ * Guard every staged base selling-unit change against stock recorded under the
+ * current unit, at each grain (product, variant, sub-variant), honoring
+ * inheritance. Runs BEFORE the publish transaction; throws UnitChangeBlockedError
+ * on the first refusal so nothing is written. A base-unit switch (different unit
+ * name) reads as a factor/dimension/qty_step change vs the old base and is caught;
+ * a re-save with identical numerics is not a change and passes.
+ */
+async function assertStagedUnitChangesAllowed(
+  productId: string,
+  units: any[]
+): Promise<void> {
+  const baseOf = (rows: any[]) => rows.find(u => u.is_base) ?? null
+
+  const productBase = baseOf(units.filter(u =>
+    !u._cleared && (!u.variant_id || u.variant_id === 'null') && (!u.sub_variant_id || u.sub_variant_id === 'null')
+  ))
+  const variantBases = new Map<string, any>()
+  const subVariantBases = new Map<string, any>()
+  for (const u of units) {
+    if (u._cleared) continue
+    if (u.sub_variant_id && u.sub_variant_id !== 'null') {
+      if (u.is_base && !subVariantBases.has(u.sub_variant_id)) subVariantBases.set(u.sub_variant_id, u)
+    } else if (u.variant_id && u.variant_id !== 'null') {
+      if (u.is_base && !variantBases.has(u.variant_id)) variantBases.set(u.variant_id, u)
+    }
+  }
+
+  const guard = async (
+    scope: { variantId: string | null; subVariantId: string | null },
+    staged: any
+  ) => {
+    if (!staged) return
+    // An admin-confirmed override wipes this grain's stock on publish, so the change
+    // is allowed — the wipe (which runs first, inside the tx) leaves nothing to block.
+    if (staged._reset_stock_on_publish) return
+    const live = await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; display_label: string | null }>(
+      `SELECT unit, factor::text, dimension, qty_step::text, display_label
+         FROM product_units
+        WHERE product_id = $1 AND is_base = true
+          AND variant_id IS NOT DISTINCT FROM $2::uuid
+          AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+        LIMIT 1`,
+      [productId, scope.variantId, scope.subVariantId]
+    )
+    if (!live) return
+    const reason = await assertUnitChangeAllowed(
+      { query },
+      { productId, variantId: scope.variantId, subVariantId: scope.subVariantId, label: live.display_label || live.unit },
+      changedUnitFields(
+        { factor: staged.factor, dimension: staged.dimension, qty_step: staged.qty_step },
+        live
+      )
+    )
+    if (reason) throw new UnitChangeBlockedError(reason)
+  }
+
+  await guard({ variantId: null, subVariantId: null }, productBase)
+  for (const [vid, staged] of variantBases) await guard({ variantId: vid, subVariantId: null }, staged)
+  for (const [svid, staged] of subVariantBases) await guard({ variantId: null, subVariantId: svid }, staged)
+}
+
+/**
+ * Scopes whose staged base unit (or cleared-base sentinel) carries an
+ * admin-confirmed `_reset_stock_on_publish` override.
+ */
+function scopesToWipe(units: any[]): { variantId: string | null; subVariantId: string | null }[] {
+  const out: { variantId: string | null; subVariantId: string | null }[] = []
+  const seen = new Set<string>()
+  for (const u of units) {
+    if (!u._reset_stock_on_publish) continue
+    if (!u.is_base && !u._cleared) continue
+    const variantId = u.variant_id && u.variant_id !== 'null' ? u.variant_id : null
+    const subVariantId = u.sub_variant_id && u.sub_variant_id !== 'null' ? u.sub_variant_id : null
+    const key = `${variantId}|${subVariantId}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ variantId, subVariantId })
+  }
+  return out
+}
+
+/**
+ * Wipe live stock at an overridden grain PLUS every child that inherits its unit
+ * (a child with no own base unit). In-stock only: sold/reserved serials are kept
+ * (FK-referenced by orders). Runs inside the publish tx, before the unit upserts.
+ */
+async function wipeStockForScope(
+  client: { query: (t: string, p?: unknown[]) => Promise<{ rows: any[] }> },
+  productId: string,
+  scope: { variantId: string | null; subVariantId: string | null }
+): Promise<void> {
+  const { variantId, subVariantId } = scope
+
+  if (subVariantId) {
+    // Leaf grain — just this sub-variant.
+    await client.query(`DELETE FROM product_serials WHERE product_id = $1 AND sub_variant_id = $2 AND status = 'in_stock'`, [productId, subVariantId])
+    await client.query(`DELETE FROM product_batches WHERE product_id = $1 AND sub_variant_id = $2`, [productId, subVariantId])
+    await client.query(`DELETE FROM shelf_stock WHERE product_id = $1 AND sub_variant_id = $2`, [productId, subVariantId])
+    await client.query(`UPDATE product_sub_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [subVariantId])
+    return
+  }
+
+  if (variantId) {
+    // Variant grain + its sub-variants that inherit (no own base unit).
+    await client.query(
+      `DELETE FROM product_serials s WHERE s.product_id = $1 AND s.variant_id = $2 AND s.status = 'in_stock'
+         AND (s.sub_variant_id IS NULL OR NOT EXISTS (
+           SELECT 1 FROM product_units pu WHERE pu.sub_variant_id = s.sub_variant_id AND pu.is_base = true))`,
+      [productId, variantId]
+    )
+    await client.query(
+      `DELETE FROM product_batches b WHERE b.product_id = $1 AND b.variant_id = $2
+         AND (b.sub_variant_id IS NULL OR NOT EXISTS (
+           SELECT 1 FROM product_units pu WHERE pu.sub_variant_id = b.sub_variant_id AND pu.is_base = true))`,
+      [productId, variantId]
+    )
+    await client.query(
+      `DELETE FROM shelf_stock sh WHERE sh.product_id = $1 AND sh.variant_id = $2
+         AND (sh.sub_variant_id IS NULL OR NOT EXISTS (
+           SELECT 1 FROM product_units pu WHERE pu.sub_variant_id = sh.sub_variant_id AND pu.is_base = true))`,
+      [productId, variantId]
+    )
+    await client.query(
+      `UPDATE product_sub_variants sv SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW()
+        WHERE sv.variant_id = $1
+          AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.sub_variant_id = sv.id AND pu.is_base = true)`,
+      [variantId]
+    )
+    await client.query(`UPDATE product_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [variantId])
+    return
+  }
+
+  // Product grain + all variants/sub-variants that inherit (no own base unit).
+  await client.query(
+    `DELETE FROM product_serials s WHERE s.product_id = $1 AND s.status = 'in_stock'
+       AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true
+         AND (pu.variant_id IS NOT DISTINCT FROM s.variant_id) AND (pu.sub_variant_id IS NOT DISTINCT FROM s.sub_variant_id)
+         AND (pu.variant_id IS NOT NULL OR pu.sub_variant_id IS NOT NULL))`,
+    [productId]
+  )
+  await client.query(
+    `DELETE FROM product_batches b WHERE b.product_id = $1
+       AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true
+         AND (pu.variant_id IS NOT DISTINCT FROM b.variant_id) AND (pu.sub_variant_id IS NOT DISTINCT FROM b.sub_variant_id)
+         AND (pu.variant_id IS NOT NULL OR pu.sub_variant_id IS NOT NULL))`,
+    [productId]
+  )
+  await client.query(
+    `DELETE FROM shelf_stock sh WHERE sh.product_id = $1
+       AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true
+         AND (pu.variant_id IS NOT DISTINCT FROM sh.variant_id) AND (pu.sub_variant_id IS NOT DISTINCT FROM sh.sub_variant_id)
+         AND (pu.variant_id IS NOT NULL OR pu.sub_variant_id IS NOT NULL))`,
+    [productId]
+  )
+  await client.query(
+    `UPDATE product_sub_variants sv SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW()
+       FROM product_variants v
+      WHERE sv.variant_id = v.id AND v.product_id = $1
+        AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true AND (pu.variant_id = sv.variant_id OR pu.sub_variant_id = sv.id))`,
+    [productId]
+  )
+  await client.query(
+    `UPDATE product_variants v SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW()
+      WHERE v.product_id = $1
+        AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true AND pu.variant_id = v.id)`,
+    [productId]
+  )
+  await client.query(`UPDATE products SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [productId])
 }
 
 interface ProductDraft {
@@ -111,6 +291,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
   const units = Array.isArray(draft.units) && draft.units.length > 0
     ? draft.units
     : await queryMany(`SELECT * FROM product_units WHERE product_id = $1`, [productId])
+
+  // Block a base selling-unit change (or switch) at any grain when stock recorded
+  // under the current unit would be reinterpreted. Runs before the write tx.
+  await assertStagedUnitChangesAllowed(productId, units as any[])
 
   await withTransaction(async (client) => {
     await client.query(
@@ -868,6 +1052,14 @@ export async function publishProductDraft(productId: string): Promise<void> {
       (!u.sub_variant_id || u.sub_variant_id === 'null')
     )
     if (productUnits.length > 0) {
+      // Clear the scope's single-flag rows FIRST so an incoming base/purchase-default
+      // with a DIFFERENT unit name (a unit switch) doesn't collide with the old one on
+      // uniq_product_units_one_base_product / one_purchase_product during the upsert.
+      await client.query(
+        `UPDATE product_units SET is_base = FALSE, is_purchase_default = FALSE
+          WHERE product_id = $1 AND variant_id IS NULL AND sub_variant_id IS NULL`,
+        [productId]
+      )
       await client.query(
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, is_base, is_purchase_default,
@@ -934,6 +1126,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
       )
     }
     const variantUnits = (units as any[]).filter((u: any) => !u._cleared && u.variant_id && u.variant_id !== 'null')
+    // Clear each variant scope's flags once before its upserts, so a base/purchase-default
+    // switch to a different unit name doesn't collide on the one_base/one_purchase_variant indexes.
+    for (const vid of new Set(variantUnits.map((u: any) => u.variant_id))) {
+      await client.query(
+        `UPDATE product_units SET is_base = FALSE, is_purchase_default = FALSE
+          WHERE product_id = $1 AND variant_id = $2 AND sub_variant_id IS NULL`,
+        [productId, vid]
+      )
+    }
     for (const u of variantUnits) {
       await client.query(
         `INSERT INTO product_units (
@@ -972,6 +1173,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
       )
     }
     const subVariantUnits = (units as any[]).filter((u: any) => !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null')
+    // Clear each sub-variant scope's flags once before its upserts, so a base/purchase-default
+    // switch to a different unit name doesn't collide on the one_base/one_purchase_sub_variant indexes.
+    for (const svid of new Set(subVariantUnits.map((u: any) => u.sub_variant_id))) {
+      await client.query(
+        `UPDATE product_units SET is_base = FALSE, is_purchase_default = FALSE
+          WHERE product_id = $1 AND sub_variant_id = $2`,
+        [productId, svid]
+      )
+    }
     for (const u of subVariantUnits) {
       // Carry variant_id so a sub-variant unit row keeps its full grain (the live
       // route writes it too). A same-`unit` row at another grain can still raise a
@@ -1023,6 +1233,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
           ]
         )
       }
+    }
+
+    // ── Selling-unit override: wipe stock at flagged grains ───────────────────
+    // An admin confirmed changing the base unit despite stock. Runs AFTER the unit
+    // upserts so the inherit checks see the new units, and BEFORE any final stock
+    // recompute. In-stock serials, batches and shelf are deleted; inventory set to 0
+    // at the grain and every child that inherits it. Sold/reserved serials are kept.
+    for (const scope of scopesToWipe(units as any[])) {
+      await wipeStockForScope(client, productId, scope)
     }
 
     // ── Toggle-OFF cleanup: perishable/serialized turned OFF ──────────────────

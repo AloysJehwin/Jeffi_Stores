@@ -1,356 +1,162 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-// Mock global fetch before importing the module
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-import { aiChat, AiClientError, getAiProvider } from '@/lib/ai-client'
+vi.mock('@/lib/tenant-context', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+  resolveTenantId: vi.fn(async () => null),
+}))
 
-function makeOllamaOkResponse(content: string, model = 'qwen3:14b') {
-  return {
-    ok: true,
-    json: async () => ({ message: { content }, model }),
-    text: async () => '',
-  }
+import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/ai-client'
+import { resolveTenantId } from '@/lib/tenant-context'
+
+const GATEWAY_REPLY = {
+  content: 'Hello world',
+  provider: 'ollama',
+  model: 'gemma3:4b',
+  latencyMs: 12,
+  fallbackUsed: false,
+  cache: null,
 }
 
-function makeOpenAiOkResponse(content: string) {
-  return {
-    ok: true,
-    json: async () => ({
-      choices: [{ message: { content } }],
-    }),
-  }
+function okJson(body: unknown) {
+  return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }
 }
+
+function sentBody(callIndex = 0) {
+  return JSON.parse(mockFetch.mock.calls[callIndex][1].body)
+}
+
+beforeEach(() => {
+  mockFetch.mockReset()
+  vi.mocked(resolveTenantId).mockResolvedValue(null)
+})
 
 describe('AiClientError', () => {
   it('has name AiClientError', () => {
-    const err = new AiClientError('test', 'openai')
+    const err = new AiClientError('test', 'gateway')
     expect(err.name).toBe('AiClientError')
-    expect(err.provider).toBe('openai')
+    expect(err.provider).toBe('gateway')
     expect(err.message).toBe('test')
   })
 
   it('is instanceof Error', () => {
-    const err = new AiClientError('x', 'ollama')
-    expect(err instanceof Error).toBe(true)
+    expect(new AiClientError('x', 'gateway') instanceof Error).toBe(true)
   })
 })
 
 describe('getAiProvider', () => {
-  it('returns openai by default', () => {
-    // AI_PROVIDER not set in test env — defaults to openai
+  it('returns a known provider', () => {
     expect(['openai', 'ollama']).toContain(getAiProvider())
   })
 })
 
-describe('aiChat — openai provider', () => {
-  beforeEach(() => {
-    mockFetch.mockReset()
-    process.env.AI_PROVIDER = 'openai'
-    process.env.OPENAI_API_KEY = 'test-key'
-    process.env.OPENAI_MODEL = 'gpt-4o-mini'
+describe('aiChat (gateway client)', () => {
+  it('posts the request to the gateway chat endpoint and returns its reply', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    const result = await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(result).toEqual(GATEWAY_REPLY)
+    const [url, init] = mockFetch.mock.calls[0]
+    expect(url).toMatch(/\/v1\/chat$/)
+    expect(init.method).toBe('POST')
+    expect(init.signal).toBeDefined()
   })
 
-  afterEach(() => {
-    delete process.env.AI_PROVIDER
-    delete process.env.OPENAI_API_KEY
-  })
-
-  it('calls OpenAI and returns content', async () => {
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('Hello world'))
-
-    const result = await aiChat({
-      messages: [{ role: 'user', content: 'hi' }],
-    })
-
-    expect(result.content).toBe('Hello world')
-    expect(result.provider).toBe('openai')
-    expect(typeof result.latencyMs).toBe('number')
-    expect(result.fallbackUsed).toBe(false)
-  })
-
-  it('throws AiClientError when OPENAI_API_KEY is missing', async () => {
-    delete process.env.OPENAI_API_KEY
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'hi' }] }))
-      .rejects.toThrow('OPENAI_API_KEY not configured')
-  })
-
-  it('throws AiClientError on non-ok OpenAI response', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      json: async () => ({ error: { message: 'Rate limit exceeded' } }),
-    })
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'hi' }] }))
-      .rejects.toThrow('Rate limit exceeded')
-  })
-
-  it('throws AiClientError when choices missing', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ choices: [] }),
-    })
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'hi' }] }))
-      .rejects.toThrow('choices[0].message.content')
-  })
-
-  it('sends jsonMode as response_format json_object', async () => {
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('{"a":1}'))
-
-    await aiChat({ messages: [{ role: 'user', content: 'hi' }], jsonMode: true })
-
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
-    expect(body.response_format).toEqual({ type: 'json_object' })
-  })
-
-  it('passes temperature and maxTokens', async () => {
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('ok'))
-
-    await aiChat({ messages: [{ role: 'user', content: 'hi' }], temperature: 0.9, maxTokens: 500 })
-
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
-    expect(body.temperature).toBe(0.9)
-    expect(body.max_tokens).toBe(500)
-  })
-})
-
-describe('aiChat — ollama provider', () => {
-  beforeEach(() => {
-    mockFetch.mockReset()
-    process.env.AI_PROVIDER = 'ollama'
-    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
-    process.env.OLLAMA_FALLBACK_TO_OPENAI = 'false'
-    process.env.OPENAI_API_KEY = 'test-key'
-  })
-
-  afterEach(() => {
-    delete process.env.AI_PROVIDER
-    delete process.env.OLLAMA_FALLBACK_TO_OPENAI
-  })
-
-  it('calls Ollama health check then chat', async () => {
-    // First call: health check /api/tags
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ models: [] }) })
-    // Second call: /api/chat
-    mockFetch.mockResolvedValueOnce(makeOllamaOkResponse('Ollama response'))
-
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
-
-    expect(result.content).toBe('Ollama response')
-    expect(result.provider).toBe('ollama')
-    expect(result.fallbackUsed).toBe(false)
-  })
-
-  it('strips <think>...</think> blocks from Ollama response', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce(makeOllamaOkResponse('<think>reasoning here</think>actual answer'))
-
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
-
-    expect(result.content).toBe('actual answer')
-  })
-
-  it('throws AiClientError when Ollama unreachable (no fallback)', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('connection refused')) // health check fails
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
-      .rejects.toThrow('Ollama is not reachable')
-  })
-
-  it('throws AiClientError when Ollama unreachable even with fallback env set', async () => {
-    process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
-
-    mockFetch.mockRejectedValueOnce(new Error('connection refused')) // health
-
-    // Ollama-only: fallback env is ignored, health failure surfaces directly.
-    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
-      .rejects.toThrow('Ollama is not reachable')
-  })
-
-  it('uses thinking field when content is empty (Qwen3 extended-thinking)', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ message: { content: '', thinking: 'The answer is 42.' }, model: 'qwen3:14b' }),
-      text: async () => '',
-    })
-
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
-    expect(result.content).toBe('The answer is 42.')
-  })
-
-  it('throws AiClientError on non-ok Ollama response', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      text: async () => 'internal error',
-      json: async () => ({}),
-    })
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
-      .rejects.toThrow('Ollama HTTP 500')
-  })
-
-  it('routes modelHint=sql to SQL model', async () => {
-    process.env.OLLAMA_SQL_MODEL = 'codellama:7b'
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce(makeOllamaOkResponse('sql answer', 'codellama:7b'))
-
-    await aiChat({ messages: [{ role: 'user', content: 'test' }], modelHint: 'sql' })
-
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body)
-    expect(body.model).toBe('codellama:7b')
-    delete process.env.OLLAMA_SQL_MODEL
-  })
-
-  it('returns toolCalls when Ollama responds with native tool_calls', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        message: {
-          content: '',
-          tool_calls: [
-            { id: 'call_1', function: { name: 'search_products', arguments: { query: 'hex bolt' } } },
-          ],
-        },
-        model: 'gemma4:12b',
-      }),
-      text: async () => '',
-    })
-
-    const result = await aiChat({
-      messages: [{ role: 'user', content: 'Find hex bolts' }],
-      tools: [{ type: 'function', function: { name: 'search_products', description: 'Search', parameters: {} } }],
-    })
-
-    expect(result.content).toBe('')
-    expect(result.toolCalls).toHaveLength(1)
-    expect(result.toolCalls![0].name).toBe('search_products')
-    expect(result.toolCalls![0].arguments).toEqual({ query: 'hex bolt' })
-    expect(result.provider).toBe('ollama')
-  })
-
-  it('passes tools array to Ollama request body', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce(makeOllamaOkResponse('answer'))
-
-    const tools = [{ type: 'function' as const, function: { name: 'my_tool', description: 'desc', parameters: {} } }]
-    await aiChat({ messages: [{ role: 'user', content: 'test' }], tools })
-
-    const body = JSON.parse(mockFetch.mock.calls[1][1].body)
-    expect(body.tools).toEqual(tools)
-  })
-
-  it('throws when Ollama call fails (no fallback, fallback env ignored)', async () => {
-    process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
-
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health — reachable
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'busy', json: async () => ({}) }) // ollama fails
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
-      .rejects.toThrow('Ollama HTTP 503')
-  })
-
-  it('throws with tools when Ollama call fails (no fallback)', async () => {
-    process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
-    process.env.OPENAI_API_KEY = 'sk-test'
-
-    const tools = [{ type: 'function' as const, function: { name: 'search', description: 'search', parameters: {} } }]
-
-    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, text: async () => '', json: async () => ({}) }) // ollama fails
-
-    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }], tools }))
-      .rejects.toThrow('Ollama HTTP 503')
-  })
-})
-
-describe('aiChat — openai provider with tools', () => {
-  beforeEach(() => {
-    mockFetch.mockReset()
-    process.env.AI_PROVIDER = 'openai'
-    process.env.OPENAI_API_KEY = 'sk-test'
-  })
-
-  afterEach(() => {
-    delete process.env.AI_PROVIDER
-    delete process.env.OPENAI_API_KEY
-  })
-
-  it('returns toolCalls when OpenAI responds with tool_calls', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{
-          message: {
-            tool_calls: [
-              { function: { name: 'get_products', arguments: '{"query":"shelf"}' } },
-            ],
-          },
-        }],
-      }),
-    })
-
-    const result = await aiChat({ messages: [{ role: 'user', content: 'find products' }] })
-    expect(result.toolCalls).toHaveLength(1)
-    expect(result.toolCalls![0].name).toBe('get_products')
-    expect(result.toolCalls![0].arguments).toEqual({ query: 'shelf' })
-    expect(result.content).toBe('')
-  })
-
-  it('passes tools to OpenAI request body', async () => {
+  it('forwards model hint, JSON mode, sampling, tools and noCache', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
     const tools = [{ type: 'function' as const, function: { name: 'fn', description: 'd', parameters: {} } }]
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('ok'))
-
-    await aiChat({ messages: [{ role: 'user', content: 'hi' }], tools })
-
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
-    expect(body.tools).toEqual(tools)
-    expect(body.tool_choice).toBe('auto')
-  })
-
-  it('does not set tool_choice when no tools provided', async () => {
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('ok'))
-
-    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
-
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
-    expect(body.tool_choice).toBeUndefined()
-  })
-
-  it('parses tool_call arguments when they are a JSON string', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{
-          message: {
-            tool_calls: [
-              { function: { name: 'search', arguments: '{"q":"bolts","limit":5}' } },
-            ],
-          },
-        }],
-      }),
-    })
-
-    const result = await aiChat({ messages: [{ role: 'user', content: 'find bolts' }] })
-    expect(result.toolCalls![0].arguments).toEqual({ q: 'bolts', limit: 5 })
-  })
-
-  it('uses forceProvider to bypass env AI_PROVIDER', async () => {
-    process.env.AI_PROVIDER = 'ollama'
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('forced openai'))
-
-    const result = await aiChat({
+    await aiChat({
       messages: [{ role: 'user', content: 'hi' }],
-      forceProvider: 'openai',
+      modelHint: 'sql', jsonMode: true, temperature: 0.9, maxTokens: 500, noCache: true, tools,
     })
-    expect(result.content).toBe('forced openai')
-    expect(result.provider).toBe('openai')
+    expect(sentBody()).toMatchObject({ modelHint: 'sql', jsonMode: true, temperature: 0.9, maxTokens: 500, noCache: true, tools })
+  })
+
+  it('partitions the cache under platform when no tenant is in scope', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody().cacheNamespace).toBe('platform')
+  })
+
+  it('partitions the cache under the request tenant', async () => {
+    vi.mocked(resolveTenantId).mockResolvedValueOnce('tenant-42')
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody().cacheNamespace).toBe('tenant-42')
+  })
+
+  it('uses an explicit cacheNamespace without resolving the tenant', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }], cacheNamespace: 'tenant-7' })
+    expect(sentBody().cacheNamespace).toBe('tenant-7')
+    expect(resolveTenantId).not.toHaveBeenCalled()
+  })
+
+  it('falls back to platform when tenant resolution throws', async () => {
+    vi.mocked(resolveTenantId).mockRejectedValueOnce(new Error('no request scope'))
+    mockFetch.mockResolvedValueOnce(okJson(GATEWAY_REPLY))
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(sentBody().cacheNamespace).toBe('platform')
+  })
+
+  it('throws AiClientError with the gateway status and body on a non-ok reply', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'rate limited', json: async () => ({}) })
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toBe('AI gateway HTTP 429: rate limited')
+    expect(err.provider).toBe('gateway')
+  })
+
+  it('wraps network failures in AiClientError', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('connection refused'))
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toBe('connection refused')
+  })
+
+  it('returns tool calls from the gateway unchanged', async () => {
+    const reply = { ...GATEWAY_REPLY, content: '', toolCalls: [{ name: 'search_products', arguments: { query: 'shelf' } }] }
+    mockFetch.mockResolvedValueOnce(okJson(reply))
+    const result = await aiChat({ messages: [{ role: 'user', content: 'find' }] })
+    expect(result.toolCalls).toEqual([{ name: 'search_products', arguments: { query: 'shelf' } }])
+  })
+})
+
+describe('aiEmbed (gateway client)', () => {
+  it('returns the gateway embeddings', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ embeddings: [[0.1, 0.2]] }))
+    const result = await aiEmbed('hello')
+    expect(result).toEqual([[0.1, 0.2]])
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/embed$/)
+    expect(sentBody()).toMatchObject({ input: 'hello' })
+  })
+
+  it('throws AiClientError on a non-ok reply', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) })
+    await expect(aiEmbed('hello')).rejects.toThrow('AI gateway embed HTTP 502')
+  })
+})
+
+describe('aiVision (gateway client)', () => {
+  it('returns the gateway OCR result', async () => {
+    mockFetch.mockResolvedValueOnce(okJson({ ok: true, text: 'line 1', model: 'PP-OCRv5' }))
+    const result = await aiVision(['aGVsbG8='], 'extract')
+    expect(result).toEqual({ ok: true, text: 'line 1', model: 'PP-OCRv5' })
+    expect(mockFetch.mock.calls[0][0]).toMatch(/\/v1\/vision$/)
+    expect(sentBody()).toMatchObject({ images: ['aGVsbG8='], prompt: 'extract' })
+  })
+
+  it('reports a non-ok reply without throwing', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    const result = await aiVision(['x'], 'extract')
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('AI gateway vision HTTP 503')
+  })
+
+  it('reports a network failure without throwing', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('ECONNRESET'))
+    const result = await aiVision(['x'], 'extract')
+    expect(result).toMatchObject({ ok: false, error: 'ECONNRESET' })
   })
 })

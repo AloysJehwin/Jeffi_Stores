@@ -1,0 +1,18 @@
+{
+  "name": "@jeffi/ai-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tier-1 AI inference platform: portable gateway + SDK fronting Ollama/PaddleOCR, HA on Razer via k8s, cloud-migratable.",
+  "workspaces": [
+    "sdk",
+    "gateway"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace sdk && npm run build --workspace gateway",
+    "typecheck": "tsc -p sdk/tsconfig.json --noEmit && tsc -p gateway/tsconfig.json --noEmit",
+    "test": "node --test gateway/dist/**/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

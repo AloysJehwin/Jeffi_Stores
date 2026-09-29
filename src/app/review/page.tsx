@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 const TAGS = [
   'Great quality',
@@ -36,6 +37,8 @@ export default function ReviewPage() {
   const [title, setTitle] = useState('')
   const [comment, setComment] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled && !aiOff
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -69,6 +72,7 @@ export default function ReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productName: product.productName, rating, tags: selectedTags }),
       })
+      if (res.status === 403) { setAiOff(true); return }
       const data = await res.json()
       if (data.review) setComment(data.review)
     } finally {
@@ -233,18 +237,20 @@ export default function ReviewPage() {
           </div>
 
           {/* AI generate */}
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!rating || isGenerating}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-[#e07b3f] text-[#e07b3f] text-sm font-medium hover:bg-orange-50 disabled:opacity-40 transition-colors"
-          >
-            {isGenerating ? (
-              <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Generating…</>
-            ) : (
-              <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate with AI</>
-            )}
-          </button>
+          {aiEnabled && (
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!rating || isGenerating}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-[#e07b3f] text-[#e07b3f] text-sm font-medium hover:bg-orange-50 disabled:opacity-40 transition-colors"
+            >
+              {isGenerating ? (
+                <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Generating…</>
+              ) : (
+                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate with AI</>
+              )}
+            </button>
+          )}
 
           {/* Title */}
           <div>

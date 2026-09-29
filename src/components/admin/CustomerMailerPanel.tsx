@@ -562,7 +562,7 @@ export default function CustomerMailerPanel({
           {/* Subject */}
           <div>
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Subject *</label>
-            <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} context={aiContext}>
+            <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} scope="mailer:write" context={aiContext}>
               <input
                 type="text"
                 value={subject}
@@ -576,7 +576,7 @@ export default function CustomerMailerPanel({
           {/* Headline */}
           <div>
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Headline *</label>
-            <AIEnrichButton fieldLabel="Email Headline" value={headline} onChange={setHeadline} context={aiContext}>
+            <AIEnrichButton fieldLabel="Email Headline" value={headline} onChange={setHeadline} scope="mailer:write" context={aiContext}>
               <input
                 type="text"
                 value={headline}

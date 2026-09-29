@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import RichTextEditor from '@/components/admin/RichTextEditor'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
   {
@@ -78,6 +78,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const [showPreview, setShowPreview] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const canUseAi = useCanUseAi('mailer:write')
 
   function applyTemplate(templateId: string) {
     const t = TEMPLATES.find(t => t.id === templateId)
@@ -213,7 +214,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
             </div>
           </div>
 
-          {selectedTemplate === 'custom' && (
+          {selectedTemplate === 'custom' && canUseAi && (
             <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-3 space-y-2">
               <label className="text-xs font-semibold text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>

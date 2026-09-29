@@ -1,0 +1,6 @@
+[Unit]
+Description=Adjust Ollama GPU/CPU mode based on other GPU users
+After=ollama.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ollama-gpu-guard.sh

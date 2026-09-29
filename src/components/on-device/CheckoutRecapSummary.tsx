@@ -44,6 +44,8 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
   const [feedback, setFeedback] = useState<'liked' | 'disliked' | null>(null)
   const [wifiDismissed, setWifiDismissed] = useState(false)
   const [showMobileToast, setShowMobileToast] = useState(false)
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = flags.aiStorefrontEnabled && !aiOff
   const started = useRef(false)
 
   // Whether the in-browser model is allowed to run on THIS device class.
@@ -53,7 +55,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
   const onDeviceRuns = !!verdict?.capable && platformAllowed
 
   useEffect(() => {
-    if (!ondeviceEnabled) return
+    if (!ondeviceEnabled || !aiEnabled) return
     let alive = true
     canRunOnDeviceSummary().then(v => {
       if (!alive) return
@@ -75,10 +77,10 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       }
     })
     return () => { alive = false; disposeSummarizer() }
-  }, [ondeviceEnabled, flags.ondeviceSummaryMobileEnabled])
+  }, [ondeviceEnabled, aiEnabled, flags.ondeviceSummaryMobileEnabled])
 
   useEffect(() => {
-    if (!verdict || started.current) return
+    if (!aiEnabled || !verdict || started.current) return
     if (!items || items.length === 0) return
     // If on-device won't run here AND there's no server fallback path (feature
     // disabled entirely is already handled by the ondeviceEnabled guard above),
@@ -108,6 +110,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cart: items, total: signals.total, itemCount }),
         })
+        if (res.status === 403) { setAiOff(true); return }
         if (!res.ok) throw new Error('ollama failed')
         const data = await res.json() as { text?: string }
         if (!data.text) throw new Error('empty')
@@ -126,7 +129,9 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       // Device can't (or isn't allowed to) run on-device → server fallback.
       runServerFallback()
     }
-  }, [verdict, items, total, onDeviceRuns])
+  }, [aiEnabled, verdict, items, total, onDeviceRuns])
+
+  if (!aiEnabled) return null
 
   // Not-wifi banner — only relevant when on-device WOULD run on this device
   // (platform-allowed). If the device uses the server fallback, wifi is irrelevant.

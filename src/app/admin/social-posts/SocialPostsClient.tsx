@@ -320,6 +320,7 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
               fieldLabel="Social media caption"
               value={caption}
               onChange={setCaption}
+              scope="campaigns:write"
               context={selectedProduct ? `Product: ${selectedProduct.name}${selectedProduct.short_description ? ' — ' + selectedProduct.short_description : ''}. Platform: ${PLATFORM_LABELS[platform]}.` : `Platform: ${PLATFORM_LABELS[platform]}.`}
               multiline
             >

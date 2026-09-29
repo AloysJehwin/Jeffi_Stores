@@ -368,7 +368,7 @@ describe('POST /api/customer-agent/chat', () => {
     const res = await POST(makeRequest({ message: 'building a wooden shelf' }) as any)
     const json = await res.json()
     expect(json.message).toContain('wood-screw')
-    expect(json.message).toContain('project')
+    expect(json.message).toContain('match what you described')
   })
 
   it('formats recommend_for_project with empty products → "don\'t carry" message', async () => {

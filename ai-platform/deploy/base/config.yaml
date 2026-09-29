@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-gateway-config
+  namespace: ai-platform
+data:
+  PORT: "8080"
+  OLLAMA_BASE_URL: "http://ollama:11434"
+  PADDLE_OCR_URL: "http://paddleocr:8866"
+  REDIS_URL: "redis://ai-redis:6379"
+  OLLAMA_REQUEST_TIMEOUT_MS: "120000"
+  OLLAMA_AGENT_MODEL: "qwen2.5:7b"
+  OLLAMA_SQL_MODEL: "gemma4:12b"
+  OLLAMA_COPY_MODEL: "gemma4:12b"
+  OLLAMA_EMAIL_MODEL: "gemma3:4b"
+  OLLAMA_FAST_MODEL: "gemma3:4b"
+  OLLAMA_VISION_MODEL: "gemma4:12b"
+  RAG_EMBED_MODEL: "nomic-embed-text"
+  AI_JOB_ATTEMPTS: "3"
+  AI_WORKER_CONCURRENCY: "2"
+---
+# secret.example.yaml — copy to a real Secret (never commit real values).
+# AI_CACHE_PG_URL: postgres connection for the ai_cache (pgvector) table.
+# OPENAI_API_KEY: only used when a request forces the openai provider.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-gateway-secret
+  namespace: ai-platform
+type: Opaque
+stringData:
+  AI_CACHE_PG_URL: ""
+  OPENAI_API_KEY: ""

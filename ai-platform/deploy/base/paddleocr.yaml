@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paddleocr
+  namespace: ai-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: paddleocr }
+  template:
+    metadata:
+      labels: { app: paddleocr }
+    spec:
+      containers:
+        - name: paddleocr
+          # Replace with the OCR sidecar image that serves POST /ocr {data, mime_type}.
+          image: jeffi/paddleocr-service:latest
+          ports:
+            - containerPort: 8866
+          readinessProbe:
+            httpGet: { path: /health, port: 8866 }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "500m", memory: 1Gi }
+            limits: { cpu: "2", memory: 4Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paddleocr
+  namespace: ai-platform
+spec:
+  selector: { app: paddleocr }
+  ports:
+    - port: 8866
+      targetPort: 8866

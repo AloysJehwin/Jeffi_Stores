@@ -12,6 +12,8 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
   const [text, setText] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
   const [source, setSource] = useState<'on-device' | 'ollama'>('on-device')
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = flags.aiStorefrontEnabled && !aiOff
   const started = useRef(false)
   const prevHash = useRef('')
 
@@ -25,7 +27,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
   }, [items])
 
   useEffect(() => {
-    if (!ondeviceEnabled) return
+    if (!ondeviceEnabled || !aiEnabled) return
     if (state !== 'idle' || started.current || !items.length) return
     started.current = true
     setState('loading')
@@ -60,6 +62,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cart: items }),
         })
+        if (res.status === 403) { setAiOff(true); return }
         if (!res.ok) throw new Error('ollama failed')
         const data = await res.json() as { text?: string }
         if (!data.text) throw new Error('empty')
@@ -69,11 +72,11 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
       }
     })
     return () => disposeSummarizer()
-  }, [state, items, ondeviceEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
+  }, [state, items, ondeviceEnabled, aiEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
 
   // Only render once real text has started streaming — never flash a loading box
   // that would then vanish on devices where the model can't load (most mobiles).
-  if (!text.trim()) return null
+  if (!aiEnabled || !text.trim()) return null
 
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 mt-4 mb-4 bg-surface-elevated rounded-xl border border-border-default">

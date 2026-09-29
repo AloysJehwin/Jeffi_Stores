@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
         firstName: user.first_name,
         lastName: user.last_name,
         phone: user.phone,
+        phoneVerified: user.phone_verified ?? false,
       },
     })
   } catch (err: any) {

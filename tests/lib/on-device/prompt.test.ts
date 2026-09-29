@@ -236,7 +236,7 @@ describe('buildRecapPrompt', () => {
 describe('buildCartInsightPrompt', () => {
   it('includes insight instruction and ends with ### Insight', () => {
     const out = buildCartInsightPrompt({ cart: [{ name: 'Drill', qty: 1 }] })
-    expect(out).toContain('describe what the customer is building')
+    expect(out).toContain('describe what the customer appears to be shopping for')
     expect(out).toContain('- 1x Drill')
     expect(out.endsWith('### Insight')).toBe(true)
   })

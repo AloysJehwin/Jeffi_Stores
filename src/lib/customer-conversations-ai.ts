@@ -153,6 +153,7 @@ export async function refreshAiSummary(userId: string): Promise<{ summary: strin
     modelHint: 'fast',
     temperature: 0.3,
     maxTokens: 400,
+    noCache: true,
     messages: [
       { role: 'system', content: prompt.system },
       { role: 'user', content: prompt.user },

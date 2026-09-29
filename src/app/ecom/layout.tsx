@@ -17,7 +17,7 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col">
+    <div className="ecom-scope min-h-screen bg-surface flex flex-col">
       <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
       <EcomMain>{children}</EcomMain>
     </div>

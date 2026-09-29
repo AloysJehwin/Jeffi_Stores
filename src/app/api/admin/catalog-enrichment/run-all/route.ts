@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany } from '@/lib/db'
+import { aiChat } from '@/lib/ai-client'
+import { storeDescriptorForPrompt } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,20 +34,23 @@ interface Enrichment {
   ai_search_tags: string[]
 }
 
-const SYSTEM_PROMPT = `You write product intelligence data for an Indian B2B/B2C hardware and tools store (jeffistores.com).
+// Examples are deliberately store-neutral: the store's own niche comes from the descriptor, so a
+// tenant's catalogue is never nudged toward another store's product category.
+const systemPrompt = (store: string) => `You write product intelligence data for ${store}.
 Given a product name, category, brand, and description, produce ALL of the following fields:
 
 1. ai_description: A clear 1-2 sentence customer-facing description. No marketing fluff.
-2. ai_use_cases: 4-10 short buyer search-intent phrases (e.g. "hang picture frame", "wall mounting"). Lowercase, 1-4 words each.
-3. ai_keywords: 5-12 synonyms, alternate names, colloquial terms buyers use (e.g. "rawl plug", "wall anchor", "fischer plug"). Lowercase.
-4. ai_who_uses_it: A short phrase describing who buys this (e.g. "electricians, contractors, DIY homeowners").
-5. ai_application: One sentence on where/how it is used (e.g. "Used to hang picture frames and mirrors on plastered or brick walls").
-6. ai_product_type: The normalized product type in 1-3 words (e.g. "Wall Anchor", "Hex Bolt", "Toggle Switch").
-7. ai_features: 3-8 key product features or specs as short phrases (e.g. "rust resistant", "load rated 5 kg", "includes nail").
-8. ai_search_tags: 5-15 broader context tags for semantic search (e.g. "hanging", "mounting", "home decor", "interior").
+2. ai_use_cases: 4-10 short buyer search-intent phrases describing what the product is used for. Lowercase, 1-4 words each.
+3. ai_keywords: 5-12 synonyms, alternate names and colloquial terms buyers use for this product. Lowercase.
+4. ai_who_uses_it: A short phrase describing who buys this.
+5. ai_application: One sentence on where/how it is used.
+6. ai_product_type: The normalized product type in 1-3 words.
+7. ai_features: 3-8 key product features or specs as short phrases.
+8. ai_search_tags: 5-15 broader context tags for semantic search.
 
 Rules:
 - Only use facts from the input. Do not invent specs.
+- Stay within this store's product category; do not assume an industry the input does not show.
 - All array values: lowercase, no duplicates, concise.
 - Respond with strict JSON only — no prose, no markdown fences.
 
@@ -103,8 +108,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-  const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
+  // Resolve the tenant's descriptor inside the request: the loop below outlives the response.
+  const SYSTEM_PROMPT = systemPrompt(await storeDescriptorForPrompt())
+  const { resolveTenantId } = await import('@/lib/tenant-context')
+  const cacheNamespace = (await resolveTenantId()) ?? 'platform'
 
   const candidates = await queryMany<ProductRow>(
     `SELECT p.id::text, p.name, p.description, p.sku, p.material, p.size,
@@ -137,24 +144,17 @@ export async function POST(req: NextRequest) {
         if (wait > 0) await new Promise(r => setTimeout(r, wait))
         lastAt = Date.now()
 
-        const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(45000),
-          body: JSON.stringify({
-            model: OLLAMA_MODEL,
-            stream: false,
-            format: 'json',
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: buildPrompt(p) },
-            ],
-            options: { temperature: 0.3 },
-          }),
+        const r = await aiChat({
+          cacheNamespace,
+          modelHint: 'copy',
+          jsonMode: true,
+          temperature: 0.3,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: buildPrompt(p) },
+          ],
         })
-        if (!res.ok) continue
-        const data = await res.json() as { message?: { content?: string } }
-        const e = parseEnrichment(data.message?.content || '')
+        const e = parseEnrichment(r.content)
 
         const { query } = await import('@/lib/db')
         await query(
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
           [p.id, p.name, p.description || null,
            e.ai_description, e.ai_use_cases, e.ai_keywords, e.ai_who_uses_it,
            e.ai_application, e.ai_product_type, e.ai_features, e.ai_search_tags,
-           OLLAMA_MODEL]
+           r.model]
         )
       } catch {
         void 0

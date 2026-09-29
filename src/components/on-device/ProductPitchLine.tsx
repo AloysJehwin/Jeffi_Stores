@@ -13,12 +13,13 @@ interface Props {
 
 type Source = 'on-device' | 'ollama'
 
-async function fetchOllamaPitch(productName: string, brand: string | null, category: string | null): Promise<string> {
+async function fetchOllamaPitch(productName: string, brand: string | null, category: string | null): Promise<string | null> {
   const res = await fetch('/api/ai-pitch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ productName, brand, category }),
   })
+  if (res.status === 403) return null
   if (!res.ok) throw new Error('ollama failed')
   const data = await res.json() as { pitch?: string }
   if (!data.pitch) throw new Error('empty result')
@@ -31,10 +32,12 @@ export default function ProductPitchLine({ productName, brand, category }: Props
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const [source, setSource] = useState<Source>('on-device')
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = flags.aiStorefrontEnabled && !aiOff
   const started = useRef(false)
 
   useEffect(() => {
-    if (!ondeviceEnabled) return
+    if (!ondeviceEnabled || !aiEnabled) return
     if (started.current) return
     started.current = true
 
@@ -63,6 +66,7 @@ export default function ProductPitchLine({ productName, brand, category }: Props
         try {
           setSource('ollama')
           const result = await fetchOllamaPitch(productName, brand, category)
+          if (result === null) { setAiOff(true); return }
           setText(result)
           setDone(true)
         } catch {
@@ -70,9 +74,9 @@ export default function ProductPitchLine({ productName, brand, category }: Props
         }
       }
     }).catch(() => {})
-  }, [productName, brand, category, ondeviceEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
+  }, [productName, brand, category, ondeviceEnabled, aiEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
 
-  if (!text) return null
+  if (!aiEnabled || !text) return null
 
   return (
     <div className="flex items-start gap-2 mt-3 pt-3 border-t border-border-default">

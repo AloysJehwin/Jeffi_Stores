@@ -129,6 +129,17 @@ describe('PATCH /api/admin/categories/[id]', () => {
     expect(mockSuggestIcon).toHaveBeenCalledWith('Nuts')
   })
 
+  it('uses the default icon without calling suggestIcon when the plan has no AI', async () => {
+    mockHasScope.mockImplementation((_role, _scopes, scope) => scope !== 'catalog_enrichment:write')
+    const res = await PATCH(
+      makeReq({ name: 'Nuts' }),
+      { params: Promise.resolve({ id: CAT_ID }) }
+    )
+    expect(res.status).toBe(200)
+    expect(mockSuggestIcon).not.toHaveBeenCalled()
+    expect(mockQuery.mock.calls[0][1]).toContain('Package')
+  })
+
   it('handles optional return_allowed and replacement_allowed fields', async () => {
     const res = await PATCH(
       makeReq({

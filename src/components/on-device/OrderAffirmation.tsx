@@ -24,10 +24,12 @@ export default function OrderAffirmation({ items, total }: Props) {
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const [source, setSource] = useState<'on-device' | 'ollama'>('on-device')
+  const [aiOff, setAiOff] = useState(false)
+  const aiEnabled = flags.aiStorefrontEnabled && !aiOff
   const started = useRef(false)
 
   useEffect(() => {
-    if (!ondeviceEnabled) return
+    if (!ondeviceEnabled || !aiEnabled) return
     if (started.current || !items.length) return
     started.current = true
 
@@ -72,6 +74,7 @@ export default function OrderAffirmation({ items, total }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemNames }),
         })
+        if (res.status === 403) { setAiOff(true); return }
         if (!res.ok) throw new Error('ollama failed')
         const data = await res.json() as { text?: string }
         if (!data.text) throw new Error('empty')
@@ -81,9 +84,9 @@ export default function OrderAffirmation({ items, total }: Props) {
         // silently fail
       }
     })
-  }, [items, total, ondeviceEnabled, finetuneEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled, flags.ondeviceFinetuneMobileEnabled, flags.ondeviceFinetuneDesktopEnabled])
+  }, [items, total, ondeviceEnabled, aiEnabled, finetuneEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled, flags.ondeviceFinetuneMobileEnabled, flags.ondeviceFinetuneDesktopEnabled])
 
-  if (!text) return null
+  if (!aiEnabled || !text) return null
 
   return (
     <div className="flex items-start gap-2.5 bg-surface-elevated border border-border-default rounded-xl px-4 py-3 mb-6">

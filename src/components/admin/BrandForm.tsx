@@ -87,7 +87,8 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
               { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
             ]}
             onFill={handleAIFill}
-            context="Hardware/tools brand for jeffistores.com"
+            scope="brands:write"
+            context="Product brand carried by this store"
           />
         </div>
 
@@ -166,6 +167,7 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
               fieldLabel="Description"
               value={description}
               onChange={setDescription}
+              scope="brands:write"
               context={`Brand: ${brandName}`}
               multiline
             >

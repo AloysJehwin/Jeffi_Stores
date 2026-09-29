@@ -97,3 +97,7 @@ public/ort/*.wasm
 public/ort/*.map
 public/models/onboarding/ort/*.wasm
 public/models/onboarding/ort/*.mjs
+
+
+# IDE state (holds local diff caches; never commit)
+.idea/

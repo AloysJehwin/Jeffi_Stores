@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
-import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useCanUseAi } from '@/contexts/AdminScopesContext'
 
 interface AiSummary {
   summary: string | null
@@ -21,8 +21,8 @@ function relTime(iso: string | null): string {
 }
 
 export default function CustomerAiSummary({ customerId, canWrite: canWriteProp = false }: { customerId: string; canWrite?: boolean }) {
-  const canWriteScope = useCanWrite('customers:write')
-  const canWrite = canWriteProp && canWriteScope
+  const canUseAi = useCanUseAi('customers:write')
+  const canGenerate = canWriteProp && canUseAi
   const [data, setData] = useState<AiSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
@@ -57,7 +57,7 @@ export default function CustomerAiSummary({ customerId, canWrite: canWriteProp =
         return
       }
       if (res.ok) setData(await res.json())
-      else setError('Could not generate a profile')
+      else setError((await res.json().catch(() => null))?.error || 'Could not generate a profile')
     } catch {
       setError('AI profile generation is not available')
     } finally {
@@ -71,7 +71,7 @@ export default function CustomerAiSummary({ customerId, canWrite: canWriteProp =
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">About this customer</h2>
-        {canWrite && (data?.summary || !loading) && (
+        {canGenerate && (data?.summary || !loading) && (
           <button
             type="button"
             onClick={refresh}
@@ -101,7 +101,7 @@ export default function CustomerAiSummary({ customerId, canWrite: canWriteProp =
           </div>
         </div>
       ) : (
-        <p className="text-sm text-foreground-muted">No profile yet{canWrite ? '. Use Generate to create one from this customer’s history.' : '.'}</p>
+        <p className="text-sm text-foreground-muted">No profile yet{canGenerate ? '. Use Generate to create one from this customer’s history.' : '.'}</p>
       )}
 
       {error && <p className="text-xs text-red-600 dark:text-red-400 mt-3">{error}</p>}

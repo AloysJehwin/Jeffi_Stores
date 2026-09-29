@@ -38,7 +38,21 @@ const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface
 type FormMode = 'base' | 'extra' | null
 
 export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false, roleNote }: Props) {
-  const { showToast } = useToast()
+  const { showToast, showConfirm } = useToast()
+
+  const scopeNoun = subVariantId ? 'sub-variant' : variantId ? 'variant' : 'product'
+
+  // On a 409 the unit change was blocked by existing stock. Offer to wipe stock on
+  // publish (serials, shelf, batches -> 0) and retry the same request with override.
+  async function confirmOverride(reason: string): Promise<boolean> {
+    return showConfirm({
+      title: 'Existing stock blocks this change',
+      message: `${reason}\n\nOverride: set stock to 0 and delete all serials, shelf locations and batches for this ${scopeNoun} (and anything inheriting it) when you publish. Sold or reserved serials are kept. This cannot be undone after publishing. Continue?`,
+      confirmText: 'Override on publish',
+      cancelText: 'Keep current unit',
+      type: 'danger',
+    })
+  }
   const canWrite = useCanWrite('inventory')
   const [allUnits, setAllUnits] = useState<ProductUnit[]>([])
   const [inherited, setInherited] = useState(false)
@@ -236,10 +250,18 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   async function handleResetBase() {
     const base = allUnits.find(u => u.is_base) ?? allUnits[0]
     if (!base) return
+    const withOverride = (url: string, override: boolean) =>
+      override ? `${url}${url.includes('?') ? '&' : '?'}override=true` : url
     setSaving(true)
     try {
-      const res = await fetch(unitUrl(base.id), { method: 'DELETE', credentials: 'include' })
-      if (!res.ok) { showToast((await res.json().catch(() => ({}))).error || 'Failed to reset', 'error'); return }
+      let res = await fetch(withOverride(unitUrl(base.id), false), { method: 'DELETE', credentials: 'include' })
+      let data = await res.json().catch(() => ({}))
+      if (res.status === 409 && data.canOverride) {
+        if (!(await confirmOverride(data.error))) return
+        res = await fetch(withOverride(unitUrl(base.id), true), { method: 'DELETE', credentials: 'include' })
+        data = await res.json().catch(() => ({}))
+      }
+      if (!res.ok) { showToast(data.error || 'Failed to reset', 'error'); return }
       await load()
     } finally { setSaving(false) }
   }
@@ -282,12 +304,20 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
 
     const payload = { unit: key, factor: factorNum, dimension: draftDimension, display_label: draftLabel || null, conversion_meta: conversionMeta, min_qty: minQty, max_qty: maxQty, qty_step: qtyStep }
 
+    const send = (override: boolean) =>
+      baseUnit && !inherited
+        ? fetch(unitUrl(baseUnit.id), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, ...(override ? { override: true } : {}) }) })
+        : fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: true, ...(override ? { override: true } : {}) }) })
+
     setSaving(true)
     try {
-      const res = baseUnit && !inherited
-        ? await fetch(unitUrl(baseUnit.id), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        : await fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: true }) })
-      const data = await res.json()
+      let res = await send(false)
+      let data = await res.json()
+      if (res.status === 409 && data.canOverride) {
+        if (!(await confirmOverride(data.error))) return
+        res = await send(true)
+        data = await res.json()
+      }
       if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
       setFormMode(null)
       await load()

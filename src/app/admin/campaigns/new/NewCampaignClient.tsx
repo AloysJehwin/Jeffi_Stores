@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface CouponOption {
   id: string
@@ -65,6 +65,7 @@ export default function NewCampaignClient() {
   const [creating, setCreating] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   useEffect(() => { loadCoupons(); loadScenarios() }, [])
 
@@ -96,6 +97,7 @@ export default function NewCampaignClient() {
   async function generateWithAI() {
     if (!aiPrompt.trim()) return
     setAiGenerating(true)
+    setAiError(null)
     try {
       const scenario = scenarios.find(s => s.kind === form.scenario_kind)
       const res = await fetch('/api/admin/campaigns/generate', {
@@ -123,10 +125,10 @@ export default function NewCampaignClient() {
         }))
         showToast('Template generated', 'success')
       } else {
-        showToast(data.error || 'Generation failed', 'error')
+        setAiError(data.error || 'Generation failed')
       }
     } catch {
-      showToast('Generation failed — please try again', 'error')
+      setAiError('Generation failed — please try again')
     } finally {
       setAiGenerating(false)
     }
@@ -174,6 +176,7 @@ export default function NewCampaignClient() {
   return (
     <div className="space-y-5">
       <RequireWrite scope="campaigns:write">
+      <RequireAi scope="mailer:write">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
         <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Generate template with AI</p>
         <div className="flex gap-2">
@@ -194,8 +197,10 @@ export default function NewCampaignClient() {
             {aiGenerating ? 'Generating…' : 'Generate'}
           </button>
         </div>
+        {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
         <p className="text-[10px] text-foreground-muted">AI will fill the name, kind, subject and body. You can edit anything afterwards.</p>
       </div>
+      </RequireAi>
       </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">

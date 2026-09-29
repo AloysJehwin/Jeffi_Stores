@@ -7,7 +7,7 @@ import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
-import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface EligibleRecipient {
   reference_id: string
@@ -139,6 +139,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [loading, setLoading] = useState(true)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [hasDraft, setHasDraft] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -358,6 +359,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   async function generateWithAI() {
     if (!aiPrompt.trim() || !form) return
     setAiGenerating(true)
+    setAiError(null)
     try {
       const sk = form.scenario_kind || campaign?.kind
       const sc = scenarios.find(s => s.kind === sk)
@@ -380,8 +382,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         setForm(f => f ? { ...f, subject_template: data.subject_template, body_template: data.body_template } : f)
         showToast('Template updated', 'success')
       } else {
-        showToast(data.error || 'Generation failed', 'error')
+        setAiError(data.error || 'Generation failed')
       }
+    } catch {
+      setAiError('Generation failed — please try again')
     } finally {
       setAiGenerating(false)
     }
@@ -445,6 +449,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   return (
     <div className="space-y-5">
       <RequireWrite scope="campaigns:write">
+      <RequireAi scope="mailer:write">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
         <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Regenerate template with AI</p>
         <div className="flex gap-2">
@@ -465,8 +470,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             {aiGenerating ? 'Generating…' : 'Generate'}
           </button>
         </div>
+        {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
         <p className="text-[10px] text-foreground-muted">AI will rewrite the subject and body. Your other settings are untouched.</p>
       </div>
+      </RequireAi>
       </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -561,6 +568,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             fieldLabel="Subject line"
             value={form.subject_template}
             onChange={v => setForm({ ...form, subject_template: v })}
+            scope="campaigns:write"
             context={`Campaign: ${campaign.name ?? ''}`}
           >
             <input
