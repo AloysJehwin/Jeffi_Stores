@@ -1,6 +1,6 @@
 'use client'
 
-import type { StaffNoteDraft } from './useStaffNoteDraft'
+import type { StaffNoteDraft } from '@/app/staff/notes/_lib/useStaffNoteDraft'
 
 const inputClass = 'w-full px-4 py-3 border border-border-secondary rounded-xl bg-surface text-foreground text-base placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 

@@ -5,7 +5,7 @@ import PortalShell from '@/components/portal/PortalShell'
 import PortalSignIn from '@/components/portal/PortalSignIn'
 import PortalSignOutButton from '@/components/portal/PortalSignOutButton'
 import { STAFF_NOTES } from '@/lib/portal-config'
-import StaffNotesEntry from '../StaffNotesEntry'
+import StaffNotesEntry from './_components/StaffNotesEntry'
 
 export const dynamic = 'force-dynamic'
 

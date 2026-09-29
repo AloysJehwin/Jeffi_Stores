@@ -10,7 +10,7 @@ import { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
-import ReviewModal from '@/components/shared/ReviewModal'
+import ReviewModal from './ReviewModal'
 import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']

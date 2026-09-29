@@ -2,7 +2,7 @@
 
 import { useRef } from 'react'
 import StaffVoiceMemo from './StaffVoiceMemo'
-import { MAX_FILES, type StaffNoteDraft } from './useStaffNoteDraft'
+import { MAX_FILES, type StaffNoteDraft } from '@/app/staff/notes/_lib/useStaffNoteDraft'
 
 export default function StaffAttachmentsPicker({ d, layout }: { d: StaffNoteDraft; layout: 'mobile' | 'desktop' }) {
   const galleryRef = useRef<HTMLInputElement>(null)
