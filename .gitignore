@@ -53,6 +53,9 @@ SECURITY_GROUP_INSTRUCTIONS.md
 # AWS config files
 s3-bucket-policy*.json
 
+# Supabase CLI local state
+supabase/.temp
+
 # Google Service Account key
 jeffi-stores-*.json
 
