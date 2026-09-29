@@ -1,127 +1,162 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// ---------------------------------------------------------------------------
+// Mocks — factories must NOT reference variables defined outside the factory
+// because vi.mock() is hoisted to the top of the file.
+// ---------------------------------------------------------------------------
+
+vi.mock('@/lib/jwt', () => ({
+  authenticateAnyUser: vi.fn().mockResolvedValue(null),
+}))
 
 vi.mock('@/lib/db', () => ({
-  query: vi.fn(),
-  queryOne: vi.fn(),
-  queryMany: vi.fn(),
-  withTransaction: vi.fn(),
+  query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
+  queryOne: vi.fn().mockResolvedValue(null),
+  queryMany: vi.fn().mockResolvedValue([]),
 }))
-vi.mock('@/lib/jwt', () => ({
-  authenticateAnyUser: vi.fn(),
-  authenticateAdmin: vi.fn(),
-  authenticateUser: vi.fn(),
-  verifyToken: vi.fn(),
+
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({
+    get: (_key: string) => undefined,
+    set: vi.fn(),
+    delete: vi.fn(),
+  }),
+  headers: vi.fn().mockResolvedValue(new Headers()),
 }))
-vi.mock('@/lib/checkout-intent', () => ({ verifyIntent: vi.fn() }))
+
+vi.mock('@/lib/ai-feedback', () => ({
+  recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/activity', () => ({
+  logActivity: vi.fn().mockResolvedValue(undefined),
+}))
+
+// Use vi.fn() with no default — each test sets its own return value via beforeEach
 vi.mock('@/lib/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
   loadActiveCart: vi.fn(),
-  cartSubtotal: vi.fn(),
 }))
 
-import { GET } from '@/app/api/checkout/intents/[token]/route'
+vi.mock('@/lib/checkout-intent', () => ({
+  signIntent: vi.fn(),
+  verifyIntent: vi.fn(),
+}))
+
+// ---------------------------------------------------------------------------
+// Import handlers AFTER mocks
+// ---------------------------------------------------------------------------
+import { POST } from '@/app/api/checkout/intents/route'
 import { authenticateAnyUser } from '@/lib/jwt'
-import { verifyIntent } from '@/lib/checkout-intent'
-import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/order-commit'
-import { queryOne } from '@/lib/db'
+import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
+import { signIntent } from '@/lib/checkout-intent'
 
-const mockAuth = vi.mocked(authenticateAnyUser)
-const mockVerifyIntent = vi.mocked(verifyIntent)
-const mockResolve = vi.mocked(resolveBuyNowItem)
-const mockLoadCart = vi.mocked(loadActiveCart)
-const mockCartSubtotal = vi.mocked(cartSubtotal)
-const mockQueryOne = vi.mocked(queryOne)
+const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440002'
+const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 
-function makeRequest() {
-  return new Request('http://localhost/api/checkout/intents/tok123')
+function makeRequest(body: unknown) {
+  return new Request('http://localhost/api/checkout/intents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 }
 
-const params = { params: Promise.resolve({ token: 'tok123' }) }
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-describe('GET /api/checkout/intents/[token]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
-
-  it('returns 400 when intent is invalid', async () => {
-    mockVerifyIntent.mockResolvedValueOnce(null)
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toBe('Invalid or expired intent')
-  })
-
-  it('returns 401 for cart mode when not authenticated', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({ mode: 'cart', userId: 'u1' } as any)
-    mockAuth.mockResolvedValueOnce(null)
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(401)
-  })
-
-  it('returns 403 for cart mode when user mismatch', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({ mode: 'cart', userId: 'u1' } as any)
-    mockAuth.mockResolvedValueOnce({ userId: 'u2' } as any)
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(403)
-  })
-
-  it('returns 400 for cart mode when cart is empty', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({ mode: 'cart', userId: 'u1' } as any)
-    mockAuth.mockResolvedValueOnce({ userId: 'u1' } as any)
-    mockLoadCart.mockResolvedValueOnce([])
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toBe('Cart is empty')
-  })
-
-  it('returns cart data for cart mode', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({ mode: 'cart', userId: 'u1' } as any)
-    mockAuth.mockResolvedValueOnce({ userId: 'u1' } as any)
-    mockLoadCart.mockResolvedValueOnce([{ id: 'ci1' }] as any)
-    mockCartSubtotal.mockReturnValueOnce(500)
-
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(200)
-    const json = await res.json()
-    expect(json.mode).toBe('cart')
-    expect(json.itemCount).toBe(1)
-    expect(json.subtotal).toBe(500)
-  })
-
-  it('returns 400 for buyNow mode when resolve fails', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({
-      mode: 'buyNow',
-      productId: 'p1', variantId: null, subVariantId: null,
-      qty: 1, buyMode: 'retail', buyUnit: 'pc',
-    } as any)
-    mockResolve.mockResolvedValueOnce({ ok: false, error: 'out of stock' } as any)
-
-    const res = await GET(makeRequest() as any, params as any)
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toBe('out of stock')
-  })
-
-  it('returns buyNow data when resolve succeeds', async () => {
-    mockVerifyIntent.mockResolvedValueOnce({
-      mode: 'buyNow',
-      productId: 'p1', variantId: 'v1', subVariantId: null,
-      qty: 2, buyMode: 'retail', buyUnit: 'pc',
-    } as any)
-    mockResolve.mockResolvedValueOnce({
+describe('POST /api/checkout/intents — buyNow mode', () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue(null)
+    vi.mocked(resolveBuyNowItem).mockResolvedValue({
       ok: true,
-      item: { productId: 'p1', variantId: 'v1', subVariantId: null, qty: 2, buyMode: 'retail', buyUnit: 'pc', price: 200 },
+      item: {
+        productId: PRODUCT_ID,
+        variantId: null,
+        subVariantId: null,
+        qty: 2,
+        buyMode: 'unit',
+        buyUnit: null,
+      },
     } as any)
-    mockQueryOne.mockResolvedValueOnce({
-      name: 'Bolt', sku: 'B1', mrp: 250, gst_percentage: 18,
-      brand_name: 'Unbrako', variant_name: 'M6', variant_sku: 'V-B1',
-      variant_mrp: 250, sub_variant_name: null, sub_variant_sku: null, sub_variant_mrp: null,
-    })
+    vi.mocked(signIntent).mockResolvedValue('mock-intent-token-xyz')
+  })
 
-    const res = await GET(makeRequest() as any, params as any)
+  it('creates an intent token for a valid buyNow request', async () => {
+    const req = makeRequest({ productId: PRODUCT_ID, qty: 2 })
+    const res = await POST(req as any)
     expect(res.status).toBe(200)
-    const json = await res.json()
-    expect(json.mode).toBe('buyNow')
-    expect(json.price).toBe(200)
-    expect(json.productName).toBe('Bolt')
+    const body = await res.json()
+    expect(body).toHaveProperty('intent')
+    expect(typeof body.intent).toBe('string')
+    expect(body.intent).toBe('mock-intent-token-xyz')
+  })
+
+  it('returns 400 when productId is missing for buyNow', async () => {
+    // Neither productId nor qty will be present — schema allows both optional,
+    // but the route's own guard emits: "productId and qty required"
+    const req = makeRequest({ qty: 1 })
+    const res = await POST(req as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('productId and qty required')
+  })
+
+  it('returns 400 when qty is missing for buyNow', async () => {
+    // productId present but qty absent — route guard fires
+    const req = makeRequest({ productId: PRODUCT_ID })
+    const res = await POST(req as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('productId and qty required')
+  })
+
+  it('returns 400 when resolveBuyNowItem fails', async () => {
+    vi.mocked(resolveBuyNowItem).mockResolvedValue({
+      ok: false,
+      error: 'Product out of stock',
+    } as any)
+    const req = makeRequest({ productId: PRODUCT_ID, qty: 1 })
+    const res = await POST(req as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Product out of stock')
+  })
+})
+
+describe('POST /api/checkout/intents — cart mode', () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(loadActiveCart).mockResolvedValue([
+      { id: 'cart-item-1', product_id: PRODUCT_ID },
+    ] as any)
+    vi.mocked(signIntent).mockResolvedValue('cart-intent-token-abc')
+  })
+
+  it('creates a cart intent token when user is authenticated with items', async () => {
+    const req = makeRequest({ mode: 'cart' })
+    const res = await POST(req as any)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.intent).toBe('cart-intent-token-abc')
+  })
+
+  it('returns 401 when cart mode is requested but user is not authenticated', async () => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue(null)
+    const req = makeRequest({ mode: 'cart' })
+    const res = await POST(req as any)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error).toBe('Unauthorized')
+  })
+
+  it('returns 400 when cart is empty', async () => {
+    vi.mocked(loadActiveCart).mockResolvedValue([])
+    const req = makeRequest({ mode: 'cart' })
+    const res = await POST(req as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toBe('Cart is empty')
   })
 })

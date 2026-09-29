@@ -1,67 +1,146 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
-  query: vi.fn(),
-  queryOne: vi.fn(),
-  queryMany: vi.fn(),
-  withTransaction: vi.fn(),
-}))
+// ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock('@/lib/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/business/customers/[id]/route'
+vi.mock('@/lib/db', () => ({
+  queryMany: vi.fn(),
+  queryCount: vi.fn(),
+}))
+
+// ── Imports (after mocks) ─────────────────────────────────────────────────────
+
+import { GET } from '@/app/api/admin/business/customers/route'
 import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryMany, queryCount } from '@/lib/db'
 
-const mockRequireAdminScope = vi.mocked(requireAdminScope)
-const mockQueryOne = vi.mocked(queryOne)
+const mockRequireScope = vi.mocked(requireAdminScope)
 const mockQueryMany = vi.mocked(queryMany)
+const mockQueryCount = vi.mocked(queryCount)
 
-const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['business_customers'] }
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeReq(id: string) {
-  return new NextRequest(`http://localhost/api/admin/business/customers/${id}`)
+const adminPayload = {
+  adminId: 'admin-1',
+  username: 'testadmin',
+  role: 'admin',
+  scopes: ['business_customers'],
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+function setAuthSuccess() {
+  mockRequireScope.mockResolvedValue(adminPayload as any)
+}
 
-describe('GET /api/admin/business/customers/[id]', () => {
-  it('returns 401 when requireAdminScope returns NextResponse', async () => {
-    const errResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    mockRequireAdminScope.mockResolvedValue(errResponse)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
+function setAuthFailure(status = 401) {
+  const errResponse = NextResponse.json({ error: 'Unauthorized' }, { status })
+  mockRequireScope.mockResolvedValue(errResponse)
+}
+
+function makeRequest(searchParams: Record<string, string> = {}) {
+  const url = new URL('http://localhost/api/admin/business/customers')
+  for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v)
+  return new NextRequest(url.toString(), {
+    method: 'GET',
+    headers: { cookie: 'admin_sid=valid-token' },
+  })
+}
+
+const sampleCustomers = [
+  {
+    id: 'user-1',
+    email: 'biz@example.com',
+    first_name: 'Biz',
+    last_name: 'Owner',
+    company_name: 'Acme Corp',
+    approval_status: 'approved',
+  },
+]
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('GET /api/admin/business/customers', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns auth error when scope check fails', async () => {
+    setAuthFailure(401)
+    const res = await GET(makeRequest())
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 when requireAdminScope returns 403 NextResponse', async () => {
-    const errResponse = NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    mockRequireAdminScope.mockResolvedValue(errResponse)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
-    expect(res.status).toBe(403)
-  })
-
-  it('returns 404 when customer not found', async () => {
-    mockRequireAdminScope.mockResolvedValue(admin)
-    mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
-    expect(res.status).toBe(404)
-    const body = await res.json()
-    expect(body.error).toBe('Not found')
-  })
-
-  it('returns customer and discounts on happy path', async () => {
-    mockRequireAdminScope.mockResolvedValue(admin)
-    const customer = { id: 'u1', email: 'biz@x.com', company_name: 'ACME' }
-    const discounts = [{ id: 'd1', category_id: 'c1', category_name: 'Bolts', discount_pct: 10 }]
-    mockQueryOne.mockResolvedValue(customer)
-    mockQueryMany.mockResolvedValue(discounts)
-    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
+  it('returns paginated customers list', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue(sampleCustomers as any)
+    mockQueryCount.mockResolvedValue(1)
+    const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.customer).toEqual(customer)
-    expect(body.discounts).toEqual(discounts)
+    expect(body.customers).toEqual(sampleCustomers)
+    expect(body.total).toBe(1)
+    expect(body.page).toBe(1)
+    expect(body.pageSize).toBe(25)
+  })
+
+  it('filters by approval status', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await GET(makeRequest({ status: 'pending' }))
+    const countCall = mockQueryCount.mock.calls[0]
+    expect(countCall[1]).toContain('pending')
+  })
+
+  it('filters by search query', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await GET(makeRequest({ q: 'Acme' }))
+    const countCall = mockQueryCount.mock.calls[0]
+    expect(countCall[1]).toContain('%Acme%')
+  })
+
+  it('handles combined status and search filters', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await GET(makeRequest({ status: 'approved', q: 'Corp' }))
+    const queryCall = mockQueryMany.mock.calls[0]
+    expect(queryCall[1]).toContain('approved')
+    expect(queryCall[1]).toContain('%Corp%')
+  })
+
+  it('handles page pagination correctly', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(100)
+    const res = await GET(makeRequest({ page: '3' }))
+    const body = await res.json()
+    expect(body.page).toBe(3)
+    // offset should be (3-1)*25 = 50, check it's in query params
+    const queryCall = mockQueryMany.mock.calls[0]
+    expect(queryCall[1]).toContain(50) // offset value
+  })
+
+  it('returns empty customers when no results', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    const res = await GET(makeRequest({ status: 'rejected' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.customers).toEqual([])
+    expect(body.total).toBe(0)
+  })
+
+  it('defaults to page 1 when page param is invalid', async () => {
+    setAuthSuccess()
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    const res = await GET(makeRequest({ page: '-1' }))
+    const body = await res.json()
+    expect(body.page).toBe(1)
   })
 })
