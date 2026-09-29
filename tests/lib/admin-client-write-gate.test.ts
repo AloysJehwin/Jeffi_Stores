@@ -43,14 +43,14 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/admin/audit/AdminAuditClient.tsx',
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
-  'src/components/admin/ProductsTableClient.tsx',
+  'src/app/admin/products/ProductsTableClient.tsx',
   'src/app/admin/invoices/InvoicesClient.tsx',
   'src/app/admin/quotations/QuotationsClient.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
   'src/app/admin/packing-slips/PackingSlipsClient.tsx',
-  'src/components/admin/LabelsClient.tsx',
+  'src/app/admin/labels/LabelsClient.tsx',
   'src/components/admin/BatchSerialLabelPicker.tsx',
-  'src/components/admin/ProductLabelModal.tsx',
+  'src/app/admin/products/_components/ProductLabelModal.tsx',
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
   'src/components/admin/BatchPickerModal.tsx',

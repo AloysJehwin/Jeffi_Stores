@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import OffersClient from './OffersClient'
-import OffersListClient from '@/components/admin/OffersListClient'
+import OffersListClient from './OffersListClient'
 
 type Tab = 'bank' | 'offers'
 

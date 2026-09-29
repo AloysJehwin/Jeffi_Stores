@@ -9,7 +9,7 @@ import { round2 } from '@/lib/gst'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
 import { productLabel, variantLabel } from '@/lib/product-label'
-import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import CopySku from '@/components/ui/CopySku'
 
 export interface SellUnit {

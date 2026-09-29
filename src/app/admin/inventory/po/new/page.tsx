@@ -8,7 +8,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import CopySku from '@/components/ui/CopySku'
-import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 

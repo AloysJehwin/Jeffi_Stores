@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import { RankedBars } from './Charts'
-import { SectionCard, SectionHeader, CompactStat, MiniStat, Chip, rs, rsCompact, pctStr, numStr } from './Primitives'
+import { RankedBars } from '@/components/admin/dashboard/Charts'
+import { SectionCard, SectionHeader, CompactStat, MiniStat, Chip, rs, rsCompact, pctStr, numStr } from '@/components/admin/dashboard/Primitives'
 
 function convTone(v: number | null): 'neutral' | 'good' | 'warn' | 'bad' {
   if (v == null) return 'neutral'

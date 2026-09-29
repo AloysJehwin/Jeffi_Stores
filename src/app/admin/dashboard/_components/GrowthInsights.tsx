@@ -3,8 +3,8 @@
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import { DonutSplit, RankedBars } from './Charts'
-import { SectionCard, SectionHeader, CompactStat, MiniStat, HourBars, rs, rsCompact, pctStr, numStr, delta } from './Primitives'
+import { DonutSplit, RankedBars } from '@/components/admin/dashboard/Charts'
+import { SectionCard, SectionHeader, CompactStat, MiniStat, HourBars, rs, rsCompact, pctStr, numStr, delta } from '@/components/admin/dashboard/Primitives'
 
 const SOURCE_LABELS: Record<string, string> = { online: 'Online store', offline: 'Counter / offline', pos: 'Point of sale', business: 'Business portal' }
 const sourceLabel = (s: string) => SOURCE_LABELS[s] || s.replace(/_/g, ' ')

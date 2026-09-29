@@ -1,4 +1,4 @@
-import MerchantSyncClient from '@/components/admin/merchant/MerchantSyncClient'
+import MerchantSyncClient from './_components/MerchantSyncClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { resolveTenantId } from '@/lib/tenant-context'
 import { listIntegrationCredentials } from '@/lib/tenant-registry'
