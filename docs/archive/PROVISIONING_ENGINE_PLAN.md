@@ -128,4 +128,4 @@ Auto-migrating N tenant DBs on every schema change is **O(N) work per deploy** a
 
 ---
 
-*Grounded in: `deploy/aws-infrastructure.yaml` (RDS/VPC/SG/zone/cert IDs), `deploy/schema-diff.sh`, `src/lib/s3.ts`, `src/lib/db.ts` `buildTenantPool`, `src/lib/tenant-registry.ts`, `database/control-plane/schema.sql`, and AWS SDK v3 (`@aws-sdk/client-rds`, `-s3`, `-route-53`, `-acm`) research. Live IDs should be re-verified via `aws` CLI before hardcoding.*
+*Grounded in: `deploy/aws/aws-infrastructure.yaml` (RDS/VPC/SG/zone/cert IDs), `deploy/schema-diff.sh`, `src/lib/s3.ts`, `src/lib/db.ts` `buildTenantPool`, `src/lib/tenant-registry.ts`, `database/control-plane/schema.sql`, and AWS SDK v3 (`@aws-sdk/client-rds`, `-s3`, `-route-53`, `-acm`) research. Live IDs should be re-verified via `aws` CLI before hardcoding.*

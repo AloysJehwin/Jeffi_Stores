@@ -1,4 +1,4 @@
-# ADR-0002: On-device checkout recap (browser-run Gemma 3 270M)
+# ADR-0008: On-device checkout recap (browser-run Gemma 3 270M)
 
 - **Status**: Accepted (implemented behind a flag)
 - **Date**: 2026-07-20

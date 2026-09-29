@@ -133,10 +133,10 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
         <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
         <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
-          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. Run the migration on your production database:
+          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. It is defined in the schema file below and is created by the schema pipeline:
         </p>
         <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
-          psql $DATABASE_URL -f database/migrations/mailer.sql
+          database/marketing.sql
         </pre>
       </div>
     )
