@@ -3,7 +3,8 @@ config({ path: '.env.local' })
 import { SignJWT } from 'jose'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-const TEST_USER = { userId: '9a5a94f1-01fc-4f5f-b6e3-5ca0bfd4c8c9', email: 'rajagopalvreghunath@gmail.com' }
+const TEST_USER = { userId: process.env.SMOKE_USER_ID, email: process.env.SMOKE_USER_EMAIL }
+if (!TEST_USER.userId || !TEST_USER.email) throw new Error('Set SMOKE_USER_ID and SMOKE_USER_EMAIL in .env.local')
 
 const QUERIES = [
   'car jack',
