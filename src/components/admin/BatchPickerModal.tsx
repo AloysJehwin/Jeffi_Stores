@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { productLabel } from '@/lib/product-label'
-import { useBarcodeScanner } from './useBarcodeScanner'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 export interface BatchOption {
   id: string

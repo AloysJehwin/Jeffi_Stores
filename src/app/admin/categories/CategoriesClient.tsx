@@ -22,7 +22,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import DeleteCategoryButton from './DeleteCategoryButton'
+import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'

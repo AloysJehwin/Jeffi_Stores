@@ -1,4 +1,4 @@
-import DataSourceClient from '@/components/admin/data-source/DataSourceClient'
+import DataSourceClient from './_components/DataSourceClient'
 import { resolveImportTenantId, getGsheetStatus } from '@/lib/import/jobs'
 
 export const dynamic = 'force-dynamic'

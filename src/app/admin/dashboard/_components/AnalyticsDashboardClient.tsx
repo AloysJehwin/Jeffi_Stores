@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { StatCard } from './StatCard'
+import { StatCard } from '@/components/admin/dashboard/StatCard'
 import { useHasScope } from '@/contexts/AdminScopesContext'
-import { TrendChart, DonutSplit, RankedBars } from './Charts'
+import { TrendChart, DonutSplit, RankedBars } from '@/components/admin/dashboard/Charts'
 import { ap } from '@/lib/admin-path'
 import type { DashboardAnalytics, AnalyticsRange } from '@/lib/queries'
 import type { ReactNode } from 'react'
@@ -13,7 +13,7 @@ import GrowthInsights from './GrowthInsights'
 import {
   Icon, GroupLabel, SectionHeader, SectionCard, MiniStat, ListRows, LinkedLegend, FunnelBar,
   statusBadgeClass, statusLabel, rs, rsCompact, pctStr, numStr,
-} from './Primitives'
+} from '@/components/admin/dashboard/Primitives'
 
 const RANGES: { key: AnalyticsRange; label: string }[] = [
   { key: 'today', label: 'Today' },

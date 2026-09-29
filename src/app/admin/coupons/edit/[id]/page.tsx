@@ -6,7 +6,7 @@ import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
 import CouponForm from '../../CouponForm'
 import Pagination from '@/components/admin/Pagination'
-import CouponEligibleUsersClient from '@/components/admin/CouponEligibleUsersClient'
+import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 
 export const dynamic = 'force-dynamic'
 

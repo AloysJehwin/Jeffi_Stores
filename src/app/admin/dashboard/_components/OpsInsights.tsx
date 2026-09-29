@@ -3,7 +3,7 @@
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import { SectionCard, SectionHeader, CompactStat, MiniStat, pctStr, hoursStr, daysStr, delta, numStr } from './Primitives'
+import { SectionCard, SectionHeader, CompactStat, MiniStat, pctStr, hoursStr, daysStr, delta, numStr } from '@/components/admin/dashboard/Primitives'
 
 export default function OpsInsights({ data, host }: { data: DashboardAnalytics; host: string }) {
   const { fulfilment: f, attention: a, engagement: e, cash } = data.insights

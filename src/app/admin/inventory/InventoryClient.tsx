@@ -14,7 +14,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/selling-unit'
 import CopySku from '@/components/ui/CopySku'
-import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 
 type Tab = 'suppliers' | 'po' | 'stock'
