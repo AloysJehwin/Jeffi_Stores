@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { currentAdminBaseUrl, platformOAuthBaseUrl } from '@/lib/brand'
 import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState, returnToAdmin } from '@/app/api/admin/integrations/state'
+import { verifyAdminState, returnToAdmin } from '@/lib/oauth-state'
 
 export const dynamic = 'force-dynamic'
 

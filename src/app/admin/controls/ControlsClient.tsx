@@ -8,8 +8,8 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
 import AdminFilters from '@/components/admin/AdminFilters'
-import AdvancedFilterPanel, { type AdvancedFilterField } from '@/components/admin/AdvancedFilterPanel'
-import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/product-attribute-filters'
+import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
+import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/product-attribute-filters'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
 type OperationSnapshot = {

@@ -8,6 +8,7 @@ import {
 } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenant-context'
 import { queryMany } from '@/lib/db'
+import type { ShipmentRow } from '@/lib/tenant-shipments-shared'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
 import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
 import { TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
@@ -21,18 +22,6 @@ import KycTab from '@/components/admin/ecom/tabs/KycTab'
 import AccessTab from '@/components/admin/ecom/tabs/AccessTab'
 
 export const dynamic = 'force-dynamic'
-
-export interface ShipmentRow {
-  id: string
-  order_number: string | null
-  awb_number: string | null
-  payment_mode: string | null
-  shipment_status: string | null
-  shipping_amount: string | null
-  delhivery_billed_amount: string | null
-  delhivery_extra_charge: string | null
-  delhivery_billed_at: string | null
-}
 
 /**
  * Single object page for a tenant. Replaces the four pages that each loaded the same

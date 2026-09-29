@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   getPolicyBySlug: vi.fn(),
 }))
 vi.mock('@/lib/policy-pdf', () => ({
@@ -8,7 +8,7 @@ vi.mock('@/lib/policy-pdf', () => ({
 }))
 
 import { GET } from '@/app/api/legal/[slug]/pdf/route'
-import { getPolicyBySlug } from '@/app/legal/policies'
+import { getPolicyBySlug } from '@/lib/legals/policies'
 import { generatePolicyPDF } from '@/lib/policy-pdf'
 
 const mockGetPolicy = vi.mocked(getPolicyBySlug)

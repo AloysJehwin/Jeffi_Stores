@@ -1,5 +1,5 @@
 import path from 'path'
-import type { Policy, Section } from '@/app/legal/policies'
+import type { Policy, Section } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/site-controls'
 
 const PDFDocument = eval('require')('pdfkit')

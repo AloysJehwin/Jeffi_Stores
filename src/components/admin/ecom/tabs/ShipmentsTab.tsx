@@ -1,4 +1,4 @@
-import type { ShipmentRow } from '@/app/admin/ecom/customers/[id]/page'
+import type { ShipmentRow } from '@/lib/tenant-shipments-shared'
 import { Section } from '../EcomUI'
 import ShipmentCorrection from './ShipmentCorrection'
 

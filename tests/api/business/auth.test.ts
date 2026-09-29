@@ -34,7 +34,7 @@ vi.mock('@/lib/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 

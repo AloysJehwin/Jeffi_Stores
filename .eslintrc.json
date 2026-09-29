@@ -1,3 +1,15 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          { "target": "./src/lib", "from": "./src/app", "message": "src/lib must not import src/app." },
+          { "target": "./src/lib", "from": "./src/components", "message": "src/lib must not import src/components." },
+          { "target": "./src/components", "from": "./src/app", "message": "src/components must not import src/app." }
+        ]
+      }
+    ]
+  }
 }

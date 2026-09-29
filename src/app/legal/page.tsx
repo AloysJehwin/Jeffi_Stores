@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { policies } from './policies'
+import { policies } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/site-controls'
 import type { Metadata } from 'next'
 

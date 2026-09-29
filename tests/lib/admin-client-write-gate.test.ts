@@ -25,7 +25,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
   'src/components/admin/NotificationBell.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
-  'src/app/admin/ecom/kyc/KycActionButtons.tsx',
+  'src/components/admin/ecom/tabs/KycActionButtons.tsx',
   'src/components/admin/ecom/TenantActions.tsx',
   'src/components/admin/ecom/PurgeCustomerButton.tsx',
   'src/app/admin/ecom/billing/[id]/AccountModeToggle.tsx',

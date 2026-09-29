@@ -3,16 +3,9 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany } from '@/lib/db'
+import type { PickerProduct } from '@/lib/homepage-sections'
 
 export const dynamic = 'force-dynamic'
-
-export interface PickerProduct {
-  id: string
-  name: string
-  sku: string | null
-  image_url: string | null
-  is_bundle: boolean
-}
 
 const querySchema = z.object({
   q: z.string().trim().max(100).optional(),

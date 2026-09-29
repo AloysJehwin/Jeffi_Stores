@@ -5,7 +5,7 @@ import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveTenantSocialAccount } from '@/lib/tenant-registry'
 import { exchangeCodeForToken, getLongLivedToken, getPageAndIgAccounts } from '@/lib/meta'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState, returnToAdmin } from '@/app/api/admin/integrations/state'
+import { verifyAdminState, returnToAdmin } from '@/lib/oauth-state'
 
 export const dynamic = 'force-dynamic'
 

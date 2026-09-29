@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getPolicyBySlug, policies } from '../policies'
+import { getPolicyBySlug, policies } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/site-controls'
 
 export async function generateStaticParams() {

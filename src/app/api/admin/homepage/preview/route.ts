@@ -6,7 +6,7 @@ import { queryMany } from '@/lib/db'
 import { buildProductRowSql } from '@/lib/homepage-data'
 import {
   productSource, sectionLimit, resolveAboutStats, configId, friendlyCount, safeHref, SECTION_TYPES, SECTION_COPY_DEFAULTS,
-  type SectionType, type HomepageSection,
+  type SectionType, type HomepageSection, type PreviewItem,
 } from '@/lib/homepage-sections'
 import {
   getBackInStock, getBundles, getCategoryTabs, getCountdownDeal, getTestimonials, getValueStats,
@@ -22,14 +22,6 @@ import { listActiveOffers, listOffersByIds } from '@/lib/product-offers'
 export const dynamic = 'force-dynamic'
 
 const PREVIEW_LIMIT = 8
-
-export interface PreviewItem {
-  id: string
-  name: string
-  image_url: string | null
-  price?: number | null
-  value?: string
-}
 
 type PreviewKind = 'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
 

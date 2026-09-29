@@ -6,7 +6,7 @@ import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
-import { POLICY_VERSION } from '@/app/legal/policies'
+import { POLICY_VERSION } from '@/lib/legals/policies'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')

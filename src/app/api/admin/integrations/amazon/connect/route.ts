@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/jwt'
 import { resolveTenant } from '@/lib/tenant-context'
-import { signAdminState } from '@/app/api/admin/integrations/state'
+import { signAdminState } from '@/lib/oauth-state'
 
 export const dynamic = 'force-dynamic'
 

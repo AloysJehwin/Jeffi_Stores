@@ -7,7 +7,7 @@ import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { createAdminNotification } from '@/lib/admin-notify'
 import { cookieDomainOption } from '@/lib/cookie-domain'
-import { POLICY_VERSION } from '@/app/legal/policies'
+import { POLICY_VERSION } from '@/lib/legals/policies'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
 

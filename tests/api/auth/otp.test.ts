@@ -24,7 +24,7 @@ vi.mock('@/lib/email', () => ({
   sendOTPEmail: vi.fn(),
 }))
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
