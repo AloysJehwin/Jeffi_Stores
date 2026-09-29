@@ -1,6 +1,6 @@
 # Plan: On-device Gemma 3 270M checkout recap summary
 
-> Working plan for review (not an ADR yet — ADR-0002 gets written during Step 2).
+> Working plan for review (not an ADR yet — ADR-0008 gets written during Step 2).
 > Ship a **cart-recap summary** on the checkout review page, generated **entirely in
 > the user's browser** (WebGPU, transformers.js + ONNX) by a **fine-tuned Gemma 3 270M**.
 > No cloud inference — the model runs on the customer's device, so their session data
@@ -21,7 +21,7 @@ Steps 2–6. **No GPU work runs until the user explicitly approves the fine-tune
 
 ## Conventions to honor (from ADR-0001)
 - Training on the Razer RTX 4080 only; export to **ONNX**; scripts in `scripts/`.
-- **No PII in training data** — session signals are aggregated/anonymized (product names, categories, counts — never names/addresses/emails). Inference is on-device, so raw session data never leaves the browser. Write **ADR-0002** documenting this pipeline + privacy posture.
+- **No PII in training data** — session signals are aggregated/anonymized (product names, categories, counts — never names/addresses/emails). Inference is on-device, so raw session data never leaves the browser. Write **ADR-0008** documenting this pipeline + privacy posture.
 
 ---
 
@@ -55,7 +55,7 @@ Generate `(session-signals JSON → ideal recap summary)` pairs from the **local
 - **`<CheckoutRecapSummary/>`** on `src/app/checkout/review/page.tsx`: mounts client-side, runs the gate, renders a small "Your order at a glance" card that streams the on-device summary on capable devices; renders nothing otherwise or on error. Non-blocking.
 
 ## Critical files
-- **New:** `scripts/gen-onboarding-dataset.mjs`, `scripts/train-gemma-onboarding.py`, `scripts/export-gemma-onnx.py`, `src/lib/on-device/prompt.ts`, `src/lib/on-device/runtime.ts`, `src/lib/on-device/session-signals.ts`, `src/components/on-device/CheckoutRecapSummary.tsx`, `public/models/onboarding/*`, `docs/adr/0002-on-device-summary.md`.
+- **New:** `scripts/gen-onboarding-dataset.mjs`, `scripts/train-gemma-onboarding.py`, `scripts/export-gemma-onnx.py`, `src/lib/on-device/prompt.ts`, `src/lib/on-device/runtime.ts`, `src/lib/on-device/session-signals.ts`, `src/components/on-device/CheckoutRecapSummary.tsx`, `public/models/onboarding/*`, `docs/adr/0008-on-device-summary.md`.
 - **Edit:** `src/app/checkout/review/page.tsx`, product/search pages (tracking hooks), `package.json`.
 - **Reuse:** `src/lib/on-device/capability.ts`, `useCart()`, `useAuth()`, pricing helpers.
 

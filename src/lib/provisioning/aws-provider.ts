@@ -34,7 +34,7 @@ import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
  * real @aws-sdk call and treats "already exists / already owned" as success so the
  * state machine can safely retry after crashes.
  *
- * Locked infra (from docs/PROVISIONING_ENGINE_PLAN.md):
+ * Locked infra (from docs/archive/PROVISIONING_ENGINE_PLAN.md):
  *   VPC vpc-04bd02e91e0bc0882, RDS SG sg-0e361f0f1b093bd83, region us-east-1
  *
  * Enable with PROVISIONING_PROVIDER=aws.

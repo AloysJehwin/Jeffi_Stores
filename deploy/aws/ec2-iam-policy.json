@@ -4,8 +4,8 @@
     "IAM Role: jeffi-stores-ec2-role (used by EC2 instance — fetches secrets at container startup)",
     "IAM User: the CI/CD IAM user whose AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are stored in GitHub Secrets (fetches NEXT_PUBLIC_ vars before docker build)"
   ],
-  "_how_to_apply_role": "aws iam put-role-policy --role-name jeffi-stores-ec2-role --policy-name JeffiSecretsManagerRead --policy-document file://deploy/ec2-iam-policy.json",
-  "_how_to_apply_user": "aws iam put-user-policy --user-name <ci-iam-user> --policy-name JeffiSecretsManagerRead --policy-document file://deploy/ec2-iam-policy.json",
+  "_how_to_apply_role": "aws iam put-role-policy --role-name jeffi-stores-ec2-role --policy-name JeffiSecretsManagerRead --policy-document file://deploy/aws/ec2-iam-policy.json",
+  "_how_to_apply_user": "aws iam put-user-policy --user-name <ci-iam-user> --policy-name JeffiSecretsManagerRead --policy-document file://deploy/aws/ec2-iam-policy.json",
   "Version": "2012-10-17",
   "Statement": [
     {

@@ -6,9 +6,9 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 > **This is the authoritative status doc for the multi-tenant effort.** It SUPERSEDES the
 > earlier design docs, which were written before any code existed and still describe the work
 > as unstarted:
-> `SAAS_MULTITENANT_PLAN.md` ("No code written yet"), `MULTI_TENANT_PHASES.md` (Phases 0–5
-> "not started"), `PROVISIONING_ENGINE_PLAN.md` ("Design for review, no code"),
-> `PROXY_ASG_PLAN.md` (flags `/api/health` debt that is already fixed — readiness now lives at
+> `archive/SAAS_MULTITENANT_PLAN.md` ("No code written yet"), `MULTI_TENANT_PHASES.md` (local
+> only, not checked in; Phases 0–5 "not started"), `archive/PROVISIONING_ENGINE_PLAN.md` ("Design
+> for review, no code"), `archive/PROXY_ASG_PLAN.md` (flags `/api/health` debt that is already fixed — readiness now lives at
 > `/api/ready`). Read those for *design rationale only*; trust this file for current state.
 
 ---
@@ -193,7 +193,7 @@ database/control-plane/schema.sql
 | 🟡 **4** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
 | 🟡 **5** | **Wildcard cert renewal is now a fleet-wide SPOF** | Cert expires **2026-11-15**. Every tenant's HTTPS depends on it. Wildcards need DNS-01, so certbot auto-renew must retain working `dns-route53` creds on the box — a silent renewal failure takes down *all* tenants at once. Verify `certbot renew --dry-run` + add an expiry alert. |
 | 🟡 **6** | **Release the idle EIP `32.196.38.130`** | The old (pre-EIP-swap) address is still allocated and **unassociated** — AWS bills idle EIPs (~$3.60/mo). Three other EIPs are attached to non-instance ENIs and are worth an audit at the same time. |
-| 🟡 **7** | **`deploy/aws-infrastructure.yaml` still documents the dead IP** | `32.196.38.130` appears in 4 places incl. `EC2_HOST`. Verified **not consumed by any tooling** (doc-only, so nothing breaks) — but it's the file an operator would trust mid-incident. Update to `52.20.193.62`. |
+| 🟡 **7** | **`deploy/aws/aws-infrastructure.yaml` still documents the dead IP** | `32.196.38.130` appears in 4 places incl. `EC2_HOST`. Verified **not consumed by any tooling** (doc-only, so nothing breaks) — but it's the file an operator would trust mid-incident. Update to `52.20.193.62`. |
 | 🟡 **8** | **Never re-enable the EC2/RDS start-stop schedules** | `jeffi-start/stop-ec2` + `jeffi-start/stop-rds` in EventBridge group `jeffi-stores` are currently **DISABLED** (app runs 24/7 — correct for SaaS). Re-enabling them would take **every tenant storefront offline overnight**, and would stall the provisioning worker during the down window. The stale comment in `deploy/sync-cron-setup.sh` ("app is only up 09:00–00:00 IST") predates this and should be corrected. |
 | 🟡 **9** | **Local AWS CLI is authenticated as account ROOT** | The `default` profile holds **root access keys** (`arn:aws:iam::708835965056:root`, `AccountAccessKeysPresent: 1`). Root keys bypass all IAM policy/boundaries/SCPs; root MFA (enabled) does **not** protect them. 5 IAM users already exist. Point `default` at a scoped IAM admin (or Identity Center) and delete the root access keys. Does not affect the app, which correctly uses the `jeffi-tenant-provisioning` role on the EC2 instance profile. |
 
