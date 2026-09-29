@@ -74,6 +74,29 @@ export async function walletBlocksShipment(tenantId: string): Promise<boolean> {
 }
 
 /**
+ * Gate an RVP (reverse pickup) on wallet balance: a platform-Delhivery tenant must hold at least
+ * WALLET_PICKUP_MIN_FLOOR_INR (Rs 500) before we create the return shipment, because the reverse leg
+ * has no customer-quoted shipping and its charge is debited from the wallet once the admin sets it.
+ * own_delhivery tenants ship on their own account and are exempt. Returns null when allowed, else a
+ * user-facing reason.
+ */
+export async function assertWalletCanCreateRvp(tenantId: string): Promise<string | null> {
+  const res = await controlPlanePool().query(
+    `SELECT t.own_delhivery, COALESCE(w.balance, 0) AS balance
+       FROM tenants t LEFT JOIN tenant_wallets w ON w.tenant_id = t.id
+      WHERE t.id = $1`,
+    [tenantId],
+  ).catch(() => null)
+  const row = res?.rows[0]
+  if (!row || row.own_delhivery) return null
+  const balance = Number(row.balance) || 0
+  if (balance < WALLET_PICKUP_MIN_FLOOR_INR) {
+    return `Insufficient wallet balance to create a return pickup. A minimum of Rs ${WALLET_PICKUP_MIN_FLOOR_INR} is required; current balance is Rs ${balance.toFixed(2)}. Please recharge.`
+  }
+  return null
+}
+
+/**
  * Record a wallet recharge. Ledger row + balance bump happen in one control-plane
  * transaction so the running balance can never drift from the ledger.
  */

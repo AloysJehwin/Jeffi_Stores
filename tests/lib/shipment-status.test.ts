@@ -492,9 +492,12 @@ describe('shipmentStatusToReverseStep', () => {
     expect(shipmentStatusToReverseStep(null)).toBe(0)
   })
 
-  it('forward-only statuses → step 0 on reverse timeline', () => {
-    expect(shipmentStatusToReverseStep('in_transit')).toBe(0)
-    expect(shipmentStatusToReverseStep('delivered')).toBe(0)
+  // An RVP (customer return pickup) travels a forward-shaped journey, so Delhivery reports it with
+  // forward statuses; the reverse stepper must advance on those, not sit at step 0.
+  it('forward statuses advance the reverse timeline (RVP journey)', () => {
+    expect(shipmentStatusToReverseStep('in_transit')).toBe(2)
+    expect(shipmentStatusToReverseStep('out_for_delivery')).toBe(3)
+    expect(shipmentStatusToReverseStep('delivered')).toBe(4)
     expect(shipmentStatusToReverseStep('created')).toBe(0)
   })
 })

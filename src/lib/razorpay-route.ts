@@ -680,6 +680,124 @@ export async function recordTenantTransaction(opts: {
     [opts.tenantId, opts.orderRef, opts.grossAmountInr, tenantShare, commission, gatewayFee,
      !!opts.isCod, opts.gatewayTxnId ?? null],
   ).catch(() => {})
+
+  // Self-heal the transfer.processed race: the webhook may have fired (and matched 0 rows)
+  // before this INSERT committed. If the transfer is already processed at Razorpay, settle now.
+  // Order of the two events no longer matters. Best-effort; never blocks payment handling.
+  if (opts.split && opts.gatewayTxnId && opts.gatewayTxnId.startsWith('trf_')) {
+    settleTenantTransaction({ tenantId: opts.tenantId, orderRef: opts.orderRef, transferId: opts.gatewayTxnId }).catch(() => {})
+  }
+}
+
+/** Live status of a Route transfer, or null on any failure. */
+export async function fetchTransferStatus(transferId: string): Promise<{ status: string; onHold: boolean } | null> {
+  try {
+    const rz = getRazorpayInstance()
+    const t = await (rz.transfers as any).fetch(transferId)
+    return { status: String(t?.status ?? ''), onHold: t?.on_hold === true }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Idempotently move a prepaid tenant_transactions row captured -> settled AND write its
+ * settlement_ledger entries (tenant_share credit, commission debit, gateway_fee debit). Called by
+ * the transfer.processed webhook, by recordTenantTransaction's post-insert self-check, and by the
+ * reconcile job. Idempotent: the status guard makes the flip a no-op once settled, and the ledger
+ * insert is guarded so entries are written exactly once per (tenant, order_ref).
+ *
+ * `verifyLive`: when true (reconcile path) the transfer's live status is confirmed `processed`
+ * before settling; the webhook/self-check paths already know it processed and pass false.
+ */
+export async function settleTenantTransaction(opts: {
+  tenantId: string
+  orderRef?: string
+  transferId?: string
+  verifyLive?: boolean
+}): Promise<'settled' | 'noop'> {
+  if (!opts.tenantId || (!opts.orderRef && !opts.transferId)) return 'noop'
+  const { controlPlanePool } = await import('./tenant-registry')
+  const pool = controlPlanePool()
+
+  const where = opts.orderRef
+    ? { clause: 'order_ref = $2', val: opts.orderRef }
+    : { clause: 'gateway_txn_id = $2', val: opts.transferId! }
+  const row = await pool.query(
+    `SELECT id, order_ref, gateway_txn_id, tenant_share, platform_commission, gateway_fee, is_cod, status
+       FROM tenant_transactions WHERE tenant_id = $1 AND ${where.clause} LIMIT 1`,
+    [opts.tenantId, where.val]
+  ).then(r => r.rows[0]).catch(() => null)
+  if (!row || row.status !== 'captured' || row.is_cod) return 'noop'
+
+  if (opts.verifyLive && row.gateway_txn_id?.startsWith('trf_')) {
+    const live = await fetchTransferStatus(row.gateway_txn_id)
+    if (!live || live.status !== 'processed' || live.onHold) return 'noop'
+  }
+
+  const flipped = await pool.query(
+    `UPDATE tenant_transactions SET status = 'settled'
+      WHERE id = $1 AND status = 'captured' RETURNING id`,
+    [row.id]
+  ).then(r => r.rowCount ?? 0).catch(() => 0)
+  if (!flipped) return 'noop'
+
+  // Prepaid settlement ledger — mirror the COD shape, guarded so it writes once per order.
+  const tenantShare = Number(row.tenant_share) || 0
+  const commission = Number(row.platform_commission) || 0
+  const gatewayFee = Number(row.gateway_fee) || 0
+  await pool.query(
+    `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
+     SELECT * FROM (VALUES
+        ($1::uuid, 'order_capture', $2::numeric, $5::uuid, $6::text, now()),
+        ($1::uuid, 'commission',    $3::numeric, $5::uuid, $7::text, now()),
+        ($1::uuid, 'gateway_fee',   $4::numeric, $5::uuid, $8::text, now())
+     ) v(tenant_id, entry_type, amount, txn_id, note, occurred_at)
+     WHERE NOT EXISTS (
+       SELECT 1 FROM settlement_ledger
+        WHERE tenant_id = $1 AND txn_id = $5 AND entry_type = 'order_capture')`,
+    [opts.tenantId, tenantShare, -Math.abs(commission), -Math.abs(gatewayFee), row.id,
+     `Order settled (tenant share) — order ${row.order_ref}`,
+     `Platform commission — order ${row.order_ref}`,
+     `Gateway fee — order ${row.order_ref}`]
+  ).catch(() => {})
+
+  return 'settled'
+}
+
+/**
+ * Reconcile captured prepaid rows whose Route transfer has already processed at Razorpay but whose
+ * status never advanced (the transfer.processed race). Reads live transfer status and settles each
+ * via settleTenantTransaction(verifyLive). Optionally scoped to one tenant. Returns how many settled.
+ */
+export async function reconcileCapturedTransactions(opts?: {
+  tenantId?: string
+  olderThanMinutes?: number
+  limit?: number
+}): Promise<{ scanned: number; settled: number }> {
+  const { controlPlanePool } = await import('./tenant-registry')
+  const pool = controlPlanePool()
+  const age = opts?.olderThanMinutes ?? 2
+  const limit = opts?.limit ?? 200
+  const args: any[] = [age, limit]
+  let scope = ''
+  if (opts?.tenantId) { args.push(opts.tenantId); scope = `AND tenant_id = $${args.length}` }
+  const rows = await pool.query(
+    `SELECT tenant_id, gateway_txn_id FROM tenant_transactions
+      WHERE status = 'captured' AND is_cod = false
+        AND gateway_txn_id LIKE 'trf_%'
+        AND occurred_at < now() - ($1 || ' minutes')::interval
+        ${scope}
+      ORDER BY occurred_at ASC LIMIT $2`,
+    args
+  ).then(r => r.rows).catch(() => [])
+
+  let settled = 0
+  for (const r of rows) {
+    const res = await settleTenantTransaction({ tenantId: r.tenant_id, transferId: r.gateway_txn_id, verifyLive: true }).catch(() => 'noop' as const)
+    if (res === 'settled') settled++
+  }
+  return { scanned: rows.length, settled }
 }
 
 /**
