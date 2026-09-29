@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { resolveShipmentStatus } from '@/lib/shipment-status'
 
 export async function GET(
   request: NextRequest,
@@ -38,12 +39,29 @@ export async function GET(
 
     if (!shipment) return NextResponse.json({ tracking: null })
 
+    const scans = (shipment.Scans ?? []).map((s: any) => ({
+      date: s.ScanDetail?.ScanDateTime ?? null,
+      location: s.ScanDetail?.ScannedLocation ?? null,
+      activity: s.ScanDetail?.Scan ?? null,
+      instructions: s.ScanDetail?.Instructions ?? null,
+      scanType: s.ScanDetail?.ScanType ?? null,
+    }))
+
+    // Resolve to our internal ShipmentStatus (scan-walk) so the reverse tracker advances past
+    // "Pickup Scheduled" — the raw Status.Status alone left shipmentStatus null and stuck at step 0.
+    const shipmentStatus = resolveShipmentStatus(
+      shipment.Status?.StatusType ?? null,
+      scans,
+      shipment.Status?.Status ?? null,
+    )
+
     return NextResponse.json({
       tracking: {
         awb: shipment.AWB,
         status: shipment.Status?.Status ?? null,
         statusType: shipment.Status?.StatusType ?? null,
         statusDateTime: shipment.Status?.StatusDateTime ?? null,
+        shipmentStatus,
         instructions: shipment.Status?.Instructions ?? null,
         pickUpDate: shipment.PickUpDate ?? null,
         expectedDelivery: shipment.ExpectedDeliveryDate ?? null,
@@ -53,12 +71,7 @@ export async function GET(
         reverseInTransit: shipment.ReverseInTransit ?? false,
         destReceiveDate: shipment.DestRecieveDate ?? null,
         returnedDate: shipment.ReturnedDate ?? null,
-        scans: (shipment.Scans ?? []).map((s: any) => ({
-          date: s.ScanDetail?.ScanDateTime ?? null,
-          location: s.ScanDetail?.ScannedLocation ?? null,
-          activity: s.ScanDetail?.Scan ?? null,
-          instructions: s.ScanDetail?.Instructions ?? null,
-        })),
+        scans,
       },
     })
   } catch (err: any) {
