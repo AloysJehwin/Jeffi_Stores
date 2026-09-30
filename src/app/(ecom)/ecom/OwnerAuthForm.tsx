@@ -2,17 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
 export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [otp, setOtp] = useState('')
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
 
   const input =
     'w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
@@ -20,7 +21,6 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setErr(null)
     try {
       const res = await fetch('/api/ecom/auth/send-otp', {
         method: 'POST',
@@ -28,10 +28,10 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
         body: JSON.stringify({ email }),
       })
       const data = await res.json()
-      if (!res.ok) setErr(data.error || 'Failed to send OTP')
+      if (!res.ok) showToast(data.error || 'Failed to send OTP', 'error')
       else setStep('otp')
     } catch {
-      setErr('Network error')
+      showToast('Network error', 'error')
     } finally {
       setBusy(false)
     }
@@ -40,7 +40,6 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   async function verify(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
-    setErr(null)
     try {
       const res = await fetch('/api/ecom/auth/verify-otp', {
         method: 'POST',
@@ -49,14 +48,14 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
       })
       const data = await res.json()
       if (!res.ok) {
-        setErr(data.error || 'Invalid OTP')
+        showToast(data.error || 'Invalid OTP', 'error')
         return
       }
       // New owner → onboarding wizard; returning → dashboard.
       router.push(mode === 'signup' ? '/onboard' : '/dashboard')
       router.refresh()
     } catch {
-      setErr('Network error')
+      showToast('Network error', 'error')
     } finally {
       setBusy(false)
     }
@@ -128,13 +127,11 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
           </form>
         )}
 
-        {err && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{err}</p>}
-
         <div className="my-6 flex items-center gap-3 text-xs text-foreground-muted">
           <span className="flex-1 h-px bg-border-default" /> or <span className="flex-1 h-px bg-border-default" />
         </div>
 
-        <GoogleButton mode={mode} onError={setErr} />
+        <GoogleButton mode={mode} onError={m => showToast(m, 'error')} />
 
         <p className="mt-6 text-center text-sm text-foreground-muted">
           {mode === 'signup' ? (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 export interface BankState {
   last4: string | null
@@ -31,6 +32,7 @@ const STATE: Record<string, { label: string; tone: string; blurb: string }> = {
 }
 
 export default function PayoutsClient({ initial }: { initial: BankState | null }) {
+  const { showToast } = useToast()
   const [bank, setBank] = useState<BankState | null>(initial)
   const [editing, setEditing] = useState(!initial)
   const [accountNumber, setAccountNumber] = useState('')
@@ -38,8 +40,6 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
   const [ifsc, setIfsc] = useState(initial?.ifsc ?? '')
   const [holderName, setHolderName] = useState(initial?.holderName ?? '')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
 
   const status = bank?.verificationStatus ?? 'unverified'
   const meta = STATE[status] ?? STATE.unverified
@@ -48,8 +48,6 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
 
   async function submit() {
     setBusy(true)
-    setError(null)
-    setDone(null)
     try {
       const res = await fetch('/api/ecom/bank/verify', {
         method: 'POST',
@@ -58,7 +56,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.reason || data.error || 'Could not save those details.')
+        showToast(data.reason || data.error || 'Could not save those details.', 'error')
       } else {
         setBank({
           last4: accountNumber.slice(-4),
@@ -69,17 +67,18 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
           verificationRef: null,
           hasRouteAccount: !!data.pushedToRoute,
         })
-        setDone(
+        showToast(
           data.pushedToRoute
             ? 'Updated with the payment provider.'
-            : 'Saved. It will be sent to the payment provider when your store goes live.'
+            : 'Saved. It will be sent to the payment provider when your store goes live.',
+          'success'
         )
         setEditing(false)
         setAccountNumber('')
         setConfirmNumber('')
       }
     } catch {
-      setError('Network error — please try again.')
+      showToast('Network error — please try again.', 'error')
     }
     setBusy(false)
   }
@@ -104,12 +103,8 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
             </span>
           </div>
           <p className="text-xs text-foreground-muted mt-3">{meta.blurb}</p>
-          {done && <p className="text-xs text-green-700 dark:text-green-300 mt-2">{done}</p>}
           <button
-            onClick={() => {
-              setEditing(true)
-              setDone(null)
-            }}
+            onClick={() => setEditing(true)}
             className="mt-4 rounded-lg border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
           >
             {status === 'failed' ? 'Correct these details' : 'Change account'}
@@ -156,7 +151,6 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
             <label className={lbl}>Account holder name</label>
             <input className={inp} value={holderName} onChange={e => setHolderName(e.target.value)} />
           </div>
-          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="flex gap-2">
             <button
               disabled={!canSubmit || busy}
@@ -167,10 +161,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
             </button>
             {bank && (
               <button
-                onClick={() => {
-                  setEditing(false)
-                  setError(null)
-                }}
+                onClick={() => setEditing(false)}
                 className="rounded-lg border border-border-default px-4 py-2 text-sm font-medium text-foreground"
               >
                 Cancel
