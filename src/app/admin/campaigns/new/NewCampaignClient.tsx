@@ -67,12 +67,15 @@ export default function NewCampaignClient() {
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
-  useEffect(() => { loadCoupons(); loadScenarios() }, [])
+  useEffect(() => {
+    loadCoupons()
+    loadScenarios()
+  }, [])
 
   useEffect(() => {
     const presetScenario = searchParams.get('scenario')
     if (presetScenario && scenarios.some(s => s.kind === presetScenario)) {
-      setForm(f => f.scenario_kind ? f : { ...f, scenario_kind: presetScenario })
+      setForm(f => (f.scenario_kind ? f : { ...f, scenario_kind: presetScenario }))
     }
   }, [searchParams, scenarios])
 
@@ -118,8 +121,8 @@ export default function NewCampaignClient() {
       if (res.ok) {
         setForm(f => ({
           ...f,
-          name: f.name.trim() ? f.name : (data.name || f.name),
-          kind: f.kind.trim() ? f.kind : (data.kind || f.kind),
+          name: f.name.trim() ? f.name : data.name || f.name,
+          kind: f.kind.trim() ? f.kind : data.kind || f.kind,
           subject_template: data.subject_template,
           body_template: data.body_template,
         }))
@@ -168,46 +171,59 @@ export default function NewCampaignClient() {
     })),
   ]
   const previewVars = selectedCoupon
-    ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
+    ? {
+        ...SAMPLE_VARS,
+        couponCode: selectedCoupon.code,
+        discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0,
+      }
     : SAMPLE_VARS
   const previewSubject = renderTemplate(form.subject_template || 'Subject preview will appear here', previewVars)
-  const previewBody = renderTemplate(form.body_template || '<p style="color:#888;font-family:sans-serif">Email body preview will appear here</p>', previewVars)
+  const previewBody = renderTemplate(
+    form.body_template || '<p style="color:#888;font-family:sans-serif">Email body preview will appear here</p>',
+    previewVars
+  )
 
   return (
     <div className="space-y-5">
       <RequireWrite scope="campaigns:write">
-      <RequireAi scope="mailer:write">
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
-        <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Generate template with AI</p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={aiPrompt}
-            onChange={e => setAiPrompt(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && generateWithAI()}
-            placeholder="Describe the campaign email you want…"
-            className="flex-1 field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
-          <button
-            type="button"
-            onClick={generateWithAI}
-            disabled={aiGenerating || !aiPrompt.trim()}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
-          >
-            {aiGenerating ? 'Generating…' : 'Generate'}
-          </button>
-        </div>
-        {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
-        <p className="text-[10px] text-foreground-muted">AI will fill the name, kind, subject and body. You can edit anything afterwards.</p>
-      </div>
-      </RequireAi>
+        <RequireAi scope="mailer:write">
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
+            <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+              Generate template with AI
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+                placeholder="Describe the campaign email you want…"
+                className="flex-1 field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <button
+                type="button"
+                onClick={generateWithAI}
+                disabled={aiGenerating || !aiPrompt.trim()}
+                className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                {aiGenerating ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+            {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
+            <p className="text-[10px] text-foreground-muted">
+              AI will fill the name, kind, subject and body. You can edit anything afterwards.
+            </p>
+          </div>
+        </RequireAi>
       </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Campaign name</label>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Campaign name
+              </label>
               <input
                 type="text"
                 value={form.name}
@@ -217,7 +233,9 @@ export default function NewCampaignClient() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Kind (slug)</label>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Kind (slug)
+              </label>
               <input
                 type="text"
                 value={form.kind}
@@ -225,12 +243,16 @@ export default function NewCampaignClient() {
                 placeholder="e.g. summer_sale"
                 className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
-              <p className="text-[10px] text-foreground-muted mt-1">Unique identifier — lowercase letters, numbers, underscores</p>
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Unique identifier — lowercase letters, numbers, underscores
+              </p>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Description (optional)</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Description (optional)
+            </label>
             <input
               type="text"
               value={form.description}
@@ -240,7 +262,9 @@ export default function NewCampaignClient() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Scenario (trigger)</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Scenario (trigger)
+            </label>
             <AdminSelect
               value={form.scenario_kind}
               options={[
@@ -250,12 +274,16 @@ export default function NewCampaignClient() {
               onChange={v => setForm(f => ({ ...f, scenario_kind: v }))}
               sm
             />
-            <p className="text-[10px] text-foreground-muted mt-1">Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.</p>
+            <p className="text-[10px] text-foreground-muted mt-1">
+              Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Delay (hours)</label>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Delay (hours)
+              </label>
               <input
                 type="number"
                 min={0}
@@ -267,7 +295,9 @@ export default function NewCampaignClient() {
               <p className="text-[10px] text-foreground-muted mt-1">Hours after trigger before sending</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Discount %</label>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Discount %
+              </label>
               <input
                 type="number"
                 min={0}
@@ -276,12 +306,16 @@ export default function NewCampaignClient() {
                 onChange={e => setForm(f => ({ ...f, discount_percent: parseInt(e.target.value || '0', 10) }))}
                 className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
-              <p className="text-[10px] text-foreground-muted mt-1">Auto-generates per-user coupon if no coupon assigned</p>
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Auto-generates per-user coupon if no coupon assigned
+              </p>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Assign coupon</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Assign coupon
+            </label>
             <AdminSelect
               value={form.coupon_id || ''}
               options={couponOptions}
@@ -296,7 +330,9 @@ export default function NewCampaignClient() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Subject line</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Subject line
+            </label>
             <input
               type="text"
               value={form.subject_template}
@@ -306,7 +342,9 @@ export default function NewCampaignClient() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">HTML body</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              HTML body
+            </label>
             <textarea
               value={form.body_template}
               onChange={e => setForm(f => ({ ...f, body_template: e.target.value }))}
@@ -314,7 +352,13 @@ export default function NewCampaignClient() {
               className="w-full field-normal font-mono text-xs border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">
-              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
+              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
             </p>
           </div>
 
@@ -343,12 +387,10 @@ export default function NewCampaignClient() {
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
           <div className="border border-border-default rounded-lg overflow-hidden">
             <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
-              <span className="text-foreground-muted">Subject:</span> <span className="font-semibold text-foreground">{previewSubject}</span>
+              <span className="text-foreground-muted">Subject:</span>{' '}
+              <span className="font-semibold text-foreground">{previewSubject}</span>
             </div>
-            <div
-              className="p-4 bg-white text-zinc-900"
-              dangerouslySetInnerHTML={{ __html: previewBody }}
-            />
+            <div className="p-4 bg-white text-zinc-900" dangerouslySetInnerHTML={{ __html: previewBody }} />
           </div>
         </div>
       </div>

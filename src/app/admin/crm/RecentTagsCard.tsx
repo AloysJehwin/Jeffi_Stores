@@ -49,10 +49,7 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Recently Tagged</h2>
           {hasMore && (
-            <button
-              onClick={() => setOpen(true)}
-              className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-            >
+            <button onClick={() => setOpen(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
               View all ({items.length}) →
             </button>
           )}
@@ -61,7 +58,9 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
           <p className="text-sm text-foreground-muted">No recent tag activity.</p>
         ) : (
           <div className="divide-y divide-border-default">
-            {preview.map((t, i) => <TagRow key={i} t={t} />)}
+            {preview.map((t, i) => (
+              <TagRow key={i} t={t} />
+            ))}
             {hasMore && (
               <button
                 onClick={() => setOpen(true)}
@@ -74,36 +73,41 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
         )}
       </div>
 
-      {open && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setOpen(false)}
-        >
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setOpen(false)}
           >
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <div>
-                <h2 className="text-base font-semibold text-foreground">Recently Tagged</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">{items.length} tag events</p>
+            <div
+              className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Recently Tagged</h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">{items.length} tag events</p>
+                </div>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="overflow-y-auto divide-y divide-border-default">
+                {items.map((t, i) => (
+                  <TagRow key={i} t={t} />
+                ))}
+              </div>
             </div>
-            <div className="overflow-y-auto divide-y divide-border-default">
-              {items.map((t, i) => <TagRow key={i} t={t} />)}
-            </div>
-          </div>
-        </div>
-      , document.body)}
+          </div>,
+          document.body
+        )}
     </>
   )
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
 import { getCrmInsights } from '@/lib/crm-insights'
@@ -20,20 +20,21 @@ import { adminCookieName } from '@/lib/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 
-
 export default async function CrmDashboardPage() {
   const host = await getHost()
   const cookieStore = await cookies()
   const token = cookieStore.get(await adminCookieName())?.value
   let adminId = ''
   if (token) {
-    try { adminId = (await verifyToken(token))?.adminId || '' } catch {}
+    try {
+      adminId = (await verifyToken(token))?.adminId || ''
+    } catch {}
   }
 
   let data: Awaited<ReturnType<typeof getCrmDashboardData>>
   let insights: Awaited<ReturnType<typeof getCrmInsights>> | null = null
   try {
-    [data, insights] = await Promise.all([
+    ;[data, insights] = await Promise.all([
       getCrmDashboardData(adminId),
       getCrmInsights({ range: '30d', segment: 'all' }).catch(err => {
         console.error('getCrmInsights failed', err)
@@ -53,7 +54,9 @@ export default async function CrmDashboardPage() {
     <div className="p-4 sm:p-6 space-y-5">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">CRM</h1>
-        <p className="text-foreground-secondary text-sm mt-1">{s.total.toLocaleString('en-IN')} customers · {data.leadsThisWeek} new this week without an order</p>
+        <p className="text-foreground-secondary text-sm mt-1">
+          {s.total.toLocaleString('en-IN')} customers · {data.leadsThisWeek} new this week without an order
+        </p>
       </div>
 
       {insights && <AttentionQueueCard items={insights.attention} />}
@@ -76,12 +79,20 @@ export default async function CrmDashboardPage() {
                 : 'bg-surface-elevated border-border-default'
             }`}
           >
-            <p className={`text-xs font-semibold uppercase tracking-wide ${
-              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground-muted'
-            }`}>Overdue</p>
-            <p className={`text-2xl font-bold mt-1 ${
-              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground'
-            }`}>{data.tasks.overdue}</p>
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${
+                data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground-muted'
+              }`}
+            >
+              Overdue
+            </p>
+            <p
+              className={`text-2xl font-bold mt-1 ${
+                data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground'
+              }`}
+            >
+              {data.tasks.overdue}
+            </p>
           </Link>
           <Link
             href={ap('/admin/tasks?scope=all&status=open', host)}

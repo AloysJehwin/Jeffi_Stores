@@ -62,20 +62,36 @@ function ImageFieldUpload({ fieldId, label, required }: { fieldId: string; label
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-600 mb-1.5">{label}{required ? ' *' : ''}</label>
+      <label className="block text-sm font-medium text-gray-600 mb-1.5">
+        {label}
+        {required ? ' *' : ''}
+      </label>
       <div
         onClick={() => ref.current?.click()}
         className="border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
       >
         {preview ? (
           <div className="relative">
-            <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-40 object-contain rounded-lg" unoptimized />
+            <Image
+              src={preview}
+              alt="Preview"
+              width={400}
+              height={200}
+              className="w-full max-h-40 object-contain rounded-lg"
+              unoptimized
+            />
             <button
               type="button"
-              onClick={e => { e.stopPropagation(); setPreview(null); if (ref.current) ref.current.value = '' }}
+              onClick={e => {
+                e.stopPropagation()
+                setPreview(null)
+                if (ref.current) ref.current.value = ''
+              }}
               aria-label="Remove file"
               className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
-            ><X className="w-3.5 h-3.5" /></button>
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         ) : (
           <div className="text-center py-3">
@@ -92,7 +108,10 @@ function ImageFieldUpload({ fieldId, label, required }: { fieldId: string; label
         accept="image/*"
         required={required}
         className="hidden"
-        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+        onChange={e => {
+          const f = e.target.files?.[0]
+          if (f) handleFile(f)
+        }}
       />
     </div>
   )
@@ -135,7 +154,10 @@ export default function FormClient({ form }: { form: ReviewForm }) {
       setError('Enter a valid email address')
       return
     }
-    if (screenshotRequired && !file) { setError('Please upload a screenshot of your Google review'); return }
+    if (screenshotRequired && !file) {
+      setError('Please upload a screenshot of your Google review')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -149,7 +171,10 @@ export default function FormClient({ form }: { form: ReviewForm }) {
       const res = await fetch(`/api/forms/${form.slug}/submit`, { method: 'POST', body: fd })
       const data = await res.json()
 
-      if (!res.ok) { setError(data.error || 'Something went wrong, please try again'); return }
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong, please try again')
+        return
+      }
       setSuccess(data)
     } finally {
       setSubmitting(false)
@@ -169,9 +194,12 @@ export default function FormClient({ form }: { form: ReviewForm }) {
   }
 
   if (success) {
-    const discountText = success.discountType === 'percentage'
-      ? `${success.discountValue}% off`
-      : success.discountValue ? `₹${success.discountValue} off` : null
+    const discountText =
+      success.discountType === 'percentage'
+        ? `${success.discountValue}% off`
+        : success.discountValue
+          ? `₹${success.discountValue} off`
+          : null
 
     return (
       <div className="min-h-[calc(100vh-48px)] bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
@@ -188,7 +216,12 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                 {success.couponDescription && <p className="text-sm opacity-80">{success.couponDescription}</p>}
                 {success.validUntil && (
                   <p className="text-xs opacity-70 mt-1">
-                    Valid until {new Date(success.validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    Valid until{' '}
+                    {new Date(success.validUntil).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
                   </p>
                 )}
               </div>
@@ -222,7 +255,9 @@ export default function FormClient({ form }: { form: ReviewForm }) {
         {isGoogleReview && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
             <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-blue-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <span className="w-7 h-7 rounded-full bg-blue-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800">Leave us a Google review</p>
                 <p className="text-xs text-gray-400">It takes less than a minute!</p>
@@ -242,20 +277,27 @@ export default function FormClient({ form }: { form: ReviewForm }) {
         {isProductFeedback && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
             <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-purple-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <span className="w-7 h-7 rounded-full bg-purple-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800">Rate your experience</p>
                 <p className="text-xs text-gray-400">How was your recent purchase?</p>
               </div>
             </div>
-            <StarRating value={ratings['__overall'] || 0} onChange={v => setRatings(prev => ({ ...prev, __overall: v }))} />
+            <StarRating
+              value={ratings['__overall'] || 0}
+              onChange={v => setRatings(prev => ({ ...prev, __overall: v }))}
+            />
           </div>
         )}
 
         {isTestimonial && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
             <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-indigo-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <span className="w-7 h-7 rounded-full bg-indigo-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800">Share your story</p>
                 <p className="text-xs text-gray-400">Tell us about your experience with {config.identity.name}</p>
@@ -280,7 +322,9 @@ export default function FormClient({ form }: { form: ReviewForm }) {
               <p className="font-semibold text-gray-800">
                 {isGoogleReview ? 'Submit your review screenshot' : 'Submit your details'}
               </p>
-              <p className="text-xs text-gray-400">{form.coupon_id ? 'Get your discount coupon instantly' : 'We\'ll verify your submission'}</p>
+              <p className="text-xs text-gray-400">
+                {form.coupon_id ? 'Get your discount coupon instantly' : "We'll verify your submission"}
+              </p>
             </div>
           </div>
 
@@ -308,13 +352,26 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                 >
                   {preview ? (
                     <div className="relative">
-                      <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-48 object-contain rounded-lg" unoptimized />
+                      <Image
+                        src={preview}
+                        alt="Preview"
+                        width={400}
+                        height={200}
+                        className="w-full max-h-48 object-contain rounded-lg"
+                        unoptimized
+                      />
                       <button
                         type="button"
-                        onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          setFile(null)
+                          setPreview(null)
+                        }}
                         aria-label="Remove file"
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                      ><X className="w-3.5 h-3.5" /></button>
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ) : (
                     <div className="text-center py-4">
@@ -324,7 +381,16 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                     </div>
                   )}
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0]
+                    if (f) handleFile(f)
+                  }}
+                />
               </div>
             )}
 
@@ -339,13 +405,26 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                 >
                   {preview ? (
                     <div className="relative">
-                      <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-48 object-contain rounded-lg" unoptimized />
+                      <Image
+                        src={preview}
+                        alt="Preview"
+                        width={400}
+                        height={200}
+                        className="w-full max-h-48 object-contain rounded-lg"
+                        unoptimized
+                      />
                       <button
                         type="button"
-                        onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          setFile(null)
+                          setPreview(null)
+                        }}
                         aria-label="Remove file"
                         className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
-                      ><X className="w-3.5 h-3.5" /></button>
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ) : (
                     <div className="text-center py-4">
@@ -355,7 +434,16 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                     </div>
                   )}
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0]
+                    if (f) handleFile(f)
+                  }}
+                />
               </div>
             )}
 
@@ -363,7 +451,10 @@ export default function FormClient({ form }: { form: ReviewForm }) {
               <div key={field.id}>
                 {field.type === 'text' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">{field.label}{field.required ? ' *' : ''}</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      {field.label}
+                      {field.required ? ' *' : ''}
+                    </label>
                     <input
                       name={`field_${field.id}`}
                       type="text"
@@ -374,7 +465,10 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                 )}
                 {field.type === 'textarea' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">{field.label}{field.required ? ' *' : ''}</label>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      {field.label}
+                      {field.required ? ' *' : ''}
+                    </label>
                     <textarea
                       name={`field_${field.id}`}
                       rows={3}
@@ -388,8 +482,14 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                 )}
                 {field.type === 'rating' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">{field.label}{field.required ? ' *' : ''}</label>
-                    <StarRating value={ratings[field.id] || 0} onChange={v => setRatings(prev => ({ ...prev, [field.id]: v }))} />
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                      {field.label}
+                      {field.required ? ' *' : ''}
+                    </label>
+                    <StarRating
+                      value={ratings[field.id] || 0}
+                      onChange={v => setRatings(prev => ({ ...prev, [field.id]: v }))}
+                    />
                   </div>
                 )}
               </div>

@@ -68,10 +68,17 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
     return (
       <div className="space-y-2">
         {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+            {error}
+          </p>
         )}
         <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-          <svg className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
           <div className="flex-1 min-w-0">
@@ -81,37 +88,39 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
         </div>
         {cancelConfirming ? (
           <RequireWrite scope="orders:write">
-          <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-800 dark:text-red-300 flex-1">Cancel this shipment with Delhivery? This cannot be undone once picked up.</p>
-            <div className="flex gap-2 shrink-0">
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
-              >
-                {cancelling ? 'Cancelling…' : 'Confirm Cancel'}
-              </button>
-              <button
-                onClick={() => setCancelConfirming(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
-              >
-                Keep
-              </button>
+            <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-800 dark:text-red-300 flex-1">
+                Cancel this shipment with Delhivery? This cannot be undone once picked up.
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                >
+                  {cancelling ? 'Cancelling…' : 'Confirm Cancel'}
+                </button>
+                <button
+                  onClick={() => setCancelConfirming(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
+                >
+                  Keep
+                </button>
+              </div>
             </div>
-          </div>
           </RequireWrite>
         ) : (
           <RequireWrite scope="orders:write">
-          <button
-            onClick={() => setCancelConfirming(true)}
-            disabled={cancelling}
-            className="w-full px-4 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Cancel Shipment
-          </button>
+            <button
+              onClick={() => setCancelConfirming(true)}
+              disabled={cancelling}
+              className="w-full px-4 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Cancel Shipment
+            </button>
           </RequireWrite>
         )}
       </div>
@@ -121,64 +130,68 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   return (
     <div className="space-y-2">
       {error && (
-        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
+          {error}
+        </p>
       )}
       {confirming ? (
         <RequireWrite scope="orders:write">
-        <div className="px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 space-y-3">
-          <p className="text-sm text-yellow-800 dark:text-yellow-300">Register with Delhivery and generate an AWB number?</p>
-          {warehouses.length > 1 && (
-            <label className="block text-xs font-medium text-yellow-800 dark:text-yellow-300 space-y-1">
-              <span>Pickup warehouse</span>
-              <AdminSelect
-                sm
-                value={pickupLocation}
-                options={warehouses}
-                onChange={setPickupLocation}
-              />
-            </label>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => setConfirming(false)}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
-            >
-              Cancel
-            </button>
+          <div className="px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 space-y-3">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300">
+              Register with Delhivery and generate an AWB number?
+            </p>
+            {warehouses.length > 1 && (
+              <label className="block text-xs font-medium text-yellow-800 dark:text-yellow-300 space-y-1">
+                <span>Pickup warehouse</span>
+                <AdminSelect sm value={pickupLocation} options={warehouses} onChange={setPickupLocation} />
+              </label>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleCreate}
+                disabled={loading}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
         </RequireWrite>
       ) : (
         <RequireWrite scope="orders:write">
-        <button
-          onClick={beginConfirm}
-          disabled={loading}
-          className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Creating shipment…
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-              </svg>
-              Create Delhivery Shipment
-            </>
-          )}
-        </button>
+          <button
+            onClick={beginConfirm}
+            disabled={loading}
+            className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Creating shipment…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                  />
+                </svg>
+                Create Delhivery Shipment
+              </>
+            )}
+          </button>
         </RequireWrite>
       )}
     </div>

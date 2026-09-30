@@ -43,9 +43,9 @@ interface CustomerTasksProps {
 
 const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  high:   'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  low:    'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+  low: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
 export default function CustomerTasks({ customerId, canWrite: canWriteProp = false }: CustomerTasksProps) {
@@ -65,10 +65,9 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
   const [assignedTo, setAssignedTo] = useState<string>('')
 
   async function load() {
-    const res = await fetch(
-      `/api/admin/customers/${customerId}/tasks?status=${showCompleted ? 'completed' : 'open'}`,
-      { credentials: 'include' }
-    )
+    const res = await fetch(`/api/admin/customers/${customerId}/tasks?status=${showCompleted ? 'completed' : 'open'}`, {
+      credentials: 'include',
+    })
     if (res.ok) {
       const data = await res.json()
       setTasks(data.tasks || [])
@@ -148,7 +147,9 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
     }
   }
 
-  function adminName(a: AdminOption | { first_name: string | null; last_name: string | null; username: string | null }) {
+  function adminName(
+    a: AdminOption | { first_name: string | null; last_name: string | null; username: string | null }
+  ) {
     const f = a.first_name || ''
     const l = a.last_name || ''
     return `${f} ${l}`.trim() || a.username || 'Admin'
@@ -211,12 +212,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
             className="w-full px-2.5 py-1.5 text-sm border border-border-secondary rounded bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500 resize-none"
           />
           <div className="grid grid-cols-3 gap-2">
-            <DatePicker
-              value={dueDate}
-              onChange={setDueDate}
-              placeholder="Due date"
-              className="w-full"
-            />
+            <DatePicker value={dueDate} onChange={setDueDate} placeholder="Due date" className="w-full" />
             <AdminSelect
               sm
               value={priority}
@@ -242,7 +238,12 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               type="button"
-              onClick={() => { setAdding(false); setTitle(''); setDescription(''); setDueDate('') }}
+              onClick={() => {
+                setAdding(false)
+                setTitle('')
+                setDescription('')
+                setDueDate('')
+              }}
               className="px-3 py-1.5 text-xs font-medium text-foreground-secondary hover:text-foreground transition-colors"
             >
               Cancel
@@ -273,63 +274,90 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
               >
                 <div className="flex items-start gap-2">
                   {canWrite && (
-                  <button
-                    type="button"
-                    onClick={() => toggle(t)}
-                    disabled={busy}
-                    className={`mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
-                      completed
-                        ? 'bg-green-500 border-green-500'
-                        : 'border-border-secondary hover:border-accent-500'
-                    }`}
-                    aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
-                  >
-                    {completed && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => toggle(t)}
+                      disabled={busy}
+                      className={`mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
+                        completed ? 'bg-green-500 border-green-500' : 'border-border-secondary hover:border-accent-500'
+                      }`}
+                      aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
+                    >
+                      {completed && (
+                        <svg
+                          className="w-3 h-3 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={3}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <p className={`text-sm font-medium ${completed ? 'line-through text-foreground-muted' : 'text-foreground'}`}>
+                      <p
+                        className={`text-sm font-medium ${completed ? 'line-through text-foreground-muted' : 'text-foreground'}`}
+                      >
                         {t.title}
                       </p>
                       {canWrite && (
-                      <button
-                        type="button"
-                        onClick={() => remove(t.id)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground-muted hover:text-red-600 shrink-0"
-                        aria-label="Delete task"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22" />
-                        </svg>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(t.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground-muted hover:text-red-600 shrink-0"
+                          aria-label="Delete task"
+                        >
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22"
+                            />
+                          </svg>
+                        </button>
                       )}
                     </div>
                     {t.description && (
-                      <p className={`text-xs mt-1 whitespace-pre-wrap break-words ${completed ? 'text-foreground-muted' : 'text-foreground-secondary'}`}>
+                      <p
+                        className={`text-xs mt-1 whitespace-pre-wrap break-words ${completed ? 'text-foreground-muted' : 'text-foreground-secondary'}`}
+                      >
                         {t.description}
                       </p>
                     )}
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {t.auto_created && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd"/></svg>
+                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
                           auto
                         </span>
                       )}
                       <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${PRIORITY_BADGE[t.priority]}`}>
                         {t.priority}
                       </span>
-                      {due && !completed && (
-                        <span className={`text-[10px] ${due.color}`}>{due.text}</span>
-                      )}
+                      {due && !completed && <span className={`text-[10px] ${due.color}`}>{due.text}</span>}
                       {t.assigned_to && (
                         <span className="text-[10px] text-foreground-muted">
-                          → {adminName({ first_name: t.assigned_to_first_name, last_name: t.assigned_to_last_name, username: t.assigned_to_username })}
+                          →{' '}
+                          {adminName({
+                            first_name: t.assigned_to_first_name,
+                            last_name: t.assigned_to_last_name,
+                            username: t.assigned_to_username,
+                          })}
                         </span>
                       )}
                     </div>

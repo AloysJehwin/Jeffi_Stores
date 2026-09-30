@@ -1,4 +1,4 @@
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -17,7 +17,11 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null
-  try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
+  try {
+    session = await verifyToken(token.value)
+  } catch {
+    redirect(ap('/admin/login', host))
+  }
 
   if (!hasScope(session?.role || '', session?.scopes || [], 'quotations:read')) {
     redirect(ap('/admin/dashboard', host))

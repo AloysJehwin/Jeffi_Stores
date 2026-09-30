@@ -1,4 +1,4 @@
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import SupplierDetailClient from './SupplierDetailClient'
@@ -15,7 +15,11 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
   const token = cookieStore.get(await adminCookieName())
   if (!token) redirect(ap('/admin/login', host))
 
-  try { await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
+  try {
+    await verifyToken(token.value)
+  } catch {
+    redirect(ap('/admin/login', host))
+  }
 
   return <SupplierDetailClient id={id} />
 }

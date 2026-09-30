@@ -20,7 +20,8 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
   const [host, categories, misassignedRows, pendingDrafts, createDrafts] = await Promise.all([
     getHost(),
     getFilteredCategories({
-      is_active: resolvedSearchParams.is_active }),
+      is_active: resolvedSearchParams.is_active,
+    }),
     queryMany<{ id: string; name: string; category_id: string; category_name: string }>(
       `SELECT p.id, p.name, p.category_id, c.name AS category_name
        FROM products p
@@ -57,15 +58,21 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCategories}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            {totalCategories}
+          </p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Main Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{mainCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            {mainCategoriesCount}
+          </p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Subcategories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{subCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            {subCategoriesCount}
+          </p>
         </div>
       </div>
 
@@ -73,7 +80,14 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
         <details className="mb-6 group">
           <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              <svg
+                className="w-4 h-4 transition-transform group-open:rotate-90"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
             <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
@@ -81,7 +95,7 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {/* Create-drafts: brand-new categories not yet on the live list. Publish activates them. */}
-              {createDrafts.map((d) => (
+              {createDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={`new-${d.id}`}
@@ -104,8 +118,8 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                     <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
                   </div>
                 )
-              ))}
-              {pendingDrafts.map((d) => (
+              )}
+              {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={d.category_id}
@@ -122,17 +136,14 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
                   </div>
                 )
-              ))}
+              )}
             </div>
           </div>
         </details>
       )}
 
       {misassignedRows.length > 0 && (
-        <MisassignedProductsBanner
-          products={misassignedRows}
-          categories={allCategories}
-        />
+        <MisassignedProductsBanner products={misassignedRows} categories={allCategories} />
       )}
     </div>
   )
@@ -141,14 +152,17 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
 async function CategoriesListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const [categories, productCountRows] = await Promise.all([
     getFilteredCategories({
-      is_active: resolvedSearchParams.is_active }),
+      is_active: resolvedSearchParams.is_active,
+    }),
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
     ),
   ])
 
   const productCounts: Record<string, number> = {}
-  productCountRows.forEach(r => { productCounts[r.category_id] = parseInt(r.count, 10) })
+  productCountRows.forEach(r => {
+    productCounts[r.category_id] = parseInt(r.count, 10)
+  })
 
   const allCategories = categories || []
 
@@ -191,14 +205,16 @@ export default function CategoriesPage({ searchParams }: { searchParams: Promise
             options: [
               { value: 'true', label: 'Active' },
               { value: 'false', label: 'Inactive' },
-            ] },
+            ],
+          },
           {
             name: 'type',
             label: 'Type',
             options: [
               { value: 'main', label: 'Main Categories' },
               { value: 'sub', label: 'Subcategories' },
-            ] },
+            ],
+          },
         ]}
         searchPlaceholder="Search by name..."
         suggestType="categories"

@@ -33,9 +33,20 @@ interface Review {
 function Stars({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <svg key={star} className={`w-4 h-4 ${star <= rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`} viewBox="0 0 24 24" fill={star <= rating ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={star <= rating ? 0 : 1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+      {[1, 2, 3, 4, 5].map(star => (
+        <svg
+          key={star}
+          className={`w-4 h-4 ${star <= rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
+          viewBox="0 0 24 24"
+          fill={star <= rating ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth={star <= rating ? 0 : 1.5}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+          />
         </svg>
       ))}
     </div>
@@ -67,7 +78,9 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
 
   useEffect(() => {
     if (!lightboxUrl) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null) }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxUrl(null)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxUrl])
@@ -75,12 +88,15 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
   function syncUrl(patch: Record<string, string>) {
     const p = new URLSearchParams(window.location.search)
     for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v); else p.delete(k)
+      if (v) p.set(k, v)
+      else p.delete(k)
     }
     router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
   }
 
-  useEffect(() => { fetchReviews(search, 1) }, [filter])
+  useEffect(() => {
+    fetchReviews(search, 1)
+  }, [filter])
 
   const fetchReviews = async (q = search, p = page) => {
     setIsLoading(true)
@@ -167,12 +183,18 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Reviews</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">Moderate customer reviews before they appear on product pages</p>
+          <p className="text-sm text-foreground-muted mt-0.5">
+            Moderate customer reviews before they appear on product pages
+          </p>
         </div>
         {filter === 'pending' && !isLoading && pendingCount > 0 && (
           <span className="inline-flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm font-semibold px-3 py-1.5 rounded-full">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96L13.75 4a2 2 0 00-3.5 0L3.25 16.04A2 2 0 005.07 19z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96L13.75 4a2 2 0 00-3.5 0L3.25 16.04A2 2 0 005.07 19z"
+              />
             </svg>
             {pendingCount} awaiting approval
           </span>
@@ -185,7 +207,10 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
           {TABS.map(tab => (
             <button
               key={tab.key}
-              onClick={() => { setFilter(tab.key); syncUrl({ filter: tab.key }) }}
+              onClick={() => {
+                setFilter(tab.key)
+                syncUrl({ filter: tab.key })
+              }}
               className={`relative px-4 py-3 text-sm font-medium transition-colors ${
                 filter === tab.key
                   ? 'text-accent-600 dark:text-accent-400'
@@ -201,8 +226,18 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         </div>
         <div className="px-4 py-3">
           <div className="relative max-w-sm">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"
+              />
             </svg>
             <input
               type="text"
@@ -234,8 +269,18 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         </div>
       ) : reviews.length === 0 ? (
         <div className="bg-surface-elevated rounded-xl border border-border-default py-16 flex flex-col items-center gap-3">
-          <svg className="w-14 h-14 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <svg
+            className="w-14 h-14 text-foreground-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
           </svg>
           <p className="font-semibold text-foreground">No reviews found</p>
           <p className="text-sm text-foreground-muted">
@@ -244,11 +289,15 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         </div>
       ) : (
         <div className="space-y-3">
-          {reviews.map((review) => {
-            const initials = `${review.users.first_name?.[0] || ''}${review.users.last_name?.[0] || ''}`.toUpperCase() || '?'
+          {reviews.map(review => {
+            const initials =
+              `${review.users.first_name?.[0] || ''}${review.users.last_name?.[0] || ''}`.toUpperCase() || '?'
             const isExpanded = expandedId === review.id
             return (
-              <div key={review.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+              <div
+                key={review.id}
+                className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden"
+              >
                 {/* Card header row */}
                 <div className="px-4 pt-4 pb-3">
                   <div className="flex items-start gap-3">
@@ -267,7 +316,13 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                         <span className="text-xs text-foreground-muted hidden sm:inline">{review.users.email}</span>
                         {review.is_verified_purchase && (
                           <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <svg
+                              className="w-3 h-3"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                             Verified
@@ -275,7 +330,13 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                         )}
                         {review.is_approved ? (
                           <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                            <svg
+                              className="w-3 h-3"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                             Approved
@@ -291,7 +352,11 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                           </span>
                         )}
                         <span className="text-xs text-foreground-muted ml-auto">
-                          {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {new Date(review.created_at).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </span>
                       </div>
 
@@ -304,18 +369,28 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-xs text-accent-600 dark:text-accent-400 hover:underline font-medium truncate max-w-[200px]"
                         >
-                          <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          <svg
+                            className="w-3 h-3 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
                           </svg>
                           {review.products.name}
                         </a>
                       </div>
 
                       {/* Review text */}
-                      {review.title && (
-                        <p className="font-semibold text-sm text-foreground mb-0.5">{review.title}</p>
-                      )}
-                      <p className={`text-sm text-foreground-secondary leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                      {review.title && <p className="font-semibold text-sm text-foreground mb-0.5">{review.title}</p>}
+                      <p
+                        className={`text-sm text-foreground-secondary leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}
+                      >
                         {review.comment}
                       </p>
                       {review.comment.length > 160 && (
@@ -338,7 +413,11 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                               onClick={() => setLightboxUrl(url)}
                               className="w-16 h-16 rounded-lg overflow-hidden border border-border-secondary hover:border-accent-500 transition-colors shrink-0"
                             >
-                              <ImgWithSkeleton src={review.image_thumbnail_urls?.[idx] || url} alt="" className="w-full h-full object-cover" />
+                              <ImgWithSkeleton
+                                src={review.image_thumbnail_urls?.[idx] || url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
                             </button>
                           ))}
                         </div>
@@ -366,7 +445,11 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                       className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
                       </svg>
                       Delete
                     </button>
@@ -381,42 +464,58 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
       {!isLoading && reviews.length > 0 && totalPages > 1 && (
         <div className="mt-4 px-1 flex items-center justify-between gap-2">
           <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span>
-            {' '}of <span className="font-medium text-foreground">{total}</span> reviews
+            <span className="font-medium text-foreground">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+            </span>{' '}
+            of <span className="font-medium text-foreground">{total}</span> reviews
           </p>
           <div className="flex items-center gap-1.5">
-            <button disabled={page <= 1} onClick={() => fetchReviews(search, page - 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => fetchReviews(search, page + 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+            <button
+              disabled={page <= 1}
+              onClick={() => fetchReviews(search, page - 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-foreground-muted whitespace-nowrap">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => fetchReviews(search, page + 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
 
       {/* Lightbox */}
-      {lightboxUrl && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setLightboxUrl(null)}
-        >
-          <img
-            src={lightboxUrl}
-            alt=""
-            className="max-w-full max-h-[90vh] rounded-lg object-contain shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          />
-          <button
-            type="button"
+      {lightboxUrl &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
             onClick={() => setLightboxUrl(null)}
-            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-black/60 text-white rounded-full hover:bg-black/80 text-xl leading-none"
-            aria-label="Close"
           >
-            ×
-          </button>
-        </div>,
-        document.body
-      )}
+            <img
+              src={lightboxUrl}
+              alt=""
+              className="max-w-full max-h-[90vh] rounded-lg object-contain shadow-2xl"
+              onClick={e => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-black/60 text-white rounded-full hover:bg-black/80 text-xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

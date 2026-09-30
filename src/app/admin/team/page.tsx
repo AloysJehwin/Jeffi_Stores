@@ -47,7 +47,9 @@ function CertBadge({ status }: { status: string }) {
     'No Certificate': 'bg-surface-secondary text-foreground-muted',
   }
   return (
-    <span className={`inline-flex whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? map['No Certificate']}`}>
+    <span
+      className={`inline-flex whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? map['No Certificate']}`}
+    >
       {status}
     </span>
   )
@@ -58,8 +60,10 @@ function CertBadge({ status }: { status: string }) {
 // page reflects a portal download/revoke. Best-effort: if the control plane is unreachable, the
 // store-local flags stand.
 async function overlayPortalState(admins: any[]): Promise<void> {
-  const serials = admins.flatMap((a: any) => (a.certificates as any[] | null) || [])
-    .map((c: any) => c?.serial_number).filter(Boolean)
+  const serials = admins
+    .flatMap((a: any) => (a.certificates as any[] | null) || [])
+    .map((c: any) => c?.serial_number)
+    .filter(Boolean)
   if (serials.length === 0) return
   try {
     const { rows } = await controlPlanePool().query(
@@ -69,7 +73,7 @@ async function overlayPortalState(admins: any[]): Promise<void> {
     )
     const byId = new Map(rows.map((r: any) => [r.serial, r]))
     for (const a of admins) {
-      for (const c of ((a.certificates as any[] | null) || [])) {
+      for (const c of (a.certificates as any[] | null) || []) {
         const central = byId.get(String(c.serial_number).toLowerCase())
         if (!central) continue
         if (central.downloaded_at && !c.downloaded_at) c.downloaded_at = central.downloaded_at
@@ -117,11 +121,12 @@ export default async function TeamPage() {
   await overlayPortalState(allAdmins as any[])
 
   const scopeLabels: Record<string, string> = {}
-  ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
+  ADMIN_SCOPES.forEach(s => {
+    scopeLabels[s.key] = s.label
+  })
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-
       <div>
         <h1 className="text-2xl font-bold text-foreground">Team Members</h1>
         <p className="text-sm text-foreground-muted mt-0.5">
@@ -131,15 +136,17 @@ export default async function TeamPage() {
 
       {/* Add member */}
       <div className="hidden md:block">
-      <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-        <div className="px-5 py-4 border-b border-border-default">
-          <h2 className="text-sm font-semibold text-foreground">Add Team Member</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">Generate credentials and a client certificate for a new admin user</p>
-        </div>
-        <div className="p-5">
-          <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
-        </div>
-      </section>
+        <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+          <div className="px-5 py-4 border-b border-border-default">
+            <h2 className="text-sm font-semibold text-foreground">Add Team Member</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              Generate credentials and a client certificate for a new admin user
+            </p>
+          </div>
+          <div className="p-5">
+            <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
+          </div>
+        </section>
       </div>
 
       {/* Members table */}
@@ -159,35 +166,52 @@ export default async function TeamPage() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">{(admin.first_name || admin.username)[0]}</span>
+                      <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">
+                        {(admin.first_name || admin.username)[0]}
+                      </span>
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
-                        {admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username}
-                        {admin.id === adminInfo.id && <span className="ml-1.5 text-xs font-normal text-accent-500">(you)</span>}
+                        {admin.first_name && admin.last_name
+                          ? `${admin.first_name} ${admin.last_name}`
+                          : admin.username}
+                        {admin.id === adminInfo.id && (
+                          <span className="ml-1.5 text-xs font-normal text-accent-500">(you)</span>
+                        )}
                       </p>
                       <p className="text-xs text-foreground-muted capitalize">{admin.role.replace('_', ' ')}</p>
                     </div>
                   </div>
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    admin.is_active !== false
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                      : 'bg-surface-secondary text-foreground-muted'
-                  }`}>
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      admin.is_active !== false
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                        : 'bg-surface-secondary text-foreground-muted'
+                    }`}
+                  >
                     {admin.is_active !== false ? 'Active' : 'Inactive'}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap gap-1">
                   {isPlatformOwner(admin.role) ? (
-                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
+                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                      All Access
+                    </span>
                   ) : scopes.length > 0 ? (
                     <>
                       {scopes.slice(0, 4).map(scope => (
-                        <span key={scope} className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs">{scopeLabels[scope] || scope}</span>
+                        <span
+                          key={scope}
+                          className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs"
+                        >
+                          {scopeLabels[scope] || scope}
+                        </span>
                       ))}
                       {scopes.length > 4 && (
-                        <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">+{scopes.length - 4}</span>
+                        <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">
+                          +{scopes.length - 4}
+                        </span>
                       )}
                     </>
                   ) : (
@@ -218,15 +242,33 @@ export default async function TeamPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border-default bg-surface-secondary/40">
-                <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-48">Member</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Role</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider max-w-[260px]">Scopes</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-16">2FA</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-36">Certificate</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Expiry</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider whitespace-nowrap w-40">Last Login</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-48">
+                  Member
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
+                  Role
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider max-w-[260px]">
+                  Scopes
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-16">
+                  2FA
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-36">
+                  Certificate
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
+                  Expiry
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider whitespace-nowrap w-40">
+                  Last Login
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -241,12 +283,18 @@ export default async function TeamPage() {
                     <td className="px-5 py-3 w-48">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">{(admin.first_name || admin.username)[0]}</span>
+                          <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">
+                            {(admin.first_name || admin.username)[0]}
+                          </span>
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-foreground text-sm truncate">
-                            {admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username}
-                            {admin.id === adminInfo.id && <span className="ml-1 text-xs font-normal text-accent-500">(you)</span>}
+                            {admin.first_name && admin.last_name
+                              ? `${admin.first_name} ${admin.last_name}`
+                              : admin.username}
+                            {admin.id === adminInfo.id && (
+                              <span className="ml-1 text-xs font-normal text-accent-500">(you)</span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -257,14 +305,23 @@ export default async function TeamPage() {
                     <td className="px-4 py-3 max-w-[260px]">
                       <div className="flex items-center gap-1 flex-wrap">
                         {isPlatformOwner(admin.role) ? (
-                          <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All</span>
+                          <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                            All
+                          </span>
                         ) : scopes.length > 0 ? (
                           <>
                             {visible.map(scope => (
-                              <span key={scope} className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs whitespace-nowrap">{scopeLabels[scope] || scope}</span>
+                              <span
+                                key={scope}
+                                className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs whitespace-nowrap"
+                              >
+                                {scopeLabels[scope] || scope}
+                              </span>
                             ))}
                             {overflow > 0 && (
-                              <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs whitespace-nowrap">+{overflow}</span>
+                              <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs whitespace-nowrap">
+                                +{overflow}
+                              </span>
                             )}
                           </>
                         ) : (
@@ -273,20 +330,24 @@ export default async function TeamPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 w-24">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        admin.is_active !== false
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : 'bg-surface-secondary text-foreground-muted'
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          admin.is_active !== false
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-surface-secondary text-foreground-muted'
+                        }`}
+                      >
                         {admin.is_active !== false ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-4 py-3 w-16">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        admin.mfa_enabled
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                      }`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          admin.mfa_enabled
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
                         {admin.mfa_enabled ? 'On' : 'Off'}
                       </span>
                     </td>
@@ -297,11 +358,23 @@ export default async function TeamPage() {
                       {cert && !cert.is_revoked ? new Date(cert.expires_at).toLocaleDateString('en-IN') : '—'}
                     </td>
                     <td className="px-4 py-3 text-xs text-foreground-secondary w-40 whitespace-nowrap">
-                      {admin.last_login ? new Date(admin.last_login).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                      {admin.last_login
+                        ? new Date(admin.last_login).toLocaleString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Never'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end">
-                        <AdminUserActions admin={admin} currentAdminId={adminInfo.id} allowedScopeKeys={allowedScopeKeys} />
+                        <AdminUserActions
+                          admin={admin}
+                          currentAdminId={adminInfo.id}
+                          allowedScopeKeys={allowedScopeKeys}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -316,7 +389,10 @@ export default async function TeamPage() {
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
         <div className="px-5 py-4 border-b border-border-default">
           <h2 className="text-sm font-semibold text-foreground">Available Scopes</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">{visibleScopes.length} scopes{planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating a team member</p>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            {visibleScopes.length} scopes{planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating a
+            team member
+          </p>
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {Array.from(new Set(visibleScopes.map(s => s.group || 'General'))).map(groupName => {
@@ -339,7 +415,6 @@ export default async function TeamPage() {
           })}
         </div>
       </section>
-
     </div>
   )
 }

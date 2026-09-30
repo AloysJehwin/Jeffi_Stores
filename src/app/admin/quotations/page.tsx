@@ -8,7 +8,8 @@ import QuotationsClient from './QuotationsClient'
 import { adminCookieName } from '@/lib/admin-cookie'
 
 export const metadata = {
-  title: 'Quotations — Jeffi Admin' }
+  title: 'Quotations — Jeffi Admin',
+}
 
 export default async function QuotationsPage() {
   const cookieStore = await cookies()

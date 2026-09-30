@@ -19,14 +19,16 @@ const TEMPLATE_LABELS: Record<string, string> = {
   promotion: 'Promotion',
   event: 'Event',
   announcement: 'Announcement',
-  custom: 'Custom' }
+  custom: 'Custom',
+}
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   scheduled: 'bg-blue-100 text-blue-700',
   sending: 'bg-yellow-100 text-yellow-700',
   sent: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-600' }
+  failed: 'bg-red-100 text-red-600',
+}
 
 interface Campaign {
   id: string
@@ -41,7 +43,11 @@ interface Campaign {
   created_at: string
 }
 
-export default async function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
+export default async function MailerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; search?: string }>
+}) {
   const host = await getHost()
   return (
     <div className="p-4 sm:p-6">
@@ -51,7 +57,10 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
           <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
         </div>
         <div className="hidden md:block">
-          <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+          <Link
+            href={ap('/admin/mailer/new', host)}
+            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+          >
             New Campaign
           </Link>
         </div>
@@ -77,7 +86,11 @@ async function MailerListSection({ searchParams }: { searchParams: Promise<{ pag
   )
 }
 
-async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParams: { page?: string; search?: string } }) {
+async function MailerListContent({
+  resolvedSearchParams,
+}: {
+  resolvedSearchParams: { page?: string; search?: string }
+}) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const search = resolvedSearchParams.search?.trim() || ''
@@ -133,7 +146,8 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
         <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
         <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
-          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. It is defined in the schema file below and is created by the schema pipeline:
+          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table
+          does not exist yet. It is defined in the schema file below and is created by the schema pipeline:
         </p>
         <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
           database/marketing.sql
@@ -150,7 +164,12 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
             <thead className="bg-surface-secondary">
               <tr>
                 {['Title', 'Template', 'Audience', 'Recipients', 'Status', 'Date', 'Actions'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -158,14 +177,25 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
               {campaigns.map(c => (
                 <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
                   <td className="px-4 py-3">
-                    <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="font-medium text-foreground hover:text-accent-500 transition-colors">{c.title}</Link>
+                    <Link
+                      href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                      className="font-medium text-foreground hover:text-accent-500 transition-colors"
+                    >
+                      {c.title}
+                    </Link>
                     <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
                   </td>
-                  <td className="px-4 py-3 text-foreground-secondary">{TEMPLATE_LABELS[c.template_key] || c.template_key}</td>
-                  <td className="px-4 py-3 capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</td>
+                  <td className="px-4 py-3 text-foreground-secondary">
+                    {TEMPLATE_LABELS[c.template_key] || c.template_key}
+                  </td>
+                  <td className="px-4 py-3 capitalize text-foreground-secondary">
+                    {c.audience_type.replace('_', ' ')}
+                  </td>
                   <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}>
+                    <span
+                      className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
+                    >
                       {c.status}
                     </span>
                   </td>
@@ -173,22 +203,38 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
                     {c.status === 'scheduled' && c.scheduled_at
                       ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`
                       : c.sent_at
-                      ? new Date(c.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
-                      : new Date(c.created_at).toLocaleDateString('en-IN')}
+                        ? new Date(c.sent_at).toLocaleString('en-IN', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                            timeZone: 'Asia/Kolkata',
+                          })
+                        : new Date(c.created_at).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {(c.status === 'draft' || c.status === 'scheduled') && (
                         <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
                       )}
-                      <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">View</Link>
+                      <Link
+                        href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                        className="text-accent-500 hover:underline text-sm"
+                      >
+                        View
+                      </Link>
                       {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
                     </div>
                   </td>
                 </tr>
               ))}
               {campaigns.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-foreground-muted">No campaigns yet. <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">Create your first one.</Link></td></tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-foreground-muted">
+                    No campaigns yet.{' '}
+                    <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">
+                      Create your first one.
+                    </Link>
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -198,17 +244,39 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
           {campaigns.map(c => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="font-medium text-foreground">{c.title}</Link>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}>
+                <Link
+                  href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                  className="font-medium text-foreground"
+                >
+                  {c.title}
+                </Link>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
+                >
                   {c.status}
                 </span>
               </div>
-              <p className="text-xs text-foreground-muted">{TEMPLATE_LABELS[c.template_key]} · {c.audience_type.replace('_', ' ')}</p>
-              {c.recipient_count != null && <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>}
+              <p className="text-xs text-foreground-muted">
+                {TEMPLATE_LABELS[c.template_key]} · {c.audience_type.replace('_', ' ')}
+              </p>
+              {c.recipient_count != null && (
+                <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>
+              )}
               <div className="flex gap-3 pt-1">
-                {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />}
-                <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
-                {c.status !== 'sending' && <div className="hidden md:block"><DeleteCampaignButton id={c.id} title={c.title} /></div>}
+                {(c.status === 'draft' || c.status === 'scheduled') && (
+                  <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
+                )}
+                <Link
+                  href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                  className="text-xs text-accent-500 hover:underline"
+                >
+                  View
+                </Link>
+                {c.status !== 'sending' && (
+                  <div className="hidden md:block">
+                    <DeleteCampaignButton id={c.id} title={c.title} />
+                  </div>
+                )}
               </div>
             </div>
           ))}

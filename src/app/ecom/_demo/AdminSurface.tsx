@@ -130,7 +130,7 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
   const { world } = useDemo()
   const m = world.metrics
   const aov = Math.round(m.revenue / Math.max(1, m.orderCount))
-  const lowStock = STOCK_ROWS.filter((r) => r.status !== 'In Stock').length
+  const lowStock = STOCK_ROWS.filter(r => r.status !== 'In Stock').length
   const cards = [
     { label: 'Revenue', node: <CountUp value={m.revenue} prefix="Rs. " animate={!reducedMotion} /> },
     { label: 'Orders', node: <CountUp value={m.orderCount} animate={!reducedMotion} /> },
@@ -146,7 +146,7 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 shrink-0">
-        {cards.map((c) => (
+        {cards.map(c => (
           <div key={c.label} className="bg-surface-secondary rounded-xl border border-border-default p-2.5">
             <p className="text-[11px] text-foreground-secondary">{c.label}</p>
             <p className="text-sm sm:text-base font-bold text-foreground mt-1 tabular-nums">{c.node}</p>
@@ -154,7 +154,7 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
         ))}
       </div>
       <div className="flex flex-wrap gap-2 shrink-0">
-        {attention.map((a) => (
+        {attention.map(a => (
           <span key={a.label} className={clsx('px-2.5 py-1 text-xs font-semibold rounded-full', a.tone)}>
             {a.label}
           </span>
@@ -181,7 +181,7 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
           <p className="text-sm font-semibold text-foreground">Live activity</p>
         </div>
         <ul className="space-y-2">
-          {world.activity.slice(0, 4).map((row) => (
+          {world.activity.slice(0, 4).map(row => (
             <li key={row.id} className="flex items-start gap-2.5">
               <span className="mt-0.5 ecom-accent-text shrink-0">{activityIcon(row.kind)}</span>
               <span className="text-sm text-foreground leading-snug">
@@ -213,7 +213,7 @@ function OrderView() {
         <Pill status={order.status} />
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden divide-y divide-border-default border-y border-border-default">
-        {order.items.map((it) => (
+        {order.items.map(it => (
           <div key={it.productId} className="flex items-center justify-between py-2 text-sm">
             <span className="text-foreground">
               {it.name} <span className="text-foreground-muted">x{it.qty}</span>
@@ -250,7 +250,11 @@ function ShipmentView({ reducedMotion }: { reducedMotion: boolean }) {
         <Pill status={order.status} />
       </div>
       {notShipped ? (
-        <button className={clsx(BTN, 'self-start mt-3 shrink-0')} disabled={order.status !== 'processing'} onClick={actions.ship}>
+        <button
+          className={clsx(BTN, 'self-start mt-3 shrink-0')}
+          disabled={order.status !== 'processing'}
+          onClick={actions.ship}
+        >
           <Truck className="w-4 h-4" /> Create shipment
         </button>
       ) : null}
@@ -270,7 +274,9 @@ function DocsView() {
       <div className={clsx(PANEL, 'min-h-0 p-4 flex flex-col overflow-hidden')}>
         <div className="flex items-center justify-between shrink-0">
           <p className="text-sm font-semibold text-foreground">GST packing slip</p>
-          <span className="text-xs text-foreground-muted">GSTIN {INVOICE.buyerGstin === '-' ? '29ABCDE1234F1Z5' : INVOICE.buyerGstin}</span>
+          <span className="text-xs text-foreground-muted">
+            GSTIN {INVOICE.buyerGstin === '-' ? '29ABCDE1234F1Z5' : INVOICE.buyerGstin}
+          </span>
         </div>
         <div className="mt-3 flex-1 min-h-0 overflow-hidden">
           <table className="w-full text-sm">
@@ -285,7 +291,7 @@ function DocsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {order.items.map((it) => (
+              {order.items.map(it => (
                 <tr key={it.productId}>
                   <td className="py-2 text-foreground">{it.name}</td>
                   <td className="py-2 font-mono text-xs text-foreground-secondary">{INVOICE.hsn}</td>
@@ -411,19 +417,37 @@ function CrmView() {
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.id as string}
+          keyOf={r => r.id as string}
           rows={rows as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Customer', cell: (c) => <span className="text-foreground">{c.name as string}</span> },
-            { head: 'Orders', align: 'center', cell: (c) => <span className="text-foreground-secondary tabular-nums">{c.orders as number}</span> },
-            { head: 'Lifetime', align: 'right', cell: (c) => <span className="text-foreground tabular-nums">{rupees(c.spent as number)}</span> },
+            { head: 'Customer', cell: c => <span className="text-foreground">{c.name as string}</span> },
             {
-              head: 'Health', align: 'center', cell: (c) => {
+              head: 'Orders',
+              align: 'center',
+              cell: c => <span className="text-foreground-secondary tabular-nums">{c.orders as number}</span>,
+            },
+            {
+              head: 'Lifetime',
+              align: 'right',
+              cell: c => <span className="text-foreground tabular-nums">{rupees(c.spent as number)}</span>,
+            },
+            {
+              head: 'Health',
+              align: 'center',
+              cell: c => {
                 const h = HEALTH[c.tag as string] ?? HEALTH.New
                 return <span className={clsx('px-2 py-0.5 text-xs font-semibold rounded-full', h.tone)}>{h.tier}</span>
               },
             },
-            { head: 'Segment', align: 'right', cell: (c) => <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">{(c.tag as string).toLowerCase()}</span> },
+            {
+              head: 'Segment',
+              align: 'right',
+              cell: c => (
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                  {(c.tag as string).toLowerCase()}
+                </span>
+              ),
+            },
           ]}
         />
       </div>
@@ -433,9 +457,9 @@ function CrmView() {
 
 type Render = (rm: boolean) => ReactNode
 const TABS: { focus: string; label: string; icon: typeof LayoutDashboard; render: Render }[] = [
-  { focus: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, render: (rm) => <DashboardView reducedMotion={rm} /> },
+  { focus: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, render: rm => <DashboardView reducedMotion={rm} /> },
   { focus: 'order', label: 'Order', icon: Package, render: () => <OrderView /> },
-  { focus: 'shipment', label: 'Shipment', icon: Truck, render: (rm) => <ShipmentView reducedMotion={rm} /> },
+  { focus: 'shipment', label: 'Shipment', icon: Truck, render: rm => <ShipmentView reducedMotion={rm} /> },
   { focus: 'docs', label: 'Docs', icon: Printer, render: () => <DocsView /> },
   { focus: 'inventory', label: 'Inventory', icon: Boxes, render: () => <InventoryView /> },
   { focus: 'po', label: 'Purchase order', icon: ClipboardList, render: () => <PoView /> },
@@ -454,7 +478,7 @@ const TABS: { focus: string; label: string; icon: typeof LayoutDashboard; render
 export default function AdminSurface() {
   const { chapter, reducedMotion } = useDemo()
   const focus = chapter.focus ?? 'dashboard'
-  const active = TABS.find((t) => t.focus === focus) ?? TABS[0]
+  const active = TABS.find(t => t.focus === focus) ?? TABS[0]
   return (
     <div
       className="ecom-clean bg-surface text-foreground h-full w-full flex flex-col overflow-hidden rounded-xl p-4"
@@ -466,7 +490,7 @@ export default function AdminSurface() {
           <h3 className="text-base font-bold text-foreground mt-0.5 truncate">{active.label}</h3>
         </div>
         <nav className="flex items-center gap-1 flex-wrap justify-end max-w-[70%]">
-          {TABS.map((t) => {
+          {TABS.map(t => {
             const Icon = t.icon
             const on = t.focus === focus
             return (

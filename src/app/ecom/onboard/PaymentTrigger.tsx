@@ -14,25 +14,45 @@ interface Props {
   razorpayKeyId: string
 }
 
-export default function PaymentTrigger({ subscriptionId, checkoutUrl, slug, displayName, ownerEmail, ownerName, planName, razorpayKeyId }: Props) {
+export default function PaymentTrigger({
+  subscriptionId,
+  checkoutUrl,
+  slug,
+  displayName,
+  ownerEmail,
+  ownerName,
+  planName,
+  razorpayKeyId,
+}: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
 
   useEffect(() => {
-    if ((window as any).Razorpay) { setScriptLoaded(true); return }
+    if ((window as any).Razorpay) {
+      setScriptLoaded(true)
+      return
+    }
     const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.onload = () => setScriptLoaded(true)
     script.onerror = () => setErr('Failed to load payment gateway. Please refresh.')
     document.body.appendChild(script)
-    return () => { try { document.body.removeChild(script) } catch {} }
+    return () => {
+      try {
+        document.body.removeChild(script)
+      } catch {}
+    }
   }, [])
 
   function openCheckout() {
-    if (!scriptLoaded) { setErr('Payment gateway not ready. Please refresh.'); return }
-    setBusy(true); setErr(null)
+    if (!scriptLoaded) {
+      setErr('Payment gateway not ready. Please refresh.')
+      return
+    }
+    setBusy(true)
+    setErr(null)
 
     const options = {
       key: razorpayKeyId,
@@ -64,8 +84,18 @@ export default function PaymentTrigger({ subscriptionId, checkoutUrl, slug, disp
     <div className="w-full max-w-lg text-center">
       <div className="rounded-2xl border border-accent-200 dark:border-accent-800 bg-surface-elevated p-10 shadow-lg">
         <div className="w-14 h-14 rounded-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center mx-auto mb-5">
-          <svg className="w-7 h-7 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+          <svg
+            className="w-7 h-7 text-accent-600 dark:text-accent-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z"
+            />
           </svg>
         </div>
         <h1 className="text-xl font-bold text-foreground">Application approved!</h1>
@@ -76,8 +106,11 @@ export default function PaymentTrigger({ subscriptionId, checkoutUrl, slug, disp
 
         {err && <p className="text-sm text-red-600 dark:text-red-400 mt-4">{err}</p>}
 
-        <button onClick={openCheckout} disabled={busy || !scriptLoaded}
-          className="inline-block mt-6 w-full px-6 py-3.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white font-semibold text-base transition-colors shadow-md shadow-accent-600/20">
+        <button
+          onClick={openCheckout}
+          disabled={busy || !scriptLoaded}
+          className="inline-block mt-6 w-full px-6 py-3.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white font-semibold text-base transition-colors shadow-md shadow-accent-600/20"
+        >
           {busy ? 'Opening payment…' : !scriptLoaded ? 'Loading…' : 'Complete payment'}
         </button>
         <p className="text-xs text-foreground-muted mt-4">Secured by Razorpay</p>

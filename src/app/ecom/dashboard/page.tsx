@@ -17,7 +17,11 @@ export const dynamic = 'force-dynamic'
 export default async function OwnerDashboard({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
-  const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
+  const signals = {
+    userAgent: h.get('user-agent'),
+    acceptLanguage: h.get('accept-language'),
+    uaPlatform: h.get('sec-ch-ua-platform'),
+  }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
   if (!owner) redirect('/signin')
 
@@ -26,15 +30,13 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
 
   // PRE-PAYMENT states belong in the onboard flow — the owner shouldn't reach the dashboard until
   // they've paid. /onboard shows the 'under review' → payment-link states for these.
-  if (tenants.some((t) => t.status === 'pending_approval' || t.status === 'awaiting_payment')) {
+  if (tenants.some(t => t.status === 'pending_approval' || t.status === 'awaiting_payment')) {
     redirect('/onboard')
   }
 
   const { tenant: wanted } = await searchParams
   const tenant =
-    (wanted && tenants.find((t) => t.slug === wanted)) ||
-    tenants.find((t) => t.status === 'active') ||
-    tenants[0]
+    (wanted && tenants.find(t => t.slug === wanted)) || tenants.find(t => t.status === 'active') || tenants[0]
 
   const [billing, rzpSub] = await Promise.all([
     getTenantBilling(tenant.id),
@@ -44,7 +46,11 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
   ])
 
   const renewalDate = rzpSub?.current_end
-    ? new Date(rzpSub.current_end * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    ? new Date(rzpSub.current_end * 1000).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
     : null
 
   const isLive = tenant.status === 'active'
@@ -54,8 +60,13 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
   const monthly = Number(tenant.monthly_price_inr ?? 0)
   const price = tenant.billing_interval === 'yearly' ? monthly * 12 : monthly
 
-  const created = new Date(tenant.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  const priceLabel = price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'
+  const created = new Date(tenant.created_at).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const priceLabel =
+    price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'
 
   return (
     <div className="w-full min-h-screen bg-surface-secondary">
@@ -68,13 +79,19 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
             {isLive && <SiteReachabilityBadge url={storeUrl} />}
           </div>
           <div className="flex gap-2">
-            <Link href={`/dashboard/billing?tenant=${tenant.slug}`}
-              className="px-4 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+            <Link
+              href={`/dashboard/billing?tenant=${tenant.slug}`}
+              className="px-4 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
               Billing
             </Link>
             {isLive && (
-              <a href={storeUrl} target="_blank" rel="noopener noreferrer"
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">
+              <a
+                href={storeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
+              >
                 Open store →
               </a>
             )}
@@ -107,14 +124,30 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
             {isLive ? (
               <>
                 <Field label="Storefront">
-                  <a href={storeUrl} target="_blank" rel="noopener noreferrer"
-                    className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all">
+                  <a
+                    href={storeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all"
+                  >
                     {tenant.slug}.jeffistores.in
                   </a>
                 </Field>
-                {tenant.rds_endpoint && <Field label="Database"><span className="font-mono text-xs text-foreground break-all">{tenant.rds_endpoint}</span></Field>}
-                {tenant.s3_bucket && <Field label="Storage bucket"><span className="font-mono text-xs text-foreground break-all">{tenant.s3_bucket}</span></Field>}
-                {tenant.region && <Field label="Region"><span className="text-xs text-foreground">{tenant.region}</span></Field>}
+                {tenant.rds_endpoint && (
+                  <Field label="Database">
+                    <span className="font-mono text-xs text-foreground break-all">{tenant.rds_endpoint}</span>
+                  </Field>
+                )}
+                {tenant.s3_bucket && (
+                  <Field label="Storage bucket">
+                    <span className="font-mono text-xs text-foreground break-all">{tenant.s3_bucket}</span>
+                  </Field>
+                )}
+                {tenant.region && (
+                  <Field label="Region">
+                    <span className="text-xs text-foreground">{tenant.region}</span>
+                  </Field>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-24 text-center">
@@ -140,11 +173,7 @@ export default async function OwnerDashboard({ searchParams }: { searchParams: P
         {/* ── Custom domains ── */}
         <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />
 
-        <DeliveryAccount
-          tenantId={tenant.id}
-          ownDelhivery={ownDelhivery}
-          tokenConnected={delhiveryTokenConnected}
-        />
+        <DeliveryAccount tenantId={tenant.id} ownDelhivery={ownDelhivery} tokenConnected={delhiveryTokenConnected} />
 
         {/* ── Transactions + ledger tabs ── */}
         <section className="rounded-2xl border border-border-default bg-surface-elevated p-6">
@@ -184,7 +213,9 @@ function Row({ label, value, mono = false }: { label: string; value: React.React
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-foreground-secondary flex-shrink-0">{label}</span>
-      <span className={`text-foreground text-right ${mono ? 'font-mono text-xs break-all' : 'font-medium'}`}>{value}</span>
+      <span className={`text-foreground text-right ${mono ? 'font-mono text-xs break-all' : 'font-medium'}`}>
+        {value}
+      </span>
     </div>
   )
 }

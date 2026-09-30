@@ -30,7 +30,7 @@ const STAGE_LABELS: Record<Stage, string> = {
   delivered: 'Delivered',
 }
 
-const TIMELINE_STEPS: { key: Stage; label: string }[] = STAGES.map((key) => ({
+const TIMELINE_STEPS: { key: Stage; label: string }[] = STAGES.map(key => ({
   key,
   label: STAGE_LABELS[key],
 }))
@@ -61,7 +61,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
   const delivered = currentIdx >= STAGES.length - 1
 
   const atFor = (label: string): string => {
-    const match = timeline.find((t) => t.label.toLowerCase() === label.toLowerCase())
+    const match = timeline.find(t => t.label.toLowerCase() === label.toLowerCase())
     return match?.at ?? ''
   }
   const doneFor = (idx: number): boolean => idx <= currentIdx
@@ -91,14 +91,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
             role="img"
             aria-label="Delivery route from warehouse to destination"
           >
-            <path
-              d={ROUTE_D}
-              fill="none"
-              stroke={TRACK}
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeDasharray="2 8"
-            />
+            <path d={ROUTE_D} fill="none" stroke={TRACK} strokeWidth={3} strokeLinecap="round" strokeDasharray="2 8" />
             <motion.path
               d={ROUTE_D}
               fill="none"
@@ -177,17 +170,11 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
                     />
                   </span>
                   {i < TIMELINE_STEPS.length - 1 ? (
-                    <span
-                      className="w-0.5 flex-1"
-                      style={{ backgroundColor: i < currentIdx ? ACCENT : TRACK }}
-                    />
+                    <span className="w-0.5 flex-1" style={{ backgroundColor: i < currentIdx ? ACCENT : TRACK }} />
                   ) : null}
                 </div>
                 <div className="pb-2">
-                  <p
-                    className="text-sm font-semibold leading-tight"
-                    style={{ color: done ? '#0f172a' : IDLE }}
-                  >
+                  <p className="text-sm font-semibold leading-tight" style={{ color: done ? '#0f172a' : IDLE }}>
                     {step.label}
                   </p>
                   <p className="text-[11px] leading-tight text-slate-400">
@@ -239,10 +226,7 @@ function DestinationPin({ x, y, active }: { x: number; y: number; active: boolea
   const fill = active ? ACCENT : IDLE
   return (
     <g transform={`translate(${x} ${y - 24})`}>
-      <path
-        d="M0 0 C7 0 11 5 11 10 C11 16 0 24 0 24 C0 24 -11 16 -11 10 C-11 5 -7 0 0 0 Z"
-        fill={fill}
-      />
+      <path d="M0 0 C7 0 11 5 11 10 C11 16 0 24 0 24 C0 24 -11 16 -11 10 C-11 5 -7 0 0 0 Z" fill={fill} />
       <circle cx={0} cy={10} r={4} fill="#ffffff" />
     </g>
   )

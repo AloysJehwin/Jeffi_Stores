@@ -1,11 +1,46 @@
 export const dynamic = 'force-static'
 
 const orders = [
-  { id: '1042', customer: 'Alex Morgan',    amount: 'Rs. 2,499.00', status: 'shipped',    payment_status: 'paid',     source: 'online'    },
-  { id: '1041', customer: 'Jordan Lee',      amount: 'Rs. 1,799.00', status: 'delivered',  payment_status: 'paid',     source: 'online'    },
-  { id: '1040', customer: 'Sam Carter',      amount: 'Rs. 649.00',   status: 'processing', payment_status: 'paid',     source: 'business'  },
-  { id: '1039', customer: 'Taylor Reed',     amount: 'Rs. 3,148.00', status: 'pending',    payment_status: 'pending',  source: 'online'    },
-  { id: '1038', customer: 'Casey Brooks',    amount: 'Rs. 899.00',   status: 'cancelled',  payment_status: 'refunded', source: 'cash_sale' },
+  {
+    id: '1042',
+    customer: 'Alex Morgan',
+    amount: 'Rs. 2,499.00',
+    status: 'shipped',
+    payment_status: 'paid',
+    source: 'online',
+  },
+  {
+    id: '1041',
+    customer: 'Jordan Lee',
+    amount: 'Rs. 1,799.00',
+    status: 'delivered',
+    payment_status: 'paid',
+    source: 'online',
+  },
+  {
+    id: '1040',
+    customer: 'Sam Carter',
+    amount: 'Rs. 649.00',
+    status: 'processing',
+    payment_status: 'paid',
+    source: 'business',
+  },
+  {
+    id: '1039',
+    customer: 'Taylor Reed',
+    amount: 'Rs. 3,148.00',
+    status: 'pending',
+    payment_status: 'pending',
+    source: 'online',
+  },
+  {
+    id: '1038',
+    customer: 'Casey Brooks',
+    amount: 'Rs. 899.00',
+    status: 'cancelled',
+    payment_status: 'refunded',
+    source: 'cash_sale',
+  },
 ]
 
 function statusCls(s: string) {
@@ -30,7 +65,7 @@ function sourceLabel(s: string) {
   return 'Cash Sale'
 }
 
-const chartBars = [45,62,38,75,55,88,70,82,65,90,73,95]
+const chartBars = [45, 62, 38, 75, 55, 88, 70, 82, 65, 90, 73, 95]
 
 export default function PreviewOrders() {
   return (
@@ -45,7 +80,12 @@ export default function PreviewOrders() {
             <p className="text-3xl sm:text-4xl font-bold mt-1">Rs. 3,84,250.00</p>
           </div>
           <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
-            {[['342','Total'],['17','Pending'],['28','Processing'],['297','Completed']] .map(([v, l]) => (
+            {[
+              ['342', 'Total'],
+              ['17', 'Pending'],
+              ['28', 'Processing'],
+              ['297', 'Completed'],
+            ].map(([v, l]) => (
               <div key={l} className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
                 <p className="text-lg sm:text-2xl font-bold leading-none">{v}</p>
                 <p className="text-[10px] sm:text-xs text-white/80 mt-1">{l}</p>
@@ -57,13 +97,26 @@ export default function PreviewOrders() {
           <p className="text-sm font-semibold text-foreground mb-3">Revenue by Source</p>
           <div className="flex items-end gap-1 flex-1">
             {chartBars.map((h, i) => (
-              <div key={i} className={`flex-1 rounded-t ${i % 3 === 0 ? 'bg-blue-500/70' : i % 3 === 1 ? 'bg-accent-500/70' : 'bg-purple-500/60'}`} style={{ height: `${h}%` }} />
+              <div
+                key={i}
+                className={`flex-1 rounded-t ${i % 3 === 0 ? 'bg-blue-500/70' : i % 3 === 1 ? 'bg-accent-500/70' : 'bg-purple-500/60'}`}
+                style={{ height: `${h}%` }}
+              />
             ))}
           </div>
           <div className="flex gap-3 mt-2 text-[10px] text-foreground-muted">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500/70 inline-block" />Online</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-accent-500/70 inline-block" />Business</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-purple-500/60 inline-block" />Cash</span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-blue-500/70 inline-block" />
+              Online
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-accent-500/70 inline-block" />
+              Business
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-purple-500/60 inline-block" />
+              Cash
+            </span>
           </div>
         </div>
       </div>
@@ -73,8 +126,13 @@ export default function PreviewOrders() {
         <table className="min-w-full divide-y divide-border-default">
           <thead className="bg-surface-secondary">
             <tr>
-              {['Order ID','Source','Customer','Date','Amount','Status','Payment'].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
+              {['Order ID', 'Source', 'Customer', 'Date', 'Amount', 'Status', 'Payment'].map(h => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -83,16 +141,22 @@ export default function PreviewOrders() {
               <tr key={o.id} className="hover:bg-surface-secondary/50">
                 <td className="px-4 py-3 text-sm font-semibold text-foreground">#{o.id}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${sourceCls(o.source)}`}>{sourceLabel(o.source)}</span>
+                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${sourceCls(o.source)}`}>
+                    {sourceLabel(o.source)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-foreground">{o.customer}</td>
                 <td className="px-4 py-3 text-sm text-foreground-muted">05/09/2026</td>
                 <td className="px-4 py-3 text-sm font-semibold text-foreground">{o.amount}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusCls(o.status)}`}>{o.status}</span>
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusCls(o.status)}`}>
+                    {o.status}
+                  </span>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentCls(o.payment_status)}`}>{o.payment_status}</span>
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentCls(o.payment_status)}`}>
+                    {o.payment_status}
+                  </span>
                 </td>
               </tr>
             ))}

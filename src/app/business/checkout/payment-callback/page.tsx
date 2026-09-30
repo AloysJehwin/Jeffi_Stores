@@ -25,13 +25,16 @@ function PaymentCallbackInner() {
     try {
       const raw = sessionStorage.getItem('rzp_pending_biz')
       const existing = raw ? JSON.parse(raw) : {}
-      sessionStorage.setItem('rzp_pending_biz', JSON.stringify({
-        ...existing,
-        razorpayOrderId: razorpay_order_id,
-        razorpayPaymentId: razorpay_payment_id,
-        razorpaySignature: razorpay_signature,
-        ts: Date.now(),
-      }))
+      sessionStorage.setItem(
+        'rzp_pending_biz',
+        JSON.stringify({
+          ...existing,
+          razorpayOrderId: razorpay_order_id,
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+          ts: Date.now(),
+        })
+      )
     } catch {}
 
     router.replace('/business/checkout')

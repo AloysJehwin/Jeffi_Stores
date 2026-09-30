@@ -191,10 +191,10 @@ async function getBrands() {
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number, host: string) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
-  if (searchParams.brand)    params.set('brand',    searchParams.brand)
-  if (searchParams.search)   params.set('search',   searchParams.search)
-  if (searchParams.sort)     params.set('sort',     searchParams.sort)
-  if (searchParams.order)    params.set('order',    searchParams.order)
+  if (searchParams.brand) params.set('brand', searchParams.brand)
+  if (searchParams.search) params.set('search', searchParams.search)
+  if (searchParams.sort) params.set('sort', searchParams.sort)
+  if (searchParams.order) params.set('order', searchParams.order)
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
   return bp('/business/products', host) + (qs ? `?${qs}` : '')
@@ -227,187 +227,213 @@ export default async function ProductsPage({
           <aside className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
             {/* Desktop sidebar filter */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-                <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
+              <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
-                {/* Search */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Search
-                  </label>
-                  <ProductsSearch defaultValue={resolvedSearchParams.search} portalHeader="business" basePath={bp('/business/products', host)} />
-                </div>
+              {/* Search */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Search</label>
+                <ProductsSearch
+                  defaultValue={resolvedSearchParams.search}
+                  portalHeader="business"
+                  basePath={bp('/business/products', host)}
+                />
+              </div>
 
-                {/* Categories Filter */}
-                <div className="mb-6">
-                  <h3 className="font-semibold text-foreground mb-3">Categories</h3>
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {(() => {
-                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
-                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
+              {/* Categories Filter */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-foreground mb-3">Categories</h3>
+                <div className="space-y-1 max-h-64 overflow-y-auto">
+                  {(() => {
+                    const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                    const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
 
-                      function catIsActive(cat: any) {
-                        return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
-                      }
+                    function catIsActive(cat: any) {
+                      return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
+                    }
 
-                      function toggleCatUrl(cat: any) {
-                        const active = catIsActive(cat)
-                        const next = active
-                          ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
-                          : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
-                        const p = new URLSearchParams()
-                        if (next.length) p.set('category', next.join(','))
-                        if (activeBrands.length) p.set('brand', activeBrands.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
-                      }
+                    function toggleCatUrl(cat: any) {
+                      const active = catIsActive(cat)
+                      const next = active
+                        ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
+                        : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
+                      const p = new URLSearchParams()
+                      if (next.length) p.set('category', next.join(','))
+                      if (activeBrands.length) p.set('brand', activeBrands.join(','))
+                      if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                      if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                      if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
+                      return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
+                    }
 
-                      return (
-                        <>
-                          <Link
-                            href={bp('/business/products', host)}
-                            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                              activeCats.length === 0
-                                ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                : 'text-foreground-secondary hover:bg-surface-secondary'
-                            }`}
-                          >
-                            All Categories
-                          </Link>
-                          {mainCats.map((cat: any) => {
-                            const subs = subCats.filter((s: any) => s.parent_category_id === cat.id)
-                            const isActive = catIsActive(cat)
-                            return (
-                              <div key={cat.id}>
-                                <Link
-                                  href={toggleCatUrl(cat)}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors font-medium ${
-                                    isActive
-                                      ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
-                                      : 'text-foreground hover:bg-surface-secondary'
-                                  }`}
-                                >
-                                  {cat.name}
-                                  {isActive && (
-                                    <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                </Link>
-                                {subs.map((sub: any) => {
-                                  const isSubActive = catIsActive(sub)
-                                  return (
-                                    <Link
-                                      key={sub.id}
-                                      href={toggleCatUrl(sub)}
-                                      className={`flex items-center justify-between pl-6 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
-                                        isSubActive
-                                          ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                          : 'text-foreground-secondary hover:bg-surface-secondary'
-                                      }`}
-                                    >
-                                      {sub.name}
-                                      {isSubActive && (
-                                        <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                        </svg>
-                                      )}
-                                    </Link>
-                                  )
-                                })}
-                              </div>
-                            )
-                          })}
-                        </>
-                      )
-                    })()}
-                  </div>
-                </div>
-
-                {/* Brands Filter */}
-                <div className="mb-6">
-                  <h3 className="font-semibold text-foreground mb-3">Brands</h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {(() => {
-                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
-                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
-
-                      function brandIsActive(brand: any) {
-                        return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
-                      }
-
-                      function toggleBrandUrl(brand: any) {
-                        const active = brandIsActive(brand)
-                        const next = active
-                          ? activeBrands.filter(v => v !== brand.id && v !== brand.slug)
-                          : [...activeBrands.filter(v => v !== brand.id && v !== brand.slug), brand.id]
-                        const p = new URLSearchParams()
-                        if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (next.length) p.set('brand', next.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
-                      }
-
-                      const clearBrandsUrl = (() => {
-                        const p = new URLSearchParams()
-                        if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
-                      })()
-
-                      return (
-                        <>
-                          <Link
-                            href={clearBrandsUrl}
-                            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                              activeBrands.length === 0
-                                ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                : 'text-foreground-secondary hover:bg-surface-secondary'
-                            }`}
-                          >
-                            All Brands
-                          </Link>
-                          {brands.map((brand: any) => {
-                            const isActive = brandIsActive(brand)
-                            return (
+                    return (
+                      <>
+                        <Link
+                          href={bp('/business/products', host)}
+                          className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                            activeCats.length === 0
+                              ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
+                              : 'text-foreground-secondary hover:bg-surface-secondary'
+                          }`}
+                        >
+                          All Categories
+                        </Link>
+                        {mainCats.map((cat: any) => {
+                          const subs = subCats.filter((s: any) => s.parent_category_id === cat.id)
+                          const isActive = catIsActive(cat)
+                          return (
+                            <div key={cat.id}>
                               <Link
-                                key={brand.id}
-                                href={toggleBrandUrl(brand)}
-                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                href={toggleCatUrl(cat)}
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors font-medium ${
                                   isActive
-                                    ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                    : 'text-foreground-secondary hover:bg-surface-secondary'
+                                    ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
+                                    : 'text-foreground hover:bg-surface-secondary'
                                 }`}
                               >
-                                {brand.name}
+                                {cat.name}
                                 {isActive && (
-                                  <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  <svg
+                                    className="w-3.5 h-3.5 text-accent-500 shrink-0"
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                      clipRule="evenodd"
+                                    />
                                   </svg>
                                 )}
                               </Link>
-                            )
-                          })}
-                        </>
-                      )
-                    })()}
-                  </div>
+                              {subs.map((sub: any) => {
+                                const isSubActive = catIsActive(sub)
+                                return (
+                                  <Link
+                                    key={sub.id}
+                                    href={toggleCatUrl(sub)}
+                                    className={`flex items-center justify-between pl-6 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
+                                      isSubActive
+                                        ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
+                                        : 'text-foreground-secondary hover:bg-surface-secondary'
+                                    }`}
+                                  >
+                                    {sub.name}
+                                    {isSubActive && (
+                                      <svg
+                                        className="w-3.5 h-3.5 text-accent-500 shrink-0"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    )}
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
                 </div>
+              </div>
 
-                {/* Clear Filters */}
-                {(resolvedSearchParams.category || resolvedSearchParams.brand || resolvedSearchParams.search) && (
-                  <Link
-                    href={bp('/business/products', host)}
-                    className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
-                  >
-                    Clear All Filters
-                  </Link>
-                )}
+              {/* Brands Filter */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-foreground mb-3">Brands</h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {(() => {
+                    const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                    const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
+
+                    function brandIsActive(brand: any) {
+                      return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
+                    }
+
+                    function toggleBrandUrl(brand: any) {
+                      const active = brandIsActive(brand)
+                      const next = active
+                        ? activeBrands.filter(v => v !== brand.id && v !== brand.slug)
+                        : [...activeBrands.filter(v => v !== brand.id && v !== brand.slug), brand.id]
+                      const p = new URLSearchParams()
+                      if (activeCats.length) p.set('category', activeCats.join(','))
+                      if (next.length) p.set('brand', next.join(','))
+                      if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                      if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                      if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
+                      return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
+                    }
+
+                    const clearBrandsUrl = (() => {
+                      const p = new URLSearchParams()
+                      if (activeCats.length) p.set('category', activeCats.join(','))
+                      if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                      if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                      if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
+                      return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
+                    })()
+
+                    return (
+                      <>
+                        <Link
+                          href={clearBrandsUrl}
+                          className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                            activeBrands.length === 0
+                              ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
+                              : 'text-foreground-secondary hover:bg-surface-secondary'
+                          }`}
+                        >
+                          All Brands
+                        </Link>
+                        {brands.map((brand: any) => {
+                          const isActive = brandIsActive(brand)
+                          return (
+                            <Link
+                              key={brand.id}
+                              href={toggleBrandUrl(brand)}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                                isActive
+                                  ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
+                                  : 'text-foreground-secondary hover:bg-surface-secondary'
+                              }`}
+                            >
+                              {brand.name}
+                              {isActive && (
+                                <svg
+                                  className="w-3.5 h-3.5 text-accent-500 shrink-0"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                            </Link>
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {(resolvedSearchParams.category || resolvedSearchParams.brand || resolvedSearchParams.search) && (
+                <Link
+                  href={bp('/business/products', host)}
+                  className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
+                >
+                  Clear All Filters
+                </Link>
+              )}
             </div>
           </aside>
 
@@ -420,16 +446,26 @@ export default async function ProductsPage({
                 <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of products</p>
               </div>
               <div className="lg:hidden shrink-0">
-                <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath={bp('/business/products', host)} />
+                <MobileFilterSheet
+                  categories={allCats}
+                  brands={brands as any[]}
+                  basePath={bp('/business/products', host)}
+                />
               </div>
             </div>
             {/* Sort Bar */}
             <div className="flex items-center justify-between mb-6">
               <p className="text-foreground-secondary text-sm">
-                {total > 0
-                  ? <><span className="font-semibold text-foreground">{start}–{end}</span> of <span className="font-semibold text-foreground">{total}</span> products</>
-                  : '0 products found'
-                }
+                {total > 0 ? (
+                  <>
+                    <span className="font-semibold text-foreground">
+                      {start}–{end}
+                    </span>{' '}
+                    of <span className="font-semibold text-foreground">{total}</span> products
+                  </>
+                ) : (
+                  '0 products found'
+                )}
               </p>
               <SortDropdown basePath={bp('/business/products', host)} />
             </div>
@@ -438,22 +474,31 @@ export default async function ProductsPage({
             {products.length > 0 ? (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 stagger-grid">
-                  {products.map((product) => {
-                    const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+                  {products.map(product => {
+                    const primaryImage =
+                      product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                     const hasVariants = product.has_variants
-                    const displayPrice = hasVariants && product.variant_min_price
-                      ? product.variant_min_price
-                      : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
-                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
+                    const displayPrice =
+                      hasVariants && product.variant_min_price
+                        ? product.variant_min_price
+                        : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+                    const effectiveStock = hasVariants
+                      ? Number(product.variant_stock_total)
+                      : product.stock_status !== 'Out of Stock'
+                        ? 1
+                        : 0
                     const rawMrp = hasVariants
-                      ? (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                      : (product.mrp ? Number(product.mrp) : null)
+                      ? product.variant_min_mrp
+                        ? Number(product.variant_min_mrp)
+                        : null
+                      : product.mrp
+                        ? Number(product.mrp)
+                        : null
                     // When GST is off, displayPrice is ex-GST, so put the (inclusive)
                     // MRP on the same ex-GST basis before computing discount / striking through.
                     const gstRate = Number(product.gst_percentage ?? 0)
-                    const mrpBasis = (!gstEnabled && rawMrp != null && gstRate > 0)
-                      ? rawMrp / (1 + gstRate / 100)
-                      : rawMrp
+                    const mrpBasis =
+                      !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
                     const mrpDiscount = mrpDiscountPct(mrpBasis, Number(displayPrice))
 
                     return (
@@ -482,13 +527,23 @@ export default async function ProductsPage({
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  buildHref={(p) => buildPageUrl(resolvedSearchParams, p, host)}
+                  buildHref={p => buildPageUrl(resolvedSearchParams, p, host)}
                 />
               </>
             ) : (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                <svg
+                  className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
                 </svg>
                 <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
                 <p className="text-foreground-secondary mb-6">

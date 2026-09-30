@@ -19,7 +19,11 @@ interface AdminOffer {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-  card: 'Card', emi: 'EMI', upi: 'UPI', netbanking: 'Netbanking', wallet: 'Wallet',
+  card: 'Card',
+  emi: 'EMI',
+  upi: 'UPI',
+  netbanking: 'Netbanking',
+  wallet: 'Wallet',
 }
 
 function daysLeft(iso: string | null): number | null {
@@ -53,7 +57,9 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
     }
   }, [showToast])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   async function patch(offerId: string, body: Record<string, unknown>) {
     setSaving(offerId)
@@ -65,7 +71,10 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
         body: JSON.stringify({ offerId, ...body }),
       })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) { showToast(d.error || 'Update failed', 'error'); return }
+      if (!res.ok) {
+        showToast(d.error || 'Update failed', 'error')
+        return
+      }
       await load()
     } catch {
       showToast('Update failed', 'error')
@@ -80,9 +89,9 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
     <div className="space-y-5">
       <div className="rounded-xl border border-border-default bg-surface-secondary p-4">
         <p className="text-sm text-foreground">
-          Offers are created in the Razorpay dashboard, not here — Razorpay&apos;s API does not
-          allow creating them. This page controls which of your account&apos;s offers appear on
-          product pages, how they read, and in what order.
+          Offers are created in the Razorpay dashboard, not here — Razorpay&apos;s API does not allow creating them.
+          This page controls which of your account&apos;s offers appear on product pages, how they read, and in what
+          order.
         </p>
         <p className="text-xs text-foreground-muted mt-2">
           {loading
@@ -108,14 +117,12 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
 
       {!loading && !problem && offers.length === 0 && (
         <div className="rounded-xl border border-border-default p-8 text-center">
-          <p className="text-sm text-foreground-muted">
-            No active offers on this Razorpay account.
-          </p>
+          <p className="text-sm text-foreground-muted">No active offers on this Razorpay account.</p>
         </div>
       )}
 
       <div className="space-y-3">
-        {offers.map((o) => {
+        {offers.map(o => {
           const d = daysLeft(o.endsAt)
           const expiringSoon = d !== null && d < 30
           return (
@@ -127,7 +134,9 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                       {o.titleOverride || o.title}
                     </span>
                     {o.titleOverride && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted">edited</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted">
+                        edited
+                      </span>
                     )}
                     {o.looksInternal && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -137,9 +146,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                   </div>
 
                   {o.titleOverride && (
-                    <div className="text-xs text-foreground-muted mt-1 break-words">
-                      Razorpay: {o.title}
-                    </div>
+                    <div className="text-xs text-foreground-muted mt-1 break-words">Razorpay: {o.title}</div>
                   )}
 
                   <div className="flex items-center gap-3 mt-2 text-xs text-foreground-muted flex-wrap">
@@ -160,7 +167,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                     <Toggle
                       checked={o.isVisible}
                       disabled={saving === o.id}
-                      onChange={(on) => patch(o.id, { isVisible: on })}
+                      onChange={on => patch(o.id, { isVisible: on })}
                       label={o.isVisible ? 'Shown' : 'Hidden'}
                     />
                   )}
@@ -173,13 +180,16 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                     <>
                       <input
                         value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
+                        onChange={e => setDraftTitle(e.target.value)}
                         placeholder={o.title}
                         maxLength={200}
                         className="flex-1 min-w-[16rem] px-2.5 py-1.5 text-sm rounded-lg border border-border-default bg-surface-secondary text-foreground"
                       />
                       <button
-                        onClick={() => { patch(o.id, { titleOverride: draftTitle }); setEditing(null) }}
+                        onClick={() => {
+                          patch(o.id, { titleOverride: draftTitle })
+                          setEditing(null)
+                        }}
                         className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium"
                       >
                         Save
@@ -194,7 +204,10 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                   ) : (
                     <>
                       <button
-                        onClick={() => { setEditing(o.id); setDraftTitle(o.titleOverride || '') }}
+                        onClick={() => {
+                          setEditing(o.id)
+                          setDraftTitle(o.titleOverride || '')
+                        }}
                         className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
                       >
                         {o.titleOverride ? 'Edit wording' : 'Override wording'}
@@ -214,7 +227,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                           min={0}
                           max={999}
                           defaultValue={o.displayOrder}
-                          onBlur={(e) => {
+                          onBlur={e => {
                             const v = Number(e.target.value)
                             if (v !== o.displayOrder) patch(o.id, { displayOrder: v })
                           }}

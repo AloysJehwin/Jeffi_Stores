@@ -35,7 +35,8 @@ export async function generateMetadata() {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover' }
+  viewportFit: 'cover',
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const host = await getHost()
@@ -84,17 +85,31 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k='jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()` }}
+            __html: `(function(){try{var k='jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()`,
+          }}
         />
       </head>
       <body className="antialiased bg-surface text-foreground m-0 p-0">
         <SessionGuard />
         <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
-        <Script id="gtag-init" strategy="afterInteractive"
+        <Script
+          id="gtag-init"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');` }}
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
+          }}
         />
-        <ConditionalLayout initialStoreConfig={initialStoreConfig} isFormsSubdomain={isFormsSubdomain} isDocumentSubdomain={isDocumentSubdomain} isBusinessSubdomain={isBusinessSubdomain} isAdminSubdomain={isAdminSubdomain} isEcomSubdomain={isEcomSubdomain} isCertPortalSubdomain={isCertPortalSubdomain}>{children}</ConditionalLayout>
+        <ConditionalLayout
+          initialStoreConfig={initialStoreConfig}
+          isFormsSubdomain={isFormsSubdomain}
+          isDocumentSubdomain={isDocumentSubdomain}
+          isBusinessSubdomain={isBusinessSubdomain}
+          isAdminSubdomain={isAdminSubdomain}
+          isEcomSubdomain={isEcomSubdomain}
+          isCertPortalSubdomain={isCertPortalSubdomain}
+        >
+          {children}
+        </ConditionalLayout>
       </body>
     </html>
   )

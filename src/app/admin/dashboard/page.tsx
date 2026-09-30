@@ -45,7 +45,14 @@ const MORE_ACTIONS: { label: string; path: string; icon: string; scope: string }
 ]
 
 type Tone = 'amber' | 'red'
-interface Alert { label: string; count: number; tone: Tone; path: string; scope?: string; group: string }
+interface Alert {
+  label: string
+  count: number
+  tone: Tone
+  path: string
+  scope?: string
+  group: string
+}
 
 function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: Tone; href: string }) {
   const tones = {
@@ -54,7 +61,10 @@ function AlertChip({ label, count, tone, href }: { label: string; count: number;
   }
   const dots = { amber: 'bg-amber-500', red: 'bg-red-500' }
   return (
-    <Link href={href} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 transition-colors ${tones[tone]}`}>
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 transition-colors ${tones[tone]}`}
+    >
       <span className={`w-1.5 h-1.5 rounded-full ${dots[tone]}`} />
       <span className="tabular-nums font-semibold">{count}</span>
       <span>{label}</span>
@@ -99,15 +109,26 @@ export default async function AdminDashboard() {
   let role = headersList.get('x-user-role') || ''
   let adminId = headersList.get('x-user-id') || ''
   let scopes: string[] = []
-  try { scopes = JSON.parse(headersList.get('x-user-scopes') || '[]') } catch { scopes = [] }
+  try {
+    scopes = JSON.parse(headersList.get('x-user-scopes') || '[]')
+  } catch {
+    scopes = []
+  }
   if (token) {
     try {
-      const payload = await verifyToken(token) as { adminId?: string; displayName?: string; role?: string; scopes?: string[] } | null
+      const payload = (await verifyToken(token)) as {
+        adminId?: string
+        displayName?: string
+        role?: string
+        scopes?: string[]
+      } | null
       if (payload?.displayName) displayName = payload.displayName
       if (!role && payload?.role) role = payload.role
       if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
-    } catch { /* fall back to x-username */ }
+    } catch {
+      /* fall back to x-username */
+    }
   }
   const host = await getHost()
   const can = (scope: string) => hasScope(role, scopes, scope)
@@ -122,27 +143,162 @@ export default async function AdminDashboard() {
 
   // Session scopes are already narrowed to the plan, so a chip never links into a module this admin cannot open.
   const candidates: Alert[] = [
-    { group: 'Orders', label: 'pending orders', count: metrics.funnel.pending, tone: 'amber', path: '/admin/orders?status=pending' },
-    { group: 'Orders', label: 'pending over 24 h', count: a.pendingOver24h, tone: 'red', path: '/admin/orders?status=pending' },
-    { group: 'Orders', label: 'unshipped over 48 h', count: a.unshippedOver48h, tone: 'red', path: '/admin/orders?status=processing' },
-    { group: 'Orders', label: 'cancel requests', count: a.cancelRequested, tone: 'amber', path: '/admin/orders?status=cancel_requested' },
-    { group: 'Orders', label: 'delivery attempted', count: a.deliveryAttempted, tone: 'amber', path: '/admin/orders?status=out_for_delivery' },
+    {
+      group: 'Orders',
+      label: 'pending orders',
+      count: metrics.funnel.pending,
+      tone: 'amber',
+      path: '/admin/orders?status=pending',
+    },
+    {
+      group: 'Orders',
+      label: 'pending over 24 h',
+      count: a.pendingOver24h,
+      tone: 'red',
+      path: '/admin/orders?status=pending',
+    },
+    {
+      group: 'Orders',
+      label: 'unshipped over 48 h',
+      count: a.unshippedOver48h,
+      tone: 'red',
+      path: '/admin/orders?status=processing',
+    },
+    {
+      group: 'Orders',
+      label: 'cancel requests',
+      count: a.cancelRequested,
+      tone: 'amber',
+      path: '/admin/orders?status=cancel_requested',
+    },
+    {
+      group: 'Orders',
+      label: 'delivery attempted',
+      count: a.deliveryAttempted,
+      tone: 'amber',
+      path: '/admin/orders?status=out_for_delivery',
+    },
     { group: 'Orders', label: 'unpaid online orders', count: a.unpaidOnline, tone: 'amber', path: '/admin/orders' },
-    { group: 'Stock', label: 'low stock', count: analytics.inventory.lowStock, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'out of stock', count: analytics.inventory.outOfStock, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'selling but out of stock', count: a.sellingButOut, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'restock within 7 days', count: a.restockSoon, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'batches expiring in 30 days', count: a.expiringBatches, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'expired batches', count: a.expiredBatches, tone: 'red', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Stock', label: 'back-in-stock requests', count: a.backInStockWaitlist, tone: 'amber', path: '/admin/inventory', scope: 'inventory:read' },
-    { group: 'Returns', label: 'open returns', count: a.openReturns, tone: 'red', path: '/admin/returns', scope: 'returns:read' },
-    { group: 'Returns', label: 'RTO in transit', count: analytics.returns.rtoInTransit, tone: 'amber', path: '/admin/returns', scope: 'returns:read' },
-    { group: 'Customers', label: 'open support chats', count: a.supportOpen, tone: 'amber', path: '/admin/crm', scope: 'crm:read' },
-    { group: 'Customers', label: 'reviews awaiting approval', count: a.pendingReviews, tone: 'amber', path: '/admin/reviews', scope: 'reviews:read' },
-    { group: 'Customers', label: 'overdue tasks', count: a.overdueTasks, tone: 'red', path: '/admin/tasks', scope: 'tasks:read' },
-    { group: 'Customers', label: 'high churn risk', count: a.churnHigh, tone: 'amber', path: '/admin/crm', scope: 'crm:read' },
-    { group: 'Business', label: 'pending RFQs', count: a.pendingRfqs, tone: 'amber', path: '/admin/business/rfqs', scope: 'business_rfqs:read' },
-    { group: 'Business', label: 'overdue bills', count: a.overdueBills, tone: 'red', path: '/admin/financial', scope: 'financial:read' },
+    {
+      group: 'Stock',
+      label: 'low stock',
+      count: analytics.inventory.lowStock,
+      tone: 'amber',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'out of stock',
+      count: analytics.inventory.outOfStock,
+      tone: 'red',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'selling but out of stock',
+      count: a.sellingButOut,
+      tone: 'red',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'restock within 7 days',
+      count: a.restockSoon,
+      tone: 'amber',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'batches expiring in 30 days',
+      count: a.expiringBatches,
+      tone: 'amber',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'expired batches',
+      count: a.expiredBatches,
+      tone: 'red',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Stock',
+      label: 'back-in-stock requests',
+      count: a.backInStockWaitlist,
+      tone: 'amber',
+      path: '/admin/inventory',
+      scope: 'inventory:read',
+    },
+    {
+      group: 'Returns',
+      label: 'open returns',
+      count: a.openReturns,
+      tone: 'red',
+      path: '/admin/returns',
+      scope: 'returns:read',
+    },
+    {
+      group: 'Returns',
+      label: 'RTO in transit',
+      count: analytics.returns.rtoInTransit,
+      tone: 'amber',
+      path: '/admin/returns',
+      scope: 'returns:read',
+    },
+    {
+      group: 'Customers',
+      label: 'open support chats',
+      count: a.supportOpen,
+      tone: 'amber',
+      path: '/admin/crm',
+      scope: 'crm:read',
+    },
+    {
+      group: 'Customers',
+      label: 'reviews awaiting approval',
+      count: a.pendingReviews,
+      tone: 'amber',
+      path: '/admin/reviews',
+      scope: 'reviews:read',
+    },
+    {
+      group: 'Customers',
+      label: 'overdue tasks',
+      count: a.overdueTasks,
+      tone: 'red',
+      path: '/admin/tasks',
+      scope: 'tasks:read',
+    },
+    {
+      group: 'Customers',
+      label: 'high churn risk',
+      count: a.churnHigh,
+      tone: 'amber',
+      path: '/admin/crm',
+      scope: 'crm:read',
+    },
+    {
+      group: 'Business',
+      label: 'pending RFQs',
+      count: a.pendingRfqs,
+      tone: 'amber',
+      path: '/admin/business/rfqs',
+      scope: 'business_rfqs:read',
+    },
+    {
+      group: 'Business',
+      label: 'overdue bills',
+      count: a.overdueBills,
+      tone: 'red',
+      path: '/admin/financial',
+      scope: 'financial:read',
+    },
   ]
   const alerts = candidates.filter(x => x.count > 0 && (!x.scope || can(x.scope)))
   const groups = Array.from(new Set(alerts.map(x => x.group)))
@@ -167,10 +323,14 @@ export default async function AdminDashboard() {
           <div className="space-y-3">
             {groups.map(g => (
               <div key={g} className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted w-20 shrink-0">{g}</span>
-                {alerts.filter(x => x.group === g).map(x => (
-                  <AlertChip key={x.label} label={x.label} count={x.count} tone={x.tone} href={ap(x.path, host)} />
-                ))}
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted w-20 shrink-0">
+                  {g}
+                </span>
+                {alerts
+                  .filter(x => x.group === g)
+                  .map(x => (
+                    <AlertChip key={x.label} label={x.label} count={x.count} tone={x.tone} href={ap(x.path, host)} />
+                  ))}
               </div>
             ))}
           </div>
@@ -190,7 +350,14 @@ export default async function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <AnalyticsDashboardClient initial={analytics} metrics={metrics} host={host} username={displayName} ops={opsBlock} footer={footerBlock} />
+      <AnalyticsDashboardClient
+        initial={analytics}
+        metrics={metrics}
+        host={host}
+        username={displayName}
+        ops={opsBlock}
+        footer={footerBlock}
+      />
     </div>
   )
 }

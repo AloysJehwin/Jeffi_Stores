@@ -50,7 +50,10 @@ export default function SupplierDetailClient({ id }: { id: string }) {
   useEffect(() => {
     fetch(`/api/admin/suppliers/${id}`)
       .then(r => r.json())
-      .then(j => { setData(j); setLoading(false) })
+      .then(j => {
+        setData(j)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
 
@@ -59,7 +62,12 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       <div className="p-6">
         <p className="text-foreground-secondary">Supplier not found.</p>
         {data?.error && <p className="text-red-500 text-xs mt-1 font-mono">{data.error}</p>}
-        <Link href={ap('/admin/inventory?tab=suppliers')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Suppliers</Link>
+        <Link
+          href={ap('/admin/inventory?tab=suppliers')}
+          className="text-accent-500 hover:underline text-sm mt-2 inline-block"
+        >
+          ← Back to Suppliers
+        </Link>
       </div>
     )
   }
@@ -79,11 +87,19 @@ export default function SupplierDetailClient({ id }: { id: string }) {
         {/* Info cards — 3-col grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="h-3 w-24 bg-surface-secondary rounded animate-pulse" />
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                  <div
+                    key={j}
+                    className="flex justify-between gap-4 animate-pulse"
+                    style={{ animationDelay: `${j * 40}ms` }}
+                  >
                     <div className="h-3.5 w-20 bg-surface-secondary rounded shrink-0" />
                     <div className="h-3.5 bg-surface-secondary rounded flex-1" />
                   </div>
@@ -126,7 +142,10 @@ export default function SupplierDetailClient({ id }: { id: string }) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/inventory?tab=suppliers')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap('/admin/inventory?tab=suppliers')}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Suppliers
         </a>
@@ -137,14 +156,19 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href={ap('/admin/inventory')} className="text-foreground-secondary hover:text-foreground transition-colors">
+          <Link
+            href={ap('/admin/inventory')}
+            className="text-foreground-secondary hover:text-foreground transition-colors"
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
           <h1 className="text-xl font-bold text-foreground">{s.name}</h1>
           {!s.is_active && (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">Inactive</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">
+              Inactive
+            </span>
           )}
         </div>
         <Link
@@ -170,13 +194,17 @@ export default function SupplierDetailClient({ id }: { id: string }) {
             {s.phone && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Phone</span>
-                <a href={`tel:+91${s.phone}`} className="text-accent-500 hover:underline">+91 {s.phone}</a>
+                <a href={`tel:+91${s.phone}`} className="text-accent-500 hover:underline">
+                  +91 {s.phone}
+                </a>
               </div>
             )}
             {s.email && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Email</span>
-                <a href={`mailto:${s.email}`} className="text-accent-500 hover:underline text-xs">{s.email}</a>
+                <a href={`mailto:${s.email}`} className="text-accent-500 hover:underline text-xs">
+                  {s.email}
+                </a>
               </div>
             )}
             {s.address && (
@@ -271,8 +299,8 @@ export default function SupplierDetailClient({ id }: { id: string }) {
               {t === 'pos'
                 ? `Purchase Orders (${pos.length})`
                 : t === 'expenses'
-                ? `Bills / Expenses (${expenses.length})`
-                : `Products (${linkedProducts.length})`}
+                  ? `Bills / Expenses (${expenses.length})`
+                  : `Products (${linkedProducts.length})`}
             </button>
           ))}
         </div>
@@ -286,29 +314,50 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">PO #</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Date</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Expected</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Status</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Amount</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        PO #
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Date
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Expected
+                      </th>
+                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Status
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
                     {pos.map((po: any) => (
                       <tr key={po.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={ap(`/admin/inventory?po=${po.po_number}`)} className="font-mono font-medium text-accent-500 hover:underline">
+                          <Link
+                            href={ap(`/admin/inventory?po=${po.po_number}`)}
+                            className="font-mono font-medium text-accent-500 hover:underline"
+                          >
                             {po.po_number}
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(po.order_date)}</td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(po.expected_date)}</td>
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                          {formatDate(po.order_date)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                          {formatDate(po.expected_date)}
+                        </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[po.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[po.status] || 'bg-surface-secondary text-foreground-secondary'}`}
+                          >
                             {po.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(po.total_amount || '0'))}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-foreground">
+                          {formatINR(parseFloat(po.total_amount || '0'))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -327,12 +376,24 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Bill #</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">PO #</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Date</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Due</th>
-                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Status</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Amount</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Bill #
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        PO #
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Date
+                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Due
+                      </th>
+                      <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Status
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
@@ -340,7 +401,10 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                       <tr key={e.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
                           {canFinancial ? (
-                            <Link href={ap(`/admin/financial/payables/${e.id}`)} className="font-mono font-medium text-accent-500 hover:underline">
+                            <Link
+                              href={ap(`/admin/financial/payables/${e.id}`)}
+                              className="font-mono font-medium text-accent-500 hover:underline"
+                            >
                               {e.expense_number}
                             </Link>
                           ) : (
@@ -348,18 +412,26 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                           )}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary font-mono text-xs">{e.po_number || '—'}</td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(e.expense_date)}</td>
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                          {formatDate(e.expense_date)}
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`${new Date(e.due_date) < new Date() && e.status !== 'paid' ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}`}>
+                          <span
+                            className={`${new Date(e.due_date) < new Date() && e.status !== 'paid' ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}`}
+                          >
                             {formatDate(e.due_date)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[e.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[e.status] || 'bg-surface-secondary text-foreground-secondary'}`}
+                          >
                             {e.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(e.total_amount || '0'))}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-foreground">
+                          {formatINR(parseFloat(e.total_amount || '0'))}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -373,34 +445,64 @@ export default function SupplierDetailClient({ id }: { id: string }) {
           <div className="space-y-6">
             {/* Linked — current buy-price list from product_suppliers */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Linked (buy-price list)</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+                Linked (buy-price list)
+              </p>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 {linkedProducts.length === 0 ? (
-                  <p className="text-foreground-secondary text-sm text-center py-8">No products linked to this supplier</p>
+                  <p className="text-foreground-secondary text-sm text-center py-8">
+                    No products linked to this supplier
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-surface-secondary">
                         <tr>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Product</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant / Sub-variant</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Buy Price</th>
-                          <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Preferred</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">MOQ</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Lead (days)</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Product
+                          </th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Variant / Sub-variant
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Buy Price
+                          </th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Preferred
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            MOQ
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Lead (days)
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border-default">
                         {linkedProducts.map((p: any, i: number) => (
-                          <tr key={`${p.product_id}-${p.variant_id || ''}-${p.sub_variant_id || ''}-${i}`} className="hover:bg-surface-secondary/40 transition-colors">
+                          <tr
+                            key={`${p.product_id}-${p.variant_id || ''}-${p.sub_variant_id || ''}-${i}`}
+                            className="hover:bg-surface-secondary/40 transition-colors"
+                          >
                             <td className="px-4 py-3">
-                              <Link href={ap(`/admin/products/${p.product_id}`)} className="font-medium text-accent-500 hover:underline">{p.product_name}</Link>
+                              <Link
+                                href={ap(`/admin/products/${p.product_id}`)}
+                                className="font-medium text-accent-500 hover:underline"
+                              >
+                                {p.product_name}
+                              </Link>
                             </td>
-                            <td className="px-4 py-3 text-foreground-secondary">{p.sub_variant_name || p.variant_name || '—'}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.unit_cost || '0'))}</td>
+                            <td className="px-4 py-3 text-foreground-secondary">
+                              {p.sub_variant_name || p.variant_name || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">
+                              {formatINR(parseFloat(p.unit_cost || '0'))}
+                            </td>
                             <td className="px-4 py-3 text-center">{p.is_preferred ? '★' : '—'}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary">{p.moq ?? '—'}</td>
-                            <td className="px-4 py-3 text-right text-foreground-secondary">{p.lead_time_days ?? '—'}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary">
+                              {p.lead_time_days ?? '—'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -412,33 +514,63 @@ export default function SupplierDetailClient({ id }: { id: string }) {
 
             {/* Purchased — actuals from purchase order items */}
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Purchased (from POs)</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+                Purchased (from POs)
+              </p>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 {purchasedProducts.length === 0 ? (
-                  <p className="text-foreground-secondary text-sm text-center py-8">No purchases recorded from this supplier</p>
+                  <p className="text-foreground-secondary text-sm text-center py-8">
+                    No purchases recorded from this supplier
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-surface-secondary">
                         <tr>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Product</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Total Qty</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Last Unit Cost</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Last Ordered</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">POs</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Product
+                          </th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Variant
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Total Qty
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Last Unit Cost
+                          </th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            Last Ordered
+                          </th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                            POs
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border-default">
                         {purchasedProducts.map((p: any, i: number) => (
-                          <tr key={`${p.product_id}-${p.variant_id || ''}-${i}`} className="hover:bg-surface-secondary/40 transition-colors">
+                          <tr
+                            key={`${p.product_id}-${p.variant_id || ''}-${i}`}
+                            className="hover:bg-surface-secondary/40 transition-colors"
+                          >
                             <td className="px-4 py-3">
-                              <Link href={ap(`/admin/products/${p.product_id}`)} className="font-medium text-accent-500 hover:underline">{p.product_name}</Link>
+                              <Link
+                                href={ap(`/admin/products/${p.product_id}`)}
+                                className="font-medium text-accent-500 hover:underline"
+                              >
+                                {p.product_name}
+                              </Link>
                             </td>
-                            <td className="px-4 py-3 text-foreground-secondary">{p.sub_variant_name || p.variant_name || '—'}</td>
+                            <td className="px-4 py-3 text-foreground-secondary">
+                              {p.sub_variant_name || p.variant_name || '—'}
+                            </td>
                             <td className="px-4 py-3 text-right text-foreground">{Number(p.total_qty || 0)}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.last_unit_cost || '0'))}</td>
-                            <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(p.last_order_date)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">
+                              {formatINR(parseFloat(p.last_unit_cost || '0'))}
+                            </td>
+                            <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                              {formatDate(p.last_order_date)}
+                            </td>
                             <td className="px-4 py-3 text-right text-foreground-secondary">{p.po_count ?? 0}</td>
                           </tr>
                         ))}

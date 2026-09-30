@@ -78,7 +78,7 @@ async function getProducts(searchParams: any) {
   const allowedSortColumns: Record<string, string> = {
     created_at: 'p.created_at',
     name: 'p.name',
-    category: 'c.name, p.name',  // group-by-category sort
+    category: 'c.name, p.name', // group-by-category sort
     base_price: `CASE WHEN p.has_variants THEN (
       SELECT MIN(price) FROM (
         SELECT pv2.price FROM product_variants pv2
@@ -208,8 +208,10 @@ async function getCategoryBanners(gstEnabled: boolean) {
       )
     ORDER BY c.display_order ASC LIMIT 6
   `)
-  const withProducts = await Promise.all(cats.map(async cat => {
-    const products = await queryMany<any>(`
+  const withProducts = await Promise.all(
+    cats.map(async cat => {
+      const products = await queryMany<any>(
+        `
       SELECT p.id, p.name, p.slug, p.has_variants, p.base_price, p.price_ex_gst,
         MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price,
         (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
@@ -219,9 +221,12 @@ async function getCategoryBanners(gstEnabled: boolean) {
       LEFT JOIN product_variants pv ON pv.product_id = p.id
       WHERE p.is_active = true
       GROUP BY p.id ORDER BY p.is_featured DESC, p.created_at DESC LIMIT 12
-    `, [cat.id])
-    return { ...cat, products }
-  }))
+    `,
+        [cat.id]
+      )
+      return { ...cat, products }
+    })
+  )
   return withProducts.filter(c => c.products.length >= 2)
 }
 
@@ -229,26 +234,26 @@ async function getCategoryBanners(gstEnabled: boolean) {
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
-  if (searchParams.brand)    params.set('brand',    searchParams.brand)
-  if (searchParams.offer)    params.set('offer',    searchParams.offer)
-  if (searchParams.search)   params.set('search',   searchParams.search)
-  if (searchParams.sort)     params.set('sort',     searchParams.sort)
-  if (searchParams.order)    params.set('order',    searchParams.order)
-  if (searchParams.minPrice)   params.set('minPrice',   searchParams.minPrice)
-  if (searchParams.maxPrice)   params.set('maxPrice',   searchParams.maxPrice)
-  if (searchParams.inStock)    params.set('inStock',    searchParams.inStock)
-  if (searchParams.onSale)     params.set('onSale',     searchParams.onSale)
-  if (searchParams.color)      params.set('color',      searchParams.color)
-  if (searchParams.grade)      params.set('grade',      searchParams.grade)
-  if (searchParams.material)   params.set('material',   searchParams.material)
-  if (searchParams.finish)     params.set('finish',     searchParams.finish)
+  if (searchParams.brand) params.set('brand', searchParams.brand)
+  if (searchParams.offer) params.set('offer', searchParams.offer)
+  if (searchParams.search) params.set('search', searchParams.search)
+  if (searchParams.sort) params.set('sort', searchParams.sort)
+  if (searchParams.order) params.set('order', searchParams.order)
+  if (searchParams.minPrice) params.set('minPrice', searchParams.minPrice)
+  if (searchParams.maxPrice) params.set('maxPrice', searchParams.maxPrice)
+  if (searchParams.inStock) params.set('inStock', searchParams.inStock)
+  if (searchParams.onSale) params.set('onSale', searchParams.onSale)
+  if (searchParams.color) params.set('color', searchParams.color)
+  if (searchParams.grade) params.set('grade', searchParams.grade)
+  if (searchParams.material) params.set('material', searchParams.material)
+  if (searchParams.finish) params.set('finish', searchParams.finish)
   if (searchParams.compliance) params.set('compliance', searchParams.compliance)
-  if (searchParams.origin)     params.set('origin',     searchParams.origin)
-  if (searchParams.minRating)  params.set('minRating',  searchParams.minRating)
+  if (searchParams.origin) params.set('origin', searchParams.origin)
+  if (searchParams.minRating) params.set('minRating', searchParams.minRating)
   if (searchParams.variantType) params.set('variantType', searchParams.variantType)
   if (searchParams.variantValue) params.set('variantValue', searchParams.variantValue)
-  if (searchParams.specKey)    params.set('specKey',    searchParams.specKey)
-  if (searchParams.specValue)  params.set('specValue',  searchParams.specValue)
+  if (searchParams.specKey) params.set('specKey', searchParams.specKey)
+  if (searchParams.specValue) params.set('specValue', searchParams.specValue)
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
   return `/products${qs ? `?${qs}` : ''}`
@@ -280,16 +285,23 @@ export default async function ProductsPage({
         )
         SELECT id FROM cat_tree
       )`)
-      facetBaseParams.push(catVals[0]); facetIdx++
+      facetBaseParams.push(catVals[0])
+      facetIdx++
     } else {
-      const parts = catVals.map(() => { const p = facetIdx++; return `(id::text = $${p} OR slug = $${p})` })
+      const parts = catVals.map(() => {
+        const p = facetIdx++
+        return `(id::text = $${p} OR slug = $${p})`
+      })
       facetBaseConditions.push(`p.category_id IN (SELECT id FROM categories WHERE ${parts.join(' OR ')})`)
       facetBaseParams.push(...catVals)
     }
   }
   if (resolvedSearchParams.brand) {
     const brandVals = String(resolvedSearchParams.brand).split(',').filter(Boolean)
-    const parts = brandVals.map(() => { const p = facetIdx++; return `(id::text = $${p} OR slug = $${p})` })
+    const parts = brandVals.map(() => {
+      const p = facetIdx++
+      return `(id::text = $${p} OR slug = $${p})`
+    })
     facetBaseConditions.push(`p.brand_id IN (SELECT id FROM brands WHERE ${parts.join(' OR ')})`)
     facetBaseParams.push(...brandVals)
   }
@@ -306,9 +318,10 @@ export default async function ProductsPage({
     eligibleSlugs: new Set(liveOffers.map(o => o.slug)),
   })
   // A selected offer that has ended or emptied stays listed so the shopper can see and clear it.
-  const filterOffers = activeOffer && !liveOffers.some(o => o.slug === activeOffer.slug)
-    ? [...liveOffers, { slug: activeOffer.slug, title: activeOffer.title }]
-    : liveOffers
+  const filterOffers =
+    activeOffer && !liveOffers.some(o => o.slug === activeOffer.slug)
+      ? [...liveOffers, { slug: activeOffer.slug, title: activeOffer.title }]
+      : liveOffers
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, total)
@@ -338,10 +351,18 @@ export default async function ProductsPage({
             {/* Profile-based insight banner */}
             <SearchInsightBanner
               activeBrands={(brands as any[])
-                .filter((b: any) => resolvedSearchParams.brand?.split(',').includes(String(b.id)) || resolvedSearchParams.brand?.split(',').includes(b.slug))
+                .filter(
+                  (b: any) =>
+                    resolvedSearchParams.brand?.split(',').includes(String(b.id)) ||
+                    resolvedSearchParams.brand?.split(',').includes(b.slug)
+                )
                 .map((b: any) => b.name)}
               activeCategories={(categories as any[])
-                .filter((c: any) => resolvedSearchParams.category?.split(',').includes(String(c.id)) || resolvedSearchParams.category?.split(',').includes(c.slug))
+                .filter(
+                  (c: any) =>
+                    resolvedSearchParams.category?.split(',').includes(String(c.id)) ||
+                    resolvedSearchParams.category?.split(',').includes(c.slug)
+                )
                 .map((c: any) => c.name)}
               resultCount={total}
             />
@@ -349,17 +370,44 @@ export default async function ProductsPage({
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
-                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} filterSlot={<MobileFilterSheet key="mobile-filters" categories={allCats} brands={brands as any[]} facets={facets} offers={filterOffers} />} promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined} />
+                <ProductGrid
+                  products={products as any[]}
+                  gstEnabled={gstEnabled}
+                  categoryBanners={categoryBanners as any[]}
+                  total={total}
+                  start={start}
+                  end={end}
+                  filterSlot={
+                    <MobileFilterSheet
+                      key="mobile-filters"
+                      categories={allCats}
+                      brands={brands as any[]}
+                      facets={facets}
+                      offers={filterOffers}
+                    />
+                  }
+                  promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
+                />
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  buildHref={(p) => buildPageUrl(resolvedSearchParams, p)}
+                  buildHref={p => buildPageUrl(resolvedSearchParams, p)}
                 />
               </>
             ) : (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                <svg
+                  className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                  />
                 </svg>
                 <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
                 <p className="text-foreground-secondary mb-6">

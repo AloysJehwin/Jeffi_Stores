@@ -27,9 +27,17 @@ const COUPON_SORT_COLS: Record<string, string> = {
   min_purchase: 'min_purchase_amount',
   usage: 'times_used',
   valid_until: 'valid_until',
-  status: 'is_active' }
+  status: 'is_active',
+}
 
-async function getFilteredCoupons(filters: { is_active?: string; search?: string; campaign?: string; page?: number; sort?: string; dir?: string }) {
+async function getFilteredCoupons(filters: {
+  is_active?: string
+  search?: string
+  campaign?: string
+  page?: number
+  sort?: string
+  dir?: string
+}) {
   const conditions: string[] = []
   const params: unknown[] = []
   let i = 1
@@ -57,7 +65,7 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   const limit = PAGE_SIZE
   const offset = ((filters.page || 1) - 1) * limit
 
-  const safeCol = (filters.sort && COUPON_SORT_COLS[filters.sort]) ? COUPON_SORT_COLS[filters.sort] : 'created_at'
+  const safeCol = filters.sort && COUPON_SORT_COLS[filters.sort] ? COUPON_SORT_COLS[filters.sort] : 'created_at'
   const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
   const orderBy = `ORDER BY ${safeCol} ${safeDir}`
 
@@ -69,7 +77,11 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   return { coupons, total }
 }
 
-export default function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function CouponsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -88,12 +100,27 @@ export default function CouponsPage({ searchParams }: { searchParams: Promise<{ 
 
       <AdminFilters
         filters={[
-          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
-          { name: 'campaign', label: 'Source', options: [{ value: '__manual__', label: 'Manual' }, { value: 'winback_90', label: 'Winback 90d' }, { value: 'winback_180', label: 'Winback 180d' }] },
+          {
+            name: 'is_active',
+            label: 'Status',
+            options: [
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ],
+          },
+          {
+            name: 'campaign',
+            label: 'Source',
+            options: [
+              { value: '__manual__', label: 'Manual' },
+              { value: 'winback_90', label: 'Winback 90d' },
+              { value: 'winback_180', label: 'Winback 180d' },
+            ],
+          },
         ]}
         searchPlaceholder="Search by code or description..."
         suggestType="coupons"
-        />
+      />
 
       <CouponsListSection searchParams={searchParams} />
     </div>
@@ -109,7 +136,10 @@ async function AddCouponButton() {
   if (!canWrite) return null
   return (
     <div className="hidden md:block">
-      <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+      <Link
+        href={ap('/admin/coupons/add', host)}
+        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+      >
         Add New Coupon
       </Link>
     </div>
@@ -142,7 +172,9 @@ async function CouponsStats() {
 
   const totalCoupons = allStats.total
   const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
-  const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
+  const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(
+    c => c.valid_until && new Date(c.valid_until) < new Date()
+  ).length
   const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
 
   return (
@@ -170,7 +202,14 @@ async function CouponsStats() {
         <details className="mb-6 group">
           <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              <svg
+                className="w-4 h-4 transition-transform group-open:rotate-90"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
             <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
@@ -178,7 +217,7 @@ async function CouponsStats() {
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {/* Create-drafts: brand-new coupons not yet on the live list. Publish activates them. */}
-              {createDrafts.map((d) => (
+              {createDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={`new-${d.id}`}
@@ -197,12 +236,14 @@ async function CouponsStats() {
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">{d.code}</p>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">
+                      {d.code}
+                    </p>
                     <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
                   </div>
                 )
-              ))}
-              {pendingDrafts.map((d) => (
+              )}
+              {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={d.coupon_id}
@@ -217,10 +258,12 @@ async function CouponsStats() {
                   />
                 ) : (
                   <div key={d.coupon_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">{d.code}</p>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">
+                      {d.code}
+                    </p>
                   </div>
                 )
-              ))}
+              )}
             </div>
           </div>
         </details>
@@ -242,7 +285,11 @@ async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [k
   )
 }
 
-async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchParams: { [key: string]: string | undefined } }) {
+async function CouponsListContent({
+  resolvedSearchParams,
+}: {
+  resolvedSearchParams: { [key: string]: string | undefined }
+}) {
   const host = await getHost()
   const h = await headers()
   const role = h.get('x-user-role') || ''
@@ -253,7 +300,14 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
   const campaign = resolvedSearchParams.campaign
 
-  const { coupons, total } = await getFilteredCoupons({ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, page, sort, dir })
+  const { coupons, total } = await getFilteredCoupons({
+    is_active: resolvedSearchParams.is_active,
+    search: resolvedSearchParams.search,
+    campaign,
+    page,
+    sort,
+    dir,
+  })
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
@@ -286,14 +340,58 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                <SortableHeader label="Code" column="code" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Type" column="type" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Value" column="value" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Min Purchase" column="min_purchase" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Usage" column="usage" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Valid Until" column="valid_until" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Actions</th>
+                <SortableHeader
+                  label="Code"
+                  column="code"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Type"
+                  column="type"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Value"
+                  column="value"
+                  options={sortOptions('number')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Min Purchase"
+                  column="min_purchase"
+                  options={sortOptions('number')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Usage"
+                  column="usage"
+                  options={sortOptions('number')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Valid Until"
+                  column="valid_until"
+                  options={sortOptions('date')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Status"
+                  column="status"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -301,7 +399,11 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
                 <CouponTableRow key={c.id} coupon={c} backUrl={currentListUrl} canWrite={canWrite} />
               ))}
               {coupons.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">No coupons found</td></tr>
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">
+                    No coupons found
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -320,7 +422,9 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
                     </span>
                   )}
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}
+                >
                   {c.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -330,9 +434,21 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
                 {c.valid_until && ` · Expires ${new Date(c.valid_until).toLocaleDateString('en-IN')}`}
               </div>
               <div className="flex gap-3 pt-1">
-                <Link href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">View</Link>
+                <Link
+                  href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                  className="text-sm text-accent-500 hover:underline"
+                >
+                  View
+                </Link>
                 <div className="hidden md:flex gap-3">
-                  {canWrite && <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>}
+                  {canWrite && (
+                    <Link
+                      href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                      className="text-sm text-accent-500 hover:underline"
+                    >
+                      Edit
+                    </Link>
+                  )}
                   {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
                 </div>
               </div>

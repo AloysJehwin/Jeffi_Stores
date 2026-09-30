@@ -79,21 +79,23 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [])
 
   function update(i: number, patch: Partial<ItemState>) {
-    setStates(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s))
+    setStates(prev => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)))
   }
 
   function toggleTag(i: number, tag: string) {
-    setStates(prev => prev.map((s, idx) => {
-      if (idx !== i) return s
-      const tags = s.selectedTags.includes(tag)
-        ? s.selectedTags.filter(t => t !== tag)
-        : [...s.selectedTags, tag]
-      return { ...s, selectedTags: tags }
-    }))
+    setStates(prev =>
+      prev.map((s, idx) => {
+        if (idx !== i) return s
+        const tags = s.selectedTags.includes(tag) ? s.selectedTags.filter(t => t !== tag) : [...s.selectedTags, tag]
+        return { ...s, selectedTags: tags }
+      })
+    )
   }
 
   async function handleGenerate(i: number) {
@@ -107,7 +109,10 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
         credentials: 'include',
         body: JSON.stringify({ productName: items[i].productName, rating: s.rating, tags: s.selectedTags }),
       })
-      if (res.status === 403) { setAiOff(true); return }
+      if (res.status === 403) {
+        setAiOff(true)
+        return
+      }
       const data = await res.json()
       if (data.review) update(i, { comment: data.review })
     } finally {
@@ -138,34 +143,36 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
     setIsSubmitting(true)
     setGlobalError('')
     try {
-      await Promise.all(items.map(async (item, i) => {
-        const s = nextStates[i]
-        if (s.submitted) return
-        const existing = reviewMap[item.productId]
+      await Promise.all(
+        items.map(async (item, i) => {
+          const s = nextStates[i]
+          if (s.submitted) return
+          const existing = reviewMap[item.productId]
 
-        const fd = new FormData()
-        fd.append('productId', item.productId)
-        fd.append('rating', String(s.rating))
-        if (s.title.trim()) fd.append('title', s.title.trim())
-        fd.append('comment', s.comment.trim())
-        s.selectedTags.forEach(t => fd.append('tags[]', t))
-        s.newImages.forEach(f => fd.append('images', f))
+          const fd = new FormData()
+          fd.append('productId', item.productId)
+          fd.append('rating', String(s.rating))
+          if (s.title.trim()) fd.append('title', s.title.trim())
+          fd.append('comment', s.comment.trim())
+          s.selectedTags.forEach(t => fd.append('tags[]', t))
+          s.newImages.forEach(f => fd.append('images', f))
 
-        let res: Response
-        if (existing) {
-          fd.append('reviewId', existing.id)
-          fd.append('existingImageUrls', JSON.stringify(s.existingImageUrls))
-          fd.append('existingImageThumbUrls', JSON.stringify(s.existingThumbUrls))
-          res = await fetch('/api/reviews', { method: 'PATCH', body: fd, credentials: 'include' })
-        } else {
-          res = await fetch('/api/reviews', { method: 'POST', body: fd, credentials: 'include' })
-        }
+          let res: Response
+          if (existing) {
+            fd.append('reviewId', existing.id)
+            fd.append('existingImageUrls', JSON.stringify(s.existingImageUrls))
+            fd.append('existingImageThumbUrls', JSON.stringify(s.existingThumbUrls))
+            res = await fetch('/api/reviews', { method: 'PATCH', body: fd, credentials: 'include' })
+          } else {
+            res = await fetch('/api/reviews', { method: 'POST', body: fd, credentials: 'include' })
+          }
 
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || `Failed to submit review for ${item.productName}`)
-        onSuccess(item.productId, data.review)
-        update(i, { submitted: true })
-      }))
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error || `Failed to submit review for ${item.productName}`)
+          onSuccess(item.productId, data.review)
+          update(i, { submitted: true })
+        })
+      )
       onClose()
     } catch (err: any) {
       setGlobalError(err?.message || 'Something went wrong. Please try again.')
@@ -202,14 +209,20 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                 {/* Product header */}
                 <div className="flex items-center gap-3 mb-4">
                   {item.productImage && (
-                    <img src={item.productImage} alt={item.productName} className="w-12 h-12 rounded-lg object-cover border border-border-default flex-shrink-0" />
+                    <img
+                      src={item.productImage}
+                      alt={item.productName}
+                      className="w-12 h-12 rounded-lg object-cover border border-border-default flex-shrink-0"
+                    />
                   )}
                   <p className="text-sm font-semibold text-foreground line-clamp-2">{item.productName}</p>
                 </div>
 
                 {/* Stars */}
                 <div className="mb-4">
-                  <p className="text-sm font-medium text-foreground mb-2">Rating <span className="text-red-500">*</span></p>
+                  <p className="text-sm font-medium text-foreground mb-2">
+                    Rating <span className="text-red-500">*</span>
+                  </p>
                   <div className="flex gap-1">
                     {[1, 2, 3, 4, 5].map(n => (
                       <button
@@ -220,7 +233,9 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                         onMouseLeave={() => update(i, { hoverRating: 0 })}
                         className="text-3xl leading-none transition-transform hover:scale-110"
                       >
-                        <span className={(s.hoverRating || s.rating) >= n ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+                        <span className={(s.hoverRating || s.rating) >= n ? 'text-yellow-400' : 'text-gray-300'}>
+                          ★
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -256,16 +271,34 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                     className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-accent-400 text-accent-600 dark:text-accent-400 text-sm font-medium hover:bg-accent-50 dark:hover:bg-accent-900/20 disabled:opacity-40 transition-colors mb-4"
                   >
                     {s.isGenerating ? (
-                      <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Generating…</>
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>{' '}
+                        Generating…
+                      </>
                     ) : (
-                      <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Generate with AI</>
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13 10V3L4 14h7v7l9-11h-7z"
+                          />
+                        </svg>{' '}
+                        Generate with AI
+                      </>
                     )}
                   </button>
                 )}
 
                 {/* Title */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-foreground mb-1">Title <span className="text-foreground-muted">(optional)</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Title <span className="text-foreground-muted">(optional)</span>
+                  </label>
                   <input
                     type="text"
                     value={s.title}
@@ -278,7 +311,9 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
 
                 {/* Comment */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-foreground mb-1">Your review <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Your review <span className="text-red-500">*</span>
+                  </label>
                   <textarea
                     value={s.comment}
                     onChange={e => update(i, { comment: e.target.value })}
@@ -291,29 +326,43 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
 
                 {/* Photos */}
                 <div>
-                  <p className="text-sm font-medium text-foreground mb-2">Photos <span className="text-foreground-muted">(up to 3)</span></p>
+                  <p className="text-sm font-medium text-foreground mb-2">
+                    Photos <span className="text-foreground-muted">(up to 3)</span>
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {s.existingImageUrls.map((url, j) => (
-                      <div key={`ex-${j}`} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border-default">
+                      <div
+                        key={`ex-${j}`}
+                        className="relative w-14 h-14 rounded-lg overflow-hidden border border-border-default"
+                      >
                         <img src={s.existingThumbUrls[j] || url} alt="" className="w-full h-full object-cover" />
                         <button
                           type="button"
-                          onClick={() => update(i, {
-                            existingImageUrls: s.existingImageUrls.filter((_, idx) => idx !== j),
-                            existingThumbUrls: s.existingThumbUrls.filter((_, idx) => idx !== j),
-                          })}
+                          onClick={() =>
+                            update(i, {
+                              existingImageUrls: s.existingImageUrls.filter((_, idx) => idx !== j),
+                              existingThumbUrls: s.existingThumbUrls.filter((_, idx) => idx !== j),
+                            })
+                          }
                           className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-xs leading-none"
-                        >×</button>
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
                     {s.newImages.map((file, j) => (
-                      <div key={`new-${j}`} className="relative w-14 h-14 rounded-lg overflow-hidden border border-border-default">
+                      <div
+                        key={`new-${j}`}
+                        className="relative w-14 h-14 rounded-lg overflow-hidden border border-border-default"
+                      >
                         <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => update(i, { newImages: s.newImages.filter((_, idx) => idx !== j) })}
                           className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-xs leading-none"
-                        >×</button>
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
                     {canAddMore && (
@@ -328,7 +377,9 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
                       </button>
                     )}
                     <input
-                      ref={el => { fileRefs.current[i] = el }}
+                      ref={el => {
+                        fileRefs.current[i] = el
+                      }}
                       type="file"
                       accept="image/*"
                       multiple

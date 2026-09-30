@@ -56,9 +56,7 @@ export default function AccountModeToggle({
       >
         {busy ? 'Saving…' : ownRazorpay ? 'Switch to platform' : 'Switch to own Razorpay'}
       </button>
-      {!canEnable && (
-        <div className="text-[11px] text-foreground-muted mt-1">Connect a Razorpay account first.</div>
-      )}
+      {!canEnable && <div className="text-[11px] text-foreground-muted mt-1">Connect a Razorpay account first.</div>}
       {error && <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
     </div>
   )

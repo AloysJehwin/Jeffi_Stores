@@ -5,7 +5,12 @@ import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { NAV_ICONS } from '@/components/admin/AdminSidebarNav'
 
-interface Action { label: string; icon: string; path: string; primary?: boolean }
+interface Action {
+  label: string
+  icon: string
+  path: string
+  primary?: boolean
+}
 
 function fallbackIcon() {
   return (
@@ -22,7 +27,9 @@ function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
       href={ap(path, host)}
       className="group flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
     >
-      <span className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'} [&_svg]:w-5 [&_svg]:h-5`}>
+      <span
+        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'} [&_svg]:w-5 [&_svg]:h-5`}
+      >
         {NAV_ICONS[icon] ?? fallbackIcon()}
       </span>
       <span className="text-center leading-tight">{label}</span>
@@ -33,11 +40,7 @@ function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
 // Command bar: primary quick actions in a fixed 8-column grid; a centered
 // chevron expands the rest in-place into the same grid (mirrors the
 // products-list AdvancedFilterPanel toggle).
-export default function QuickActionBar({ primary, more, host }: {
-  primary: Action[]
-  more: Action[]
-  host: string
-}) {
+export default function QuickActionBar({ primary, more, host }: { primary: Action[]; more: Action[]; host: string }) {
   const [expanded, setExpanded] = useState(false)
   const actions = expanded ? [...primary, ...more] : primary
 
@@ -58,7 +61,13 @@ export default function QuickActionBar({ primary, more, host }: {
             aria-label={expanded ? 'Show fewer actions' : 'Show more actions'}
             className="flex items-center gap-1 px-3 py-1 text-xs text-foreground-muted hover:text-foreground transition-colors rounded-full hover:bg-surface-secondary"
           >
-            <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg
+              className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </button>

@@ -42,7 +42,7 @@ type PickupRequest = {
 
 function todayIST(): string {
   const now = new Date()
-  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000))
+  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000)
   return ist.toISOString().slice(0, 10)
 }
 
@@ -51,7 +51,8 @@ function OwnDelhiveryNote() {
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-6 py-4">
       <h2 className="text-lg font-semibold text-foreground">Delhivery Account</h2>
       <p className="text-sm text-foreground-secondary mt-1">
-        This store ships on its own Delhivery account and is billed by Delhivery directly. The store owner manages the API token from the ecom portal.
+        This store ships on its own Delhivery account and is billed by Delhivery directly. The store owner manages the
+        API token from the ecom portal.
       </p>
     </div>
   )
@@ -74,7 +75,16 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
   const [busy, setBusy] = useState(false)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
-  const [form, setForm] = useState({ name: '', phone: '', pincode: '', address: '', registeredName: '', email: '', city: '', state: '' })
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    pincode: '',
+    address: '',
+    registeredName: '',
+    email: '',
+    city: '',
+    state: '',
+  })
 
   const load = () => {
     setLoading(true)
@@ -84,53 +94,83 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
       .catch(() => setWarehouses([]))
       .finally(() => setLoading(false))
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }))
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }))
 
   const save = async () => {
-    setBusy(true); setToast(null)
+    setBusy(true)
+    setToast(null)
     try {
       const res = await fetch('/api/admin/delhivery/pickup-locations/create', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
       const data = await res.json()
-      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to add warehouse' }); return }
+      if (!res.ok) {
+        setToast({ ok: false, text: data.error || 'Failed to add warehouse' })
+        return
+      }
       setToast({ ok: true, text: `Warehouse "${data.name}" added.` })
       setOpen(false)
       setForm({ name: '', phone: '', pincode: '', address: '', registeredName: '', email: '', city: '', state: '' })
       load()
-    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setBusy(false) }
+    } catch {
+      setToast({ ok: false, text: 'Network error' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   const setDefault = async (name: string) => {
-    setRowBusy(name); setToast(null)
+    setRowBusy(name)
+    setToast(null)
     try {
       const res = await fetch('/api/admin/delhivery/pickup-locations/set-default', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
       const data = await res.json()
-      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to set default' }); return }
+      if (!res.ok) {
+        setToast({ ok: false, text: data.error || 'Failed to set default' })
+        return
+      }
       // The default warehouse identity feeds the server-rendered origin (delivery charge + EDD),
       // so reload to reflect it everywhere on the page.
       window.location.reload()
-    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setRowBusy(null) }
+    } catch {
+      setToast({ ok: false, text: 'Network error' })
+    } finally {
+      setRowBusy(null)
+    }
   }
 
   const remove = async (name: string) => {
-    setRowBusy(name); setToast(null)
+    setRowBusy(name)
+    setToast(null)
     try {
       const res = await fetch('/api/admin/delhivery/pickup-locations/deactivate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
       const data = await res.json()
-      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to remove warehouse' }); return }
+      if (!res.ok) {
+        setToast({ ok: false, text: data.error || 'Failed to remove warehouse' })
+        return
+      }
       setToast({ ok: true, text: `Warehouse "${name}" removed.` })
       load()
-    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setRowBusy(null) }
+    } catch {
+      setToast({ ok: false, text: 'Network error' })
+    } finally {
+      setRowBusy(null)
+    }
   }
 
   const extraWarehouses = warehouses.filter(w => w.name !== defaultWarehouse.pickupLocation)
@@ -140,43 +180,68 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
       <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-foreground">Pickup Warehouses</h2>
-          <span className="text-sm text-foreground-secondary">{loading ? 'Loading…' : `${warehouses.length} registered`}</span>
+          <span className="text-sm text-foreground-secondary">
+            {loading ? 'Loading…' : `${warehouses.length} registered`}
+          </span>
         </div>
         {canWrite && (
-          <button type="button" onClick={() => setOpen(o => !o)}
-            className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+          >
             {open ? 'Hide' : '+ Add warehouse'}
           </button>
         )}
       </div>
       <div className="px-6 py-4 space-y-3">
         {toast && (
-          <div className={`rounded-lg border px-4 py-2.5 text-sm ${toast.ok
-            ? 'border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-            : 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
+          <div
+            className={`rounded-lg border px-4 py-2.5 text-sm ${
+              toast.ok
+                ? 'border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                : 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+            }`}
+          >
             {toast.text}
           </div>
         )}
         {open && canWrite && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-border-default bg-surface-secondary/40 p-4">
-            {([
-              ['name', 'Warehouse name *'], ['phone', 'Phone *'], ['pincode', 'Pincode *'], ['registeredName', 'Registered name'],
-              ['email', 'Email'], ['city', 'City'], ['state', 'State'],
-            ] as [keyof typeof form, string][]).map(([k, label]) => (
+            {(
+              [
+                ['name', 'Warehouse name *'],
+                ['phone', 'Phone *'],
+                ['pincode', 'Pincode *'],
+                ['registeredName', 'Registered name'],
+                ['email', 'Email'],
+                ['city', 'City'],
+                ['state', 'State'],
+              ] as [keyof typeof form, string][]
+            ).map(([k, label]) => (
               <div key={k}>
                 <label className="block text-xs font-medium text-foreground-muted mb-1">{label}</label>
-                <input value={form[k]} onChange={set(k)}
-                  className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground" />
+                <input
+                  value={form[k]}
+                  onChange={set(k)}
+                  className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+                />
               </div>
             ))}
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-foreground-muted mb-1">Address *</label>
-              <input value={form.address} onChange={set('address')}
-                className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground" />
+              <input
+                value={form.address}
+                onChange={set('address')}
+                className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+              />
             </div>
             <div className="sm:col-span-2">
-              <button onClick={save} disabled={busy || !form.name || !form.address || !form.phone || !form.pincode}
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors">
+              <button
+                onClick={save}
+                disabled={busy || !form.name || !form.address || !form.phone || !form.pincode}
+                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+              >
                 {busy ? 'Adding…' : 'Add warehouse'}
               </button>
             </div>
@@ -184,58 +249,103 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
         )}
         <ul className="divide-y divide-border-default">
           <li className="py-2">
-            <button type="button" onClick={() => setEditingDefault(o => !o)}
-              className="w-full flex items-center justify-between gap-3 text-left">
+            <button
+              type="button"
+              onClick={() => setEditingDefault(o => !o)}
+              className="w-full flex items-center justify-between gap-3 text-left"
+            >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {defaultWarehouse.pickupLocation || 'Default pickup'}
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400">Default</span>
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400">
+                    Default
+                  </span>
                 </p>
                 <p className="text-xs text-foreground-secondary truncate">
-                  {[defaultWarehouse.sellerAddress, defaultWarehouse.sellerPhone].filter(Boolean).join(' · ') || 'Registered pickup identity used on shipments'}
+                  {[defaultWarehouse.sellerAddress, defaultWarehouse.sellerPhone].filter(Boolean).join(' · ') ||
+                    'Registered pickup identity used on shipments'}
                 </p>
               </div>
-              <svg className={`w-4 h-4 shrink-0 text-foreground-muted transition-transform ${editingDefault ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className={`w-4 h-4 shrink-0 text-foreground-muted transition-transform ${editingDefault ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
             {editingDefault && (
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-border-default bg-surface-secondary/40 p-4">
-                <TextControl settingKey="delhivery_pickup_location" label="Pickup location name" hint="Registered Delhivery pickup location name." initial={defaultWarehouse.pickupLocation} />
-                <TextControl settingKey="delhivery_seller_name" label="Seller name" hint="Seller/return name on shipments." initial={defaultWarehouse.sellerName} />
+                <TextControl
+                  settingKey="delhivery_pickup_location"
+                  label="Pickup location name"
+                  hint="Registered Delhivery pickup location name."
+                  initial={defaultWarehouse.pickupLocation}
+                />
+                <TextControl
+                  settingKey="delhivery_seller_name"
+                  label="Seller name"
+                  hint="Seller/return name on shipments."
+                  initial={defaultWarehouse.sellerName}
+                />
                 <div className="sm:col-span-2">
-                  <TextAreaControl settingKey="delhivery_seller_address" label="Pickup / return address" hint="Warehouse address used for pickups and returns." initial={defaultWarehouse.sellerAddress} rows={2} />
+                  <TextAreaControl
+                    settingKey="delhivery_seller_address"
+                    label="Pickup / return address"
+                    hint="Warehouse address used for pickups and returns."
+                    initial={defaultWarehouse.sellerAddress}
+                    rows={2}
+                  />
                 </div>
-                <TextControl settingKey="delhivery_seller_phone" label="Pickup / return phone" initial={defaultWarehouse.sellerPhone} />
-                <TextControl settingKey="delhivery_origin_pincode" label="Pickup pincode" hint="Ship-from pincode for this pickup address, used for Delhivery rate & shipment creation." initial={defaultWarehouse.originPincode} />
+                <TextControl
+                  settingKey="delhivery_seller_phone"
+                  label="Pickup / return phone"
+                  initial={defaultWarehouse.sellerPhone}
+                />
+                <TextControl
+                  settingKey="delhivery_origin_pincode"
+                  label="Pickup pincode"
+                  hint="Ship-from pincode for this pickup address, used for Delhivery rate & shipment creation."
+                  initial={defaultWarehouse.originPincode}
+                />
               </div>
             )}
           </li>
-          {!loading && extraWarehouses.map(w => (
-            <li key={w.name} className="py-2 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{w.name}</p>
-                <p className="text-xs text-foreground-secondary truncate">
-                  {[w.address, w.pin].filter(Boolean).join(' · ') || '—'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {!w.active && <span className="text-xs text-foreground-muted">inactive</span>}
-                {canWrite && w.active && (
-                  <>
-                    <button type="button" onClick={() => setDefault(w.name)} disabled={rowBusy === w.name}
-                      className="px-2.5 py-1 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 transition-colors">
-                      {rowBusy === w.name ? '…' : 'Set as default'}
-                    </button>
-                    <button type="button" onClick={() => remove(w.name)} disabled={rowBusy === w.name}
-                      className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors">
-                      Remove
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
+          {!loading &&
+            extraWarehouses.map(w => (
+              <li key={w.name} className="py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{w.name}</p>
+                  <p className="text-xs text-foreground-secondary truncate">
+                    {[w.address, w.pin].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!w.active && <span className="text-xs text-foreground-muted">inactive</span>}
+                  {canWrite && w.active && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setDefault(w.name)}
+                        disabled={rowBusy === w.name}
+                        className="px-2.5 py-1 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 transition-colors"
+                      >
+                        {rowBusy === w.name ? '…' : 'Set as default'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(w.name)}
+                        disabled={rowBusy === w.name}
+                        className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
         </ul>
       </div>
     </div>
@@ -243,20 +353,26 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
 }
 
 const STATUS_OPTIONS: { value: PickupRequest['pickup_status']; label: string }[] = [
-  { value: 'pending',   label: 'Pending' },
+  { value: 'pending', label: 'Pending' },
   { value: 'picked_up', label: 'Picked Up' },
-  { value: 'failed',    label: 'Failed' },
+  { value: 'failed', label: 'Failed' },
 ]
 
 const STATUS_STYLES: Record<PickupRequest['pickup_status'], string> = {
-  pending:   'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+  pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
   picked_up: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
-  failed:    'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+  failed: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
 }
 
 export type DeliveryMode = 'flagship' | 'own' | 'platform'
 
-export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: { deliveryMode: DeliveryMode; defaultWarehouse: DefaultWarehouse }) {
+export default function DelhiveryPageClient({
+  deliveryMode,
+  defaultWarehouse,
+}: {
+  deliveryMode: DeliveryMode
+  defaultWarehouse: DefaultWarehouse
+}) {
   const canWrite = useCanWrite('delhivery:write')
   const [orders, setOrders] = useState<EligibleOrder[]>([])
   const [pickupHistory, setPickupHistory] = useState<PickupRequest[]>([])
@@ -279,8 +395,12 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
   const [historyPage, setHistoryPage] = useState(1)
   const ordersTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE))
   const historyTotalPages = Math.max(1, Math.ceil(pickupHistory.length / PAGE_SIZE))
-  useEffect(() => { if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages) }, [ordersPage, ordersTotalPages])
-  useEffect(() => { if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages) }, [historyPage, historyTotalPages])
+  useEffect(() => {
+    if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages)
+  }, [ordersPage, ordersTotalPages])
+  useEffect(() => {
+    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages)
+  }, [historyPage, historyTotalPages])
   const pagedOrders = useMemo(
     () => orders.slice((ordersPage - 1) * PAGE_SIZE, ordersPage * PAGE_SIZE),
     [orders, ordersPage]
@@ -303,22 +423,34 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+  }, [])
 
   useEffect(() => {
     const seed: Warehouse[] = defaultWarehouse.pickupLocation
-      ? [{ name: defaultWarehouse.pickupLocation, pin: defaultWarehouse.originPincode || '', phone: '', address: defaultWarehouse.sellerAddress || '', active: true }]
+      ? [
+          {
+            name: defaultWarehouse.pickupLocation,
+            pin: defaultWarehouse.originPincode || '',
+            phone: '',
+            address: defaultWarehouse.sellerAddress || '',
+            active: true,
+          },
+        ]
       : []
     fetch('/api/admin/delhivery/pickup-locations')
       .then(r => r.json())
       .then(d => {
-        const locs: Warehouse[] = (d.locations && d.locations.length) ? d.locations : seed
+        const locs: Warehouse[] = d.locations && d.locations.length ? d.locations : seed
         setPickupLocations(locs)
         if (locs.length && !locs.some(l => l.name === pickupLocation)) {
           setPickupLocation(defaultWarehouse.pickupLocation || locs[0].name)
         }
       })
-      .catch(() => { setPickupLocations(seed) })
+      .catch(() => {
+        setPickupLocations(seed)
+      })
   }, [])
 
   const toggleAll = () => {
@@ -369,7 +501,7 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
         body: JSON.stringify({ id: req.id, pickup_status: newStatus }),
       })
       if (res.ok) {
-        setPickupHistory(prev => prev.map(r => r.id === req.id ? { ...r, pickup_status: newStatus } : r))
+        setPickupHistory(prev => prev.map(r => (r.id === req.id ? { ...r, pickup_status: newStatus } : r)))
         if (newStatus === 'failed') loadData()
       }
     } finally {
@@ -390,12 +522,18 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
       if (!res.ok) {
         setResult({ success: false, message: data.error || 'Failed to add AWB' })
       } else {
-        setPickupHistory(prev => prev.map(r => {
-          if (r.id !== pickupId) return r
-          return { ...r, awbs: [...r.awbs, data.awb], awb_count: r.awb_count + 1 }
-        }))
+        setPickupHistory(prev =>
+          prev.map(r => {
+            if (r.id !== pickupId) return r
+            return { ...r, awbs: [...r.awbs, data.awb], awb_count: r.awb_count + 1 }
+          })
+        )
         setOrders(prev => prev.filter(o => o.id !== addAwbOrderId))
-        setSelected(prev => { const n = new Set(prev); n.delete(addAwbOrderId); return n })
+        setSelected(prev => {
+          const n = new Set(prev)
+          n.delete(addAwbOrderId)
+          return n
+        })
         setResult({ success: true, message: `AWB ${data.awb} added to pickup request.` })
         setAddAwbFor(null)
         setAddAwbOrderId('')
@@ -415,8 +553,11 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
       if (!res.ok) {
         setResult({ success: false, message: data.error || 'Refresh failed' })
       } else if (data.updated) {
-        setPickupHistory(prev => prev.map(r => r.id === req.id ? { ...r, pickup_status: data.pickup_status } : r))
-        setResult({ success: true, message: `Pickup #${req.pickup_id ?? req.id.slice(0, 8)} status updated to ${data.pickup_status.replace('_', ' ')}.` })
+        setPickupHistory(prev => prev.map(r => (r.id === req.id ? { ...r, pickup_status: data.pickup_status } : r)))
+        setResult({
+          success: true,
+          message: `Pickup #${req.pickup_id ?? req.id.slice(0, 8)} status updated to ${data.pickup_status.replace('_', ' ')}.`,
+        })
         if (data.pickup_status === 'picked_up') loadData()
       } else {
         setResult({ success: true, message: `No change — still ${data.pickup_status.replace('_', ' ')}.` })
@@ -454,11 +595,13 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
   return (
     <div>
       {result && (
-        <div className={`mb-6 px-4 py-3 rounded-lg border text-sm ${
-          result.success
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
-        }`}>
+        <div
+          className={`mb-6 px-4 py-3 rounded-lg border text-sm ${
+            result.success
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+          }`}
+        >
           <p className="font-medium">{result.message}</p>
           {result.details && <p className="mt-1 opacity-80">{result.details}</p>}
         </div>
@@ -504,22 +647,43 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
-                    <th className="px-4 py-3 w-8"><div className="h-4 w-4 bg-surface-elevated rounded" /></th>
+                    <th className="px-4 py-3 w-8">
+                      <div className="h-4 w-4 bg-surface-elevated rounded" />
+                    </th>
                     {['Order', 'AWB', 'Customer', 'Destination', 'Placed', 'Status'].map((_, i) => (
-                      <th key={i} className="px-4 py-3"><div className="h-3 bg-surface-elevated rounded w-16" style={{ animationDelay: `${i * 40}ms` }} /></th>
+                      <th key={i} className="px-4 py-3">
+                        <div
+                          className="h-3 bg-surface-elevated rounded w-16"
+                          style={{ animationDelay: `${i * 40}ms` }}
+                        />
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {[...Array(6)].map((_, i) => (
                     <tr key={i} className="border-b border-border-default" style={{ animationDelay: `${i * 60}ms` }}>
-                      <td className="px-4 py-3"><div className="h-4 w-4 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-20 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-28 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-32 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-36 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-4 w-24 bg-surface-secondary rounded" /></td>
-                      <td className="px-4 py-3"><div className="h-5 w-16 bg-surface-secondary rounded-full" /></td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-4 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-20 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-28 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-32 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-36 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-4 w-24 bg-surface-secondary rounded" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-5 w-16 bg-surface-secondary rounded-full" />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -529,7 +693,12 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
         ) : orders.length === 0 ? (
           <div className="p-8 text-center text-foreground-muted">
             <svg className="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+              />
             </svg>
             <p>No eligible orders. All orders with AWBs are already in a pending pickup request.</p>
           </div>
@@ -540,8 +709,12 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
                     <th className="px-4 py-3 text-left">
-                      <input type="checkbox" checked={selected.size === orders.length} onChange={toggleAll}
-                        className="w-4 h-4 rounded border-border-default accent-accent-500" />
+                      <input
+                        type="checkbox"
+                        checked={selected.size === orders.length}
+                        onChange={toggleAll}
+                        className="w-4 h-4 rounded border-border-default accent-accent-500"
+                      />
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Order</th>
                     <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWB</th>
@@ -553,13 +726,23 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
                 </thead>
                 <tbody>
                   {pagedOrders.map(order => (
-                    <tr key={order.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
+                    <tr
+                      key={order.id}
+                      className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50"
+                    >
                       <td className="px-4 py-3">
-                        <input type="checkbox" checked={selected.has(order.id)} onChange={() => toggle(order.id)}
-                          className="w-4 h-4 rounded border-border-default accent-accent-500" />
+                        <input
+                          type="checkbox"
+                          checked={selected.has(order.id)}
+                          onChange={() => toggle(order.id)}
+                          className="w-4 h-4 rounded border-border-default accent-accent-500"
+                        />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={ap(`/admin/orders/${order.id}`)} className="font-mono text-accent-500 hover:underline">
+                        <Link
+                          href={ap(`/admin/orders/${order.id}`)}
+                          className="font-mono text-accent-500 hover:underline"
+                        >
                           #{order.order_number || order.id.slice(0, 8)}
                         </Link>
                       </td>
@@ -569,7 +752,13 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
                         {[order.city, order.state, order.postal_code].filter(Boolean).join(', ')}
                       </td>
                       <td className="px-4 py-3 text-foreground-secondary">
-                        {new Date(order.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                        {new Date(order.created_at).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Asia/Kolkata',
+                        })}
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
@@ -585,41 +774,70 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
             {ordersTotalPages > 1 && (
               <div className="px-6 py-3 border-t border-border-default flex items-center justify-between gap-2">
                 <p className="text-xs text-foreground-muted whitespace-nowrap">
-                  Showing <span className="font-medium text-foreground">{(ordersPage - 1) * PAGE_SIZE + 1}–{Math.min(ordersPage * PAGE_SIZE, orders.length)}</span>
-                  {' '}of <span className="font-medium text-foreground">{orders.length}</span>
+                  Showing{' '}
+                  <span className="font-medium text-foreground">
+                    {(ordersPage - 1) * PAGE_SIZE + 1}–{Math.min(ordersPage * PAGE_SIZE, orders.length)}
+                  </span>{' '}
+                  of <span className="font-medium text-foreground">{orders.length}</span>
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <button disabled={ordersPage <= 1} onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
-                  <span className="text-xs text-foreground-muted whitespace-nowrap">Page {ordersPage} of {ordersTotalPages}</span>
-                  <button disabled={ordersPage >= ordersTotalPages} onClick={() => setOrdersPage(p => Math.min(ordersTotalPages, p + 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+                  <button
+                    disabled={ordersPage <= 1}
+                    onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs text-foreground-muted whitespace-nowrap">
+                    Page {ordersPage} of {ordersTotalPages}
+                  </span>
+                  <button
+                    disabled={ordersPage >= ordersTotalPages}
+                    onClick={() => setOrdersPage(p => Math.min(ordersTotalPages, p + 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             )}
 
             <div className="px-6 py-4 border-t border-border-default flex items-center justify-between gap-3">
-              <p className="text-sm text-foreground-secondary">{selected.size} of {orders.length} selected</p>
+              <p className="text-sm text-foreground-secondary">
+                {selected.size} of {orders.length} selected
+              </p>
               {canWrite && (
-              <button onClick={handleSubmit} disabled={submitting || selected.size === 0}
-                className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2">
-                {submitting ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Sending…
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Request Pickup — {selected.size} order{selected.size !== 1 ? 's' : ''}
-                  </>
-                )}
-              </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || selected.size === 0}
+                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                      Request Pickup — {selected.size} order{selected.size !== 1 ? 's' : ''}
+                    </>
+                  )}
+                </button>
               )}
             </div>
           </>
@@ -630,16 +848,22 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
           <div className="px-6 py-4 border-b border-border-default">
             <h2 className="text-lg font-semibold text-foreground">Pickup Request History</h2>
-            <p className="text-sm text-foreground-secondary mt-0.5">Update each request once you confirm pickup outcome with Delhivery</p>
+            <p className="text-sm text-foreground-secondary mt-0.5">
+              Update each request once you confirm pickup outcome with Delhivery
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-secondary">
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Pickup Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">
+                    Pickup Date
+                  </th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
-                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">Requested At</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary whitespace-nowrap">
+                    Requested At
+                  </th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-foreground-secondary">Actions</th>
                 </tr>
@@ -649,124 +873,195 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
                   const awbs = req.awbs ?? []
                   const status = req.pickup_status || 'pending'
                   return (
-                  <Fragment key={req.id}>
-                    <tr className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
-                      <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">
-                        {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-foreground-secondary">
-                        {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {awbs.map(awb => (
-                            <span key={awb} className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground">{awb}</span>
-                          ))}
-                          <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
-                        {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
-                          {status.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          {awbs.length > 0 && (
-                            <button
-                              onClick={() => handleDownloadLabels(req)}
-                              disabled={downloadingId === req.id}
-                              title="Download all shipping labels in this pickup request (one PDF)"
-                              className="h-[34px] px-3 flex items-center gap-1.5 rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors whitespace-nowrap"
-                            >
-                              {downloadingId === req.id ? (
-                                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    <Fragment key={req.id}>
+                      <tr className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
+                        <td className="px-4 py-3 text-foreground font-medium whitespace-nowrap">
+                          {new Date(req.pickup_date).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-foreground-secondary">
+                          {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {awbs.map(awb => (
+                              <span
+                                key={awb}
+                                className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground"
+                              >
+                                {awb}
+                              </span>
+                            ))}
+                            <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                          {new Date(req.created_at).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'Asia/Kolkata',
+                          })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}
+                          >
+                            {status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-2">
+                            {awbs.length > 0 && (
+                              <button
+                                onClick={() => handleDownloadLabels(req)}
+                                disabled={downloadingId === req.id}
+                                title="Download all shipping labels in this pickup request (one PDF)"
+                                className="h-[34px] px-3 flex items-center gap-1.5 rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+                              >
+                                {downloadingId === req.id ? (
+                                  <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    />
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                  </svg>
+                                )}
+                                <span className="text-sm font-medium">Labels</span>
+                              </button>
+                            )}
+                            {req.pickup_status === 'pending' && (
+                              <button
+                                onClick={() => handleRefresh(req)}
+                                disabled={refreshingId === req.id}
+                                title="Poll AWB tracking for live pickup status"
+                                className="h-[34px] w-[34px] flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors"
+                              >
+                                <svg
+                                  className={`w-3.5 h-3.5 ${refreshingId === req.id ? 'animate-spin' : ''}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                  />
                                 </svg>
-                              ) : (
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                              )}
-                              <span className="text-sm font-medium">Labels</span>
-                            </button>
-                          )}
-                          {req.pickup_status === 'pending' && (
-                            <button
-                              onClick={() => handleRefresh(req)}
-                              disabled={refreshingId === req.id}
-                              title="Poll AWB tracking for live pickup status"
-                              className="h-[34px] w-[34px] flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors"
-                            >
-                              <svg className={`w-3.5 h-3.5 ${refreshingId === req.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </button>
+                            )}
+                            {req.pickup_status === 'pending' && orders.length > 0 && canWrite && (
+                              <button
+                                onClick={() => {
+                                  setAddAwbFor(addAwbFor === req.id ? null : req.id)
+                                  setAddAwbOrderId('')
+                                }}
+                                className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
+                              >
+                                + Add AWB
+                              </button>
+                            )}
+                            {req.pickup_status !== 'picked_up' && canWrite && (
+                              <AdminSelect
+                                sm
+                                value={req.pickup_status}
+                                disabled={updatingId === req.id}
+                                options={STATUS_OPTIONS}
+                                onChange={val => handleStatusChange(req, val as PickupRequest['pickup_status'])}
+                              />
+                            )}
+                            {updatingId === req.id && (
+                              <svg
+                                className="animate-spin w-3.5 h-3.5 text-foreground-secondary"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                />
                               </svg>
-                            </button>
-                          )}
-                          {req.pickup_status === 'pending' && orders.length > 0 && canWrite && (
-                            <button
-                              onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
-                              className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
-                            >
-                              + Add AWB
-                            </button>
-                          )}
-                          {req.pickup_status !== 'picked_up' && canWrite && (
-                            <AdminSelect
-                              sm
-                              value={req.pickup_status}
-                              disabled={updatingId === req.id}
-                              options={STATUS_OPTIONS}
-                              onChange={val => handleStatusChange(req, val as PickupRequest['pickup_status'])}
-                            />
-                          )}
-                          {updatingId === req.id && (
-                            <svg className="animate-spin w-3.5 h-3.5 text-foreground-secondary" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {addAwbFor === req.id && (
-                      <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
-                        <td colSpan={6} className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
-                            <AdminSelect
-                              sm
-                              value={addAwbOrderId}
-                              placeholder="— select an order —"
-                              options={orders.map(o => ({
-                                value: o.id,
-                                label: `#${o.order_number || o.id.slice(0, 8)} · ${o.awb_number} · ${o.customer_name}`,
-                              }))}
-                              onChange={val => setAddAwbOrderId(val)}
-                              className="flex-1"
-                            />
-                            <button
-                              onClick={() => handleAddAwb(req.id)}
-                              disabled={!addAwbOrderId || addAwbLoading}
-                              className="h-[34px] px-3 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
-                            >
-                              {addAwbLoading ? 'Adding…' : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => { setAddAwbFor(null); setAddAwbOrderId('') }}
-                              className="h-[34px] px-3 text-xs font-medium rounded-lg border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
-                            >
-                              Cancel
-                            </button>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
+                      {addAwbFor === req.id && (
+                        <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
+                          <td colSpan={6} className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">
+                                Add order to this pickup:
+                              </label>
+                              <AdminSelect
+                                sm
+                                value={addAwbOrderId}
+                                placeholder="— select an order —"
+                                options={orders.map(o => ({
+                                  value: o.id,
+                                  label: `#${o.order_number || o.id.slice(0, 8)} · ${o.awb_number} · ${o.customer_name}`,
+                                }))}
+                                onChange={val => setAddAwbOrderId(val)}
+                                className="flex-1"
+                              />
+                              <button
+                                onClick={() => handleAddAwb(req.id)}
+                                disabled={!addAwbOrderId || addAwbLoading}
+                                className="h-[34px] px-3 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                              >
+                                {addAwbLoading ? 'Adding…' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setAddAwbFor(null)
+                                  setAddAwbOrderId('')
+                                }}
+                                className="h-[34px] px-3 text-xs font-medium rounded-lg border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -775,15 +1070,30 @@ export default function DelhiveryPageClient({ deliveryMode, defaultWarehouse }: 
           {historyTotalPages > 1 && (
             <div className="px-6 py-3 border-t border-border-default flex items-center justify-between gap-2">
               <p className="text-xs text-foreground-muted whitespace-nowrap">
-                Showing <span className="font-medium text-foreground">{(historyPage - 1) * PAGE_SIZE + 1}–{Math.min(historyPage * PAGE_SIZE, pickupHistory.length)}</span>
-                {' '}of <span className="font-medium text-foreground">{pickupHistory.length}</span>
+                Showing{' '}
+                <span className="font-medium text-foreground">
+                  {(historyPage - 1) * PAGE_SIZE + 1}–{Math.min(historyPage * PAGE_SIZE, pickupHistory.length)}
+                </span>{' '}
+                of <span className="font-medium text-foreground">{pickupHistory.length}</span>
               </p>
               <div className="flex items-center gap-1.5">
-                <button disabled={historyPage <= 1} onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
-                <span className="text-xs text-foreground-muted whitespace-nowrap">Page {historyPage} of {historyTotalPages}</span>
-                <button disabled={historyPage >= historyTotalPages} onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+                <button
+                  disabled={historyPage <= 1}
+                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-foreground-muted whitespace-nowrap">
+                  Page {historyPage} of {historyTotalPages}
+                </span>
+                <button
+                  disabled={historyPage >= historyTotalPages}
+                  onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}

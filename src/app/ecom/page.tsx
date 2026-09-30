@@ -16,11 +16,13 @@ export default function EcomLandingPage() {
       <section className="relative overflow-hidden border-b border-border-default">
         <div className="w-full px-6 lg:px-12 pt-12 pb-10 sm:pt-24 text-center">
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] text-foreground">
-            Sell anything.<br />
+            Sell anything.
+            <br />
             <span className="ecom-accent-text">We run the store.</span>
           </h1>
           <p className="mt-6 text-lg text-foreground-secondary max-w-2xl mx-auto">
-            A complete online store on your own subdomain — storefront, admin, payments, delivery and GST, managed for you.
+            A complete online store on your own subdomain — storefront, admin, payments, delivery and GST, managed for
+            you.
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
@@ -125,10 +127,14 @@ export default function EcomLandingPage() {
 
       {/* ── Integrations strip ── */}
       <section className="w-full px-6 lg:px-12 py-12">
-        <p className="text-center text-sm text-foreground-muted uppercase tracking-widest mb-8">Powered by the tools you trust</p>
+        <p className="text-center text-sm text-foreground-muted uppercase tracking-widest mb-8">
+          Powered by the tools you trust
+        </p>
         <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 w-full">
-          {['Razorpay', 'Delhivery', 'GST / GSTN', 'Google', 'AWS'].map((n) => (
-            <span key={n} className="text-xl font-bold text-foreground-muted/70">{n}</span>
+          {['Razorpay', 'Delhivery', 'GST / GSTN', 'Google', 'AWS'].map(n => (
+            <span key={n} className="text-xl font-bold text-foreground-muted/70">
+              {n}
+            </span>
           ))}
         </div>
       </section>

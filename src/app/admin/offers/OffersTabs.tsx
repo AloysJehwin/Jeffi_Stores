@@ -52,11 +52,7 @@ export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
         </button>
       </div>
 
-      {tab === 'bank' ? (
-        <OffersClient canWrite={canWrite} />
-      ) : (
-        <OffersListClient canWrite={canWrite} />
-      )}
+      {tab === 'bank' ? <OffersClient canWrite={canWrite} /> : <OffersListClient canWrite={canWrite} />}
     </div>
   )
 }

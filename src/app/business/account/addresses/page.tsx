@@ -55,8 +55,11 @@ export default function AddressesPage() {
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
 
-  const filteredAddresses = useMemo(() =>
-    filterType === 'all' ? addresses : addresses.filter(a => a.address_type === filterType || a.address_type === 'both'),
+  const filteredAddresses = useMemo(
+    () =>
+      filterType === 'all'
+        ? addresses
+        : addresses.filter(a => a.address_type === filterType || a.address_type === 'both'),
     [addresses, filterType]
   )
 
@@ -71,7 +74,10 @@ export default function AddressesPage() {
 
   const fetchAddresses = async () => {
     try {
-      const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
+      const response = await fetch('/api/user/addresses', {
+        credentials: 'include',
+        headers: { 'X-Auth-Portal': 'business' },
+      })
       if (response.ok) {
         const data = await response.json()
         setAddresses(data.addresses || [])
@@ -176,7 +182,11 @@ export default function AddressesPage() {
     })
     if (!ok) return
     try {
-      const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
+      const response = await fetch(`/api/user/addresses/${addressId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'X-Auth-Portal': 'business' },
+      })
       if (response.ok) {
         await fetchAddresses()
         showToast('Address deleted successfully', 'success')
@@ -196,7 +206,11 @@ export default function AddressesPage() {
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-pulse">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-4"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <div className="h-4 bg-surface-secondary rounded w-24 mb-3" />
               <div className="space-y-2">
                 <div className="h-3 bg-surface-secondary rounded w-full" />
@@ -216,334 +230,351 @@ export default function AddressesPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-
       <BusinessAccountMobileHeader />
 
       <div className="container mx-auto px-4 pt-4">
         <div>
-
-            {/* Type filter + Add button row */}
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-1.5">
-                {(['all', 'shipping', 'billing'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setFilterType(t)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
-                      filterType === t
-                        ? 'bg-accent-500 text-white'
-                        : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-                    }`}
-                  >
-                    {t === 'all' ? 'All' : t}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingAddress(null)
-                  const fullName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : ''
-                  const phone = user?.phone ? user.phone.replace(/^\+91/, '') : ''
-                  setFormData({ ...emptyForm, full_name: fullName, phone })
-                  setPinLookupState('idle')
-                  setLocalities([])
-                  setShowForm(!showForm)
-                }}
-                className="px-5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold text-sm"
-              >
-                {showForm ? 'Cancel' : '+ Add New Address'}
-              </button>
+          {/* Type filter + Add button row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-1.5">
+              {(['all', 'shipping', 'billing'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setFilterType(t)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                    filterType === t
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                  }`}
+                >
+                  {t === 'all' ? 'All' : t}
+                </button>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingAddress(null)
+                const fullName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : ''
+                const phone = user?.phone ? user.phone.replace(/^\+91/, '') : ''
+                setFormData({ ...emptyForm, full_name: fullName, phone })
+                setPinLookupState('idle')
+                setLocalities([])
+                setShowForm(!showForm)
+              }}
+              className="px-5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold text-sm"
+            >
+              {showForm ? 'Cancel' : '+ Add New Address'}
+            </button>
+          </div>
 
-            {showForm && (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-6">
-                <h2 className="text-xl font-bold text-foreground mb-6">
-                  {editingAddress ? 'Edit Address' : 'Add New Address'}
-                </h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <CustomSelect
-                      id="address_type"
-                      label="Address Type"
-                      value={formData.address_type}
-                      onChange={(val) => setFormData({ ...formData, address_type: val })}
-                      required
-                      options={[
-                        { value: 'shipping', label: 'Shipping' },
-                        { value: 'billing', label: 'Billing' },
-                        { value: 'both', label: 'Both' },
-                      ]}
-                    />
-                    <div>
-                      <label htmlFor="full_name" className="block text-sm font-medium text-foreground-secondary mb-2">
-                        Full Name *
-                      </label>
-                      <input
-                        id="full_name"
-                        type="text"
-                        value={formData.full_name}
-                        onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
+          {showForm && (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-6">
+              <h2 className="text-xl font-bold text-foreground mb-6">
+                {editingAddress ? 'Edit Address' : 'Add New Address'}
+              </h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <CustomSelect
+                    id="address_type"
+                    label="Address Type"
+                    value={formData.address_type}
+                    onChange={val => setFormData({ ...formData, address_type: val })}
+                    required
+                    options={[
+                      { value: 'shipping', label: 'Shipping' },
+                      { value: 'billing', label: 'Billing' },
+                      { value: 'both', label: 'Both' },
+                    ]}
+                  />
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      Phone Number *
-                    </label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-4 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
-                        +91
-                      </span>
-                      <input
-                        id="phone"
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={10}
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                        className="w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        placeholder="00000 00000"
-                        required
-                      />
-                    </div>
-                    {formData.phone && formData.phone.length > 0 && formData.phone.length !== 10 && (
-                      <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="address_line1" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      Address Line 1 *
+                    <label htmlFor="full_name" className="block text-sm font-medium text-foreground-secondary mb-2">
+                      Full Name *
                     </label>
                     <input
-                      id="address_line1"
+                      id="full_name"
                       type="text"
-                      value={formData.address_line1}
-                      onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
+                      value={formData.full_name}
+                      onChange={e => setFormData({ ...formData, full_name: e.target.value })}
                       className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      placeholder="House/Flat No., Street, Area"
                       required
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label htmlFor="postal_code" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      PIN Code *
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="postal_code"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={formData.postal_code}
-                        onChange={(e) => handlePincodeChange(e.target.value)}
-                        className="w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        placeholder="6-digit PIN code"
-                        required
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        {pinLookupState === 'loading' && (
-                          <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
-                        )}
-                        {pinLookupState === 'found' && (
-                          <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                        {pinLookupState === 'error' && (
-                          <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                    {pinLookupState === 'error' && (
-                      <p className="mt-1 text-xs text-red-500">PIN code not found. Please check and try again.</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-foreground-secondary mb-2">
-                        City / District *
-                      </label>
-                      <input
-                        id="city"
-                        type="text"
-                        value={formData.city}
-                        readOnly={pinLookupDone}
-                        onChange={(e) => !pinLookupDone && setFormData({ ...formData, city: e.target.value })}
-                        className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
-                          pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
-                        }`}
-                        placeholder="Auto-filled from PIN"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-foreground-secondary mb-2">
-                        State *
-                      </label>
-                      <input
-                        id="state"
-                        type="text"
-                        value={formData.state}
-                        readOnly={pinLookupDone}
-                        onChange={(e) => !pinLookupDone && setFormData({ ...formData, state: e.target.value })}
-                        className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
-                          pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
-                        }`}
-                        placeholder="Auto-filled from PIN"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {localities.length > 0 ? (
-                    <CustomSelect
-                      id="address_line2"
-                      label="Locality / Village"
-                      value={formData.address_line2}
-                      onChange={(val) => setFormData({ ...formData, address_line2: val })}
-                      placeholder="Select locality"
-                      options={localities.map((loc) => ({ value: loc, label: loc }))}
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Phone Number *
+                  </label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-4 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
+                      +91
+                    </span>
+                    <input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={formData.phone}
+                      onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      placeholder="00000 00000"
+                      required
                     />
-                  ) : (
-                    <div>
-                      <label htmlFor="address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
-                        Locality / Village
-                      </label>
-                      <input
-                        id="address_line2"
-                        type="text"
-                        value={formData.address_line2}
-                        onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        placeholder="Area, Colony, Village"
-                      />
-                    </div>
+                  </div>
+                  {formData.phone && formData.phone.length > 0 && formData.phone.length !== 10 && (
+                    <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
                   )}
+                </div>
 
-                  <div>
-                    <label htmlFor="landmark" className="block text-sm font-medium text-foreground-secondary mb-2">
-                      Landmark (Optional)
-                    </label>
+                <div>
+                  <label htmlFor="address_line1" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Address Line 1 *
+                  </label>
+                  <input
+                    id="address_line1"
+                    type="text"
+                    value={formData.address_line1}
+                    onChange={e => setFormData({ ...formData, address_line1: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    placeholder="House/Flat No., Street, Area"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="postal_code" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    PIN Code *
+                  </label>
+                  <div className="relative">
                     <input
-                      id="landmark"
+                      id="postal_code"
                       type="text"
-                      value={formData.landmark}
-                      onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
-                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      placeholder="Nearby landmark"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={formData.postal_code}
+                      onChange={e => handlePincodeChange(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      placeholder="6-digit PIN code"
+                      required
                     />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="is_default"
-                      checked={formData.is_default}
-                      onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                      className="w-4 h-4 text-accent-600 border-border-secondary rounded focus:ring-accent-500"
-                    />
-                    <label htmlFor="is_default" className="text-sm text-foreground-secondary">
-                      Set as default address
-                    </label>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      type="submit"
-                      disabled={isSaving}
-                      className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                          Saving...
-                        </>
-                      ) : (
-                        editingAddress ? 'Update Address' : 'Save Address'
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {pinLookupState === 'loading' && (
+                        <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
                       )}
+                      {pinLookupState === 'found' && (
+                        <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                      {pinLookupState === 'error' && (
+                        <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  {pinLookupState === 'error' && (
+                    <p className="mt-1 text-xs text-red-500">PIN code not found. Please check and try again.</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-foreground-secondary mb-2">
+                      City / District *
+                    </label>
+                    <input
+                      id="city"
+                      type="text"
+                      value={formData.city}
+                      readOnly={pinLookupDone}
+                      onChange={e => !pinLookupDone && setFormData({ ...formData, city: e.target.value })}
+                      className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                        pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
+                      }`}
+                      placeholder="Auto-filled from PIN"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-foreground-secondary mb-2">
+                      State *
+                    </label>
+                    <input
+                      id="state"
+                      type="text"
+                      value={formData.state}
+                      readOnly={pinLookupDone}
+                      onChange={e => !pinLookupDone && setFormData({ ...formData, state: e.target.value })}
+                      className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                        pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
+                      }`}
+                      placeholder="Auto-filled from PIN"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {localities.length > 0 ? (
+                  <CustomSelect
+                    id="address_line2"
+                    label="Locality / Village"
+                    value={formData.address_line2}
+                    onChange={val => setFormData({ ...formData, address_line2: val })}
+                    placeholder="Select locality"
+                    options={localities.map(loc => ({ value: loc, label: loc }))}
+                  />
+                ) : (
+                  <div>
+                    <label htmlFor="address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
+                      Locality / Village
+                    </label>
+                    <input
+                      id="address_line2"
+                      type="text"
+                      value={formData.address_line2}
+                      onChange={e => setFormData({ ...formData, address_line2: e.target.value })}
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      placeholder="Area, Colony, Village"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label htmlFor="landmark" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Landmark (Optional)
+                  </label>
+                  <input
+                    id="landmark"
+                    type="text"
+                    value={formData.landmark}
+                    onChange={e => setFormData({ ...formData, landmark: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    placeholder="Nearby landmark"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="is_default"
+                    checked={formData.is_default}
+                    onChange={e => setFormData({ ...formData, is_default: e.target.checked })}
+                    className="w-4 h-4 text-accent-600 border-border-secondary rounded focus:ring-accent-500"
+                  />
+                  <label htmlFor="is_default" className="text-sm text-foreground-secondary">
+                    Set as default address
+                  </label>
+                </div>
+
+                <div className="flex gap-4">
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                        Saving...
+                      </>
+                    ) : editingAddress ? (
+                      'Update Address'
+                    ) : (
+                      'Save Address'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => {
+                      setShowForm(false)
+                      setEditingAddress(null)
+                    }}
+                    className="px-6 py-3 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors font-semibold disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {addresses.length === 0 ? (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+              <svg
+                className="w-16 h-16 text-foreground-muted mx-auto mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <h3 className="text-xl font-semibold text-foreground mb-2">No addresses saved</h3>
+              <p className="text-foreground-secondary">Add an address to make checkout faster.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredAddresses.map(address => (
+                <div
+                  key={address.id}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative"
+                >
+                  {address.is_default && (
+                    <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
+                      Default
+                    </span>
+                  )}
+                  <div className="mb-4">
+                    <span className="inline-block px-3 py-1 bg-surface-secondary text-foreground-secondary text-xs font-semibold rounded mb-3 capitalize">
+                      {address.address_type}
+                    </span>
+                    <p className="text-foreground font-medium">{address.full_name}</p>
+                    <p className="text-foreground">{address.address_line1}</p>
+                    {address.address_line2 && <p className="text-foreground-secondary">{address.address_line2}</p>}
+                    {address.landmark && <p className="text-foreground-secondary text-sm">Near: {address.landmark}</p>}
+                    <p className="text-foreground-secondary">
+                      {address.city}, {address.state} {address.postal_code}
+                    </p>
+                    <p className="text-foreground-secondary">{address.country}</p>
+                    <p className="text-foreground-secondary mt-2">Phone: {address.phone}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(address)}
+                      className="px-4 py-2 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors text-sm font-medium"
+                    >
+                      Edit
                     </button>
                     <button
                       type="button"
-                      disabled={isSaving}
-                      onClick={() => {
-                        setShowForm(false)
-                        setEditingAddress(null)
-                      }}
-                      className="px-6 py-3 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors font-semibold disabled:opacity-50"
+                      onClick={() => handleDelete(address.id)}
+                      className="px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium"
                     >
-                      Cancel
+                      Delete
                     </button>
                   </div>
-                </form>
-              </div>
-            )}
-
-            {addresses.length === 0 ? (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <h3 className="text-xl font-semibold text-foreground mb-2">No addresses saved</h3>
-                <p className="text-foreground-secondary">Add an address to make checkout faster.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredAddresses.map((address) => (
-                  <div key={address.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative">
-                    {address.is_default && (
-                      <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
-                        Default
-                      </span>
-                    )}
-                    <div className="mb-4">
-                      <span className="inline-block px-3 py-1 bg-surface-secondary text-foreground-secondary text-xs font-semibold rounded mb-3 capitalize">
-                        {address.address_type}
-                      </span>
-                      <p className="text-foreground font-medium">{address.full_name}</p>
-                      <p className="text-foreground">{address.address_line1}</p>
-                      {address.address_line2 && (
-                        <p className="text-foreground-secondary">{address.address_line2}</p>
-                      )}
-                      {address.landmark && (
-                        <p className="text-foreground-secondary text-sm">Near: {address.landmark}</p>
-                      )}
-                      <p className="text-foreground-secondary">
-                        {address.city}, {address.state} {address.postal_code}
-                      </p>
-                      <p className="text-foreground-secondary">{address.country}</p>
-                      <p className="text-foreground-secondary mt-2">Phone: {address.phone}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(address)}
-                        className="px-4 py-2 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors text-sm font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(address.id)}
-                        className="px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+    </div>
   )
 }

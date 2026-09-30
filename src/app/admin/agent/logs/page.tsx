@@ -44,14 +44,19 @@ export default function AgentLogsPage() {
     }
   }
 
-  useEffect(() => { load(page) }, [page])
+  useEffect(() => {
+    load(page)
+  }, [page])
 
   return (
     <div className="p-4 sm:p-6 w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-semibold text-foreground">Agent Tool Logs</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more tools.</p>
+          <p className="text-sm text-foreground-muted mt-0.5">
+            Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more
+            tools.
+          </p>
         </div>
         <button
           type="button"
@@ -67,7 +72,11 @@ export default function AgentLogsPage() {
       {loading && toolLogs.length === 0 ? (
         <div className="space-y-2 animate-pulse">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-surface-elevated border border-border-default rounded-lg px-4 py-3 flex items-start gap-3" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated border border-border-default rounded-lg px-4 py-3 flex items-start gap-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="w-8 h-8 rounded-full bg-surface-secondary shrink-0" />
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -88,10 +97,14 @@ export default function AgentLogsPage() {
           <div className="space-y-2">
             {toolLogs.map(msg => {
               const isExpanded = expandedId === msg.id
-              const adminName = [msg.admin_first_name, msg.admin_last_name].filter(Boolean).join(' ') || msg.admin_username || 'Admin'
+              const adminName =
+                [msg.admin_first_name, msg.admin_last_name].filter(Boolean).join(' ') || msg.admin_username || 'Admin'
               const errorCount = msg.tool_calls.filter(tc => tc.isError).length
               return (
-                <div key={msg.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                <div
+                  key={msg.id}
+                  className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden"
+                >
                   <button
                     type="button"
                     onClick={() => setExpandedId(isExpanded ? null : msg.id)}
@@ -127,20 +140,27 @@ export default function AgentLogsPage() {
                         return (
                           <div key={i} className={`px-4 py-3 ${tc.isError ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
                             <div className="flex items-center gap-2 mb-2">
-                              {tc.isError
-                                ? <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                : <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                              }
+                              {tc.isError ? (
+                                <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                              )}
                               <span className="text-xs font-semibold font-mono text-foreground">{tc.tool}</span>
                             </div>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-[11px]">
                               <div>
                                 <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Input</p>
-                                <pre className="bg-surface-secondary rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground font-mono leading-relaxed">{inputStr}</pre>
+                                <pre className="bg-surface-secondary rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground font-mono leading-relaxed">
+                                  {inputStr}
+                                </pre>
                               </div>
                               <div>
                                 <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Output</p>
-                                <pre className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-100/50 dark:bg-red-900/20 text-red-800 dark:text-red-300' : 'bg-surface-secondary text-foreground'}`}>{outputStr}</pre>
+                                <pre
+                                  className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-100/50 dark:bg-red-900/20 text-red-800 dark:text-red-300' : 'bg-surface-secondary text-foreground'}`}
+                                >
+                                  {outputStr}
+                                </pre>
                               </div>
                             </div>
                           </div>
@@ -159,13 +179,21 @@ export default function AgentLogsPage() {
                 Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}
               </p>
               <div className="flex items-center gap-1">
-                <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
+                >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <span className="text-xs px-2 text-foreground">Page {page}</span>
-                <button type="button" onClick={() => setPage(p => p + 1)} disabled={page * 50 >= total}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page * 50 >= total}
+                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
+                >
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>

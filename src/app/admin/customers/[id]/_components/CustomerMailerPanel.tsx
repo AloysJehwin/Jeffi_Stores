@@ -65,11 +65,11 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
 
   // ── Order-status-aware templates ────────────────────────────────────────────
 
-  const processingOrder = recentOrders.find(o =>
-    ['confirmed', 'processing'].includes(o.status)
-  )
+  const processingOrder = recentOrders.find(o => ['confirmed', 'processing'].includes(o.status))
   if (processingOrder) {
-    const ref = processingOrder.order_number ? `#${processingOrder.order_number}` : `placed on ${fmtDate(processingOrder.created_at)}`
+    const ref = processingOrder.order_number
+      ? `#${processingOrder.order_number}`
+      : `placed on ${fmtDate(processingOrder.created_at)}`
     templates.push({
       label: 'Order Processing',
       subject: `Your order ${ref} is being prepared`,
@@ -78,11 +78,11 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
     })
   }
 
-  const shippedOrder = recentOrders.find(o =>
-    ['dispatched', 'shipped', 'out_for_delivery'].includes(o.status)
-  )
+  const shippedOrder = recentOrders.find(o => ['dispatched', 'shipped', 'out_for_delivery'].includes(o.status))
   if (shippedOrder) {
-    const ref = shippedOrder.order_number ? `#${shippedOrder.order_number}` : `placed on ${fmtDate(shippedOrder.created_at)}`
+    const ref = shippedOrder.order_number
+      ? `#${shippedOrder.order_number}`
+      : `placed on ${fmtDate(shippedOrder.created_at)}`
     const statusLabel = shippedOrder.status === 'out_for_delivery' ? 'out for delivery' : 'on its way'
     templates.push({
       label: 'Order Shipped',
@@ -94,7 +94,9 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
 
   const deliveredOrder = recentOrders.find(o => o.status === 'delivered')
   if (deliveredOrder) {
-    const ref = deliveredOrder.order_number ? `#${deliveredOrder.order_number}` : `placed on ${fmtDate(deliveredOrder.created_at)}`
+    const ref = deliveredOrder.order_number
+      ? `#${deliveredOrder.order_number}`
+      : `placed on ${fmtDate(deliveredOrder.created_at)}`
     templates.push({
       label: 'Post-Delivery',
       subject: `How's your order ${ref} going?`,
@@ -109,11 +111,13 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
     })
   }
 
-  const pendingPaymentOrder = recentOrders.find(o =>
-    o.payment_status === 'pending' && !['cancelled', 'refunded'].includes(o.status)
+  const pendingPaymentOrder = recentOrders.find(
+    o => o.payment_status === 'pending' && !['cancelled', 'refunded'].includes(o.status)
   )
   if (pendingPaymentOrder) {
-    const ref = pendingPaymentOrder.order_number ? `#${pendingPaymentOrder.order_number}` : `placed on ${fmtDate(pendingPaymentOrder.created_at)}`
+    const ref = pendingPaymentOrder.order_number
+      ? `#${pendingPaymentOrder.order_number}`
+      : `placed on ${fmtDate(pendingPaymentOrder.created_at)}`
     templates.push({
       label: 'Payment Pending',
       subject: `Action needed — payment pending for order ${ref}`,
@@ -126,12 +130,15 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
     ['return_requested', 'return_approved', 'return_picked_up'].includes(o.status)
   )
   if (returnOrder) {
-    const ref = returnOrder.order_number ? `#${returnOrder.order_number}` : `placed on ${fmtDate(returnOrder.created_at)}`
-    const statusMsg = returnOrder.status === 'return_requested'
-      ? 'we have received your return request and are reviewing it'
-      : returnOrder.status === 'return_approved'
-      ? 'your return has been approved and we are arranging a pickup'
-      : 'your return has been picked up and is on its way back to us'
+    const ref = returnOrder.order_number
+      ? `#${returnOrder.order_number}`
+      : `placed on ${fmtDate(returnOrder.created_at)}`
+    const statusMsg =
+      returnOrder.status === 'return_requested'
+        ? 'we have received your return request and are reviewing it'
+        : returnOrder.status === 'return_approved'
+          ? 'your return has been approved and we are arranging a pickup'
+          : 'your return has been picked up and is on its way back to us'
     templates.push({
       label: 'Return Update',
       subject: `Update on your return for order ${ref}`,
@@ -142,7 +149,9 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
 
   const cancelledOrder = recentOrders.find(o => o.status === 'cancelled')
   if (cancelledOrder) {
-    const ref = cancelledOrder.order_number ? `#${cancelledOrder.order_number}` : `placed on ${fmtDate(cancelledOrder.created_at)}`
+    const ref = cancelledOrder.order_number
+      ? `#${cancelledOrder.order_number}`
+      : `placed on ${fmtDate(cancelledOrder.created_at)}`
     templates.push({
       label: 'Post-Cancellation',
       subject: `${first}, we're sorry about order ${ref}`,
@@ -319,13 +328,33 @@ const EMAIL_TEMPLATES = [
   { value: 'announcement', label: 'Announcement' },
 ]
 
-const inputCls = 'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+const inputCls =
+  'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
 export default function CustomerMailerPanel({
-  customerId, customerName, customerEmail, segments, healthScore,
-  totalOrders, lifetimeValue, daysSinceLastOrder, lastOrderAt, recentOrders,
+  customerId,
+  customerName,
+  customerEmail,
+  segments,
+  healthScore,
+  totalOrders,
+  lifetimeValue,
+  daysSinceLastOrder,
+  lastOrderAt,
+  recentOrders,
 }: CustomerContext) {
-  const ctx: CustomerContext = { customerId, customerName, customerEmail, segments, healthScore, totalOrders, lifetimeValue, daysSinceLastOrder, lastOrderAt, recentOrders }
+  const ctx: CustomerContext = {
+    customerId,
+    customerName,
+    customerEmail,
+    segments,
+    healthScore,
+    totalOrders,
+    lifetimeValue,
+    daysSinceLastOrder,
+    lastOrderAt,
+    recentOrders,
+  }
   const quickTemplates = buildQuickTemplates(ctx)
 
   const [templateKey, setTemplateKey] = useState<'promotion' | 'announcement'>('promotion')
@@ -367,35 +396,49 @@ export default function CustomerMailerPanel({
   useEffect(() => {
     if (attachMode !== 'product') return
     if (productDebounce.current) clearTimeout(productDebounce.current)
-    productDebounce.current = setTimeout(async () => {
-      setProductsLoading(true)
-      try {
-        const qs = productQuery.trim() ? `?q=${encodeURIComponent(productQuery)}&limit=6` : `?featured=true&limit=6`
-        const res = await fetch(`/api/admin/quotations/products${qs}`, { credentials: 'include' })
-        const d = await res.json()
-        const rows: Array<{ product_id: string; name: string; base_price: number; slug: string | null }> = Array.isArray(d.products) ? d.products : []
-        const seen = new Set<string>()
-        const deduped: Product[] = []
-        for (const row of rows) {
-          if (!seen.has(row.product_id)) {
-            seen.add(row.product_id)
-            deduped.push({ id: row.product_id, name: row.name, base_price: row.base_price || 0, slug: row.slug || null })
+    productDebounce.current = setTimeout(
+      async () => {
+        setProductsLoading(true)
+        try {
+          const qs = productQuery.trim() ? `?q=${encodeURIComponent(productQuery)}&limit=6` : `?featured=true&limit=6`
+          const res = await fetch(`/api/admin/quotations/products${qs}`, { credentials: 'include' })
+          const d = await res.json()
+          const rows: Array<{ product_id: string; name: string; base_price: number; slug: string | null }> =
+            Array.isArray(d.products) ? d.products : []
+          const seen = new Set<string>()
+          const deduped: Product[] = []
+          for (const row of rows) {
+            if (!seen.has(row.product_id)) {
+              seen.add(row.product_id)
+              deduped.push({
+                id: row.product_id,
+                name: row.name,
+                base_price: row.base_price || 0,
+                slug: row.slug || null,
+              })
+            }
           }
+          setProducts(deduped.slice(0, 6))
+        } catch {
+          setProducts([])
+        } finally {
+          setProductsLoading(false)
         }
-        setProducts(deduped.slice(0, 6))
-      } catch {
-        setProducts([])
-      } finally {
-        setProductsLoading(false)
-      }
-    }, productQuery.trim() ? 300 : 0)
+      },
+      productQuery.trim() ? 300 : 0
+    )
   }, [productQuery, attachMode])
 
   const buildTemplateData = useCallback((): Record<string, string> => {
     const data: Record<string, string> = { headline, body }
     if (attachMode === 'product' && selectedProduct) {
       const productUrl = selectedProduct.slug ? `${BASE_URL}/products/${selectedProduct.slug}` : null
-      data.body = [body, `\nCheck out: <strong>${selectedProduct.name}</strong> — starting at ₹${Math.round(selectedProduct.base_price).toLocaleString('en-IN')}${productUrl ? `\n<a href="${productUrl}" style="color:#e07b3f;">View Product →</a>` : ''}`].filter(Boolean).join('\n')
+      data.body = [
+        body,
+        `\nCheck out: <strong>${selectedProduct.name}</strong> — starting at ₹${Math.round(selectedProduct.base_price).toLocaleString('en-IN')}${productUrl ? `\n<a href="${productUrl}" style="color:#e07b3f;">View Product →</a>` : ''}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
     }
     return data
   }, [headline, body, attachMode, selectedProduct])
@@ -450,7 +493,10 @@ export default function CustomerMailerPanel({
           },
         }),
       })
-      if (!createRes.ok) { showToast('Failed to create mailer.', 'error'); return }
+      if (!createRes.ok) {
+        showToast('Failed to create mailer.', 'error')
+        return
+      }
       const { id } = await createRes.json()
       const sendRes = await fetch(`/api/admin/mailer/${id}/send`, {
         method: 'POST',
@@ -467,9 +513,7 @@ export default function CustomerMailerPanel({
     }
   }
 
-  const segmentLabel = segments.length > 0
-    ? segments.map(s => s.replace(/_/g, ' ')).join(', ')
-    : 'customer'
+  const segmentLabel = segments.length > 0 ? segments.map(s => s.replace(/_/g, ' ')).join(', ') : 'customer'
 
   const storeConfig = useStoreConfig()
   const storeName = storeConfig.identity.name || 'this store'
@@ -478,10 +522,16 @@ export default function CustomerMailerPanel({
     `Customer: ${customerName}.`,
     `Segment: ${segmentLabel}.`,
     healthScore !== null ? `Health score: ${healthScore}/100.` : '',
-    daysSinceLastOrder !== null ? `Days since last order: ${daysSinceLastOrder}.` : totalOrders === 0 ? 'No orders yet.' : '',
+    daysSinceLastOrder !== null
+      ? `Days since last order: ${daysSinceLastOrder}.`
+      : totalOrders === 0
+        ? 'No orders yet.'
+        : '',
     `Total orders: ${totalOrders}. Lifetime value: ₹${Math.round(lifetimeValue).toLocaleString('en-IN')}.`,
     `Email template type: ${templateKey}. Store: ${storeName}.`,
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   if (sendResult) {
     return (
@@ -490,10 +540,21 @@ export default function CustomerMailerPanel({
           <Mail className="w-5 h-5 text-green-600 dark:text-green-400" />
         </div>
         <p className="text-sm font-semibold text-foreground">Mailer sent!</p>
-        <p className="text-xs text-foreground-muted">{sendResult.sent} delivered · {sendResult.failed} failed</p>
+        <p className="text-xs text-foreground-muted">
+          {sendResult.sent} delivered · {sendResult.failed} failed
+        </p>
         <button
           type="button"
-          onClick={() => { setSendResult(null); setSubject(''); setHeadline(''); setBody(''); setAttachMode('none'); setSelectedCoupon(null); setSelectedProduct(null); setTab('compose') }}
+          onClick={() => {
+            setSendResult(null)
+            setSubject('')
+            setHeadline('')
+            setBody('')
+            setAttachMode('none')
+            setSelectedCoupon(null)
+            setSelectedProduct(null)
+            setTab('compose')
+          }}
           className="mt-1 px-3 py-1.5 rounded-lg border border-border-secondary text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors"
         >
           Send another
@@ -532,7 +593,11 @@ export default function CustomerMailerPanel({
                 <button
                   key={tpl.label}
                   type="button"
-                  onClick={() => { setSubject(tpl.subject); setHeadline(tpl.headline); setBody(tpl.body) }}
+                  onClick={() => {
+                    setSubject(tpl.subject)
+                    setHeadline(tpl.headline)
+                    setBody(tpl.body)
+                  }}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
                 >
                   {tpl.label}
@@ -561,8 +626,16 @@ export default function CustomerMailerPanel({
 
           {/* Subject */}
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Subject *</label>
-            <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} scope="mailer:write" context={aiContext}>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Subject *
+            </label>
+            <AIEnrichButton
+              fieldLabel="Email Subject"
+              value={subject}
+              onChange={setSubject}
+              scope="mailer:write"
+              context={aiContext}
+            >
               <input
                 type="text"
                 value={subject}
@@ -575,8 +648,16 @@ export default function CustomerMailerPanel({
 
           {/* Headline */}
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Headline *</label>
-            <AIEnrichButton fieldLabel="Email Headline" value={headline} onChange={setHeadline} scope="mailer:write" context={aiContext}>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Headline *
+            </label>
+            <AIEnrichButton
+              fieldLabel="Email Headline"
+              value={headline}
+              onChange={setHeadline}
+              scope="mailer:write"
+              context={aiContext}
+            >
               <input
                 type="text"
                 value={headline}
@@ -589,33 +670,44 @@ export default function CustomerMailerPanel({
 
           {/* Body */}
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Message</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Message
+            </label>
             <RichTextEditor value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
-              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
+              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
+              are replaced with the actual customer details when the email is sent.
             </p>
           </div>
 
           {/* Attachment */}
           <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">Attach (optional)</label>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">
+              Attach (optional)
+            </label>
             <div className="flex gap-2 flex-wrap">
-              {([
+              {[
                 { mode: 'none' as AttachMode, icon: <X className="w-3.5 h-3.5" />, label: 'None' },
                 { mode: 'coupon' as AttachMode, icon: <Tag className="w-3.5 h-3.5" />, label: 'Coupon' },
                 { mode: 'product' as AttachMode, icon: <Package className="w-3.5 h-3.5" />, label: 'Product' },
-              ]).map(({ mode, icon, label }) => (
+              ].map(({ mode, icon, label }) => (
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => { setAttachMode(mode); setSelectedCoupon(null); setSelectedProduct(null); setProductQuery('') }}
+                  onClick={() => {
+                    setAttachMode(mode)
+                    setSelectedCoupon(null)
+                    setSelectedProduct(null)
+                    setProductQuery('')
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                     attachMode === mode
                       ? 'bg-accent-500 border-accent-500 text-white'
                       : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
                   }`}
                 >
-                  {icon}{label}
+                  {icon}
+                  {label}
                 </button>
               ))}
             </div>
@@ -638,25 +730,29 @@ export default function CustomerMailerPanel({
               </button>
               {couponOpen && (
                 <div className="absolute z-50 left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {couponsLoading
-                    ? <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
-                    : coupons.length === 0
-                    ? <p className="text-xs text-foreground-muted px-3 py-2">No active coupons found.</p>
-                    : coupons.map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => { setSelectedCoupon(c); setCouponOpen(false) }}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors"
-                        >
-                          <span className="font-semibold text-foreground">{c.code}</span>
-                          <span className="ml-2 text-foreground-muted">
-                            {c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off
-                            {c.description && ` · ${c.description}`}
-                          </span>
-                        </button>
-                      ))
-                  }
+                  {couponsLoading ? (
+                    <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
+                  ) : coupons.length === 0 ? (
+                    <p className="text-xs text-foreground-muted px-3 py-2">No active coupons found.</p>
+                  ) : (
+                    coupons.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCoupon(c)
+                          setCouponOpen(false)
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors"
+                      >
+                        <span className="font-semibold text-foreground">{c.code}</span>
+                        <span className="ml-2 text-foreground-muted">
+                          {c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`} off
+                          {c.description && ` · ${c.description}`}
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -668,7 +764,10 @@ export default function CustomerMailerPanel({
               <input
                 type="text"
                 value={productQuery}
-                onChange={e => { setSelectedProduct(null); setProductQuery(e.target.value) }}
+                onChange={e => {
+                  setSelectedProduct(null)
+                  setProductQuery(e.target.value)
+                }}
                 placeholder="Search products…"
                 className={inputCls}
               />
@@ -677,7 +776,10 @@ export default function CustomerMailerPanel({
                   <span className="font-semibold text-foreground">{selectedProduct.name}</span>
                   <button
                     type="button"
-                    onClick={() => { setSelectedProduct(null); setProductQuery('') }}
+                    onClick={() => {
+                      setSelectedProduct(null)
+                      setProductQuery('')
+                    }}
                     className="text-foreground-muted hover:text-foreground ml-2"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -685,22 +787,25 @@ export default function CustomerMailerPanel({
                 </div>
               ) : (
                 <div className="mt-1 border border-border-default rounded-lg overflow-hidden bg-surface-elevated">
-                  {productsLoading
-                    ? <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
-                    : products.length === 0
-                    ? <p className="text-xs text-foreground-muted px-3 py-2">No products found.</p>
-                    : products.map(p => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setSelectedProduct(p)}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors border-b border-border-default last:border-0"
-                        >
-                          <span className="font-semibold text-foreground">{p.name}</span>
-                          <span className="ml-2 text-foreground-muted">₹{Math.round(p.base_price).toLocaleString('en-IN')}</span>
-                        </button>
-                      ))
-                  }
+                  {productsLoading ? (
+                    <p className="text-xs text-foreground-muted px-3 py-2">Loading…</p>
+                  ) : products.length === 0 ? (
+                    <p className="text-xs text-foreground-muted px-3 py-2">No products found.</p>
+                  ) : (
+                    products.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setSelectedProduct(p)}
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-surface-secondary transition-colors border-b border-border-default last:border-0"
+                      >
+                        <span className="font-semibold text-foreground">{p.name}</span>
+                        <span className="ml-2 text-foreground-muted">
+                          ₹{Math.round(p.base_price).toLocaleString('en-IN')}
+                        </span>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -710,22 +815,26 @@ export default function CustomerMailerPanel({
 
       {tab === 'preview' && (
         <div className="border border-border-default rounded-lg overflow-hidden">
-          {previewLoading
-            ? <div className="flex items-center justify-center py-8"><span className="w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" /></div>
-            : (
-              <>
-                <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
-                  <span className="text-foreground-muted">To:</span>{' '}
-                  <span className="font-semibold text-foreground">{customerEmail}</span>
-                </div>
-                <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
-                  <span className="text-foreground-muted">Subject:</span>{' '}
-                  <span className="font-semibold text-foreground">{subject || '(no subject)'}</span>
-                </div>
-                <div className="p-4 bg-white text-zinc-900 text-xs max-h-64 overflow-y-auto" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-              </>
-            )
-          }
+          {previewLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <span className="w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
+                <span className="text-foreground-muted">To:</span>{' '}
+                <span className="font-semibold text-foreground">{customerEmail}</span>
+              </div>
+              <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
+                <span className="text-foreground-muted">Subject:</span>{' '}
+                <span className="font-semibold text-foreground">{subject || '(no subject)'}</span>
+              </div>
+              <div
+                className="p-4 bg-white text-zinc-900 text-xs max-h-64 overflow-y-auto"
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -733,18 +842,19 @@ export default function CustomerMailerPanel({
       <div className="flex flex-col gap-1 pt-1 border-t border-border-default">
         <div className="flex items-center gap-2 flex-wrap">
           <RequireWrite scope="customers:write">
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={sending || !subject.trim() || !headline.trim()}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
-          >
-            {sending
-              ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              : <Mail className="w-3.5 h-3.5" />
-            }
-            {sending ? 'Sending…' : `Send to ${customerName}`}
-          </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending || !subject.trim() || !headline.trim()}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+            >
+              {sending ? (
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Mail className="w-3.5 h-3.5" />
+              )}
+              {sending ? 'Sending…' : `Send to ${customerName}`}
+            </button>
           </RequireWrite>
           <p className="text-[10px] text-foreground-muted">Subject and headline required.</p>
         </div>

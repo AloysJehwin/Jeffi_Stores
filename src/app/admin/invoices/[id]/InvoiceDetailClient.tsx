@@ -51,24 +51,31 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
     return fetch(`/api/admin/invoices/${id}/detail`)
       .then(r => r.json())
       .then(j => {
-        if (j.redirect) { router.replace(j.redirect); return }
+        if (j.redirect) {
+          router.replace(j.redirect)
+          return
+        }
         setData(j)
         setQrImageUrl(j.order?.razorpay_qr_image_url || null)
         setLoading(false)
         // Check for amendment draft only for finalized invoices
         if (j.order?.invoice_number && j.order?.status !== 'draft') {
           fetch(`/api/admin/invoices/${id}/amendment-draft`, { credentials: 'include' })
-            .then(r => r.ok ? r.json() : null)
+            .then(r => (r.ok ? r.json() : null))
             .then(d => {
               setAmendDraft(d?.draft ?? null)
             })
-            .catch(() => { setAmendDraft(null) })
+            .catch(() => {
+              setAmendDraft(null)
+            })
         } else {
           setAmendDraft(null)
         }
         return j
       })
-      .catch(() => { setLoading(false) })
+      .catch(() => {
+        setLoading(false)
+      })
   }
 
   useEffect(() => {
@@ -76,13 +83,18 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   }, [id, router])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setQrModalOpen(false) }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setQrModalOpen(false)
+    }
     function onClickOutside(e: MouseEvent) {
       if (qrModalRef.current && !qrModalRef.current.contains(e.target as Node)) setQrModalOpen(false)
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onClickOutside)
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClickOutside) }
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onClickOutside)
+    }
   }, [])
 
   // Poll every 4s while QR is shown and payment is unpaid
@@ -90,7 +102,9 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
     const order = data?.order
     if (!order || order.payment_mode !== 'upi_qr' || order.payment_status === 'paid') return
     const interval = setInterval(async () => {
-      const j = await fetch(`/api/admin/invoices/${id}/detail`).then(r => r.json()).catch(() => null)
+      const j = await fetch(`/api/admin/invoices/${id}/detail`)
+        .then(r => r.json())
+        .catch(() => null)
       if (!j?.order) return
       if (j.order.payment_status === 'paid') {
         setData(j)
@@ -118,8 +132,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       if (res.ok && json.qrImageUrl) {
         setQrImageUrl(json.qrImageUrl)
         setQrModalOpen(true)
-      }
-      else showToast(json.error || 'Failed to generate QR', 'error')
+      } else showToast(json.error || 'Failed to generate QR', 'error')
     } finally {
       setQrLoading(false)
     }
@@ -134,7 +147,10 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         credentials: 'include',
       })
       const json = await res.json()
-      if (!res.ok) { setFinalizeError(json.error || 'Failed to finalize'); return }
+      if (!res.ok) {
+        setFinalizeError(json.error || 'Failed to finalize')
+        return
+      }
       await loadData()
     } catch {
       setFinalizeError('Failed to finalize invoice')
@@ -152,7 +168,10 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         credentials: 'include',
       })
       const json = await res.json()
-      if (!res.ok) { setAmendError(json.error || 'Failed to create amendment draft'); return }
+      if (!res.ok) {
+        setAmendError(json.error || 'Failed to create amendment draft')
+        return
+      }
       router.push(ap(`/admin/invoices/${json.draftId}`))
     } catch {
       setAmendError('Failed to create amendment draft')
@@ -165,7 +184,9 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Invoice not found.</p>
-        <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Invoices</Link>
+        <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">
+          ← Back to Invoices
+        </Link>
       </div>
     )
   }
@@ -190,11 +211,19 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         {/* Info cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="h-3 w-28 bg-surface-secondary rounded animate-pulse" />
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, j) => (
-                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                  <div
+                    key={j}
+                    className="flex justify-between gap-4 animate-pulse"
+                    style={{ animationDelay: `${j * 40}ms` }}
+                  >
                     <div className="h-3.5 w-16 bg-surface-secondary rounded shrink-0" />
                     <div className="h-3.5 bg-surface-secondary rounded flex-1" />
                   </div>
@@ -246,10 +275,16 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       {/* QR Modal */}
       {qrModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div ref={qrModalRef} className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default p-6 flex flex-col items-center gap-4 max-w-xs w-full">
+          <div
+            ref={qrModalRef}
+            className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default p-6 flex flex-col items-center gap-4 max-w-xs w-full"
+          >
             <div className="flex items-center justify-between w-full">
               <p className="text-sm font-semibold text-foreground">UPI QR — {formatINR(parseFloat(o.total_amount))}</p>
-              <button onClick={() => setQrModalOpen(false)} className="text-foreground-muted hover:text-foreground transition-colors">
+              <button
+                onClick={() => setQrModalOpen(false)}
+                className="text-foreground-muted hover:text-foreground transition-colors"
+              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -276,23 +311,24 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         </div>
       )}
       {/* Breadcrumb (matches order detail pattern) */}
-      <a
-        href={ap('/admin/invoices')}
-        className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block"
-      >
+      <a href={ap('/admin/invoices')} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
         ← Back to Invoices
       </a>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground font-mono">Invoice #{o.invoice_number}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground font-mono">
+            Invoice #{o.invoice_number}
+          </h1>
           {isVoided && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 uppercase">
               {o.status}
             </span>
           )}
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[o.payment_status] || 'bg-surface-secondary text-foreground-secondary'}`}>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[o.payment_status] || 'bg-surface-secondary text-foreground-secondary'}`}
+          >
             {o.payment_status}
           </span>
         </div>
@@ -317,7 +353,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           )}
           {showQrSection && canWrite && (
             <button
-              onClick={() => qrImageUrl ? setQrModalOpen(true) : generateQr()}
+              onClick={() => (qrImageUrl ? setQrModalOpen(true) : generateQr())}
               disabled={qrLoading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
             >
@@ -341,7 +377,12 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             Download PDF
           </a>
@@ -400,8 +441,16 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             {o.irn && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">IRN</span>
-                <span className={`text-xs font-medium inline-flex items-center gap-1 ${o.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                  {o.irn_status === 'generated' ? <><Check className="w-3 h-3" /> Generated</> : 'Stub'}
+                <span
+                  className={`text-xs font-medium inline-flex items-center gap-1 ${o.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}
+                >
+                  {o.irn_status === 'generated' ? (
+                    <>
+                      <Check className="w-3 h-3" /> Generated
+                    </>
+                  ) : (
+                    'Stub'
+                  )}
                 </span>
               </div>
             )}
@@ -488,15 +537,35 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Item</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">HSN</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">GST%</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Qty</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Unit Price</th>
-                {hasItemDiscount && <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Disc.</th>}
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Taxable</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Tax</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Total</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Item
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  HSN
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  GST%
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Qty
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Unit Price
+                </th>
+                {hasItemDiscount && (
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Disc.
+                  </th>
+                )}
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Taxable
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Tax
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -504,17 +573,26 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.product_name}</div>
-                    {variantLabel(item) && <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>}
-                    {item.product_sku && <div className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></div>}
+                    {variantLabel(item) && (
+                      <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>
+                    )}
+                    {item.product_sku && (
+                      <div className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
+                        {item.product_sku}
+                        <CopySku sku={item.product_sku} />
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
+                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">
+                    {item.hsn_code || '—'}
+                  </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-foreground">
                     {(() => {
                       const orderedQty = Number(item.quantity)
                       const isCount = item.sell_unit_dimension === 'count'
                       const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
-                      const unitLabel = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : null
+                      const unitLabel = item.buy_unit && item.buy_unit !== 'unit' ? item.buy_unit : null
                       if (isCount && unitLabel && factor > 1) {
                         return `${orderedQty} ${unitLabel} (${orderedQty * factor} pcs)`
                       }
@@ -527,12 +605,20 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>
                   {hasItemDiscount && (
                     <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 text-xs">
-                      {parseFloat(item.discount_amount || '0') > 0 ? `−${formatINR(parseFloat(item.discount_amount))}` : '—'}
+                      {parseFloat(item.discount_amount || '0') > 0
+                        ? `−${formatINR(parseFloat(item.discount_amount))}`
+                        : '—'}
                     </td>
                   )}
-                  <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.taxable_amount || '0'))}</td>
-                  <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.tax_amount || '0'))}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.total_price))}</td>
+                  <td className="px-4 py-3 text-right text-foreground-secondary">
+                    {formatINR(parseFloat(item.taxable_amount || '0'))}
+                  </td>
+                  <td className="px-4 py-3 text-right text-foreground-secondary">
+                    {formatINR(parseFloat(item.tax_amount || '0'))}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">
+                    {formatINR(parseFloat(item.total_price))}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -555,7 +641,9 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             {parseFloat(o.business_discount_amount || '0') > 0 && (
               <div className="flex justify-between gap-8">
                 <span className="text-foreground-secondary">Business Discount</span>
-                <span className="text-green-600 dark:text-green-400">−{formatINR(parseFloat(o.business_discount_amount))}</span>
+                <span className="text-green-600 dark:text-green-400">
+                  −{formatINR(parseFloat(o.business_discount_amount))}
+                </span>
               </div>
             )}
             {parseFloat(o.shipping_amount || '0') > 0 && (

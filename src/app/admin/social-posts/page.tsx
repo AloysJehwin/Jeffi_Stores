@@ -24,7 +24,11 @@ export default async function SocialPostsPage() {
           <AdminIntegrationsPopup
             scope="social"
             integrations={[]}
-            socialAccounts={socialAccounts.map((s) => ({ provider: s.provider, page_name: s.page_name, status: s.status }))}
+            socialAccounts={socialAccounts.map(s => ({
+              provider: s.provider,
+              page_name: s.page_name,
+              status: s.status,
+            }))}
           />
         </div>
       )}

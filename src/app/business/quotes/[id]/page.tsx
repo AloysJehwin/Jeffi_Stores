@@ -73,28 +73,31 @@ interface RFQMessage {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:        'bg-yellow-400/20 text-yellow-600 dark:text-yellow-300',
-  reviewed:       'bg-blue-400/20 text-blue-600 dark:text-blue-300',
-  negotiating:    'bg-purple-400/20 text-purple-600 dark:text-purple-300',
+  pending: 'bg-yellow-400/20 text-yellow-600 dark:text-yellow-300',
+  reviewed: 'bg-blue-400/20 text-blue-600 dark:text-blue-300',
+  negotiating: 'bg-purple-400/20 text-purple-600 dark:text-purple-300',
   offer_accepted: 'bg-teal-400/20 text-teal-600 dark:text-teal-300',
-  converted:      'bg-green-400/20 text-green-600 dark:text-green-300',
-  rejected:       'bg-red-400/20 text-red-600 dark:text-red-300',
+  converted: 'bg-green-400/20 text-green-600 dark:text-green-300',
+  rejected: 'bg-red-400/20 text-red-600 dark:text-red-300',
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  pending:        'Pending Review',
-  reviewed:       'Under Review',
-  negotiating:    'Negotiating',
+  pending: 'Pending Review',
+  reviewed: 'Under Review',
+  negotiating: 'Negotiating',
   offer_accepted: 'Offer Accepted',
-  converted:      'Quotation Ready',
-  rejected:       'Rejected',
+  converted: 'Quotation Ready',
+  rejected: 'Rejected',
 }
 
 const EDITABLE_STATUSES = ['pending', 'reviewed', 'negotiating']
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString('en-IN', {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -147,12 +150,16 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
       .catch(() => setLoading(false))
 
     fetch(`/api/business/rfqs/${id}/messages`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : { messages: [] })
+      .then(r => (r.ok ? r.json() : { messages: [] }))
       .then(m => setMessages(m.messages || []))
-      .catch(() => {/* messages table may not exist yet */})
+      .catch(() => {
+        /* messages table may not exist yet */
+      })
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    load()
+  }, [id])
 
   useEffect(() => {
     if (threadRef.current) {
@@ -161,19 +168,24 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
   }, [messages])
 
   const startEdit = () => {
-    setEditItems(items.map(item => ({
-      id: item.id,
-      quantity: item.quantity,
-      requested_price: item.requested_price,
-      notes: item.notes || '',
-    })))
+    setEditItems(
+      items.map(item => ({
+        id: item.id,
+        quantity: item.quantity,
+        requested_price: item.requested_price,
+        notes: item.notes || '',
+      }))
+    )
     setEditNotes(rfq?.notes || '')
     setSaveError('')
     setSaved(false)
     setEditing(true)
   }
 
-  const cancelEdit = () => { setEditing(false); setSaveError('') }
+  const cancelEdit = () => {
+    setEditing(false)
+    setSaveError('')
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -188,7 +200,8 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
           items: editItems.map(item => ({
             id: item.id,
             quantity: item.quantity === '' ? null : Number(item.quantity),
-            requested_price: item.requested_price === '' || item.requested_price == null ? null : Number(item.requested_price),
+            requested_price:
+              item.requested_price === '' || item.requested_price == null ? null : Number(item.requested_price),
             notes: item.notes || null,
           })),
         }),
@@ -220,11 +233,14 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
         body: JSON.stringify({ message: msgText.trim() }),
       })
       const data = await res.json()
-      if (!res.ok) { setMsgError(data.error || 'Failed to send'); return }
+      if (!res.ok) {
+        setMsgError(data.error || 'Failed to send')
+        return
+      }
       setMessages(prev => [...prev, data.message])
       setMsgText('')
       if (rfq && ['pending', 'reviewed'].includes(rfq.status)) {
-        setRfq(r => r ? { ...r, status: 'negotiating' } : r)
+        setRfq(r => (r ? { ...r, status: 'negotiating' } : r))
       }
     } catch {
       setMsgError('Network error')
@@ -238,11 +254,12 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
     setMsgError('')
     try {
       const message = action === 'decline' ? counterReplyText.trim() || undefined : undefined
-      const counter_items = action === 'decline'
-        ? Object.entries(counterPrices)
-            .map(([rfq_item_id, raw]) => ({ rfq_item_id, offered_price: Number(raw) }))
-            .filter(c => Number.isFinite(c.offered_price) && c.offered_price >= 0)
-        : undefined
+      const counter_items =
+        action === 'decline'
+          ? Object.entries(counterPrices)
+              .map(([rfq_item_id, raw]) => ({ rfq_item_id, offered_price: Number(raw) }))
+              .filter(c => Number.isFinite(c.offered_price) && c.offered_price >= 0)
+          : undefined
       const payload: { action: string; message?: string; counter_items?: typeof counter_items } = { action, message }
       if (counter_items && counter_items.length > 0) payload.counter_items = counter_items
       const res = await fetch(`/api/business/rfqs/${id}/respond`, {
@@ -252,7 +269,10 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (!res.ok) { setMsgError(data.error || 'Failed to respond'); return }
+      if (!res.ok) {
+        setMsgError(data.error || 'Failed to respond')
+        return
+      }
       setShowCounterInput(false)
       setCounterReplyText('')
       setCounterPrices({})
@@ -290,43 +310,47 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
     }
   }
 
-  if (!loading && !rfq) return (
-    <div className="bg-surface min-h-screen flex items-center justify-center text-foreground-muted">
-      Quote not found.
-    </div>
-  )
+  if (!loading && !rfq)
+    return (
+      <div className="bg-surface min-h-screen flex items-center justify-center text-foreground-muted">
+        Quote not found.
+      </div>
+    )
 
-  if (!rfq) return (
-    <div className="bg-surface min-h-screen">
-      <BusinessAccountNavBar />
-      <BusinessAccountMobileHeader />
-      <div className="container mx-auto px-4 py-6 pb-32">
-        <div className="flex items-center gap-2 text-sm text-foreground-secondary mb-5">
-          <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</Link>
-          <span>/</span>
-          <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
-        </div>
-        <div className="bg-zinc-800 rounded-2xl p-5 text-white border border-zinc-700 mb-5">
-          <div className="h-6 w-40 bg-zinc-700 rounded animate-pulse mb-2" />
-          <div className="h-4 w-56 bg-zinc-700/70 rounded animate-pulse" />
-        </div>
-        <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-5 lg:space-y-0">
-          <div className="lg:col-span-2 space-y-5">
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-5 space-y-3">
-              <div className="h-4 w-32 bg-surface-secondary rounded animate-pulse" />
-              <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
-            </div>
+  if (!rfq)
+    return (
+      <div className="bg-surface min-h-screen">
+        <BusinessAccountNavBar />
+        <BusinessAccountMobileHeader />
+        <div className="container mx-auto px-4 py-6 pb-32">
+          <div className="flex items-center gap-2 text-sm text-foreground-secondary mb-5">
+            <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">
+              My Quotes
+            </Link>
+            <span>/</span>
+            <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
           </div>
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
-              <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
+          <div className="bg-zinc-800 rounded-2xl p-5 text-white border border-zinc-700 mb-5">
+            <div className="h-6 w-40 bg-zinc-700 rounded animate-pulse mb-2" />
+            <div className="h-4 w-56 bg-zinc-700/70 rounded animate-pulse" />
+          </div>
+          <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-5 lg:space-y-0">
+            <div className="lg:col-span-2 space-y-5">
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 space-y-3">
+                <div className="h-4 w-32 bg-surface-secondary rounded animate-pulse" />
+                <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
+                <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
+              </div>
+            </div>
+            <div className="lg:col-span-1 space-y-4">
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
+                <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
 
   const canEdit = EDITABLE_STATUSES.includes(rfq.status)
   const canMessage = !['converted', 'rejected', 'offer_accepted'].includes(rfq.status)
@@ -335,10 +359,10 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
   // Only treat the admin counter as "pending on customer" if the customer hasn't
   // already replied with their own counter — once the customer counters back,
   // the ball is in admin's court and the Accept/Negotiate card should hide.
-  const pendingAdminOffer = !!latestCounter && (
-    !latestCustomerCounter ||
-    new Date(latestCounter.created_at).getTime() > new Date(latestCustomerCounter.created_at).getTime()
-  )
+  const pendingAdminOffer =
+    !!latestCounter &&
+    (!latestCustomerCounter ||
+      new Date(latestCounter.created_at).getTime() > new Date(latestCustomerCounter.created_at).getTime())
   const customerCounterMap: Record<string, number> = {}
   if (latestCustomerCounter?.counter_items) {
     for (const ci of latestCustomerCounter.counter_items) {
@@ -375,10 +399,11 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
       <BusinessAccountNavBar />
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 py-6 pb-32">
-
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-foreground-secondary mb-5">
-          <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</Link>
+          <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">
+            My Quotes
+          </Link>
           <span>/</span>
           <span className="text-foreground font-mono">{rfq.rfq_number}</span>
         </div>
@@ -389,12 +414,19 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-xl font-bold font-mono">{rfq.rfq_number}</h1>
-                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-zinc-500/20 text-zinc-300'}`}>
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-zinc-500/20 text-zinc-300'}`}
+                >
                   {STATUS_LABEL[rfq.status] || rfq.status}
                 </span>
               </div>
               <p className="text-zinc-400 text-xs mt-1">
-                Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                Submitted{' '}
+                {new Date(rfq.created_at).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -411,8 +443,12 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
             </div>
           </div>
           {rfq.admin_note && (
-            <div className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}>
-              <p className="font-semibold mb-1">{rfq.status === 'rejected' ? 'Reason for rejection:' : 'Note from our team:'}</p>
+            <div
+              className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}
+            >
+              <p className="font-semibold mb-1">
+                {rfq.status === 'rejected' ? 'Reason for rejection:' : 'Note from our team:'}
+              </p>
               <p className="font-normal">{rfq.admin_note}</p>
             </div>
           )}
@@ -430,9 +466,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                 placeholder="Optional: any updated context or reason for the resubmission..."
                 className="w-full px-3 py-2 rounded-lg border border-amber-700 bg-amber-950/40 text-amber-100 placeholder:text-amber-400/70 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mb-3"
               />
-              {resubmitError && (
-                <p className="text-xs text-red-300 mb-2">{resubmitError}</p>
-              )}
+              {resubmitError && <p className="text-xs text-red-300 mb-2">{resubmitError}</p>}
               <button
                 onClick={handleResubmit}
                 disabled={resubmitting}
@@ -447,7 +481,13 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
         {/* Save success banner */}
         {saved && (
           <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-700 dark:text-green-300 flex items-center gap-2 mb-5">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             Changes saved successfully.
@@ -456,10 +496,8 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
 
         {/* Two-column grid on large screens */}
         <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-5 lg:space-y-0">
-
           {/* LEFT — Items + Messages */}
           <div className="lg:col-span-2 space-y-5">
-
             {/* Items table */}
             <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
               <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
@@ -482,46 +520,72 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                     const rawCatalogUnit = item.variant_price ?? item.catalog_price
                     const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * unitFactor : null
                     const discountPct = item.category_id ? (discountMap[item.category_id] ?? 0) : 0
-                    const businessUnitPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : null
+                    const businessUnitPrice =
+                      catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : null
                     const shownCatalogPrice = businessUnitPrice ?? catalogUnit
                     const rawCatalogMrp = item.variant_mrp ?? item.catalog_mrp
                     const catalogMrp = rawCatalogMrp != null ? Number(rawCatalogMrp) * unitFactor : null
 
                     // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST after discount) or counter offer from messages (already incl-GST)
                     const quotedGstRate = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
-                    const quotedDiscPct = item.quoted_rate != null && item.quoted_discount_pct != null ? Number(item.quoted_discount_pct) : 0
-                    const offeredPrice = item.quoted_rate != null
-                      ? Number(item.quoted_rate) * (1 - quotedDiscPct / 100) * (1 + quotedGstRate / 100)
-                      : offered != null ? Number(offered) : null
+                    const quotedDiscPct =
+                      item.quoted_rate != null && item.quoted_discount_pct != null
+                        ? Number(item.quoted_discount_pct)
+                        : 0
+                    const offeredPrice =
+                      item.quoted_rate != null
+                        ? Number(item.quoted_rate) * (1 - quotedDiscPct / 100) * (1 + quotedGstRate / 100)
+                        : offered != null
+                          ? Number(offered)
+                          : null
                     const offeredDiscountSource = item.quoted_rate != null ? item.quoted_discount_pct : null
 
                     // resolved customer target — uses latest customer counter offer if present, else original requested_price
                     const targetPrice = targetFor(item)
                     // requested discount % vs our business price
-                    const reqDiscountPct = targetPrice != null && shownCatalogPrice && shownCatalogPrice > 0
-                      ? Math.round((1 - Number(targetPrice) / Number(shownCatalogPrice)) * 100)
-                      : null
-                    // offered discount % vs our business price
-                    const offeredDiscountPct = offeredDiscountSource != null
-                      ? Number(offeredDiscountSource)
-                      : offeredPrice != null && shownCatalogPrice && shownCatalogPrice > 0
-                        ? Math.round((1 - offeredPrice / Number(shownCatalogPrice)) * 100)
+                    const reqDiscountPct =
+                      targetPrice != null && shownCatalogPrice && shownCatalogPrice > 0
+                        ? Math.round((1 - Number(targetPrice) / Number(shownCatalogPrice)) * 100)
                         : null
+                    // offered discount % vs our business price
+                    const offeredDiscountPct =
+                      offeredDiscountSource != null
+                        ? Number(offeredDiscountSource)
+                        : offeredPrice != null && shownCatalogPrice && shownCatalogPrice > 0
+                          ? Math.round((1 - offeredPrice / Number(shownCatalogPrice)) * 100)
+                          : null
 
                     const hasOffer = offeredPrice != null
 
                     return (
-                      <div key={item.id} className={`px-4 py-4 sm:px-5 ${hasOffer ? 'bg-purple-50/40 dark:bg-purple-900/10' : ''}`}>
+                      <div
+                        key={item.id}
+                        className={`px-4 py-4 sm:px-5 ${hasOffer ? 'bg-purple-50/40 dark:bg-purple-900/10' : ''}`}
+                      >
                         {/* Top row: image + name + qty badge */}
                         <div className="flex gap-3 mb-3">
                           {/* Image */}
                           <div className="w-14 h-14 flex-shrink-0 rounded-xl border border-border-default bg-surface-secondary overflow-hidden">
                             {item.image_url ? (
-                              <img src={item.image_url} alt={item.description} className="w-full h-full object-contain p-1" />
+                              <img
+                                src={item.image_url}
+                                alt={item.description}
+                                className="w-full h-full object-contain p-1"
+                              />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg
+                                  className="w-5 h-5 text-foreground-muted"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
                                 </svg>
                               </div>
                             )}
@@ -532,13 +596,20 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                             <div className="flex items-start justify-between gap-2">
                               <p className="font-semibold text-foreground text-sm leading-snug">
                                 {item.product_slug ? (
-                                  <Link href={bp(`/business/products/${item.product_slug}`)} className="hover:text-accent-500 transition-colors">
+                                  <Link
+                                    href={bp(`/business/products/${item.product_slug}`)}
+                                    className="hover:text-accent-500 transition-colors"
+                                  >
                                     {item.description}
                                   </Link>
-                                ) : item.description}
+                                ) : (
+                                  item.description
+                                )}
                               </p>
                               {/* Item index */}
-                              <span className="text-[11px] text-foreground-muted font-mono flex-shrink-0">#{i + 1}</span>
+                              <span className="text-[11px] text-foreground-muted font-mono flex-shrink-0">
+                                #{i + 1}
+                              </span>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                               {item.variant_sku && (
@@ -567,7 +638,9 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                           {/* Our Price */}
                           {shownCatalogPrice != null && (
                             <div className="bg-surface-secondary rounded-xl px-3 py-2.5">
-                              <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Our Price</p>
+                              <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                Our Price
+                              </p>
                               <p className="text-sm font-bold text-foreground leading-none">
                                 ₹{fmt(shownCatalogPrice)}
                               </p>
@@ -593,8 +666,12 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                           )}
 
                           {/* Your Target */}
-                          <div className={`rounded-xl px-3 py-2.5 ${targetPrice != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}>
-                            <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Your Target</p>
+                          <div
+                            className={`rounded-xl px-3 py-2.5 ${targetPrice != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}
+                          >
+                            <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                              Your Target
+                            </p>
                             {targetPrice != null ? (
                               <>
                                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400 leading-none">
@@ -612,7 +689,9 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                           </div>
 
                           {/* Offered Price */}
-                          <div className={`rounded-xl px-3 py-2.5 ${hasOffer ? 'bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800' : 'bg-surface-secondary'}`}>
+                          <div
+                            className={`rounded-xl px-3 py-2.5 ${hasOffer ? 'bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800' : 'bg-surface-secondary'}`}
+                          >
                             <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
                               {item.quoted_rate != null ? 'Quoted Price' : 'Offered'}
                             </p>
@@ -634,17 +713,25 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
 
                           {/* Line Total */}
                           <div className="bg-surface-secondary rounded-xl px-3 py-2.5">
-                            <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Line Total</p>
+                            <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                              Line Total
+                            </p>
                             {shownCatalogPrice != null ? (
                               <p className="text-sm font-bold text-foreground leading-none">
-                                ₹{(Number(shownCatalogPrice) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                ₹
+                                {(Number(shownCatalogPrice) * item.quantity).toLocaleString('en-IN', {
+                                  maximumFractionDigits: 0,
+                                })}
                               </p>
                             ) : (
                               <p className="text-sm text-foreground-muted leading-none">—</p>
                             )}
                             {targetPrice != null && (
                               <p className="text-[10px] text-foreground-muted mt-1">
-                                Target: ₹{(Number(targetPrice) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                Target: ₹
+                                {(Number(targetPrice) * item.quantity).toLocaleString('en-IN', {
+                                  maximumFractionDigits: 0,
+                                })}
                               </p>
                             )}
                           </div>
@@ -668,29 +755,54 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                     return (
                       <div key={item.id} className="p-5 space-y-3">
                         <div className="flex items-start gap-3">
-                          <span className="text-xs text-foreground-muted font-mono mt-0.5 w-4 flex-shrink-0">{i + 1}</span>
+                          <span className="text-xs text-foreground-muted font-mono mt-0.5 w-4 flex-shrink-0">
+                            {i + 1}
+                          </span>
                           <p className="font-medium text-foreground text-sm">{orig.description}</p>
                         </div>
                         <div className="pl-7 grid grid-cols-2 gap-3 sm:grid-cols-3">
                           <div>
-                            <label className="block text-xs font-medium text-foreground-muted mb-1">Quantity <span className="text-foreground-secondary">({orig.unit})</span></label>
+                            <label className="block text-xs font-medium text-foreground-muted mb-1">
+                              Quantity <span className="text-foreground-secondary">({orig.unit})</span>
+                            </label>
                             <input
                               type="number"
                               min={1}
                               value={item.quantity}
-                              onChange={e => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: e.target.value === '' ? '' : Number(e.target.value) } : it))}
+                              onChange={e =>
+                                setEditItems(prev =>
+                                  prev.map((it, idx) =>
+                                    idx === i
+                                      ? { ...it, quantity: e.target.value === '' ? '' : Number(e.target.value) }
+                                      : it
+                                  )
+                                )
+                              }
                               className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-muted mb-1">Target Price (₹)</label>
+                            <label className="block text-xs font-medium text-foreground-muted mb-1">
+                              Target Price (₹)
+                            </label>
                             <input
                               type="number"
                               min={0}
                               step={0.01}
                               placeholder="Optional"
                               value={item.requested_price ?? ''}
-                              onChange={e => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, requested_price: e.target.value === '' ? null : Number(e.target.value) } : it))}
+                              onChange={e =>
+                                setEditItems(prev =>
+                                  prev.map((it, idx) =>
+                                    idx === i
+                                      ? {
+                                          ...it,
+                                          requested_price: e.target.value === '' ? null : Number(e.target.value),
+                                        }
+                                      : it
+                                  )
+                                )
+                              }
                               className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                             />
                             <p className="text-[11px] text-foreground-muted mt-1">Max 30% discount off listed price</p>
@@ -701,7 +813,11 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                               type="text"
                               placeholder="Optional"
                               value={item.notes}
-                              onChange={e => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, notes: e.target.value } : it))}
+                              onChange={e =>
+                                setEditItems(prev =>
+                                  prev.map((it, idx) => (idx === i ? { ...it, notes: e.target.value } : it))
+                                )
+                              }
                               className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                             />
                           </div>
@@ -726,23 +842,34 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                       const isAdmin = msg.sender === 'admin'
                       return (
                         <div key={msg.id} className={`flex gap-2 ${isAdmin ? '' : 'flex-row-reverse'}`}>
-                          <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${isAdmin ? 'bg-accent-500 text-white' : 'bg-zinc-600 text-white'}`}>
+                          <div
+                            className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${isAdmin ? 'bg-accent-500 text-white' : 'bg-zinc-600 text-white'}`}
+                          >
                             {isAdmin ? 'JS' : 'Me'}
                           </div>
 
                           <div className={`flex-1 max-w-[80%] space-y-1.5 ${isAdmin ? '' : 'items-end flex flex-col'}`}>
-                            <div className={`rounded-2xl px-4 py-2.5 text-sm ${isAdmin ? 'bg-surface rounded-tl-none border border-border-default' : 'bg-accent-500 text-white rounded-tr-none'}`}>
+                            <div
+                              className={`rounded-2xl px-4 py-2.5 text-sm ${isAdmin ? 'bg-surface rounded-tl-none border border-border-default' : 'bg-accent-500 text-white rounded-tr-none'}`}
+                            >
                               <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
                             </div>
 
                             {msg.counter_items && msg.counter_items.length > 0 && (
                               <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-3 space-y-1.5 w-full">
-                                <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Offered Prices</p>
+                                <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+                                  Offered Prices
+                                </p>
                                 {msg.counter_items.map(ci => {
                                   const item = items.find(it => it.id === ci.rfq_item_id)
                                   return (
-                                    <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 text-xs">
-                                      <span className="text-foreground-secondary truncate">{item?.description || ci.rfq_item_id}</span>
+                                    <div
+                                      key={ci.rfq_item_id}
+                                      className="flex items-center justify-between gap-3 text-xs"
+                                    >
+                                      <span className="text-foreground-secondary truncate">
+                                        {item?.description || ci.rfq_item_id}
+                                      </span>
                                       <span className="font-semibold text-purple-600 dark:text-purple-400 shrink-0">
                                         ₹{fmt(ci.offered_price)}
                                       </span>
@@ -761,9 +888,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                 )}
 
                 {messages.length === 0 && !rfq.status.includes('offer_accepted') && (
-                  <div className="px-5 py-6 text-center text-sm text-foreground-muted">
-                    No messages yet.
-                  </div>
+                  <div className="px-5 py-6 text-center text-sm text-foreground-muted">No messages yet.</div>
                 )}
 
                 {/* Offer accepted state */}
@@ -771,7 +896,13 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                   <div className="px-4 pb-4 pt-3">
                     <div className="flex items-center gap-3 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-700 p-4">
                       <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
-                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg
+                          className="w-5 h-5 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
@@ -793,10 +924,22 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                     {pendingAdminOffer && latestCounter ? (
                       <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-3">
                         <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          <svg
+                            className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                            />
                           </svg>
-                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">You have a pending offer</p>
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                            You have a pending offer
+                          </p>
                         </div>
 
                         {/* Offered prices summary */}
@@ -807,22 +950,27 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                             const rawCatalogUnit = item ? (item.variant_price ?? item.catalog_price) : null
                             const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * uf : null
                             const discountPct = item?.category_id ? (discountMap[item.category_id] ?? 0) : 0
-                            const businessPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : catalogUnit
-                            const savingPct = businessPrice && businessPrice > 0
-                              ? Math.round((1 - ci.offered_price / Number(businessPrice)) * 100)
-                              : null
+                            const businessPrice =
+                              catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : catalogUnit
+                            const savingPct =
+                              businessPrice && businessPrice > 0
+                                ? Math.round((1 - ci.offered_price / Number(businessPrice)) * 100)
+                                : null
                             return (
-                              <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2">
-                                <span className="text-xs text-foreground-secondary truncate">{item?.description || 'Item'}</span>
+                              <div
+                                key={ci.rfq_item_id}
+                                className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2"
+                              >
+                                <span className="text-xs text-foreground-secondary truncate">
+                                  {item?.description || 'Item'}
+                                </span>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {savingPct != null && savingPct > 0 && (
                                     <span className="text-[10px] font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-1.5 py-0.5 rounded-full">
                                       {savingPct}% off
                                     </span>
                                   )}
-                                  <span className="text-sm font-bold text-foreground">
-                                    ₹{fmt(ci.offered_price)}
-                                  </span>
+                                  <span className="text-sm font-bold text-foreground">₹{fmt(ci.offered_price)}</span>
                                 </div>
                               </div>
                             )
@@ -840,7 +988,13 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                               {respondingAction === 'accept' ? (
                                 <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                               ) : (
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2.5}
+                                >
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
@@ -858,8 +1012,18 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                               disabled={respondingAction != null}
                               className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                />
                               </svg>
                               Negotiate / Counter
                             </button>
@@ -867,14 +1031,23 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                         ) : (
                           <div className="space-y-3 pt-1">
                             <div className="space-y-1.5">
-                              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your counter prices</p>
+                              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                                Your counter prices
+                              </p>
                               {(latestCounter.counter_items || []).map(ci => {
                                 const item = items.find(it => it.id === ci.rfq_item_id)
                                 return (
-                                  <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2 border border-border-secondary">
+                                  <div
+                                    key={ci.rfq_item_id}
+                                    className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2 border border-border-secondary"
+                                  >
                                     <div className="min-w-0 flex-1">
-                                      <span className="text-xs text-foreground-secondary truncate block">{item?.description || 'Item'}</span>
-                                      <span className="text-[10px] text-foreground-muted">Admin offered ₹{fmt(ci.offered_price)}</span>
+                                      <span className="text-xs text-foreground-secondary truncate block">
+                                        {item?.description || 'Item'}
+                                      </span>
+                                      <span className="text-[10px] text-foreground-muted">
+                                        Admin offered ₹{fmt(ci.offered_price)}
+                                      </span>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       <span className="text-xs text-foreground-secondary">₹</span>
@@ -883,7 +1056,9 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                                         min={0}
                                         step="0.01"
                                         value={counterPrices[ci.rfq_item_id] ?? ''}
-                                        onChange={e => setCounterPrices(p => ({ ...p, [ci.rfq_item_id]: e.target.value }))}
+                                        onChange={e =>
+                                          setCounterPrices(p => ({ ...p, [ci.rfq_item_id]: e.target.value }))
+                                        }
                                         className="w-24 px-2 py-1 border border-border-secondary rounded-md bg-surface text-foreground text-sm text-right focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                                       />
                                     </div>
@@ -911,7 +1086,11 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                                 Send Counter Offer
                               </button>
                               <button
-                                onClick={() => { setShowCounterInput(false); setCounterReplyText(''); setCounterPrices({}) }}
+                                onClick={() => {
+                                  setShowCounterInput(false)
+                                  setCounterReplyText('')
+                                  setCounterPrices({})
+                                }}
                                 disabled={respondingAction != null}
                                 className="px-3 py-2 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm rounded-lg transition-colors"
                               >
@@ -934,18 +1113,21 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
 
           {/* RIGHT — Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-
             {/* Notes */}
             {!editing ? (
               rfq.notes ? (
                 <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
-                  <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">Your Notes</h2>
+                  <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">
+                    Your Notes
+                  </h2>
                   <p className="text-sm text-foreground">{rfq.notes}</p>
                 </div>
               ) : null
             ) : (
               <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
-                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">Overall Notes</label>
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">
+                  Overall Notes
+                </label>
                 <textarea
                   rows={3}
                   placeholder="Any additional notes…"
@@ -968,7 +1150,9 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                 <div className="px-5 py-4 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-foreground-muted">Payment</span>
-                    <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${linkedOrder.payment_status === 'paid' ? 'bg-green-400/20 text-green-600 dark:text-green-300' : 'bg-yellow-400/20 text-yellow-600 dark:text-yellow-300'}`}>
+                    <span
+                      className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${linkedOrder.payment_status === 'paid' ? 'bg-green-400/20 text-green-600 dark:text-green-300' : 'bg-yellow-400/20 text-yellow-600 dark:text-yellow-300'}`}
+                    >
                       {linkedOrder.payment_status === 'paid' ? 'Paid' : 'Awaiting Payment'}
                     </span>
                   </div>
@@ -980,8 +1164,18 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                   </div>
                   {linkedOrder.payment_status === 'paid' && (
                     <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-4 h-4 flex-shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                       <p className="text-xs font-medium">Payment received. Thank you!</p>
                     </div>
@@ -1010,7 +1204,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
             <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
               <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">Status</h2>
               <ol className="relative border-l border-border-default space-y-4 ml-2">
-                {(['pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted'] as const).map((s) => {
+                {(['pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted'] as const).map(s => {
                   const statuses = ['pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected']
                   const currentIdx = statuses.indexOf(rfq.status)
                   const stepIdx = statuses.indexOf(s)
@@ -1018,8 +1212,12 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                   const active = rfq.status === s
                   return (
                     <li key={s} className="ml-4">
-                      <span className={`absolute -left-1.5 w-3 h-3 rounded-full border-2 ${active ? 'border-accent-500 bg-accent-500' : done ? 'border-green-500 bg-green-500' : 'border-border-secondary bg-surface'}`} />
-                      <p className={`text-xs font-medium ${active ? 'text-accent-500' : done ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
+                      <span
+                        className={`absolute -left-1.5 w-3 h-3 rounded-full border-2 ${active ? 'border-accent-500 bg-accent-500' : done ? 'border-green-500 bg-green-500' : 'border-border-secondary bg-surface'}`}
+                      />
+                      <p
+                        className={`text-xs font-medium ${active ? 'text-accent-500' : done ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}
+                      >
                         {STATUS_LABEL[s]}
                       </p>
                     </li>
@@ -1033,7 +1231,6 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                 )}
               </ol>
             </div>
-
           </div>
         </div>
 
@@ -1041,14 +1238,24 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
         {editing && (
           <div className="fixed bottom-0 left-0 right-0 z-30 bg-surface-elevated border-t border-border-default px-4 py-3 flex items-center gap-3 shadow-lg">
             {saveError && <p className="text-xs text-red-600 dark:text-red-400 flex-1">{saveError}</p>}
-            {!saveError && <span className="flex-1 text-xs text-foreground-muted">Review your changes before saving</span>}
-            <button onClick={cancelEdit} disabled={saving}
-              className="px-4 py-2 rounded-lg border border-border-secondary text-foreground-secondary text-sm font-medium hover:bg-surface-secondary transition-colors disabled:opacity-50">
+            {!saveError && (
+              <span className="flex-1 text-xs text-foreground-muted">Review your changes before saving</span>
+            )}
+            <button
+              onClick={cancelEdit}
+              disabled={saving}
+              className="px-4 py-2 rounded-lg border border-border-secondary text-foreground-secondary text-sm font-medium hover:bg-surface-secondary transition-colors disabled:opacity-50"
+            >
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving}
-              className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2">
-              {saving && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2"
+            >
+              {saving && (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
               {saving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>

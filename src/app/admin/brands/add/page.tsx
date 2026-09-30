@@ -10,7 +10,12 @@ async function createBrand(formData: FormData) {
   'use server'
 
   const name = formData.get('name') as string
-  const slug = formData.get('slug') as string || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slug =
+    (formData.get('slug') as string) ||
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
   const description = (formData.get('description') as string) || null
   const website = (formData.get('website') as string) || null
   const logo_url = (formData.get('logo_url') as string) || null
@@ -25,7 +30,17 @@ async function createBrand(formData: FormData) {
     await query<{ id: string }>(
       `INSERT INTO brands (name, slug, description, website, logo_url, is_active, is_draft, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
        VALUES ($1, $2, $3, $4, $5, false, true, $6, $7, $8, $9) RETURNING id`,
-      [name, slug, description, website, logo_url, return_allowed, return_window_days, replacement_allowed, replacement_window_days]
+      [
+        name,
+        slug,
+        description,
+        website,
+        logo_url,
+        return_allowed,
+        return_window_days,
+        replacement_allowed,
+        replacement_window_days,
+      ]
     )
 
     revalidatePath('/admin/brands')
@@ -43,7 +58,10 @@ export default async function AddBrandPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/brands', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap('/admin/brands', host)}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Brands
         </a>

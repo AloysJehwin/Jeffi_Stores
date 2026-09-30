@@ -14,7 +14,11 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   // Minimal signals from headers (server component can't use the request object directly).
   const h = await headers()
-  const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
+  const signals = {
+    userAgent: h.get('user-agent'),
+    acceptLanguage: h.get('accept-language'),
+    uaPlatform: h.get('sec-ch-ua-platform'),
+  }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
 
   return (

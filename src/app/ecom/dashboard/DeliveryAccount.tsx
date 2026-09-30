@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 
-export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected }: {
+export default function DeliveryAccount({
+  tenantId,
+  ownDelhivery,
+  tokenConnected,
+}: {
   tenantId: string
   ownDelhivery: boolean
   tokenConnected: boolean
@@ -40,9 +44,13 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest">Delivery account</div>
         {ownDelhivery && (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${connected
-            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+              connected
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+            }`}
+          >
             {connected ? 'Token connected' : 'Token missing'}
           </span>
         )}
@@ -50,7 +58,8 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
 
       {!ownDelhivery ? (
         <p className="text-sm text-foreground-secondary">
-          Your store ships on the platform Delhivery account, and courier charges are paid from your wallet. To ship on your own Delhivery account instead, contact support.
+          Your store ships on the platform Delhivery account, and courier charges are paid from your wallet. To ship on
+          your own Delhivery account instead, contact support.
         </p>
       ) : (
         <>
@@ -62,7 +71,9 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
           {open ? (
             <div className="mt-4 space-y-3">
               <div>
-                <label htmlFor="delhivery-token" className="block text-xs font-medium text-foreground-secondary mb-1">Delhivery API token</label>
+                <label htmlFor="delhivery-token" className="block text-xs font-medium text-foreground-secondary mb-1">
+                  Delhivery API token
+                </label>
                 <input
                   id="delhivery-token"
                   type="password"
@@ -74,7 +85,8 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
                   className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 />
                 <p className="text-xs text-foreground-secondary mt-1.5">
-                  Use a token from the same Delhivery account. Shipments already created stay tied to the account that created them. The token is checked with Delhivery before it is saved.
+                  Use a token from the same Delhivery account. Shipments already created stay tied to the account that
+                  created them. The token is checked with Delhivery before it is saved.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -88,7 +100,11 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setOpen(false); setToken(''); setMsg(null) }}
+                  onClick={() => {
+                    setOpen(false)
+                    setToken('')
+                    setMsg(null)
+                  }}
                   disabled={busy}
                   className="px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:text-foreground disabled:opacity-50"
                 >
@@ -99,7 +115,10 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
           ) : (
             <button
               type="button"
-              onClick={() => { setOpen(true); setMsg(null) }}
+              onClick={() => {
+                setOpen(true)
+                setMsg(null)
+              }}
               className="mt-3 text-sm font-medium text-accent-600 dark:text-accent-400 hover:underline"
             >
               {connected ? 'Replace token' : 'Add token'}
@@ -109,7 +128,11 @@ export default function DeliveryAccount({ tenantId, ownDelhivery, tokenConnected
       )}
 
       {msg && (
-        <p className={`text-sm mt-3 ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{msg.text}</p>
+        <p
+          className={`text-sm mt-3 ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+        >
+          {msg.text}
+        </p>
       )}
     </div>
   )

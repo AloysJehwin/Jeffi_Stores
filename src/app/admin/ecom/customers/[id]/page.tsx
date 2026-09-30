@@ -2,9 +2,16 @@ import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import { isPlatformAdmin } from '@/lib/scopes'
 import {
-  getTenant, getTenantBilling, getKyc, getProvisioningJob,
-  getTenantOwners, getTenantSocialAccounts, listIntegrationCredentials,
-  listCustomDomains, getTenantBankAccount, lookupTenantContextById,
+  getTenant,
+  getTenantBilling,
+  getKyc,
+  getProvisioningJob,
+  getTenantOwners,
+  getTenantSocialAccounts,
+  listIntegrationCredentials,
+  listCustomDomains,
+  getTenantBankAccount,
+  lookupTenantContextById,
 } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenant-context'
 import { queryMany } from '@/lib/db'
@@ -35,7 +42,8 @@ export const dynamic = 'force-dynamic'
  * for sections nobody is looking at.
  */
 export default async function TenantObjectPage({
-  params, searchParams,
+  params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
   searchParams: Promise<{ tab?: string }>
@@ -53,10 +61,7 @@ export default async function TenantObjectPage({
   // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
   // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
   // Anything used by exactly one tab is loaded inside that tab's branch instead.
-  const [kyc, headerJob] = await Promise.all([
-    getKyc(id).catch(() => null),
-    getProvisioningJob(id).catch(() => null),
-  ])
+  const [kyc, headerJob] = await Promise.all([getKyc(id).catch(() => null), getProvisioningJob(id).catch(() => null)])
   const kycPending = kyc?.status === 'pending'
 
   return (
@@ -72,15 +77,23 @@ export default async function TenantObjectPage({
       <TenantTabNav
         tenantId={t.id}
         active={tab}
-        badges={{ kyc: kycPending ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" /> : null }}
+        badges={{
+          kyc: kycPending ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" />
+          ) : null,
+        }}
       />
 
       <div className="mt-6">
-        {tab === 'overview' && <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />}
+        {tab === 'overview' && (
+          <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />
+        )}
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
         {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}
         {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id)} />}
-        {tab === 'shipments' && <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />}
+        {tab === 'shipments' && (
+          <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />
+        )}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
       </div>
@@ -130,7 +143,7 @@ async function shipmentData(id: string): Promise<ShipmentRow[]> {
          FROM orders
         WHERE awb_number IS NOT NULL
         ORDER BY COALESCE(delhivery_billed_at, created_at) DESC
-        LIMIT 100`,
+        LIMIT 100`
     ).catch(() => [])
     return rows
   }).catch(() => [])

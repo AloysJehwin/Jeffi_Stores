@@ -1,7 +1,14 @@
 import type { ComponentType } from 'react'
 import {
-  ShoppingBag, LayoutDashboard, CreditCard, Truck,
-  FileText, Boxes, Users, Megaphone, Building2,
+  ShoppingBag,
+  LayoutDashboard,
+  CreditCard,
+  Truck,
+  FileText,
+  Boxes,
+  Users,
+  Megaphone,
+  Building2,
 } from 'lucide-react'
 
 interface Feature {
@@ -32,7 +39,7 @@ export default function FeatureGrid() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-        {FEATURES.map((f) => {
+        {FEATURES.map(f => {
           const Icon = f.icon
           return (
             <div

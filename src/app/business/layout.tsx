@@ -21,15 +21,25 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const signinPath = isSubdomain ? '/signin' : '/business/signin'
   const pendingPath = isSubdomain ? '/pending' : '/business/pending'
 
-  const isAuthPage = AUTH_PAGES.some(p => pathname.startsWith(p)) || AUTH_PAGES_SUBDOMAIN.some(p => pathname.startsWith(p))
+  const isAuthPage =
+    AUTH_PAGES.some(p => pathname.startsWith(p)) || AUTH_PAGES_SUBDOMAIN.some(p => pathname.startsWith(p))
   const isPublicLanding = pathname === PUBLIC_LANDING_APEX || pathname === PUBLIC_LANDING_SUBDOMAIN
   const isPublic = isAuthPage || isPublicLanding
 
   useEffect(() => {
     if (isLoading || isPublic) return
-    if (!user || !user.isBusiness) { router.replace(signinPath); return }
-    if (user.approvalStatus === 'pending') { router.replace(pendingPath); return }
-    if (user.approvalStatus === 'rejected') { router.replace(`${signinPath}?rejected=1`); return }
+    if (!user || !user.isBusiness) {
+      router.replace(signinPath)
+      return
+    }
+    if (user.approvalStatus === 'pending') {
+      router.replace(pendingPath)
+      return
+    }
+    if (user.approvalStatus === 'rejected') {
+      router.replace(`${signinPath}?rejected=1`)
+      return
+    }
   }, [user, isLoading, isPublic, router, signinPath, pendingPath])
 
   if (isPublic) return <>{children}</>
@@ -40,9 +50,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
     <CartProvider>
       <div className="flex flex-col min-h-screen bg-surface">
         <BusinessHeader />
-        <main className="flex-1 pt-16 lg:pt-20">
-          {children}
-        </main>
+        <main className="flex-1 pt-16 lg:pt-20">{children}</main>
       </div>
     </CartProvider>
   )

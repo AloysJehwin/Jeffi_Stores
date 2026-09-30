@@ -7,7 +7,8 @@ import type { Intent, SearchTerm } from '@/lib/crm-insights-shared'
 
 export default function IntentCard({ intent, topSearches }: { intent: Intent; topSearches: SearchTerm[] }) {
   const totalAbandoned = intent.abandoned.reduce((s, a) => s + a.count, 0)
-  const empty = totalAbandoned === 0 && intent.savedForLater === 0 && intent.wishlistItems === 0 && topSearches.length === 0
+  const empty =
+    totalAbandoned === 0 && intent.savedForLater === 0 && intent.wishlistItems === 0 && topSearches.length === 0
   if (empty) return null
 
   return (

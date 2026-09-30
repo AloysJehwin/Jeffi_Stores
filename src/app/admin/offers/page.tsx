@@ -14,7 +14,8 @@ export default async function OffersPage() {
     <div className="p-6 w-full max-w-full min-w-0">
       <h1 className="text-2xl font-bold text-foreground">Offers</h1>
       <p className="text-sm text-foreground-muted mt-1 mb-6">
-        Razorpay bank offers shown on product pages, and your own product offers with their titles, dates, images, and assigned products.
+        Razorpay bank offers shown on product pages, and your own product offers with their titles, dates, images, and
+        assigned products.
       </p>
       <OffersTabs canWrite={canWrite} />
     </div>

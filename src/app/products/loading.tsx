@@ -6,7 +6,11 @@ export default function Loading() {
           <div className="h-12 bg-surface-secondary rounded-lg animate-pulse mb-4" />
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-10 bg-surface-secondary rounded-lg animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />
+              <div
+                key={i}
+                className="h-10 bg-surface-secondary rounded-lg animate-pulse"
+                style={{ animationDelay: `${i * 60}ms` }}
+              />
             ))}
           </div>
         </div>

@@ -26,7 +26,7 @@ interface Props {
   onClose: () => void
 }
 
-const BARS = [3,1,2,1,3,1,1,2,1,2,3,1,2,1,1,2,3,1,1,2,2,1,3,1,2,1,2,1,3,1,1]
+const BARS = [3, 1, 2, 1, 3, 1, 1, 2, 1, 2, 3, 1, 2, 1, 1, 2, 3, 1, 1, 2, 2, 1, 3, 1, 2, 1, 2, 1, 3, 1, 1]
 function Barcode({ w, h, text }: { w: number; h: number; text: string }) {
   const total = BARS.reduce((s, b) => s + b, 0)
   let cx = 0
@@ -36,92 +36,157 @@ function Barcode({ w, h, text }: { w: number; h: number; text: string }) {
         const x = (cx / total) * w
         const bwPx = (bw / total) * w
         cx += bw
-        return i % 2 === 0
-          ? <rect key={i} x={x} y={0} width={Math.max(0.5, bwPx - 0.5)} height={h * 0.8} fill="#1a1a1a"/>
-          : null
+        return i % 2 === 0 ? (
+          <rect key={i} x={x} y={0} width={Math.max(0.5, bwPx - 0.5)} height={h * 0.8} fill="#1a1a1a" />
+        ) : null
       })}
-      <text x={w/2} y={h*0.98} textAnchor="middle" fontSize={Math.max(5, h*0.17)} fill="#333" fontFamily="monospace" dominantBaseline="auto">
-        {text.slice(0,16)}
+      <text
+        x={w / 2}
+        y={h * 0.98}
+        textAnchor="middle"
+        fontSize={Math.max(5, h * 0.17)}
+        fill="#333"
+        fontFamily="monospace"
+        dominantBaseline="auto"
+      >
+        {text.slice(0, 16)}
       </text>
     </svg>
   )
 }
 
 const QR_CELLS = [
-  [1,1,1,1,1,1,1,0,1,0,0,1,0,1,1,1,1,1,1,1,1],
-  [1,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,1],
-  [1,0,1,1,1,0,1,0,1,0,1,0,1,1,0,1,1,1,0,0,1],
-  [1,0,1,1,1,0,1,0,0,0,0,1,0,1,0,1,1,1,0,0,1],
-  [1,0,0,0,0,0,1,0,1,1,0,0,1,1,0,0,0,0,0,0,1],
-  [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
-  [0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0],
-  [1,0,1,1,0,1,0,1,0,0,1,0,0,1,0,0,1,1,0,1,1],
-  [0,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,0,1,1,0,0],
-  [1,0,0,1,0,1,0,0,0,0,1,1,0,1,0,0,1,0,0,1,0],
-  [0,0,1,0,0,0,1,1,0,1,0,0,1,0,1,1,0,0,1,0,1],
-  [0,0,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,1,0,1,0],
-  [1,1,1,1,1,1,1,0,0,1,0,1,1,0,1,0,1,0,1,0,1],
-  [1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,0,1,0],
-  [1,0,1,1,1,0,1,0,0,0,1,1,0,0,1,0,1,1,1,0,1],
-  [1,0,1,1,1,0,1,0,1,0,0,1,0,1,0,1,0,0,0,1,0],
-  [1,0,0,0,0,0,1,0,0,1,1,0,1,0,1,1,1,1,0,1,1],
-  [1,1,1,1,1,1,1,0,1,0,0,0,0,1,0,0,0,1,0,0,1],
+  [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1],
+  [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [1, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1],
+  [0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0],
+  [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+  [0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 1],
+  [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0],
+  [1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0],
+  [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+  [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1],
 ]
 function QR({ size }: { size: number }) {
   const cols = QR_CELLS[0].length
   const cs = size / cols
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <rect width={size} height={size} fill="white"/>
-      {QR_CELLS.flatMap((row, ri) => row.map((c, ci) =>
-        c ? <rect key={`${ri}-${ci}`} x={ci*cs} y={ri*cs} width={cs} height={cs} fill="#111"/> : null
-      ))}
+      <rect width={size} height={size} fill="white" />
+      {QR_CELLS.flatMap((row, ri) =>
+        row.map((c, ci) =>
+          c ? <rect key={`${ri}-${ci}`} x={ci * cs} y={ri * cs} width={cs} height={cs} fill="#111" /> : null
+        )
+      )}
     </svg>
   )
 }
 
 const WarnFlame = () => (
-  <svg viewBox="0 0 10 14" fill="currentColor" style={{ width: '0.7em', height: '0.95em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+  <svg
+    viewBox="0 0 10 14"
+    fill="currentColor"
+    style={{ width: '0.7em', height: '0.95em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}
+  >
     <path d="M5 0C5 0 2 4 2 7a3 3 0 006 0c0-.5-.1-1-.25-1.4.5.8.75 1.7.75 2.9a4 4 0 01-8 0C.5 5 5 0 5 0zm0 3C4.3 4.5 3.5 6 3.5 7.5a1.5 1.5 0 003 0C6.5 6.3 5.8 4.8 5 3z" />
   </svg>
 )
 const WarnTriangle = () => (
-  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+  <svg
+    viewBox="0 0 12 12"
+    fill="currentColor"
+    style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}
+  >
     <path d="M6 1L11.5 11H.5L6 1zm0 2.5L2.2 10h7.6L6 3.5zM5.4 6h1.2v2.5H5.4V6zm0 3h1.2v1.2H5.4V9z" />
   </svg>
 )
 const WarnDiamond = () => (
-  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+  <svg
+    viewBox="0 0 12 12"
+    fill="currentColor"
+    style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}
+  >
     <path d="M6 .5L11.5 6 6 11.5.5 6 6 .5zm0 2L2.5 6l1.8 1.8L5.5 6l1.5 2 1-2 .8 1.8L10.5 6 6 2.5z" />
   </svg>
 )
 
-function WarningIcons({ entry, size, barH, pad }: { entry: LabelEntry | null; size: number; barH: number; pad: number }) {
+function WarningIcons({
+  entry,
+  size,
+  barH,
+  pad,
+}: {
+  entry: LabelEntry | null
+  size: number
+  barH: number
+  pad: number
+}) {
   if (!entry) return null
   const badges: { key: string; label: string; color: string; bg: string; Icon: () => JSX.Element }[] = []
-  if (entry.flammable) badges.push({ key: 'flammable', label: 'FLAMMABLE', color: '#fff', bg: '#c0392b', Icon: WarnFlame })
-  if (entry.hazardous) badges.push({ key: 'hazardous', label: 'HAZARDOUS', color: '#fff', bg: '#e67e22', Icon: WarnTriangle })
-  if (entry.fragile)   badges.push({ key: 'fragile',   label: 'FRAGILE',   color: '#fff', bg: '#2980b9', Icon: WarnDiamond })
+  if (entry.flammable)
+    badges.push({ key: 'flammable', label: 'FLAMMABLE', color: '#fff', bg: '#c0392b', Icon: WarnFlame })
+  if (entry.hazardous)
+    badges.push({ key: 'hazardous', label: 'HAZARDOUS', color: '#fff', bg: '#e67e22', Icon: WarnTriangle })
+  if (entry.fragile) badges.push({ key: 'fragile', label: 'FRAGILE', color: '#fff', bg: '#2980b9', Icon: WarnDiamond })
   if (badges.length === 0) return null
   const fs = Math.max(5, Math.round(size * 0.55))
   return (
-    <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+    <div
+      style={{
+        position: 'absolute',
+        bottom: barH + pad + 2,
+        right: pad,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-end',
+        gap: 2,
+      }}
+    >
       {badges.map(({ key, label, color, bg, Icon }) => (
-        <div key={key} style={{
-          background: bg, color,
-          fontSize: fs, fontWeight: 700, fontFamily: 'Helvetica, Arial, sans-serif',
-          padding: `1px ${Math.round(fs * 0.6)}px`,
-          borderRadius: 2, lineHeight: 1.4, whiteSpace: 'nowrap',
-          letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
-        }}>
-          <Icon />{label}
+        <div
+          key={key}
+          style={{
+            background: bg,
+            color,
+            fontSize: fs,
+            fontWeight: 700,
+            fontFamily: 'Helvetica, Arial, sans-serif',
+            padding: `1px ${Math.round(fs * 0.6)}px`,
+            borderRadius: 2,
+            lineHeight: 1.4,
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.02em',
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <Icon />
+          {label}
         </div>
       ))}
     </div>
   )
 }
 
-function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entry: LabelEntry | null; scale: number; showPrice: boolean }) {
+function LabelPreview({
+  spec,
+  entry,
+  scale,
+  showPrice,
+}: {
+  spec: LabelSpec
+  entry: LabelEntry | null
+  scale: number
+  showPrice: boolean
+}) {
   const w = Math.round(spec.widthPt * scale)
   const h = Math.round(spec.heightPt * scale)
   const pad = Math.max(3, Math.round(2.5 * scale))
@@ -134,9 +199,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
   const incGst = entry && entry.base_price ? round2(Number(entry.base_price)) : null
   const mrpInc = entry?.mrp && entry.mrp > 0 ? round2(Number(entry.mrp)) : null
   const gstPct = entry?.gst_percentage ?? 0
-  const exGstDisplay = incGst && gstPct > 0 && entry?.price_ex_gst
-    ? round2(Number(entry.price_ex_gst))
-    : null
+  const exGstDisplay = incGst && gstPct > 0 && entry?.price_ex_gst ? round2(Number(entry.price_ex_gst)) : null
   const showMrp = mrpInc && incGst && mrpInc !== incGst
 
   const nameFs = Math.round(8 * scale)
@@ -144,9 +207,16 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
   const priceFs = Math.round(10 * scale)
 
   const base: React.CSSProperties = {
-    width: w, height: h, position: 'relative', overflow: 'hidden',
-    background: '#fff', border: '1px solid #d1d5db', borderRadius: 2,
-    boxSizing: 'border-box', fontFamily: 'Helvetica, Arial, sans-serif', flexShrink: 0,
+    width: w,
+    height: h,
+    position: 'relative',
+    overflow: 'hidden',
+    background: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: 2,
+    boxSizing: 'border-box',
+    fontFamily: 'Helvetica, Arial, sans-serif',
+    flexShrink: 0,
   }
 
   if (spec.size === '30x20') {
@@ -154,13 +224,42 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
     const vfs = Math.round(4.5 * scale)
     return (
       <div style={base}>
-        <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad, overflow:'hidden' }}>
-          <div style={{ fontSize:fs, fontWeight:700, lineHeight:1.2, color:'#111', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{name}</div>
-          {variantName && <div style={{ fontSize:vfs, color:'#555', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
-          {showPrice && incGst && <div style={{ marginTop:1, fontSize:fs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>}
+        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad, overflow: 'hidden' }}>
+          <div
+            style={{
+              fontSize: fs,
+              fontWeight: 700,
+              lineHeight: 1.2,
+              color: '#111',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {name}
+          </div>
+          {variantName && (
+            <div
+              style={{
+                fontSize: vfs,
+                color: '#555',
+                marginTop: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {variantName}
+            </div>
+          )}
+          {showPrice && incGst && (
+            <div style={{ marginTop: 1, fontSize: fs, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>
+              Rs. {incGst.toFixed(2)}
+            </div>
+          )}
         </div>
-        <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
-          <Barcode w={w-pad*2} h={barH} text={sku} />
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <Barcode w={w - pad * 2} h={barH} text={sku} />
         </div>
         <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
@@ -174,19 +273,62 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
     const efs = Math.round(4.5 * scale)
     return (
       <div style={base}>
-        <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad, overflow:'hidden', display:'flex', flexDirection:'column', justifyContent:'center' }}>
-          <div style={{ fontSize:fs, fontWeight:700, color:'#111', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>{name}</div>
-          {variantName && <div style={{ fontSize:vfs, color:'#555', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>{variantName}</div>}
+        <div
+          style={{
+            position: 'absolute',
+            top: pad,
+            left: pad,
+            right: pad,
+            bottom: barH + pad,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: fs,
+              fontWeight: 700,
+              color: '#111',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              lineHeight: 1.2,
+            }}
+          >
+            {name}
+          </div>
+          {variantName && (
+            <div
+              style={{
+                fontSize: vfs,
+                color: '#555',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                lineHeight: 1.2,
+              }}
+            >
+              {variantName}
+            </div>
+          )}
           {showPrice && incGst && (
-            <div style={{ display:'flex', alignItems:'baseline', gap:Math.round(3*scale), flexWrap:'wrap' }}>
-              {showMrp && <span style={{ fontSize:efs, color:'#aaa', textDecoration:'line-through' }}>Rs. {mrpInc!.toFixed(2)}</span>}
-              <span style={{ fontSize:pfs, fontWeight:700, color:'#c0392b' }}>Rs. {incGst.toFixed(2)}</span>
-              {gstPct > 0 && <span style={{ fontSize:efs, color:'#888' }}>ex.GST Rs. {exGstDisplay!.toFixed(2)}</span>}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: Math.round(3 * scale), flexWrap: 'wrap' }}>
+              {showMrp && (
+                <span style={{ fontSize: efs, color: '#aaa', textDecoration: 'line-through' }}>
+                  Rs. {mrpInc!.toFixed(2)}
+                </span>
+              )}
+              <span style={{ fontSize: pfs, fontWeight: 700, color: '#c0392b' }}>Rs. {incGst.toFixed(2)}</span>
+              {gstPct > 0 && (
+                <span style={{ fontSize: efs, color: '#888' }}>ex.GST Rs. {exGstDisplay!.toFixed(2)}</span>
+              )}
             </div>
           )}
         </div>
-        <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
-          <Barcode w={w-pad*2} h={barH} text={sku} />
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <Barcode w={w - pad * 2} h={barH} text={sku} />
         </div>
         <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
@@ -196,20 +338,72 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
   if (spec.size === '30x50') {
     return (
       <div style={base}>
-        <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad+12, overflow:'hidden' }}>
-          <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.3, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?2:3, WebkitBoxOrient:'vertical' as any }}>{name}</div>
-          {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
+        <div
+          style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad + 12, overflow: 'hidden' }}
+        >
+          <div
+            style={{
+              fontSize: nameFs,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              color: '#111',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: variantName ? 2 : 3,
+              WebkitBoxOrient: 'vertical' as any,
+            }}
+          >
+            {name}
+          </div>
+          {variantName && (
+            <div
+              style={{
+                fontSize: smallFs,
+                color: '#333',
+                marginTop: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {variantName}
+            </div>
+          )}
           {showPrice && incGst && (
-            <div style={{ marginTop:2 }}>
-              {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
-              <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
+            <div style={{ marginTop: 2 }}>
+              {showMrp && (
+                <div style={{ fontSize: smallFs * 0.85, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>
+                  Rs. {mrpInc!.toFixed(2)}
+                </div>
+              )}
+              <div style={{ fontSize: priceFs * 0.9, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>
+                Rs. {incGst.toFixed(2)}
+              </div>
+              {gstPct > 0 && (
+                <div style={{ fontSize: smallFs * 0.85 - 1, color: '#888', lineHeight: 1 }}>
+                  ex. GST Rs. {exGstDisplay!.toFixed(2)}
+                </div>
+              )}
             </div>
           )}
         </div>
-        <div style={{ position:'absolute', bottom:barH+pad+1, left:pad, right:pad, fontSize:smallFs*0.85, color:'#777', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{sku}</div>
-        <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
-          <Barcode w={w-pad*2} h={barH} text={sku} />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: barH + pad + 1,
+            left: pad,
+            right: pad,
+            fontSize: smallFs * 0.85,
+            color: '#777',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {sku}
+        </div>
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <Barcode w={w - pad * 2} h={barH} text={sku} />
         </div>
         <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
@@ -217,24 +411,71 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
   }
 
   if (spec.size === '40x60') {
-    const qrSize = Math.round(Math.min(w,h)*0.27)
+    const qrSize = Math.round(Math.min(w, h) * 0.27)
     return (
       <div style={base}>
-        <div style={{ position:'absolute', top:pad, right:pad }}><QR size={qrSize}/></div>
-        <div style={{ position:'absolute', top:pad, left:pad, right:qrSize+pad*2+2, bottom:barH+pad, overflow:'hidden' }}>
-          <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.25, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?1:2, WebkitBoxOrient:'vertical' as any }}>{name}</div>
-          {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
-          <div style={{ fontSize:smallFs*0.9, color:'#666', marginTop:2 }}>SKU: {sku}</div>
+        <div style={{ position: 'absolute', top: pad, right: pad }}>
+          <QR size={qrSize} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            top: pad,
+            left: pad,
+            right: qrSize + pad * 2 + 2,
+            bottom: barH + pad,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              fontSize: nameFs,
+              fontWeight: 700,
+              lineHeight: 1.25,
+              color: '#111',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: variantName ? 1 : 2,
+              WebkitBoxOrient: 'vertical' as any,
+            }}
+          >
+            {name}
+          </div>
+          {variantName && (
+            <div
+              style={{
+                fontSize: smallFs,
+                color: '#333',
+                marginTop: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {variantName}
+            </div>
+          )}
+          <div style={{ fontSize: smallFs * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
           {showPrice && incGst && (
-            <div style={{ marginTop:3 }}>
-              {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
-              <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
+            <div style={{ marginTop: 3 }}>
+              {showMrp && (
+                <div style={{ fontSize: smallFs * 0.85, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>
+                  Rs. {mrpInc!.toFixed(2)}
+                </div>
+              )}
+              <div style={{ fontSize: priceFs * 0.9, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>
+                Rs. {incGst.toFixed(2)}
+              </div>
+              {gstPct > 0 && (
+                <div style={{ fontSize: smallFs * 0.85 - 1, color: '#888', lineHeight: 1 }}>
+                  ex. GST Rs. {exGstDisplay!.toFixed(2)}
+                </div>
+              )}
             </div>
           )}
         </div>
-        <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
-          <Barcode w={w-pad*2} h={barH} text={sku} />
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <Barcode w={w - pad * 2} h={barH} text={sku} />
         </div>
         <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
@@ -242,31 +483,105 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
   }
 
   if (spec.size === '50x50') {
-    const qrSize = Math.round(w*0.29)
-    const gapQ = Math.round(pad*0.7)
+    const qrSize = Math.round(w * 0.29)
+    const gapQ = Math.round(pad * 0.7)
     const rightX = pad + qrSize + gapQ
     const rightW = w - rightX - pad
-    const contentH = h - barH - pad*2 - 6
-    const skuRowH = Math.round(smallFs*0.85) + 3
+    const contentH = h - barH - pad * 2 - 6
+    const skuRowH = Math.round(smallFs * 0.85) + 3
     const infoH = contentH - skuRowH
     return (
       <div style={base}>
-        <div style={{ position:'absolute', top:pad, left:pad, width:qrSize, height:Math.min(qrSize,infoH), overflow:'hidden' }}><QR size={qrSize}/></div>
-        <div style={{ position:'absolute', top:pad, left:rightX, width:rightW, height:infoH, overflow:'hidden' }}>
-          <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.25, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?1:2, WebkitBoxOrient:'vertical' as any }}>{name}</div>
-          {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
-          {brand && <div style={{ fontSize:Math.round(smallFs*0.85), color:'#888', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{brand}</div>}
+        <div
+          style={{
+            position: 'absolute',
+            top: pad,
+            left: pad,
+            width: qrSize,
+            height: Math.min(qrSize, infoH),
+            overflow: 'hidden',
+          }}
+        >
+          <QR size={qrSize} />
+        </div>
+        <div style={{ position: 'absolute', top: pad, left: rightX, width: rightW, height: infoH, overflow: 'hidden' }}>
+          <div
+            style={{
+              fontSize: nameFs,
+              fontWeight: 700,
+              lineHeight: 1.25,
+              color: '#111',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: variantName ? 1 : 2,
+              WebkitBoxOrient: 'vertical' as any,
+            }}
+          >
+            {name}
+          </div>
+          {variantName && (
+            <div
+              style={{
+                fontSize: smallFs,
+                color: '#333',
+                marginTop: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {variantName}
+            </div>
+          )}
+          {brand && (
+            <div
+              style={{
+                fontSize: Math.round(smallFs * 0.85),
+                color: '#888',
+                marginTop: 1,
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {brand}
+            </div>
+          )}
           {showPrice && incGst && (
-            <div style={{ marginTop:3 }}>
-              {showMrp && <div style={{ fontSize:smallFs*0.9, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
-              <div style={{ fontSize:priceFs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.9, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
+            <div style={{ marginTop: 3 }}>
+              {showMrp && (
+                <div style={{ fontSize: smallFs * 0.9, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>
+                  Rs. {mrpInc!.toFixed(2)}
+                </div>
+              )}
+              <div style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>
+                Rs. {incGst.toFixed(2)}
+              </div>
+              {gstPct > 0 && (
+                <div style={{ fontSize: smallFs * 0.9, color: '#888', lineHeight: 1 }}>
+                  ex. GST Rs. {exGstDisplay!.toFixed(2)}
+                </div>
+              )}
             </div>
           )}
         </div>
-        <div style={{ position:'absolute', bottom:barH+pad+1, left:pad, right:pad, fontSize:Math.round(smallFs*0.85), color:'#666', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>SKU: {sku}</div>
-        <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
-          <Barcode w={w-pad*2} h={barH} text={sku} />
+        <div
+          style={{
+            position: 'absolute',
+            bottom: barH + pad + 1,
+            left: pad,
+            right: pad,
+            fontSize: Math.round(smallFs * 0.85),
+            color: '#666',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          SKU: {sku}
+        </div>
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <Barcode w={w - pad * 2} h={barH} text={sku} />
         </div>
         <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
@@ -295,8 +610,8 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   const previewScale = Math.min(PREV_MAX / spec.widthPt, PREV_MAX / spec.heightPt)
 
   const previewEntry = previewId
-    ? entries.find(e => e.id === previewId) ?? null
-    : entries.find(e => selected.has(e.id)) ?? null
+    ? (entries.find(e => e.id === previewId) ?? null)
+    : (entries.find(e => selected.has(e.id)) ?? null)
 
   useEffect(() => {
     if (!product) return
@@ -308,7 +623,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
     fetch(`/api/admin/labels/products?q=&limit=200&product_id=${product.id}`)
       .then(r => r.json())
       .then(d => {
-        const rows: LabelEntry[] = (d.products || [])
+        const rows: LabelEntry[] = d.products || []
         setEntries(rows)
         setSelected(new Set(rows.map((e: LabelEntry) => e.id)))
         if (rows.length > 0) setPreviewId(rows[0].id)
@@ -320,7 +635,9 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   useEffect(() => {
     if (!product) return
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [product])
 
   const toggleEntry = useCallback((id: string) => {
@@ -354,7 +671,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `labels-${size}-${product!.name.slice(0,30).replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`
+      a.download = `labels-${size}-${product!.name.slice(0, 30).replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
@@ -372,7 +689,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className={`relative bg-surface-elevated w-full sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col transition-all ${
           modalSize === 'sm' ? 'sm:max-w-lg' : modalSize === 'lg' ? 'sm:max-w-4xl' : 'sm:max-w-2xl'
@@ -392,9 +709,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                   onClick={() => setModalSize(s)}
                   title={s === 'sm' ? 'Compact' : s === 'md' ? 'Normal' : 'Wide'}
                   className={`px-2 py-1 text-[10px] font-medium transition-colors ${i > 0 ? 'border-l border-border-default' : ''} ${
-                    modalSize === s
-                      ? 'bg-orange-500 text-white'
-                      : 'text-foreground-muted hover:bg-surface-secondary'
+                    modalSize === s ? 'bg-orange-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary'
                   }`}
                 >
                   {s === 'sm' ? 'S' : s === 'md' ? 'M' : 'L'}
@@ -406,7 +721,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -432,11 +747,18 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                     const rH = Math.round((s.heightMm / maxD) * 24)
                     return (
                       <div className="flex items-center justify-center h-7 w-full">
-                        <div style={{ width: rW, height: rH }} className={`border-2 rounded-sm ${size === s.size ? 'border-orange-500 bg-orange-100 dark:bg-orange-800/30' : 'border-border-strong'}`}/>
+                        <div
+                          style={{ width: rW, height: rH }}
+                          className={`border-2 rounded-sm ${size === s.size ? 'border-orange-500 bg-orange-100 dark:bg-orange-800/30' : 'border-border-strong'}`}
+                        />
                       </div>
                     )
                   })()}
-                  <span className={`text-[9px] font-semibold leading-tight ${size === s.size ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-muted'}`}>{s.label}</span>
+                  <span
+                    className={`text-[9px] font-semibold leading-tight ${size === s.size ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-muted'}`}
+                  >
+                    {s.label}
+                  </span>
                 </button>
               ))}
             </div>
@@ -462,21 +784,30 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               </div>
             </div>
             <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Copies each</p>
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                Copies each
+              </p>
               <input
-                type="number" min={1} max={100} value={copies}
+                type="number"
+                min={1}
+                max={100}
+                value={copies}
                 onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
                 className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
             <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Print Price</p>
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                Print Price
+              </p>
               <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
                 <div
                   onClick={() => setShowPrice(v => !v)}
                   className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-4 border-orange-300' : 'translate-x-0.5'}`} />
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-4 border-orange-300' : 'translate-x-0.5'}`}
+                  />
                 </div>
                 <span className="text-xs text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
               </label>
@@ -491,9 +822,13 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                 </p>
                 {entries.length > 1 && (
                   <div className="flex gap-2">
-                    <button onClick={selectAll} className="text-[10px] text-accent-500 hover:text-accent-600">All</button>
+                    <button onClick={selectAll} className="text-[10px] text-accent-500 hover:text-accent-600">
+                      All
+                    </button>
                     <span className="text-foreground-muted text-[10px]">·</span>
-                    <button onClick={clearAll} className="text-[10px] text-foreground-muted hover:text-red-500">None</button>
+                    <button onClick={clearAll} className="text-[10px] text-foreground-muted hover:text-red-500">
+                      None
+                    </button>
                   </div>
                 )}
               </div>
@@ -522,11 +857,17 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                         className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
                       />
                       <div className="flex-1 min-w-0">
-                        {e.variant_name
-                          ? <div className="text-sm font-medium text-foreground truncate">{e.variant_name}</div>
-                          : <div className="text-sm font-medium text-foreground truncate">{e.name}</div>
-                        }
-                        <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{e.sku}{e.sku && <CopySku sku={e.sku} />}</span></div>
+                        {e.variant_name ? (
+                          <div className="text-sm font-medium text-foreground truncate">{e.variant_name}</div>
+                        ) : (
+                          <div className="text-sm font-medium text-foreground truncate">{e.name}</div>
+                        )}
+                        <div className="text-xs text-foreground-muted">
+                          <span className="inline-flex items-center gap-1">
+                            {e.sku}
+                            {e.sku && <CopySku sku={e.sku} />}
+                          </span>
+                        </div>
                       </div>
                       <div className="text-xs font-semibold text-primary-500 shrink-0">
                         Rs. {Number(e.base_price).toFixed(2)}
@@ -538,11 +879,11 @@ export default function ProductLabelModal({ product, onClose }: Props) {
             </div>
 
             <div className="shrink-0 flex flex-col items-center gap-2">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide self-start">Preview</p>
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide self-start">
+                Preview
+              </p>
               <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-xl p-2 flex items-center justify-center min-w-[140px] min-h-[100px]">
-                {spec && (
-                  <LabelPreview spec={spec} entry={previewEntry} scale={previewScale} showPrice={showPrice} />
-                )}
+                {spec && <LabelPreview spec={spec} entry={previewEntry} scale={previewScale} showPrice={showPrice} />}
               </div>
               <p className="text-[10px] text-foreground-muted text-center">
                 {spec.widthMm} × {spec.heightMm} mm
@@ -579,7 +920,12 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               {downloading ? 'Generating…' : 'Download PDF'}
             </button>

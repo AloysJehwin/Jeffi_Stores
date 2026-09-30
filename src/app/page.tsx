@@ -1,13 +1,24 @@
 import { queryMany } from '@/lib/db'
 import { heroSlideHref } from '@/lib/hero-slides'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import {
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
+} from '@/lib/queries'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
 import { getHost } from '@/lib/get-host'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/homepage-data'
 import { loadSectionExtras } from '@/lib/homepage-extras'
-import { productRowKey, sectionLimit, defaultAboutCopy, resolveAboutStats, type ProductSource } from '@/lib/homepage-sections'
+import {
+  productRowKey,
+  sectionLimit,
+  defaultAboutCopy,
+  resolveAboutStats,
+  type ProductSource,
+} from '@/lib/homepage-sections'
 import { listActiveOffers, listOffersByIds } from '@/lib/product-offers'
 
 export const revalidate = 120
@@ -18,7 +29,7 @@ async function getProductsForSource(
   source: ProductSource,
   limit: number,
   categorySlug: string | null,
-  gstEnabled: boolean,
+  gstEnabled: boolean
 ) {
   const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   const sql = buildProductRowSql(source, categorySlug, {
@@ -31,8 +42,6 @@ async function getProductsForSource(
   if (source === 'category' && categorySlug) params.push(categorySlug)
   return queryMany(sql, params)
 }
-
-
 
 async function getMainCategories() {
   return queryMany(`
@@ -67,8 +76,10 @@ async function getHeroSlides() {
   // Fallback: derive slides from active parent categories (legacy behaviour).
   // Pick 4 categories daily using a date-seeded deterministic shuffle.
   const all = await queryMany<{
-    name: string; slug: string;
-    hero_image_mobile: string | null; hero_image_desktop: string | null;
+    name: string
+    slug: string
+    hero_image_mobile: string | null
+    hero_image_desktop: string | null
   }>(`
     SELECT name, slug, hero_image_mobile, hero_image_desktop
     FROM categories
@@ -81,18 +92,23 @@ async function getHeroSlides() {
 
   // Fisher-Yates with seeded PRNG (mulberry32)
   function mulberry32(seed: number) {
-    return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 }
+    return () => {
+      seed |= 0
+      seed = (seed + 0x6d2b79f5) | 0
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
   }
   const rng = mulberry32(daySeed)
   const shuffled = [...all]
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    const j = Math.floor(rng() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
 
   return shuffled.slice(0, 4)
 }
-
 
 async function getTopBrands() {
   return queryMany<{ id: string; name: string; slug: string; product_count: number }>(`
@@ -148,8 +164,10 @@ async function getCategoryShowcase() {
     HAVING COUNT(p.id) >= 2
     ORDER BY COUNT(p.id) DESC LIMIT 4
   `)
-  const result = await Promise.all(categories.map(async cat => {
-    const products = await queryMany(`
+  const result = await Promise.all(
+    categories.map(async cat => {
+      const products = await queryMany(
+        `
       SELECT p.id, p.name, p.slug, p.has_variants,
         p.base_price, p.price_ex_gst, p.discount_pct,
         (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
@@ -162,9 +180,12 @@ async function getCategoryShowcase() {
       GROUP BY p.id
       ORDER BY p.is_featured DESC, p.created_at DESC
       LIMIT 5
-    `, [cat.id])
-    return { ...cat, products }
-  }))
+    `,
+        [cat.id]
+      )
+      return { ...cat, products }
+    })
+  )
   return result.filter(c => c.products.length >= 2)
 }
 
@@ -191,17 +212,20 @@ export default async function HomePage() {
     : []
 
   const extrasPromise = loadSectionExtras(sections, gstEnabled)
-  const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] = await Promise.all([
-    needs.mainCategories ? getMainCategories() : Promise.resolve([]),
-    needs.heroSlides ? getHeroSlides() : Promise.resolve([]),
-    needs.offerSlider
-      ? (pickedOfferIds.length > 0 ? listOffersByIds(pickedOfferIds) : listActiveOffers())
-      : Promise.resolve([]),
-    needs.categoryShowcase ? getCategoryShowcase() : Promise.resolve([]),
-    needs.topBrands ? getTopBrands() : Promise.resolve([]),
-    needs.dealOfTheDay ? getDealOfTheDay(gstEnabled) : Promise.resolve([]),
-    needs.freeShippingThreshold ? getFreeShippingThreshold() : Promise.resolve(0),
-  ])
+  const [mainCategories, heroSlides, offers, categoryShowcase, topBrands, dealOfTheDay, freeShippingThreshold] =
+    await Promise.all([
+      needs.mainCategories ? getMainCategories() : Promise.resolve([]),
+      needs.heroSlides ? getHeroSlides() : Promise.resolve([]),
+      needs.offerSlider
+        ? pickedOfferIds.length > 0
+          ? listOffersByIds(pickedOfferIds)
+          : listActiveOffers()
+        : Promise.resolve([]),
+      needs.categoryShowcase ? getCategoryShowcase() : Promise.resolve([]),
+      needs.topBrands ? getTopBrands() : Promise.resolve([]),
+      needs.dealOfTheDay ? getDealOfTheDay(gstEnabled) : Promise.resolve([]),
+      needs.freeShippingThreshold ? getFreeShippingThreshold() : Promise.resolve(0),
+    ])
 
   // One query per distinct row config, then fanned back out to the sections that share it.
   const rowResults = await Promise.all(

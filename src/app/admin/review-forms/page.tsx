@@ -46,7 +46,11 @@ async function getForms(filters: { search?: string; page?: number }) {
   return { forms, total }
 }
 
-export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function ReviewFormsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
   const host = await getHost()
 
   return (
@@ -54,20 +58,21 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Shareable forms that reward customers for Google reviews</p>
+          <p className="text-foreground-secondary mt-1 text-sm">
+            Shareable forms that reward customers for Google reviews
+          </p>
         </div>
         <div className="hidden md:block">
-          <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+          <Link
+            href={ap('/admin/review-forms/add', host)}
+            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+          >
             Create Form
           </Link>
         </div>
       </div>
 
-      <AdminFilters
-        filters={[]}
-        searchPlaceholder="Search by title or slug..."
-        suggestType="review_forms"
-      />
+      <AdminFilters filters={[]} searchPlaceholder="Search by title or slug..." suggestType="review_forms" />
 
       <Suspense fallback={null}>
         <ReviewFormsDraftsBanner host={host} />
@@ -101,7 +106,14 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
     <details className="mb-6 group">
       <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
         <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-          <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+          <svg
+            className="w-4 h-4 transition-transform group-open:rotate-90"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
           Pending Drafts ({pendingDraftsCount})
         </span>
         <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
@@ -109,7 +121,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
       <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
         <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
           {/* Create-drafts: brand-new forms not yet on the live list. Publish activates them. */}
-          {createDrafts.map((d) => (
+          {createDrafts.map(d => (
             <DraftRowActions
               key={`new-${d.id}`}
               entityId={d.id}
@@ -126,7 +138,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               entityLabel="review form"
             />
           ))}
-          {pendingDrafts.map((d) => (
+          {pendingDrafts.map(d => (
             <DraftRowActions
               key={d.form_id}
               entityId={d.form_id}
@@ -144,7 +156,13 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
   )
 }
 
-async function ReviewFormsListSection({ searchParams, host }: { searchParams: Promise<{ [key: string]: string | undefined }>; host: string }) {
+async function ReviewFormsListSection({
+  searchParams,
+  host,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+  host: string
+}) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
 
@@ -155,7 +173,13 @@ async function ReviewFormsListSection({ searchParams, host }: { searchParams: Pr
   )
 }
 
-async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: { [key: string]: string | undefined }; host: string }) {
+async function ReviewFormsListContent({
+  resolvedSearchParams,
+  host,
+}: {
+  resolvedSearchParams: { [key: string]: string | undefined }
+  host: string
+}) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
   const formsBase = `https://${formsHostForHost(host)}`
@@ -184,7 +208,12 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
             <thead className="bg-surface-secondary">
               <tr>
                 {['Title', 'Template', 'Shareable Link', 'Coupon', 'Submissions', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -193,7 +222,11 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
                 <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} formsBase={formsBase} />
               ))}
               {forms.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">
+                    No review forms yet. Create your first one!
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -206,17 +239,38 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
               <div key={f.id} className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">{f.title}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}
+                  >
                     {f.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <CopyLinkButton url={formUrl} />
-                <p className="text-xs text-foreground-muted">Coupon: {f.coupon_code || 'None'} · {f.submissions_count} submissions</p>
+                <p className="text-xs text-foreground-muted">
+                  Coupon: {f.coupon_code || 'None'} · {f.submissions_count} submissions
+                </p>
                 <div className="flex gap-3 pt-1">
-                  <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-muted hover:underline">Open ↗</a>
-                  <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-xs text-accent-500 hover:underline">Submissions</Link>
+                  <a
+                    href={formUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-foreground-muted hover:underline"
+                  >
+                    Open ↗
+                  </a>
+                  <Link
+                    href={ap(`/admin/review-forms/${f.id}/submissions`, host)}
+                    className="text-xs text-accent-500 hover:underline"
+                  >
+                    Submissions
+                  </Link>
                   <div className="hidden md:flex gap-3">
-                    <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
+                    <Link
+                      href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                      className="text-xs text-accent-500 hover:underline"
+                    >
+                      Edit
+                    </Link>
                     <DeleteReviewFormButton id={f.id} title={f.title} />
                   </div>
                 </div>

@@ -101,17 +101,34 @@ interface OrderDetails {
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
   const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
+  if (match)
+    return (
+      <>
+        {match[1]}
+        <sup>2</sup>
+      </>
+    )
   return <>{label}</>
 }
 
 function resolveOrderEdd(order: OrderDetails): string | null {
   if (!order.estimatedDeliveryDate) return null
-  return new Date(order.estimatedDeliveryDate + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
+  return new Date(order.estimatedDeliveryDate + 'T00:00:00Z').toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: string; color: string } {
   if (order.status === 'delivered') {
-    return { label: 'Delivered', sub: order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : edd, color: 'text-green-600 dark:text-green-400' }
+    return {
+      label: 'Delivered',
+      sub: order.deliveredAt
+        ? new Date(order.deliveredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+        : edd,
+      color: 'text-green-600 dark:text-green-400',
+    }
   }
   if (order.status === 'out_for_delivery') {
     return { label: 'Arriving Today', sub: 'Out for delivery', color: 'text-accent-500' }
@@ -125,7 +142,8 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
   if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
-  if (diffDays < 0) return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
+  if (diffDays < 0)
+    return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
   return { label: 'Estimated Delivery', sub: edd, color: 'text-foreground' }
 }
 
@@ -180,7 +198,11 @@ function getPaymentStatusColor(status: string) {
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
-  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes, identity: storeIdentity } = useStoreConfig()
+  const {
+    flags: { razorpayEnabled: isRazorpayEnabled },
+    orderAutoCancelMinutes,
+    identity: storeIdentity,
+  } = useStoreConfig()
   const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
   const pathname = usePathname()
@@ -201,17 +223,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { refreshCart } = useCart()
 
   const [returnRequest, setReturnRequest] = useState<{
-    id: string; type: string; status: string; reason: string;
-    description?: string | null; admin_notes?: string | null;
-    replacement_order_id?: string | null; replacement_order_number?: string | null;
-    rvp_awb_number?: string | null;
+    id: string
+    type: string
+    status: string
+    reason: string
+    description?: string | null
+    admin_notes?: string | null
+    replacement_order_id?: string | null
+    replacement_order_number?: string | null
+    rvp_awb_number?: string | null
     items?: Array<{
-      id: string; product_name?: string | null; variant_name?: string | null;
-      quantity: number; unit_price: number; refund_amount: number;
-    }> | null;
+      id: string
+      product_name?: string | null
+      variant_name?: string | null
+      quantity: number
+      unit_price: number
+      refund_amount: number
+    }> | null
   } | null>(null)
   const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
-  const [refundBreakdown, setRefundBreakdown] = useState<{ grossRefund: number; charge: number; netRefund: number } | null>(null)
+  const [refundBreakdown, setRefundBreakdown] = useState<{
+    grossRefund: number
+    charge: number
+    netRefund: number
+  } | null>(null)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
   const [returnReason, setReturnReason] = useState('')
@@ -224,7 +259,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [isUploadingImages, setIsUploadingImages] = useState(false)
   const [returnSelectedItems, setReturnSelectedItems] = useState<Record<string, boolean>>({})
 
-  const [reviewMap, setReviewMap] = useState<Record<string, { id: string; rating: number; title: string | null; comment: string; tags: string[]; image_urls: string[]; image_thumbnail_urls: string[] }>>({})
+  const [reviewMap, setReviewMap] = useState<
+    Record<
+      string,
+      {
+        id: string
+        rating: number
+        title: string | null
+        comment: string
+        tags: string[]
+        image_urls: string[]
+        image_thumbnail_urls: string[]
+      }
+    >
+  >({})
   const [showReviewModal, setShowReviewModal] = useState(false)
 
   useEffect(() => {
@@ -250,16 +298,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (revRes.ok) {
         const revData = await revRes.json()
         const map: typeof reviewMap = {}
-        for (const r of (revData.reviews ?? [])) map[r.product_id] = r
+        for (const r of revData.reviews ?? []) map[r.product_id] = r
         setReviewMap(map)
       }
 
       const retRes = await fetch(`/api/orders/${id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
-        setReturnRequest(retData.returnRequest
-          ? { ...retData.returnRequest, items: retData.returnItems || [] }
-          : null)
+        setReturnRequest(retData.returnRequest ? { ...retData.returnRequest, items: retData.returnItems || [] } : null)
         setMonthlyLimitReached(!!retData.monthlyLimitReached)
         setRefundBreakdown(retData.refundBreakdown ?? null)
       }
@@ -373,7 +419,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       setIsSubmittingReturn(false)
       return
     }
-    const selectedItemIds = Object.entries(returnSelectedItems).filter(([, v]) => v).map(([k]) => k)
+    const selectedItemIds = Object.entries(returnSelectedItems)
+      .filter(([, v]) => v)
+      .map(([k]) => k)
     if (selectedItemIds.length === 0) {
       setReturnError('Please select at least one item to return.')
       setIsSubmittingReturn(false)
@@ -386,7 +434,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         for (const file of returnImages) {
           const fd = new FormData()
           fd.append('file', file)
-          const res = await fetch(`/api/orders/${id}/return-images`, { method: 'POST', body: fd, credentials: 'include' })
+          const res = await fetch(`/api/orders/${id}/return-images`, {
+            method: 'POST',
+            body: fd,
+            credentials: 'include',
+          })
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || 'Image upload failed')
           uploadedUrls.push(data.url)
@@ -402,7 +454,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           reason: returnReason,
           description: returnDescription || undefined,
           image_urls: uploadedUrls,
-          items: selectedItemIds.map(itemId => ({ order_item_id: itemId, quantity: order!.items.find(i => i.id === itemId)!.quantity })),
+          items: selectedItemIds.map(itemId => ({
+            order_item_id: itemId,
+            quantity: order!.items.find(i => i.id === itemId)!.quantity,
+          })),
         }),
       })
       const data = await response.json()
@@ -428,7 +483,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const script = document.createElement('script')
       script.src = 'https://checkout.razorpay.com/v1/checkout.js'
       script.async = true
-      script.onload = () => { setRazorpayLoaded(true); resolve() }
+      script.onload = () => {
+        setRazorpayLoaded(true)
+        resolve()
+      }
       script.onerror = () => reject(new Error('Failed to load payment gateway'))
       document.body.appendChild(script)
     })
@@ -477,7 +535,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             await fetchOrder()
             setIsPayingNow(false)
           } catch (err: any) {
-            setPaymentError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
+            setPaymentError(
+              err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.'
+            )
             setIsPayingNow(false)
           }
         },
@@ -508,10 +568,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleConfirmVariantChange = async () => {
     if (!order) return
-    setVcrBusy(true); setVcrError('')
+    setVcrBusy(true)
+    setVcrError('')
     try {
       const res = await fetch(`/api/orders/${order.id}/variant-change/confirm`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to confirm change')
@@ -529,7 +593,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           handler: async function (response: any) {
             try {
               const vr = await fetch('/api/razorpay/verify', {
-                method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   razorpay_order_id: response.razorpay_order_id,
                   razorpay_payment_id: response.razorpay_payment_id,
@@ -541,16 +607,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               await fetchOrder()
               setVcrBusy(false)
             } catch (err: any) {
-              setVcrError(err?.message || 'Payment received but confirmation failed. Contact support — your payment is safe.')
+              setVcrError(
+                err?.message || 'Payment received but confirmation failed. Contact support — your payment is safe.'
+              )
               setVcrBusy(false)
             }
           },
-          prefill: { name: order.shippingAddress?.full_name || '', email: user?.email || '', contact: order.shippingAddress?.phone || '' },
+          prefill: {
+            name: order.shippingAddress?.full_name || '',
+            email: user?.email || '',
+            contact: order.shippingAddress?.phone || '',
+          },
           theme: { color: '#f97316' },
-          modal: { ondismiss: function () { setVcrBusy(false) } },
+          modal: {
+            ondismiss: function () {
+              setVcrBusy(false)
+            },
+          },
         }
         const rzp = new (window as any).Razorpay(options)
-        rzp.on('payment.failed', function (r: any) { setVcrError(`Payment failed: ${r.error?.description || ''}`); setVcrBusy(false) })
+        rzp.on('payment.failed', function (r: any) {
+          setVcrError(`Payment failed: ${r.error?.description || ''}`)
+          setVcrBusy(false)
+        })
         rzp.open()
         return
       }
@@ -566,10 +645,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleRejectVariantChange = async () => {
     if (!order) return
-    setVcrBusy(true); setVcrError('')
+    setVcrBusy(true)
+    setVcrError('')
     try {
       const res = await fetch(`/api/orders/${order.id}/variant-change/reject`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to decline change')
@@ -603,7 +686,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-4">
               <div className="h-5 w-36 bg-surface-secondary rounded" />
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0" style={{ animationDelay: `${i * 60}ms` }}>
+                <div
+                  key={i}
+                  className="flex gap-4 pb-4 border-b border-border-default last:border-b-0"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
                   <div className="w-20 h-20 bg-surface-secondary rounded-lg shrink-0" />
                   <div className="flex-1 space-y-2">
                     <div className="h-4 bg-surface-secondary rounded w-3/4" />
@@ -642,38 +729,52 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!user) return null
 
-  const canRefund = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
-    const deliveryDate = order.deliveredAt || order.updatedAt
-    if (!deliveryDate) return false
-    const ts = new Date(deliveryDate).getTime()
-    return order.items.some((item: OrderItem) =>
-      item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
-    )
-  })()
+  const canRefund =
+    order?.status === 'delivered' &&
+    !returnRequest &&
+    order.items.length > 0 &&
+    (() => {
+      const deliveryDate = order.deliveredAt || order.updatedAt
+      if (!deliveryDate) return false
+      const ts = new Date(deliveryDate).getTime()
+      return order.items.some(
+        (item: OrderItem) => item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
+      )
+    })()
 
-  const canReplace = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
-    const deliveryDate = order.deliveredAt || order.updatedAt
-    if (!deliveryDate) return false
-    const ts = new Date(deliveryDate).getTime()
-    return order.items.some((item: OrderItem) =>
-      item.replacementAllowed && Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
-    )
-  })()
+  const canReplace =
+    order?.status === 'delivered' &&
+    !returnRequest &&
+    order.items.length > 0 &&
+    (() => {
+      const deliveryDate = order.deliveredAt || order.updatedAt
+      if (!deliveryDate) return false
+      const ts = new Date(deliveryDate).getTime()
+      return order.items.some(
+        (item: OrderItem) =>
+          item.replacementAllowed && Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
+      )
+    })()
 
   const canReturn = !monthlyLimitReached && (canRefund || canReplace)
 
-  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !monthlyLimitReached && !(canRefund || canReplace) && (() => {
-    const deliveryDate = order.deliveredAt || order.updatedAt
-    if (!deliveryDate) return false
-    const ts = new Date(deliveryDate).getTime()
-    // True only if every item that HAD a policy now has an expired window
-    const eligibleItems = order.items.filter((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
-    if (eligibleItems.length === 0) return false
-    return eligibleItems.every((item: OrderItem) => {
-      const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
-      return Date.now() > ts + days * 24 * 60 * 60 * 1000
-    })
-  })()
+  const returnWindowExpired =
+    order?.status === 'delivered' &&
+    !returnRequest &&
+    !monthlyLimitReached &&
+    !(canRefund || canReplace) &&
+    (() => {
+      const deliveryDate = order.deliveredAt || order.updatedAt
+      if (!deliveryDate) return false
+      const ts = new Date(deliveryDate).getTime()
+      // True only if every item that HAD a policy now has an expired window
+      const eligibleItems = order.items.filter((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
+      if (eligibleItems.length === 0) return false
+      return eligibleItems.every((item: OrderItem) => {
+        const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
+        return Date.now() > ts + days * 24 * 60 * 60 * 1000
+      })
+    })()
 
   const MobileAccountHeader = () => (
     <>
@@ -690,7 +791,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
           </div>
           <div>
-            <p className="text-xl font-bold text-white">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xl font-bold text-white">
+              {user?.firstName} {user?.lastName}
+            </p>
             <p className="text-sm text-white/70 mt-0.5">{user?.email}</p>
           </div>
         </div>
@@ -698,7 +801,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map((item) => {
+            {navItems.map(item => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
               return (
                 <Link
@@ -711,7 +814,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   }`}
                 >
                   <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                    {item.label}
+                  </span>
                 </Link>
               )
             })}
@@ -727,16 +832,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <MobileAccountHeader />
         <div className="container mx-auto px-4">
           <div className="py-4">
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
-                <p className="text-foreground-secondary mb-6">{error || 'Unable to load order details'}</p>
-                <Link
-                  href="/account/orders"
-                  className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
-                >
-                  View All Orders
-                </Link>
-              </div>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+              <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
+              <p className="text-foreground-secondary mb-6">{error || 'Unable to load order details'}</p>
+              <Link
+                href="/account/orders"
+                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+              >
+                View All Orders
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -745,31 +850,35 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <>
-    <div className="bg-surface min-h-screen">
-      <MobileAccountHeader />
-      <div className="container mx-auto px-4 pb-8">
-        <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="bg-surface min-h-screen">
+        <MobileAccountHeader />
+        <div className="container mx-auto px-4 pb-8">
+          <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Order Header */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">
-                    Order #{order.orderNumber}
-                  </h2>
+                  <h2 className="text-xl font-bold text-foreground">Order #{order.orderNumber}</h2>
                   {order.originalOrderId && order.originalOrderNumber && (
                     <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
                       Replacement for{' '}
-                      <a href={`/account/orders/${order.originalOrderId}`} className="underline hover:text-blue-800 dark:hover:text-blue-300">
+                      <a
+                        href={`/account/orders/${order.originalOrderId}`}
+                        className="underline hover:text-blue-800 dark:hover:text-blue-300"
+                      >
                         #{order.originalOrderNumber}
                       </a>
                     </p>
                   )}
                   <p className="text-sm text-foreground-secondary mt-1">
-                    Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
+                    Placed on{' '}
+                    {new Date(order.createdAt).toLocaleDateString('en-IN', {
                       day: 'numeric',
                       month: 'long',
                       year: 'numeric',
-                    })} at {new Date(order.createdAt).toLocaleTimeString('en-IN', {
+                    })}{' '}
+                    at{' '}
+                    {new Date(order.createdAt).toLocaleTimeString('en-IN', {
                       hour: '2-digit',
                       minute: '2-digit',
                       timeZone: 'Asia/Kolkata',
@@ -777,21 +886,37 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                    {order.status === 'cancel_requested' ? 'Cancellation Requested'
-                      : order.status === 'cancel_rejected' ? 'Cancellation Rejected'
-                      : order.status === 'out_for_delivery' ? 'Out for Delivery'
-                      : order.status === 'return_requested' ? 'Return Requested'
-                      : order.status === 'return_approved' ? 'Return Approved'
-                      : order.status === 'return_received' ? 'Return Received'
-                      : order.status === 'return_rejected' ? 'Return Rejected'
-                      : order.status === 'returned' ? 'Returned'
-                      : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                  >
+                    {order.status === 'cancel_requested'
+                      ? 'Cancellation Requested'
+                      : order.status === 'cancel_rejected'
+                        ? 'Cancellation Rejected'
+                        : order.status === 'out_for_delivery'
+                          ? 'Out for Delivery'
+                          : order.status === 'return_requested'
+                            ? 'Return Requested'
+                            : order.status === 'return_approved'
+                              ? 'Return Approved'
+                              : order.status === 'return_received'
+                                ? 'Return Received'
+                                : order.status === 'return_rejected'
+                                  ? 'Return Rejected'
+                                  : order.status === 'returned'
+                                    ? 'Returned'
+                                    : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}
+                  >
                     Payment: {order.paymentStatus}
                   </span>
-                  {(CANCELLABLE_STATUSES.includes(order.status) || (canReturn && !showReturnForm) || returnWindowExpired || monthlyLimitReached || (order.invoiceNumber && !order.originalOrderId)) && (
+                  {(CANCELLABLE_STATUSES.includes(order.status) ||
+                    (canReturn && !showReturnForm) ||
+                    returnWindowExpired ||
+                    monthlyLimitReached ||
+                    (order.invoiceNumber && !order.originalOrderId)) && (
                     <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
                   )}
                   {CANCELLABLE_STATUSES.includes(order.status) && (
@@ -800,8 +925,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       onClick={() => setShowCancelConfirm(true)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancel Order' : 'Request Cancellation'}
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      {order.status === 'pending' && order.paymentStatus === 'unpaid'
+                        ? 'Cancel Order'
+                        : 'Request Cancellation'}
                     </button>
                   )}
                   {canReturn && !showReturnForm && (
@@ -813,36 +942,74 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-colors"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                      {canRefund && canReplace ? 'Request Return / Replacement' : canRefund ? 'Request Return' : 'Request Replacement'}
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                        />
+                      </svg>
+                      {canRefund && canReplace
+                        ? 'Request Return / Replacement'
+                        : canRefund
+                          ? 'Request Return'
+                          : 'Request Replacement'}
                     </button>
                   )}
                   {returnWindowExpired && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 italic">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
                       Return window closed
                     </span>
                   )}
                   {monthlyLimitReached && (canRefund || canReplace) && !returnRequest && (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 italic">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
                       Monthly return limit reached
                     </span>
                   )}
-                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (order.paymentStatus === 'paid' || order.paymentStatus === 'cod_collected') && (
-                    <a
-                      href={`/invoice/${order.viewToken}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                      View Invoice
-                    </a>
-                  )}
+                  {order.invoiceNumber &&
+                    !order.originalOrderId &&
+                    order.viewToken &&
+                    (order.paymentStatus === 'paid' || order.paymentStatus === 'cod_collected') && (
+                      <a
+                        href={`/invoice/${order.viewToken}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                        View Invoice
+                      </a>
+                    )}
                 </div>
               </div>
             </div>
@@ -859,9 +1026,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </>
                 ) : (
                   <>
-                    <h3 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Request cancellation for this order?</h3>
+                    <h3 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">
+                      Request cancellation for this order?
+                    </h3>
                     <p className="text-red-800 dark:text-red-300 text-sm mb-4">
-                      Your cancellation request will be sent to our team for review. You will be notified once it is approved or rejected.
+                      Your cancellation request will be sent to our team for review. You will be notified once it is
+                      approved or rejected.
                     </p>
                   </>
                 )}
@@ -875,10 +1045,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     {isCancelling ? (
                       <>
                         <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancelling...' : 'Submitting...'}
+                        {order.status === 'pending' && order.paymentStatus === 'unpaid'
+                          ? 'Cancelling...'
+                          : 'Submitting...'}
                       </>
+                    ) : order.status === 'pending' && order.paymentStatus === 'unpaid' ? (
+                      'Yes, Cancel Order'
                     ) : (
-                      order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Yes, Cancel Order' : 'Yes, Request Cancellation'
+                      'Yes, Request Cancellation'
                     )}
                   </button>
                   <button
@@ -897,11 +1071,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {order.status === 'cancel_requested' && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <p className="text-orange-800 dark:text-orange-300 text-sm">
-                    Your cancellation request is pending review by our team. You will receive an email once it is approved or rejected.
+                    Your cancellation request is pending review by our team. You will receive an email once it is
+                    approved or rejected.
                   </p>
                 </div>
               </div>
@@ -911,8 +1096,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {order.pendingVariantChange && order.pendingVariantChange.status === 'pending_customer' && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <svg
+                    className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                    />
                   </svg>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-foreground">A variant change needs your approval</h3>
@@ -922,22 +1117,43 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <strong>{order.pendingVariantChange.newVariantName || '—'}</strong>.
                     </p>
                     <p className="text-sm mt-1">
-                      {order.pendingVariantChange.settlementType === 'refund'
-                        ? <>We&apos;ll <strong>refund ₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> to your original payment.</>
-                        : order.pendingVariantChange.settlementType === 'collect'
-                          ? <>An extra <strong>₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> is payable — you&apos;ll pay it securely on confirm.</>
-                          : order.pendingVariantChange.settlementType === 'cod_adjust'
-                            ? <>Your total will be adjusted; you pay the updated amount on delivery.</>
-                            : <>No change to your total.</>}
+                      {order.pendingVariantChange.settlementType === 'refund' ? (
+                        <>
+                          We&apos;ll{' '}
+                          <strong>refund ₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> to your
+                          original payment.
+                        </>
+                      ) : order.pendingVariantChange.settlementType === 'collect' ? (
+                        <>
+                          An extra <strong>₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> is
+                          payable — you&apos;ll pay it securely on confirm.
+                        </>
+                      ) : order.pendingVariantChange.settlementType === 'cod_adjust' ? (
+                        <>Your total will be adjusted; you pay the updated amount on delivery.</>
+                      ) : (
+                        <>No change to your total.</>
+                      )}
                     </p>
                     {vcrError && <p className="text-sm text-red-600 mt-2">{vcrError}</p>}
                     <div className="flex gap-2 mt-3">
-                      <button onClick={handleConfirmVariantChange} disabled={vcrBusy}
-                        className="px-4 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50">
-                        {vcrBusy ? 'Processing…' : (order.pendingVariantChange.settlementType === 'collect' ? 'Confirm & pay difference' : 'Confirm change')}
+                      <button
+                        onClick={handleConfirmVariantChange}
+                        disabled={vcrBusy}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50"
+                      >
+                        {vcrBusy
+                          ? 'Processing…'
+                          : order.pendingVariantChange.settlementType === 'collect'
+                            ? 'Confirm & pay difference'
+                            : 'Confirm change'}
                       </button>
-                      <button onClick={handleRejectVariantChange} disabled={vcrBusy}
-                        className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground disabled:opacity-50">Decline</button>
+                      <button
+                        onClick={handleRejectVariantChange}
+                        disabled={vcrBusy}
+                        className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground disabled:opacity-50"
+                      >
+                        Decline
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -954,10 +1170,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {order.status === 'return_requested' && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
-                  <p className="text-orange-800 dark:text-orange-300 text-sm">Return request submitted — awaiting admin review.</p>
+                  <p className="text-orange-800 dark:text-orange-300 text-sm">
+                    Return request submitted — awaiting admin review.
+                  </p>
                 </div>
               </div>
             )}
@@ -965,13 +1193,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {order.status === 'return_approved' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <p className="text-blue-800 dark:text-blue-300 text-sm font-medium">Return Approved</p>
-                <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">Please ship the item back. A team member will contact you with return shipping instructions.</p>
+                <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">
+                  Please ship the item back. A team member will contact you with return shipping instructions.
+                </p>
               </div>
             )}
 
             {order.status === 'return_received' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-blue-800 dark:text-blue-300 text-sm">Item received — processing your {returnRequest?.type === 'replacement' ? 'replacement order' : 'refund'}.</p>
+                <p className="text-blue-800 dark:text-blue-300 text-sm">
+                  Item received — processing your{' '}
+                  {returnRequest?.type === 'replacement' ? 'replacement order' : 'refund'}.
+                </p>
               </div>
             )}
 
@@ -998,14 +1231,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 ) : refundBreakdown && refundBreakdown.netRefund <= 0 && refundBreakdown.charge > 0 ? (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
                     Your return has been accepted. A ₹{refundBreakdown.charge.toLocaleString('en-IN')} return handling
-                    charge applied to the ₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} returnable amount, so no
-                    amount was refunded for this return.
+                    charge applied to the ₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} returnable amount, so
+                    no amount was refunded for this return.
                   </p>
                 ) : refundBreakdown && refundBreakdown.charge > 0 ? (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
-                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN')} has been processed
-                    (₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} less a ₹{refundBreakdown.charge.toLocaleString('en-IN')} return
-                    handling charge). It may take 5–7 business days to reflect in your account.
+                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN')} has been processed (₹
+                    {refundBreakdown.grossRefund.toLocaleString('en-IN')} less a ₹
+                    {refundBreakdown.charge.toLocaleString('en-IN')} return handling charge). It may take 5–7 business
+                    days to reflect in your account.
                   </p>
                 ) : (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
@@ -1016,37 +1250,57 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Returned Items Summary — shown whenever a return request exists */}
-            {returnRequest && returnRequest.items && returnRequest.items.length > 0 && RETURN_STATUSES.includes(order.status) && (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-                <h3 className="text-base font-semibold text-foreground mb-3">
-                  {returnRequest.type === 'replacement' ? 'Items Requested for Replacement' : 'Items Being Returned'}
-                  <span className="ml-2 text-sm font-normal text-foreground-secondary">
-                    · ₹{returnRequest.items.reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0).toLocaleString('en-IN')} {returnRequest.type === 'refund' ? 'refund' : 'value'}
-                  </span>
-                </h3>
-                <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
-                  {returnRequest.items.map((item, idx) => (
-                    <div key={item.id ?? idx} className="flex items-center justify-between px-3 py-2.5 bg-surface text-sm">
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{item.product_name}</p>
-                        {item.variant_name && (
-                          <p className="text-xs text-foreground-secondary">{item.variant_name}</p>
-                        )}
+            {returnRequest &&
+              returnRequest.items &&
+              returnRequest.items.length > 0 &&
+              RETURN_STATUSES.includes(order.status) && (
+                <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+                  <h3 className="text-base font-semibold text-foreground mb-3">
+                    {returnRequest.type === 'replacement' ? 'Items Requested for Replacement' : 'Items Being Returned'}
+                    <span className="ml-2 text-sm font-normal text-foreground-secondary">
+                      · ₹
+                      {returnRequest.items
+                        .reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0)
+                        .toLocaleString('en-IN')}{' '}
+                      {returnRequest.type === 'refund' ? 'refund' : 'value'}
+                    </span>
+                  </h3>
+                  <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+                    {returnRequest.items.map((item, idx) => (
+                      <div
+                        key={item.id ?? idx}
+                        className="flex items-center justify-between px-3 py-2.5 bg-surface text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">{item.product_name}</p>
+                          {item.variant_name && (
+                            <p className="text-xs text-foreground-secondary">{item.variant_name}</p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-4">
+                          <p className="text-xs text-foreground-secondary">
+                            Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toLocaleString('en-IN')}
+                          </p>
+                          <p className="font-medium text-foreground">
+                            ₹{parseFloat(String(item.refund_amount)).toLocaleString('en-IN')}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-4">
-                        <p className="text-xs text-foreground-secondary">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toLocaleString('en-IN')}</p>
-                        <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toLocaleString('en-IN')}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Return Request Form */}
             {showReturnForm && (
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 sm:p-6">
-                <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-4">{canRefund && canReplace ? 'Request Return / Replacement' : canRefund ? 'Request Return' : 'Request Replacement'}</h3>
+                <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-4">
+                  {canRefund && canReplace
+                    ? 'Request Return / Replacement'
+                    : canRefund
+                      ? 'Request Return'
+                      : 'Request Replacement'}
+                </h3>
                 {returnError && (
                   <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
                     {returnError}
@@ -1058,20 +1312,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
                       <div className="flex gap-3">
                         {(['refund', 'replacement'] as const)
-                          .filter(t => t === 'refund' ? canRefund : canReplace)
-                          .map((t) => (
-                          <label key={t} className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="radio"
-                              name="returnType"
-                              value={t}
-                              checked={returnType === t}
-                              onChange={() => { setReturnType(t); setReturnSelectedItems({}) }}
-                              className="accent-accent-500"
-                            />
-                            <span className="text-sm text-foreground capitalize">{t}</span>
-                          </label>
-                        ))}
+                          .filter(t => (t === 'refund' ? canRefund : canReplace))
+                          .map(t => (
+                            <label key={t} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="returnType"
+                                value={t}
+                                checked={returnType === t}
+                                onChange={() => {
+                                  setReturnType(t)
+                                  setReturnSelectedItems({})
+                                }}
+                                className="accent-accent-500"
+                              />
+                              <span className="text-sm text-foreground capitalize">{t}</span>
+                            </label>
+                          ))}
                       </div>
                     </div>
                   )}
@@ -1083,13 +1340,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       {order.items.map(item => {
                         const deliveryDate = order.deliveredAt || order.updatedAt
                         const ts = deliveryDate ? new Date(deliveryDate).getTime() : 0
-                        const eligible = returnType === 'refund'
-                          ? item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
-                          : item.replacementAllowed && Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
+                        const eligible =
+                          returnType === 'refund'
+                            ? item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
+                            : item.replacementAllowed &&
+                              Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
                         if (!eligible) return null
                         const checked = !!returnSelectedItems[item.id]
-                        const thumb = item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url
-                          || item.products?.product_images?.[0]?.thumbnail_url
+                        const thumb =
+                          item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url ||
+                          item.products?.product_images?.[0]?.thumbnail_url
                         return (
                           <label
                             key={item.id}
@@ -1111,9 +1371,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium text-foreground truncate">{item.productName}</p>
                               {item.variantName && (
-                                <p className="text-xs text-foreground-secondary">{item.variantName}{item.subVariantName ? ` / ${item.subVariantName}` : ''}</p>
+                                <p className="text-xs text-foreground-secondary">
+                                  {item.variantName}
+                                  {item.subVariantName ? ` / ${item.subVariantName}` : ''}
+                                </p>
                               )}
-                              <p className="text-xs text-foreground-muted">Qty: {item.quantity} · ₹{item.unitPrice.toFixed(0)}</p>
+                              <p className="text-xs text-foreground-muted">
+                                Qty: {item.quantity} · ₹{item.unitPrice.toFixed(0)}
+                              </p>
                             </div>
                           </label>
                         )
@@ -1136,7 +1401,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-1">Description <span className="text-foreground-muted">(optional)</span></label>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1">
+                      Description <span className="text-foreground-muted">(optional)</span>
+                    </label>
                     <textarea
                       value={returnDescription}
                       onChange={e => setReturnDescription(e.target.value)}
@@ -1149,26 +1416,43 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">
-                      Photos <span className="text-red-500">*</span> <span className="text-foreground-muted">(required, up to 3)</span>
+                      Photos <span className="text-red-500">*</span>{' '}
+                      <span className="text-foreground-muted">(required, up to 3)</span>
                     </label>
                     <div className="flex gap-2 flex-wrap">
                       {returnImagePreviews.map((src, i) => (
-                        <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
+                        <div
+                          key={i}
+                          className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary"
+                        >
                           <img src={src} alt="" className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => handleReturnImageRemove(i)}
                             className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 rounded-full flex items-center justify-center text-white text-xs"
-                          >✕</button>
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                       {returnImages.length < 3 && (
                         <label className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-border-secondary rounded-lg cursor-pointer hover:border-accent-400 transition-colors text-foreground-muted hover:text-accent-500">
-                          <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <svg
+                            className="w-6 h-6 mb-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                           </svg>
                           <span className="text-xs">Add</span>
-                          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleReturnImageAdd} />
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={handleReturnImageAdd}
+                          />
                         </label>
                       )}
                     </div>
@@ -1185,11 +1469,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
                           {isUploadingImages ? 'Uploading photos...' : 'Submitting...'}
                         </>
-                      ) : 'Submit Request'}
+                      ) : (
+                        'Submit Request'
+                      )}
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setShowReturnForm(false); setReturnError(''); setReturnImages([]); setReturnImagePreviews([]); setReturnSelectedItems({}) }}
+                      onClick={() => {
+                        setShowReturnForm(false)
+                        setReturnError('')
+                        setReturnImages([])
+                        setReturnImagePreviews([])
+                        setReturnSelectedItems({})
+                      }}
                       disabled={isSubmittingReturn}
                       className="px-4 py-2.5 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors"
                     >
@@ -1201,24 +1493,45 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Estimated Delivery */}
-            {!['cancelled', 'returned'].includes(order.status) && (() => { const edd = resolveOrderEdd(order); if (!edd) return null; const { label, sub, color } = getEddDisplay(order, edd); return (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
-                <svg className="w-5 h-5 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <div>
-                  <p className={`text-sm font-semibold ${color}`}>{label}</p>
-                  <p className="text-xs text-foreground-muted">{sub}</p>
-                </div>
-              </div>
-            ) })()}
+            {!['cancelled', 'returned'].includes(order.status) &&
+              (() => {
+                const edd = resolveOrderEdd(order)
+                if (!edd) return null
+                const { label, sub, color } = getEddDisplay(order, edd)
+                return (
+                  <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
+                    <svg
+                      className="w-5 h-5 text-accent-500 shrink-0"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <div>
+                      <p className={`text-sm font-semibold ${color}`}>{label}</p>
+                      <p className="text-xs text-foreground-muted">{sub}</p>
+                    </div>
+                  </div>
+                )
+              })()}
 
             {/* Tracking */}
             {order.awbNumber && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                    />
                   </svg>
                   <h3 className="text-base font-semibold text-foreground">Shipment Tracking</h3>
                 </div>
@@ -1233,7 +1546,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+                    />
                   </svg>
                   <h3 className="text-base font-semibold text-foreground">Return Shipment Tracking</h3>
                 </div>
@@ -1250,8 +1568,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </h3>
 
               <div className="space-y-4">
-                {order.items.map((item) => {
-                  const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
+                {order.items.map(item => {
+                  const primaryImage =
+                    item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
 
                   return (
                     <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
@@ -1264,8 +1583,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            <svg
+                              className="w-8 h-8 text-foreground-muted"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
                             </svg>
                           </div>
                         )}
@@ -1291,20 +1620,57 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             {item.subVariantName}
                           </span>
                         )}
-                        <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
+                        <ProductWarningBadges
+                          fragile={item.products?.fragile}
+                          hazardous={item.products?.hazardous}
+                          flammable={item.products?.flammable}
+                          size="xs"
+                        />
                         {(() => {
-                          const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
-                          const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
+                          const isFractional =
+                            (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+                          const unitLabel =
+                            item.buyUnit && item.buyUnit !== 'unit'
+                              ? item.buyUnit
+                              : item.buyMode && item.buyMode !== 'unit'
+                                ? item.buyMode
+                                : null
                           const qtyDisplay = isFractional
                             ? Number(Number(item.quantity).toFixed(6)).toString()
                             : String(Math.round(Number(item.quantity)))
                           return (
                             <>
                               <p className="text-sm text-foreground-secondary mt-1">
-                                Quantity: {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                                Quantity: {qtyDisplay}
+                                {unitLabel ? (
+                                  <>
+                                    {' '}
+                                    <UnitLabel label={unitLabel} />
+                                  </>
+                                ) : (
+                                  ''
+                                )}
                               </p>
                               <p className="text-sm font-semibold text-foreground mt-1">
-                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} x {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                                {unitLabel ? (
+                                  <>
+                                    {' '}
+                                    / <UnitLabel label={unitLabel} />
+                                  </>
+                                ) : (
+                                  ''
+                                )}{' '}
+                                x {qtyDisplay}
+                                {unitLabel ? (
+                                  <>
+                                    {' '}
+                                    <UnitLabel label={unitLabel} />
+                                  </>
+                                ) : (
+                                  ''
+                                )}{' '}
+                                = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                               </p>
                             </>
                           )
@@ -1342,7 +1708,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 {(order.codFeeAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-sm text-foreground-secondary">
                     <span>COD handling fee</span>
-                    <span>{(order.codFeeAmount ?? 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                    <span>
+                      {(order.codFeeAmount ?? 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-2">
@@ -1376,15 +1744,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 {order.items.some(item => reviewMap[item.productId]) && (
                   <div className="mt-4 pt-4 border-t border-border-default flex flex-wrap gap-3">
-                    {order.items.filter(item => reviewMap[item.productId]).map(item => {
-                      const r = reviewMap[item.productId]
-                      return (
-                        <div key={item.productId} className="flex items-center gap-2 text-xs text-foreground-secondary">
-                          <span className="text-yellow-400 text-sm">{'★'.repeat(r.rating)}<span className="text-gray-300">{'★'.repeat(5 - r.rating)}</span></span>
-                          <span className="font-medium text-foreground truncate max-w-[140px]">{item.productName}</span>
-                        </div>
-                      )
-                    })}
+                    {order.items
+                      .filter(item => reviewMap[item.productId])
+                      .map(item => {
+                        const r = reviewMap[item.productId]
+                        return (
+                          <div
+                            key={item.productId}
+                            className="flex items-center gap-2 text-xs text-foreground-secondary"
+                          >
+                            <span className="text-yellow-400 text-sm">
+                              {'★'.repeat(r.rating)}
+                              <span className="text-gray-300">{'★'.repeat(5 - r.rating)}</span>
+                            </span>
+                            <span className="font-medium text-foreground truncate max-w-[140px]">
+                              {item.productName}
+                            </span>
+                          </div>
+                        )
+                      })}
                   </div>
                 )}
               </div>
@@ -1393,7 +1771,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {Array.isArray((order as any).sharedNotes) && (order as any).sharedNotes.length > 0 && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6">
                 <h3 className="text-lg font-bold text-foreground mb-1">Notes from the store</h3>
-                <p className="text-xs text-foreground-muted mb-4">Sketches, measurements and messages our team shared with you for this order.</p>
+                <p className="text-xs text-foreground-muted mb-4">
+                  Sketches, measurements and messages our team shared with you for this order.
+                </p>
                 <div className="space-y-4">
                   {(order as any).sharedNotes.map((n: any) => (
                     <div key={n.id} className="border border-border-default rounded-lg p-4">
@@ -1401,17 +1781,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       {n.body && <p className="text-sm text-foreground-secondary whitespace-pre-wrap mt-1">{n.body}</p>}
                       {n.attachments?.some((a: any) => a.kind === 'image') && (
                         <div className="flex flex-wrap gap-2 mt-3">
-                          {n.attachments.filter((a: any) => a.kind === 'image').map((a: any) => (
-                            <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
-                              <img src={a.thumbnailUrl || a.url} alt="" className="w-24 h-24 object-cover rounded-lg border border-border-default" />
-                            </a>
-                          ))}
+                          {n.attachments
+                            .filter((a: any) => a.kind === 'image')
+                            .map((a: any) => (
+                              <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={a.thumbnailUrl || a.url}
+                                  alt=""
+                                  className="w-24 h-24 object-cover rounded-lg border border-border-default"
+                                />
+                              </a>
+                            ))}
                         </div>
                       )}
-                      {n.attachments?.filter((a: any) => a.kind === 'audio').map((a: any) => (
-                        <audio key={a.id} controls preload="none" src={a.url} className="mt-3 w-full" />
-                      ))}
-                      <p className="text-[11px] text-foreground-muted mt-2">{new Date(n.createdAt).toLocaleString('en-IN')}</p>
+                      {n.attachments
+                        ?.filter((a: any) => a.kind === 'audio')
+                        .map((a: any) => (
+                          <audio key={a.id} controls preload="none" src={a.url} className="mt-3 w-full" />
+                        ))}
+                      <p className="text-[11px] text-foreground-muted mt-2">
+                        {new Date(n.createdAt).toLocaleString('en-IN')}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -1425,9 +1815,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="text-foreground-secondary">
                   <p className="font-semibold">{order.shippingAddress.full_name}</p>
                   <p className="mt-2">{order.shippingAddress.address_line1}</p>
-                  {order.shippingAddress.address_line2 && (
-                    <p>{order.shippingAddress.address_line2}</p>
-                  )}
+                  {order.shippingAddress.address_line2 && <p>{order.shippingAddress.address_line2}</p>}
                   {order.shippingAddress.landmark && (
                     <p className="text-foreground-secondary text-sm">Landmark: {order.shippingAddress.landmark}</p>
                   )}
@@ -1458,8 +1846,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {order.paymentStatus === 'paid' && (
               <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <p className="text-green-800 dark:text-green-300 text-sm font-medium">
                     Payment received. Thank you for your purchase!
@@ -1468,118 +1866,170 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'cod' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
-              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-3 flex-1">
-                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <p className="text-blue-800 dark:text-blue-300 text-sm">
-                        Payment is pending for this order. Pay online to confirm your order instantly.
-                      </p>
-                      {timeLeft !== null && timeLeft > 0 && (
-                        <p className="text-blue-900 dark:text-blue-200 text-sm font-bold mt-2">
-                          Time remaining to pay: {Math.floor(timeLeft / 60000)}:{String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+            {order.paymentStatus === 'unpaid' &&
+              order.paymentMode !== 'cod' &&
+              isRazorpayEnabled &&
+              order.status !== 'cancelled' &&
+              order.status !== 'cancel_requested' && (
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex gap-3 flex-1">
+                      <svg
+                        className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="text-blue-800 dark:text-blue-300 text-sm">
+                          Payment is pending for this order. Pay online to confirm your order instantly.
                         </p>
-                      )}
-                      {isAutoCancelling && (
-                        <p className="text-blue-800 dark:text-blue-300 text-sm mt-2">
-                          Time expired. Cancelling order and restoring items to your cart...
-                        </p>
-                      )}
+                        {timeLeft !== null && timeLeft > 0 && (
+                          <p className="text-blue-900 dark:text-blue-200 text-sm font-bold mt-2">
+                            Time remaining to pay: {Math.floor(timeLeft / 60000)}:
+                            {String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+                          </p>
+                        )}
+                        {isAutoCancelling && (
+                          <p className="text-blue-800 dark:text-blue-300 text-sm mt-2">
+                            Time expired. Cancelling order and restoring items to your cart...
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    {!isAutoCancelling && (
+                      <button
+                        type="button"
+                        onClick={handlePayNow}
+                        disabled={isPayingNow}
+                        className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+                      >
+                        {isPayingNow ? (
+                          <>
+                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          `Pay ₹${order.totalAmount.toLocaleString('en-IN')}`
+                        )}
+                      </button>
+                    )}
                   </div>
-                  {!isAutoCancelling && (
-                    <button
-                      type="button"
-                      onClick={handlePayNow}
-                      disabled={isPayingNow}
-                      className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+                </div>
+              )}
+
+            {order.paymentStatus === 'unpaid' &&
+              !isRazorpayEnabled &&
+              order.status !== 'cancelled' &&
+              order.status !== 'cancel_requested' && (
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex gap-3">
+                    <svg
+                      className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
-                      {isPayingNow ? (
-                        <>
-                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        `Pay ₹${order.totalAmount.toLocaleString('en-IN')}`
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {order.paymentStatus === 'unpaid' && !isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
-              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-blue-800 dark:text-blue-300 text-sm">
-                    Our team will contact you to confirm your order and provide payment details.
-                    {(storeIdentity.phone || storeIdentity.email) && ' For queries, '}
-                    {storeIdentity.phone && `call ${storeIdentity.phone}`}
-                    {storeIdentity.phone && storeIdentity.email && ' or '}
-                    {storeIdentity.email && `email ${storeIdentity.email}`}
-                    {(storeIdentity.phone || storeIdentity.email) && '.'}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {order.paymentStatus === 'failed' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-3 flex-1">
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
-                    <div>
-                      <p className="text-red-800 dark:text-red-300 text-sm">
-                        Payment failed for this order. Please retry to complete your purchase.
-                      </p>
-                      {timeLeft !== null && timeLeft > 0 && (
-                        <p className="text-red-900 dark:text-red-200 text-sm font-bold mt-2">
-                          Time remaining to pay: {Math.floor(timeLeft / 60000)}:{String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
-                        </p>
-                      )}
-                      {isAutoCancelling && (
-                        <p className="text-red-800 dark:text-red-300 text-sm mt-2">
-                          Time expired. Cancelling order and restoring items to your cart...
-                        </p>
-                      )}
-                    </div>
+                    <p className="text-blue-800 dark:text-blue-300 text-sm">
+                      Our team will contact you to confirm your order and provide payment details.
+                      {(storeIdentity.phone || storeIdentity.email) && ' For queries, '}
+                      {storeIdentity.phone && `call ${storeIdentity.phone}`}
+                      {storeIdentity.phone && storeIdentity.email && ' or '}
+                      {storeIdentity.email && `email ${storeIdentity.email}`}
+                      {(storeIdentity.phone || storeIdentity.email) && '.'}
+                    </p>
                   </div>
-                  {!isAutoCancelling && (
-                    <button
-                      type="button"
-                      onClick={handlePayNow}
-                      disabled={isPayingNow}
-                      className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
-                    >
-                      {isPayingNow ? (
-                        <>
-                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                          Processing...
-                        </>
-                      ) : (
-                        'Retry Payment'
-                      )}
-                    </button>
-                  )}
                 </div>
-              </div>
-            )}
+              )}
+
+            {order.paymentStatus === 'failed' &&
+              isRazorpayEnabled &&
+              order.status !== 'cancelled' &&
+              order.status !== 'cancel_requested' && (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex gap-3 flex-1">
+                      <svg
+                        className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="text-red-800 dark:text-red-300 text-sm">
+                          Payment failed for this order. Please retry to complete your purchase.
+                        </p>
+                        {timeLeft !== null && timeLeft > 0 && (
+                          <p className="text-red-900 dark:text-red-200 text-sm font-bold mt-2">
+                            Time remaining to pay: {Math.floor(timeLeft / 60000)}:
+                            {String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+                          </p>
+                        )}
+                        {isAutoCancelling && (
+                          <p className="text-red-800 dark:text-red-300 text-sm mt-2">
+                            Time expired. Cancelling order and restoring items to your cart...
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {!isAutoCancelling && (
+                      <button
+                        type="button"
+                        onClick={handlePayNow}
+                        disabled={isPayingNow}
+                        className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
+                      >
+                        {isPayingNow ? (
+                          <>
+                            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          'Retry Payment'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
             {/* Payment Error */}
             {paymentError && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <div className="flex gap-3">
-                  <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <p className="text-red-800 dark:text-red-300 text-sm">{paymentError}</p>
                 </div>
@@ -1609,9 +2059,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           items={order.items.map(item => ({
             productId: item.productId,
             productName: item.productName,
-            productImage: item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url
-              || item.products?.product_images?.[0]?.thumbnail_url
-              || null,
+            productImage:
+              item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url ||
+              item.products?.product_images?.[0]?.thumbnail_url ||
+              null,
           }))}
           orderId={id}
           reviewMap={reviewMap}

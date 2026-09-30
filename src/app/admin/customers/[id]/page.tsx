@@ -35,7 +35,8 @@ function formatOrderStatus(status: string) {
     return_rejected: 'Return Rejected',
     return_picked_up: 'Picked Up',
     refunded: 'Refunded',
-    replaced: 'Replaced' }
+    replaced: 'Replaced',
+  }
   return map[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
@@ -46,7 +47,8 @@ function formatPaymentStatus(status: string) {
     failed: 'Failed',
     refunded: 'Refunded',
     partial_refund: 'Part Refunded',
-    cod: 'COD' }
+    cod: 'COD',
+  }
   return map[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
@@ -64,25 +66,28 @@ function orderStatusBadge(status: string) {
 
 function paymentStatusBadge(status: string) {
   if (status === 'paid') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-  if (status === 'refunded' || status === 'partial_refund') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+  if (status === 'refunded' || status === 'partial_refund')
+    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
   if (status === 'failed') return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
 }
 
 const SEGMENT_LABELS: Record<string, { label: string; color: string }> = {
-  vip:      { label: 'VIP',           color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
-  loyal:    { label: 'Loyal',         color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
-  repeat:   { label: 'Repeat Buyer',  color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  one_time: { label: 'One-time',      color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
-  new:      { label: 'New',           color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
-  at_risk:  { label: 'At Risk',       color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  dormant:  { label: 'Dormant',       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-  b2b:      { label: 'B2B',           color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  lead:     { label: 'Lead',          color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' } }
+  vip: { label: 'VIP', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  loyal: { label: 'Loyal', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  repeat: { label: 'Repeat Buyer', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+  one_time: { label: 'One-time', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
+  new: { label: 'New', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  at_risk: { label: 'At Risk', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
+  dormant: { label: 'Dormant', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  b2b: { label: 'B2B', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
+  lead: { label: 'Lead', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
+}
 
 export default async function CustomerDetailPage({
   params,
-  searchParams }: {
+  searchParams,
+}: {
   params: Promise<{ id: string }>
   searchParams: Promise<{ chat?: string; back?: string }>
 }) {
@@ -110,13 +115,14 @@ export default async function CustomerDetailPage({
   const currentStatus: 'active' | 'inactive' | 'flagged' = customer.is_flagged
     ? 'flagged'
     : customer.is_active
-    ? 'active'
-    : 'inactive'
+      ? 'active'
+      : 'inactive'
 
   const statusBadge = {
     active: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
     inactive: 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300',
-    flagged: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' }
+    flagged: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-full space-y-5">
@@ -142,12 +148,19 @@ export default async function CustomerDetailPage({
                 {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
               </span>
               {customer.user_type === 'business' && (
-                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
-                  customer.bp_approval_status === 'approved' ? 'bg-blue-500/20 text-blue-200'
-                  : customer.bp_approval_status === 'rejected' ? 'bg-red-500/20 text-red-300'
-                  : 'bg-amber-500/20 text-amber-200'
-                }`}>
-                  Business Partner{customer.bp_approval_status !== 'approved' ? ` · ${customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}` : ''}
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                    customer.bp_approval_status === 'approved'
+                      ? 'bg-blue-500/20 text-blue-200'
+                      : customer.bp_approval_status === 'rejected'
+                        ? 'bg-red-500/20 text-red-300'
+                        : 'bg-amber-500/20 text-amber-200'
+                  }`}
+                >
+                  Business Partner
+                  {customer.bp_approval_status !== 'approved'
+                    ? ` · ${customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}`
+                    : ''}
                 </span>
               )}
               {customer.customer_type && customer.customer_type !== 'retail' && (
@@ -157,9 +170,7 @@ export default async function CustomerDetailPage({
               )}
             </div>
             <p className="text-zinc-400 text-sm mt-0.5">{customer.email}</p>
-            {customer.phone && (
-              <p className="text-zinc-500 text-xs mt-0.5">+91 {customer.phone}</p>
-            )}
+            {customer.phone && <p className="text-zinc-500 text-xs mt-0.5">+91 {customer.phone}</p>}
             {customer.segments && customer.segments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {customer.segments.map((seg: string) => {
@@ -178,7 +189,9 @@ export default async function CustomerDetailPage({
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white/5 rounded-xl p-3.5 border border-white/10">
             <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-medium">Total Orders</p>
-            <p className="text-white font-bold text-2xl mt-1">{Number(customer.total_orders).toLocaleString('en-IN')}</p>
+            <p className="text-white font-bold text-2xl mt-1">
+              {Number(customer.total_orders).toLocaleString('en-IN')}
+            </p>
           </div>
           <div className="bg-white/5 rounded-xl p-3.5 border border-white/10">
             <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-medium">Lifetime Spend</p>
@@ -197,7 +210,11 @@ export default async function CustomerDetailPage({
           <div className="bg-white/5 rounded-xl p-3.5 border border-white/10">
             <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-medium">Member Since</p>
             <p className="text-white font-semibold text-sm mt-2 leading-tight">
-              {new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              {new Date(customer.created_at).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              })}
             </p>
           </div>
         </div>
@@ -207,7 +224,11 @@ export default async function CustomerDetailPage({
       {customer.is_flagged && customer.flag_reason && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex gap-3 items-start">
           <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+              clipRule="evenodd"
+            />
           </svg>
           <div>
             <p className="text-sm font-semibold text-red-800 dark:text-red-300">Account Flagged</p>
@@ -220,55 +241,82 @@ export default async function CustomerDetailPage({
       {customer.assigned_coupons && customer.assigned_coupons.length > 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
-            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z" />
+            <svg
+              className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z"
+              />
             </svg>
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              {customer.assigned_coupons.length} Personal Coupon{customer.assigned_coupons.length > 1 ? 's' : ''} Assigned
+              {customer.assigned_coupons.length} Personal Coupon{customer.assigned_coupons.length > 1 ? 's' : ''}{' '}
+              Assigned
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {customer.assigned_coupons.map((c: { id: string; code: string; discount_type: string; discount_value: number; valid_until: string | null; times_used: number; description: string | null }) => (
-              <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg text-xs">
-                <span className="font-mono font-bold text-amber-800 dark:text-amber-200">{c.code}</span>
-                <span className="text-amber-600 dark:text-amber-400">
-                  {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
-                </span>
-                {c.times_used > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">Used</span>
-                )}
-                {c.valid_until && (
-                  <span className="text-amber-500 dark:text-amber-500">
-                    until {new Date(c.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+            {customer.assigned_coupons.map(
+              (c: {
+                id: string
+                code: string
+                discount_type: string
+                discount_value: number
+                valid_until: string | null
+                times_used: number
+                description: string | null
+              }) => (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg text-xs"
+                >
+                  <span className="font-mono font-bold text-amber-800 dark:text-amber-200">{c.code}</span>
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
                   </span>
-                )}
-              </div>
-            ))}
+                  {c.times_used > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">
+                      Used
+                    </span>
+                  )}
+                  {c.valid_until && (
+                    <span className="text-amber-500 dark:text-amber-500">
+                      until {new Date(c.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </span>
+                  )}
+                </div>
+              )
+            )}
           </div>
         </div>
       )}
 
       {/* Main content — 3-col layout on wide screens */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
         {/* Left column: Actions + Business details + Contact */}
         <div className="space-y-5">
           {/* Engagement chips + Health Score — CRM/WhatsApp requires Growth plan */}
           {hasCrm && (
-          <div id="engagement" className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerEngagementChips
-              customerId={customer.id}
-              phone={customer.phone}
-              marketingOptOut={customer.marketing_opt_out}
-              autoOpenChat={resolvedSearchParams.chat === 'true'}
-            />
-            <HealthScoreCard customerId={customer.id} initial={customer.health || null} />
-          </div>
+            <div id="engagement" className="bg-surface-elevated rounded-xl border border-border-default p-5">
+              <CustomerEngagementChips
+                customerId={customer.id}
+                phone={customer.phone}
+                marketingOptOut={customer.marketing_opt_out}
+                autoOpenChat={resolvedSearchParams.chat === 'true'}
+              />
+              <HealthScoreCard customerId={customer.id} initial={customer.health || null} />
+            </div>
           )}
 
           {/* Account Actions */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Account Actions</h2>
+            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
+              Account Actions
+            </h2>
             {canWrite ? (
               <CustomerActionButton
                 customerId={customer.id}
@@ -288,7 +336,11 @@ export default async function CustomerDetailPage({
 
           {/* Internal Notes */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerNotes customerId={customer.id} initialNotes={await listNotes({ userId: customer.id })} canWrite={canWrite} />
+            <CustomerNotes
+              customerId={customer.id}
+              initialNotes={await listNotes({ userId: customer.id })}
+              canWrite={canWrite}
+            />
           </div>
 
           {/* Tasks */}
@@ -299,7 +351,9 @@ export default async function CustomerDetailPage({
           {/* Business details (customer_profiles) */}
           {(customer.company_name || customer.gst_number || customer.credit_limit) && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Business Details</h2>
+              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">
+                Business Details
+              </h2>
               <div className="space-y-3 text-sm">
                 {customer.company_name && (
                   <div>
@@ -316,7 +370,9 @@ export default async function CustomerDetailPage({
                 {customer.credit_limit && (
                   <div>
                     <p className="text-foreground-muted text-xs mb-0.5">Credit Limit</p>
-                    <p className="text-foreground font-semibold">₹{Number(customer.credit_limit).toLocaleString('en-IN')}</p>
+                    <p className="text-foreground font-semibold">
+                      ₹{Number(customer.credit_limit).toLocaleString('en-IN')}
+                    </p>
                   </div>
                 )}
               </div>
@@ -327,13 +383,23 @@ export default async function CustomerDetailPage({
           {customer.user_type === 'business' && customer.bp_company_name && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Business Partner</h2>
-                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
-                  customer.bp_approval_status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                  : customer.bp_approval_status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                  : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                }`}>
-                  {customer.bp_approval_status === 'approved' ? 'Approved' : customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}
+                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
+                  Business Partner
+                </h2>
+                <span
+                  className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                    customer.bp_approval_status === 'approved'
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      : customer.bp_approval_status === 'rejected'
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                  }`}
+                >
+                  {customer.bp_approval_status === 'approved'
+                    ? 'Approved'
+                    : customer.bp_approval_status === 'rejected'
+                      ? 'Rejected'
+                      : 'Pending'}
                 </span>
               </div>
               <div className="space-y-3 text-sm">
@@ -362,13 +428,25 @@ export default async function CustomerDetailPage({
                 {customer.bp_created_at && (
                   <div>
                     <p className="text-foreground-muted text-xs mb-0.5">Applied</p>
-                    <p className="text-foreground">{new Date(customer.bp_created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    <p className="text-foreground">
+                      {new Date(customer.bp_created_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
                 )}
                 {customer.bp_approved_at && customer.bp_approval_status === 'approved' && (
                   <div>
                     <p className="text-foreground-muted text-xs mb-0.5">Approved On</p>
-                    <p className="text-foreground">{new Date(customer.bp_approved_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    <p className="text-foreground">
+                      {new Date(customer.bp_approved_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
                 )}
                 {customer.bp_rejection_note && customer.bp_approval_status === 'rejected' && (
@@ -388,7 +466,6 @@ export default async function CustomerDetailPage({
               </div>
             </div>
           )}
-
         </div>
 
         {/* Right column: Timeline + Orders table (spans 2 cols) */}
@@ -397,7 +474,13 @@ export default async function CustomerDetailPage({
             <CustomerAiSummary customerId={customer.id} canWrite={canWrite} />
           </div>
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerConversations customerId={customer.id} email={customer.email} phone={customer.phone} canWrite={canWrite} isBusiness={customer.user_type === 'business'} />
+            <CustomerConversations
+              customerId={customer.id}
+              email={customer.email}
+              phone={customer.phone}
+              canWrite={canWrite}
+              isBusiness={customer.user_type === 'business'}
+            />
           </div>
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerTimeline customerId={customer.id} />
@@ -419,11 +502,21 @@ export default async function CustomerDetailPage({
                 <table className="min-w-full divide-y divide-border-default">
                   <thead className="bg-surface-secondary">
                     <tr>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Order #</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Date</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Total</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Payment</th>
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Order #
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Total
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Payment
+                      </th>
+                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Status
+                      </th>
                       <th className="px-5 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider"></th>
                     </tr>
                   </thead>
@@ -434,18 +527,26 @@ export default async function CustomerDetailPage({
                           #{order.order_number || order.id.slice(0, 8)}
                         </td>
                         <td className="px-5 py-3.5 text-sm text-foreground-secondary whitespace-nowrap">
-                          {new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {new Date(order.created_at).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
                         </td>
                         <td className="px-5 py-3.5 text-sm font-semibold text-foreground whitespace-nowrap">
                           ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-5 py-3.5">
-                          <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full whitespace-nowrap ${paymentStatusBadge(order.payment_status)}`}>
+                          <span
+                            className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full whitespace-nowrap ${paymentStatusBadge(order.payment_status)}`}
+                          >
                             {formatPaymentStatus(order.payment_status)}
                           </span>
                         </td>
                         <td className="px-5 py-3.5">
-                          <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full whitespace-nowrap ${orderStatusBadge(order.status)}`}>
+                          <span
+                            className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full whitespace-nowrap ${orderStatusBadge(order.status)}`}
+                          >
                             {formatOrderStatus(order.status)}
                           </span>
                         </td>
@@ -471,21 +572,23 @@ export default async function CustomerDetailPage({
 
           {/* Send Mailer */}
           {canMail && (
-          <div id="mailer" className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Send Mailer</h2>
-            <CustomerMailerPanel
-              customerId={customer.id}
-              customerName={fullName}
-              customerEmail={customer.email}
-              segments={customer.segments}
-              healthScore={customer.health?.score ?? null}
-              totalOrders={customer.total_orders}
-              lifetimeValue={customer.lifetime_value}
-              daysSinceLastOrder={customer.days_since_last_order}
-              lastOrderAt={customer.last_order_at}
-              recentOrders={customer.recent_orders ?? []}
-            />
-          </div>
+            <div id="mailer" className="bg-surface-elevated rounded-xl border border-border-default p-5">
+              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
+                Send Mailer
+              </h2>
+              <CustomerMailerPanel
+                customerId={customer.id}
+                customerName={fullName}
+                customerEmail={customer.email}
+                segments={customer.segments}
+                healthScore={customer.health?.score ?? null}
+                totalOrders={customer.total_orders}
+                lifetimeValue={customer.lifetime_value}
+                daysSinceLastOrder={customer.days_since_last_order}
+                lastOrderAt={customer.last_order_at}
+                recentOrders={customer.recent_orders ?? []}
+              />
+            </div>
           )}
         </div>
       </div>

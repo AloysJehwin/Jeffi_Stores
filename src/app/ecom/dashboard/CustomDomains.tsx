@@ -9,7 +9,11 @@ interface Domain {
   verification_token: string | null
 }
 
-export default function CustomDomains({ tenantId, slug, maxDomains }: {
+export default function CustomDomains({
+  tenantId,
+  slug,
+  maxDomains,
+}: {
   tenantId: string
   slug: string
   maxDomains: number
@@ -22,37 +26,58 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
   const [msg, setMsg] = useState<string | null>(null)
 
   async function load() {
-    const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}`).then(r => r.json()).catch(() => null)
-    if (res?.domains) { setDomains(res.domains); if (res.cnameTarget) setCnameTarget(res.cnameTarget) }
+    const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}`)
+      .then(r => r.json())
+      .catch(() => null)
+    if (res?.domains) {
+      setDomains(res.domains)
+      if (res.cnameTarget) setCnameTarget(res.cnameTarget)
+    }
   }
-  useEffect(() => { load() }, [tenantId])
+  useEffect(() => {
+    load()
+  }, [tenantId])
 
   async function addDomain() {
-    setBusy(true); setErr(null); setMsg(null)
+    setBusy(true)
+    setErr(null)
+    setMsg(null)
     const res = await fetch('/api/ecom/domains', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tenantId, domain: newDomain }),
     })
     const data = await res.json()
-    if (!res.ok) { setErr(data.error); setBusy(false); return }
-    setNewDomain(''); setMsg(data.instructions)
-    await load(); setBusy(false)
+    if (!res.ok) {
+      setErr(data.error)
+      setBusy(false)
+      return
+    }
+    setNewDomain('')
+    setMsg(data.instructions)
+    await load()
+    setBusy(false)
   }
 
   async function verify(id: string) {
-    setBusy(true); setErr(null); setMsg(null)
+    setBusy(true)
+    setErr(null)
+    setMsg(null)
     const res = await fetch(`/api/ecom/domains/${id}/verify`, { method: 'POST' })
     const data = await res.json()
     if (!res.ok) setErr(data.error)
     else setMsg(data.message)
-    await load(); setBusy(false)
+    await load()
+    setBusy(false)
   }
 
   if (maxDomains === 0) {
     return (
       <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest mb-2">Custom domain</div>
-        <p className="text-sm text-foreground-secondary">Available on Pro plan and above. Upgrade to connect your own domain.</p>
+        <p className="text-sm text-foreground-secondary">
+          Available on Pro plan and above. Upgrade to connect your own domain.
+        </p>
       </div>
     )
   }
@@ -68,18 +93,25 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
     <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs text-foreground-secondary uppercase tracking-widest">Custom domains</div>
-        <span className="text-xs text-foreground-secondary">{domains.length}/{maxDomains} used</span>
+        <span className="text-xs text-foreground-secondary">
+          {domains.length}/{maxDomains} used
+        </span>
       </div>
 
-      {domains.map((d) => (
+      {domains.map(d => (
         <div key={d.id} className="flex items-center justify-between py-2.5 border-b border-border-default/60 text-sm">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-mono text-foreground truncate">{d.domain}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor[d.status] ?? ''}`}>{d.status}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor[d.status] ?? ''}`}>
+              {d.status}
+            </span>
           </div>
           {d.status !== 'verified' && (
-            <button onClick={() => verify(d.id)} disabled={busy}
-              className="text-xs px-3 py-1 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50">
+            <button
+              onClick={() => verify(d.id)}
+              disabled={busy}
+              className="text-xs px-3 py-1 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+            >
               Verify
             </button>
           )}
@@ -89,10 +121,17 @@ export default function CustomDomains({ tenantId, slug, maxDomains }: {
       {domains.length < maxDomains && (
         <div className="mt-4 space-y-2">
           <div className="flex gap-2">
-            <input value={newDomain} onChange={(e) => setNewDomain(e.target.value)} placeholder="shop.yourbrand.com"
-              className="flex-1 rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500" />
-            <button onClick={addDomain} disabled={busy || !newDomain}
-              className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium">
+            <input
+              value={newDomain}
+              onChange={e => setNewDomain(e.target.value)}
+              placeholder="shop.yourbrand.com"
+              className="flex-1 rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
+            <button
+              onClick={addDomain}
+              disabled={busy || !newDomain}
+              className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium"
+            >
               Add
             </button>
           </div>

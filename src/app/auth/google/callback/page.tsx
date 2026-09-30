@@ -39,7 +39,9 @@ export default function GoogleCallbackPage() {
         // only allow same-origin paths
         if (candidate.startsWith('/')) returnTo = candidate
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Redirect back to the originating page with the hash so its own
     // hash-fallback handler can pick up the token and complete sign-in.
@@ -51,7 +53,11 @@ export default function GoogleCallbackPage() {
       <div className="text-center">
         <div className="flex items-center justify-center gap-1.5 mb-4">
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-2.5 h-2.5 bg-accent-500 rounded-full animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />
+            <div
+              key={i}
+              className="w-2.5 h-2.5 bg-accent-500 rounded-full animate-pulse"
+              style={{ animationDelay: `${i * 150}ms` }}
+            />
           ))}
         </div>
         <p className="text-foreground-secondary text-sm">Completing sign-in…</p>

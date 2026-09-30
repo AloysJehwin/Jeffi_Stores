@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 
-export default function GoogleSheetDisconnect({ onDone }: {
+export default function GoogleSheetDisconnect({
+  onDone,
+}: {
   onDone: (result: { kind: 'ok' | 'err'; text: string }) => void
 }) {
   const canWrite = useCanWrite('products')
@@ -15,7 +17,8 @@ export default function GoogleSheetDisconnect({ onDone }: {
   const disconnect = async () => {
     const ok = await showConfirm({
       title: 'Disconnect Google Sheet?',
-      message: 'Syncing stops. Products synced from the sheet stay in your store and become manually managed, so a sheet you connect later will not remove them.',
+      message:
+        'Syncing stops. Products synced from the sheet stay in your store and become manually managed, so a sheet you connect later will not remove them.',
       confirmText: 'Disconnect',
       cancelText: 'Cancel',
       type: 'warning',
@@ -25,9 +28,14 @@ export default function GoogleSheetDisconnect({ onDone }: {
     try {
       const res = await fetch('/api/admin/data-source/google/disconnect', { method: 'POST', credentials: 'include' })
       const body = await res.json().catch(() => ({}))
-      onDone(res.ok
-        ? { kind: 'ok', text: `Google Sheet disconnected. ${body.released ?? 0} synced product(s) are now managed manually.` }
-        : { kind: 'err', text: body.error || `Disconnect failed (${res.status})` })
+      onDone(
+        res.ok
+          ? {
+              kind: 'ok',
+              text: `Google Sheet disconnected. ${body.released ?? 0} synced product(s) are now managed manually.`,
+            }
+          : { kind: 'err', text: body.error || `Disconnect failed (${res.status})` }
+      )
     } finally {
       setWorking(false)
     }

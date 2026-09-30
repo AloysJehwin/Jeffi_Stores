@@ -11,9 +11,9 @@ export default async function DataSourcePage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Data Source</h1>
         <p className="text-sm text-foreground-secondary mt-1">
-          Bulk-import products from a spreadsheet. Download the template, fill in every product,
-          variant and sub-variant, add image URLs, and upload. Rows are created or updated by SKU
-          through the same publish path the product editor uses.
+          Bulk-import products from a spreadsheet. Download the template, fill in every product, variant and
+          sub-variant, add image URLs, and upload. Rows are created or updated by SKU through the same publish path the
+          product editor uses.
         </p>
       </div>
       <DataSourceClient initialGsheet={initialGsheet} />

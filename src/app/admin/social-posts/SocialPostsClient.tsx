@@ -55,13 +55,20 @@ const STATUS_COLORS: Record<string, string> = {
   failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 }
 
-const inputCls = 'w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
+const inputCls =
+  'w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 function fmtDate(s: string) {
   if (!s) return ''
   const d = new Date(s)
-  return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function SocialPostsClient({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
@@ -90,11 +97,14 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
   const [rawPrimaryImage, setRawPrimaryImage] = useState('')
 
   useEffect(() => {
-    if (!productId) { setSelectedProduct(null); return }
+    if (!productId) {
+      setSelectedProduct(null)
+      return
+    }
     let cancelled = false
     setProductLoading(true)
     fetch(`/api/admin/products/${productId}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(p => {
         if (cancelled || !p || p.error) return
         setSelectedProduct(p)
@@ -104,8 +114,12 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
         setCaption(c => withProductLink(c.trim() ? c : p.name, p.slug))
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setProductLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setProductLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [productId])
 
   // The ad card is the same artwork the product list offers for download, rendered server-side
@@ -115,15 +129,19 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
     let cancelled = false
     setAdCardLoading(true)
     fetch(`/api/admin/products/${productId}/ad-image`, { method: 'POST', credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(d => {
         if (cancelled || !d?.url) return
         setAdCardUrl(d.url)
         setImageUrl(d.url)
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setAdCardLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setAdCardLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [productId, useAdCard])
 
   function toggleAdCard(on: boolean) {
@@ -149,11 +167,22 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
     }
   }, [showToast])
 
-  useEffect(() => { fetchPosts() }, [fetchPosts])
+  useEffect(() => {
+    fetchPosts()
+  }, [fetchPosts])
 
   function resetComposer() {
-    setPlatform('fb'); setCaption(''); setProductId(''); setProductName(''); setImageUrl(''); setUseAllImages(false); setVideoUrl(''); setScheduledAt('')
-    setUseAdCard(true); setAdCardUrl(''); setRawPrimaryImage('')
+    setPlatform('fb')
+    setCaption('')
+    setProductId('')
+    setProductName('')
+    setImageUrl('')
+    setUseAllImages(false)
+    setVideoUrl('')
+    setScheduledAt('')
+    setUseAdCard(true)
+    setAdCardUrl('')
+    setRawPrimaryImage('')
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -163,12 +192,14 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
       // The ad card is the post: mixing raw photos in behind it would bury the card at slide 1
       // of a carousel, so extras are only sent when posting the raw images.
       const allProductImages = (selectedProduct?.product_images || []).map(i => i.image_url).filter(Boolean)
-      const extraImages = !useAdCard && useAllImages && allProductImages.length >= 2
-        ? allProductImages.filter(u => u !== imageUrl.trim())
-        : null
+      const extraImages =
+        !useAdCard && useAllImages && allProductImages.length >= 2
+          ? allProductImages.filter(u => u !== imageUrl.trim())
+          : null
 
       const res = await fetch('/api/admin/social-posts', {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           platform,
@@ -181,7 +212,10 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
         }),
       })
       const data = await res.json()
-      if (!res.ok) { showToast(data.error || 'Failed to queue post', 'error'); return }
+      if (!res.ok) {
+        showToast(data.error || 'Failed to queue post', 'error')
+        return
+      }
       showToast('Post queued', 'success')
       resetComposer()
       setShowComposer(false)
@@ -198,8 +232,11 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
     try {
       const res = await fetch(`/api/admin/social-posts/${post.id}/publish`, { method: 'POST', credentials: 'include' })
       const data = await res.json()
-      if (!res.ok || !data.ok) { showToast(data.error || 'Publish failed', 'error') }
-      else { showToast('Posted', 'success') }
+      if (!res.ok || !data.ok) {
+        showToast(data.error || 'Publish failed', 'error')
+      } else {
+        showToast('Posted', 'success')
+      }
       fetchPosts()
     } catch {
       showToast('Publish failed', 'error')
@@ -216,8 +253,10 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
           <p className="text-foreground-secondary mt-1 text-sm">Scheduled and posted Facebook / Instagram content</p>
         </div>
         {canWrite && (
-          <button onClick={() => setShowComposer(v => !v)}
-            className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors">
+          <button
+            onClick={() => setShowComposer(v => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -227,7 +266,10 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
       </div>
 
       {canWrite && showComposer && (
-        <form onSubmit={handleCreate} className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
+        <form
+          onSubmit={handleCreate}
+          className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3"
+        >
           <h2 className="text-sm font-semibold text-foreground">New Post</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -248,15 +290,26 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
               <AdminTypeahead
                 type="products"
                 value={productName}
-                onChange={v => { setProductName(v); if (!v) setProductId('') }}
-                onSelect={item => { setProductId(item.id); setProductName(item.label) }}
+                onChange={v => {
+                  setProductName(v)
+                  if (!v) setProductId('')
+                }}
+                onSelect={item => {
+                  setProductId(item.id)
+                  setProductName(item.label)
+                }}
                 placeholder="Search by name or SKU…"
                 inputClassName={inputCls + ' pr-9'}
               />
             </div>
             <div>
               <label className={labelCls}>Schedule (optional)</label>
-              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} className="w-full [&>button]:py-1.5" placeholder="Select date & time" />
+              <DateTimePicker
+                value={scheduledAt}
+                onChange={setScheduledAt}
+                className="w-full [&>button]:py-1.5"
+                placeholder="Select date & time"
+              />
             </div>
           </div>
 
@@ -264,33 +317,41 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
             <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
               {productLoading ? (
                 <div className="text-xs text-foreground-muted">Loading product…</div>
-              ) : selectedProduct && (
-                <>
-                  {(() => {
-                    const img = (selectedProduct.product_images || []).find(i => i.is_primary) || selectedProduct.product_images?.[0]
-                    return img?.thumbnail_url || img?.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img.thumbnail_url || img.image_url} alt="" className="w-10 h-10 rounded-md object-cover border border-border-default shrink-0" />
-                    ) : null
-                  })()}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground truncate">{selectedProduct.name}</div>
-                    <div className="text-xs text-foreground-muted truncate">
-                      {selectedProduct.base_price != null ? `₹${selectedProduct.base_price}` : ''}
-                      {selectedProduct.stock_status ? ` · ${selectedProduct.stock_status}` : ''}
+              ) : (
+                selectedProduct && (
+                  <>
+                    {(() => {
+                      const img =
+                        (selectedProduct.product_images || []).find(i => i.is_primary) ||
+                        selectedProduct.product_images?.[0]
+                      return img?.thumbnail_url || img?.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={img.thumbnail_url || img.image_url}
+                          alt=""
+                          className="w-10 h-10 rounded-md object-cover border border-border-default shrink-0"
+                        />
+                      ) : null
+                    })()}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-foreground truncate">{selectedProduct.name}</div>
+                      <div className="text-xs text-foreground-muted truncate">
+                        {selectedProduct.base_price != null ? `₹${selectedProduct.base_price}` : ''}
+                        {selectedProduct.stock_status ? ` · ${selectedProduct.stock_status}` : ''}
+                      </div>
                     </div>
-                  </div>
-                  {platform !== 'ig_reel' && !useAdCard && (selectedProduct.product_images?.length ?? 0) >= 2 && (
-                    <div className="shrink-0">
-                      <Toggle
-                        size="sm"
-                        checked={useAllImages}
-                        onChange={setUseAllImages}
-                        label={`Use all ${selectedProduct.product_images!.length} images (carousel)`}
-                      />
-                    </div>
-                  )}
-                </>
+                    {platform !== 'ig_reel' && !useAdCard && (selectedProduct.product_images?.length ?? 0) >= 2 && (
+                      <div className="shrink-0">
+                        <Toggle
+                          size="sm"
+                          checked={useAllImages}
+                          onChange={setUseAllImages}
+                          label={`Use all ${selectedProduct.product_images!.length} images (carousel)`}
+                        />
+                      </div>
+                    )}
+                  </>
+                )
               )}
             </div>
           )}
@@ -299,7 +360,11 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
             <div className="flex items-start gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
               {useAdCard && adCardUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={adCardUrl} alt="" className="w-10 h-[71px] rounded-md object-cover border border-border-default shrink-0" />
+                <img
+                  src={adCardUrl}
+                  alt=""
+                  className="w-10 h-[71px] rounded-md object-cover border border-border-default shrink-0"
+                />
               )}
               <div className="min-w-0 flex-1">
                 <Toggle checked={useAdCard} onChange={toggleAdCard} label="Post the ad card" />
@@ -321,29 +386,64 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
               value={caption}
               onChange={setCaption}
               scope="campaigns:write"
-              context={selectedProduct ? `Product: ${selectedProduct.name}${selectedProduct.short_description ? ' — ' + selectedProduct.short_description : ''}. Platform: ${PLATFORM_LABELS[platform]}.` : `Platform: ${PLATFORM_LABELS[platform]}.`}
+              context={
+                selectedProduct
+                  ? `Product: ${selectedProduct.name}${selectedProduct.short_description ? ' — ' + selectedProduct.short_description : ''}. Platform: ${PLATFORM_LABELS[platform]}.`
+                  : `Platform: ${PLATFORM_LABELS[platform]}.`
+              }
               multiline
             >
-              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} className={inputCls + ' resize-none pr-8'} placeholder="Leave blank to auto-generate from the product…" />
+              <textarea
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+                rows={3}
+                className={inputCls + ' resize-none pr-8'}
+                placeholder="Leave blank to auto-generate from the product…"
+              />
             </AIEnrichButton>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Image URL {platform === 'ig' && <span className="text-red-500">*</span>}</label>
-              <input type="text" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+              <label className={labelCls}>
+                Image URL {platform === 'ig' && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="text"
+                value={imageUrl}
+                onChange={e => setImageUrl(e.target.value)}
+                className={inputCls}
+                placeholder="https://…"
+              />
             </div>
             <div>
-              <label className={labelCls}>Video URL {platform === 'ig_reel' && <span className="text-red-500">*</span>}</label>
-              <input type="text" value={videoUrl} onChange={e => setVideoUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+              <label className={labelCls}>
+                Video URL {platform === 'ig_reel' && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="text"
+                value={videoUrl}
+                onChange={e => setVideoUrl(e.target.value)}
+                className={inputCls}
+                placeholder="https://…"
+              />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button type="submit" disabled={submitting}
-              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+            >
               {submitting ? 'Queuing…' : 'Queue Post'}
             </button>
-            <button type="button" onClick={() => { resetComposer(); setShowComposer(false) }}
-              className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                resetComposer()
+                setShowComposer(false)
+              }}
+              className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
               Cancel
             </button>
           </div>
@@ -354,7 +454,11 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
         {loading ? (
           <div className="p-4 space-y-2">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-2 py-1 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+              <div
+                key={i}
+                className="flex items-center gap-3 px-2 py-1 animate-pulse"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
                 <div className="h-4 w-20 bg-surface-secondary rounded" />
                 <div className="h-4 flex-1 bg-surface-secondary rounded" />
                 <div className="h-4 w-16 bg-surface-secondary rounded" />
@@ -380,27 +484,41 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
               </thead>
               <tbody>
                 {posts.map(post => (
-                  <tr key={post.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors">
+                  <tr
+                    key={post.id}
+                    className="border-b border-border-default hover:bg-surface-secondary transition-colors"
+                  >
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PLATFORM_COLORS[post.platform] || ''}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${PLATFORM_COLORS[post.platform] || ''}`}
+                      >
                         {PLATFORM_LABELS[post.platform] || post.platform}
                       </span>
                     </td>
                     <td className="px-4 py-3 max-w-xs">
-                      <div className="text-foreground truncate">{post.caption || <span className="text-foreground-muted">—</span>}</div>
+                      <div className="text-foreground truncate">
+                        {post.caption || <span className="text-foreground-muted">—</span>}
+                      </div>
                       {post.last_error && <div className="text-xs text-red-500 truncate mt-0.5">{post.last_error}</div>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[post.status] || ''}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[post.status] || ''}`}
+                      >
                         {post.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">{fmtDate(post.scheduled_at)}</td>
+                    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
+                      {fmtDate(post.scheduled_at)}
+                    </td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-muted">{post.posted_id || '—'}</td>
                     <td className="px-4 py-3 text-right">
                       {canWrite && (post.status === 'pending' || post.status === 'failed') && (
-                        <button onClick={() => postNow(post)} disabled={publishingId === post.id}
-                          className="text-xs font-semibold text-secondary-600 dark:text-secondary-300 hover:text-secondary-800 dark:hover:text-secondary-100 disabled:opacity-50 transition-colors">
+                        <button
+                          onClick={() => postNow(post)}
+                          disabled={publishingId === post.id}
+                          className="text-xs font-semibold text-secondary-600 dark:text-secondary-300 hover:text-secondary-800 dark:hover:text-secondary-100 disabled:opacity-50 transition-colors"
+                        >
                           {publishingId === post.id ? 'Posting…' : 'Post now'}
                         </button>
                       )}

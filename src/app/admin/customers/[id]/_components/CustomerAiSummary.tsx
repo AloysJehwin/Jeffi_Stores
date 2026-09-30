@@ -20,7 +20,13 @@ function relTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export default function CustomerAiSummary({ customerId, canWrite: canWriteProp = false }: { customerId: string; canWrite?: boolean }) {
+export default function CustomerAiSummary({
+  customerId,
+  canWrite: canWriteProp = false,
+}: {
+  customerId: string
+  canWrite?: boolean
+}) {
   const canUseAi = useCanUseAi('customers:write')
   const canGenerate = canWriteProp && canUseAi
   const [data, setData] = useState<AiSummary | null>(null)
@@ -44,14 +50,19 @@ export default function CustomerAiSummary({ customerId, canWrite: canWriteProp =
         if (alive) setLoading(false)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [customerId])
 
   async function refresh() {
     setRefreshing(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/customers/${customerId}/ai-summary`, { method: 'POST', credentials: 'include' })
+      const res = await fetch(`/api/admin/customers/${customerId}/ai-summary`, {
+        method: 'POST',
+        credentials: 'include',
+      })
       if (res.status === 503) {
         setError('AI profile generation is not available')
         return
@@ -101,7 +112,9 @@ export default function CustomerAiSummary({ customerId, canWrite: canWriteProp =
           </div>
         </div>
       ) : (
-        <p className="text-sm text-foreground-muted">No profile yet{canGenerate ? '. Use Generate to create one from this customer’s history.' : '.'}</p>
+        <p className="text-sm text-foreground-muted">
+          No profile yet{canGenerate ? '. Use Generate to create one from this customer’s history.' : '.'}
+        </p>
       )}
 
       {error && <p className="text-xs text-red-600 dark:text-red-400 mt-3">{error}</p>}

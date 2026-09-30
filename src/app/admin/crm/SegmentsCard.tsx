@@ -49,11 +49,17 @@ function CustomerRow({ c, large }: { c: Customer; large?: boolean }) {
         </p>
       </div>
       {c.health_score != null && (
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-          c.health_score >= 60 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-          : c.health_score >= 40 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
-          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-        }`}>{c.health_score}</span>
+        <span
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+            c.health_score >= 60
+              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+              : c.health_score >= 40
+                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
+                : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+          }`}
+        >
+          {c.health_score}
+        </span>
       )}
     </Link>
   )
@@ -74,18 +80,21 @@ function SegmentModal({ segment, onClose }: ModalProps) {
     setLoading(true)
     fetch(`/api/admin/customers?segment=${segment.key}&limit=50`, { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setCustomers(d.customers || []); setLoaded(true) })
-      .catch(() => { setCustomers([]); setLoaded(true) })
+      .then(d => {
+        setCustomers(d.customers || [])
+        setLoaded(true)
+      })
+      .catch(() => {
+        setCustomers([])
+        setLoaded(true)
+      })
       .finally(() => setLoading(false))
   }
 
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
         className="relative bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col overflow-hidden"
@@ -94,7 +103,9 @@ function SegmentModal({ segment, onClose }: ModalProps) {
         <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
           <div>
             <h2 className="text-base font-semibold text-foreground">{segment.label}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">{segment.count.toLocaleString('en-IN')} customers in segment</p>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {segment.count.toLocaleString('en-IN')} customers in segment
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -122,32 +133,34 @@ function SegmentModal({ segment, onClose }: ModalProps) {
               {loaded && customers?.length === 0 && (
                 <p className="text-sm text-foreground-muted py-4">No customers found.</p>
               )}
-              {customers?.map(c => <CustomerRow key={c.id} c={c} large />)}
+              {customers?.map(c => (
+                <CustomerRow key={c.id} c={c} large />
+              ))}
             </div>
           </div>
 
           {/* Right: mailer panel */}
           {canMail && (
-          <div className="flex flex-col flex-1 min-w-0">
-            <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
-              <Link
-                href={ap(`/admin/customers?segment=${segment.key}`)}
-                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                onClick={onClose}
-              >
-                View all in Customers →
-              </Link>
+            <div className="flex flex-col flex-1 min-w-0">
+              <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
+                <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
+                <Link
+                  href={ap(`/admin/customers?segment=${segment.key}`)}
+                  className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                  onClick={onClose}
+                >
+                  View all in Customers →
+                </Link>
+              </div>
+              <div className="overflow-y-auto flex-1 px-6 pb-6">
+                <CrmMailerPanel
+                  segmentKey={segment.key}
+                  segmentLabel={segment.label}
+                  recipientCount={segment.count}
+                  onClose={onClose}
+                />
+              </div>
             </div>
-            <div className="overflow-y-auto flex-1 px-6 pb-6">
-              <CrmMailerPanel
-                segmentKey={segment.key}
-                segmentLabel={segment.label}
-                recipientCount={segment.count}
-                onClose={onClose}
-              />
-            </div>
-          </div>
           )}
         </div>
       </div>
@@ -156,21 +169,60 @@ function SegmentModal({ segment, onClose }: ModalProps) {
   )
 }
 
-export default function SegmentsCard({ segments }: {
-  segments: Record<string, number>
-}) {
+export default function SegmentsCard({ segments }: { segments: Record<string, number> }) {
   const [activeSegment, setActiveSegment] = useState<SegmentMeta | null>(null)
 
   const SEGMENT_META: { key: string; label: string; color: string }[] = [
-    { key: 'vip',      label: 'VIP',        color: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700' },
-    { key: 'loyal',    label: 'Loyal',      color: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700' },
-    { key: 'b2b',      label: 'B2B',        color: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700' },
-    { key: 'repeat',   label: 'Repeat',     color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700' },
-    { key: 'new',      label: 'New (<30d)', color: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700' },
-    { key: 'at_risk',  label: 'At Risk',    color: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700' },
-    { key: 'dormant',  label: 'Dormant',    color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700' },
-    { key: 'one_time', label: 'One-Time',   color: 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700' },
-    { key: 'lead',     label: 'Lead',       color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700' },
+    {
+      key: 'vip',
+      label: 'VIP',
+      color:
+        'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+    },
+    {
+      key: 'loyal',
+      label: 'Loyal',
+      color:
+        'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+    },
+    {
+      key: 'b2b',
+      label: 'B2B',
+      color:
+        'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
+    },
+    {
+      key: 'repeat',
+      label: 'Repeat',
+      color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+    },
+    {
+      key: 'new',
+      label: 'New (<30d)',
+      color:
+        'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
+    },
+    {
+      key: 'at_risk',
+      label: 'At Risk',
+      color:
+        'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
+    },
+    {
+      key: 'dormant',
+      label: 'Dormant',
+      color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+    },
+    {
+      key: 'one_time',
+      label: 'One-Time',
+      color: 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
+    },
+    {
+      key: 'lead',
+      label: 'Lead',
+      color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700',
+    },
   ]
 
   return (
@@ -184,12 +236,14 @@ export default function SegmentsCard({ segments }: {
               <button
                 key={key}
                 type="button"
-                onClick={() => setActiveSegment({
-                  key,
-                  label,
-                  count,
-                  color,
-                })}
+                onClick={() =>
+                  setActiveSegment({
+                    key,
+                    label,
+                    count,
+                    color,
+                  })
+                }
                 className={`group rounded-xl border px-4 py-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${color}`}
               >
                 <div className="flex items-baseline justify-between gap-2">
@@ -202,12 +256,7 @@ export default function SegmentsCard({ segments }: {
         </div>
       </div>
 
-      {activeSegment && (
-        <SegmentModal
-          segment={activeSegment}
-          onClose={() => setActiveSegment(null)}
-        />
-      )}
+      {activeSegment && <SegmentModal segment={activeSegment} onClose={() => setActiveSegment(null)} />}
     </>
   )
 }

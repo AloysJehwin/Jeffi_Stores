@@ -16,15 +16,7 @@ function discountPct(price: number, mrp: number | null): number | null {
   return Math.round(((mrp - price) / mrp) * 100)
 }
 
-function View({
-  children,
-  reduced,
-  focusKey,
-}: {
-  children: ReactNode
-  reduced: boolean
-  focusKey: string
-}) {
+function View({ children, reduced, focusKey }: { children: ReactNode; reduced: boolean; focusKey: string }) {
   if (reduced) {
     return <div className="h-full w-full flex flex-col overflow-hidden">{children}</div>
   }
@@ -45,7 +37,7 @@ function View({
 function Stars({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((i) => (
+      {[1, 2, 3, 4, 5].map(i => (
         <svg
           key={i}
           className={`w-3 h-3 ${i <= Math.round(rating) ? 'text-amber-400' : 'text-border-default'}`}
@@ -76,7 +68,11 @@ function StoreHeader({ cartCount }: { cartCount: number }) {
       </div>
       <div className="relative flex items-center gap-1.5 text-foreground">
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+          />
         </svg>
         <span className="text-sm font-bold">{cartCount}</span>
       </div>
@@ -96,7 +92,7 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
         <span className="text-xs text-foreground-muted">{products.length} items</span>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 min-h-0 content-start">
-        {visible.map((p) => {
+        {visible.map(p => {
           const off = discountPct(p.price, p.mrp)
           return (
             <button
@@ -113,7 +109,9 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
                 )}
               </div>
               <div className="p-3.5 flex flex-col gap-1.5 flex-1">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted">{p.category}</span>
+                <span className="text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
+                  {p.category}
+                </span>
                 <span className="text-sm font-semibold text-foreground leading-snug line-clamp-1">{p.name}</span>
                 <div className="flex items-center gap-1">
                   <Stars rating={p.rating} />
@@ -121,9 +119,7 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
                 </div>
                 <div className="flex items-baseline gap-2 mt-auto pt-1">
                   <span className="text-base font-black text-foreground">{formatRs(p.price)}</span>
-                  {p.mrp && (
-                    <span className="text-[11px] text-foreground-muted line-through">{formatRs(p.mrp)}</span>
-                  )}
+                  {p.mrp && <span className="text-[11px] text-foreground-muted line-through">{formatRs(p.mrp)}</span>}
                 </div>
               </div>
             </button>
@@ -146,13 +142,13 @@ function ProductView({ product, onAdd }: { product: Product; onAdd: () => void }
         <h2 className="text-2xl font-black tracking-tight text-foreground leading-tight">{product.name}</h2>
         <div className="flex items-center gap-2">
           <Stars rating={product.rating} />
-          <span className="text-xs text-foreground-muted">{product.rating} · {product.reviews} reviews</span>
+          <span className="text-xs text-foreground-muted">
+            {product.rating} · {product.reviews} reviews
+          </span>
         </div>
         <div className="flex items-baseline gap-3">
           <span className="text-3xl font-black text-foreground">{formatRs(product.price)}</span>
-          {product.mrp && (
-            <span className="text-base text-foreground-muted line-through">{formatRs(product.mrp)}</span>
-          )}
+          {product.mrp && <span className="text-base text-foreground-muted line-through">{formatRs(product.mrp)}</span>}
           {off !== null && <span className="ecom-accent-text text-sm font-bold">{off}% off</span>}
         </div>
         <p className="text-sm text-foreground-secondary leading-relaxed">
@@ -182,7 +178,7 @@ function CartView({
     <div className="flex-1 min-h-0 flex flex-col">
       <h2 className="text-lg font-black tracking-tight text-foreground mb-3 flex-shrink-0">Your cart</h2>
       <div className="flex-1 min-h-0 flex flex-col gap-3">
-        {lines.map((line) => (
+        {lines.map(line => (
           <div
             key={line.productId}
             className="flex items-center gap-3 bg-surface rounded-xl border border-border-default p-3"
@@ -271,19 +267,18 @@ export default function StorefrontSurface() {
   const focus = chapter?.focus ?? 'catalogue'
 
   const openProduct =
-    (world.openProductId ? world.products.find((p) => p.id === world.openProductId) : null) ??
-    world.products[0]
+    (world.openProductId ? world.products.find(p => p.id === world.openProductId) : null) ?? world.products[0]
 
   const rawLines =
     world.cart.length > 0
       ? world.cart
       : [{ productId: openProduct.id, name: openProduct.name, qty: 1, price: openProduct.price }]
-  const cartLines = rawLines.map((l) => ({
+  const cartLines = rawLines.map(l => ({
     productId: l.productId,
     name: l.name,
     qty: l.qty,
     price: l.price,
-    category: world.products.find((p) => p.id === l.productId)?.category ?? openProduct.category,
+    category: world.products.find(p => p.id === l.productId)?.category ?? openProduct.category,
   }))
   const cartTotal = cartLines.reduce((s, l) => s + l.price * l.qty, 0)
   const checkoutTotal = world.order ? world.order.total : cartTotal
@@ -299,11 +294,7 @@ export default function StorefrontSurface() {
             ) : focus === 'cart' ? (
               <CartView lines={cartLines} total={cartTotal} onCheckout={actions.pay} />
             ) : focus === 'checkout' ? (
-              <CheckoutView
-                total={checkoutTotal}
-                order={world.order}
-                onPay={actions.pay}
-              />
+              <CheckoutView total={checkoutTotal} order={world.order} onPay={actions.pay} />
             ) : (
               <CatalogueView products={world.products} onOpen={actions.openProduct} />
             )}

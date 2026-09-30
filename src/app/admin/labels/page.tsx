@@ -1,4 +1,4 @@
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -10,7 +10,8 @@ import { getAllCategories } from '@/lib/queries'
 import { adminCookieName } from '@/lib/admin-cookie'
 
 export const metadata = {
-  title: 'Label Generator — Jeffi Admin' }
+  title: 'Label Generator — Jeffi Admin',
+}
 
 export default async function LabelsPage() {
   const cookieStore = await cookies()
@@ -29,13 +30,15 @@ export default async function LabelsPage() {
     redirect(ap('/admin/dashboard', host))
   }
 
-  const categories = await getAllCategories() || []
+  const categories = (await getAllCategories()) || []
 
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Label Generator</h1>
-        <p className="text-foreground-secondary mt-1">Generate and download product labels with barcodes and QR codes</p>
+        <p className="text-foreground-secondary mt-1">
+          Generate and download product labels with barcodes and QR codes
+        </p>
       </div>
       <LabelsClient labelSizes={LABEL_SIZES} categories={categories} />
     </div>

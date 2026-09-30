@@ -38,9 +38,13 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
   ;(async () => {
     try {
       const product = await queryOne<{
-        name: string; description: string | null; sku: string | null
-        category_name: string | null; brand_name: string | null
-        material: string | null; size: string | null
+        name: string
+        description: string | null
+        sku: string | null
+        category_name: string | null
+        brand_name: string | null
+        material: string | null
+        size: string | null
       }>(
         `SELECT p.name, p.description, p.sku, p.material, p.size,
                 c.name AS category_name, b.name AS brand_name
@@ -60,10 +64,15 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
         product.description ? `Existing description: ${product.description}` : 'Existing description: (empty)',
         product.material ? `Material: ${product.material}` : null,
         product.size ? `Size: ${product.size}` : null,
-      ].filter(Boolean).join('\n')
+      ]
+        .filter(Boolean)
+        .join('\n')
 
       const r = await aiChat({
-        cacheNamespace, modelHint: 'copy', jsonMode: true, temperature: 0.3,
+        cacheNamespace,
+        modelHint: 'copy',
+        jsonMode: true,
+        temperature: 0.3,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
@@ -71,10 +80,20 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
       })
       const raw = r.content
       let obj: Record<string, unknown>
-      try { obj = JSON.parse(raw) } catch { const m = raw.match(/\{[\s\S]*\}/); if (!m) return; obj = JSON.parse(m[0]) }
+      try {
+        obj = JSON.parse(raw)
+      } catch {
+        const m = raw.match(/\{[\s\S]*\}/)
+        if (!m) return
+        obj = JSON.parse(m[0])
+      }
       const desc = String(obj.ai_description || '').trim()
-      const cleanArr = (v: unknown, max = 40, n = 15) => !Array.isArray(v) ? [] :
-        [...new Set((v as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= max))].slice(0, n)
+      const cleanArr = (v: unknown, max = 40, n = 15) =>
+        !Array.isArray(v)
+          ? []
+          : [
+              ...new Set((v as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= max)),
+            ].slice(0, n)
       const use_cases = cleanArr(obj.ai_use_cases, 50, 12)
       if (!desc || desc.length < 20 || use_cases.length < 2) return
 
@@ -85,13 +104,26 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
             ai_application, ai_product_type, ai_features, ai_search_tags,
             model, status)
          VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'proposed')`,
-        [productId, product.name, product.description || null,
-         desc, use_cases, cleanArr(obj.ai_keywords, 50, 15),
-         String(obj.ai_who_uses_it || '').trim().slice(0, 300),
-         String(obj.ai_application || '').trim().slice(0, 500),
-         String(obj.ai_product_type || '').trim().slice(0, 100),
-         cleanArr(obj.ai_features, 100, 10), cleanArr(obj.ai_search_tags, 50, 20),
-         r.model]
+        [
+          productId,
+          product.name,
+          product.description || null,
+          desc,
+          use_cases,
+          cleanArr(obj.ai_keywords, 50, 15),
+          String(obj.ai_who_uses_it || '')
+            .trim()
+            .slice(0, 300),
+          String(obj.ai_application || '')
+            .trim()
+            .slice(0, 500),
+          String(obj.ai_product_type || '')
+            .trim()
+            .slice(0, 100),
+          cleanArr(obj.ai_features, 100, 10),
+          cleanArr(obj.ai_search_tags, 50, 20),
+          r.model,
+        ]
       )
     } catch {
       void 0
@@ -107,36 +139,41 @@ async function updateProduct(productId: string, formData: FormData) {
   const categoryId = formData.get('category_id') as string
   const brandId = formData.get('brand_id') as string
   const hasVariants = formData.get('has_variants') === 'true'
-  const variantType = formData.get('variant_type') as string || null
-  const subVariantType = formData.get('sub_variant_type') as string || null
+  const variantType = (formData.get('variant_type') as string) || null
+  const subVariantType = (formData.get('sub_variant_type') as string) || null
   const basePrice = hasVariants ? 0 : round2(parseFloat(formData.get('base_price') as string))
   const mrp = formData.get('mrp') ? round2(parseFloat(formData.get('mrp') as string)) : null
   const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
-  const supplierId = (formData.get('supplier_id') as string || '').trim() || null
+  const supplierId = ((formData.get('supplier_id') as string) || '').trim() || null
   // Multi-supplier: product-level supplier price list. The preferred row's supplier
   // is denormalized onto products.supplier_id (legacy field) on publish.
   const productSuppliersRaw = formData.get('product_suppliers_json') as string | null
   let productSuppliers: any[] = []
-  try { productSuppliers = productSuppliersRaw ? JSON.parse(productSuppliersRaw) : [] } catch { productSuppliers = [] }
-  const preferredSupplierId =
-    productSuppliers.find((s: any) => s.is_preferred)?.supplier_id || supplierId || null
-  const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
-  const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
-  const hsnCode = formData.get('hsn_code') as string || null
-  const mpn = formData.get('mpn') as string || null
-  const gtin = formData.get('gtin') as string || null
-  const stockStatus = hasVariants ? 'In Stock' : formData.get('stock_status') as string
+  try {
+    productSuppliers = productSuppliersRaw ? JSON.parse(productSuppliersRaw) : []
+  } catch {
+    productSuppliers = []
+  }
+  const preferredSupplierId = productSuppliers.find((s: any) => s.is_preferred)?.supplier_id || supplierId || null
+  const discountPct = formData.get('discount_pct')
+    ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2))
+    : 0
+  const gstPercentage = parseFloat((formData.get('gst_percentage') as string) || '18')
+  const hsnCode = (formData.get('hsn_code') as string) || null
+  const mpn = (formData.get('mpn') as string) || null
+  const gtin = (formData.get('gtin') as string) || null
+  const stockStatus = hasVariants ? 'In Stock' : (formData.get('stock_status') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
-  const dimensions = formData.get('dimensions') as string || null
+  const dimensions = (formData.get('dimensions') as string) || null
   const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
-  const packageType = formData.get('package_type') as string || null
+  const packageType = (formData.get('package_type') as string) || null
   const lengthCm = formData.get('length_cm') ? parseFloat(formData.get('length_cm') as string) : null
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
-  const isActive = (intent === 'draft' || intent === 'draft-stay') ? false : (formData.get('is_active') === 'true')
+  const isActive = intent === 'draft' || intent === 'draft-stay' ? false : formData.get('is_active') === 'true'
   const isFeatured = formData.get('is_featured') === 'true'
 
   // Server-side weight & packaging validation — enforced on publish only, so a
@@ -150,21 +187,35 @@ async function updateProduct(productId: string, formData: FormData) {
       if (weightGrams == null || !(weightGrams > 0)) {
         errors.push('Shipping weight is required and must be greater than 0.')
       }
-      if (packageType && STORED_DIMS_TYPES.includes(packageType) && (lengthCm == null || breadthCm == null || heightCm == null)) {
+      if (
+        packageType &&
+        STORED_DIMS_TYPES.includes(packageType) &&
+        (lengthCm == null || breadthCm == null || heightCm == null)
+      ) {
         errors.push('Dimensions required for this package type')
       }
     } else {
       const variantsJsonRaw = formData.get('variants_json') as string | null
       let parsedVariants: any[] = []
-      try { parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : [] } catch { parsedVariants = [] }
+      try {
+        parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : []
+      } catch {
+        parsedVariants = []
+      }
       const blank = (x: any) => x == null || String(x).trim() === ''
-      const filled = (...vals: any[]) => { const hit = vals.find(x => !blank(x)); return hit == null ? '' : String(hit) }
+      const filled = (...vals: any[]) => {
+        const hit = vals.find(x => !blank(x))
+        return hit == null ? '' : String(hit)
+      }
       const subsOn = (v: any) => v?.sub_variant_type_on === true || v?.sub_variant_type_on === 'true'
       const activeParsed = parsedVariants.filter(v => !v?._isDeleted)
       let draftSubs: any[] = []
       let liveSubs: any[] = []
       if (activeParsed.some(subsOn)) {
-        const draftRow = await queryOne<{ sub_variants: any[] | null }>('SELECT sub_variants FROM product_drafts WHERE product_id = $1', [productId])
+        const draftRow = await queryOne<{ sub_variants: any[] | null }>(
+          'SELECT sub_variants FROM product_drafts WHERE product_id = $1',
+          [productId]
+        )
         draftSubs = Array.isArray(draftRow?.sub_variants) ? draftRow!.sub_variants : []
         liveSubs = await queryMany<any>(
           'SELECT variant_id, sub_variant_name, weight_grams, length_cm, breadth_cm, height_cm, package_type FROM product_sub_variants WHERE product_id = $1 AND is_active = true',
@@ -175,21 +226,33 @@ async function updateProduct(productId: string, formData: FormData) {
         const vLabel = v?.variant_name || v?.sku || ''
         if (subsOn(v)) {
           const staged = draftSubs.filter(sv => sv?.variant_id === v?.id)
-          const effective = staged.length > 0
-            ? staged.filter(sv => !sv._cleared && sv.sub_variant_name)
-            : liveSubs.filter(sv => sv.variant_id === v?.id)
+          const effective =
+            staged.length > 0
+              ? staged.filter(sv => !sv._cleared && sv.sub_variant_name)
+              : liveSubs.filter(sv => sv.variant_id === v?.id)
           if (effective.length === 0) {
-            errors.push(`Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`)
+            errors.push(
+              `Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`
+            )
             break
           }
           for (const sv of effective) {
             if (!(parseFloat(filled(sv.weight_grams, v?.weight_grams, weightGrams)) > 0)) {
-              errors.push(`Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`)
+              errors.push(
+                `Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`
+              )
               break
             }
             const pt = filled(sv.package_type, v?.package_type, packageType) || 'flat_poly_auto'
-            if (STORED_DIMS_TYPES.includes(pt) && (blank(filled(sv.length_cm, v?.length_cm)) || blank(filled(sv.breadth_cm, v?.breadth_cm)) || blank(filled(sv.height_cm, v?.height_cm)))) {
-              errors.push(`Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`)
+            if (
+              STORED_DIMS_TYPES.includes(pt) &&
+              (blank(filled(sv.length_cm, v?.length_cm)) ||
+                blank(filled(sv.breadth_cm, v?.breadth_cm)) ||
+                blank(filled(sv.height_cm, v?.height_cm)))
+            ) {
+              errors.push(
+                `Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`
+              )
               break
             }
           }
@@ -226,18 +289,23 @@ async function updateProduct(productId: string, formData: FormData) {
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
-  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
+  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson
+    ? JSON.parse(galleryImageIdsJson)
+    : []
   const imageOrderJson = formData.get('image_order') as string
   const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
-  const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const baseSlug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
   const slug = baseSlug
 
-  const rawSku = (formData.get('sku') as string || '').trim().toUpperCase()
+  const rawSku = ((formData.get('sku') as string) || '').trim().toUpperCase()
   const skuFromForm = rawSku || null
 
   // Extra fields collected for draft fields JSONB (mirrors all SET clauses below)
-  const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
+  const extraDeliveryDays = parseInt((formData.get('extra_delivery_days') as string) || '0') || 0
   const barcode = (formData.get('barcode') as string) || null
   const isbn = (formData.get('isbn') as string) || null
   const asin = (formData.get('asin') as string) || null
@@ -256,7 +324,12 @@ async function updateProduct(productId: string, formData: FormData) {
   const flammable = formData.get('flammable') === 'true'
   const perishable = formData.get('perishable') === 'true'
   const serialized = formData.get('serialized') === 'true'
-  const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+  const certifications = (formData.get('certifications') as string)
+    ? (formData.get('certifications') as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : null
   const complianceStandard = (formData.get('compliance_standard') as string) || null
   const safetyRating = (formData.get('safety_rating') as string) || null
   const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
@@ -273,22 +346,36 @@ async function updateProduct(productId: string, formData: FormData) {
   const downloadUrl = (formData.get('download_url') as string) || null
   const licenseType = (formData.get('license_type') as string) || null
   const fileFormat = (formData.get('file_format') as string) || null
-  const platformCompatibility = (formData.get('platform_compatibility') as string) ? (formData.get('platform_compatibility') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+  const platformCompatibility = (formData.get('platform_compatibility') as string)
+    ? (formData.get('platform_compatibility') as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : null
   const isSubscription = formData.get('is_subscription') === 'true'
   const subscriptionInterval = (formData.get('subscription_interval') as string) || null
-  const subscriptionPrice = formData.get('subscription_price') ? round2(parseFloat(formData.get('subscription_price') as string)) : null
+  const subscriptionPrice = formData.get('subscription_price')
+    ? round2(parseFloat(formData.get('subscription_price') as string))
+    : null
   const isBundle = formData.get('is_bundle') === 'true'
   const metaTitle = (formData.get('meta_title') as string) || null
   const metaDescription = (formData.get('meta_description') as string) || null
   const isSearchable = formData.get('is_searchable') !== 'false'
   const inventorySync = formData.get('inventory_sync') === 'true'
-  const lowStockThreshold = formData.get('low_stock_threshold') ? parseFloat(formData.get('low_stock_threshold') as string) : null
+  const lowStockThreshold = formData.get('low_stock_threshold')
+    ? parseFloat(formData.get('low_stock_threshold') as string)
+    : null
   const taxClass = (formData.get('tax_class') as string) || 'standard'
   const inclusiveTax = formData.get('inclusive_tax') === 'true'
   const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
   const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
   const targetGender = (formData.get('target_gender') as string) || null
-  const targetAudience = (formData.get('target_audience') as string) ? (formData.get('target_audience') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+  const targetAudience = (formData.get('target_audience') as string)
+    ? (formData.get('target_audience') as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : null
 
   try {
     // Check if a product_drafts row exists for this product
@@ -305,37 +392,96 @@ async function updateProduct(productId: string, formData: FormData) {
       // Save-as-Draft/Publish through this action does not wipe what autosave stored.
       let bsEntriesFromForm: unknown = undefined
       const bsEntriesRaw = formData.get('bs_entries_json') as string | null
-      if (bsEntriesRaw) { try { bsEntriesFromForm = JSON.parse(bsEntriesRaw) } catch { /* ignore malformed */ } }
+      if (bsEntriesRaw) {
+        try {
+          bsEntriesFromForm = JSON.parse(bsEntriesRaw)
+        } catch {
+          /* ignore malformed */
+        }
+      }
       const draftFields = {
-        name, slug, description, category_id: categoryId,
-        brand_id: brandId || null, base_price: basePrice, mrp, mrp_ex_gst: mrpExGst,
-        price_ex_gst: salePrice, gst_percentage: gstPercentage, hsn_code: hsnCode,
-        stock_status: stockStatus, weight, dimensions, is_active: isActive,
-        is_featured: isFeatured, has_variants: hasVariants, variant_type: variantType,
-        sub_variant_type: subVariantType, weight_grams: weightGrams, package_type: packageType,
-        length_cm: lengthCm, breadth_cm: breadthCm, height_cm: heightCm,
-        cost_price: costPrice, discount_pct: discountPct, supplier_id: preferredSupplierId,
+        name,
+        slug,
+        description,
+        category_id: categoryId,
+        brand_id: brandId || null,
+        base_price: basePrice,
+        mrp,
+        mrp_ex_gst: mrpExGst,
+        price_ex_gst: salePrice,
+        gst_percentage: gstPercentage,
+        hsn_code: hsnCode,
+        stock_status: stockStatus,
+        weight,
+        dimensions,
+        is_active: isActive,
+        is_featured: isFeatured,
+        has_variants: hasVariants,
+        variant_type: variantType,
+        sub_variant_type: subVariantType,
+        weight_grams: weightGrams,
+        package_type: packageType,
+        length_cm: lengthCm,
+        breadth_cm: breadthCm,
+        height_cm: heightCm,
+        cost_price: costPrice,
+        discount_pct: discountPct,
+        supplier_id: preferredSupplierId,
         product_suppliers: productSuppliers,
         sku: skuFromForm,
-        mpn: hasVariants ? null : mpn, gtin: hasVariants ? null : gtin,
+        mpn: hasVariants ? null : mpn,
+        gtin: hasVariants ? null : gtin,
         extra_delivery_days: extraDeliveryDays,
-        barcode, isbn, asin, brand_part_number: brandPartNumber,
-        country_of_origin: countryOfOrigin, shelf_life_days: shelfLifeDays,
-        grade, specifications, color, color_hex: colorHex, volume_ml: volumeMl,
-        net_weight_grams: netWeightGrams, fragile, hazardous, flammable, perishable, serialized,
-        certifications, compliance_standard: complianceStandard, safety_rating: safetyRating,
-        warranty_months: warrantyMonths, warranty_type: warrantyType,
-        condition, is_cod_allowed: isCodAllowed, launch_date: launchDate,
-        discontinue_date: discontinueDate, sort_order: sortOrderVal,
-        handling_days: handlingDays, shipping_class: shippingClass, is_oversized: isOversized,
-        is_digital: isDigital, download_url: downloadUrl, license_type: licenseType,
-        file_format: fileFormat, platform_compatibility: platformCompatibility,
-        is_subscription: isSubscription, subscription_interval: subscriptionInterval,
-        subscription_price: subscriptionPrice, is_bundle: isBundle,
-        meta_title: metaTitle, meta_description: metaDescription, is_searchable: isSearchable,
-        tax_class: taxClass, inclusive_tax: inclusiveTax,
-        age_min: ageMin, age_max: ageMax, target_gender: targetGender, target_audience: targetAudience,
-        inventory_sync: inventorySync, low_stock_threshold: lowStockThreshold,
+        barcode,
+        isbn,
+        asin,
+        brand_part_number: brandPartNumber,
+        country_of_origin: countryOfOrigin,
+        shelf_life_days: shelfLifeDays,
+        grade,
+        specifications,
+        color,
+        color_hex: colorHex,
+        volume_ml: volumeMl,
+        net_weight_grams: netWeightGrams,
+        fragile,
+        hazardous,
+        flammable,
+        perishable,
+        serialized,
+        certifications,
+        compliance_standard: complianceStandard,
+        safety_rating: safetyRating,
+        warranty_months: warrantyMonths,
+        warranty_type: warrantyType,
+        condition,
+        is_cod_allowed: isCodAllowed,
+        launch_date: launchDate,
+        discontinue_date: discontinueDate,
+        sort_order: sortOrderVal,
+        handling_days: handlingDays,
+        shipping_class: shippingClass,
+        is_oversized: isOversized,
+        is_digital: isDigital,
+        download_url: downloadUrl,
+        license_type: licenseType,
+        file_format: fileFormat,
+        platform_compatibility: platformCompatibility,
+        is_subscription: isSubscription,
+        subscription_interval: subscriptionInterval,
+        subscription_price: subscriptionPrice,
+        is_bundle: isBundle,
+        meta_title: metaTitle,
+        meta_description: metaDescription,
+        is_searchable: isSearchable,
+        tax_class: taxClass,
+        inclusive_tax: inclusiveTax,
+        age_min: ageMin,
+        age_max: ageMax,
+        target_gender: targetGender,
+        target_audience: targetAudience,
+        inventory_sync: inventorySync,
+        low_stock_threshold: lowStockThreshold,
         // Preserve the bootstrap capture across explicit saves. Fall back to the
         // existing draft value when the form didn't send one (so we never wipe it).
         _bsEntries: bsEntriesFromForm ?? (draftRow as any)?.fields?._bsEntries ?? undefined,
@@ -387,25 +533,61 @@ async function updateProduct(productId: string, formData: FormData) {
 
     // No draft — live product direct edit path
     const setClauses: string[] = [
-      'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
-      'brand_id = $5', 'base_price = $6', 'mrp = $7', 'mrp_ex_gst = $8',
+      'name = $1',
+      'slug = $2',
+      'description = $3',
+      'category_id = $4',
+      'brand_id = $5',
+      'base_price = $6',
+      'mrp = $7',
+      'mrp_ex_gst = $8',
       'price_ex_gst = $9',
-      'gst_percentage = $10', 'hsn_code = $11',
-      'stock_status = $12', 'weight = $13',
-      'dimensions = $14', 'is_active = $15', 'is_featured = $16', 'has_variants = $17', 'variant_type = $18',
+      'gst_percentage = $10',
+      'hsn_code = $11',
+      'stock_status = $12',
+      'weight = $13',
+      'dimensions = $14',
+      'is_active = $15',
+      'is_featured = $16',
+      'has_variants = $17',
+      'variant_type = $18',
       'sub_variant_type = $19',
-      'weight_grams = $20', 'package_type = $21', 'length_cm = $22', 'breadth_cm = $23', 'height_cm = $24',
-      'cost_price = $25', 'discount_pct = $26', 'updated_at = $27',
+      'weight_grams = $20',
+      'package_type = $21',
+      'length_cm = $22',
+      'breadth_cm = $23',
+      'height_cm = $24',
+      'cost_price = $25',
+      'discount_pct = $26',
+      'updated_at = $27',
     ]
     const params: any[] = [
-      name, slug, description, categoryId,
-      brandId || null, basePrice, mrp, mrpExGst, salePrice,
-      gstPercentage, hsnCode,
-      stockStatus, weight,
-      dimensions, isActive, isFeatured, hasVariants, variantType,
+      name,
+      slug,
+      description,
+      categoryId,
+      brandId || null,
+      basePrice,
+      mrp,
+      mrpExGst,
+      salePrice,
+      gstPercentage,
+      hsnCode,
+      stockStatus,
+      weight,
+      dimensions,
+      isActive,
+      isFeatured,
+      hasVariants,
+      variantType,
       subVariantType,
-      weightGrams, packageType, lengthCm, breadthCm, heightCm,
-      costPrice, discountPct,
+      weightGrams,
+      packageType,
+      lengthCm,
+      breadthCm,
+      heightCm,
+      costPrice,
+      discountPct,
       new Date().toISOString(),
     ]
     setClauses.push(`supplier_id = $${params.length + 1}`)
@@ -420,29 +602,81 @@ async function updateProduct(productId: string, formData: FormData) {
     }
     setClauses.push(`extra_delivery_days = $${params.length + 1}`)
     params.push(extraDeliveryDays)
-    setClauses.push(`barcode = $${params.length + 1}`, `isbn = $${params.length + 2}`, `asin = $${params.length + 3}`, `brand_part_number = $${params.length + 4}`, `country_of_origin = $${params.length + 5}`, `shelf_life_days = $${params.length + 6}`)
+    setClauses.push(
+      `barcode = $${params.length + 1}`,
+      `isbn = $${params.length + 2}`,
+      `asin = $${params.length + 3}`,
+      `brand_part_number = $${params.length + 4}`,
+      `country_of_origin = $${params.length + 5}`,
+      `shelf_life_days = $${params.length + 6}`
+    )
     params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
     setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
     params.push(grade, specifications)
-    setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`, `serialized = $${params.length + 9}`)
+    setClauses.push(
+      `color = $${params.length + 1}`,
+      `color_hex = $${params.length + 2}`,
+      `volume_ml = $${params.length + 3}`,
+      `net_weight_grams = $${params.length + 4}`,
+      `fragile = $${params.length + 5}`,
+      `hazardous = $${params.length + 6}`,
+      `flammable = $${params.length + 7}`,
+      `perishable = $${params.length + 8}`,
+      `serialized = $${params.length + 9}`
+    )
     params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
-    setClauses.push(`certifications = $${params.length + 1}`, `compliance_standard = $${params.length + 2}`, `safety_rating = $${params.length + 3}`, `warranty_months = $${params.length + 4}`, `warranty_type = $${params.length + 5}`)
+    setClauses.push(
+      `certifications = $${params.length + 1}`,
+      `compliance_standard = $${params.length + 2}`,
+      `safety_rating = $${params.length + 3}`,
+      `warranty_months = $${params.length + 4}`,
+      `warranty_type = $${params.length + 5}`
+    )
     params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
-    setClauses.push(`condition = $${params.length + 1}`, `is_cod_allowed = $${params.length + 2}`, `launch_date = $${params.length + 3}`, `discontinue_date = $${params.length + 4}`, `sort_order = $${params.length + 5}`)
+    setClauses.push(
+      `condition = $${params.length + 1}`,
+      `is_cod_allowed = $${params.length + 2}`,
+      `launch_date = $${params.length + 3}`,
+      `discontinue_date = $${params.length + 4}`,
+      `sort_order = $${params.length + 5}`
+    )
     params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
-    setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`)
+    setClauses.push(
+      `handling_days = $${params.length + 1}`,
+      `shipping_class = $${params.length + 2}`,
+      `is_oversized = $${params.length + 3}`
+    )
     params.push(handlingDays, shippingClass, isOversized)
-    setClauses.push(`is_digital = $${params.length + 1}`, `download_url = $${params.length + 2}`, `license_type = $${params.length + 3}`, `file_format = $${params.length + 4}`, `platform_compatibility = $${params.length + 5}`)
+    setClauses.push(
+      `is_digital = $${params.length + 1}`,
+      `download_url = $${params.length + 2}`,
+      `license_type = $${params.length + 3}`,
+      `file_format = $${params.length + 4}`,
+      `platform_compatibility = $${params.length + 5}`
+    )
     params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
-    setClauses.push(`is_subscription = $${params.length + 1}`, `subscription_interval = $${params.length + 2}`, `subscription_price = $${params.length + 3}`)
+    setClauses.push(
+      `is_subscription = $${params.length + 1}`,
+      `subscription_interval = $${params.length + 2}`,
+      `subscription_price = $${params.length + 3}`
+    )
     params.push(isSubscription, subscriptionInterval, subscriptionPrice)
     setClauses.push(`is_bundle = $${params.length + 1}`)
     params.push(isBundle)
-    setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `is_searchable = $${params.length + 3}`)
+    setClauses.push(
+      `meta_title = $${params.length + 1}`,
+      `meta_description = $${params.length + 2}`,
+      `is_searchable = $${params.length + 3}`
+    )
     params.push(metaTitle, metaDescription, isSearchable)
     setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
     params.push(taxClass, inclusiveTax)
-    setClauses.push(`age_min = $${params.length + 1}`, `age_max = $${params.length + 2}`, `target_gender = $${params.length + 3}`, `target_audience = $${params.length + 4}`)
+    setClauses.push(
+      `age_min = $${params.length + 1}`,
+      `age_max = $${params.length + 2}`,
+      `target_gender = $${params.length + 3}`,
+      `target_audience = $${params.length + 4}`
+    )
     params.push(ageMin, ageMax, targetGender, targetAudience)
 
     // Create-draft (is_draft=true, no product_drafts row) editing in place: Publish clears is_draft
@@ -454,11 +688,11 @@ async function updateProduct(productId: string, formData: FormData) {
     }
 
     params.push(productId)
-    const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>('SELECT perishable, serialized FROM products WHERE id = $1', [productId])
-    await query(
-      `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
-      params
+    const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>(
+      'SELECT perishable, serialized FROM products WHERE id = $1',
+      [productId]
     )
+    await query(`UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`, params)
     // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
     if (prevRow?.perishable && !perishable) {
       // Capture per-grain batch totals BEFORE deleting.
@@ -481,10 +715,16 @@ async function updateProduct(productId: string, formData: FormData) {
       await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
 
       // Write converted stock back at the correct grain.
-      const hasVariantsRow = await queryOne<{ has_variants: boolean }>('SELECT has_variants FROM products WHERE id = $1', [productId])
+      const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
+        'SELECT has_variants FROM products WHERE id = $1',
+        [productId]
+      )
       if (hasVariantsRow?.has_variants && (variantBatch.length || subVariantBatch.length)) {
         for (const sv of subVariantBatch) {
-          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [parseFloat(sv.total) || 0, sv.sub_variant_id])
+          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
+            parseFloat(sv.total) || 0,
+            sv.sub_variant_id,
+          ])
         }
         for (const v of variantBatch) {
           await query(
@@ -508,11 +748,15 @@ async function updateProduct(productId: string, formData: FormData) {
 
       // Keep shelf_stock rows — update total quantity across locations to match converted qty
       const shelfRows = await queryOne<{ cnt: string }>(
-        `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+        `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`,
+        [productId]
       )
       const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
       if (shelfCount === 1) {
-        await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+        await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [
+          converted,
+          productId,
+        ])
       } else if (shelfCount > 1) {
         // Distribute proportionally; zero out if converted is 0
         await query(
@@ -551,11 +795,15 @@ async function updateProduct(productId: string, formData: FormData) {
         await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
         // Keep shelf_stock — update qty to match converted count
         const shelfRows = await queryOne<{ cnt: string }>(
-          `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+          `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`,
+          [productId]
         )
         const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
         if (shelfCount === 1) {
-          await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+          await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [
+            converted,
+            productId,
+          ])
         } else if (shelfCount > 1) {
           await query(
             `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
@@ -567,11 +815,17 @@ async function updateProduct(productId: string, formData: FormData) {
       }
 
       // Write the converted stock back at the CORRECT grain so it shows in inventory.
-      const hasVariantsRow = await queryOne<{ has_variants: boolean }>('SELECT has_variants FROM products WHERE id = $1', [productId])
+      const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
+        'SELECT has_variants FROM products WHERE id = $1',
+        [productId]
+      )
       if (hasVariantsRow?.has_variants && (variantCounts.length || subVariantCounts.length)) {
         // Sub-variant-tracked stock
         for (const sv of subVariantCounts) {
-          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [parseFloat(sv.cnt) || 0, sv.sub_variant_id])
+          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
+            parseFloat(sv.cnt) || 0,
+            sv.sub_variant_id,
+          ])
         }
         // Variant-tracked stock (only for variants without sub-variants; those roll up separately)
         for (const v of variantCounts) {
@@ -598,10 +852,7 @@ async function updateProduct(productId: string, formData: FormData) {
     }
 
     if (uploadedImages.length > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
-      const allExistingImages = await queryMany(
-        'SELECT * FROM product_images WHERE product_id = $1',
-        [productId]
-      )
+      const allExistingImages = await queryMany('SELECT * FROM product_images WHERE product_id = $1', [productId])
 
       const existingIdsToKeep = new Set(existingImagesToKeep.map((img: any) => img.id))
       const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
@@ -625,11 +876,19 @@ async function updateProduct(productId: string, formData: FormData) {
             height, display_order, is_primary
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
           [
-            productId, img.url, img.thumbnailUrl,
+            productId,
+            img.url,
+            img.thumbnailUrl,
             img.s3Bucket,
-            img.s3Key, img.s3ThumbnailKey,
-            img.fileName, img.fileSize, img.mimeType,
-            img.width, img.height, 999, false,
+            img.s3Key,
+            img.s3ThumbnailKey,
+            img.fileName,
+            img.fileSize,
+            img.mimeType,
+            img.width,
+            img.height,
+            999,
+            false,
           ]
         )
         if (inserted) newFileIds[i] = inserted.id
@@ -638,11 +897,10 @@ async function updateProduct(productId: string, formData: FormData) {
       const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
         const { copyGalleryImageToProduct } = await import('@/lib/s3')
-        const galleryImages = await queryMany(
-          `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
-          [galleryImageRefs.map(r => r.id)]
-        )
-        for (const gimg of (galleryImages || [])) {
+        const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
+          galleryImageRefs.map(r => r.id),
+        ])
+        for (const gimg of galleryImages || []) {
           let copied
           try {
             copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId)
@@ -657,11 +915,19 @@ async function updateProduct(productId: string, formData: FormData) {
               height, display_order, is_primary
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
-              productId, copied.url, copied.thumbnailUrl,
+              productId,
+              copied.url,
+              copied.thumbnailUrl,
               copied.s3Bucket,
-              copied.s3Key, copied.s3ThumbnailKey,
-              gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-              gimg.width, gimg.height, 999, false,
+              copied.s3Key,
+              copied.s3ThumbnailKey,
+              gimg.custom_name || gimg.file_name,
+              gimg.file_size,
+              gimg.mime_type,
+              gimg.width,
+              gimg.height,
+              999,
+              false,
             ]
           )
           if (inserted) newGalleryIds[gimg.id] = inserted.id
@@ -669,17 +935,18 @@ async function updateProduct(productId: string, formData: FormData) {
       }
 
       const applyOrder = async (keys: string[]) => {
-        const primaryKey = keys.find(k => {
-          if (k.startsWith('existing:')) {
-            const id = k.slice(9)
-            return existingImagesToKeep.find((img: any) => img.id === id)?.is_primary
-          }
-          if (k.startsWith('gallery:')) {
-            const gid = k.slice(8)
-            return galleryImageRefs.find(r => r.id === gid)?.isPrimary
-          }
-          return false
-        }) || keys[0]
+        const primaryKey =
+          keys.find(k => {
+            if (k.startsWith('existing:')) {
+              const id = k.slice(9)
+              return existingImagesToKeep.find((img: any) => img.id === id)?.is_primary
+            }
+            if (k.startsWith('gallery:')) {
+              const gid = k.slice(8)
+              return galleryImageRefs.find(r => r.id === gid)?.isPrimary
+            }
+            return false
+          }) || keys[0]
 
         await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
 
@@ -688,15 +955,29 @@ async function updateProduct(productId: string, formData: FormData) {
           const isPrimary = key === primaryKey
           if (key.startsWith('existing:')) {
             const id = key.slice(9)
-            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, id])
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+              i,
+              isPrimary,
+              id,
+            ])
           } else if (key.startsWith('gallery:')) {
             const gid = key.slice(8)
             const pid = newGalleryIds[gid]
-            if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+            if (pid)
+              await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+                i,
+                isPrimary,
+                pid,
+              ])
           } else if (key.startsWith('file:')) {
             const fi = parseInt(key.slice(5))
             const pid = newFileIds[fi]
-            if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+            if (pid)
+              await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+                i,
+                isPrimary,
+                pid,
+              ])
           }
         }
       }
@@ -707,15 +988,27 @@ async function updateProduct(productId: string, formData: FormData) {
         await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
         for (let i = 0; i < existingImagesToKeep.length; i++) {
           const img = existingImagesToKeep[i]
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, img.is_primary || false, img.id])
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+            i,
+            img.is_primary || false,
+            img.id,
+          ])
         }
         let offset = existingImagesToKeep.length
         for (const [fi, pid] of Object.entries(newFileIds)) {
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [offset, offset === 0, pid])
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+            offset,
+            offset === 0,
+            pid,
+          ])
           offset++
         }
         for (const [, pid] of Object.entries(newGalleryIds)) {
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [offset, offset === 0, pid])
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+            offset,
+            offset === 0,
+            pid,
+          ])
           offset++
         }
       }
@@ -744,12 +1037,16 @@ async function updateProduct(productId: string, formData: FormData) {
                  isbn = $22
                WHERE id = $23 AND product_id = $24`,
               [
-                variantSku, variant.variant_name,
+                variantSku,
+                variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
                 variant.mrp ? round2(parseFloat(variant.mrp)) : null,
                 variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
-                variant.price_ex_gst ? round2(parseFloat(variant.price_ex_gst))
-                  : variant.price ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100)) : null,
+                variant.price_ex_gst
+                  ? round2(parseFloat(variant.price_ex_gst))
+                  : variant.price
+                    ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100))
+                    : null,
                 variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
@@ -766,20 +1063,22 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
                 variant.asin || null,
                 variant.isbn || null,
-                variant.id, productId,
+                variant.id,
+                productId,
               ]
             )
             const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
               'SELECT id, sub_variant_name FROM product_sub_variants WHERE variant_id = $1',
               [variant.id]
             )
-            for (const sv of (subVariants || [])) {
+            for (const sv of subVariants || []) {
               if (!sv.sub_variant_name) continue
               const newSubSku = generateVariantSku(variantSku, sv.sub_variant_name)
-              await query(
-                'UPDATE product_sub_variants SET sku = $1, discount_pct = $2 WHERE id = $3',
-                [newSubSku, discountPct, sv.id]
-              )
+              await query('UPDATE product_sub_variants SET sku = $1, discount_pct = $2 WHERE id = $3', [
+                newSubSku,
+                discountPct,
+                sv.id,
+              ])
             }
           } else if (!isPersisted && !variant._isDeleted) {
             if (!variant.variant_name) continue
@@ -788,12 +1087,17 @@ async function updateProduct(productId: string, formData: FormData) {
               `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true)`,
               [
-                productId, variantSku, variant.variant_name,
+                productId,
+                variantSku,
+                variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
                 variant.mrp ? round2(parseFloat(variant.mrp)) : null,
                 variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
-                variant.price_ex_gst ? round2(parseFloat(variant.price_ex_gst))
-                  : variant.price ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100)) : null,
+                variant.price_ex_gst
+                  ? round2(parseFloat(variant.price_ex_gst))
+                  : variant.price
+                    ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100))
+                    : null,
                 variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
@@ -847,7 +1151,13 @@ async function updateProduct(productId: string, formData: FormData) {
   }
 }
 
-export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function EditProductPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
   const { id } = await params
   const { back } = await searchParams
   const host = await getHost()
@@ -885,10 +1195,13 @@ export default async function EditProductPage({ params, searchParams }: { params
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
   const hasReturns = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
 
-  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[]; sub_variants: Record<string, unknown>[]; images: Record<string, unknown>[] }>(
-    `SELECT product_id, fields, variants, sub_variants, images FROM product_drafts WHERE product_id = $1`,
-    [id]
-  )
+  const draftRow = await queryOne<{
+    product_id: string
+    fields: Record<string, unknown>
+    variants: Record<string, unknown>[]
+    sub_variants: Record<string, unknown>[]
+    images: Record<string, unknown>[]
+  }>(`SELECT product_id, fields, variants, sub_variants, images FROM product_drafts WHERE product_id = $1`, [id])
   const isDraft = !!draftRow
   // A create-draft product (is_draft = true) has no product_drafts row but must still render its
   // edit form (editing in place via the live-edit path) rather than bouncing to the detail page.
@@ -905,10 +1218,10 @@ export default async function EditProductPage({ params, searchParams }: { params
   // In draft mode, merge saved draft fields over the live product so the form
   // shows the admin's last saved changes (not the original live values).
   // Only use draft variants if they have both id and sku (autosaved from popup).
-  const draftVariants = isDraft && Array.isArray(draftRow?.variants) &&
-    draftRow!.variants.some((v: any) => v.sku && v.id)
-    ? draftRow!.variants
-    : null
+  const draftVariants =
+    isDraft && Array.isArray(draftRow?.variants) && draftRow!.variants.some((v: any) => v.sku && v.id)
+      ? draftRow!.variants
+      : null
 
   // Distribute draft sub_variants onto their parent variant so the form's initial
   // render reflects DRAFT sub-variant edits (add/remove/rename), not just live. The
@@ -928,9 +1241,7 @@ export default async function EditProductPage({ params, searchParams }: { params
       }
       byVariant.set(sv.variant_id, list)
     }
-    return (variantList || []).map((v: any) =>
-      byVariant.has(v.id) ? { ...v, sub_variants: byVariant.get(v.id) } : v
-    )
+    return (variantList || []).map((v: any) => (byVariant.has(v.id) ? { ...v, sub_variants: byVariant.get(v.id) } : v))
   }
 
   // getProduct now returns inactive variants/sub-variants too (the detail page needs them
@@ -940,7 +1251,9 @@ export default async function EditProductPage({ params, searchParams }: { params
     .filter((v: any) => v?.is_active !== false)
     .map((v: any) => ({
       ...v,
-      sub_variants: Array.isArray(v?.sub_variants) ? v.sub_variants.filter((sv: any) => sv?.is_active !== false) : v?.sub_variants,
+      sub_variants: Array.isArray(v?.sub_variants)
+        ? v.sub_variants.filter((sv: any) => sv?.is_active !== false)
+        : v?.sub_variants,
     }))
   const mergedVariants = draftVariants
     ? withDraftSubVariants(draftVariants as any[])
@@ -952,14 +1265,15 @@ export default async function EditProductPage({ params, searchParams }: { params
   // if the draft somehow has none (older drafts created before ids were kept).
   const draftImages = isDraft && Array.isArray(draftRow?.images) ? draftRow!.images : []
   const draftImagesUsable = draftImages.length > 0 && draftImages.every((img: any) => img && img.id)
-  const productForForm = isDraft && draftRow?.fields
-    ? {
-        ...product,
-        ...draftRow.fields,
-        product_variants: mergedVariants,
-        ...(draftImagesUsable ? { product_images: draftImages } : {}),
-      }
-    : product
+  const productForForm =
+    isDraft && draftRow?.fields
+      ? {
+          ...product,
+          ...draftRow.fields,
+          product_variants: mergedVariants,
+          ...(draftImagesUsable ? { product_images: draftImages } : {}),
+        }
+      : product
 
   // On-hand stock grains for the "assign existing stock" bootstrap. These MUST be
   // read from the LIVE product (getProduct), never from the draft merge above: the
@@ -967,7 +1281,13 @@ export default async function EditProductPage({ params, searchParams }: { params
   // deriving grains from productForForm would collapse every qty to 0 and hide the
   // bootstrap capture after the first autosave. Stock is intrinsic to the live
   // product and is not edited by the draft, so compute it here once.
-  const liveStockGrains: { variant_id: string | null; sub_variant_id: string | null; label: string; qty: number; qty_step?: number }[] = []
+  const liveStockGrains: {
+    variant_id: string | null
+    sub_variant_id: string | null
+    label: string
+    qty: number
+    qty_step?: number
+  }[] = []
   {
     const p: any = product
     if (p?.has_variants && Array.isArray(p?.product_variants)) {
@@ -977,7 +1297,13 @@ export default async function EditProductPage({ params, searchParams }: { params
         if (subs.length > 0) {
           for (const sv of subs) {
             const qty = parseFloat(sv?.inventory_quantity) || 0
-            if (qty > 0) liveStockGrains.push({ variant_id: v.id, sub_variant_id: sv.id, label: `${v.variant_name} / ${sv.sub_variant_name}`, qty })
+            if (qty > 0)
+              liveStockGrains.push({
+                variant_id: v.id,
+                sub_variant_id: sv.id,
+                label: `${v.variant_name} / ${sv.sub_variant_name}`,
+                qty,
+              })
           }
         } else {
           const qty = parseFloat(v?.inventory_quantity) || 0
@@ -996,11 +1322,14 @@ export default async function EditProductPage({ params, searchParams }: { params
   if (liveStockGrains.length > 0) {
     const { resolveGrainUnit } = await import('@/lib/selling-unit')
     for (const g of liveStockGrains) {
-      const u = await resolveGrainUnit({ query }, {
-        productId: id,
-        variantId: g.variant_id,
-        subVariantId: g.sub_variant_id,
-      })
+      const u = await resolveGrainUnit(
+        { query },
+        {
+          productId: id,
+          variantId: g.variant_id,
+          subVariantId: g.sub_variant_id,
+        }
+      )
       g.qty_step = u && u.qty_step > 0 ? u.qty_step : 1
     }
   }
@@ -1008,7 +1337,10 @@ export default async function EditProductPage({ params, searchParams }: { params
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap(backUrl, host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap(backUrl, host)}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Products
         </a>
@@ -1026,8 +1358,12 @@ export default async function EditProductPage({ params, searchParams }: { params
       )}
 
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Product'}</h1>
-        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update product information'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
+          {isDraft ? 'Edit Draft' : 'Edit Product'}
+        </h1>
+        <p className="text-foreground-secondary mt-1">
+          {isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
+        </p>
       </div>
 
       <ProductForm

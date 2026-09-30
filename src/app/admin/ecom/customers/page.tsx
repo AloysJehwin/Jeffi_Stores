@@ -58,18 +58,31 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
           </thead>
           <tbody className="divide-y divide-border-default">
             {tenants.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No tenants match.</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">
+                  No tenants match.
+                </td>
+              </tr>
             )}
-            {tenants.map((t) => (
+            {tenants.map(t => (
               <tr key={t.id} className="hover:bg-surface-secondary cursor-pointer">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  <Link href={`/admin/ecom/customers/${t.id}?tab=overview`} className="hover:text-accent-600">{t.display_name}</Link>
+                  <Link href={`/admin/ecom/customers/${t.id}?tab=overview`} className="hover:text-accent-600">
+                    {t.display_name}
+                  </Link>
                 </td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.slug}.jeffistores.in</td>
                 <td className="px-4 py-3 text-foreground-secondary capitalize">{t.plan || '—'}</td>
-                <td className="px-4 py-3 text-foreground-secondary">{t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'}{t.daily_payout ? ' +daily' : ''}</td>
-                <td className="px-4 py-3"><StatusPill status={t.status} /></td>
-                <td className="px-4 py-3 text-foreground-muted">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+                <td className="px-4 py-3 text-foreground-secondary">
+                  {t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'}
+                  {t.daily_payout ? ' +daily' : ''}
+                </td>
+                <td className="px-4 py-3">
+                  <StatusPill status={t.status} />
+                </td>
+                <td className="px-4 py-3 text-foreground-muted">
+                  {new Date(t.created_at).toLocaleDateString('en-IN')}
+                </td>
                 <td className="px-4 py-3 text-right">
                   {(t.status === 'terminated' || t.status === 'deprovisioned') && (
                     <PurgeCustomerButton tenantId={t.id} slug={t.slug} />

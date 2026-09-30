@@ -15,23 +15,41 @@ interface Props {
 }
 
 const SEGMENTS = [
-  { key: 'vip',      label: 'VIP',       color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  { key: 'loyal',    label: 'Loyal',     color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
-  { key: 'b2b',      label: 'B2B',       color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  { key: 'repeat',   label: 'Repeat',    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { key: 'new',      label: 'New',       color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
-  { key: 'at_risk',  label: 'At Risk',   color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  { key: 'dormant',  label: 'Dormant',   color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
-  { key: 'one_time', label: 'One-time',  color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  { key: 'lead',     label: 'Lead',      color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
+  { key: 'vip', label: 'VIP', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  { key: 'loyal', label: 'Loyal', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  { key: 'b2b', label: 'B2B', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+  { key: 'repeat', label: 'Repeat', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  { key: 'new', label: 'New', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
+  {
+    key: 'at_risk',
+    label: 'At Risk',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  },
+  { key: 'dormant', label: 'Dormant', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
+  {
+    key: 'one_time',
+    label: 'One-time',
+    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  },
+  { key: 'lead', label: 'Lead', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
 ]
 
 const SCORE_BUCKETS = [
   { min: 80, max: 100, label: '80–100', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { min: 60, max: 80,  label: '60–80',  color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300' },
-  { min: 40, max: 60,  label: '40–60',  color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  { min: 20, max: 40,  label: '20–40',  color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  { min: 0,  max: 20,  label: '0–20',   color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+  { min: 60, max: 80, label: '60–80', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300' },
+  {
+    min: 40,
+    max: 60,
+    label: '40–60',
+    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  },
+  {
+    min: 20,
+    max: 40,
+    label: '20–40',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  },
+  { min: 0, max: 20, label: '0–20', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ]
 
 type PickerMode = 'search' | 'segment' | 'score'
@@ -48,7 +66,10 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
 
   const search = useCallback((val: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (val.length < 2) { setResults([]); return }
+    if (val.length < 2) {
+      setResults([])
+      return
+    }
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
@@ -61,7 +82,9 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
     }, 300)
   }, [])
 
-  useEffect(() => { if (pickerMode === 'search') search(q) }, [q, search, pickerMode])
+  useEffect(() => {
+    if (pickerMode === 'search') search(q)
+  }, [q, search, pickerMode])
 
   async function handleAdd(user: UserResult) {
     setAdding(user.id)
@@ -79,7 +102,10 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
     try {
       const res = await fetch(`/api/admin/coupons/user-pool?${params}`)
       const data = await res.json()
-      if (!res.ok) { setBulkStatus(`Error: ${data.error}`); return }
+      if (!res.ok) {
+        setBulkStatus(`Error: ${data.error}`)
+        return
+      }
       const users: UserResult[] = (data.users || []).filter((u: UserResult) => !existingIds.has(u.id))
       if (users.length === 0) {
         setBulkStatus(`No new users to add from ${label}`)
@@ -106,9 +132,15 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
     <div className="space-y-2">
       {/* Mode tabs */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <button type="button" className={tabClass('search')} onClick={() => setPickerMode('search')}>Search</button>
-        <button type="button" className={tabClass('segment')} onClick={() => setPickerMode('segment')}>By Segment</button>
-        <button type="button" className={tabClass('score')} onClick={() => setPickerMode('score')}>By Score</button>
+        <button type="button" className={tabClass('search')} onClick={() => setPickerMode('search')}>
+          Search
+        </button>
+        <button type="button" className={tabClass('segment')} onClick={() => setPickerMode('segment')}>
+          By Segment
+        </button>
+        <button type="button" className={tabClass('score')} onClick={() => setPickerMode('score')}>
+          By Score
+        </button>
         <button
           type="button"
           disabled={bulkLoading}
@@ -133,8 +165,8 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
             {loading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 <svg className="w-4 h-4 animate-spin text-foreground-muted" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
               </div>
             )}
@@ -144,7 +176,10 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
               {results.map(u => {
                 const already = existingIds.has(u.id)
                 return (
-                  <div key={u.id} className="flex items-center justify-between px-3 py-2.5 bg-surface hover:bg-surface-secondary text-sm border-b border-border-secondary last:border-0">
+                  <div
+                    key={u.id}
+                    className="flex items-center justify-between px-3 py-2.5 bg-surface hover:bg-surface-secondary text-sm border-b border-border-secondary last:border-0"
+                  >
                     <div>
                       <p className="font-medium text-foreground">{u.full_name?.trim() || '—'}</p>
                       <p className="text-xs text-foreground-muted">{u.email}</p>
@@ -206,9 +241,7 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
         </div>
       )}
 
-      {bulkStatus && (
-        <p className="text-xs text-foreground-secondary">{bulkStatus}</p>
-      )}
+      {bulkStatus && <p className="text-xs text-foreground-secondary">{bulkStatus}</p>}
     </div>
   )
 }

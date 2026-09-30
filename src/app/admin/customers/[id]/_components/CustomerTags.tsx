@@ -24,14 +24,14 @@ interface CustomerTagsProps {
 }
 
 const COLOR_CLASSES: Record<string, { badge: string; pill: string }> = {
-  blue:   { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',     pill: 'bg-blue-500' },
+  blue: { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', pill: 'bg-blue-500' },
   purple: { badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300', pill: 'bg-purple-500' },
-  green:  { badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',  pill: 'bg-green-500' },
+  green: { badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300', pill: 'bg-green-500' },
   orange: { badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', pill: 'bg-orange-500' },
-  gold:   { badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300', pill: 'bg-yellow-500' },
-  red:    { badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',          pill: 'bg-red-500' },
-  gray:   { badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',         pill: 'bg-zinc-400' },
-  teal:   { badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',      pill: 'bg-teal-500' },
+  gold: { badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300', pill: 'bg-yellow-500' },
+  red: { badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', pill: 'bg-red-500' },
+  gray: { badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300', pill: 'bg-zinc-400' },
+  teal: { badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300', pill: 'bg-teal-500' },
   accent: { badge: 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300', pill: 'bg-accent-500' },
 }
 
@@ -76,7 +76,9 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
         credentials: 'include',
       })
       if (res.ok) {
-        const list = await fetch(`/api/admin/customers/${customerId}/tags`, { credentials: 'include' }).then(r => r.json())
+        const list = await fetch(`/api/admin/customers/${customerId}/tags`, { credentials: 'include' }).then(r =>
+          r.json()
+        )
         setTags(list.tags || [])
         router.refresh()
       }
@@ -156,7 +158,9 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
 
           {open && available.length > 0 && (
             <div className="absolute z-50 top-full mt-1 left-0 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-2 min-w-[180px] max-w-xs">
-              <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider px-2 pb-1.5">Select a tag</p>
+              <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider px-2 pb-1.5">
+                Select a tag
+              </p>
               <div className="flex flex-col gap-0.5">
                 {available.map(def => {
                   const cls = tagClasses(def.color)
@@ -165,7 +169,10 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
                       key={def.id}
                       type="button"
                       disabled={busy}
-                      onClick={() => { add(def.tag); setOpen(false) }}
+                      onClick={() => {
+                        add(def.tag)
+                        setOpen(false)
+                      }}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-surface-secondary transition-colors disabled:opacity-50 text-left"
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${cls.pill}`} />

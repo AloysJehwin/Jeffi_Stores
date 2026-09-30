@@ -27,7 +27,14 @@ function StarPreview() {
   )
 }
 
-export default function FormsPreview({ title, description, templateType, googleReviewUrl, couponId, customFields }: Props) {
+export default function FormsPreview({
+  title,
+  description,
+  templateType,
+  googleReviewUrl,
+  couponId,
+  customFields,
+}: Props) {
   const storeConfig = useStoreConfig()
   const storeName = storeConfig.identity.name || 'Our Store'
   return (
@@ -46,7 +53,9 @@ export default function FormsPreview({ title, description, templateType, googleR
         {templateType === 'google_review' && (
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800 text-sm">Leave us a Google review</p>
                 <p className="text-xs text-gray-400">It takes less than a minute!</p>
@@ -61,7 +70,9 @@ export default function FormsPreview({ title, description, templateType, googleR
         {templateType === 'product_feedback' && (
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <span className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800 text-sm">How was your experience?</p>
                 <p className="text-xs text-gray-400">Rate your recent purchase</p>
@@ -74,13 +85,17 @@ export default function FormsPreview({ title, description, templateType, googleR
         {templateType === 'testimonial' && (
           <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <span className="w-6 h-6 rounded-full bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">
+                1
+              </span>
               <div>
                 <p className="font-semibold text-gray-800 text-sm">Share your story</p>
                 <p className="text-xs text-gray-400">Tell us about your experience</p>
               </div>
             </div>
-            <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400 h-16">Write your testimonial…</div>
+            <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400 h-16">
+              Write your testimonial…
+            </div>
           </div>
         )}
 
@@ -93,14 +108,18 @@ export default function FormsPreview({ title, description, templateType, googleR
               <p className="font-semibold text-gray-800 text-sm">
                 {templateType === 'google_review' ? 'Submit your review screenshot' : 'Submit your details'}
               </p>
-              <p className="text-xs text-gray-400">{couponId ? 'Get your discount coupon instantly' : 'We\'ll verify your submission'}</p>
+              <p className="text-xs text-gray-400">
+                {couponId ? 'Get your discount coupon instantly' : "We'll verify your submission"}
+              </p>
             </div>
           </div>
 
           <div className="space-y-3">
             <div>
               <p className="text-xs font-medium text-gray-600 mb-1">Email Address *</p>
-              <div className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-400 text-xs bg-gray-50">you@example.com</div>
+              <div className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-400 text-xs bg-gray-50">
+                you@example.com
+              </div>
             </div>
 
             {templateType === 'google_review' && (
@@ -115,12 +134,19 @@ export default function FormsPreview({ title, description, templateType, googleR
 
             {customFields.map(field => (
               <div key={field.id}>
-                <p className="text-xs font-medium text-gray-600 mb-1">{field.label || '(unnamed field)'}{field.required ? ' *' : ''}</p>
+                <p className="text-xs font-medium text-gray-600 mb-1">
+                  {field.label || '(unnamed field)'}
+                  {field.required ? ' *' : ''}
+                </p>
                 {field.type === 'text' && (
-                  <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400">Text answer…</div>
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400">
+                    Text answer…
+                  </div>
                 )}
                 {field.type === 'textarea' && (
-                  <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400 h-14">Long answer…</div>
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400 h-14">
+                    Long answer…
+                  </div>
                 )}
                 {field.type === 'image' && (
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">

@@ -25,14 +25,25 @@ interface Props {
   canWrite?: boolean
 }
 
-export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false, canWrite = false }: Props) {
+export default function ProductsTableClient({
+  products,
+  featuredCount,
+  backUrl = '/admin/products',
+  isSuperAdmin = false,
+  canWrite = false,
+}: Props) {
   const canLabels = useHasScope('labels:read')
   const confirm = useConfirm()
   const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
-  const [draftProduct, setDraftProduct] = useState<{ id: string; name: string; sku: string | null; backUrl: string } | null>(null)
+  const [draftProduct, setDraftProduct] = useState<{
+    id: string
+    name: string
+    sku: string | null
+    backUrl: string
+  } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleToggleActive(productId: string, currentActive: boolean) {
@@ -51,7 +62,11 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
   }
 
   async function handleDelete(productId: string, productName: string) {
-    const ok = await confirm({ message: `Permanently delete "${productName}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Delete' })
+    const ok = await confirm({
+      message: `Permanently delete "${productName}"? This cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    })
     if (!ok) return
     setDeletingId(productId)
     try {
@@ -86,7 +101,10 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                 <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                   <div className="flex-shrink-0 h-10 w-10">
                     <ProductImage
-                      thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
+                      thumbnailUrl={
+                        product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url ||
+                        product.product_images?.[0]?.thumbnail_url
+                      }
                       altText={product.name}
                     />
                   </div>
@@ -110,7 +128,10 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                           {product.product_images?.[0] && (
                             <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-border-default bg-surface-secondary">
                               <img
-                                src={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
+                                src={
+                                  product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url ||
+                                  product.product_images?.[0]?.thumbnail_url
+                                }
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                               />
@@ -124,16 +145,30 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                             >
                               {product.name}
                             </Link>
-                            <p className="text-xs text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span></p>
+                            <p className="text-xs text-foreground-muted mt-0.5">
+                              <span className="inline-flex items-center gap-1">
+                                {product.sku}
+                                {product.sku && <CopySku sku={product.sku} />}
+                              </span>
+                            </p>
                             <div className="flex gap-1 mt-1 flex-wrap">
-                              <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${product.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                              <span
+                                className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${product.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                              >
                                 {product.is_active ? 'Active' : 'Inactive'}
                               </span>
                               {product.is_featured && (
-                                <span className="px-1.5 py-0.5 text-xs rounded-full font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
+                                <span className="px-1.5 py-0.5 text-xs rounded-full font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 inline-flex items-center gap-1">
+                                  <Star className="w-3 h-3 fill-current" /> Featured
+                                </span>
                               )}
                             </div>
-                            <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} size="xs" />
+                            <ProductWarningBadges
+                              fragile={product.fragile}
+                              hazardous={product.hazardous}
+                              flammable={product.flammable}
+                              size="xs"
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs border-t border-border-default pt-2">
@@ -164,22 +199,42 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                               </div>
                             )}
                           </div>
-                          <div className={product.has_variants && Array.isArray(product.product_variants) && product.product_variants.length > 0 ? 'col-span-2' : ''}>
+                          <div
+                            className={
+                              product.has_variants &&
+                              Array.isArray(product.product_variants) &&
+                              product.product_variants.length > 0
+                                ? 'col-span-2'
+                                : ''
+                            }
+                          >
                             <p className="text-foreground-muted mb-0.5">Stock</p>
-                            {product.has_variants && Array.isArray(product.product_variants) && product.product_variants.length > 0 ? (
+                            {product.has_variants &&
+                            Array.isArray(product.product_variants) &&
+                            product.product_variants.length > 0 ? (
                               <div className="space-y-0.5">
                                 {product.product_variants.map((v: any) => {
                                   const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
-                                  const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
+                                  const vInv = hasSubs
+                                    ? Number(v.sub_variant_inventory_total || 0)
+                                    : Number(v.inventory_quantity || 0)
                                   const vListed = hasSubs
-                                    ? (Number(v.sub_variant_stock_total || 0) > 0 ? 'In Stock' : 'Out of Stock')
-                                    : (v.stock_status || '—')
+                                    ? Number(v.sub_variant_stock_total || 0) > 0
+                                      ? 'In Stock'
+                                      : 'Out of Stock'
+                                    : v.stock_status || '—'
                                   return (
                                     <div key={v.id} className="flex items-center justify-between gap-2">
                                       <span className="text-foreground-secondary truncate">{v.variant_name}</span>
                                       <div className="flex gap-1.5 shrink-0">
-                                        <span className={`font-semibold ${vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>{vInv}</span>
-                                        <span className="text-foreground-muted text-[11px] whitespace-nowrap">{vListed}</span>
+                                        <span
+                                          className={`font-semibold ${vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}
+                                        >
+                                          {vInv}
+                                        </span>
+                                        <span className="text-foreground-muted text-[11px] whitespace-nowrap">
+                                          {vListed}
+                                        </span>
                                       </div>
                                     </div>
                                   )
@@ -189,14 +244,20 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                               <div className="space-y-0.5">
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-foreground-muted">Inventory</span>
-                                  <span className={`font-semibold shrink-0 ${
-                                    (product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)) === 0
-                                      ? 'text-red-600 dark:text-red-400'
-                                      : product.stock_status === 'Low Stock'
-                                      ? 'text-orange-600 dark:text-orange-400'
-                                      : 'text-foreground'
-                                  }`}>
-                                    {product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)}
+                                  <span
+                                    className={`font-semibold shrink-0 ${
+                                      (product.has_variants
+                                        ? Number(product.variant_inventory_total)
+                                        : Number(product.inventory_quantity ?? 0)) === 0
+                                        ? 'text-red-600 dark:text-red-400'
+                                        : product.stock_status === 'Low Stock'
+                                          ? 'text-orange-600 dark:text-orange-400'
+                                          : 'text-foreground'
+                                    }`}
+                                  >
+                                    {product.has_variants
+                                      ? Number(product.variant_inventory_total)
+                                      : Number(product.inventory_quantity ?? 0)}
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between gap-2">
@@ -217,12 +278,20 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <p className="text-xs text-accent-500 font-medium">Click row to view full details →</p>
                       </div>
                     </HoverCard>
-                    <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} size="xs" />
+                    <ProductWarningBadges
+                      fragile={product.fragile}
+                      hazardous={product.hazardous}
+                      flammable={product.flammable}
+                      size="xs"
+                    />
                   </div>
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
-                <span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span>
+                <span className="inline-flex items-center gap-1">
+                  {product.sku}
+                  {product.sku && <CopySku sku={product.sku} />}
+                </span>
               </td>
               <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
                 {product.categories?.name || 'N/A'}
@@ -234,16 +303,22 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                 <div className="text-sm font-semibold text-primary-500 truncate">
                   {product.has_variants ? (
                     <div className="flex items-baseline gap-1.5">
-                      <span>From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                      {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
-                        <span className="text-xs text-foreground-muted line-through font-normal">
-                          Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </span>
-                      )}
+                      <span>
+                        From Rs.{' '}
+                        {Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      {product.variant_min_mrp &&
+                        Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
+                          <span className="text-xs text-foreground-muted line-through font-normal">
+                            Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
                     </div>
                   ) : (
                     <div className="flex items-baseline gap-1.5">
-                      <span>Rs. {Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        Rs. {Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
                       {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
                         <span className="text-xs text-foreground-muted line-through font-normal">
                           Rs. {Number(product.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -255,17 +330,24 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
               </td>
               <td className="px-4 py-3">
                 {(() => {
-                  const invStock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
+                  const invStock = product.has_variants
+                    ? Number(product.variant_inventory_total)
+                    : Number(product.inventory_quantity ?? 0)
                   const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
                   const stockStatus: string = product.stock_status || 'In Stock'
                   const isOut = invStock === 0 || stockStatus === 'Out of Stock'
-                  const isLow = !isOut && (stockStatus === 'Low Stock' || (product.has_variants && invStock > 0 && invStock <= 3))
-                  const invColor = isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                  const isLow =
+                    !isOut && (stockStatus === 'Low Stock' || (product.has_variants && invStock > 0 && invStock <= 3))
+                  const invColor = isOut
+                    ? 'text-red-600 dark:text-red-400'
+                    : isLow
+                      ? 'text-orange-500 dark:text-orange-400'
+                      : 'text-foreground'
                   const statusColor = isOut
                     ? 'text-red-600 dark:text-red-400'
                     : isLow
-                    ? 'text-orange-500 dark:text-orange-400'
-                    : 'text-green-600 dark:text-green-400'
+                      ? 'text-orange-500 dark:text-orange-400'
+                      : 'text-green-600 dark:text-green-400'
                   return (
                     <div className="text-xs space-y-0.5">
                       <div className="flex items-center gap-1">
@@ -274,7 +356,9 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         {product.has_variants && (
                           <HoverCard
                             trigger={
-                              <span className="text-[10px] text-blue-500 dark:text-blue-400 underline decoration-dotted underline-offset-2 cursor-default hover:text-blue-700 dark:hover:text-blue-200 transition-colors">(v)</span>
+                              <span className="text-[10px] text-blue-500 dark:text-blue-400 underline decoration-dotted underline-offset-2 cursor-default hover:text-blue-700 dark:hover:text-blue-200 transition-colors">
+                                (v)
+                              </span>
                             }
                             align="left"
                             side="bottom"
@@ -286,22 +370,38 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                                 <div className="border-t border-border-default pt-2 space-y-1.5">
                                   {product.product_variants.map((v: any) => {
                                     const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
-                                    const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
-                                    const vColor = vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                                    const vInv = hasSubs
+                                      ? Number(v.sub_variant_inventory_total || 0)
+                                      : Number(v.inventory_quantity || 0)
+                                    const vColor =
+                                      vInv === 0
+                                        ? 'text-red-600 dark:text-red-400'
+                                        : vInv <= 3
+                                          ? 'text-orange-500 dark:text-orange-400'
+                                          : 'text-foreground'
                                     return (
                                       <div key={v.id} className="text-xs">
                                         <div className="flex items-center justify-between gap-2">
                                           <span className="text-foreground font-medium truncate">{v.variant_name}</span>
-                                          {!hasSubs && <span className={`font-semibold shrink-0 ${vColor}`}>{vInv}</span>}
+                                          {!hasSubs && (
+                                            <span className={`font-semibold shrink-0 ${vColor}`}>{vInv}</span>
+                                          )}
                                         </div>
                                         {hasSubs && (
                                           <div className="ml-2 mt-0.5 space-y-0.5">
                                             {v.sub_variants.map((sv: any) => {
                                               const svInv = Number(sv.inventory_quantity || 0)
-                                              const svColor = svInv === 0 ? 'text-red-600 dark:text-red-400' : svInv <= 3 ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                                              const svColor =
+                                                svInv === 0
+                                                  ? 'text-red-600 dark:text-red-400'
+                                                  : svInv <= 3
+                                                    ? 'text-orange-500 dark:text-orange-400'
+                                                    : 'text-foreground'
                                               return (
                                                 <div key={sv.id} className="flex items-center justify-between gap-2">
-                                                  <span className="text-foreground-muted truncate">{sv.sub_variant_name}</span>
+                                                  <span className="text-foreground-muted truncate">
+                                                    {sv.sub_variant_name}
+                                                  </span>
                                                   <span className={`font-semibold shrink-0 ${svColor}`}>{svInv}</span>
                                                 </div>
                                               )
@@ -313,7 +413,9 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                                   })}
                                 </div>
                               ) : (
-                                <p className="text-xs text-foreground-muted border-t border-border-default pt-2">No variant data.</p>
+                                <p className="text-xs text-foreground-muted border-t border-border-default pt-2">
+                                  No variant data.
+                                </p>
                               )}
                             </div>
                           </HoverCard>
@@ -338,7 +440,9 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
                   <button
-                    onClick={() => canWrite && handleToggleActive(product.id, activeStates[product.id] ?? product.is_active)}
+                    onClick={() =>
+                      canWrite && handleToggleActive(product.id, activeStates[product.id] ?? product.is_active)
+                    }
                     disabled={!canWrite}
                     className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${
                       (activeStates[product.id] ?? product.is_active)
@@ -348,7 +452,13 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                   >
                     {(activeStates[product.id] ?? product.is_active) ? 'Active' : 'Inactive'}
                   </button>
-                  {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
+                  {canWrite && (
+                    <FeaturedToggleButton
+                      productId={product.id}
+                      isFeatured={product.is_featured}
+                      featuredCount={featuredCount}
+                    />
+                  )}
                 </div>
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -359,44 +469,79 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                      />
                     </svg>
                   </Link>
-                  {product.is_active ? (
-                    canWrite && (
+                  {product.is_active
+                    ? canWrite && (
+                        <button
+                          onClick={() =>
+                            setDraftProduct({
+                              id: product.id,
+                              name: String(product.name || ''),
+                              sku: product.sku ? String(product.sku) : null,
+                              backUrl,
+                            })
+                          }
+                          title="Edit Product"
+                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                        </button>
+                      )
+                    : canWrite && (
+                        <Link
+                          href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
+                          title="Edit Product"
+                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                        </Link>
+                      )}
+                  {canLabels && (
                     <button
-                      onClick={() => setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null, backUrl })}
-                      title="Edit Product"
-                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                      onClick={() =>
+                        setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })
+                      }
+                      title="Print Label"
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                        />
                       </svg>
                     </button>
-                    )
-                  ) : (
-                    canWrite && (
-                    <Link
-                      href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
-                      title="Edit Product"
-                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </Link>
-                    )
-                  )}
-{canLabels && (
-                  <button
-                    onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
-                    title="Print Label"
-                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                  </button>
                   )}
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
                   {isSuperAdmin && canWrite && (
@@ -410,7 +555,11 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
                       ) : (
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
                         </svg>
                       )}
                     </button>

@@ -10,7 +10,13 @@ import OrderAffirmation from '@/components/on-device/OrderAffirmation'
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
   const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
+  if (match)
+    return (
+      <>
+        {match[1]}
+        <sup>2</sup>
+      </>
+    )
   return <>{label}</>
 }
 
@@ -116,7 +122,9 @@ function OrderConfirmationPage() {
       <div className="container mx-auto px-4 max-w-3xl">
         {/* Success Message */}
         <div className="bg-green-50 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 sm:p-6 lg:p-8 mb-8 text-center">
-          <div className="flex justify-center mb-4"><CheckCircle className="w-16 h-16 text-green-500" /></div>
+          <div className="flex justify-center mb-4">
+            <CheckCircle className="w-16 h-16 text-green-500" />
+          </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
           <p className="text-foreground-secondary mb-4">
             Thank you for your purchase. Your order has been successfully placed.
@@ -132,27 +140,61 @@ function OrderConfirmationPage() {
           <h2 className="text-xl font-bold text-foreground mb-4">Order Summary</h2>
 
           <div className="space-y-4 mb-6">
-            {order.items.map((item) => {
-              const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
-              const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
+            {order.items.map(item => {
+              const isFractional =
+                (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+              const unitLabel =
+                item.buyUnit && item.buyUnit !== 'unit'
+                  ? item.buyUnit
+                  : item.buyMode && item.buyMode !== 'unit'
+                    ? item.buyMode
+                    : null
               const qtyNum = isFractional
                 ? Number(Number(item.quantity).toFixed(6)).toString()
                 : String(Math.round(Number(item.quantity)))
               return (
-              <div key={item.id} className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0">
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{item.productName}</p>
-                  <p className="text-sm text-foreground-secondary">
-                    Quantity: {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
-                  </p>
-                  <p className="text-sm text-foreground-secondary">
-                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} × {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                <div
+                  key={item.id}
+                  className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0"
+                >
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{item.productName}</p>
+                    <p className="text-sm text-foreground-secondary">
+                      Quantity: {qtyNum}
+                      {unitLabel ? (
+                        <>
+                          {' '}
+                          <UnitLabel label={unitLabel} />
+                        </>
+                      ) : (
+                        ''
+                      )}
+                    </p>
+                    <p className="text-sm text-foreground-secondary">
+                      ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {unitLabel ? (
+                        <>
+                          {' '}
+                          / <UnitLabel label={unitLabel} />
+                        </>
+                      ) : (
+                        ''
+                      )}{' '}
+                      × {qtyNum}
+                      {unitLabel ? (
+                        <>
+                          {' '}
+                          <UnitLabel label={unitLabel} />
+                        </>
+                      ) : (
+                        ''
+                      )}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-foreground">
+                    ₹{(item.unitPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <p className="font-semibold text-foreground">
-                  ₹{(item.unitPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
               )
             })}
           </div>
@@ -172,9 +214,7 @@ function OrderConfirmationPage() {
           <h2 className="text-xl font-bold text-foreground mb-4">Shipping Address</h2>
           <div className="text-foreground-secondary">
             <p>{order.shippingAddress.addressLine1}</p>
-            {order.shippingAddress.addressLine2 && (
-              <p>{order.shippingAddress.addressLine2}</p>
-            )}
+            {order.shippingAddress.addressLine2 && <p>{order.shippingAddress.addressLine2}</p>}
             <p>
               {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}
             </p>
@@ -186,25 +226,35 @@ function OrderConfirmationPage() {
         <div className="bg-surface-elevated rounded-lg shadow-md p-4 sm:p-6 mb-8">
           <h2 className="text-xl font-bold text-foreground mb-4">Order Status</h2>
           <div className="flex items-center gap-3">
-            <span className={`px-4 py-2 rounded-full font-semibold ${
-              order.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
-              order.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' :
-              order.status === 'shipped' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
-              order.status === 'out_for_delivery' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300' :
-              order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-              'bg-surface-secondary text-foreground'
-            }`}>
-              {order.status === 'out_for_delivery' ? 'Out for Delivery'
-                : order.status === 'cancel_requested' ? 'Cancellation Requested'
-                : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            <span
+              className={`px-4 py-2 rounded-full font-semibold ${
+                order.status === 'pending'
+                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                  : order.status === 'processing'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                    : order.status === 'shipped'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                      : order.status === 'out_for_delivery'
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+                        : order.status === 'delivered'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                          : 'bg-surface-secondary text-foreground'
+              }`}
+            >
+              {order.status === 'out_for_delivery'
+                ? 'Out for Delivery'
+                : order.status === 'cancel_requested'
+                  ? 'Cancellation Requested'
+                  : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </span>
             <span className="text-foreground-secondary">
-              Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
+              Placed on{' '}
+              {new Date(order.createdAt).toLocaleDateString('en-IN', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
                 hour: '2-digit',
-                minute: '2-digit'
+                minute: '2-digit',
               })}
             </span>
           </div>
@@ -218,12 +268,7 @@ function OrderConfirmationPage() {
         </div>
 
         {/* On-device affirmation + profile update */}
-        {order && (
-          <OrderAffirmation
-            items={order.items}
-            total={order.totalAmount}
-          />
-        )}
+        {order && <OrderAffirmation items={order.items} total={order.totalAmount} />}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">

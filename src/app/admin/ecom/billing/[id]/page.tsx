@@ -35,7 +35,9 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
 
   return (
     <div className="p-6 w-full">
-      <Link href="/admin/ecom/billing" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">← Billing</Link>
+      <Link href="/admin/ecom/billing" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">
+        ← Billing
+      </Link>
       <div className="flex items-center gap-3 mt-2 mb-6">
         <h1 className="text-2xl font-bold text-foreground">{t.display_name} — Billing</h1>
         <StatusPill status={t.status} />
@@ -45,7 +47,11 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         <div className="rounded-xl border border-border-default p-4 bg-surface-elevated">
           <div className="text-xs text-foreground-muted uppercase tracking-wide">Settlement balance</div>
-          <div className={`text-xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{inr(balance)}</div>
+          <div
+            className={`text-xl font-bold ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+          >
+            {inr(balance)}
+          </div>
         </div>
         <div className="rounded-xl border border-border-default p-4 bg-surface-elevated">
           <div className="text-xs text-foreground-muted uppercase tracking-wide">GMV</div>
@@ -85,18 +91,28 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
           </thead>
           <tbody className="divide-y divide-border-default">
             {transactions.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">No transactions yet.</td></tr>
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">
+                  No transactions yet.
+                </td>
+              </tr>
             )}
-            {transactions.map((tx) => (
+            {transactions.map(tx => (
               <tr key={tx.id} className="hover:bg-surface-secondary">
                 <td className="px-4 py-3 font-medium text-foreground">{tx.order_ref || '—'}</td>
                 <td className="px-4 py-3 text-right text-foreground">{inr(tx.gross_amount)}</td>
                 <td className="px-4 py-3 text-right text-green-600 dark:text-green-400">{inr(tx.tenant_share)}</td>
-                <td className="px-4 py-3 text-right text-accent-600 dark:text-accent-400">{inr(tx.platform_commission)}</td>
+                <td className="px-4 py-3 text-right text-accent-600 dark:text-accent-400">
+                  {inr(tx.platform_commission)}
+                </td>
                 <td className="px-4 py-3 text-right text-foreground-muted">{inr(tx.gateway_fee)}</td>
                 <td className="px-4 py-3 text-foreground-secondary">{tx.is_cod ? 'COD' : 'Prepaid'}</td>
-                <td className="px-4 py-3"><StatusPill status={tx.status} /></td>
-                <td className="px-4 py-3 text-foreground-muted">{new Date(tx.occurred_at).toLocaleDateString('en-IN')}</td>
+                <td className="px-4 py-3">
+                  <StatusPill status={tx.status} />
+                </td>
+                <td className="px-4 py-3 text-foreground-muted">
+                  {new Date(tx.occurred_at).toLocaleDateString('en-IN')}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -117,26 +133,41 @@ export default async function TenantBillingPage({ params }: { params: Promise<{ 
           </thead>
           <tbody className="divide-y divide-border-default">
             {ledger.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-foreground-muted">No ledger entries yet.</td></tr>
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-foreground-muted">
+                  No ledger entries yet.
+                </td>
+              </tr>
             )}
-            {ledger.map((e) => {
+            {ledger.map(e => {
               const amt = Number(e.amount)
               return (
                 <tr key={e.id} className="hover:bg-surface-secondary">
                   <td className="px-4 py-3 text-foreground">{LEDGER_LABEL[e.entry_type] || e.entry_type}</td>
                   <td className="px-4 py-3 text-foreground-muted">{e.note || '—'}</td>
-                  <td className={`px-4 py-3 text-right font-medium ${amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {amt >= 0 ? '+' : '−'}{inr(Math.abs(amt))}
+                  <td
+                    className={`px-4 py-3 text-right font-medium ${amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                  >
+                    {amt >= 0 ? '+' : '−'}
+                    {inr(Math.abs(amt))}
                   </td>
-                  <td className="px-4 py-3 text-foreground-muted">{new Date(e.occurred_at).toLocaleDateString('en-IN')}</td>
+                  <td className="px-4 py-3 text-foreground-muted">
+                    {new Date(e.occurred_at).toLocaleDateString('en-IN')}
+                  </td>
                 </tr>
               )
             })}
           </tbody>
           <tfoot className="bg-surface-secondary font-semibold">
             <tr>
-              <td className="px-4 py-3 text-foreground" colSpan={2}>Balance</td>
-              <td className={`px-4 py-3 text-right ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{inr(balance)}</td>
+              <td className="px-4 py-3 text-foreground" colSpan={2}>
+                Balance
+              </td>
+              <td
+                className={`px-4 py-3 text-right ${balance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+              >
+                {inr(balance)}
+              </td>
               <td></td>
             </tr>
           </tfoot>

@@ -69,13 +69,11 @@ export default function Faq() {
                   aria-hidden
                   className={clsx(
                     'ecom-accent-text h-5 w-5 shrink-0 transition-transform duration-200',
-                    isOpen && 'rotate-180',
+                    isOpen && 'rotate-180'
                   )}
                 />
               </button>
-              <div className={clsx('px-5 pb-4 text-sm text-foreground-secondary', !isOpen && 'hidden')}>
-                {item.a}
-              </div>
+              <div className={clsx('px-5 pb-4 text-sm text-foreground-secondary', !isOpen && 'hidden')}>{item.a}</div>
             </div>
           )
         })}

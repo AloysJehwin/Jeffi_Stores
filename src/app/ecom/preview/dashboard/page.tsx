@@ -2,13 +2,16 @@ export const dynamic = 'force-static'
 
 export default function PreviewDashboard() {
   const kpis = [
-    { label: 'Revenue',         value: 'Rs. 1,24,500', sub: 'Prev: Rs. 1,05,200', pct: '+18%', color: 'bg-accent-500/10'  },
-    { label: 'Orders',          value: '342',           sub: 'Prev: 276',          pct: '+24%', color: 'bg-blue-500/10'   },
-    { label: 'Avg Order Value', value: 'Rs. 364',       sub: 'Prev: Rs. 381',      pct: '-4%',  color: 'bg-amber-500/10'  },
-    { label: 'Customers',       value: '218',           sub: 'Prev: 194',          pct: '+12%', color: 'bg-violet-500/10' },
+    { label: 'Revenue', value: 'Rs. 1,24,500', sub: 'Prev: Rs. 1,05,200', pct: '+18%', color: 'bg-accent-500/10' },
+    { label: 'Orders', value: '342', sub: 'Prev: 276', pct: '+24%', color: 'bg-blue-500/10' },
+    { label: 'Avg Order Value', value: 'Rs. 364', sub: 'Prev: Rs. 381', pct: '-4%', color: 'bg-amber-500/10' },
+    { label: 'Customers', value: '218', sub: 'Prev: 194', pct: '+12%', color: 'bg-violet-500/10' },
   ]
-  const bars = [38,55,47,72,58,85,68,74,62,88,79,92,71,83,95,68,77,84,91,62,73,88,94,76,85,92,87,96,88,100]
-  const actions = ['New Product','Cash Sale','Quotation','New PO','Orders','Packing Slips']
+  const bars = [
+    38, 55, 47, 72, 58, 85, 68, 74, 62, 88, 79, 92, 71, 83, 95, 68, 77, 84, 91, 62, 73, 88, 94, 76, 85, 92, 87, 96, 88,
+    100,
+  ]
+  const actions = ['New Product', 'Cash Sale', 'Quotation', 'New PO', 'Orders', 'Packing Slips']
 
   return (
     <div className="light-scope bg-white min-h-screen p-4 sm:p-6 space-y-6 font-sans">
@@ -19,8 +22,13 @@ export default function PreviewDashboard() {
           <p className="text-sm text-foreground-secondary mt-0.5">Store at a glance · Last 30 days</p>
         </div>
         <div className="flex items-center bg-surface-secondary border border-border-default rounded-xl p-1 gap-0.5 self-start shrink-0">
-          {['7d','30d','90d','1y'].map((r, i) => (
-            <span key={r} className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold ${i === 1 ? 'bg-accent-500 text-white shadow-sm' : 'text-foreground-secondary'}`}>{r}</span>
+          {['7d', '30d', '90d', '1y'].map((r, i) => (
+            <span
+              key={r}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold ${i === 1 ? 'bg-accent-500 text-white shadow-sm' : 'text-foreground-secondary'}`}
+            >
+              {r}
+            </span>
           ))}
         </div>
       </div>
@@ -32,7 +40,9 @@ export default function PreviewDashboard() {
             <p className="text-sm text-foreground-secondary">{c.label}</p>
             <p className="text-2xl font-bold text-foreground mt-1">{c.value}</p>
             <div className="flex items-center gap-2 mt-2">
-              <span className={`text-xs font-semibold ${c.pct.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>{c.pct}</span>
+              <span className={`text-xs font-semibold ${c.pct.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                {c.pct}
+              </span>
               <span className="text-xs text-foreground-muted">{c.sub}</span>
             </div>
           </div>
@@ -51,7 +61,9 @@ export default function PreviewDashboard() {
           ))}
         </div>
         <div className="flex justify-between mt-1 text-[8px] text-foreground-muted">
-          {['1','5','10','15','20','25','30'].map(d => <span key={d}>{d}</span>)}
+          {['1', '5', '10', '15', '20', '25', '30'].map(d => (
+            <span key={d}>{d}</span>
+          ))}
         </div>
       </div>
 
@@ -60,7 +72,12 @@ export default function PreviewDashboard() {
         <p className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Quick Actions</p>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {actions.map((a, i) => (
-            <div key={a} className={`rounded-lg border px-2 py-2 text-center text-xs font-medium cursor-pointer ${i === 0 ? 'bg-accent-500/15 border-accent-500/30 text-accent-600' : 'bg-surface-secondary border-border-default text-foreground-secondary'}`}>{a}</div>
+            <div
+              key={a}
+              className={`rounded-lg border px-2 py-2 text-center text-xs font-medium cursor-pointer ${i === 0 ? 'bg-accent-500/15 border-accent-500/30 text-accent-600' : 'bg-surface-secondary border-border-default text-foreground-secondary'}`}
+            >
+              {a}
+            </div>
           ))}
         </div>
       </div>
