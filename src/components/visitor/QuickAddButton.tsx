@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -12,6 +13,12 @@ interface QuickAddButtonProps {
   slug: string
   hasVariants: boolean
   inStock: boolean
+  imageUrl?: string | null
+  brandName?: string | null
+  categoryName?: string | null
+  displayPrice?: number
+  mrp?: number | null
+  discountPct?: number
 }
 
 const MAX_QTY = 10
@@ -22,6 +29,12 @@ export default function QuickAddButton({
   slug,
   hasVariants,
   inStock,
+  imageUrl,
+  brandName,
+  categoryName,
+  displayPrice,
+  mrp,
+  discountPct,
 }: QuickAddButtonProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -124,6 +137,13 @@ export default function QuickAddButton({
           slug={slug}
           onClose={() => setOpen(false)}
           onStop={stop}
+          imageUrl={imageUrl}
+          brandName={brandName}
+          categoryName={categoryName}
+          displayPrice={displayPrice}
+          mrp={mrp}
+          discountPct={discountPct}
+          inStock={inStock}
         />
       )}
 
@@ -132,6 +152,14 @@ export default function QuickAddButton({
           qty={qty}
           adding={adding}
           prefersReduced={!!prefersReduced}
+          productName={productName}
+          imageUrl={imageUrl}
+          brandName={brandName}
+          categoryName={categoryName}
+          displayPrice={displayPrice}
+          mrp={mrp}
+          discountPct={discountPct}
+          inStock={inStock}
           onQty={setQty}
           onAdd={() => addSimple(qty)}
           onClose={() => setOpen(false)}
@@ -146,13 +174,37 @@ interface SimplePickerProps {
   qty: number
   adding: boolean
   prefersReduced: boolean
+  productName: string
+  imageUrl?: string | null
+  brandName?: string | null
+  categoryName?: string | null
+  displayPrice?: number
+  mrp?: number | null
+  discountPct?: number
+  inStock?: boolean
   onQty: (n: number) => void
   onAdd: () => void
   onClose: () => void
   onStop: (e: React.MouseEvent) => void
 }
 
-function SimpleQtyPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, onStop }: SimplePickerProps) {
+function SimpleQtyPicker({
+  qty,
+  adding,
+  prefersReduced,
+  productName,
+  imageUrl,
+  brandName,
+  categoryName,
+  displayPrice,
+  mrp,
+  discountPct,
+  inStock,
+  onQty,
+  onAdd,
+  onClose,
+  onStop,
+}: SimplePickerProps) {
   const dec = (e: React.MouseEvent) => {
     onStop(e)
     onQty(Math.max(1, qty - 1))
@@ -163,7 +215,53 @@ function SimpleQtyPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, o
   }
 
   const body = (
-    <div className="flex flex-col gap-3" onClick={onStop}>
+    <div className="flex flex-col gap-4" onClick={onStop}>
+      <div className="flex items-start gap-3">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={productName}
+            className="flex-shrink-0 w-16 h-16 rounded-xl border border-border-default object-contain bg-surface-secondary"
+          />
+        ) : (
+          <div className="flex-shrink-0 w-16 h-16 rounded-xl border border-border-default bg-surface-secondary" />
+        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2">{productName}</h3>
+          {brandName && <p className="text-sm text-foreground-secondary truncate">{brandName}</p>}
+          {categoryName && <p className="text-sm text-foreground-secondary truncate">{categoryName}</p>}
+        </div>
+        <button
+          type="button"
+          onClick={e => {
+            onStop(e)
+            onClose()
+          }}
+          aria-label="Close"
+          className="flex-shrink-0 w-7 h-7 rounded-full text-foreground-muted hover:text-foreground flex items-center justify-center"
+        >
+          &#215;
+        </button>
+      </div>
+
+      {displayPrice != null && (
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+            Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </span>
+          {mrp != null && mrp > displayPrice && (
+            <span className="text-sm text-foreground-muted line-through">
+              Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </span>
+          )}
+          {discountPct != null && discountPct > 0 && (
+            <span className="rounded-full bg-accent-500 px-2 py-0.5 text-xs font-semibold text-white">
+              {discountPct}% off
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-foreground">Quantity</span>
         <div className="flex items-center gap-1">
@@ -182,7 +280,7 @@ function SimpleQtyPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, o
           onStop(e)
           onAdd()
         }}
-        disabled={adding}
+        disabled={adding || inStock === false}
         className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
       >
         {adding ? 'Adding...' : 'Add to cart'}
@@ -190,37 +288,31 @@ function SimpleQtyPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, o
     </div>
   )
 
-  return (
-    <>
+  if (typeof document === 'undefined') return null
+
+  const overlay = (
+    <div
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+      onClick={onStop}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Quick add to cart"
+    >
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <motion.div
-        role="dialog"
-        aria-label="Quick add"
-        initial={prefersReduced ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.16, ease: 'easeOut' }}
+        initial={prefersReduced ? false : { y: '100%', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
         onClick={onStop}
-        className="hidden sm:block absolute right-0 top-full mt-2 z-30 w-52 rounded-xl border border-border-default bg-surface-elevated shadow-xl p-3"
+        className="relative w-full sm:w-[26rem] sm:max-w-[calc(100vw-2rem)] bg-surface-elevated rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 pb-8 sm:pb-5"
       >
+        <div className="w-10 h-1 bg-border-default rounded-full mx-auto mb-4 sm:hidden" />
         {body}
       </motion.div>
-
-      <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end" onClick={onStop}>
-        <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-        <motion.div
-          role="dialog"
-          aria-label="Quick add"
-          initial={prefersReduced ? false : { y: '100%' }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-          onClick={onStop}
-          className="relative bg-surface-elevated rounded-t-2xl shadow-2xl p-5 pb-8"
-        >
-          <div className="w-10 h-1 bg-border-default rounded-full mx-auto mb-4" />
-          {body}
-        </motion.div>
-      </div>
-    </>
+    </div>
   )
+
+  return createPortal(overlay, document.body)
 }
 
 function StepButton({

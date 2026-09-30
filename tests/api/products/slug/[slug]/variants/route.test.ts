@@ -30,7 +30,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 
 // ── import handler AFTER mocks ───────────────────────────────────────────────
-import { GET } from '@/app/api/(public)/products/[slug]/variants/route'
+import { GET } from '@/app/api/(public)/products/slug/[slug]/variants/route'
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 const variantsRow = {
@@ -71,7 +71,7 @@ const variantsRow = {
 }
 
 function makeReq(slug: string) {
-  return new Request(`http://localhost/api/products/${slug}/variants`)
+  return new Request(`http://localhost/api/products/slug/${slug}/variants`)
 }
 
 describe('GET /api/products/[slug]/variants', () => {
