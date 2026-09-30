@@ -25,7 +25,10 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
 
   const afterImg: Token[] = []
   for (const t of tokens) {
-    if (t.kind !== 'text') { afterImg.push(t); continue }
+    if (t.kind !== 'text') {
+      afterImg.push(t)
+      continue
+    }
     let last = 0
     IMAGE_MD_RE.lastIndex = 0
     let m: RegExpExecArray | null
@@ -39,7 +42,10 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
 
   const afterLink: Token[] = []
   for (const t of afterImg) {
-    if (t.kind !== 'text') { afterLink.push(t); continue }
+    if (t.kind !== 'text') {
+      afterLink.push(t)
+      continue
+    }
     let last = 0
     LINK_MD_RE.lastIndex = 0
     let m: RegExpExecArray | null
@@ -127,8 +133,13 @@ function renderBold(text: string, keyPrefix: string): ReactNode[] {
   let i = 0
   BOLD_RE.lastIndex = 0
   while ((match = BOLD_RE.exec(text)) !== null) {
-    if (match.index > lastIndex) out.push(<Fragment key={`${keyPrefix}-${i++}`}>{text.slice(lastIndex, match.index)}</Fragment>)
-    out.push(<strong key={`${keyPrefix}-b${i++}`} className="font-semibold">{match[1]}</strong>)
+    if (match.index > lastIndex)
+      out.push(<Fragment key={`${keyPrefix}-${i++}`}>{text.slice(lastIndex, match.index)}</Fragment>)
+    out.push(
+      <strong key={`${keyPrefix}-b${i++}`} className="font-semibold">
+        {match[1]}
+      </strong>
+    )
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < text.length) out.push(<Fragment key={`${keyPrefix}-${i++}`}>{text.slice(lastIndex)}</Fragment>)
@@ -147,14 +158,32 @@ function parseBlocks(src: string): Block[] {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]
-    if (!line.trim()) { i++; continue }
-    if (line.startsWith('### ')) { blocks.push({ type: 'h3', content: [line.slice(4)] }); i++; continue }
-    if (line.startsWith('## ')) { blocks.push({ type: 'h2', content: [line.slice(3)] }); i++; continue }
-    if (line.startsWith('# ')) { blocks.push({ type: 'h1', content: [line.slice(2)] }); i++; continue }
+    if (!line.trim()) {
+      i++
+      continue
+    }
+    if (line.startsWith('### ')) {
+      blocks.push({ type: 'h3', content: [line.slice(4)] })
+      i++
+      continue
+    }
+    if (line.startsWith('## ')) {
+      blocks.push({ type: 'h2', content: [line.slice(3)] })
+      i++
+      continue
+    }
+    if (line.startsWith('# ')) {
+      blocks.push({ type: 'h1', content: [line.slice(2)] })
+      i++
+      continue
+    }
     if (line.startsWith('```')) {
       const buf: string[] = []
       i++
-      while (i < lines.length && !lines[i].startsWith('```')) { buf.push(lines[i]); i++ }
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        buf.push(lines[i])
+        i++
+      }
       i++
       blocks.push({ type: 'code', content: buf })
       continue
@@ -179,17 +208,26 @@ function parseBlocks(src: string): Block[] {
     }
     if (line.includes('|') && lines[i + 1] && /^\s*\|?\s*-+/.test(lines[i + 1])) {
       const cells: string[][] = []
-      const splitRow = (s: string) => s.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim())
+      const splitRow = (s: string) =>
+        s
+          .replace(/^\s*\|/, '')
+          .replace(/\|\s*$/, '')
+          .split('|')
+          .map(c => c.trim())
       cells.push(splitRow(line))
       i += 2
-      while (i < lines.length && lines[i].includes('|')) { cells.push(splitRow(lines[i])); i++ }
+      while (i < lines.length && lines[i].includes('|')) {
+        cells.push(splitRow(lines[i]))
+        i++
+      }
       blocks.push({ type: 'table', content: [], cells })
       continue
     }
     const buf: string[] = [line]
     i++
     while (i < lines.length && lines[i].trim() && !/^([-*#>]|\d+\.)\s/.test(lines[i]) && !lines[i].includes('|')) {
-      buf.push(lines[i]); i++
+      buf.push(lines[i])
+      i++
     }
     blocks.push({ type: 'p', content: buf })
   }
@@ -204,26 +242,45 @@ export default function AdminAgentMessage({ text }: { text: string }) {
         const k = `b${idx}`
         switch (b.type) {
           case 'h1':
-            return <h3 key={k} className="text-base font-bold mt-2">{renderInline(b.content[0], k)}</h3>
+            return (
+              <h3 key={k} className="text-base font-bold mt-2">
+                {renderInline(b.content[0], k)}
+              </h3>
+            )
           case 'h2':
-            return <h4 key={k} className="text-sm font-bold mt-2">{renderInline(b.content[0], k)}</h4>
+            return (
+              <h4 key={k} className="text-sm font-bold mt-2">
+                {renderInline(b.content[0], k)}
+              </h4>
+            )
           case 'h3':
-            return <h5 key={k} className="text-xs font-bold uppercase tracking-wide mt-1 opacity-80">{renderInline(b.content[0], k)}</h5>
+            return (
+              <h5 key={k} className="text-xs font-bold uppercase tracking-wide mt-1 opacity-80">
+                {renderInline(b.content[0], k)}
+              </h5>
+            )
           case 'ul':
             return (
               <ul key={k} className="list-disc pl-5 space-y-0.5">
-                {b.content.map((c, i) => <li key={`${k}-${i}`}>{renderInline(c, `${k}-${i}`)}</li>)}
+                {b.content.map((c, i) => (
+                  <li key={`${k}-${i}`}>{renderInline(c, `${k}-${i}`)}</li>
+                ))}
               </ul>
             )
           case 'ol':
             return (
               <ol key={k} className="list-decimal pl-5 space-y-0.5">
-                {b.content.map((c, i) => <li key={`${k}-${i}`}>{renderInline(c, `${k}-${i}`)}</li>)}
+                {b.content.map((c, i) => (
+                  <li key={`${k}-${i}`}>{renderInline(c, `${k}-${i}`)}</li>
+                ))}
               </ol>
             )
           case 'code':
             return (
-              <pre key={k} className="text-[11px] font-mono bg-surface-secondary text-foreground rounded p-2 overflow-x-auto">
+              <pre
+                key={k}
+                className="text-[11px] font-mono bg-surface-secondary text-foreground rounded p-2 overflow-x-auto"
+              >
                 {b.content.join('\n')}
               </pre>
             )
@@ -234,7 +291,9 @@ export default function AdminAgentMessage({ text }: { text: string }) {
                   <thead>
                     <tr className="border-b border-border-default">
                       {b.cells![0].map((c, i) => (
-                        <th key={i} className="text-left font-semibold py-1.5 px-2">{renderInline(c, `${k}-h${i}`)}</th>
+                        <th key={i} className="text-left font-semibold py-1.5 px-2">
+                          {renderInline(c, `${k}-h${i}`)}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -242,7 +301,9 @@ export default function AdminAgentMessage({ text }: { text: string }) {
                     {b.cells!.slice(1).map((row, ri) => (
                       <tr key={ri} className="border-b border-border-default/50">
                         {row.map((c, ci) => (
-                          <td key={ci} className="py-1.5 px-2 align-top">{renderInline(c, `${k}-${ri}-${ci}`)}</td>
+                          <td key={ci} className="py-1.5 px-2 align-top">
+                            {renderInline(c, `${k}-${ri}-${ci}`)}
+                          </td>
                         ))}
                       </tr>
                     ))}
@@ -251,7 +312,11 @@ export default function AdminAgentMessage({ text }: { text: string }) {
               </div>
             )
           default:
-            return <p key={k} className="whitespace-pre-wrap">{renderInline(b.content.join('\n'), k)}</p>
+            return (
+              <p key={k} className="whitespace-pre-wrap">
+                {renderInline(b.content.join('\n'), k)}
+              </p>
+            )
         }
       })}
     </div>

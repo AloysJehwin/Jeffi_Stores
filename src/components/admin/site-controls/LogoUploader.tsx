@@ -35,23 +35,26 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
     <div>
       <label className="block text-sm font-medium text-foreground mb-1">Store Logo</label>
       <p className="text-xs text-foreground-muted mb-2">
-        Shown in the site header, emails and PDFs. PNG with transparency recommended. Required — upload a replacement to change it.
+        Shown in the site header, emails and PDFs. PNG with transparency recommended. Required — upload a replacement to
+        change it.
       </p>
       <div className="flex items-center gap-4">
         <div className="h-16 w-40 rounded-lg border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
           {url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={url}
-              alt="Store logo"
-              className="max-h-14 max-w-[9rem] object-contain"
-            />
+            <img src={url} alt="Store logo" className="max-h-14 max-w-[9rem] object-contain" />
           ) : (
             <span className="text-xs text-foreground-muted px-2 text-center">No logo</span>
           )}
         </div>
         <div className="flex flex-col gap-2">
-          <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={onFile} className="hidden" />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            onChange={onFile}
+            className="hidden"
+          />
           <RequireWrite scope="settings:write">
             <button
               type="button"

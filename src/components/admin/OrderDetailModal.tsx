@@ -9,9 +9,36 @@ import { ap } from '@/lib/admin-path'
 import CopySku from '@/components/ui/CopySku'
 
 const METRO_PINS_3 = new Set([
-  '110','111','112','400','401','402','403','410','421',
-  '560','561','562','563','600','601','602','603',
-  '500','501','502','503','700','711','712','411','412','413','380','382','383',
+  '110',
+  '111',
+  '112',
+  '400',
+  '401',
+  '402',
+  '403',
+  '410',
+  '421',
+  '560',
+  '561',
+  '562',
+  '563',
+  '600',
+  '601',
+  '602',
+  '603',
+  '500',
+  '501',
+  '502',
+  '503',
+  '700',
+  '711',
+  '712',
+  '411',
+  '412',
+  '413',
+  '380',
+  '382',
+  '383',
 ])
 function getTatDays(pin: string): number {
   if (pin.startsWith('49')) return 7
@@ -21,7 +48,10 @@ function getTatDays(pin: string): number {
 function resolveOrderEdd(o: any): string | null {
   const isShipped = ['shipped', 'out_for_delivery', 'delivered'].includes(o.status)
   if (isShipped && o.estimated_delivery_date) {
-    return new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    return new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+    })
   }
   const pin: string = o.shipping_address?.postal_code ?? ''
   if (!pin) return null
@@ -61,7 +91,9 @@ export default function OrderDetailModal({ order, onClose }: Props) {
   }, [order, fetchDetail])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -77,7 +109,8 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
   function statusBadgeClass(status: string) {
     if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-    if (status === 'processing' || status === 'shipped') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    if (status === 'processing' || status === 'shipped')
+      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
     if (status === 'cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
     if (status === 'cancel_requested') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -122,7 +155,11 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             <p className="text-xs text-foreground-muted mt-0.5">
               {new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
               {' · '}
-              {new Date(o.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+              {new Date(o.created_at).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Kolkata',
+              })}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -152,13 +189,15 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${paymentBadgeClass(o.payment_status)}`}>
               {o.payment_status}
             </span>
-            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
-              o.source === 'online'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                : o.source === 'business'
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-            }`}>
+            <span
+              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                o.source === 'online'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : o.source === 'business'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+              }`}
+            >
               {o.source === 'online' ? 'Online' : o.source === 'business' ? 'Business' : 'Offline'}
             </span>
           </div>
@@ -175,7 +214,10 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                 <p className="text-xs text-foreground-secondary mt-0.5">{o.users?.phone || o.billing_address?.phone}</p>
               )}
               {o.users?.id && (
-                <Link href={ap(`/admin/customers/${o.users.id}`)} className="text-xs text-accent-500 hover:underline mt-1 inline-block">
+                <Link
+                  href={ap(`/admin/customers/${o.users.id}`)}
+                  className="text-xs text-accent-500 hover:underline mt-1 inline-block"
+                >
                   View customer →
                 </Link>
               )}
@@ -184,7 +226,9 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               <div>
                 <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Shipping Address</p>
                 <p className="text-sm text-foreground leading-relaxed">
-                  {[addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode].filter(Boolean).join(', ')}
+                  {[addr.address_line1, addr.address_line2, addr.city, addr.state, addr.pincode]
+                    .filter(Boolean)
+                    .join(', ')}
                 </p>
               </div>
             )}
@@ -194,29 +238,39 @@ export default function OrderDetailModal({ order, onClose }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
-              <p className="text-sm font-semibold text-foreground">₹{Number(o.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="text-sm font-semibold text-foreground">
+                ₹{Number(o.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
             </div>
             {Number(o.discount_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">Discount</p>
-                <p className="text-sm font-semibold text-red-500">−₹{Number(o.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-sm font-semibold text-red-500">
+                  −₹{Number(o.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
               </div>
             )}
             {Number(o.business_discount_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">Business Discount</p>
-                <p className="text-sm font-semibold text-red-500">−₹{Number(o.business_discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-sm font-semibold text-red-500">
+                  −₹{Number(o.business_discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
               </div>
             )}
             {Number(o.shipping_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">Shipping</p>
-                <p className="text-sm font-semibold text-foreground">₹{Number(o.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-sm font-semibold text-foreground">
+                  ₹{Number(o.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
               </div>
             )}
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
-              <p className="text-sm font-bold text-foreground">₹{Number(o.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="text-sm font-bold text-foreground">
+                ₹{Number(o.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </p>
             </div>
           </div>
 
@@ -239,16 +293,32 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                     {items.map((item: any) => (
                       <tr key={item.id} className="hover:bg-surface-secondary">
                         <td className="px-3 py-2 font-medium text-foreground">
-                          <p className="truncate" title={item.product_name}>{item.product_name}</p>
+                          <p className="truncate" title={item.product_name}>
+                            {item.product_name}
+                          </p>
                           {item.variant_name && (
                             <p className="text-xs text-foreground-muted truncate">{item.variant_name}</p>
                           )}
-                          <ProductWarningBadges fragile={item.fragile} hazardous={item.hazardous} flammable={item.flammable} size="xs" />
+                          <ProductWarningBadges
+                            fragile={item.fragile}
+                            hazardous={item.hazardous}
+                            flammable={item.flammable}
+                            size="xs"
+                          />
                         </td>
-                        <td className="px-3 py-2 text-xs text-foreground-muted truncate"><span className="inline-flex items-center gap-1">{item.product_sku || '—'}{item.product_sku && <CopySku sku={item.product_sku} />}</span></td>
+                        <td className="px-3 py-2 text-xs text-foreground-muted truncate">
+                          <span className="inline-flex items-center gap-1">
+                            {item.product_sku || '—'}
+                            {item.product_sku && <CopySku sku={item.product_sku} />}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-right text-foreground">{item.quantity}</td>
-                        <td className="px-3 py-2 text-right text-foreground">₹{Number(item.unit_price).toLocaleString('en-IN')}</td>
-                        <td className="px-3 py-2 text-right font-semibold text-foreground">₹{Number(item.total_price).toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-2 text-right text-foreground">
+                          ₹{Number(item.unit_price).toLocaleString('en-IN')}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-foreground">
+                          ₹{Number(item.total_price).toLocaleString('en-IN')}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -260,51 +330,74 @@ export default function OrderDetailModal({ order, onClose }: Props) {
           {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
             {canPackingSlips && (
-            <a
-              href={`/api/admin/packing-slips/${order.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              Packing Slip
-            </a>
+              <a
+                href={`/api/admin/packing-slips/${order.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+                Packing Slip
+              </a>
             )}
             {o.awb_number && (
-            <a
-              href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Shipping Label
-            </a>
-            )}
-            {(() => { const e = resolveOrderEdd(o); return e ? (
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <a
+                href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                  />
                 </svg>
-                EDD: {e}
-              </span>
-            ) : null })()}
+                Shipping Label
+              </a>
+            )}
+            {(() => {
+              const e = resolveOrderEdd(o)
+              return e ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  EDD: {e}
+                </span>
+              ) : null
+            })()}
             {o.invoice_number && (
-            <a
-              href={`/api/orders/${order.id}/invoice`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Invoice PDF
-            </a>
+              <a
+                href={`/api/orders/${order.id}/invoice`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Invoice PDF
+              </a>
             )}
           </div>
         </div>

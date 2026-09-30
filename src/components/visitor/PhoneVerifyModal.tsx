@@ -158,8 +158,24 @@ export default function PhoneVerifyModal({
                 />
                 <span>
                   I agree to the{' '}
-                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  <a
+                    href="/legal/privacy-policy"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Privacy Policy
+                  </a>{' '}
+                  and{' '}
+                  <a
+                    href="/legal/terms-and-conditions"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Terms &amp; Conditions
+                  </a>
+                  .
                 </span>
               </label>
             )}
@@ -170,8 +186,13 @@ export default function PhoneVerifyModal({
               className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
-                <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending...</>
-              ) : 'Send OTP'}
+                <>
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Sending...
+                </>
+              ) : (
+                'Send OTP'
+              )}
             </button>
           </form>
         ) : (
@@ -200,8 +221,13 @@ export default function PhoneVerifyModal({
               className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
-                <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Verifying...</>
-              ) : 'Verify & Continue'}
+                <>
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify & Continue'
+              )}
             </button>
 
             <button
@@ -215,7 +241,11 @@ export default function PhoneVerifyModal({
 
             <button
               type="button"
-              onClick={() => { setStage('phone'); setOtp(''); setError('') }}
+              onClick={() => {
+                setStage('phone')
+                setOtp('')
+                setError('')
+              }}
               className="w-full text-sm text-foreground-muted hover:text-foreground"
             >
               Change number

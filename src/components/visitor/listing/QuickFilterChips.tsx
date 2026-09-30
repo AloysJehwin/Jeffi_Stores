@@ -25,7 +25,14 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
       }`}
     >
       {active && (
-        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
+        <svg
+          className="w-3 h-3 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={3}
+          aria-hidden="true"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       )}
@@ -35,7 +42,11 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
 }
 
 export default function QuickFilterChips({
-  basePath = '/products', showInStock, showOnSale, categories, brands,
+  basePath = '/products',
+  showInStock,
+  showOnSale,
+  categories,
+  brands,
 }: QuickFilterChipsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -61,19 +72,34 @@ export default function QuickFilterChips({
   const groups = [
     [
       ...(showInStock || inStock
-        ? [<Chip key="inStock" label="In Stock" active={inStock} onClick={() => apply({ inStock: inStock ? null : '1' })} />]
+        ? [
+            <Chip
+              key="inStock"
+              label="In Stock"
+              active={inStock}
+              onClick={() => apply({ inStock: inStock ? null : '1' })}
+            />,
+          ]
         : []),
       ...(showOnSale || onSale
         ? [<Chip key="onSale" label="On Sale" active={onSale} onClick={() => apply({ onSale: onSale ? null : '1' })} />]
         : []),
     ],
     categories.map(c => (
-      <Chip key={`c-${c.id}`} label={c.name} active={chipSelected(c, selectedCategories)}
-        onClick={() => apply({ category: toggleChip(categoryParam, c) })} />
+      <Chip
+        key={`c-${c.id}`}
+        label={c.name}
+        active={chipSelected(c, selectedCategories)}
+        onClick={() => apply({ category: toggleChip(categoryParam, c) })}
+      />
     )),
     brands.map(b => (
-      <Chip key={`b-${b.id}`} label={b.name} active={chipSelected(b, selectedBrands)}
-        onClick={() => apply({ brand: toggleChip(brandParam, b) })} />
+      <Chip
+        key={`b-${b.id}`}
+        label={b.name}
+        active={chipSelected(b, selectedBrands)}
+        onClick={() => apply({ brand: toggleChip(brandParam, b) })}
+      />
     )),
   ].filter(g => g.length > 0)
 

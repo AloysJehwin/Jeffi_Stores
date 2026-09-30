@@ -57,13 +57,16 @@ export default function BusinessHeader() {
       <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
         <div className="container mx-auto px-3 sm:px-4 relative">
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
-
             {/* Logo */}
             <Link href={bp('/business')} className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
-                {identity.logoUrl && <img src={identity.logoUrl} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />}
+                {identity.logoUrl && (
+                  <img src={identity.logoUrl} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />
+                )}
                 <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">{identity.name}</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">
+                    {identity.name}
+                  </div>
                   <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
                 </div>
               </div>
@@ -72,7 +75,9 @@ export default function BusinessHeader() {
             {/* Desktop Nav */}
             <nav
               className={`hidden lg:flex items-center gap-8 transition-all duration-300 ${
-                searchOpen ? 'opacity-0 pointer-events-none -translate-y-1 invisible' : 'opacity-100 translate-y-0 visible'
+                searchOpen
+                  ? 'opacity-0 pointer-events-none -translate-y-1 invisible'
+                  : 'opacity-100 translate-y-0 visible'
               }`}
               aria-hidden={searchOpen}
             >
@@ -81,7 +86,9 @@ export default function BusinessHeader() {
                   key={href}
                   href={bp(href)}
                   className={`font-medium transition-colors ${
-                    pathname.startsWith(bp(href)) ? 'text-accent-500' : 'text-foreground-secondary hover:text-accent-500'
+                    pathname.startsWith(bp(href))
+                      ? 'text-accent-500'
+                      : 'text-foreground-secondary hover:text-accent-500'
                   }`}
                 >
                   {label}
@@ -91,15 +98,35 @@ export default function BusinessHeader() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} basePath={bp('/business/products')} />
+              <SearchBar
+                isOpen={searchOpen}
+                onOpen={() => setSearchOpen(true)}
+                onClose={() => setSearchOpen(false)}
+                basePath={bp('/business/products')}
+              />
 
               {/* Cart */}
-              <Link href={bp('/business/cart')} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
-                <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              <Link
+                href={bp('/business/cart')}
+                className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group"
+              >
+                <svg
+                  className="w-6 h-6 transition-transform group-hover:scale-110"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
                 </svg>
                 {cartCount > 0 && (
-                  <span className={`absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center transition-transform duration-300 ${pulseBadge ? 'animate-cart-pulse' : ''}`}>
+                  <span
+                    className={`absolute top-0.5 right-0.5 bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center transition-transform duration-300 ${pulseBadge ? 'animate-cart-pulse' : ''}`}
+                  >
                     {cartCount}
                   </span>
                 )}
@@ -120,11 +147,29 @@ export default function BusinessHeader() {
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-surface-elevated border border-border-default rounded-xl shadow-lg py-1 z-50">
-                    <Link href={bp('/business/account')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Profile</Link>
-                    <Link href={bp('/business/account/orders')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Orders</Link>
-                    <Link href={bp('/business/quotes')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Quotes</Link>
+                    <Link
+                      href={bp('/business/account')}
+                      className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors"
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      href={bp('/business/account/orders')}
+                      className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors"
+                    >
+                      My Orders
+                    </Link>
+                    <Link
+                      href={bp('/business/quotes')}
+                      className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors"
+                    >
+                      My Quotes
+                    </Link>
                     <div className="border-t border-border-default my-1" />
-                    <button onClick={logout} className="block w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-surface-secondary transition-colors">
+                    <button
+                      onClick={logout}
+                      className="block w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-surface-secondary transition-colors"
+                    >
                       Sign Out
                     </button>
                   </div>
@@ -169,7 +214,11 @@ export default function BusinessHeader() {
                   <p className="text-xs text-accent-500 font-semibold">Business</p>
                 </div>
               </Link>
-              <button type="button" onClick={() => setMobileMenuOpen(false)} className="p-2 text-foreground-muted hover:text-foreground rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 text-foreground-muted hover:text-foreground rounded-lg"
+              >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -183,7 +232,9 @@ export default function BusinessHeader() {
                   key={href}
                   href={bp(href)}
                   className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    pathname.startsWith(bp(href)) ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'text-foreground-secondary hover:bg-surface-secondary'
+                    pathname.startsWith(bp(href))
+                      ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
+                      : 'text-foreground-secondary hover:bg-surface-secondary'
                   }`}
                 >
                   {label}
@@ -225,23 +276,37 @@ export default function BusinessHeader() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{user.firstName} {user.lastName}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {user.firstName} {user.lastName}
+                    </p>
                     <p className="text-xs text-foreground-muted truncate">{user.email}</p>
                   </div>
                 </div>
               )}
-              <Link href={bp('/business/account')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link
+                href={bp('/business/account')}
+                className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm"
+              >
                 My Profile
               </Link>
-              <Link href={bp('/business/account/orders')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link
+                href={bp('/business/account/orders')}
+                className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm"
+              >
                 My Orders
               </Link>
-              <Link href={bp('/business/quotes')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link
+                href={bp('/business/quotes')}
+                className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm"
+              >
                 My Quotes
               </Link>
               <button
                 type="button"
-                onClick={() => { logout(); setMobileMenuOpen(false) }}
+                onClick={() => {
+                  logout()
+                  setMobileMenuOpen(false)
+                }}
                 className="px-4 py-3 rounded-lg text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors text-sm"
               >
                 Sign Out

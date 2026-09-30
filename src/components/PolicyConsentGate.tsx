@@ -63,14 +63,23 @@ export default function PolicyConsentGate() {
         </h2>
         <p className="text-sm text-foreground-secondary mb-4">
           {isLegacy
-            ? 'We\'ve refreshed our Privacy Policy and Terms & Conditions. Please review and accept to continue using your account.'
+            ? "We've refreshed our Privacy Policy and Terms & Conditions. Please review and accept to continue using your account."
             : 'Before continuing, please review our Privacy Policy and Terms & Conditions.'}
         </p>
 
         <div className="bg-surface rounded-lg border border-border-default p-3 mb-4 text-xs text-foreground-secondary space-y-2">
-          <p><span className="font-semibold text-foreground">What we collect:</span> account, order, and support details — plus aggregated browsing analytics. Full details in the Privacy Policy.</p>
-          <p><span className="font-semibold text-foreground">Why:</span> to run your account, fulfil orders, file GST, and keep the platform secure.</p>
-          <p><span className="font-semibold text-foreground">Sharing:</span> only with payments/shipping/hosting partners and as required by law. We never sell your data.</p>
+          <p>
+            <span className="font-semibold text-foreground">What we collect:</span> account, order, and support details
+            — plus aggregated browsing analytics. Full details in the Privacy Policy.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Why:</span> to run your account, fulfil orders, file GST,
+            and keep the platform secure.
+          </p>
+          <p>
+            <span className="font-semibold text-foreground">Sharing:</span> only with payments/shipping/hosting partners
+            and as required by law. We never sell your data.
+          </p>
         </div>
 
         <label className="flex items-start gap-2 mb-4 cursor-pointer">
@@ -86,23 +95,27 @@ export default function PolicyConsentGate() {
               Privacy Policy
             </Link>{' '}
             and{' '}
-            <Link href="/legal/terms-and-conditions" target="_blank" className="text-accent-500 hover:underline font-medium">
+            <Link
+              href="/legal/terms-and-conditions"
+              target="_blank"
+              className="text-accent-500 hover:underline font-medium"
+            >
               Terms &amp; Conditions
             </Link>
             .
           </span>
         </label>
 
-        {error && (
-          <p className="text-xs text-red-500 mb-3">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
 
         <button
           onClick={submit}
           disabled={!accepted || submitting}
           className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
         >
-          {submitting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+          {submitting && (
+            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          )}
           {submitting ? 'Recording...' : 'Accept and continue'}
         </button>
 

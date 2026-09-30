@@ -31,7 +31,10 @@ function TestimonialCard({ t }: { t: Testimonial }) {
       <figcaption className="pt-3 border-t border-border-default text-xs">
         <span className="font-semibold text-foreground">{t.author}</span>
         {t.verified && <span className="ml-2 text-accent-600 dark:text-accent-400">Verified purchase</span>}
-        <Link href={`/products/${t.productSlug}`} className="block mt-1 text-foreground-muted hover:text-accent-600 truncate">
+        <Link
+          href={`/products/${t.productSlug}`}
+          className="block mt-1 text-foreground-muted hover:text-accent-600 truncate"
+        >
           {t.productName}
         </Link>
       </figcaption>
@@ -52,16 +55,22 @@ export default function TestimonialWall({ items, eyebrow, title, carousel = fals
     <section className="py-12 md:py-16 bg-surface-secondary">
       <div className="container mx-auto px-4">
         <div className="mb-7">
-          <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow ?? COPY.eyebrow}</p>
+          <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+            {eyebrow ?? COPY.eyebrow}
+          </p>
           <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{heading}</h2>
         </div>
         {carousel ? (
           <SectionCarousel ariaLabel={heading}>
-            {items.map(t => <TestimonialCard key={t.id} t={t} />)}
+            {items.map(t => (
+              <TestimonialCard key={t.id} t={t} />
+            ))}
           </SectionCarousel>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(t => <TestimonialCard key={t.id} t={t} />)}
+            {items.map(t => (
+              <TestimonialCard key={t.id} t={t} />
+            ))}
           </div>
         )}
       </div>

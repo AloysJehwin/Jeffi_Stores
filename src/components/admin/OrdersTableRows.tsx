@@ -9,7 +9,8 @@ import { ap } from '@/lib/admin-path'
 
 function statusBadgeClass(status: string) {
   if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-  if (status === 'processing' || status === 'shipped') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+  if (status === 'processing' || status === 'shipped')
+    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
   if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
   if (status === 'cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
   if (status === 'cancel_requested') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -38,7 +39,10 @@ function CustomerPopover({ order }: { order: any }) {
   return (
     <HoverCard
       trigger={
-        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
+        <span
+          className="cursor-default underline decoration-dotted underline-offset-2 text-foreground hover:text-accent-500 transition-colors"
+          onClick={e => e.stopPropagation()}
+        >
           {name}
         </span>
       }
@@ -51,22 +55,37 @@ function CustomerPopover({ order }: { order: any }) {
         {email && (
           <div className="flex items-center gap-2 text-xs text-foreground-secondary">
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
             </svg>
-            <a href={`mailto:${email}`} className="hover:text-accent-500 truncate">{email}</a>
+            <a href={`mailto:${email}`} className="hover:text-accent-500 truncate">
+              {email}
+            </a>
           </div>
         )}
         {phone && (
           <div className="flex items-center gap-2 text-xs text-foreground-secondary">
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+              />
             </svg>
             <span>{phone}</span>
           </div>
         )}
         {order.users?.id && (
           <div className="pt-1 border-t border-border-default">
-            <Link href={ap(`/admin/customers/${order.users.id}`)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+            <Link
+              href={ap(`/admin/customers/${order.users.id}`)}
+              className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+            >
               View customer profile →
             </Link>
           </div>
@@ -76,14 +95,16 @@ function CustomerPopover({ order }: { order: any }) {
   )
 }
 
-export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: { orders: any[], backUrl?: string }) {
+export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: { orders: any[]; backUrl?: string }) {
   const canPackingSlips = useHasScope('packing_slips:read')
   const [selected, setSelected] = useState<any>(null)
 
   if (!orders.length) {
     return (
       <tr>
-        <td colSpan={9} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
+        <td colSpan={9} className="px-6 py-12 text-center text-foreground-muted">
+          No orders found.
+        </td>
       </tr>
     )
   }
@@ -92,11 +113,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
     <>
       <OrderDetailModal order={selected} onClose={() => setSelected(null)} />
       {orders.map((order: any) => (
-        <tr
-          key={order.id}
-          className="hover:bg-surface-secondary cursor-pointer"
-          onClick={() => setSelected(order)}
-        >
+        <tr key={order.id} className="hover:bg-surface-secondary cursor-pointer" onClick={() => setSelected(order)}>
           <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
             <HoverCard
               trigger={
@@ -113,33 +130,67 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
               width="260px"
             >
               <div className="p-3 space-y-2">
-                <p className="font-mono font-semibold text-foreground text-sm">#{order.order_number || order.id.slice(0, 8)}</p>
+                <p className="font-mono font-semibold text-foreground text-sm">
+                  #{order.order_number || order.id.slice(0, 8)}
+                </p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                   <span className="text-foreground-muted">Customer</span>
                   <span className="text-foreground font-medium truncate">
-                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
+                    {order.users
+                      ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() ||
+                        order.customer_name ||
+                        'Guest'
+                      : order.customer_name || 'Guest'}
                   </span>
                   <span className="text-foreground-muted">Date</span>
-                  <span className="text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  <span className="text-foreground">
+                    {new Date(order.created_at).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
                   <span className="text-foreground-muted">Total</span>
-                  <span className="text-foreground font-semibold">₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground font-semibold">
+                    ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
                   <span className="text-foreground-muted">Payment</span>
-                  <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{order.payment_status}</span>
+                  <span
+                    className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}
+                  >
+                    {order.payment_status}
+                  </span>
                   <span className="text-foreground-muted">Source</span>
-                  <span className="text-foreground">{order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : order.source === 'cash_sale' ? 'Cash Sale' : 'Offline'}</span>
+                  <span className="text-foreground">
+                    {order.source === 'online'
+                      ? 'Online'
+                      : order.source === 'business'
+                        ? 'Business'
+                        : order.source === 'cash_sale'
+                          ? 'Cash Sale'
+                          : 'Offline'}
+                  </span>
                 </div>
               </div>
             </HoverCard>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-              order.source === 'online'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+            <span
+              className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                order.source === 'online'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : order.source === 'business'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+              }`}
+            >
+              {order.source === 'online'
+                ? 'Online'
                 : order.source === 'business'
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-            }`}>
-              {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : order.source === 'cash_sale' ? 'Cash Sale' : 'Offline'}
+                  ? 'Business'
+                  : order.source === 'cash_sale'
+                    ? 'Cash Sale'
+                    : 'Offline'}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
@@ -151,14 +202,27 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
           <td className="px-6 py-4 whitespace-nowrap">
             <div>
               <div className="text-sm text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
-              <div className="text-xs text-foreground-muted">{new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}</div>
+              <div className="text-xs text-foreground-muted">
+                {new Date(order.created_at).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata',
+                })}
+              </div>
             </div>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            {order.estimated_delivery_date
-              ? <span className="text-sm text-foreground">{new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-              : <span className="text-sm text-foreground-muted">--</span>
-            }
+            {order.estimated_delivery_date ? (
+              <span className="text-sm text-foreground">
+                {new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            ) : (
+              <span className="text-sm text-foreground-muted">--</span>
+            )}
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className="text-sm font-medium text-foreground">
@@ -166,29 +230,38 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentBadgeClass(order.payment_status)}`}>
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentBadgeClass(order.payment_status)}`}
+            >
               {order.payment_status}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass(order.status)}`}>
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass(order.status)}`}
+            >
               {statusLabel(order.status)}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
               {canPackingSlips && (
-              <a
-                href={`/api/admin/packing-slips/${order.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Packing Slip"
-                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </a>
+                <a
+                  href={`/api/admin/packing-slips/${order.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Packing Slip"
+                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </a>
               )}
               {order.awb_number && (
                 <a
@@ -199,7 +272,12 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                   className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                    />
                   </svg>
                 </a>
               )}
@@ -212,7 +290,12 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                   className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
                   </svg>
                 </a>
               )}
@@ -222,7 +305,12 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                  />
                 </svg>
               </Link>
             </div>

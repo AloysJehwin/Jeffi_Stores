@@ -13,23 +13,41 @@ interface Props {
 }
 
 const SEGMENTS = [
-  { key: 'vip',      label: 'VIP',       color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  { key: 'loyal',    label: 'Loyal',     color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
-  { key: 'b2b',      label: 'B2B',       color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  { key: 'repeat',   label: 'Repeat',    color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { key: 'new',      label: 'New',       color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
-  { key: 'at_risk',  label: 'At Risk',   color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  { key: 'dormant',  label: 'Dormant',   color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
-  { key: 'one_time', label: 'One-time',  color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  { key: 'lead',     label: 'Lead',      color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
+  { key: 'vip', label: 'VIP', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  { key: 'loyal', label: 'Loyal', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  { key: 'b2b', label: 'B2B', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+  { key: 'repeat', label: 'Repeat', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+  { key: 'new', label: 'New', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
+  {
+    key: 'at_risk',
+    label: 'At Risk',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  },
+  { key: 'dormant', label: 'Dormant', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
+  {
+    key: 'one_time',
+    label: 'One-time',
+    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  },
+  { key: 'lead', label: 'Lead', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
 ]
 
 const SCORE_BUCKETS = [
   { min: 80, max: 100, label: '80–100', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { min: 60, max: 80,  label: '60–80',  color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300' },
-  { min: 40, max: 60,  label: '40–60',  color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  { min: 20, max: 40,  label: '20–40',  color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
-  { min: 0,  max: 20,  label: '0–20',   color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+  { min: 60, max: 80, label: '60–80', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300' },
+  {
+    min: 40,
+    max: 60,
+    label: '40–60',
+    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  },
+  {
+    min: 20,
+    max: 40,
+    label: '20–40',
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  },
+  { min: 0, max: 20, label: '0–20', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
 ]
 
 type BulkMode = 'search' | 'segment' | 'score'
@@ -45,22 +63,30 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const selectedIds = useMemo(() => new Set(selected.map(u => u.id)), [selected])
 
-  const search = useCallback((val: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (val.length < 2) { setResults([]); return }
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(val)}`)
-        const data = await res.json()
-        setResults((data.results || []).filter((r: UserResult) => !selectedIds.has(r.id)))
-      } finally {
-        setLoading(false)
+  const search = useCallback(
+    (val: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (val.length < 2) {
+        setResults([])
+        return
       }
-    }, 300)
-  }, [selectedIds])
+      debounceRef.current = setTimeout(async () => {
+        setLoading(true)
+        try {
+          const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(val)}`)
+          const data = await res.json()
+          setResults((data.results || []).filter((r: UserResult) => !selectedIds.has(r.id)))
+        } finally {
+          setLoading(false)
+        }
+      }, 300)
+    },
+    [selectedIds]
+  )
 
-  useEffect(() => { if (mode === 'search') search(q) }, [q, search, mode])
+  useEffect(() => {
+    if (mode === 'search') search(q)
+  }, [q, search, mode])
 
   function addUser(u: UserResult) {
     setSelected(prev => [...prev, u])
@@ -78,7 +104,10 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
     try {
       const res = await fetch(`/api/admin/coupons/user-pool?${params}`)
       const data = await res.json()
-      if (!res.ok) { setBulkStatus(`Error: ${data.error}`); return }
+      if (!res.ok) {
+        setBulkStatus(`Error: ${data.error}`)
+        return
+      }
       const users: UserResult[] = data.users || []
       const newUsers = users.filter(u => !selectedIds.has(u.id))
       if (newUsers.length === 0) {
@@ -98,9 +127,7 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
 
   const tabClass = (m: BulkMode) =>
     `px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-      mode === m
-        ? 'bg-accent-500 text-white'
-        : 'bg-surface-secondary text-foreground-secondary hover:bg-border-default'
+      mode === m ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground-secondary hover:bg-border-default'
     }`
 
   return (
@@ -114,9 +141,18 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selected.map(u => (
-            <span key={u.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300 text-xs font-medium rounded-full">
+            <span
+              key={u.id}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300 text-xs font-medium rounded-full"
+            >
               {u.full_name?.trim() || u.email}
-              <button type="button" onClick={() => removeUser(u.id)} className="hover:text-red-500 transition-colors leading-none">×</button>
+              <button
+                type="button"
+                onClick={() => removeUser(u.id)}
+                className="hover:text-red-500 transition-colors leading-none"
+              >
+                ×
+              </button>
             </span>
           ))}
           <button
@@ -131,9 +167,15 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
 
       {/* Mode tabs */}
       <div className="flex items-center gap-1.5">
-        <button type="button" className={tabClass('search')} onClick={() => setMode('search')}>Search</button>
-        <button type="button" className={tabClass('segment')} onClick={() => setMode('segment')}>By Segment</button>
-        <button type="button" className={tabClass('score')} onClick={() => setMode('score')}>By Score</button>
+        <button type="button" className={tabClass('search')} onClick={() => setMode('search')}>
+          Search
+        </button>
+        <button type="button" className={tabClass('segment')} onClick={() => setMode('segment')}>
+          By Segment
+        </button>
+        <button type="button" className={tabClass('score')} onClick={() => setMode('score')}>
+          By Score
+        </button>
         <button
           type="button"
           disabled={bulkLoading}
@@ -157,8 +199,8 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
           {loading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <svg className="w-4 h-4 animate-spin text-foreground-muted" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
             </div>
           )}
@@ -175,8 +217,13 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
                     <p className="font-medium text-foreground truncate">{u.full_name?.trim() || '—'}</p>
                     <p className="text-xs text-foreground-muted truncate">{u.email}</p>
                   </div>
-                  <svg className="w-4 h-4 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+                  <svg
+                    className="w-4 h-4 text-accent-500 shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
                 </button>
               ))}
@@ -223,12 +270,12 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
       )}
 
       {/* Status message */}
-      {bulkStatus && (
-        <p className="text-xs text-foreground-secondary">{bulkStatus}</p>
-      )}
+      {bulkStatus && <p className="text-xs text-foreground-secondary">{bulkStatus}</p>}
 
       {selected.length > 0 && (
-        <p className="text-xs text-foreground-muted">{selected.length} user{selected.length === 1 ? '' : 's'} selected</p>
+        <p className="text-xs text-foreground-muted">
+          {selected.length} user{selected.length === 1 ? '' : 's'} selected
+        </p>
       )}
     </div>
   )

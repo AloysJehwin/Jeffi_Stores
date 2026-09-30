@@ -28,8 +28,18 @@ export default function CompareStrip() {
                   <img src={p.image} alt={p.name} className="w-full h-full object-contain p-0.5" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg
+                      className="w-4 h-4 text-foreground-muted"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                   </div>
                 )}
@@ -47,16 +57,23 @@ export default function CompareStrip() {
           ))}
           {/* Empty slots */}
           {Array.from({ length: Math.max(0, 2 - compareList.length) }).map((_, i) => (
-            <div key={`empty-${i}`} className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-accent-300 dark:border-accent-700 flex items-center justify-center">
-              <svg className="w-3.5 h-3.5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div
+              key={`empty-${i}`}
+              className="flex-shrink-0 w-10 h-10 rounded-lg border border-dashed border-accent-300 dark:border-accent-700 flex items-center justify-center"
+            >
+              <svg
+                className="w-3.5 h-3.5 text-accent-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
             </div>
           ))}
         </div>
-        <span className="text-xs text-accent-600 dark:text-accent-400 whitespace-nowrap">
-          {compareList.length} / 4
-        </span>
+        <span className="text-xs text-accent-600 dark:text-accent-400 whitespace-nowrap">{compareList.length} / 4</span>
       </div>
 
       {/* Actions */}

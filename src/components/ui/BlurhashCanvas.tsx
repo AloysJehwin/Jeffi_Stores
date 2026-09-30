@@ -16,12 +16,18 @@ export default function BlurhashCanvas({ hash, className }: { hash: string; clas
     setFailed(false)
     const canvas = canvasRef.current
     if (!canvas) return
-    if (!isBlurhashValid(hash).result) { setFailed(true); return }
+    if (!isBlurhashValid(hash).result) {
+      setFailed(true)
+      return
+    }
 
     try {
       const pixels = decode(hash, DECODE_SIZE, DECODE_SIZE)
       const ctx = canvas.getContext('2d')
-      if (!ctx) { setFailed(true); return }
+      if (!ctx) {
+        setFailed(true)
+        return
+      }
       const image = ctx.createImageData(DECODE_SIZE, DECODE_SIZE)
       image.data.set(pixels)
       ctx.putImageData(image, 0, 0)

@@ -46,11 +46,23 @@ export default function AdminSessionController() {
   const inFlightRef = useRef(false)
 
   const now = () => Date.now() + skewRef.current
-  const post = (msg: ChannelMsg) => { try { bcRef.current?.postMessage(msg) } catch { /* channel closed */ } }
+  const post = (msg: ChannelMsg) => {
+    try {
+      bcRef.current?.postMessage(msg)
+    } catch {
+      /* channel closed */
+    }
+  }
 
   const clearTimers = () => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    if (tickRef.current) {
+      clearInterval(tickRef.current)
+      tickRef.current = null
+    }
   }
 
   const logout = useCallback(async (reason: string, notifyServer: boolean) => {
@@ -60,55 +72,83 @@ export default function AdminSessionController() {
     setModal(null)
     post({ t: 'logout', reason })
     if (notifyServer) {
-      try { await fetch(ap('/api/admin/logout'), { method: 'POST', credentials: 'include' }) } catch { /* cookie also dies with the session */ }
+      try {
+        await fetch(ap('/api/admin/logout'), { method: 'POST', credentials: 'include' })
+      } catch {
+        /* cookie also dies with the session */
+      }
     }
     const onAdminSubdomain = /^admin(-[^.]+)?\./.test(window.location.host)
     window.location.href = onAdminSubdomain ? '/login' : ap('/admin/login')
   }, [])
 
-  const heartbeat = useCallback(async (force = false) => {
-    if (loggedOutRef.current || inFlightRef.current) return
-    const t = Date.now()
-    const deadline = deadlineRef.current
-    const urgent = deadline != null && deadline - now() < URGENT_WINDOW_MS
-    if (!force && (!dirtyRef.current || (t - lastBeatRef.current < HEARTBEAT_GAP_MS && !urgent))) return
-    const run = async () => {
-      inFlightRef.current = true
+  const heartbeat = useCallback(
+    async (force = false) => {
+      if (loggedOutRef.current || inFlightRef.current) return
+      const t = Date.now()
+      const deadline = deadlineRef.current
+      const urgent = deadline != null && deadline - now() < URGENT_WINDOW_MS
+      if (!force && (!dirtyRef.current || (t - lastBeatRef.current < HEARTBEAT_GAP_MS && !urgent))) return
+      const run = async () => {
+        inFlightRef.current = true
+        try {
+          const res = await fetch(ap('/api/admin/session/heartbeat'), {
+            method: 'POST',
+            credentials: 'include',
+            cache: 'no-store',
+          })
+          if (res.status === 401) {
+            await logout('expired', true)
+            return
+          }
+          if (!res.ok) return
+          const d = await res.json()
+          dirtyRef.current = false
+          lastBeatRef.current = Date.now()
+          post({ t: 'beat', at: lastBeatRef.current })
+          if (typeof d.deadlineAt === 'number')
+            applyDeadline({ deadlineAt: d.deadlineAt, expiresAt: d.expiresAt, serverNow: d.serverNow }, true)
+        } catch {
+          /* retried on next activity */
+        } finally {
+          inFlightRef.current = false
+        }
+      }
+      const locks = (navigator as any).locks
+      if (locks?.request) {
+        await locks.request(BEAT_LOCK, { ifAvailable: true }, async (lock: unknown) => {
+          if (lock) await run()
+        })
+      } else {
+        await run()
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [logout]
+  )
+
+  const resync = useCallback(
+    async (force = false) => {
+      if (loggedOutRef.current) return
+      const t = Date.now()
+      if (!force && t - lastResyncRef.current < RESYNC_GAP_MS) return
+      lastResyncRef.current = t
       try {
-        const res = await fetch(ap('/api/admin/session/heartbeat'), { method: 'POST', credentials: 'include', cache: 'no-store' })
-        if (res.status === 401) { await logout('expired', true); return }
+        const res = await fetch(ap('/api/admin/check-session'), { cache: 'no-store', credentials: 'include' })
         if (!res.ok) return
         const d = await res.json()
-        dirtyRef.current = false
-        lastBeatRef.current = Date.now()
-        post({ t: 'beat', at: lastBeatRef.current })
-        if (typeof d.deadlineAt === 'number') applyDeadline({ deadlineAt: d.deadlineAt, expiresAt: d.expiresAt, serverNow: d.serverNow }, true)
-      } catch { /* retried on next activity */ }
-      finally { inFlightRef.current = false }
-    }
-    const locks = (navigator as any).locks
-    if (locks?.request) {
-      await locks.request(BEAT_LOCK, { ifAvailable: true }, async (lock: unknown) => { if (lock) await run() })
-    } else {
-      await run()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logout])
-
-  const resync = useCallback(async (force = false) => {
-    if (loggedOutRef.current) return
-    const t = Date.now()
-    if (!force && t - lastResyncRef.current < RESYNC_GAP_MS) return
-    lastResyncRef.current = t
-    try {
-      const res = await fetch(ap('/api/admin/check-session'), { cache: 'no-store', credentials: 'include' })
-      if (!res.ok) return
-      const d = await res.json()
-      if (!d.authenticated || typeof d.deadlineAt !== 'number') { await logout('expired', true); return }
-      applyDeadline({ deadlineAt: d.deadlineAt, expiresAt: d.expiresAt, serverNow: d.serverNow }, true)
-    } catch { /* offline: keep the last known deadline */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logout])
+        if (!d.authenticated || typeof d.deadlineAt !== 'number') {
+          await logout('expired', true)
+          return
+        }
+        applyDeadline({ deadlineAt: d.deadlineAt, expiresAt: d.expiresAt, serverNow: d.serverNow }, true)
+      } catch {
+        /* offline: keep the last known deadline */
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [logout]
+  )
 
   function applyDeadline(s: Sync, broadcast: boolean) {
     if (typeof s.serverNow === 'number') skewRef.current = s.serverNow - Date.now()
@@ -123,17 +163,25 @@ export default function AdminSessionController() {
     const deadline = deadlineRef.current
     if (deadline == null || loggedOutRef.current) return
     const remaining = deadline - now()
-    if (remaining <= 0) { void onDeadline(); return }
+    if (remaining <= 0) {
+      void onDeadline()
+      return
+    }
     if (remaining > WARN_BEFORE_MS) {
       setModal(null)
       timerRef.current = setTimeout(arm, remaining - WARN_BEFORE_MS)
       return
     }
-    if (dirtyRef.current) { void heartbeat(true) }
+    if (dirtyRef.current) {
+      void heartbeat(true)
+    }
     const absolute = expiresRef.current != null && Math.abs(deadline - expiresRef.current) < 1000
     const tick = () => {
       const left = Math.ceil((deadline - now()) / 1000)
-      if (left <= 0) { void onDeadline(); return }
+      if (left <= 0) {
+        void onDeadline()
+        return
+      }
       setModal({ secondsLeft: left, absolute })
     }
     tick()
@@ -151,7 +199,9 @@ export default function AdminSessionController() {
         applyDeadline({ deadlineAt: d.deadlineAt, expiresAt: d.expiresAt, serverNow: d.serverNow }, true)
         return
       }
-    } catch { /* offline: the server refuses everything past the deadline anyway */ }
+    } catch {
+      /* offline: the server refuses everything past the deadline anyway */
+    }
     await logout('idle', true)
   }
 
@@ -159,14 +209,26 @@ export default function AdminSessionController() {
     if (isLoginPage) return
     loggedOutRef.current = false
 
-    try { bcRef.current = new BroadcastChannel(CHANNEL) } catch { bcRef.current = null }
+    try {
+      bcRef.current = new BroadcastChannel(CHANNEL)
+    } catch {
+      bcRef.current = null
+    }
     if (bcRef.current) {
       bcRef.current.onmessage = (e: MessageEvent<ChannelMsg>) => {
         const m = e.data
         if (!m) return
-        if (m.t === 'logout') { void logout(m.reason, false); return }
-        if (m.t === 'beat') { lastBeatRef.current = m.at; dirtyRef.current = false; return }
-        if (m.t === 'deadline') applyDeadline({ deadlineAt: m.deadlineAt, expiresAt: m.expiresAt, serverNow: m.serverNow }, false)
+        if (m.t === 'logout') {
+          void logout(m.reason, false)
+          return
+        }
+        if (m.t === 'beat') {
+          lastBeatRef.current = m.at
+          dirtyRef.current = false
+          return
+        }
+        if (m.t === 'deadline')
+          applyDeadline({ deadlineAt: m.deadlineAt, expiresAt: m.expiresAt, serverNow: m.serverNow }, false)
       }
     }
 
@@ -200,10 +262,15 @@ export default function AdminSessionController() {
     const unsubscribe = subscribeAdminEvents(
       frame => {
         if (frame.kind !== 'session') return
-        if (frame.type === 'logout') { void logout(frame.reason, false); return }
+        if (frame.type === 'logout') {
+          void logout(frame.reason, false)
+          return
+        }
         applyDeadline({ deadlineAt: frame.deadlineAt, expiresAt: frame.expiresAt, serverNow: frame.serverNow }, true)
       },
-      status => { if (status === 'error') void resync() },
+      status => {
+        if (status === 'error') void resync()
+      }
     )
 
     void resync(true)
@@ -220,7 +287,7 @@ export default function AdminSessionController() {
       bcRef.current?.close()
       bcRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoginPage, pathname])
 
   const handleContinue = async () => {
@@ -228,8 +295,14 @@ export default function AdminSessionController() {
     if (modal?.absolute) {
       try {
         const res = await fetch(ap('/api/admin/refresh'), { method: 'POST', credentials: 'include' })
-        if (!res.ok) { await logout('expired', true); return }
-      } catch { await logout('expired', true); return }
+        if (!res.ok) {
+          await logout('expired', true)
+          return
+        }
+      } catch {
+        await logout('expired', true)
+        return
+      }
       await resync(true)
       return
     }
@@ -245,8 +318,18 @@ export default function AdminSessionController() {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm bg-black/60">
       <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 flex flex-col items-center gap-4">
         <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-          <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <svg
+            className="w-6 h-6 text-yellow-600 dark:text-yellow-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
           </svg>
         </div>
         <div className="text-center">
@@ -257,12 +340,20 @@ export default function AdminSessionController() {
               : 'You have been inactive for a while. Continue working or you will be signed out on every device.'}
           </p>
         </div>
-        <div className="text-3xl font-mono font-bold text-red-500 tabular-nums">{mm}:{ss}</div>
+        <div className="text-3xl font-mono font-bold text-red-500 tabular-nums">
+          {mm}:{ss}
+        </div>
         <div className="flex gap-3 w-full">
-          <button onClick={() => logout('logout', true)} className="flex-1 px-4 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
+          <button
+            onClick={() => logout('logout', true)}
+            className="flex-1 px-4 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+          >
             Log out
           </button>
-          <button onClick={handleContinue} className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors">
+          <button
+            onClick={handleContinue}
+            className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors"
+          >
             Continue working
           </button>
         </div>

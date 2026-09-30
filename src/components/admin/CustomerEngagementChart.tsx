@@ -14,7 +14,8 @@ const VIEWS: { value: string; label: string }[] = [
 ]
 
 export default function CustomerEngagementChart({
-  segments, channelMix,
+  segments,
+  channelMix,
 }: {
   segments: BreakdownSlice[]
   channelMix: BreakdownSlice[]

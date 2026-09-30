@@ -22,7 +22,14 @@ interface StepEvent {
   created_at: string
 }
 interface Data {
-  tenant: { id: string; slug: string; status: string; rds_endpoint: string | null; s3_bucket: string | null; region: string | null }
+  tenant: {
+    id: string
+    slug: string
+    status: string
+    rds_endpoint: string | null
+    s3_bucket: string | null
+    region: string | null
+  }
   steps: string[]
   job: Job | null
   events?: StepEvent[]
@@ -34,7 +41,17 @@ type StepState = 'done' | 'current' | 'pending' | 'failed'
 
 const PHASES: { label: string; steps: string[] }[] = [
   { label: 'Preflight', steps: ['preflight'] },
-  { label: 'Database', steps: ['create_param_group', 'create_db_instance', 'wait_db_available', 'load_schema', 'restore_data', 'seed_data'] },
+  {
+    label: 'Database',
+    steps: [
+      'create_param_group',
+      'create_db_instance',
+      'wait_db_available',
+      'load_schema',
+      'restore_data',
+      'seed_data',
+    ],
+  },
   { label: 'Storage', steps: ['create_bucket', 'write_infra', 'generate_legals'] },
   { label: 'Compute', steps: ['ensure_compute', 'setup_delhivery'] },
   { label: 'Network', steps: ['configure_dns', 'verify_serving'] },
@@ -55,7 +72,10 @@ function fmtDuration(ms: number | null): string {
  * times shows all three with their errors — the job row alone would only ever show the last.
  */
 function StepStage({
-  name, index, state, events,
+  name,
+  index,
+  state,
+  events,
 }: {
   name: string
   index: number
@@ -63,13 +83,17 @@ function StepStage({
   events: StepEvent[]
 }) {
   const [open, setOpen] = useState(state === 'failed')
-  const dot = state === 'done' ? 'bg-green-500 border-green-500'
-    : state === 'current' ? 'bg-accent-500 border-accent-500'
-    : state === 'failed' ? 'bg-red-500 border-red-500'
-    : 'bg-surface-elevated border-border-default'
+  const dot =
+    state === 'done'
+      ? 'bg-green-500 border-green-500'
+      : state === 'current'
+        ? 'bg-accent-500 border-accent-500'
+        : state === 'failed'
+          ? 'bg-red-500 border-red-500'
+          : 'bg-surface-elevated border-border-default'
   const text = state === 'pending' ? 'text-foreground-muted' : 'text-foreground'
 
-  const errors = events.filter((e) => e.status === 'error').length
+  const errors = events.filter(e => e.status === 'error').length
   const last = events[events.length - 1]
   const hasDetail = events.length > 0
 
@@ -77,7 +101,7 @@ function StepStage({
     <li className="relative">
       <div
         className={`flex items-center gap-3 rounded-lg -mx-2 px-2 py-1.5 ${hasDetail ? 'cursor-pointer hover:bg-surface-secondary' : ''}`}
-        onClick={() => hasDetail && setOpen((v) => !v)}
+        onClick={() => hasDetail && setOpen(v => !v)}
       >
         <span className="relative z-10 flex items-center justify-center shrink-0">
           <span className={`w-3 h-3 rounded-full border-2 ${dot} ${state === 'current' ? 'animate-pulse' : ''}`} />
@@ -95,10 +119,18 @@ function StepStage({
           {last?.duration_ms != null && state !== 'pending' && (
             <span className="text-[10px] tabular-nums text-foreground-muted">{fmtDuration(last.duration_ms)}</span>
           )}
-          {state === 'current' && <span className="text-[11px] font-medium text-accent-600 dark:text-accent-400">running…</span>}
+          {state === 'current' && (
+            <span className="text-[11px] font-medium text-accent-600 dark:text-accent-400">running…</span>
+          )}
           {state === 'failed' && <span className="text-[11px] font-medium text-red-600 dark:text-red-400">failed</span>}
           {hasDetail && (
-            <svg className={`w-3 h-3 text-foreground-muted transition-transform ${open ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <svg
+              className={`w-3 h-3 text-foreground-muted transition-transform ${open ? 'rotate-90' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           )}
@@ -110,7 +142,13 @@ function StepStage({
           {events.map((e, i) => (
             <div key={i} className="text-[11px] min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={e.status === 'error' ? 'text-red-600 dark:text-red-400 font-medium' : 'text-green-600 dark:text-green-400'}>
+                <span
+                  className={
+                    e.status === 'error'
+                      ? 'text-red-600 dark:text-red-400 font-medium'
+                      : 'text-green-600 dark:text-green-400'
+                  }
+                >
                   {e.status === 'error' ? 'error' : 'ok'}
                 </span>
                 <span className="text-foreground-muted tabular-nums">
@@ -120,9 +158,7 @@ function StepStage({
                   <span className="text-foreground-muted tabular-nums">{fmtDuration(e.duration_ms)}</span>
                 )}
               </div>
-              {e.message && (
-                <p className="mt-0.5 text-foreground break-words whitespace-pre-wrap">{e.message}</p>
-              )}
+              {e.message && <p className="mt-0.5 text-foreground break-words whitespace-pre-wrap">{e.message}</p>}
               {e.detail && Object.keys(e.detail).length > 0 && (
                 <dl className="mt-1 space-y-0.5">
                   {Object.entries(e.detail).map(([k, v]) => (
@@ -162,18 +198,28 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
     try {
       const res = await fetch(`/api/admin/ecom/customers/${tenantId}/provisioning`, { cache: 'no-store' })
       const d = await res.json()
-      if (!res.ok) { setErr(d.error || 'Failed to load'); return }
-      setErr(null); setData(d)
+      if (!res.ok) {
+        setErr(d.error || 'Failed to load')
+        return
+      }
+      setErr(null)
+      setData(d)
       if (!d.job || TERMINAL.includes(d.job.status)) setLive(false)
-    } catch { setErr('Network error') }
+    } catch {
+      setErr('Network error')
+    }
   }, [tenantId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   useEffect(() => {
     if (!live) return
     timer.current = setInterval(load, 4000)
-    return () => { if (timer.current) clearInterval(timer.current) }
+    return () => {
+      if (timer.current) clearInterval(timer.current)
+    }
   }, [live, load])
 
   const job = data?.job
@@ -184,7 +230,13 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
   const eventsByStep: Record<string, StepEvent[]> = {}
   for (const e of data?.events ?? []) (eventsByStep[e.step] ??= []).push(e)
   const res = job?.created_resources ?? {}
-  const pct = !job ? 0 : job.status === 'done' ? 100 : currentIdx < 0 ? 0 : Math.round((currentIdx / steps.length) * 100)
+  const pct = !job
+    ? 0
+    : job.status === 'done'
+      ? 100
+      : currentIdx < 0
+        ? 0
+        : Math.round((currentIdx / steps.length) * 100)
 
   function stateOf(i: number): StepState {
     if (!job) return 'pending'
@@ -194,21 +246,27 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
     return 'pending'
   }
 
-  const bannerTone = !job ? 'border-border-default bg-surface-elevated'
-    : job.status === 'done' ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
-    : job.status === 'failed' ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
-    : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'
+  const bannerTone = !job
+    ? 'border-border-default bg-surface-elevated'
+    : job.status === 'done'
+      ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+      : job.status === 'failed'
+        ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
+        : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'
 
   const barTone = job?.status === 'failed' ? 'bg-red-500' : job?.status === 'done' ? 'bg-green-500' : 'bg-accent-500'
 
   return (
     <div className="space-y-5 min-w-0">
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={load} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium hover:bg-surface-secondary transition-colors">
+        <button
+          onClick={load}
+          className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium hover:bg-surface-secondary transition-colors"
+        >
           Refresh
         </button>
         <label className="flex items-center gap-2 text-sm text-foreground-muted select-none cursor-pointer">
-          <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} className="rounded" />
+          <input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} className="rounded" />
           Live
           {live && <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
         </label>
@@ -241,7 +299,10 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
               <span className="text-sm text-foreground-muted min-w-0">
                 step <span className="font-mono text-foreground break-all">{job.step}</span>
               </span>
-              <span className="text-sm text-foreground-muted" title="Worker ticks consumed, including polling iterations — not failures">
+              <span
+                className="text-sm text-foreground-muted"
+                title="Worker ticks consumed, including polling iterations — not failures"
+              >
                 ticks <span className="tabular-nums text-foreground">{job.attempts}</span>
               </span>
               {job.next_attempt_at && new Date(job.next_attempt_at) > new Date() && (
@@ -256,7 +317,9 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
                 <div className={`h-full ${barTone} transition-all duration-500`} style={{ width: `${pct}%` }} />
               </div>
               <div className="flex justify-between mt-1.5 text-[11px] text-foreground-muted tabular-nums">
-                <span>{currentIdx < 0 ? 0 : job.status === 'done' ? steps.length : currentIdx} of {steps.length} steps</span>
+                <span>
+                  {currentIdx < 0 ? 0 : job.status === 'done' ? steps.length : currentIdx} of {steps.length} steps
+                </span>
                 <span>{pct}%</span>
               </div>
             </div>
@@ -274,19 +337,21 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
                 <h2 className="font-semibold text-foreground text-sm">Pipeline</h2>
               </div>
               <div className="p-5 space-y-5">
-                {PHASES.map((phase) => {
-                  const rows = phase.steps.filter((s) => steps.includes(s))
+                {PHASES.map(phase => {
+                  const rows = phase.steps.filter(s => steps.includes(s))
                   if (rows.length === 0) return null
-                  const idxs = rows.map((s) => steps.indexOf(s))
-                  const allDone = idxs.every((i) => stateOf(i) === 'done')
+                  const idxs = rows.map(s => steps.indexOf(s))
+                  const allDone = idxs.every(i => stateOf(i) === 'done')
                   return (
                     <div key={phase.label} className="min-w-0">
                       <div className="flex items-center gap-2 mb-2.5">
-                        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">{phase.label}</h3>
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+                          {phase.label}
+                        </h3>
                         {allDone && <span className="text-[11px] text-green-600 dark:text-green-400">✓</span>}
                       </div>
                       <ol className="relative space-y-2.5 before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-px before:bg-border-default">
-                        {rows.map((s) => (
+                        {rows.map(s => (
                           <StepStage
                             key={s}
                             name={s}
@@ -315,9 +380,15 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
                   <Res
                     label="DNS hosts"
                     wide
-                    value={Array.isArray(res.dnsHosts) && res.dnsHosts.length
-                      ? <span className="flex flex-col gap-0.5">{res.dnsHosts.map((hst: string) => <span key={hst}>{hst}</span>)}</span>
-                      : null}
+                    value={
+                      Array.isArray(res.dnsHosts) && res.dnsHosts.length ? (
+                        <span className="flex flex-col gap-0.5">
+                          {res.dnsHosts.map((hst: string) => (
+                            <span key={hst}>{hst}</span>
+                          ))}
+                        </span>
+                      ) : null
+                    }
                   />
                 </dl>
                 <details className="mt-4 group">

@@ -27,7 +27,9 @@ export default function SocialStrip({ items, eyebrow, title, ctaLabel, ctaUrl }:
       <div className="container mx-auto px-4">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-7">
           <div>
-            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow ?? COPY.eyebrow}</p>
+            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+              {eyebrow ?? COPY.eyebrow}
+            </p>
             <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
           </div>
           {ctaUrl && (
@@ -49,7 +51,11 @@ export default function SocialStrip({ items, eyebrow, title, ctaLabel, ctaUrl }:
               aria-label={item.caption || 'Open post'}
               className="group relative shrink-0 w-40 sm:w-auto aspect-square rounded-xl overflow-hidden bg-surface snap-start"
             >
-              <StoreImage src={item.imageUrl} alt={item.caption} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <StoreImage
+                src={item.imageUrl}
+                alt={item.caption}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              />
               {item.caption && (
                 <span className="absolute inset-x-0 bottom-0 p-2 text-xs text-white bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity line-clamp-2">
                   {item.caption}

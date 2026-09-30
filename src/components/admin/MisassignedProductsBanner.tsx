@@ -51,7 +51,10 @@ export default function MisassignedProductsBanner({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ category_id: newCatId }),
       })
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed') }
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed')
+      }
       setDone(d => ({ ...d, [product.id]: true }))
       router.refresh()
     } catch (e: any) {
@@ -65,8 +68,18 @@ export default function MisassignedProductsBanner({
     <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <svg
+            className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
           </svg>
           <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
             {remaining.length} product{remaining.length !== 1 ? 's' : ''} assigned to a main category
@@ -89,9 +102,14 @@ export default function MisassignedProductsBanner({
         {remaining.map(product => {
           const subs = subcatsFor(product.category_id)
           return (
-            <div key={product.id} className="flex flex-wrap items-center gap-2 text-sm bg-white dark:bg-surface-elevated rounded-lg border border-amber-200 dark:border-amber-800 px-3 py-2">
+            <div
+              key={product.id}
+              className="flex flex-wrap items-center gap-2 text-sm bg-white dark:bg-surface-elevated rounded-lg border border-amber-200 dark:border-amber-800 px-3 py-2"
+            >
               <span className="font-medium text-foreground flex-1 min-w-0 truncate">{product.name}</span>
-              <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">{product.category_name}</span>
+              <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                {product.category_name}
+              </span>
               <span className="text-foreground-muted">→</span>
               <AdminSelect
                 sm

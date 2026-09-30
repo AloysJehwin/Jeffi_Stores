@@ -17,8 +17,12 @@ export default function OnDeviceCapabilityDebug() {
 
   useEffect(() => {
     let alive = true
-    detectOnDeviceCapability().then(v => { if (alive) setVerdict(v) })
-    return () => { alive = false }
+    detectOnDeviceCapability().then(v => {
+      if (alive) setVerdict(v)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
   if (!verdict) {
@@ -37,7 +41,9 @@ export default function OnDeviceCapabilityDebug() {
     <div className="max-w-sm rounded-lg border border-border-default bg-surface-elevated p-4 text-xs">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-foreground">On-device model</span>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${verdict.capable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+        <span
+          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${verdict.capable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+        >
           {verdict.capable ? 'CAPABLE' : 'NOT CAPABLE'}
         </span>
       </div>
@@ -55,7 +61,10 @@ export default function OnDeviceCapabilityDebug() {
       <Row k="GPU vendor" v={d.gpuVendor ?? '—'} />
       <Row k="device memory" v={d.deviceMemoryGB != null ? `${d.deviceMemoryGB} GB` : 'unknown'} />
       <Row k="max buffer" v={d.maxBufferSizeMB != null ? `${d.maxBufferSizeMB} MB` : '—'} />
-      <Row k="max storage binding" v={d.maxStorageBufferBindingSizeMB != null ? `${d.maxStorageBufferBindingSizeMB} MB` : '—'} />
+      <Row
+        k="max storage binding"
+        v={d.maxStorageBufferBindingSizeMB != null ? `${d.maxStorageBufferBindingSizeMB} MB` : '—'}
+      />
       <Row k="storage quota" v={d.storageQuotaMB != null ? `${d.storageQuotaMB} MB` : '—'} />
       <Row k="model cached" v={d.modelCached ? 'yes' : 'no'} />
     </div>

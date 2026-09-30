@@ -35,7 +35,10 @@ function Highlight({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) =>
         pattern.test(part) ? (
-          <mark key={i} className="bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 rounded-sm not-italic font-semibold">
+          <mark
+            key={i}
+            className="bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 rounded-sm not-italic font-semibold"
+          >
             {part}
           </mark>
         ) : (
@@ -101,10 +104,10 @@ export default function AdminTypeahead({
       abortRef.current = new AbortController()
       setLoading(true)
       try {
-        const res = await fetch(
-          `/api/admin/suggest?type=${encodeURIComponent(type)}&q=${encodeURIComponent(value)}`,
-          { signal: abortRef.current.signal, credentials: 'include' }
-        )
+        const res = await fetch(`/api/admin/suggest?type=${encodeURIComponent(type)}&q=${encodeURIComponent(value)}`, {
+          signal: abortRef.current.signal,
+          credentials: 'include',
+        })
         if (res.ok) {
           const data = await res.json()
           const newItems = data.items || []
@@ -133,11 +136,14 @@ export default function AdminTypeahead({
     return () => document.removeEventListener('mousedown', onOutsideClick)
   }, [])
 
-  const selectItem = useCallback((item: SuggestItem) => {
-    onSelect?.(item)
-    setOpen(false)
-    setItems([])
-  }, [onSelect])
+  const selectItem = useCallback(
+    (item: SuggestItem) => {
+      onSelect?.(item)
+      setOpen(false)
+      setItems([])
+    },
+    [onSelect]
+  )
 
   function previewItem(idx: number) {
     skipFetchRef.current = true
@@ -156,7 +162,11 @@ export default function AdminTypeahead({
       return
     }
     if (!open) {
-      if (e.key === 'Enter') { e.preventDefault(); onEnter?.(value); return }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        onEnter?.(value)
+        return
+      }
       return
     }
     if (e.key === 'ArrowDown') {
@@ -184,7 +194,8 @@ export default function AdminTypeahead({
     }
   }
 
-  const defaultInputCls = 'w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
+  const defaultInputCls =
+    'w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -208,7 +219,12 @@ export default function AdminTypeahead({
             <span className="w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full animate-spin block" />
           ) : (
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           )}
         </span>
@@ -223,18 +239,24 @@ export default function AdminTypeahead({
             <button
               key={item.id}
               type="button"
-              onMouseDown={e => { e.preventDefault(); selectItem(item) }}
+              onMouseDown={e => {
+                e.preventDefault()
+                selectItem(item)
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-foreground font-medium truncate">
                   <Highlight text={item.label} query={value} />
                 </p>
-                {item.sublabel && (
-                  <p className="text-xs text-foreground-muted truncate mt-0.5">{item.sublabel}</p>
-                )}
+                {item.sublabel && <p className="text-xs text-foreground-muted truncate mt-0.5">{item.sublabel}</p>}
               </div>
-              <svg className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>

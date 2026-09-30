@@ -87,15 +87,19 @@ export default function DeliverySettingsForm({ initial }: Props) {
       </div>
 
       <div className="bg-surface-secondary rounded-lg border border-border-default p-4">
-        <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview (base charge ₹{SAMPLE_BASE_CHARGE})</h3>
+        <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">
+          Preview (base charge ₹{SAMPLE_BASE_CHARGE})
+        </h3>
         <div className="space-y-1.5">
           {previewRows.map(r => (
             <div key={r.subtotal} className="grid grid-cols-3 gap-3 text-sm">
               <span className="text-foreground-secondary">Subtotal ₹{r.subtotal.toLocaleString('en-IN')}</span>
               <span className="text-foreground font-semibold tabular-nums">
-                {r.charge === 0
-                  ? <span className="text-green-600 dark:text-green-400">Free</span>
-                  : <>₹{r.charge.toFixed(2)}</>}
+                {r.charge === 0 ? (
+                  <span className="text-green-600 dark:text-green-400">Free</span>
+                ) : (
+                  <>₹{r.charge.toFixed(2)}</>
+                )}
               </span>
               <span className="text-xs text-foreground-muted self-center">
                 {r.source === 'admin_disabled' && 'delivery disabled'}
@@ -134,24 +138,34 @@ function Field({ label, hint, prefix, suffix, value, max, onChange, onBlur, savi
       <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
       {hint && <p className="text-xs text-foreground-muted mb-2">{hint}</p>}
       <div className="relative max-w-xs">
-        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{prefix}</span>}
+        {prefix && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{prefix}</span>
+        )}
         <input
           type="number"
           min={0}
           max={max}
           step={1}
           value={shown}
-          onFocus={() => { setDraft(String(Number.isFinite(value) ? value : 0)); setEditing(true) }}
+          onFocus={() => {
+            setDraft(String(Number.isFinite(value) ? value : 0))
+            setEditing(true)
+          }}
           onChange={e => {
             setDraft(e.target.value)
             const parsed = parseFloat(e.target.value)
             if (Number.isFinite(parsed)) onChange(parsed)
           }}
-          onBlur={() => { setEditing(false); onBlur() }}
+          onBlur={() => {
+            setEditing(false)
+            onBlur()
+          }}
           disabled={saving}
           className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-9' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
         />
-        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>}
+        {suffix && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>
+        )}
       </div>
     </div>
   )

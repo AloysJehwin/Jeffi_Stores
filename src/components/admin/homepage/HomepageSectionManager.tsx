@@ -35,9 +35,7 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
   const [addedId, setAddedId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const usedSingletons = new Set(
-    sections.filter(s => SECTION_META[s.type]?.singleton).map(s => s.type)
-  )
+  const usedSingletons = new Set(sections.filter(s => SECTION_META[s.type]?.singleton).map(s => s.type))
 
   async function patch(id: string, body: Record<string, unknown>) {
     const res = await fetch(`/api/admin/homepage-sections/${id}`, {
@@ -68,7 +66,10 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
       credentials: 'include',
       body: JSON.stringify({ type }),
     })
-    if (!res.ok) { showToast('Failed to add section', 'error'); return }
+    if (!res.ok) {
+      showToast('Failed to add section', 'error')
+      return
+    }
     const { section } = await res.json()
     setAddedId(section.id)
     setSections(prev => [...prev, section])
@@ -83,7 +84,10 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
     })
     if (!ok) return
     const res = await fetch(`/api/admin/homepage-sections/${section.id}`, { method: 'DELETE', credentials: 'include' })
-    if (!res.ok) { showToast('Failed to remove', 'error'); return }
+    if (!res.ok) {
+      showToast('Failed to remove', 'error')
+      return
+    }
     setSections(prev => prev.filter(s => s.id !== section.id))
     showToast('Section removed from draft', 'success')
     notifyHomepageDraftChanged()
@@ -131,11 +135,11 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
                 alwaysExpanded={alwaysExpanded}
                 defaultOpen={section.id === addedId}
                 extra={
-                  section.type === 'hero'
-                    ? heroEditor
-                    : section.type === 'offer_slider'
-                    ? <OfferSliderControl section={section} saveConfig={config => saveConfigFor(section, config)} />
-                    : undefined
+                  section.type === 'hero' ? (
+                    heroEditor
+                  ) : section.type === 'offer_slider' ? (
+                    <OfferSliderControl section={section} saveConfig={config => saveConfigFor(section, config)} />
+                  ) : undefined
                 }
               />
             ))}
@@ -201,7 +205,18 @@ interface RowProps {
   defaultOpen?: boolean
 }
 
-function SectionRow({ section, position, canWrite, options, onChange, onSave, onRemove, extra, alwaysExpanded = false, defaultOpen = false }: RowProps) {
+function SectionRow({
+  section,
+  position,
+  canWrite,
+  options,
+  onChange,
+  onSave,
+  onRemove,
+  extra,
+  alwaysExpanded = false,
+  defaultOpen = false,
+}: RowProps) {
   const [expanded, setExpanded] = useState(alwaysExpanded || defaultOpen)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id })
   const meta = SECTION_META[section.type]
@@ -253,14 +268,19 @@ function SectionRow({ section, position, canWrite, options, onChange, onSave, on
                 Hidden
               </span>
             )}
-            <ChevronDown className={`w-4 h-4 ml-auto shrink-0 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
+            <ChevronDown
+              className={`w-4 h-4 ml-auto shrink-0 text-foreground-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+            />
           </button>
         )}
 
         <Toggle
           checked={section.is_active}
           disabled={!canWrite}
-          onChange={next => { onChange(section.id, { is_active: next }); onSave(section.id, { isActive: next }) }}
+          onChange={next => {
+            onChange(section.id, { is_active: next })
+            onSave(section.id, { isActive: next })
+          }}
         />
       </div>
 

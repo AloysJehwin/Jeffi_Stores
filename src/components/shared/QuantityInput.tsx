@@ -10,12 +10,28 @@ function fmtQty(v: number, maxDecimals = 6): string {
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
   const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
+  if (match)
+    return (
+      <>
+        {match[1]}
+        <sup>2</sup>
+      </>
+    )
   return <>{label}</>
 }
 
-function QtyHint({ qtyMin, qtyMax, qtyStep, unitLabel, defaultStep = 1 }: {
-  qtyMin: number; qtyMax?: number; qtyStep: number; unitLabel?: string | null; defaultStep?: number
+function QtyHint({
+  qtyMin,
+  qtyMax,
+  qtyStep,
+  unitLabel,
+  defaultStep = 1,
+}: {
+  qtyMin: number
+  qtyMax?: number
+  qtyStep: number
+  unitLabel?: string | null
+  defaultStep?: number
 }) {
   const parts: string[] = []
   if (qtyMin > 0) parts.push(`Min: ${fmtQty(qtyMin)}`)
@@ -24,7 +40,10 @@ function QtyHint({ qtyMin, qtyMax, qtyStep, unitLabel, defaultStep = 1 }: {
   if (parts.length === 0) return null
   const unit = unitLabel ? ` ${unitLabel}` : ''
   return (
-    <p className="text-xs text-foreground-muted mt-1">{parts.join(' · ')}{unit}</p>
+    <p className="text-xs text-foreground-muted mt-1">
+      {parts.join(' · ')}
+      {unit}
+    </p>
   )
 }
 
@@ -42,7 +61,17 @@ interface QuantityInputProps {
 }
 
 // ─── Count stepper ─────────────────────────────────────────────────────────
-function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
+function CountStepper({
+  quantity,
+  quantityRaw,
+  unitLabel,
+  unitKey,
+  effectiveStock,
+  qtyMin,
+  qtyMax,
+  qtyStep,
+  onChange,
+}: QuantityInputProps) {
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
   return (
     <div className="space-y-1">
@@ -67,7 +96,10 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
             value={quantityRaw}
             onChange={e => {
               const raw = e.target.value
-              onChange(isNaN(parseInt(raw, 10)) ? quantity : Math.min(ceiling, Math.max(qtyMin, parseInt(raw, 10))), raw)
+              onChange(
+                isNaN(parseInt(raw, 10)) ? quantity : Math.min(ceiling, Math.max(qtyMin, parseInt(raw, 10))),
+                raw
+              )
             }}
             onBlur={e => {
               const v = parseInt(e.target.value, 10)
@@ -90,7 +122,11 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
             </svg>
           </button>
         </div>
-        {unitLabel && <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel} /></span>}
+        {unitLabel && (
+          <span className="text-sm text-foreground-muted">
+            <UnitLabel label={unitLabel} />
+          </span>
+        )}
       </div>
       <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={1} />
     </div>
@@ -120,27 +156,25 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // when qtyStep is small (e.g. 0.01 m).
   const pxPerUnit = Math.max(PX_PER_UNIT, Math.ceil(20 / qtyStep))
 
-  const trackRef    = useRef<HTMLDivElement>(null)
-  const fillRef     = useRef<HTMLDivElement>(null)
-  const readoutRef  = useRef<HTMLSpanElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const fillRef = useRef<HTMLDivElement>(null)
+  const readoutRef = useRef<HTMLSpanElement>(null)
 
-  const isDragging        = useRef(false)
-  const lastX             = useRef(0)
-  const liveValue         = useRef(quantity)
-  const commitTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const programmatic      = useRef(false)
+  const isDragging = useRef(false)
+  const lastX = useRef(0)
+  const liveValue = useRef(quantity)
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const programmatic = useRef(false)
   const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const snap         = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
+  const snap = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
   const toScrollLeft = (v: number) => (v - qtyMin) * pxPerUnit
   const fromScrollLeft = (sl: number) => qtyMin + sl / pxPerUnit
 
   const updateDOM = (v: number) => {
     liveValue.current = v
-    if (readoutRef.current)
-      readoutRef.current.textContent = fmtQty(v)
-    if (fillRef.current)
-      fillRef.current.style.width = `${(v - qtyMin) * pxPerUnit}px`
+    if (readoutRef.current) readoutRef.current.textContent = fmtQty(v)
+    if (fillRef.current) fillRef.current.style.width = `${(v - qtyMin) * pxPerUnit}px`
   }
 
   const commit = (v: number) => onChange(v, fmtQty(v))
@@ -151,14 +185,19 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     programmatic.current = true
     if (programmaticTimer.current) clearTimeout(programmaticTimer.current)
     el.scrollTo({ left: toScrollLeft(v), behavior: smooth ? 'smooth' : 'instant' })
-    programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 600 : 30)
+    programmaticTimer.current = setTimeout(
+      () => {
+        programmatic.current = false
+      },
+      smooth ? 600 : 30
+    )
   }
 
   // initial scroll
   useEffect(() => {
     updateDOM(quantity)
     scrollToValue(quantity, false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // external quantity change (e.g. variant switch)
@@ -170,7 +209,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
       updateDOM(quantity)
       scrollToValue(quantity, true)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantity])
 
   const onScroll = useCallback(() => {
@@ -188,7 +227,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         scrollToValue(liveValue.current, false)
       }, 150)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [max, qtyMin, qtyStep])
 
   // Mouse-only drag (touch uses native scroll)
@@ -225,7 +264,9 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     const stepsFromMin = (v - qtyMin) / qtyStep
     const isMajor = Math.abs(stepsFromMin - Math.round(stepsFromMin)) < 0.001
     const isMid = !isMajor && Math.abs((stepsFromMin * 2) % 1) < 0.01
-    const snappedLabel: string | null = isMajor ? String(Math.round((qtyMin + Math.round(stepsFromMin) * qtyStep) * 1000) / 1000) : null
+    const snappedLabel: string | null = isMajor
+      ? String(Math.round((qtyMin + Math.round(stepsFromMin) * qtyStep) * 1000) / 1000)
+      : null
     const label: string | null = snappedLabel !== null && snappedLabel !== lastMajorLabel ? snappedLabel : null
     if (label !== null) lastMajorLabel = label
     ticks.push({ pos, label, kind: isMajor ? 'major' : isMid ? 'mid' : 'minor' })
@@ -244,21 +285,24 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     })
     ro.observe(el)
     return () => ro.disconnect()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Long-press step buttons
   const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null)
-  const stepTimeout  = useRef<ReturnType<typeof setTimeout>  | null>(null)
+  const stepTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const stepBy = useCallback((dir: 1 | -1) => {
-    const next = Math.min(max, Math.max(qtyMin, Math.round((liveValue.current + dir * qtyStep) * 1000) / 1000))
-    updateDOM(next)
-    prevQty.current = next
-    commit(next)
-    scrollToValue(next, false)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [max, qtyMin, qtyStep])
+  const stepBy = useCallback(
+    (dir: 1 | -1) => {
+      const next = Math.min(max, Math.max(qtyMin, Math.round((liveValue.current + dir * qtyStep) * 1000) / 1000))
+      updateDOM(next)
+      prevQty.current = next
+      commit(next)
+      scrollToValue(next, false)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [max, qtyMin, qtyStep]
+  )
 
   const startLongPress = (dir: 1 | -1) => {
     stepBy(dir)
@@ -268,8 +312,14 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   }
 
   const stopLongPress = () => {
-    if (stepTimeout.current)  { clearTimeout(stepTimeout.current);   stepTimeout.current  = null }
-    if (stepInterval.current) { clearInterval(stepInterval.current); stepInterval.current = null }
+    if (stepTimeout.current) {
+      clearTimeout(stepTimeout.current)
+      stepTimeout.current = null
+    }
+    if (stepInterval.current) {
+      clearInterval(stepInterval.current)
+      stepInterval.current = null
+    }
   }
 
   useEffect(() => stopLongPress, [])
@@ -283,17 +333,29 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         <span ref={readoutRef} className="text-2xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
           {fmtQty(quantity)}
         </span>
-        {unitLabel && <span className="text-sm text-foreground-secondary"><UnitLabel label={unitLabel} /></span>}
+        {unitLabel && (
+          <span className="text-sm text-foreground-secondary">
+            <UnitLabel label={unitLabel} />
+          </span>
+        )}
       </div>
 
       {/* tape box */}
-      <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 80 }}>
-
+      <div
+        className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none"
+        style={{ height: 80 }}
+      >
         {/* fixed centre needle */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
           <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
-            style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
+          <div
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
+            style={{
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderTop: '8px solid var(--color-primary-600, #2563eb)',
+            }}
+          />
         </div>
 
         {/* scrollable track — touch scrolls natively; mouse uses pointer drag */}
@@ -305,7 +367,9 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
           className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing touch-pan-x"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          style={
+            { scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties
+          }
         >
           <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
             <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
@@ -317,23 +381,58 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
               />
               {/* ticks */}
               {ticks.map((t, i) => (
-                <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div style={{
+                <div
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    left: t.pos,
+                    top: 0,
                     width: 1,
-                    height: t.kind === 'major' ? 30 : t.kind === 'mid' ? 20 : 12,
-                    background: t.kind === 'major' ? '#92400e' : '#d97706',
-                    opacity: t.kind === 'minor' ? 0.4 : 0.7,
-                    marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
-                  }} />
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 1,
+                      height: t.kind === 'major' ? 30 : t.kind === 'mid' ? 20 : 12,
+                      background: t.kind === 'major' ? '#92400e' : '#d97706',
+                      opacity: t.kind === 'minor' ? 0.4 : 0.7,
+                      marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
+                    }}
+                  />
                   {t.label && (
-                    <span style={{ position: 'absolute', top: 33, fontSize: 12, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 33,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: '#92400e',
+                        transform: 'translateX(-50%)',
+                        whiteSpace: 'nowrap',
+                        userSelect: 'none',
+                        fontFamily: 'monospace',
+                      }}
+                    >
                       {t.label}
                     </span>
                   )}
                 </div>
               ))}
               {/* max label */}
-              <span style={{ position: 'absolute', left: ticksWidth + 8, top: 36, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: ticksWidth + 8,
+                  top: 36,
+                  fontSize: 11,
+                  color: '#b45309',
+                  fontWeight: 600,
+                  userSelect: 'none',
+                }}
+              >
                 <UnitLabel label={unitLabel} /> max
               </span>
             </div>
@@ -343,26 +442,36 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         {/* ‹ — left overlay, full height for easy tap */}
         <button
           type="button"
-          onPointerDown={e => { e.stopPropagation(); startLongPress(-1) }}
+          onPointerDown={e => {
+            e.stopPropagation()
+            startLongPress(-1)
+          }}
           onPointerUp={stopLongPress}
           onPointerLeave={stopLongPress}
           onPointerCancel={stopLongPress}
           disabled={quantity <= qtyMin}
           className="absolute left-0 inset-y-0 z-20 w-11 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 active:bg-amber-300/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-xl font-bold"
           style={{ backdropFilter: 'blur(2px)', touchAction: 'none' }}
-        >‹</button>
+        >
+          ‹
+        </button>
 
         {/* › — right overlay */}
         <button
           type="button"
-          onPointerDown={e => { e.stopPropagation(); startLongPress(1) }}
+          onPointerDown={e => {
+            e.stopPropagation()
+            startLongPress(1)
+          }}
           onPointerUp={stopLongPress}
           onPointerLeave={stopLongPress}
           onPointerCancel={stopLongPress}
           disabled={quantity >= max}
           className="absolute right-0 inset-y-0 z-20 w-11 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 active:bg-amber-300/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-xl font-bold"
           style={{ backdropFilter: 'blur(2px)', touchAction: 'none' }}
-        >›</button>
+        >
+          ›
+        </button>
       </div>
 
       <p className="text-xs text-foreground-muted">Swipe the tape or hold ‹ › to adjust</p>
@@ -372,7 +481,16 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
 }
 
 // ─── Slider (weight / volume) ───────────────────────────────────────────────
-function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax, qtyStep, qtyMin, onChange }: QuantityInputProps) {
+function SliderInput({
+  quantity,
+  quantityRaw,
+  unitLabel,
+  effectiveStock,
+  qtyMax,
+  qtyStep,
+  qtyMin,
+  onChange,
+}: QuantityInputProps) {
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
 
   function dec() {
@@ -393,7 +511,9 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
             onClick={dec}
             disabled={quantity <= qtyMin}
             className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >−</button>
+          >
+            −
+          </button>
           <input
             type="text"
             inputMode="decimal"
@@ -417,7 +537,9 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
             onClick={inc}
             disabled={quantity >= ceiling}
             className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >+</button>
+          >
+            +
+          </button>
         </div>
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
@@ -437,13 +559,26 @@ interface AreaInputProps {
   onChange: (qty: number, raw: string) => void
 }
 
-function DimStepper({ label, value, step, min, max, onChange }: {
-  label: string; value: number; step: number; min: number; max: number
+function DimStepper({
+  label,
+  value,
+  step,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  step: number
+  min: number
+  max: number
   onChange: (v: number) => void
 }) {
   const [raw, setRaw] = useState(fmtQty(value))
 
-  useEffect(() => { setRaw(fmtQty(value)) }, [value])
+  useEffect(() => {
+    setRaw(fmtQty(value))
+  }, [value])
 
   function snap(v: number) {
     const snapped = Math.round(v / step) * step
@@ -470,14 +605,18 @@ function DimStepper({ label, value, step, min, max, onChange }: {
           onClick={() => onChange(snap(value - step))}
           disabled={value <= min}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-lg select-none"
-        >−</button>
+        >
+          −
+        </button>
         <input
           type="text"
           inputMode="decimal"
           value={raw}
           onChange={e => setRaw(e.target.value)}
           onBlur={e => commit(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value) }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit((e.target as HTMLInputElement).value)
+          }}
           className="flex-1 text-center font-semibold text-foreground bg-transparent text-base min-h-[44px] focus:outline-none min-w-0"
         />
         <button
@@ -485,7 +624,9 @@ function DimStepper({ label, value, step, min, max, onChange }: {
           onClick={() => onChange(snap(value + step))}
           disabled={value >= max}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-lg select-none"
-        >+</button>
+        >
+          +
+        </button>
       </div>
     </div>
   )
@@ -495,9 +636,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
 
   // Strip trailing "2" or "²" to get the linear unit for width/height labels (e.g. "ft2" → "ft", "m²" → "m")
-  const linearUnit = unitLabel
-    ? unitLabel.replace(/²$/, '').replace(/2$/, '')
-    : ''
+  const linearUnit = unitLabel ? unitLabel.replace(/²$/, '').replace(/2$/, '') : ''
 
   function initDims(qty: number): [number, number] {
     const sqrtQ = Math.sqrt(Math.max(qty, qtyMin))
@@ -518,7 +657,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
       setW(nw)
       setH(nh)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantity])
 
   const dimMax = Math.sqrt(ceiling)
@@ -530,8 +669,14 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
     onChange(clamped, String(clamped))
   }
 
-  function handleW(v: number) { setW(v); emit(v, h) }
-  function handleH(v: number) { setH(v); emit(w, v) }
+  function handleW(v: number) {
+    setW(v)
+    emit(v, h)
+  }
+  function handleH(v: number) {
+    setH(v)
+    emit(w, v)
+  }
 
   return (
     <div className="space-y-3">
@@ -539,7 +684,10 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
         <div className="flex-1">
           <DimStepper
             label={linearUnit ? `Width (${linearUnit})` : 'Width'}
-            value={w} step={qtyStep} min={dimMin} max={dimMax}
+            value={w}
+            step={qtyStep}
+            min={dimMin}
+            max={dimMax}
             onChange={handleW}
           />
         </div>
@@ -547,13 +695,27 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
         <div className="flex-1">
           <DimStepper
             label={linearUnit ? `Height (${linearUnit})` : 'Height'}
-            value={h} step={qtyStep} min={dimMin} max={dimMax}
+            value={h}
+            step={qtyStep}
+            min={dimMin}
+            max={dimMax}
             onChange={handleH}
           />
         </div>
       </div>
       <p className="text-sm text-foreground-secondary">
-        Area: <span className="font-semibold text-foreground">{fmtQty(quantity)} {linearUnit ? <>{linearUnit}<sup>2</sup></> : unitLabel}</span>
+        Area:{' '}
+        <span className="font-semibold text-foreground">
+          {fmtQty(quantity)}{' '}
+          {linearUnit ? (
+            <>
+              {linearUnit}
+              <sup>2</sup>
+            </>
+          ) : (
+            unitLabel
+          )}
+        </span>
       </p>
       <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={0.001} />
     </div>
@@ -565,6 +727,17 @@ export default function QuantityInput(props: QuantityInputProps) {
   const { dimension } = props
   if (dimension === 'length') return <LengthRuler {...props} />
   if (dimension === 'weight' || dimension === 'volume') return <SliderInput {...props} />
-  if (dimension === 'area') return <AreaInput quantity={props.quantity} unitLabel={props.unitLabel} effectiveStock={props.effectiveStock} qtyMin={props.qtyMin} qtyMax={props.qtyMax} qtyStep={props.qtyStep} onChange={props.onChange} />
+  if (dimension === 'area')
+    return (
+      <AreaInput
+        quantity={props.quantity}
+        unitLabel={props.unitLabel}
+        effectiveStock={props.effectiveStock}
+        qtyMin={props.qtyMin}
+        qtyMax={props.qtyMax}
+        qtyStep={props.qtyStep}
+        onChange={props.onChange}
+      />
+    )
   return <CountStepper {...props} />
 }

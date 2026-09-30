@@ -25,19 +25,60 @@ export interface HeroSlide {
 
 // Legacy per-category copy — used only when a slide has no DB-provided badge/subtitle.
 const LEGACY_COPY: Record<string, { badge: string; badgeColor: string; subtitle: string }> = {
-  'fasteners':              { badge: 'New Arrivals',    badgeColor: 'bg-primary-500',  subtitle: 'Bolts, nuts, screws & more — precision engineered for industrial use' },
-  'power-transmission':     { badge: 'Top Picks',       badgeColor: 'bg-red-500',      subtitle: 'V-belts, timing belts, bearings and transmission components' },
-  'tools-equipment':        { badge: 'Best Sellers',    badgeColor: 'bg-accent-500',   subtitle: 'Drill bits, cutting tools and accessories for every job' },
-  'welding-supplies':       { badge: 'Trusted Quality', badgeColor: 'bg-emerald-600',  subtitle: 'Welding rods, electrodes and accessories for every application' },
-  'electrical-cables':      { badge: 'In Stock',        badgeColor: 'bg-blue-600',     subtitle: 'Industrial cables, wires and electrical accessories' },
-  'industrial-components':  { badge: 'Precision Parts', badgeColor: 'bg-purple-600',   subtitle: 'Gears, flanges, bearings and machined components' },
-  'material-handling':      { badge: 'Heavy Duty',      badgeColor: 'bg-orange-600',   subtitle: 'Chains, hooks, pulleys and lifting equipment' },
-  'abrasives':              { badge: 'Top Picks',       badgeColor: 'bg-yellow-600',   subtitle: 'Grinding wheels, cutting discs and abrasive products' },
-  'lubricants-chemicals':   { badge: 'In Stock',        badgeColor: 'bg-teal-600',     subtitle: 'Industrial lubricants, greases and specialty chemicals' },
-  'safety-equipment':       { badge: 'Stay Safe',       badgeColor: 'bg-rose-600',     subtitle: 'PPE, helmets, gloves and workplace safety gear' },
+  fasteners: {
+    badge: 'New Arrivals',
+    badgeColor: 'bg-primary-500',
+    subtitle: 'Bolts, nuts, screws & more — precision engineered for industrial use',
+  },
+  'power-transmission': {
+    badge: 'Top Picks',
+    badgeColor: 'bg-red-500',
+    subtitle: 'V-belts, timing belts, bearings and transmission components',
+  },
+  'tools-equipment': {
+    badge: 'Best Sellers',
+    badgeColor: 'bg-accent-500',
+    subtitle: 'Drill bits, cutting tools and accessories for every job',
+  },
+  'welding-supplies': {
+    badge: 'Trusted Quality',
+    badgeColor: 'bg-emerald-600',
+    subtitle: 'Welding rods, electrodes and accessories for every application',
+  },
+  'electrical-cables': {
+    badge: 'In Stock',
+    badgeColor: 'bg-blue-600',
+    subtitle: 'Industrial cables, wires and electrical accessories',
+  },
+  'industrial-components': {
+    badge: 'Precision Parts',
+    badgeColor: 'bg-purple-600',
+    subtitle: 'Gears, flanges, bearings and machined components',
+  },
+  'material-handling': {
+    badge: 'Heavy Duty',
+    badgeColor: 'bg-orange-600',
+    subtitle: 'Chains, hooks, pulleys and lifting equipment',
+  },
+  abrasives: {
+    badge: 'Top Picks',
+    badgeColor: 'bg-yellow-600',
+    subtitle: 'Grinding wheels, cutting discs and abrasive products',
+  },
+  'lubricants-chemicals': {
+    badge: 'In Stock',
+    badgeColor: 'bg-teal-600',
+    subtitle: 'Industrial lubricants, greases and specialty chemicals',
+  },
+  'safety-equipment': {
+    badge: 'Stay Safe',
+    badgeColor: 'bg-rose-600',
+    subtitle: 'PPE, helmets, gloves and workplace safety gear',
+  },
 }
 
-const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1440" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
+const PLACEHOLDER =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1440" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
 const AUTO_ADVANCE_MS = 5000
 const SWIPE_THRESHOLD = 50 // px
 
@@ -84,7 +125,9 @@ export default function HeroCarousel({ slides }: Props) {
 
   useEffect(() => {
     if (count <= 1) return
-    const t = setTimeout(() => { if (!paused.current) go(active + 1) }, AUTO_ADVANCE_MS)
+    const t = setTimeout(() => {
+      if (!paused.current) go(active + 1)
+    }, AUTO_ADVANCE_MS)
     return () => clearTimeout(t)
   }, [active, go, count])
 
@@ -126,8 +169,14 @@ export default function HeroCarousel({ slides }: Props) {
               key={s.key}
               className={`absolute inset-0 transition-opacity duration-700 ${i === active ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
             >
-              <Link href={s.href} className="absolute inset-0 z-10" aria-label={`Shop ${s.title}`}
-                onClick={(e) => { if (dragging && Math.abs(touchDeltaX.current) > SWIPE_THRESHOLD) e.preventDefault() }} />
+              <Link
+                href={s.href}
+                className="absolute inset-0 z-10"
+                aria-label={`Shop ${s.title}`}
+                onClick={e => {
+                  if (dragging && Math.abs(touchDeltaX.current) > SWIPE_THRESHOLD) e.preventDefault()
+                }}
+              />
 
               {/* The image covers only the right ~60%, and the gradient below it is not fully
                   opaque everywhere. Without a solid base the near-white page background
@@ -160,7 +209,9 @@ export default function HeroCarousel({ slides }: Props) {
 
               <div className="relative z-10 h-full flex flex-col justify-start pt-10 sm:pt-12 md:pt-14 px-6 sm:px-12 md:px-16 pb-16 max-w-[55%] sm:max-w-[50%] pointer-events-none">
                 {s.badge && (
-                  <span className={`inline-block self-start ${s.badgeColor} text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded mb-4 sm:mb-5`}>
+                  <span
+                    className={`inline-block self-start ${s.badgeColor} text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded mb-4 sm:mb-5`}
+                  >
                     {s.badge}
                   </span>
                 )}

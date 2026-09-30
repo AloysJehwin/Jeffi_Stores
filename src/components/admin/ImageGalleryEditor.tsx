@@ -33,8 +33,18 @@ const SPINNER = (cls: string) => (
 )
 
 export default function ImageGalleryEditor({
-  images, maxImages = 5, size = 'md', uploading = false, pendingAdds = 0, deleting = {}, error,
-  onUpload, onDelete, onSetPrimary, onReorder, onOpenGallery,
+  images,
+  maxImages = 5,
+  size = 'md',
+  uploading = false,
+  pendingAdds = 0,
+  deleting = {},
+  error,
+  onUpload,
+  onDelete,
+  onSetPrimary,
+  onReorder,
+  onOpenGallery,
 }: Props) {
   const dragIndex = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
@@ -70,8 +80,15 @@ export default function ImageGalleryEditor({
 
       <div
         className={`flex flex-wrap gap-2 rounded-lg transition-colors ${fileOver ? 'ring-2 ring-accent-500 ring-offset-2 ring-offset-surface' : ''}`}
-        onDragOver={e => { if (Array.from(e.dataTransfer.types).includes('Files') && slotsLeft > 0) { e.preventDefault(); setFileOver(true) } }}
-        onDragLeave={e => { if (e.currentTarget === e.target) setFileOver(false) }}
+        onDragOver={e => {
+          if (Array.from(e.dataTransfer.types).includes('Files') && slotsLeft > 0) {
+            e.preventDefault()
+            setFileOver(true)
+          }
+        }}
+        onDragLeave={e => {
+          if (e.currentTarget === e.target) setFileOver(false)
+        }}
         onDrop={e => {
           if (!Array.from(e.dataTransfer.types).includes('Files')) return
           e.preventDefault()
@@ -86,15 +103,34 @@ export default function ImageGalleryEditor({
               key={img.id}
               className={`relative group ${tile} rounded-lg border overflow-hidden bg-surface select-none transition-all ${img.is_primary ? 'border-accent-500 ring-1 ring-accent-500' : 'border-border-default'} ${isDropTarget ? 'ring-2 ring-accent-400 scale-[1.03]' : ''}`}
               draggable
-              onDragStart={e => { dragIndex.current = idx; e.dataTransfer.effectAllowed = 'move' }}
-              onDragEnter={() => { if (dragIndex.current !== null) setDragOver(idx) }}
-              onDragOver={e => { if (dragIndex.current !== null) e.preventDefault() }}
-              onDrop={e => { if (dragIndex.current !== null) { e.preventDefault(); e.stopPropagation(); finishDrag(idx) } }}
+              onDragStart={e => {
+                dragIndex.current = idx
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragEnter={() => {
+                if (dragIndex.current !== null) setDragOver(idx)
+              }}
+              onDragOver={e => {
+                if (dragIndex.current !== null) e.preventDefault()
+              }}
+              onDrop={e => {
+                if (dragIndex.current !== null) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  finishDrag(idx)
+                }
+              }}
               onDragEnd={() => finishDrag(dragOver)}
             >
-              <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none" />
+              <img
+                src={img.thumbnail_url || img.image_url}
+                alt=""
+                className="w-full h-full object-cover pointer-events-none"
+              />
 
-              <span className="absolute top-1 right-1 min-w-[16px] text-center text-[10px] bg-black/65 text-white rounded px-1 leading-4 font-semibold pointer-events-none">{idx + 1}</span>
+              <span className="absolute top-1 right-1 min-w-[16px] text-center text-[10px] bg-black/65 text-white rounded px-1 leading-4 font-semibold pointer-events-none">
+                {idx + 1}
+              </span>
               {img.is_primary && (
                 <span className="absolute top-1 left-1 flex items-center gap-0.5 bg-accent-500 text-white rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide leading-none pointer-events-none">
                   <Star className="w-2.5 h-2.5 fill-current" /> Main
@@ -127,8 +163,26 @@ export default function ImageGalleryEditor({
                 </div>
                 {images.length > 1 && (
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => idx > 0 && onReorder(idx, idx - 1)} disabled={idx === 0} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move left" aria-label="Move image left">◀</button>
-                    <button type="button" onClick={() => idx < images.length - 1 && onReorder(idx, idx + 1)} disabled={idx === images.length - 1} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move right" aria-label="Move image right">▶</button>
+                    <button
+                      type="button"
+                      onClick={() => idx > 0 && onReorder(idx, idx - 1)}
+                      disabled={idx === 0}
+                      className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                      title="Move left"
+                      aria-label="Move image left"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => idx < images.length - 1 && onReorder(idx, idx + 1)}
+                      disabled={idx === images.length - 1}
+                      className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                      title="Move right"
+                      aria-label="Move image right"
+                    >
+                      ▶
+                    </button>
                   </div>
                 )}
               </div>
@@ -143,18 +197,41 @@ export default function ImageGalleryEditor({
         })}
 
         {Array.from({ length: pendingAdds }).map((_, k) => (
-          <div key={`pending-${k}`} className={`relative ${tile} rounded-lg border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden`}>
+          <div
+            key={`pending-${k}`}
+            className={`relative ${tile} rounded-lg border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden`}
+          >
             <div className="absolute inset-0 animate-pulse bg-surface-tertiary/40" />
             {SPINNER('relative w-5 h-5 text-foreground-muted animate-spin')}
           </div>
         ))}
 
         {slotsLeft > 0 && (
-          <label className={`${isEmpty ? `w-full ${size === 'sm' ? 'h-20' : 'h-24'} flex-row gap-2` : `${tile} flex-col gap-1`} rounded-lg border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 hover:bg-surface-secondary/50 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={e => { acceptFiles(e.target.files); e.target.value = '' }} />
-            {uploading ? SPINNER('w-4 h-4 text-foreground-muted animate-spin') : (
+          <label
+            className={`${isEmpty ? `w-full ${size === 'sm' ? 'h-20' : 'h-24'} flex-row gap-2` : `${tile} flex-col gap-1`} rounded-lg border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 hover:bg-surface-secondary/50 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={e => {
+                acceptFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            {uploading ? (
+              SPINNER('w-4 h-4 text-foreground-muted animate-spin')
+            ) : (
               <>
-                <svg className={`${isEmpty ? 'w-6 h-6' : 'w-5 h-5'} text-foreground-muted`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                <svg
+                  className={`${isEmpty ? 'w-6 h-6' : 'w-5 h-5'} text-foreground-muted`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
                 <span className={`${isEmpty ? 'text-xs' : 'text-[10px]'} text-foreground-muted leading-none`}>
                   {isEmpty ? 'Drop images here, or click to browse' : 'Drop or click'}
                 </span>
@@ -174,7 +251,9 @@ export default function ImageGalleryEditor({
             Choose from Gallery
           </button>
         )}
-        <span className="text-[11px] text-foreground-muted">{used} of {maxImages} used</span>
+        <span className="text-[11px] text-foreground-muted">
+          {used} of {maxImages} used
+        </span>
       </div>
 
       {error && <p className="text-xs text-red-500">{error}</p>}

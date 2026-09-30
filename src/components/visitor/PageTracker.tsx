@@ -43,12 +43,15 @@ export default function PageTracker() {
     const sessionId = getOrCreateSessionId()
     const referrer = typeof document !== 'undefined' ? document.referrer : ''
 
-    navigator.sendBeacon('/api/track', JSON.stringify({
-      sessionId,
-      page,
-      path: pathname,
-      referrer,
-    }))
+    navigator.sendBeacon(
+      '/api/track',
+      JSON.stringify({
+        sessionId,
+        page,
+        path: pathname,
+        referrer,
+      })
+    )
   }, [pathname])
 
   return null

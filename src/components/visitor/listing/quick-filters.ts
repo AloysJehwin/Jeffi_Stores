@@ -15,7 +15,12 @@ export interface CategoryNode {
 }
 
 export function splitList(raw: string | null | undefined): string[] {
-  return raw ? raw.split(',').map(v => v.trim()).filter(Boolean) : []
+  return raw
+    ? raw
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+    : []
 }
 
 export function chipSelected(chip: QuickChip, selected: string[]): boolean {

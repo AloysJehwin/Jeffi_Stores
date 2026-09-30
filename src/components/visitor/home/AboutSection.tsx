@@ -16,7 +16,15 @@ interface AboutSectionProps {
 }
 
 export default function AboutSection({
-  aboutCopy, stats, storeName, title, eyebrow, body, imageUrl, ctaLabel, ctaUrl,
+  aboutCopy,
+  stats,
+  storeName,
+  title,
+  eyebrow,
+  body,
+  imageUrl,
+  ctaLabel,
+  ctaUrl,
 }: AboutSectionProps) {
   return (
     <section className="py-12 md:py-20 bg-surface">
@@ -31,7 +39,10 @@ export default function AboutSection({
             <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent" />
             <div className="absolute bottom-4 left-4 right-4 flex gap-3">
               {stats.map((s, i) => (
-                <div key={i} className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
+                <div
+                  key={i}
+                  className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1"
+                >
                   <p className="text-white font-black text-2xl">{s.value}</p>
                   <p className="text-white/60 text-xs font-semibold mt-0.5">{s.label}</p>
                 </div>
@@ -41,17 +52,15 @@ export default function AboutSection({
 
           <div className="space-y-5">
             <div>
-              <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{eyebrow || COPY.eyebrow}</p>
+              <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">
+                {eyebrow || COPY.eyebrow}
+              </p>
               <h2 className="text-2xl md:text-5xl font-black text-foreground leading-tight text-balance">
                 {title || COPY.title}
               </h2>
             </div>
-            <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
-              {aboutCopy}
-            </p>
-            <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
-              {body || COPY.body}
-            </p>
+            <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">{aboutCopy}</p>
+            <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">{body || COPY.body}</p>
 
             <div className="flex flex-wrap gap-3 pt-2">
               <Link

@@ -19,7 +19,9 @@ export default function FreeShippingProgress({ subtotal }: { subtotal: number })
         if (active && data && data.freeThreshold > 0) setRule(data)
       })
       .catch(() => {})
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [])
 
   if (!rule || subtotal <= 0) return null
@@ -34,7 +36,9 @@ export default function FreeShippingProgress({ subtotal }: { subtotal: number })
         {unlocked ? (
           <span className="font-semibold text-green-700 dark:text-green-400">You have unlocked free delivery</span>
         ) : (
-          <>Add <span className="font-semibold">{inr(remaining)}</span> more to get free delivery</>
+          <>
+            Add <span className="font-semibold">{inr(remaining)}</span> more to get free delivery
+          </>
         )}
       </p>
       <div

@@ -44,7 +44,11 @@ const PRICE_PRESETS: { label: string; min: number | null; max: number | null }[]
 
 const CheckIcon = () => (
   <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    <path
+      fillRule="evenodd"
+      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+      clipRule="evenodd"
+    />
   </svg>
 )
 
@@ -61,11 +65,7 @@ function Section({
 }) {
   return (
     <div className="border-b border-border-default pb-4 mb-4 last:border-0 last:mb-0 last:pb-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between mb-3 text-left"
-      >
+      <button type="button" onClick={onToggle} className="w-full flex items-center justify-between mb-3 text-left">
         <span className="font-semibold text-foreground text-sm">{title}</span>
         <svg
           className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
@@ -94,16 +94,10 @@ function CheckboxRow({
   onToggle: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 py-1.5 text-left group"
-    >
+    <button type="button" onClick={onToggle} className="w-full flex items-center gap-2 py-1.5 text-left group">
       <span
         className={`shrink-0 w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-          active
-            ? 'bg-accent-500 border-accent-500'
-            : 'border-border-secondary group-hover:border-accent-300'
+          active ? 'bg-accent-500 border-accent-500' : 'border-border-secondary group-hover:border-accent-300'
         }`}
       >
         {active && (
@@ -112,12 +106,12 @@ function CheckboxRow({
           </svg>
         )}
       </span>
-      <span className={`flex-1 text-sm ${active ? 'text-accent-700 dark:text-accent-400 font-medium' : 'text-foreground-secondary'}`}>
+      <span
+        className={`flex-1 text-sm ${active ? 'text-accent-700 dark:text-accent-400 font-medium' : 'text-foreground-secondary'}`}
+      >
         {label}
       </span>
-      {typeof count === 'number' && (
-        <span className="text-xs text-foreground-muted shrink-0">{count}</span>
-      )}
+      {typeof count === 'number' && <span className="text-xs text-foreground-muted shrink-0">{count}</span>}
     </button>
   )
 }
@@ -125,7 +119,12 @@ function CheckboxRow({
 const STORAGE_KEY = 'filter_sidebar_sections_v2'
 const DEFAULT_OPEN_SECTIONS = ['Categories', 'Price Range', 'Availability', 'Offers', 'Brand', 'Color']
 
-export default function FilterSidebar({ basePath = '/products', categories = [], facets, offers = [] }: FilterSidebarProps) {
+export default function FilterSidebar({
+  basePath = '/products',
+  categories = [],
+  facets,
+  offers = [],
+}: FilterSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -150,7 +149,9 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
   function toggleSection(title: string) {
     setSections(prev => {
       const next = { ...prev, [title]: !prev[title] }
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      } catch {}
       return next
     })
   }
@@ -204,9 +205,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
 
   function toggleInList(param: string, value: string) {
     const current = selectedList(param)
-    const next = current.includes(value)
-      ? current.filter(v => v !== value)
-      : [...current, value]
+    const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
     apply({ [param]: next.length ? next.join(',') : null })
   }
 
@@ -225,10 +224,23 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
   const currentSpecValue = searchParams.get('specValue') || ''
 
   const FILTER_PARAMS = [
-    'brand', 'color',
-    'minPrice', 'maxPrice', 'inStock', 'onSale', 'offer', 'minRating',
-    'grade', 'material', 'finish', 'compliance', 'origin',
-    'variantType', 'variantValue', 'specKey', 'specValue',
+    'brand',
+    'color',
+    'minPrice',
+    'maxPrice',
+    'inStock',
+    'onSale',
+    'offer',
+    'minRating',
+    'grade',
+    'material',
+    'finish',
+    'compliance',
+    'origin',
+    'variantType',
+    'variantValue',
+    'specKey',
+    'specValue',
   ]
   const anyFilterActive = FILTER_PARAMS.some(p => searchParams.get(p))
 
@@ -252,15 +264,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
   }
 
   // Reusable multi-select facet section with show-more
-  function FacetCheckboxSection({
-    title,
-    param,
-    values,
-  }: {
-    title: string
-    param: string
-    values: FacetValue[]
-  }) {
+  function FacetCheckboxSection({ title, param, values }: { title: string; param: string; values: FacetValue[] }) {
     if (values.length === 0) return null
     const selected = selectedList(param)
     const isExpanded = expanded[param]
@@ -307,62 +311,71 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
       </div>
 
       {/* 0. Categories */}
-      {categories.length > 0 && (() => {
-        const mainCats = categories.filter(c => !c.parent_category_id)
-        const subCats = categories.filter(c => c.parent_category_id)
-        const activeCats = selectedList('category')
-        return (
-          <Section title="Categories" open={sectionOpen('Categories')} onToggle={() => toggleSection('Categories')}>
-            <div className="space-y-0.5">
-              <button type="button"
-                onClick={() => apply({ category: null })}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors ${activeCats.length === 0 ? 'text-accent-700 dark:text-accent-400 font-medium bg-accent-50 dark:bg-accent-900/20' : 'text-foreground-secondary hover:bg-surface-secondary'}`}>
-                All Categories
-              </button>
-              {mainCats.map(cat => {
-                const subs = subCats.filter(s => s.parent_category_id === cat.id)
-                const isActive = activeCats.includes(cat.id) || activeCats.includes(cat.slug)
-                const hasActiveChild = subs.some(s => activeCats.includes(s.id) || activeCats.includes(s.slug))
-                return (
-                  <div key={cat.id}>
-                    <button type="button"
-                      onClick={() => {
-                        const next = isActive
-                          ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
-                          : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
-                        apply({ category: next.length ? next.join(',') : null })
-                      }}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${isActive || hasActiveChild ? 'text-accent-700 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/20' : 'text-foreground hover:bg-surface-secondary'}`}>
-                      {(isActive || hasActiveChild) && <CheckIcon />}
-                      {cat.name}
-                    </button>
-                    {/* Show sub-categories only when this parent is active */}
-                    {(isActive || hasActiveChild) && subs.map(sub => {
-                      const isSubActive = activeCats.includes(sub.id) || activeCats.includes(sub.slug)
-                      return (
-                        <button key={sub.id} type="button"
-                          onClick={() => {
-                            const next = isSubActive
-                              ? activeCats.filter(v => v !== sub.id && v !== sub.slug)
-                              : [...activeCats.filter(v => v !== sub.id && v !== sub.slug), sub.id]
-                            apply({ category: next.length ? next.join(',') : null })
-                          }}
-                          className={`w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-lg text-sm transition-colors ${isSubActive ? 'text-accent-700 dark:text-accent-400 font-medium bg-accent-50 dark:bg-accent-900/20' : 'text-foreground-secondary hover:bg-surface-secondary'}`}>
-                          {isSubActive && <CheckIcon />}
-                          {sub.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          </Section>
-        )
-      })()}
+      {categories.length > 0 &&
+        (() => {
+          const mainCats = categories.filter(c => !c.parent_category_id)
+          const subCats = categories.filter(c => c.parent_category_id)
+          const activeCats = selectedList('category')
+          return (
+            <Section title="Categories" open={sectionOpen('Categories')} onToggle={() => toggleSection('Categories')}>
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => apply({ category: null })}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors ${activeCats.length === 0 ? 'text-accent-700 dark:text-accent-400 font-medium bg-accent-50 dark:bg-accent-900/20' : 'text-foreground-secondary hover:bg-surface-secondary'}`}
+                >
+                  All Categories
+                </button>
+                {mainCats.map(cat => {
+                  const subs = subCats.filter(s => s.parent_category_id === cat.id)
+                  const isActive = activeCats.includes(cat.id) || activeCats.includes(cat.slug)
+                  const hasActiveChild = subs.some(s => activeCats.includes(s.id) || activeCats.includes(s.slug))
+                  return (
+                    <div key={cat.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = isActive
+                            ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
+                            : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
+                          apply({ category: next.length ? next.join(',') : null })
+                        }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium transition-colors ${isActive || hasActiveChild ? 'text-accent-700 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/20' : 'text-foreground hover:bg-surface-secondary'}`}
+                      >
+                        {(isActive || hasActiveChild) && <CheckIcon />}
+                        {cat.name}
+                      </button>
+                      {/* Show sub-categories only when this parent is active */}
+                      {(isActive || hasActiveChild) &&
+                        subs.map(sub => {
+                          const isSubActive = activeCats.includes(sub.id) || activeCats.includes(sub.slug)
+                          return (
+                            <button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => {
+                                const next = isSubActive
+                                  ? activeCats.filter(v => v !== sub.id && v !== sub.slug)
+                                  : [...activeCats.filter(v => v !== sub.id && v !== sub.slug), sub.id]
+                                apply({ category: next.length ? next.join(',') : null })
+                              }}
+                              className={`w-full flex items-center gap-2 pl-5 pr-2 py-1.5 rounded-lg text-sm transition-colors ${isSubActive ? 'text-accent-700 dark:text-accent-400 font-medium bg-accent-50 dark:bg-accent-900/20' : 'text-foreground-secondary hover:bg-surface-secondary'}`}
+                            >
+                              {isSubActive && <CheckIcon />}
+                              {sub.name}
+                            </button>
+                          )
+                        })}
+                    </div>
+                  )
+                })}
+              </div>
+            </Section>
+          )
+        })()}
 
       {/* 1. Price Range */}
-      <Section title="Price Range" open={sectionOpen("Price Range")} onToggle={() => toggleSection("Price Range")}>
+      <Section title="Price Range" open={sectionOpen('Price Range')} onToggle={() => toggleSection('Price Range')}>
         <p className="text-sm text-foreground-secondary mb-3">
           ₹{facets.priceMin.toLocaleString('en-IN')} – ₹{facets.priceMax.toLocaleString('en-IN')}
         </p>
@@ -373,7 +386,9 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
             placeholder="Min"
             value={minInput}
             onChange={e => setMinInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') applyPriceInputs() }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') applyPriceInputs()
+            }}
             className="w-full min-w-0 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
           <span className="text-foreground-muted text-sm">–</span>
@@ -383,7 +398,9 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
             placeholder="Max"
             value={maxInput}
             onChange={e => setMaxInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') applyPriceInputs() }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') applyPriceInputs()
+            }}
             className="w-full min-w-0 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
           <button
@@ -425,7 +442,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
       </Section>
 
       {/* 2. Availability */}
-      <Section title="Availability" open={sectionOpen("Availability")} onToggle={() => toggleSection("Availability")}>
+      <Section title="Availability" open={sectionOpen('Availability')} onToggle={() => toggleSection('Availability')}>
         <CheckboxRow
           label="In Stock"
           count={facets.inStockCount}
@@ -440,7 +457,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
       </Section>
 
       {/* 3. On Sale */}
-      <Section title="Offers" open={sectionOpen("Offers")} onToggle={() => toggleSection("Offers")}>
+      <Section title="Offers" open={sectionOpen('Offers')} onToggle={() => toggleSection('Offers')}>
         <button
           type="button"
           onClick={() => apply({ onSale: onSaleActive ? null : '1' })}
@@ -450,14 +467,20 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
               : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
           }`}
         >
-          <svg viewBox="0 0 14 14" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M1 1h5.5l6 6a1.5 1.5 0 0 1 0 2.1l-3.4 3.4a1.5 1.5 0 0 1-2.1 0L1 6.5V1Z" />
-              <circle cx="4" cy="4" r="0.75" fill="currentColor" stroke="none" />
-            </svg>
-            On Sale
-          {facets.onSaleCount > 0 && (
-            <span className="text-xs text-foreground-muted">({facets.onSaleCount})</span>
-          )}
+          <svg
+            viewBox="0 0 14 14"
+            className="w-3.5 h-3.5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M1 1h5.5l6 6a1.5 1.5 0 0 1 0 2.1l-3.4 3.4a1.5 1.5 0 0 1-2.1 0L1 6.5V1Z" />
+            <circle cx="4" cy="4" r="0.75" fill="currentColor" stroke="none" />
+          </svg>
+          On Sale
+          {facets.onSaleCount > 0 && <span className="text-xs text-foreground-muted">({facets.onSaleCount})</span>}
         </button>
         {offers.length > 0 && (
           <div className="mt-3 space-y-0.5">
@@ -475,30 +498,51 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
 
       {/* 4. Brand */}
       {facets.brands.length > 0 && (
-        <Section title="Brand" open={sectionOpen("Brand")} onToggle={() => toggleSection("Brand")}>
+        <Section title="Brand" open={sectionOpen('Brand')} onToggle={() => toggleSection('Brand')}>
           <div className="space-y-1">
             {(expanded['brand'] ? facets.brands : facets.brands.slice(0, 6)).map(b => {
               const selected = selectedList('brand')
               const active = selected.includes(b.id)
               return (
-                <button key={b.id} type="button"
+                <button
+                  key={b.id}
+                  type="button"
                   onClick={() => {
                     const next = active ? selected.filter(v => v !== b.id) : [...selected, b.id]
                     apply({ brand: next.length ? next.join(',') : null })
                   }}
                   className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors hover:bg-surface-secondary text-left"
                 >
-                  <div className={`shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${active ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}>
-                    {active && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  <div
+                    className={`shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${active ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}
+                  >
+                    {active && (
+                      <svg
+                        className="w-2.5 h-2.5 text-white"
+                        viewBox="0 0 10 10"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                   </div>
-                  <span className={`flex-1 truncate ${active ? 'text-accent-700 dark:text-accent-400 font-medium' : 'text-foreground'}`}>{b.name}</span>
+                  <span
+                    className={`flex-1 truncate ${active ? 'text-accent-700 dark:text-accent-400 font-medium' : 'text-foreground'}`}
+                  >
+                    {b.name}
+                  </span>
                   <span className="text-xs text-foreground-muted shrink-0">({b.count})</span>
                 </button>
               )
             })}
             {facets.brands.length > 6 && (
-              <button type="button" onClick={() => toggleExpand('brand')}
-                className="text-xs text-accent-500 hover:text-accent-600 font-medium px-2 pt-1">
+              <button
+                type="button"
+                onClick={() => toggleExpand('brand')}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium px-2 pt-1"
+              >
                 {expanded['brand'] ? 'Show less' : `+${facets.brands.length - 6} more`}
               </button>
             )}
@@ -508,13 +552,15 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
 
       {/* 5. Color */}
       {facets.colors.length > 0 && (
-        <Section title="Color" open={sectionOpen("Color")} onToggle={() => toggleSection("Color")}>
+        <Section title="Color" open={sectionOpen('Color')} onToggle={() => toggleSection('Color')}>
           <div className="flex flex-wrap gap-2">
             {facets.colors.map(c => {
               const selectedColors = selectedList('color')
               const active = selectedColors.includes(c.value)
               return (
-                <button key={c.value} type="button"
+                <button
+                  key={c.value}
+                  type="button"
                   onClick={() => {
                     const next = active ? selectedColors.filter(v => v !== c.value) : [...selectedColors, c.value]
                     apply({ color: next.length ? next.join(',') : null })
@@ -523,7 +569,10 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-all ${active ? 'border-accent-500 ring-2 ring-accent-300 dark:ring-accent-700 font-medium text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:border-border-strong'}`}
                 >
                   {c.hex && (
-                    <span className="w-3 h-3 rounded-full border border-white/20 shrink-0" style={{ background: c.hex }} />
+                    <span
+                      className="w-3 h-3 rounded-full border border-white/20 shrink-0"
+                      style={{ background: c.hex }}
+                    />
                   )}
                   {c.value}
                 </button>
@@ -544,7 +593,11 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
 
       {/* 10. Variant Dimensions */}
       {facets.variantTypes.length > 0 && (
-        <Section title="Variant Dimensions" open={sectionOpen("Variant Dimensions")} onToggle={() => toggleSection("Variant Dimensions")}>
+        <Section
+          title="Variant Dimensions"
+          open={sectionOpen('Variant Dimensions')}
+          onToggle={() => toggleSection('Variant Dimensions')}
+        >
           <div className="flex flex-wrap gap-2 mb-3">
             {facets.variantTypes.map(vt => {
               const active = currentVariantType === vt.value
@@ -566,9 +619,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                   }`}
                 >
                   {humanizeLabel(vt.value)}
-                  {typeof vt.count === 'number' && (
-                    <span className="ml-1 text-foreground-muted">{vt.count}</span>
-                  )}
+                  {typeof vt.count === 'number' && <span className="ml-1 text-foreground-muted">{vt.count}</span>}
                 </button>
               )
             })}
@@ -589,9 +640,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                     }`}
                   >
                     {humanizeLabel(vv.value)}
-                    {typeof vv.count === 'number' && (
-                      <span className="ml-1 text-foreground-muted">{vv.count}</span>
-                    )}
+                    {typeof vv.count === 'number' && <span className="ml-1 text-foreground-muted">{vv.count}</span>}
                   </button>
                 )
               })}
@@ -606,7 +655,12 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
           {facets.specFacets.map(spec => {
             const active = currentSpecKey === spec.key
             return (
-              <Section key={spec.key} title={humanizeLabel(spec.key)} open={sectionOpen(spec.key)} onToggle={() => toggleSection(spec.key)}>
+              <Section
+                key={spec.key}
+                title={humanizeLabel(spec.key)}
+                open={sectionOpen(spec.key)}
+                onToggle={() => toggleSection(spec.key)}
+              >
                 <div className="flex flex-wrap gap-2">
                   {spec.values.map(sv => {
                     const isActive = active && currentSpecValue === sv.value
@@ -627,9 +681,7 @@ export default function FilterSidebar({ basePath = '/products', categories = [],
                         }`}
                       >
                         {humanizeLabel(sv.value)}
-                        {typeof sv.count === 'number' && (
-                          <span className="ml-1 text-foreground-muted">{sv.count}</span>
-                        )}
+                        {typeof sv.count === 'number' && <span className="ml-1 text-foreground-muted">{sv.count}</span>}
                       </button>
                     )
                   })}

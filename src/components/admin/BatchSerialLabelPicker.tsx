@@ -97,7 +97,9 @@ export default function BatchSerialLabelPicker({
 
   // Default a batch's count to its remaining qty the first time it appears.
   const ensureBatchCount = useCallback((b: BatchRow) => {
-    setBatchCounts(prev => (prev[b.id] != null ? prev : { ...prev, [b.id]: Math.max(1, Math.round(Number(b.quantity_remaining) || 1)) }))
+    setBatchCounts(prev =>
+      prev[b.id] != null ? prev : { ...prev, [b.id]: Math.max(1, Math.round(Number(b.quantity_remaining) || 1)) }
+    )
   }, [])
 
   // Batch search (debounced). When lockProduct is set, load that product's batches.
@@ -117,7 +119,8 @@ export default function BatchSerialLabelPicker({
           // Seed default counts for every listed batch.
           setBatchCounts(prev => {
             const next = { ...prev }
-            for (const b of rows) if (next[b.id] == null) next[b.id] = Math.max(1, Math.round(Number(b.quantity_remaining) || 1))
+            for (const b of rows)
+              if (next[b.id] == null) next[b.id] = Math.max(1, Math.round(Number(b.quantity_remaining) || 1))
             return next
           })
         })
@@ -129,36 +132,54 @@ export default function BatchSerialLabelPicker({
   }, [query, mode, lockProduct])
 
   // Serial lookup: resolve a scanned/entered product code, then load its in-stock serials.
-  const loadSerialsForProduct = useCallback(async (code: string) => {
-    const trimmed = code.trim()
-    if (!trimmed) return
-    try {
-      const res = await fetch('/api/admin/scan/resolve', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ code: trimmed }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (data.kind === 'serial') {
-        setSelectedSerials(prev => prev.includes(data.serial.serial_number) ? prev : [...prev, data.serial.serial_number])
-        setResolvedProduct({ id: data.serial.product_id, name: data.serial.product_name })
-        showToast(`Added serial ${data.serial.serial_number}`, 'success')
-        return
+  const loadSerialsForProduct = useCallback(
+    async (code: string) => {
+      const trimmed = code.trim()
+      if (!trimmed) return
+      try {
+        const res = await fetch('/api/admin/scan/resolve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ code: trimmed }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (data.kind === 'serial') {
+          setSelectedSerials(prev =>
+            prev.includes(data.serial.serial_number) ? prev : [...prev, data.serial.serial_number]
+          )
+          setResolvedProduct({ id: data.serial.product_id, name: data.serial.product_name })
+          showToast(`Added serial ${data.serial.serial_number}`, 'success')
+          return
+        }
+        if (!data.item) {
+          showToast(`Not found: ${trimmed}`, 'error')
+          return
+        }
+        const pid = data.item.product_id
+        setResolvedProduct({ id: pid, name: data.item.name })
+        const sres = await fetch(
+          `/api/admin/inventory/serials/available?product_id=${pid}${data.item.variant_id ? `&variant_id=${data.item.variant_id}` : ''}`,
+          { credentials: 'include' }
+        )
+        const sdata = await sres.json().catch(() => ({}))
+        setSerials(sdata.serials || [])
+        if (!(sdata.serials || []).length) showToast('No in-stock serials for this product', 'info')
+      } catch {
+        showToast('Lookup failed', 'error')
       }
-      if (!data.item) { showToast(`Not found: ${trimmed}`, 'error'); return }
-      const pid = data.item.product_id
-      setResolvedProduct({ id: pid, name: data.item.name })
-      const sres = await fetch(`/api/admin/inventory/serials/available?product_id=${pid}${data.item.variant_id ? `&variant_id=${data.item.variant_id}` : ''}`, { credentials: 'include' })
-      const sdata = await sres.json().catch(() => ({}))
-      setSerials(sdata.serials || [])
-      if (!(sdata.serials || []).length) showToast('No in-stock serials for this product', 'info')
-    } catch { showToast('Lookup failed', 'error') }
-  }, [showToast])
+    },
+    [showToast]
+  )
 
   // Serial mode with lockProduct: load that product's serials on mount.
   useEffect(() => {
     if (mode !== 'serial' || !lockProduct) return
     const load = async () => {
-      const sres = await fetch(`/api/admin/inventory/serials/available?product_id=${lockProduct.product_id}${lockProduct.variant_id ? `&variant_id=${lockProduct.variant_id}` : ''}`, { credentials: 'include' })
+      const sres = await fetch(
+        `/api/admin/inventory/serials/available?product_id=${lockProduct.product_id}${lockProduct.variant_id ? `&variant_id=${lockProduct.variant_id}` : ''}`,
+        { credentials: 'include' }
+      )
       const sdata = await sres.json().catch(() => ({}))
       setSerials(sdata.serials || [])
     }
@@ -182,9 +203,15 @@ export default function BatchSerialLabelPicker({
   // Admin picks a serialized product → load its in-stock serials.
   const chooseSerialProduct = useCallback(async (p: SerialProductRow) => {
     setChosenProduct(p)
-    setResolvedProduct({ id: p.product_id, name: p.variant_name ? `${p.product_name} — ${p.variant_name}` : p.product_name })
+    setResolvedProduct({
+      id: p.product_id,
+      name: p.variant_name ? `${p.product_name} — ${p.variant_name}` : p.product_name,
+    })
     setSelectedSerials([])
-    const sres = await fetch(`/api/admin/inventory/serials/available?product_id=${p.product_id}${p.variant_id ? `&variant_id=${p.variant_id}` : ''}`, { credentials: 'include' })
+    const sres = await fetch(
+      `/api/admin/inventory/serials/available?product_id=${p.product_id}${p.variant_id ? `&variant_id=${p.variant_id}` : ''}`,
+      { credentials: 'include' }
+    )
     const sdata = await sres.json().catch(() => ({}))
     setSerials(sdata.serials || [])
   }, [])
@@ -194,54 +221,66 @@ export default function BatchSerialLabelPicker({
 
   function toggleBatch(b: BatchRow) {
     ensureBatchCount(b)
-    setSelectedBatchIds(prev => prev.includes(b.id) ? prev.filter(x => x !== b.id) : [...prev, b.id])
+    setSelectedBatchIds(prev => (prev.includes(b.id) ? prev.filter(x => x !== b.id) : [...prev, b.id]))
   }
   function updateBatchCount(id: string, c: number) {
     setBatchCounts(prev => ({ ...prev, [id]: Math.max(1, Math.min(9999, Math.round(c) || 1)) }))
   }
   function toggleSerial(sn: string) {
-    setSelectedSerials(prev => prev.includes(sn) ? prev.filter(x => x !== sn) : [...prev, sn])
+    setSelectedSerials(prev => (prev.includes(sn) ? prev.filter(x => x !== sn) : [...prev, sn]))
   }
 
   // Total labels (batch: sum of per-batch counts × copies; serial: count × copies).
-  const totalLabels = mode === 'batch'
-    ? selectedBatchIds.reduce((s, id) => s + (batchCounts[id] ?? 1), 0) * copies
-    : selectedSerials.length * copies
+  const totalLabels =
+    mode === 'batch'
+      ? selectedBatchIds.reduce((s, id) => s + (batchCounts[id] ?? 1), 0) * copies
+      : selectedSerials.length * copies
 
   // Preview: first selected item (or first listed), rendered batch/serial-specific.
-  const previewBatch = mode === 'batch'
-    ? (batches.find(b => b.id === (selectedBatchIds[0] ?? batches[0]?.id)) ?? null)
-    : null
-  const previewSerial = mode === 'serial'
-    ? (() => {
-        const sn = selectedSerials[0] ?? serials[0]?.serial_number
-        const row = serials.find(s => s.serial_number === sn)
-        if (!sn) return null
-        return {
-          productName: resolvedProduct?.name || 'Product',
-          serialNumber: sn,
-          sku: null,
-          lotNumber: row?.lot_number ?? null,
-        }
-      })()
-    : null
+  const previewBatch =
+    mode === 'batch' ? (batches.find(b => b.id === (selectedBatchIds[0] ?? batches[0]?.id)) ?? null) : null
+  const previewSerial =
+    mode === 'serial'
+      ? (() => {
+          const sn = selectedSerials[0] ?? serials[0]?.serial_number
+          const row = serials.find(s => s.serial_number === sn)
+          if (!sn) return null
+          return {
+            productName: resolvedProduct?.name || 'Product',
+            serialNumber: sn,
+            sku: null,
+            lotNumber: row?.lot_number ?? null,
+          }
+        })()
+      : null
 
   async function download() {
     const payload: any = { copies, sheet: outputMode === 'sheet', size: selectedSize, showPrice, qrAction }
     if (mode === 'batch') {
-      if (!selectedBatchIds.length) { showToast('Select at least one batch', 'error'); return }
+      if (!selectedBatchIds.length) {
+        showToast('Select at least one batch', 'error')
+        return
+      }
       payload.batches = selectedBatchIds.map(id => ({ id, count: batchCounts[id] ?? 1 }))
     } else {
-      if (!selectedSerials.length) { showToast('Select at least one serial', 'error'); return }
+      if (!selectedSerials.length) {
+        showToast('Select at least one serial', 'error')
+        return
+      }
       payload.serial_numbers = selectedSerials
     }
     setDownloading(true)
     try {
       const res = await fetch('/api/admin/labels/batch', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(payload),
       })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed') }
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || 'Failed')
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -251,7 +290,9 @@ export default function BatchSerialLabelPicker({
       URL.revokeObjectURL(url)
     } catch (e: any) {
       showToast(e.message || 'Download failed', 'error')
-    } finally { setDownloading(false) }
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const selectedCount = mode === 'batch' ? selectedBatchIds.length : selectedSerials.length
@@ -288,9 +329,11 @@ export default function BatchSerialLabelPicker({
                       }`}
                     />
                   </div>
-                  <span className={`text-[11px] font-semibold leading-tight text-center ${
-                    isActive ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-secondary'
-                  }`}>
+                  <span
+                    className={`text-[11px] font-semibold leading-tight text-center ${
+                      isActive ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-secondary'
+                    }`}
+                  >
                     {spec.label}
                   </span>
                 </button>
@@ -303,28 +346,49 @@ export default function BatchSerialLabelPicker({
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             {(['thermal', 'sheet'] as const).map(m => (
-              <button key={m} type="button" onClick={() => setOutputMode(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+              <button
+                key={m}
+                type="button"
+                onClick={() => setOutputMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+              >
                 {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
               </button>
             ))}
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground-secondary">
             Copies
-            <input type="number" min={1} max={100} value={copies}
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={copies}
               onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-              className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm" />
+              className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm"
+            />
           </label>
-          <button type="button" onClick={() => setShowPrice(v => !v)} title="Print price on label"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+          <button
+            type="button"
+            onClick={() => setShowPrice(v => !v)}
+            title="Print price on label"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+          >
             Print Price: {showPrice ? 'On' : 'Off'}
           </button>
-          <button type="button" onClick={() => setQrAction(v => !v)} title="QR opens quick actions when scanned"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+          <button
+            type="button"
+            onClick={() => setQrAction(v => !v)}
+            title="QR opens quick actions when scanned"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+          >
             QR Action: {qrAction ? 'On' : 'Off'}
           </button>
-          <button type="button" onClick={download} disabled={downloading || selectedCount === 0}
-            className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button
+            type="button"
+            onClick={download}
+            disabled={downloading || selectedCount === 0}
+            className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {downloading ? 'Generating…' : `Download PDF — ${totalLabels} label${totalLabels === 1 ? '' : 's'}`}
           </button>
         </div>
@@ -358,24 +422,64 @@ export default function BatchSerialLabelPicker({
                   const sel = selectedBatchIds.includes(b.id)
                   const cnt = batchCounts[b.id] ?? Math.max(1, Math.round(Number(b.quantity_remaining) || 1))
                   return (
-                    <div key={b.id}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default'}`}>
-                      <button type="button" onClick={() => toggleBatch(b)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}>
-                          {sel && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    <div
+                      key={b.id}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default'}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleBatch(b)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <div
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}
+                        >
+                          {sel && (
+                            <svg
+                              className="w-2.5 h-2.5 text-white"
+                              viewBox="0 0 10 10"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{b.product_name}{b.variant_name ? ` — ${b.variant_name}` : ''}</p>
-                          <p className="text-[11px] text-foreground-muted">LOT {b.lot_number || '—'} · EXP {fmtDate(b.expiry_date)} · Qty {Number(b.quantity_remaining)}</p>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {b.product_name}
+                            {b.variant_name ? ` — ${b.variant_name}` : ''}
+                          </p>
+                          <p className="text-[11px] text-foreground-muted">
+                            LOT {b.lot_number || '—'} · EXP {fmtDate(b.expiry_date)} · Qty{' '}
+                            {Number(b.quantity_remaining)}
+                          </p>
                         </div>
                       </button>
                       {sel && (
                         <div className="flex items-center gap-1 shrink-0" title="Labels to print for this batch">
-                          <button type="button" onClick={() => updateBatchCount(b.id, cnt - 1)} className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary">−</button>
-                          <input type="number" min={1} value={cnt}
+                          <button
+                            type="button"
+                            onClick={() => updateBatchCount(b.id, cnt - 1)}
+                            className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            value={cnt}
                             onChange={e => updateBatchCount(b.id, parseInt(e.target.value) || 1)}
-                            className="w-12 px-1 py-0.5 text-center text-sm rounded border border-border-default bg-surface" />
-                          <button type="button" onClick={() => updateBatchCount(b.id, cnt + 1)} className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary">+</button>
+                            className="w-12 px-1 py-0.5 text-center text-sm rounded border border-border-default bg-surface"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateBatchCount(b.id, cnt + 1)}
+                            className="w-6 h-6 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+                          >
+                            +
+                          </button>
                         </div>
                       )}
                     </div>
@@ -391,7 +495,10 @@ export default function BatchSerialLabelPicker({
                 Skipped when the popup locks a single product, or once a product is chosen. */}
             {!lockProduct && !chosenProduct ? (
               <>
-                <p className="text-[11px] text-foreground-muted mb-3">Pick a serialized product to print its serial stickers. You can also scan a product/serial with a hardware scanner.</p>
+                <p className="text-[11px] text-foreground-muted mb-3">
+                  Pick a serialized product to print its serial stickers. You can also scan a product/serial with a
+                  hardware scanner.
+                </p>
                 <div className="mb-3">
                   <AdminTypeahead
                     type="serial_products"
@@ -402,9 +509,19 @@ export default function BatchSerialLabelPicker({
                       const rawId = parts[0] ?? ''
                       const productId = parts[12] || ''
                       const parentVariantId = parts[14] || ''
-                      const variantId = rawId.startsWith('variant:') ? rawId.slice('variant:'.length) : (parentVariantId || null)
+                      const variantId = rawId.startsWith('variant:')
+                        ? rawId.slice('variant:'.length)
+                        : parentVariantId || null
                       const name = parts[2] ? `${parts[1]} — ${parts[2]}` : (parts[1] ?? '')
-                      if (productId) chooseSerialProduct({ product_id: productId, variant_id: variantId, product_name: parts[1] ?? '', sku: parts[3] ?? '', variant_name: parts[2] || null, in_stock_count: 0 })
+                      if (productId)
+                        chooseSerialProduct({
+                          product_id: productId,
+                          variant_id: variantId,
+                          product_name: parts[1] ?? '',
+                          sku: parts[3] ?? '',
+                          variant_name: parts[2] || null,
+                          in_stock_count: 0,
+                        })
                     }}
                     placeholder="Search serialized products by name or SKU…"
                     inputClassName="w-full px-3 py-1.5 pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -413,18 +530,40 @@ export default function BatchSerialLabelPicker({
                 {serialProductsLoading ? (
                   <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>
                 ) : serialProducts.length === 0 ? (
-                  <p className="text-sm text-foreground-muted py-4 text-center">No serialized products with in-stock serials.</p>
+                  <p className="text-sm text-foreground-muted py-4 text-center">
+                    No serialized products with in-stock serials.
+                  </p>
                 ) : (
                   <div className="space-y-1.5 max-h-96 overflow-y-auto">
                     {serialProducts.map(p => (
-                      <button key={`${p.product_id}:${p.variant_id || ''}`} type="button" onClick={() => chooseSerialProduct(p)}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border-default hover:bg-surface-secondary text-left transition-colors">
+                      <button
+                        key={`${p.product_id}:${p.variant_id || ''}`}
+                        type="button"
+                        onClick={() => chooseSerialProduct(p)}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border-default hover:bg-surface-secondary text-left transition-colors"
+                      >
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{p.product_name}{p.variant_name ? ` — ${p.variant_name}` : ''}</p>
-                          <p className="text-[11px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></p>
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {p.product_name}
+                            {p.variant_name ? ` — ${p.variant_name}` : ''}
+                          </p>
+                          <p className="text-[11px] text-foreground-muted font-mono">
+                            <span className="inline-flex items-center gap-1">
+                              {p.sku}
+                              {p.sku && <CopySku sku={p.sku} />}
+                            </span>
+                          </p>
                         </div>
                         <span className="text-[11px] text-foreground-muted shrink-0">{p.in_stock_count} in stock</span>
-                        <svg className="w-4 h-4 text-foreground-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        <svg
+                          className="w-4 h-4 text-foreground-muted shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                       </button>
                     ))}
                   </div>
@@ -434,35 +573,78 @@ export default function BatchSerialLabelPicker({
               <>
                 {resolvedProduct && (
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-foreground-secondary">Product: <span className="font-medium text-foreground">{resolvedProduct.name}</span></p>
+                    <p className="text-xs text-foreground-secondary">
+                      Product: <span className="font-medium text-foreground">{resolvedProduct.name}</span>
+                    </p>
                     {!lockProduct && (
-                      <button type="button" onClick={() => { setChosenProduct(null); setSerials([]); setSelectedSerials([]); setResolvedProduct(null) }}
-                        className="text-xs text-orange-500 hover:text-orange-600 font-medium">Change product</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChosenProduct(null)
+                          setSerials([])
+                          setSelectedSerials([])
+                          setResolvedProduct(null)
+                        }}
+                        className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                      >
+                        Change product
+                      </button>
                     )}
                   </div>
                 )}
-            {serials.length > 0 && (
-              <div className="flex items-center justify-between mb-2">
-                <button type="button" onClick={() => setSelectedSerials(serials.map(s => s.serial_number))}
-                  className="text-xs text-orange-500 hover:text-orange-600 font-medium">Select all ({serials.length})</button>
-                {selectedSerials.length > 0 && <button type="button" onClick={() => setSelectedSerials([])} className="text-xs text-foreground-muted hover:text-foreground">Clear</button>}
-              </div>
-            )}
-            <div className="space-y-1 max-h-96 overflow-y-auto">
-              {serials.map(s => {
-                const sel = selectedSerials.includes(s.serial_number)
-                return (
-                  <button key={s.serial_number} type="button" onClick={() => toggleSerial(s.serial_number)}
-                    className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg border text-left transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}>
-                      {sel && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                    </div>
-                    <span className="text-sm font-mono text-foreground truncate">{s.serial_number}</span>
-                    {s.lot_number && <span className="text-[10px] text-foreground-muted ml-auto shrink-0">LOT {s.lot_number}</span>}
-                  </button>
-                )
-              })}
-            </div>
+                {serials.length > 0 && (
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSerials(serials.map(s => s.serial_number))}
+                      className="text-xs text-orange-500 hover:text-orange-600 font-medium"
+                    >
+                      Select all ({serials.length})
+                    </button>
+                    {selectedSerials.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSerials([])}
+                        className="text-xs text-foreground-muted hover:text-foreground"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="space-y-1 max-h-96 overflow-y-auto">
+                  {serials.map(s => {
+                    const sel = selectedSerials.includes(s.serial_number)
+                    return (
+                      <button
+                        key={s.serial_number}
+                        type="button"
+                        onClick={() => toggleSerial(s.serial_number)}
+                        className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg border text-left transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default hover:bg-surface-secondary'}`}
+                      >
+                        <div
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}
+                        >
+                          {sel && (
+                            <svg
+                              className="w-2.5 h-2.5 text-white"
+                              viewBox="0 0 10 10"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="text-sm font-mono text-foreground truncate">{s.serial_number}</span>
+                        {s.lot_number && (
+                          <span className="text-[10px] text-foreground-muted ml-auto shrink-0">LOT {s.lot_number}</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </>
             )}
           </div>
@@ -477,17 +659,44 @@ export default function BatchSerialLabelPicker({
             <span className="text-[11px] text-foreground-muted">{activeSize.label}</span>
           </div>
           <div className="flex items-center justify-center bg-surface-secondary rounded-lg p-4 min-h-[120px]">
-            <BatchSerialPreview size={activeSize} mode={mode} batch={mode === 'batch' ? (previewBatch ? {
-              productName: previewBatch.product_name, variantName: previewBatch.variant_name,
-              sku: previewBatch.sku, lotNumber: previewBatch.lot_number,
-              expiryDate: fmtDate(previewBatch.expiry_date), quantity: Math.round(Number(previewBatch.quantity_remaining) || 0),
-            } : null) : null} serial={mode === 'serial' ? previewSerial : null} scale={previewScale} />
+            <BatchSerialPreview
+              size={activeSize}
+              mode={mode}
+              batch={
+                mode === 'batch'
+                  ? previewBatch
+                    ? {
+                        productName: previewBatch.product_name,
+                        variantName: previewBatch.variant_name,
+                        sku: previewBatch.sku,
+                        lotNumber: previewBatch.lot_number,
+                        expiryDate: fmtDate(previewBatch.expiry_date),
+                        quantity: Math.round(Number(previewBatch.quantity_remaining) || 0),
+                      }
+                    : null
+                  : null
+              }
+              serial={mode === 'serial' ? previewSerial : null}
+              scale={previewScale}
+            />
           </div>
           <div className="mt-3 space-y-1 text-[11px]">
-            <div className="flex justify-between"><span className="text-foreground-muted">Size</span><span className="text-foreground">{activeSize.label}</span></div>
-            <div className="flex justify-between"><span className="text-foreground-muted">Format</span><span className="text-foreground">{outputMode === 'sheet' ? 'A4 Sheet' : 'Thermal'}</span></div>
-            <div className="flex justify-between"><span className="text-foreground-muted">Items</span><span className="text-foreground">{selectedCount}</span></div>
-            <div className="flex justify-between"><span className="text-foreground-muted">Total labels</span><span className="text-foreground font-semibold">{totalLabels || '—'}</span></div>
+            <div className="flex justify-between">
+              <span className="text-foreground-muted">Size</span>
+              <span className="text-foreground">{activeSize.label}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-foreground-muted">Format</span>
+              <span className="text-foreground">{outputMode === 'sheet' ? 'A4 Sheet' : 'Thermal'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-foreground-muted">Items</span>
+              <span className="text-foreground">{selectedCount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-foreground-muted">Total labels</span>
+              <span className="text-foreground font-semibold">{totalLabels || '—'}</span>
+            </div>
           </div>
         </div>
       </div>

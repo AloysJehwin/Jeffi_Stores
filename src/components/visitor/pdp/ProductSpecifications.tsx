@@ -3,19 +3,40 @@ import CopySku from '@/components/ui/CopySku'
 import { buildSpecGroups, type HandlingFlag, type SpecRow, type SpecSource } from './spec-groups'
 
 const HANDLING: Record<HandlingFlag, { label: string; Icon: LucideIcon; tone: string }> = {
-  fragile: { label: 'Fragile', Icon: Wine, tone: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' },
-  hazardous: { label: 'Hazardous', Icon: TriangleAlert, tone: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' },
-  flammable: { label: 'Flammable', Icon: Flame, tone: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' },
-  perishable: { label: 'Perishable', Icon: Timer, tone: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300' },
+  fragile: {
+    label: 'Fragile',
+    Icon: Wine,
+    tone: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+  },
+  hazardous: {
+    label: 'Hazardous',
+    Icon: TriangleAlert,
+    tone: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+  },
+  flammable: {
+    label: 'Flammable',
+    Icon: Flame,
+    tone: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
+  },
+  perishable: {
+    label: 'Perishable',
+    Icon: Timer,
+    tone: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+  },
 }
 
-const CHIP = 'px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground'
+const CHIP =
+  'px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground'
 
 function RowValue({ row }: { row: SpecRow }) {
   if (row.chips?.length) {
     return (
       <div className="flex flex-wrap gap-2 mt-1">
-        {row.chips.map(chip => <span key={chip} className={CHIP}>{chip}</span>)}
+        {row.chips.map(chip => (
+          <span key={chip} className={CHIP}>
+            {chip}
+          </span>
+        ))}
       </div>
     )
   }
@@ -42,7 +63,10 @@ export default function ProductSpecifications({ product }: { product: SpecSource
             {handling.map(flag => {
               const { label, Icon, tone } = HANDLING[flag]
               return (
-                <li key={flag} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${tone}`}>
+                <li
+                  key={flag}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${tone}`}
+                >
                   <Icon aria-hidden="true" className="w-3.5 h-3.5" />
                   {label}
                 </li>
@@ -58,7 +82,9 @@ export default function ProductSpecifications({ product }: { product: SpecSource
               {group.rows.map((row, j) => (
                 <div key={`${row.label}:${j}`}>
                   <dt className="text-xs text-foreground-muted mb-0.5">{row.label}</dt>
-                  <dd className={`font-semibold text-foreground break-words ${group.id === 'codes' ? 'text-xs' : 'text-sm'}`}>
+                  <dd
+                    className={`font-semibold text-foreground break-words ${group.id === 'codes' ? 'text-xs' : 'text-sm'}`}
+                  >
                     <RowValue row={row} />
                   </dd>
                 </div>

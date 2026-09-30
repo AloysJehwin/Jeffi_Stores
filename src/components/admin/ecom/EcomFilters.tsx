@@ -6,7 +6,10 @@ import AdminSelect from '@/components/admin/AdminSelect'
 
 // URL-param filter bar for the ecom list pages. Status + plan (AdminSelect dropdowns)
 // + a debounced search box. Writes to the query string; server pages read searchParams.
-export default function EcomFilters({ showPlan = true, statusOptions }: {
+export default function EcomFilters({
+  showPlan = true,
+  statusOptions,
+}: {
   showPlan?: boolean
   statusOptions?: { value: string; label: string }[]
 }) {
@@ -51,7 +54,7 @@ export default function EcomFilters({ showPlan = true, statusOptions }: {
         label="Status"
         value={params.get('status') || ''}
         options={STATUS_OPTS}
-        onChange={(v) => setParam('status', v)}
+        onChange={v => setParam('status', v)}
         sm
       />
       {showPlan && (
@@ -59,7 +62,7 @@ export default function EcomFilters({ showPlan = true, statusOptions }: {
           label="Plan"
           value={params.get('plan') || ''}
           options={PLAN_OPTS}
-          onChange={(v) => setParam('plan', v)}
+          onChange={v => setParam('plan', v)}
           sm
         />
       )}
@@ -69,7 +72,7 @@ export default function EcomFilters({ showPlan = true, statusOptions }: {
           className="w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           placeholder="Search store name or subdomain…"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={e => setQ(e.target.value)}
         />
       </div>
     </div>
