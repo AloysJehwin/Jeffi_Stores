@@ -1,0 +1,14 @@
+.next
+node_modules
+coverage
+graphify-out
+public
+database
+ai-platform
+package-lock.json
+CHANGELOG.md
+*.md
+*.sql
+*.yml
+*.yaml
+docs
