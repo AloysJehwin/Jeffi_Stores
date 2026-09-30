@@ -4,12 +4,17 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-const WEBHOOK_SECRET = process.env.RAZORPAYX_WEBHOOK_SECRET || ''
-
+// Fail-closed: a missing secret, missing header, or mismatch all reject. The webhook is
+// reachable unauthenticated via the middleware public-path allowlist, so the HMAC is the
+// only proof the caller is RazorpayX — never proceed without it.
 function verifySignature(body: string, signature: string): boolean {
-  if (!WEBHOOK_SECRET) return true
-  const expected = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')
-  return expected === signature
+  const secret = process.env.RAZORPAYX_WEBHOOK_SECRET || ''
+  if (!secret || !signature) return false
+  const expected = crypto.createHmac('sha256', secret).update(body).digest('hex')
+  const expectedBuf = Buffer.from(expected, 'hex')
+  const providedBuf = Buffer.from(signature, 'hex')
+  if (expectedBuf.length !== providedBuf.length) return false
+  return crypto.timingSafeEqual(expectedBuf, providedBuf)
 }
 
 export async function POST(request: NextRequest) {
@@ -17,7 +22,7 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text()
     const signature = request.headers.get('x-razorpay-signature') || ''
 
-    if (WEBHOOK_SECRET && !verifySignature(rawBody, signature)) {
+    if (!verifySignature(rawBody, signature)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 

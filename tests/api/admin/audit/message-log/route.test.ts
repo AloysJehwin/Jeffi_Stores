@@ -5,6 +5,10 @@ vi.mock('@/lib/db', () => ({
   queryCount: vi.fn().mockResolvedValue(0),
 }))
 
+const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.fn() }))
+vi.mock('@/lib/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
+
+import { NextResponse } from 'next/server'
 import { GET } from '@/app/api/admin/audit/message-log/route'
 import { queryMany, queryCount } from '@/lib/db'
 
@@ -19,9 +23,17 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockQueryMany.mockResolvedValue([] as any)
   mockQueryCount.mockResolvedValue(0)
+  mockRequireAdminScope.mockResolvedValue({ adminId: 'admin-1', role: 'super_admin', scopes: [] })
 })
 
 describe('GET /api/admin/audit/message-log', () => {
+  it('returns 401 when not authenticated', async () => {
+    mockRequireAdminScope.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+    const res = await GET(req())
+    expect(res.status).toBe(401)
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
   it('returns rows, total, page, pageSize with defaults', async () => {
     mockQueryMany.mockResolvedValue([{ id: 'm1' }] as any)
     mockQueryCount.mockResolvedValue(1)

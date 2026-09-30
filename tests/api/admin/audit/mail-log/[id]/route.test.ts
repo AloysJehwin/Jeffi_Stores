@@ -8,6 +8,10 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.fn() }))
+vi.mock('@/lib/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
+
+import { NextResponse } from 'next/server'
 import { GET } from '@/app/api/admin/audit/mail-log/[id]/route'
 import { queryOne } from '@/lib/db'
 
@@ -19,9 +23,17 @@ function makeReq(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockRequireAdminScope.mockResolvedValue({ adminId: 'admin-1', role: 'super_admin', scopes: [] })
 })
 
 describe('GET /api/admin/audit/mail-log/[id]', () => {
+  it('returns 401 when not authenticated', async () => {
+    mockRequireAdminScope.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+    const res = await GET(makeReq('log-1'), { params: Promise.resolve({ id: 'log-1' }) })
+    expect(res.status).toBe(401)
+    expect(mockQueryOne).not.toHaveBeenCalled()
+  })
+
   it('returns 404 when row not found', async () => {
     mockQueryOne.mockResolvedValue(null)
     const res = await GET(makeReq('log-1'), { params: Promise.resolve({ id: 'log-1' }) })

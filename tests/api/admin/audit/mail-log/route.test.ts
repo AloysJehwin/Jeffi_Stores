@@ -8,8 +8,12 @@ vi.mock('@/lib/db', () => ({
   queryCount: vi.fn(),
 }))
 
+const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.fn() }))
+vi.mock('@/lib/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
+import { NextResponse } from 'next/server'
 import { GET } from '@/app/api/admin/audit/mail-log/route'
 import { queryMany, queryCount } from '@/lib/db'
 
@@ -38,7 +42,17 @@ const sampleRows = [
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/audit/mail-log', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRequireAdminScope.mockResolvedValue({ adminId: 'admin-1', role: 'super_admin', scopes: [] })
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockRequireAdminScope.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+    const res = await GET(makeRequest())
+    expect(res.status).toBe(401)
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
 
   it('returns paginated rows and total', async () => {
     mockQueryMany.mockResolvedValue(sampleRows as any)

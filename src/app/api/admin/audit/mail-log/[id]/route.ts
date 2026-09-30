@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
+import { requireAdminScope } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const admin = await requireAdminScope(request, null)
+  if (admin instanceof NextResponse) return admin
+
   const { id } = await params
   const row = await queryOne(
     `SELECT id, email, from_email, cc, bcc, subject, template_name, kind,
