@@ -198,6 +198,12 @@ export default function ProductCard({
                   slug={slug}
                   hasVariants={hasVariants}
                   inStock={effectiveStock > 0}
+                  imageUrl={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+                  brandName={brandName}
+                  categoryName={categoryName}
+                  displayPrice={shownPrice}
+                  mrp={mrp}
+                  discountPct={shownDiscount}
                 />
                 <button
                   onClick={handleShare}

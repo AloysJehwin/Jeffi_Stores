@@ -244,6 +244,12 @@ export default function ProductCard({
                   slug={slug}
                   hasVariants={hasVariants}
                   inStock={effectiveStock > 0}
+                  imageUrl={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+                  brandName={brandName}
+                  categoryName={categoryName}
+                  displayPrice={displayPrice}
+                  mrp={mrp}
+                  discountPct={discountPct ?? mrpDiscount}
                 />
                 <div className="hidden sm:flex items-center gap-1.5">
                   <button
