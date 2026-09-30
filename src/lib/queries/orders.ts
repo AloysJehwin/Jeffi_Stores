@@ -139,11 +139,9 @@ export async function getFilteredOrders(filters: {
   return { orders, total: countResult }
 }
 
-
 export async function getRecentOrders(limit: number = 10) {
   return queryMany('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1', [limit])
 }
-
 
 export async function getOrder(id: string) {
   const order = await queryOne(
@@ -256,4 +254,3 @@ export async function getReturnRequest(orderId: string) {
 }
 
 // ── Dashboard analytics (range-aware) ────────────────────────────────────────
-

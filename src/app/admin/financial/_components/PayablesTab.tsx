@@ -6,7 +6,20 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { inputCls, labelCls, btnPrimary, btnSecondary, Skeleton, SummaryCard, StatusBadge, formatDate, formatINR, thCls, thRight, thCenter } from './shared'
+import {
+  inputCls,
+  labelCls,
+  btnPrimary,
+  btnSecondary,
+  Skeleton,
+  SummaryCard,
+  StatusBadge,
+  formatDate,
+  formatINR,
+  thCls,
+  thRight,
+  thCenter,
+} from './shared'
 import { PayablesPayModal } from './PayablesPayModal'
 
 export function PayablesTab({ initialData }: { initialData: any }) {

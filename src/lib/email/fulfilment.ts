@@ -378,4 +378,3 @@ export async function sendQuotationFinalizedEmail(
     return { success: false, error }
   }
 }
-

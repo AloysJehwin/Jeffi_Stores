@@ -28,12 +28,7 @@ export {
 } from './brochure'
 export { getAllOrders, getFilteredOrders, getRecentOrders, getOrder, getReturnRequest } from './orders'
 export { getCustomers, getCustomerById } from './customers'
-export {
-  getDashboardStats,
-  getDashboardMetrics,
-  getDashboardAnalytics,
-  type DashboardAnalytics,
-} from './dashboard'
+export { getDashboardStats, getDashboardMetrics, getDashboardAnalytics, type DashboardAnalytics } from './dashboard'
 export {
   getRevenueTrendBySource,
   getProductBreakdowns,

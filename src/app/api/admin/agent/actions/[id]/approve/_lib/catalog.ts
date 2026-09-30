@@ -33,18 +33,16 @@ export async function createCoupon(action: AgentAction): Promise<ActionResult> {
 }
 
 export async function generatePersonalizedCoupon(action: AgentAction): Promise<ActionResult> {
-  const { userId, customerEmail, discountType, discountValue, daysValid, campaign, validUntil } =
-    action.payload as {
-      userId: string
-      customerEmail: string
-      discountType: string
-      discountValue: number
-      daysValid: number
-      campaign: string
-      validUntil: string
-    }
-  if (!userId || !discountType || !discountValue)
-    return { result: null, error: 'Missing required fields in payload' }
+  const { userId, customerEmail, discountType, discountValue, daysValid, campaign, validUntil } = action.payload as {
+    userId: string
+    customerEmail: string
+    discountType: string
+    discountValue: number
+    daysValid: number
+    campaign: string
+    validUntil: string
+  }
+  if (!userId || !discountType || !discountValue) return { result: null, error: 'Missing required fields in payload' }
   const prefix =
     (campaign || 'OFFER')
       .toUpperCase()
@@ -127,9 +125,7 @@ export async function updateProduct(action: AgentAction): Promise<ActionResult> 
   for (const [k, v] of Object.entries(changes || {})) {
     if (!ALLOWED.has(k)) continue
     params.push(v === '' ? null : v)
-    sets.push(
-      k === 'brand_id' || k === 'category_id' ? `${k} = $${params.length}::uuid` : `${k} = $${params.length}`
-    )
+    sets.push(k === 'brand_id' || k === 'category_id' ? `${k} = $${params.length}::uuid` : `${k} = $${params.length}`)
   }
   if (sets.length === 0) return { result: null, error: 'No valid fields to update' }
   params.push(productId)

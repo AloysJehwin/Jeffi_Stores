@@ -399,7 +399,6 @@ export async function getFilteredProducts(filters: {
   return { products, total }
 }
 
-
 export async function getFilteredCategories(filters: { is_active?: string; type?: string; search?: string }) {
   const conditions: string[] = []
   const params: any[] = []
@@ -428,4 +427,3 @@ export async function getFilteredCategories(filters: { is_active?: string; type?
 
   return queryMany(`SELECT * FROM categories ${where} ORDER BY display_order ASC`, params)
 }
-

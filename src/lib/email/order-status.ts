@@ -330,4 +330,3 @@ export async function sendPaymentStatusUpdate(
     return { success: false, error }
   }
 }
-

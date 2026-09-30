@@ -1,11 +1,5 @@
 import 'server-only'
-import {
-  sendAuditedMail,
-  mailShell,
-  storeName,
-  adminMailFrom,
-  currentAdminBaseUrl,
-} from './shared'
+import { sendAuditedMail, mailShell, storeName, adminMailFrom, currentAdminBaseUrl } from './shared'
 
 export async function sendAdminCertificateEmail(
   email: string,
@@ -192,4 +186,3 @@ export async function sendCertInviteEmail(
     return { success: false, error }
   }
 }
-

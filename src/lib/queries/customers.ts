@@ -324,4 +324,3 @@ export async function getCustomerById(id: string) {
     assigned_coupons: assignedCoupons,
   }
 }
-

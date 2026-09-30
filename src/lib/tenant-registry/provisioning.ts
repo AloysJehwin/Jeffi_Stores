@@ -196,4 +196,3 @@ export async function updateProvisioningJob(
   args.push(id)
   await pool.query(`UPDATE provisioning_jobs SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
 }
-

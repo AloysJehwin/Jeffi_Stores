@@ -5,7 +5,18 @@ import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
-import { Skeleton, SummaryCard, btnPrimary, btnSecondary, labelCls, formatDate, formatINR, thCls, thRight, thCenter } from './shared'
+import {
+  Skeleton,
+  SummaryCard,
+  btnPrimary,
+  btnSecondary,
+  labelCls,
+  formatDate,
+  formatINR,
+  thCls,
+  thRight,
+  thCenter,
+} from './shared'
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All' },

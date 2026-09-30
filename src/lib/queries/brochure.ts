@@ -114,4 +114,3 @@ export async function getBrochureProductsByIds(productIds: string[]): Promise<Br
   const byId = new Map(rows.map(r => [r.id, r]))
   return productIds.map(id => byId.get(id)).filter(Boolean) as BrochureProduct[]
 }
-
