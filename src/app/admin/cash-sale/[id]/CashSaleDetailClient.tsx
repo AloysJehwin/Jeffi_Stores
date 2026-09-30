@@ -4,15 +4,7 @@ import { useEffect, useState } from 'react'
 import { variantLabel } from '@/lib/product-label'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
-
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+import { formatINR, formatDate } from '@/lib/format'
 
 const PAYMENT_MODE_LABELS: Record<string, string> = {
   cash: 'Cash',
