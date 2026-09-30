@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { useToast } from '@/contexts/ToastContext'
 
 const TAGS = [
   'Great quality',
@@ -72,7 +73,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
     items.map(item => buildInitialState(reviewMap[item.productId]))
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [globalError, setGlobalError] = useState('')
+  const { showToast } = useToast()
   const [aiOff, setAiOff] = useState(false)
   const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled && !aiOff
   const fileRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -141,7 +142,6 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
     if (hasError) return
 
     setIsSubmitting(true)
-    setGlobalError('')
     try {
       await Promise.all(
         items.map(async (item, i) => {
@@ -175,7 +175,7 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
       )
       onClose()
     } catch (err: any) {
-      setGlobalError(err?.message || 'Something went wrong. Please try again.')
+      showToast(err?.message || 'Something went wrong. Please try again.', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -393,8 +393,6 @@ export default function ReviewModal({ items, orderId, reviewMap, onClose, onSucc
               </div>
             )
           })}
-
-          {globalError && <p className="text-sm text-red-500">{globalError}</p>}
 
           <div className="flex gap-3 pt-1">
             <button

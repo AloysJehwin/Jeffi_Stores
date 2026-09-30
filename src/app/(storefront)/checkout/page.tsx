@@ -156,7 +156,7 @@ function CheckoutPage() {
               attempts++
               setTimeout(poll, 3000)
             } else {
-              setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+              showToast(data.error || 'Could not confirm payment. Check My Orders or contact support.', 'error')
               setIsSubmitting(false)
               setPendingVerify(null)
             }
@@ -166,7 +166,7 @@ function CheckoutPage() {
               attempts++
               setTimeout(poll, 3000)
             } else {
-              setError('Could not confirm payment. Check My Orders or contact support.')
+              showToast('Could not confirm payment. Check My Orders or contact support.', 'error')
               setIsSubmitting(false)
               setPendingVerify(null)
             }
@@ -291,7 +291,7 @@ function CheckoutPage() {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.async = true
     script.onload = () => setRazorpayLoaded(true)
-    script.onerror = () => setError('Failed to load payment gateway. Please try again or contact support.')
+    script.onerror = () => showToast('Failed to load payment gateway. Please try again or contact support.', 'error')
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
@@ -414,7 +414,7 @@ function CheckoutPage() {
       const msg = razorpay_payment_id
         ? `Payment received but confirmation failed. Check My Orders — if no order appears in 2 minutes, contact support with payment ID: ${razorpay_payment_id}`
         : err?.message || 'Payment verification failed. Please contact support.'
-      setError(msg)
+      showToast(msg, 'error')
       setIsSubmitting(false)
     }
   }
@@ -504,7 +504,7 @@ function CheckoutPage() {
           }).catch(() => {})
           window.location.href = `/account/orders/${payload.orderId}`
         } else {
-          setError(response.error?.description || 'Payment failed. Please try again.')
+          showToast(response.error?.description || 'Payment failed. Please try again.', 'error')
           setIsSubmitting(false)
         }
       })
@@ -546,7 +546,7 @@ function CheckoutPage() {
         }).catch(() => {})
         window.location.href = `/account/orders/${payload.orderId}`
       } else {
-        setError(err?.message || 'Failed to start payment')
+        showToast(err?.message || 'Failed to start payment', 'error')
         setIsSubmitting(false)
       }
     }
@@ -563,7 +563,7 @@ function CheckoutPage() {
       setError('')
       showToast('Previous order cancelled. You can now place a new order.', 'success')
     } catch (err: any) {
-      setError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setIsCancellingPrevious(false)
     }
@@ -694,7 +694,7 @@ function CheckoutPage() {
       if (!isBuyNow) clearCart()
       router.push(`/account/orders/${data.order.id}`)
     } catch (err: any) {
-      setError(err.message)
+      showToast(err.message, 'error')
       setIsSubmitting(false)
     }
   }
