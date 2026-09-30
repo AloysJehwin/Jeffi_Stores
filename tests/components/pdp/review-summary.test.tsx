@@ -10,7 +10,7 @@ vi.mock('@/lib/db', () => ({
   queryCount: vi.fn(),
 }))
 
-import { toReviewSummary } from '@/components/visitor/pdp/review-summary'
+import { toReviewSummary } from '@/lib/review-summary-types'
 import { getApprovedReviewSummary } from '@/lib/review-summary'
 import ReviewSummaryLink from '@/components/visitor/pdp/ReviewSummaryLink'
 

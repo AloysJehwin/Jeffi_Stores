@@ -15,7 +15,7 @@ import { pickUnitPrice } from '@/lib/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
-import type { ReviewSummary } from './pdp/review-summary'
+import type { ReviewSummary } from '@/lib/review-summary-types'
 
 interface ProductImage {
   id: string
