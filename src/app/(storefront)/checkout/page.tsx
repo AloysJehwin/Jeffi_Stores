@@ -151,7 +151,7 @@ function CheckoutPage() {
               } catch {}
               clearCart()
               showToast('Payment confirmed!', 'success')
-              window.location.href = `/account/orders/${data.order.id}`
+              window.location.href = `/account/orders/confirmation?orderId=${data.order.id}`
             } else if (data.status === 'pending' && attempts < maxAttempts) {
               attempts++
               setTimeout(poll, 3000)
@@ -409,7 +409,7 @@ function CheckoutPage() {
       } catch {}
       clearCart()
       showToast('Payment successful!', 'success')
-      window.location.href = `/account/orders/${data.order.id}`
+      window.location.href = `/account/orders/confirmation?orderId=${data.order.id}`
     } catch (err: any) {
       const msg = razorpay_payment_id
         ? `Payment received but confirmation failed. Check My Orders — if no order appears in 2 minutes, contact support with payment ID: ${razorpay_payment_id}`
