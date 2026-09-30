@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import CopySku from '@/components/ui/CopySku'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -61,7 +62,7 @@ export default function AmazonMerchantPanel() {
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   const load = useCallback(
     async (opts?: { page?: number; search?: string; status?: string }) => {
@@ -80,12 +81,12 @@ export default function AmazonMerchantPanel() {
         setRows(data.rows)
         setTotal(data.total)
       } catch {
-        setMsg('Failed to load Amazon listing data.')
+        showToast('Failed to load Amazon listing data.', 'error')
       } finally {
         setLoading(false)
       }
     },
-    [page, search, statusFilter]
+    [page, search, statusFilter, showToast]
   )
 
   useEffect(() => {
@@ -103,7 +104,6 @@ export default function AmazonMerchantPanel() {
 
   const refresh = async () => {
     setRefreshing(true)
-    setMsg(null)
     try {
       const res = await fetch('/api/admin/merchant/amazon/listing-status/refresh', {
         method: 'POST',
@@ -112,15 +112,15 @@ export default function AmazonMerchantPanel() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setMsg(data.error || 'Refresh failed')
+        showToast(data.error || 'Refresh failed', 'error')
         return
       }
       setSummary(data.summary)
       await load({ page: 1 })
       setPage(1)
-      setMsg('Refreshed from Amazon.')
+      showToast('Refreshed from Amazon.', 'success')
     } catch {
-      setMsg('Refresh failed.')
+      showToast('Refresh failed.', 'error')
     } finally {
       setRefreshing(false)
     }
@@ -128,7 +128,6 @@ export default function AmazonMerchantPanel() {
 
   const syncNow = async () => {
     setSyncing(true)
-    setMsg(null)
     try {
       const res = await fetch('/api/admin/merchant/amazon/sync', {
         method: 'POST',
@@ -142,13 +141,13 @@ export default function AmazonMerchantPanel() {
         errors: data.errors,
         finished_at: data.finishedAt,
       })
-      setMsg(
-        data.errors?.length
-          ? `Sync finished with ${data.errors.length} error(s).`
-          : `Pushed ${data.synced ?? 0} items to Amazon.`
-      )
+      if (data.errors?.length) {
+        showToast(`Sync finished with ${data.errors.length} error(s).`, 'warning')
+      } else {
+        showToast(`Pushed ${data.synced ?? 0} items to Amazon.`, 'success')
+      }
     } catch {
-      setMsg('Sync failed.')
+      showToast('Sync failed.', 'error')
     } finally {
       setSyncing(false)
     }
@@ -205,7 +204,6 @@ export default function AmazonMerchantPanel() {
       </div>
 
       <div className="p-4 space-y-4">
-        {msg && <p className="text-sm text-foreground-secondary">{msg}</p>}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? (
           <p className="text-xs text-red-600">Last push had {syncStatus.errors.length} error(s).</p>
         ) : null}
