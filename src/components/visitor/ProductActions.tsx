@@ -155,7 +155,7 @@ export default function ProductActions({
   const isPreLaunch = !!launchDate && new Date(launchDate) > today
   const isDiscontinued = !!discontinueDate && new Date(discontinueDate) <= today
   const gstEnabled = useStoreConfig().flags.gstEnabled
-  const { addToCart } = useCart()
+  const { addToCart, cartItems } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
@@ -312,6 +312,13 @@ export default function ProductActions({
   }, [selectedVariantId])
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
+
+  const inCart = cartItems.some(
+    ci =>
+      ci.product_id === productId &&
+      (ci.variant_id ?? null) === (selectedVariantId ?? null) &&
+      (ci.sub_variant_id ?? null) === (selectedSubVariantId ?? null)
+  )
   const displaySku = hasVariants && selectedVariant ? selectedSubVariant?.sku || selectedVariant.sku : sku
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
@@ -1085,30 +1092,47 @@ export default function ProductActions({
           )}
         </button>
 
-        <button
-          onClick={handleAddToCart}
-          disabled={!is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-        >
-          {isAddingToCart ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              Adding...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              Add to Cart
-            </>
-          )}
-        </button>
+        {inCart && !isAddingToCart ? (
+          <a
+            href="/cart"
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98] hover:shadow-lg"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+            View cart
+          </a>
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            disabled={!is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued}
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          >
+            {isAddingToCart ? (
+              <>
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                Add to Cart
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       <StickyAddToCartBar
