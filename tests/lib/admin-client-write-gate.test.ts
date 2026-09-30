@@ -41,6 +41,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
   'src/app/admin/audit/AdminAuditClient.tsx',
+  // Dashboard shell: its only POST is a fire-and-forget payout reconciliation on mount,
+  // not a user action. Each mutating tab (receivables/payables/cod) gates on financial:write.
+  'src/app/admin/financial/FinancialClient.tsx',
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
   'src/app/admin/products/ProductsTableClient.tsx',
