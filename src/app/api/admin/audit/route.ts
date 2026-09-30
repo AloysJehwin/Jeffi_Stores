@@ -3,6 +3,7 @@ import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryCount } from '@/lib/db'
 import { logAdminAudit } from '@/lib/admin-audit'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,9 +62,7 @@ export async function GET(req: NextRequest) {
 // POST — called by service accounts or the CRON_SECRET bearer to write audit entries.
 // Auth: mTLS service account with audit:write scope, OR admin session with audit:write.
 export async function POST(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET
-  const authHeader = req.headers.get('authorization')
-  const cronOk = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+  const cronOk = verifyCronRequest(req)
 
   const sa = await authenticateServiceAccount(req)
   const admin = !sa && !cronOk ? await authenticateAdmin(req) : null

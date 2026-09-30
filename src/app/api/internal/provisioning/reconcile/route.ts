@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reconcileOrphanedTenants } from '@/lib/tenant-registry'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,9 +9,7 @@ export const dynamic = 'force-dynamic'
 // to the platform DB from) dead infra. Does not need 60-second resolution — instrumentation.ts
 // self-invokes this hourly. Auth: Bearer ${CRON_SECRET}.
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const reconciled = await reconcileOrphanedTenants().catch(() => [] as string[])

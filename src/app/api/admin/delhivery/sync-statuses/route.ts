@@ -10,10 +10,9 @@ import { getBusinessValues } from '@/lib/site-controls'
 import { resolveTenantId } from '@/lib/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { settleDelhiveryCostToWallet } from '@/lib/wallet'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
-
-const CRON_SECRET = process.env.CRON_SECRET
 
 const STATUS_SYNC: Record<
   string,
@@ -63,8 +62,7 @@ const STATUS_SYNC: Record<
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

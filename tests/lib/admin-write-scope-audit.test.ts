@@ -73,7 +73,7 @@ function mutatingRoutesWithoutWriteScope(): string[] {
     // or aiDenial on a resolveAiScope() result, which only yields AI_ACTION_SCOPES (all :write).
     if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)/.test(src)) continue
     if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
-    if (/CRON_SECRET|authenticateServiceAccount/.test(src)) continue
+    if (/CRON_SECRET|verifyCronRequest|authenticateServiceAccount/.test(src)) continue
     const route = f.replace('src/app/api/admin/', '').replace('/route.ts', '')
     if (ALLOWED_WITHOUT_WRITE_SCOPE.has(route)) continue
     offenders.push(route)

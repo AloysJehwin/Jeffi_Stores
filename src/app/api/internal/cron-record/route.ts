@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { isCronJobId } from '@/lib/cron-jobs'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) return NextResponse.json({ error: 'Not configured' }, { status: 503 })
-
-  const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${cronSecret}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 503 })
+  if (!verifyCronRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
   const { jobId, ok, errorMsg, detail } = body

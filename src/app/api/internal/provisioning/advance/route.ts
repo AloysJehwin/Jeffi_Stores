@@ -3,6 +3,7 @@ import { getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
 import { advanceProvisioningJob } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
 import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,9 +88,7 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
 }
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

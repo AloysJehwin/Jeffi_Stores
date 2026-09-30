@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runPoolAutoscale } from '@/lib/pool-autoscale'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,9 +8,7 @@ export const dynamic = 'force-dynamic'
 // (t4g.small≤10, medium≤25, large≤50, xlarge≤100). Up-only; dry-run unless
 // POOL_AUTOSCALE_ENABLED=true. Schedule hourly. Auth: Bearer ${CRON_SECRET}.
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {

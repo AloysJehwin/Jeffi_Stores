@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { syncAllProductsToMerchant, syncProductToMerchant, sendSyncFailureEmail } from '@/lib/merchant/sync'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 function isSameOriginRequest(request: NextRequest): boolean {
   const origin = request.headers.get('origin')
@@ -54,9 +55,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
+  const isCron = verifyCronRequest(request)
 
   if (!isCron) {
     const admin = await authenticateAdmin(request)

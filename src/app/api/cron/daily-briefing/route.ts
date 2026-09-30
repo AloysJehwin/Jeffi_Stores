@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendAuditedMail } from '@/lib/mail-audit'
 import { collectBriefingData, narrate, renderBriefingEmail, briefingFromAsync } from '@/lib/daily-briefing'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +11,7 @@ interface AdminRecipient {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
