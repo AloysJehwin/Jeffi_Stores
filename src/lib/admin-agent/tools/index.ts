@@ -9,8 +9,12 @@ import { CUSTOMER_OPS_TOOLS } from './customer-ops'
 import { OPERATIONS_TOOLS } from './operations'
 import { ok, err } from '../tool-envelope'
 
-function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
-function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+function vec(arr: number[]) {
+  return '[' + arr.join(',') + ']'
+}
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
 
 const FORBIDDEN_TABLES = [
   'admins',
@@ -25,15 +29,16 @@ const FORBIDDEN_TABLES = [
   'embeddings',
 ]
 const FORBIDDEN_COLUMNS = ['password_hash', 'password', 'totp_secret', 'reset_token', 'razorpay_signature']
-const SQL_BLOCKLIST_RE = new RegExp(
-  `\\b(${[...FORBIDDEN_TABLES, ...FORBIDDEN_COLUMNS].join('|')})\\b`,
-  'i'
-)
-const SQL_DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
+const SQL_BLOCKLIST_RE = new RegExp(`\\b(${[...FORBIDDEN_TABLES, ...FORBIDDEN_COLUMNS].join('|')})\\b`, 'i')
+const SQL_DML_RE =
+  /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
 
 export interface ToolInputSchema {
   type: 'object'
-  properties: Record<string, { type: string; description?: string; default?: unknown; minimum?: number; maximum?: number; enum?: string[] }>
+  properties: Record<
+    string,
+    { type: string; description?: string; default?: unknown; minimum?: number; maximum?: number; enum?: string[] }
+  >
   required?: string[]
 }
 
@@ -48,7 +53,8 @@ export interface ToolDef {
 export const TOOLS: ToolDef[] = [
   {
     name: 'search_products',
-    description: 'Semantic product search over the catalog. Use for "find me X" / "products like Y" queries. Returns ranked candidates with current price + stock.',
+    description:
+      'Semantic product search over the catalog. Use for "find me X" / "products like Y" queries. Returns ranked candidates with current price + stock.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -94,11 +100,15 @@ export const TOOLS: ToolDef[] = [
       )
       const order = new Map(productIds.map((id, i) => [id, i]))
       const sorted = rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
-      const top = sorted.slice(0, 3).map((r: any) => r.name).filter(Boolean)
+      const top = sorted
+        .slice(0, 3)
+        .map((r: any) => r.name)
+        .filter(Boolean)
       return ok({
-        summary: sorted.length === 1
-          ? `Found 1 product: ${top[0] || ''}.`
-          : `Found ${sorted.length} products${top.length > 0 ? ` (top: ${top.join(', ')})` : ''}.`,
+        summary:
+          sorted.length === 1
+            ? `Found 1 product: ${top[0] || ''}.`
+            : `Found ${sorted.length} products${top.length > 0 ? ` (top: ${top.join(', ')})` : ''}.`,
         count: sorted.length,
         data: { products: sorted },
         displayHints: { primaryField: 'name', itemNoun: 'product' },
@@ -186,7 +196,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'search_customers',
-    description: 'Search customers by name / email / phone fragments. Uses semantic search on the replica when available, falls back to SQL ILIKE.',
+    description:
+      'Search customers by name / email / phone fragments. Uses semantic search on the replica when available, falls back to SQL ILIKE.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -232,7 +243,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_recent_customers',
-    description: 'List customers who signed up recently, ordered by registration date descending. Use for "who joined in the last N days" or "new customers" queries.',
+    description:
+      'List customers who signed up recently, ordered by registration date descending. Use for "who joined in the last N days" or "new customers" queries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -297,8 +309,14 @@ export const TOOLS: ToolDef[] = [
       const d = clamp(typeof days === 'number' ? days : 7, 1, 365)
       const params: unknown[] = [d]
       const where = [`o.created_at > NOW() - ($1 || ' days')::interval`]
-      if (userId) { params.push(userId); where.push(`o.user_id = $${params.length}::uuid`) }
-      if (status) { params.push(status); where.push(`o.status = $${params.length}`) }
+      if (userId) {
+        params.push(userId)
+        where.push(`o.user_id = $${params.length}::uuid`)
+      }
+      if (status) {
+        params.push(status)
+        where.push(`o.status = $${params.length}`)
+      }
       params.push(lim)
       const rows = await queryMany(
         `SELECT o.id::text, o.order_number, o.status, o.payment_status, o.total_amount::text, o.created_at,
@@ -341,7 +359,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_low_stock_products',
-    description: 'Products with effective stock at or below a threshold, sorted by 30-day sales volume descending. Handles variant products correctly.',
+    description:
+      'Products with effective stock at or below a threshold, sorted by 30-day sales volume descending. Handles variant products correctly.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -373,7 +392,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_campaign_stats',
-    description: 'Performance for behavioral campaigns. Sent / opened / clicked / converted, optionally for a single campaign.',
+    description:
+      'Performance for behavioral campaigns. Sent / opened / clicked / converted, optionally for a single campaign.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -386,7 +406,10 @@ export const TOOLS: ToolDef[] = [
       const d = clamp(typeof days === 'number' ? days : 30, 1, 365)
       const params: unknown[] = [d]
       let where = `WHERE sent_at > NOW() - ($1 || ' days')::interval`
-      if (kind) { params.push(kind); where += ` AND campaign_kind = $${params.length}` }
+      if (kind) {
+        params.push(kind)
+        where += ` AND campaign_kind = $${params.length}`
+      }
       const rows = await queryMany(
         `SELECT campaign_kind,
                 COUNT(*)::int AS sent,
@@ -401,7 +424,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'send_test_email',
-    description: 'Propose sending a test email of a campaign template to a specific email address. The admin must approve before it sends. Use this when a user asks to test how a campaign looks.',
+    description:
+      'Propose sending a test email of a campaign template to a specific email address. The admin must approve before it sends. Use this when a user asks to test how a campaign looks.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -415,10 +439,15 @@ export const TOOLS: ToolDef[] = [
       if (!campaignKind || !toEmail || !String(toEmail).includes('@')) throw new Error('Invalid args')
       const PRODUCT_ANNOUNCEMENT_KINDS = ['featured_products', 'product_announcement', 'featured', 'products']
       if (PRODUCT_ANNOUNCEMENT_KINDS.includes(String(campaignKind).toLowerCase())) {
-        throw new Error('send_test_email is for automated campaign templates only. To send a featured products email to one address, call list_featured_products to get productIds, then propose_product_announcement_email with audience="test_only" and testEmail set.')
+        throw new Error(
+          'send_test_email is for automated campaign templates only. To send a featured products email to one address, call list_featured_products to get productIds, then propose_product_announcement_email with audience="test_only" and testEmail set.'
+        )
       }
       const c = await queryOne(`SELECT kind, name FROM campaigns WHERE kind = $1`, [campaignKind])
-      if (!c) throw new Error(`Unknown campaign kind "${campaignKind}". Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180`)
+      if (!c)
+        throw new Error(
+          `Unknown campaign kind "${campaignKind}". Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180`
+        )
       return {
         proposed: true,
         kind: 'send_test_email',
@@ -441,7 +470,8 @@ export const TOOLS: ToolDef[] = [
     mutating: true,
     handler: async ({ campaignKind, enabled }) => {
       const c = await queryOne<{ kind: string; name: string; enabled: boolean }>(
-        `SELECT kind, name, enabled FROM campaigns WHERE kind = $1`, [campaignKind]
+        `SELECT kind, name, enabled FROM campaigns WHERE kind = $1`,
+        [campaignKind]
       )
       if (!c) throw new Error(`Unknown campaign: ${campaignKind}`)
       const target = String(enabled).toLowerCase() === 'true'
@@ -487,7 +517,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_admin_tools',
-    description: 'Introspection. Returns the names, descriptions, and mutating-flag of every tool the admin agent itself has access to. Use when the user asks "what can you do?" or wants a capabilities tour.',
+    description:
+      'Introspection. Returns the names, descriptions, and mutating-flag of every tool the admin agent itself has access to. Use when the user asks "what can you do?" or wants a capabilities tour.',
     inputSchema: { type: 'object', properties: {} },
     mutating: false,
     handler: async () => {
@@ -504,17 +535,23 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'run_sql_readonly',
-    description: 'Run a single read-only SELECT against the live database for ad-hoc questions the other tools do not cover. Auto-wrapped in a READ ONLY transaction with a 5-second statement timeout; writes, DDL, and access to admins/payment_methods/password columns are blocked. Returns up to 100 rows. Prefer the dedicated tools when one fits.',
+    description:
+      'Run a single read-only SELECT against the live database for ad-hoc questions the other tools do not cover. Auto-wrapped in a READ ONLY transaction with a 5-second statement timeout; writes, DDL, and access to admins/payment_methods/password columns are blocked. Returns up to 100 rows. Prefer the dedicated tools when one fits.',
     inputSchema: {
       type: 'object',
       properties: {
-        sql: { type: 'string', description: 'A single SELECT statement. No semicolons except at the end. No CTE writes.' },
+        sql: {
+          type: 'string',
+          description: 'A single SELECT statement. No semicolons except at the end. No CTE writes.',
+        },
       },
       required: ['sql'],
     },
     mutating: false,
     handler: async ({ sql }) => {
-      const raw = String(sql || '').trim().replace(/;\s*$/, '')
+      const raw = String(sql || '')
+        .trim()
+        .replace(/;\s*$/, '')
       if (!raw) throw new Error('sql is required')
       if (raw.length > 4000) throw new Error('sql too long (max 4000 chars)')
       if (raw.includes(';')) throw new Error('semicolons not allowed inside the statement')
@@ -536,7 +573,9 @@ export const TOOLS: ToolDef[] = [
           truncated: (result.rowCount ?? result.rows.length) >= 100,
         }
       } catch (err: any) {
-        try { await client.query('ROLLBACK') } catch {}
+        try {
+          await client.query('ROLLBACK')
+        } catch {}
         throw new Error(`SQL error: ${err?.message || err}`)
       } finally {
         client.release()
@@ -545,7 +584,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'find_customer_orders',
-    description: 'Look up a customer by name or email and return their orders, ordered by most recent first. Use when the user references "a customer\'s recent order" by name without an order number — call this first, then ask the admin to pick an order via the disambiguation flow.',
+    description:
+      'Look up a customer by name or email and return their orders, ordered by most recent first. Use when the user references "a customer\'s recent order" by name without an order number — call this first, then ask the admin to pick an order via the disambiguation flow.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -560,7 +600,10 @@ export const TOOLS: ToolDef[] = [
       const q = String(customerQuery || '').trim()
       if (!q) throw new Error('customerQuery is required')
       const customers = await queryMany<{
-        id: string; email: string; first_name: string | null; last_name: string | null
+        id: string
+        email: string
+        first_name: string | null
+        last_name: string | null
       }>(
         `SELECT id::text, email, first_name, last_name
            FROM users
@@ -589,8 +632,12 @@ export const TOOLS: ToolDef[] = [
       }
       const c = customers[0]
       const orders = await queryMany<{
-        id: string; order_number: string; status: string; payment_status: string;
-        total_amount: string; created_at: string
+        id: string
+        order_number: string
+        status: string
+        payment_status: string
+        total_amount: string
+        created_at: string
       }>(
         `SELECT id::text, order_number, status, payment_status, total_amount::text, created_at
            FROM orders
@@ -607,14 +654,24 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_order_delay_email',
-    description: 'Propose sending a delivery-delay notification email to the customer of a specific order. The admin must approve before it sends. Use when the user says things like "tell customer X their order #Y will be delayed by N days because Z". If the order number is missing, call find_customer_orders first and ask the admin to pick one.',
+    description:
+      'Propose sending a delivery-delay notification email to the customer of a specific order. The admin must approve before it sends. Use when the user says things like "tell customer X their order #Y will be delayed by N days because Z". If the order number is missing, call find_customer_orders first and ask the admin to pick one.',
     inputSchema: {
       type: 'object',
       properties: {
         orderId: { type: 'string', description: 'Order UUID.' },
         orderNumber: { type: 'string', description: 'Alternative to orderId. Either is fine.' },
-        delayDays: { type: 'integer', description: 'Number of days the order will be delayed (1-90).', minimum: 1, maximum: 90 },
-        reason: { type: 'string', description: 'Customer-facing reason. Keep it brief and honest. e.g. "courier strike", "stock shortage from supplier", "weather disruption".' },
+        delayDays: {
+          type: 'integer',
+          description: 'Number of days the order will be delayed (1-90).',
+          minimum: 1,
+          maximum: 90,
+        },
+        reason: {
+          type: 'string',
+          description:
+            'Customer-facing reason. Keep it brief and honest. e.g. "courier strike", "stock shortage from supplier", "weather disruption".',
+        },
       },
       required: ['delayDays', 'reason'],
     },
@@ -627,8 +684,12 @@ export const TOOLS: ToolDef[] = [
       if (!orderId && !orderNumber) throw new Error('Provide orderId or orderNumber')
 
       const order = await queryOne<{
-        id: string; order_number: string; status: string; user_id: string;
-        customer_email: string; customer_name: string;
+        id: string
+        order_number: string
+        status: string
+        user_id: string
+        customer_email: string
+        customer_name: string
       }>(
         `SELECT o.id::text, o.order_number, o.status, o.user_id::text,
                 u.email AS customer_email,
@@ -642,7 +703,10 @@ export const TOOLS: ToolDef[] = [
       if (!order) throw new Error('Order not found')
       if (!order.customer_email) throw new Error('Order has no customer email on file')
       if (['delivered', 'cancelled'].includes(order.status)) {
-        return { proposed: false, info: `Order ${order.order_number} is already ${order.status}; delay email not appropriate.` }
+        return {
+          proposed: false,
+          info: `Order ${order.order_number} is already ${order.status}; delay email not appropriate.`,
+        }
       }
       return {
         proposed: true,
@@ -661,7 +725,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_recent_products',
-    description: 'Top N most-recently-added active products by created_at DESC. Use for "newly added products" / "what is new" queries.',
+    description:
+      'Top N most-recently-added active products by created_at DESC. Use for "newly added products" / "what is new" queries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -689,7 +754,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'estimate_email_audience',
-    description: 'Count how many customers would receive a marketing email under a given audience filter, BEFORE proposing a blast. Always call this first so the admin sees the blast radius. Filters: "all_opted_in", "recent_buyers" (placed an order in the last 90 days), or "test_only" (single email).',
+    description:
+      'Count how many customers would receive a marketing email under a given audience filter, BEFORE proposing a blast. Always call this first so the admin sees the blast radius. Filters: "all_opted_in", "recent_buyers" (placed an order in the last 90 days), or "test_only" (single email).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -728,7 +794,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_product_announcement_email',
-    description: 'Propose a marketing-style email featuring a list of products to a chosen audience. The admin must approve before it sends. ALWAYS call estimate_email_audience first so the user sees the blast radius. Provide a short subject + intro line; the email template will render product cards. For audience=test_only, also pass testEmail.',
+    description:
+      'Propose a marketing-style email featuring a list of products to a chosen audience. The admin must approve before it sends. ALWAYS call estimate_email_audience first so the user sees the blast radius. Provide a short subject + intro line; the email template will render product cards. For audience=test_only, also pass testEmail.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -736,7 +803,10 @@ export const TOOLS: ToolDef[] = [
         audience: { type: 'string', description: 'all_opted_in | recent_buyers | test_only' },
         testEmail: { type: 'string', description: 'Required when audience=test_only.' },
         subject: { type: 'string', description: 'Email subject line. Keep under 80 chars.' },
-        intro: { type: 'string', description: 'One short sentence shown above the product cards. Keep under 240 chars.' },
+        intro: {
+          type: 'string',
+          description: 'One short sentence shown above the product cards. Keep under 240 chars.',
+        },
       },
       required: ['productIds', 'audience', 'subject', 'intro'],
     },
@@ -753,16 +823,24 @@ export const TOOLS: ToolDef[] = [
       if (!subj || subj.length > 80) throw new Error('subject required, max 80 chars')
       if (!intr || intr.length > 240) throw new Error('intro required, max 240 chars')
       if (/!\[[^\]]*\]\([^)]+\)/.test(intr)) {
-        throw new Error('intro must NOT contain markdown image syntax (![alt](url)) — products render automatically below the intro. Pass a one-sentence teaser only.')
+        throw new Error(
+          'intro must NOT contain markdown image syntax (![alt](url)) — products render automatically below the intro. Pass a one-sentence teaser only.'
+        )
       }
       if (/\[[^\]]+\]\(https?:[^)]+\)/.test(intr)) {
-        throw new Error('intro must NOT contain markdown links — products auto-link to their PDP. Pass a one-sentence teaser only.')
+        throw new Error(
+          'intro must NOT contain markdown links — products auto-link to their PDP. Pass a one-sentence teaser only.'
+        )
       }
       if (/<img\b|<table\b|<a\s+href=/i.test(intr)) {
         throw new Error('intro must be plain text. The email template renders the product cards section automatically.')
       }
       const products = await queryMany<{
-        id: string; name: string; slug: string; price: string; short_description: string | null
+        id: string
+        name: string
+        slug: string
+        price: string
+        short_description: string | null
       }>(
         `SELECT p.id::text, p.name, p.slug,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
@@ -771,7 +849,10 @@ export const TOOLS: ToolDef[] = [
         [ids]
       )
       if (products.length !== ids.length) {
-        return { proposed: false, info: `Only ${products.length} of ${ids.length} ids resolved to active products. Re-check the ids.` }
+        return {
+          proposed: false,
+          info: `Only ${products.length} of ${ids.length} ids resolved to active products. Re-check the ids.`,
+        }
       }
       let audCount = 0
       let testTo: string | null = null
@@ -813,7 +894,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'describe_schema',
-    description: 'Read database schema. Returns the column list for a given table, or the full table list if no table is named. Use BEFORE writing run_sql_readonly queries against unfamiliar tables. Sensitive tables (admins, payment_methods, agent internals) are filtered out.',
+    description:
+      'Read database schema. Returns the column list for a given table, or the full table list if no table is named. Use BEFORE writing run_sql_readonly queries against unfamiliar tables. Sensitive tables (admins, payment_methods, agent internals) are filtered out.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -841,7 +923,10 @@ export const TOOLS: ToolDef[] = [
         return { error: `Table "${t}" is not accessible.` }
       }
       const cols = await queryMany<{
-        column_name: string; data_type: string; is_nullable: string; column_default: string | null
+        column_name: string
+        data_type: string
+        is_nullable: string
+        column_default: string | null
       }>(
         `SELECT column_name::text, data_type::text, is_nullable::text, column_default::text
            FROM information_schema.columns
@@ -855,7 +940,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_repo_files',
-    description: 'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    description:
+      'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -868,11 +954,14 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ dir, pattern }) => {
       const fs = await import('node:fs/promises')
       const path = await import('node:path')
-      const requested = String(dir || '').trim().replace(/^\/+/, '')
+      const requested = String(dir || '')
+        .trim()
+        .replace(/^\/+/, '')
       if (!requested || requested.includes('..') || requested.startsWith('/')) {
         throw new Error('Invalid dir — must be project-relative')
       }
-      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      const FORBIDDEN =
+        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
       if (FORBIDDEN.test(requested)) throw new Error('Path is forbidden')
       const root = path.resolve(process.cwd(), requested)
       const projectRoot = path.resolve(process.cwd())
@@ -884,7 +973,11 @@ export const TOOLS: ToolDef[] = [
       async function walk(d: string, depth: number) {
         if (depth > 4 || out.length > 100) return
         let entries
-        try { entries = await fs.readdir(d, { withFileTypes: true }) } catch { return }
+        try {
+          entries = await fs.readdir(d, { withFileTypes: true })
+        } catch {
+          return
+        }
         for (const ent of entries) {
           if (out.length > 100) return
           const full = path.join(d, ent.name)
@@ -909,7 +1002,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'read_repo_file',
-    description: 'Read a project source file to learn how something is implemented (canonical SQL fragments, email helpers, API contracts, business rules). Use this when you need to understand domain quirks before generating SQL or rendering output. Returns up to 8KB of content. Forbidden: .env*, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    description:
+      'Read a project source file to learn how something is implemented (canonical SQL fragments, email helpers, API contracts, business rules). Use this when you need to understand domain quirks before generating SQL or rendering output. Returns up to 8KB of content. Forbidden: .env*, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -922,11 +1016,14 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ path: filePath, offset }) => {
       const fs = await import('node:fs/promises')
       const path = await import('node:path')
-      const requested = String(filePath || '').trim().replace(/^\/+/, '')
+      const requested = String(filePath || '')
+        .trim()
+        .replace(/^\/+/, '')
       if (!requested || requested.includes('..') || requested.startsWith('/')) {
         throw new Error('Invalid path — must be project-relative')
       }
-      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      const FORBIDDEN =
+        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
       if (FORBIDDEN.test(requested)) throw new Error('File is forbidden')
       const projectRoot = path.resolve(process.cwd())
       const full = path.resolve(projectRoot, requested)
@@ -948,7 +1045,9 @@ export const TOOLS: ToolDef[] = [
             content: text,
             truncated: start + bytesRead < stat.size,
           }
-        } finally { await handle.close() }
+        } finally {
+          await handle.close()
+        }
       } catch (err: any) {
         if (err?.code === 'ENOENT') throw new Error(`File not found: ${requested}`)
         throw err
@@ -957,7 +1056,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'list_admin_api_routes',
-    description: 'List the real /api/admin/* routes that exist in the codebase. Returns paths and the HTTP methods exported by each route file. Use BEFORE call_admin_api so you do not guess endpoints. Filter results with the optional pathContains substring.',
+    description:
+      'List the real /api/admin/* routes that exist in the codebase. Returns paths and the HTTP methods exported by each route file. Use BEFORE call_admin_api so you do not guess endpoints. Filter results with the optional pathContains substring.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -974,7 +1074,11 @@ export const TOOLS: ToolDef[] = [
 
       async function walk(dir: string, acc: string[]) {
         let entries
-        try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
+        try {
+          entries = await fs.readdir(dir, { withFileTypes: true })
+        } catch {
+          return
+        }
         for (const ent of entries) {
           const full = path.join(dir, ent.name)
           if (ent.isDirectory()) await walk(full, acc)
@@ -991,7 +1095,11 @@ export const TOOLS: ToolDef[] = [
         if (FORBIDDEN_PATH_RE.test(rel)) continue
         if (filter && !rel.toLowerCase().includes(filter)) continue
         let src: string
-        try { src = await fs.readFile(f, 'utf8') } catch { continue }
+        try {
+          src = await fs.readFile(f, 'utf8')
+        } catch {
+          continue
+        }
         const methods: string[] = []
         for (const m of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
           if (new RegExp(`export\\s+(async\\s+)?function\\s+${m}\\b`).test(src)) methods.push(m)
@@ -1004,20 +1112,32 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'call_admin_api',
-    description: 'Call any /api/admin/* endpoint as the current admin. GET/HEAD requests run immediately and return the response. POST/PUT/PATCH/DELETE requests are PROPOSED — they queue an admin_agent_action that the admin must approve before the call fires. Use this when an existing dedicated tool does not cover the user\'s ask. Path must start with /api/admin/. Forbidden subpaths: /api/admin/agent/*, /api/admin/team*, /api/admin/admins*, /api/admin/auth*. Body cap 16KB.',
+    description:
+      "Call any /api/admin/* endpoint as the current admin. GET/HEAD requests run immediately and return the response. POST/PUT/PATCH/DELETE requests are PROPOSED — they queue an admin_agent_action that the admin must approve before the call fires. Use this when an existing dedicated tool does not cover the user's ask. Path must start with /api/admin/. Forbidden subpaths: /api/admin/agent/*, /api/admin/team*, /api/admin/admins*, /api/admin/auth*. Body cap 16KB.",
     inputSchema: {
       type: 'object',
       properties: {
         method: { type: 'string', description: 'GET, HEAD, POST, PUT, PATCH, or DELETE' },
-        path: { type: 'string', description: 'Absolute path starting with /api/admin/, e.g. /api/admin/quotations or /api/admin/orders/123' },
-        body: { type: 'string', description: 'JSON-stringified request body (for POST/PUT/PATCH). Omit for GET/DELETE.' },
-        queryString: { type: 'string', description: 'Query string fragment (e.g. "status=pending&limit=10"). Omit if not needed.' },
+        path: {
+          type: 'string',
+          description: 'Absolute path starting with /api/admin/, e.g. /api/admin/quotations or /api/admin/orders/123',
+        },
+        body: {
+          type: 'string',
+          description: 'JSON-stringified request body (for POST/PUT/PATCH). Omit for GET/DELETE.',
+        },
+        queryString: {
+          type: 'string',
+          description: 'Query string fragment (e.g. "status=pending&limit=10"). Omit if not needed.',
+        },
       },
       required: ['method', 'path'],
     },
     mutating: true,
-    handler: async (input) => {
-      const method = String(input.method || '').trim().toUpperCase()
+    handler: async input => {
+      const method = String(input.method || '')
+        .trim()
+        .toUpperCase()
       const rawPath = String(input.path || '').trim()
       const queryString = String(input.queryString || '').trim()
       const bodyStr = String(input.body || '').trim()
@@ -1037,7 +1157,11 @@ export const TOOLS: ToolDef[] = [
       }
       if (bodyStr.length > 16 * 1024) throw new Error('Body too large (max 16KB)')
       if (bodyStr) {
-        try { JSON.parse(bodyStr) } catch { throw new Error('body must be valid JSON') }
+        try {
+          JSON.parse(bodyStr)
+        } catch {
+          throw new Error('body must be valid JSON')
+        }
       }
 
       const fullPath = queryString ? `${rawPath}?${queryString}` : rawPath
@@ -1047,7 +1171,8 @@ export const TOOLS: ToolDef[] = [
         return {
           proposed: false,
           executeImmediate: true,
-          method, path: fullPath,
+          method,
+          path: fullPath,
           marker: '__call_admin_api_immediate__',
         }
       }
@@ -1070,4 +1195,3 @@ export const TOOLS: ToolDef[] = [
 export function getTool(name: string): ToolDef | null {
   return TOOLS.find(t => t.name === name) || null
 }
-

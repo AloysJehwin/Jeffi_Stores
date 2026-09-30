@@ -49,7 +49,12 @@ function decrypt(encoded: string): string {
   return Buffer.concat([d.update(Buffer.from(ct, 'base64')), d.final()]).toString('utf8')
 }
 
-export interface TenantCa { caCertPem: string; caKeyPem: string; subject: string; expiresAt: Date }
+export interface TenantCa {
+  caCertPem: string
+  caKeyPem: string
+  subject: string
+  expiresAt: Date
+}
 
 function caSubject(slug: string): string {
   return `/C=IN/O=Jeffi Commerce/OU=Tenant Admin CA/CN=${slug}.admin-ca`
@@ -65,10 +70,25 @@ export async function ensureTenantCa(tenantId: string, slug: string): Promise<Te
   const certPath = path.join(tmp, 'ca-cert.pem')
   try {
     execFileSync('openssl', ['genrsa', '-out', keyPath, '4096'], { stdio: 'pipe' })
-    execFileSync('openssl', [
-      'req', '-x509', '-new', '-nodes', '-key', keyPath,
-      '-sha256', '-days', String(CA_DAYS), '-out', certPath, '-subj', caSubject(slug),
-    ], { stdio: 'pipe' })
+    execFileSync(
+      'openssl',
+      [
+        'req',
+        '-x509',
+        '-new',
+        '-nodes',
+        '-key',
+        keyPath,
+        '-sha256',
+        '-days',
+        String(CA_DAYS),
+        '-out',
+        certPath,
+        '-subj',
+        caSubject(slug),
+      ],
+      { stdio: 'pipe' }
+    )
 
     const caCertPem = fs.readFileSync(certPath, 'utf8')
     const caKeyPem = fs.readFileSync(keyPath, 'utf8')
@@ -77,7 +97,7 @@ export async function ensureTenantCa(tenantId: string, slug: string): Promise<Te
     await controlPlanePool().query(
       `INSERT INTO tenant_ca (tenant_id, ca_cert_pem, ca_key_pem, subject, expires_at)
        VALUES ($1,$2,$3,$4,$5) ON CONFLICT (tenant_id) DO NOTHING`,
-      [tenantId, caCertPem, encrypt(caKeyPem), caSubject(slug), expiresAt],
+      [tenantId, caCertPem, encrypt(caKeyPem), caSubject(slug), expiresAt]
     )
     return { caCertPem, caKeyPem, subject: caSubject(slug), expiresAt }
   } finally {
@@ -87,7 +107,9 @@ export async function ensureTenantCa(tenantId: string, slug: string): Promise<Te
 
 export async function getTenantCa(tenantId: string): Promise<TenantCa | null> {
   const r = await controlPlanePool().query(
-    'SELECT ca_cert_pem, ca_key_pem, subject, expires_at FROM tenant_ca WHERE tenant_id = $1', [tenantId])
+    'SELECT ca_cert_pem, ca_key_pem, subject, expires_at FROM tenant_ca WHERE tenant_id = $1',
+    [tenantId]
+  )
   const row = r.rows[0]
   if (!row) return null
   return {
@@ -100,8 +122,7 @@ export async function getTenantCa(tenantId: string): Promise<TenantCa | null> {
 
 /** Public CA cert only — the hot path for verifying an inbound client certificate. */
 export async function getTenantCaCert(tenantId: string): Promise<string | null> {
-  const r = await controlPlanePool().query(
-    'SELECT ca_cert_pem FROM tenant_ca WHERE tenant_id = $1', [tenantId])
+  const r = await controlPlanePool().query('SELECT ca_cert_pem FROM tenant_ca WHERE tenant_id = $1', [tenantId])
   return r.rows[0]?.ca_cert_pem ?? null
 }
 
@@ -147,25 +168,61 @@ export async function issueTenantAdminCert(opts: {
     const subject = `/C=IN/O=Jeffi Commerce/OU=${opts.slug}/CN=${opts.commonName}`
     execFileSync('openssl', ['req', '-new', '-key', keyPath, '-out', csrPath, '-subj', subject], { stdio: 'pipe' })
 
-    fs.writeFileSync(extPath, [
-      'basicConstraints = CA:FALSE',
-      'keyUsage = digitalSignature, keyEncipherment',
-      'extendedKeyUsage = clientAuth',
-      'subjectKeyIdentifier = hash',
-      'authorityKeyIdentifier = keyid,issuer',
-    ].join('\n'))
+    fs.writeFileSync(
+      extPath,
+      [
+        'basicConstraints = CA:FALSE',
+        'keyUsage = digitalSignature, keyEncipherment',
+        'extendedKeyUsage = clientAuth',
+        'subjectKeyIdentifier = hash',
+        'authorityKeyIdentifier = keyid,issuer',
+      ].join('\n')
+    )
 
-    execFileSync('openssl', [
-      'x509', '-req', '-days', String(CLIENT_DAYS), '-in', csrPath,
-      '-CA', caCertPath, '-CAkey', caKeyPath,
-      '-out', certPath, '-extfile', extPath, '-set_serial', `0x${serialHex}`, '-sha256',
-    ], { stdio: 'pipe' })
+    execFileSync(
+      'openssl',
+      [
+        'x509',
+        '-req',
+        '-days',
+        String(CLIENT_DAYS),
+        '-in',
+        csrPath,
+        '-CA',
+        caCertPath,
+        '-CAkey',
+        caKeyPath,
+        '-out',
+        certPath,
+        '-extfile',
+        extPath,
+        '-set_serial',
+        `0x${serialHex}`,
+        '-sha256',
+      ],
+      { stdio: 'pipe' }
+    )
 
-    execFileSync('openssl', [
-      'pkcs12', '-export', '-out', p12Path,
-      '-inkey', keyPath, '-in', certPath, '-certfile', caCertPath,
-      '-name', `${opts.slug}-admin-cert`, '-passout', `pass:${p12Password}`,
-    ], { stdio: 'pipe' })
+    execFileSync(
+      'openssl',
+      [
+        'pkcs12',
+        '-export',
+        '-out',
+        p12Path,
+        '-inkey',
+        keyPath,
+        '-in',
+        certPath,
+        '-certfile',
+        caCertPath,
+        '-name',
+        `${opts.slug}-admin-cert`,
+        '-passout',
+        `pass:${p12Password}`,
+      ],
+      { stdio: 'pipe' }
+    )
 
     const p12Buffer = fs.readFileSync(p12Path)
     const serial = serialHex.toUpperCase()
@@ -174,7 +231,7 @@ export async function issueTenantAdminCert(opts: {
     await controlPlanePool().query(
       `INSERT INTO tenant_admin_certs (tenant_id, serial, common_name, issued_to, expires_at)
        VALUES ($1,$2,$3,$4,$5) ON CONFLICT (serial) DO NOTHING`,
-      [opts.tenantId, serial, opts.commonName, opts.issuedTo, expiresAt],
+      [opts.tenantId, serial, opts.commonName, opts.issuedTo, expiresAt]
     )
 
     return { p12Buffer, p12Password, serial, commonName: opts.commonName, expiresAt }
@@ -187,7 +244,7 @@ export async function revokeTenantAdminCert(serial: string, revokedBy: string): 
   const r = await controlPlanePool().query(
     `UPDATE tenant_admin_certs SET revoked_at = now(), revoked_by = $2
      WHERE serial = $1 AND revoked_at IS NULL`,
-    [serial.toUpperCase(), revokedBy],
+    [serial.toUpperCase(), revokedBy]
   )
   return (r.rowCount ?? 0) > 0
 }
@@ -206,6 +263,8 @@ export interface AdminCertRow {
 export async function listTenantAdminCerts(tenantId: string): Promise<AdminCertRow[]> {
   const r = await controlPlanePool().query(
     `SELECT id, serial, common_name, issued_to, issued_at, expires_at, revoked_at, revoked_by
-     FROM tenant_admin_certs WHERE tenant_id = $1 ORDER BY issued_at DESC`, [tenantId])
+     FROM tenant_admin_certs WHERE tenant_id = $1 ORDER BY issued_at DESC`,
+    [tenantId]
+  )
   return r.rows as AdminCertRow[]
 }

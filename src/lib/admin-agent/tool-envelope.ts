@@ -56,10 +56,7 @@ export function stripSensitive<T>(row: T): T {
   return out as unknown as T
 }
 
-export function pick<T extends Record<string, unknown>, K extends keyof T>(
-  row: T,
-  keys: readonly K[]
-): Pick<T, K> {
+export function pick<T extends Record<string, unknown>, K extends keyof T>(row: T, keys: readonly K[]): Pick<T, K> {
   const out = {} as Pick<T, K>
   for (const k of keys) {
     if (k in row) out[k] = row[k]

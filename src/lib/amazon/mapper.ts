@@ -26,25 +26,48 @@ export interface AmazonListing {
 // to HARDWARE_HANDLE (proven listable) — NEVER PRODUCT, which cannot be created.
 const CATEGORY_PRODUCT_TYPE: Record<string, string> = {
   // Confirmed live (productType keyword search):
-  bolts: 'BOLTS', bolt: 'BOLTS',
-  screws: 'SCREWS', screw: 'SCREWS',
-  'machine screws': 'SCREWS', 'self tapping screws': 'SCREWS',
-  washers: 'WASHER', washer: 'WASHER',
-  screwdrivers: 'SCREWDRIVER', screwdriver: 'SCREWDRIVER',
-  'drilling machines': 'DRILL', 'drilling machine': 'DRILL', drill: 'DRILL',
-  spanners: 'WRENCH', spanner: 'WRENCH', wrenches: 'WRENCH', wrench: 'WRENCH',
+  bolts: 'BOLTS',
+  bolt: 'BOLTS',
+  screws: 'SCREWS',
+  screw: 'SCREWS',
+  'machine screws': 'SCREWS',
+  'self tapping screws': 'SCREWS',
+  washers: 'WASHER',
+  washer: 'WASHER',
+  screwdrivers: 'SCREWDRIVER',
+  screwdriver: 'SCREWDRIVER',
+  'drilling machines': 'DRILL',
+  'drilling machine': 'DRILL',
+  drill: 'DRILL',
+  spanners: 'WRENCH',
+  spanner: 'WRENCH',
+  wrenches: 'WRENCH',
+  wrench: 'WRENCH',
   // Resolved by reasoning (verify):
-  nuts: 'NUTS', nut: 'NUTS',
-  'spirit levels': 'LEVEL', 'spirit level': 'LEVEL', levels: 'LEVEL',
-  'cable lugs': 'WIRE_TERMINAL_AND_CONNECTOR', 'cable lug': 'WIRE_TERMINAL_AND_CONNECTOR',
-  lugs: 'WIRE_TERMINAL_AND_CONNECTOR', lug: 'WIRE_TERMINAL_AND_CONNECTOR',
-  terminals: 'WIRE_TERMINAL_AND_CONNECTOR', terminal: 'WIRE_TERMINAL_AND_CONNECTOR',
-  'nut spinners': 'SCREWDRIVER', 'nut spinner': 'SCREWDRIVER', 'nut drivers': 'SCREWDRIVER',
+  nuts: 'NUTS',
+  nut: 'NUTS',
+  'spirit levels': 'LEVEL',
+  'spirit level': 'LEVEL',
+  levels: 'LEVEL',
+  'cable lugs': 'WIRE_TERMINAL_AND_CONNECTOR',
+  'cable lug': 'WIRE_TERMINAL_AND_CONNECTOR',
+  lugs: 'WIRE_TERMINAL_AND_CONNECTOR',
+  lug: 'WIRE_TERMINAL_AND_CONNECTOR',
+  terminals: 'WIRE_TERMINAL_AND_CONNECTOR',
+  terminal: 'WIRE_TERMINAL_AND_CONNECTOR',
+  'nut spinners': 'SCREWDRIVER',
+  'nut spinner': 'SCREWDRIVER',
+  'nut drivers': 'SCREWDRIVER',
   // Tools / auto:
-  tools: 'HARDWARE_HANDLE', 'hand tools': 'HARDWARE_HANDLE', 'power tools': 'POWER_TOOL',
-  belts: 'POWER_TRANSMISSION_BELT', 'v belts': 'POWER_TRANSMISSION_BELT', 'fan belts': 'POWER_TRANSMISSION_BELT',
+  tools: 'HARDWARE_HANDLE',
+  'hand tools': 'HARDWARE_HANDLE',
+  'power tools': 'POWER_TOOL',
+  belts: 'POWER_TRANSMISSION_BELT',
+  'v belts': 'POWER_TRANSMISSION_BELT',
+  'fan belts': 'POWER_TRANSMISSION_BELT',
   // Generic:
-  hardware: 'HARDWARE_HANDLE', fasteners: 'HARDWARE_HANDLE',
+  hardware: 'HARDWARE_HANDLE',
+  fasteners: 'HARDWARE_HANDLE',
 }
 
 // Non-PRODUCT fallback (PRODUCT is not listable for full-create).
@@ -75,17 +98,23 @@ function buildItemWeight(product: any, marketplaceId: string) {
 
 // Parse the first two positive numbers from the free-text dimensions/size as length x width (mm).
 function parseDimsMm(dims?: string): { length: number; width: number } {
-  const nums = String(dims || '').match(/[\d.]+/g)?.map(Number).filter(n => n > 0) || []
+  const nums =
+    String(dims || '')
+      .match(/[\d.]+/g)
+      ?.map(Number)
+      .filter(n => n > 0) || []
   return { length: nums[0] ?? 25, width: nums[1] ?? 10 }
 }
 
 function buildItemLengthWidth(product: any, marketplaceId: string) {
   const { length, width } = parseDimsMm(product.dimensions || product.size)
-  return [{
-    length: { value: length, unit: 'millimeters' },
-    width: { value: width, unit: 'millimeters' },
-    marketplace_id: marketplaceId,
-  }]
+  return [
+    {
+      length: { value: length, unit: 'millimeters' },
+      width: { value: width, unit: 'millimeters' },
+      marketplace_id: marketplaceId,
+    },
+  ]
 }
 
 function buildUnitCount(marketplaceId: string) {
@@ -118,8 +147,8 @@ function buildModelNumber(product: any, marketplaceId: string, variant?: any): R
 // (full name + address + pincode), plus a language_tag. Manufacturer/importer/packer all
 // reuse the store contact for a domestic reseller.
 const STORE_CONTACT_TEXT =
-  "Jeffi Stores, Sanjay Gandhi Chowk, Opposite Arihant Complex, Station Road, Raipur, " +
-  "Chhattisgarh 492001, India. Phone: +919685354099. Email: admin@jeffistores.in"
+  'Jeffi Stores, Sanjay Gandhi Chowk, Opposite Arihant Complex, Station Road, Raipur, ' +
+  'Chhattisgarh 492001, India. Phone: +919685354099. Email: admin@jeffistores.in'
 
 function contactInfoAttr(marketplaceId: string, contactText?: string) {
   return [{ value: contactText || STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
@@ -185,17 +214,24 @@ function parentVariationAttrs(marketplaceId: string): Record<string, unknown> {
 function childVariationAttrs(parentSku: string, marketplaceId: string): Record<string, unknown> {
   return {
     parentage_level: [{ value: 'child', marketplace_id: marketplaceId }],
-    child_parent_sku_relationship: [{
-      parent_sku: parentSku,
-      child_relationship_type: 'variation',
-      marketplace_id: marketplaceId,
-    }],
+    child_parent_sku_relationship: [
+      {
+        parent_sku: parentSku,
+        child_relationship_type: 'variation',
+        marketplace_id: marketplaceId,
+      },
+    ],
     variation_theme: [{ name: 'SIZE_NAME', marketplace_id: marketplaceId }],
   }
 }
 
 // Attributes shared by every SKU (parent + children + simple).
-function buildCommonAttributes(product: any, brandName: string, marketplaceId: string, contactText?: string): Record<string, unknown> {
+function buildCommonAttributes(
+  product: any,
+  brandName: string,
+  marketplaceId: string,
+  contactText?: string
+): Record<string, unknown> {
   const description = (product.description || product.name || '').slice(0, 2000)
   const bullets = buildProductHighlights(product).slice(0, 5)
   const common: Record<string, unknown> = {
@@ -252,7 +288,7 @@ export function productToAmazonListings(product: any, marketplaceId: string, con
     for (const v of product.product_variants) {
       if (v.price == null) continue
       const price = Number(v.price)
-      const mrp = v.mrp ? Number(v.mrp) : (product.mrp ? Number(product.mrp) : null)
+      const mrp = v.mrp ? Number(v.mrp) : product.mrp ? Number(product.mrp) : null
       const listPrice = mrp || price
       const salePrice = mrp && mrp > price ? price : null
       const inStock = productActive && v.stock_status !== 'Out of Stock'
@@ -284,20 +320,22 @@ export function productToAmazonListings(product: any, marketplaceId: string, con
   const salePrice = mrp && mrp > price ? price : null
   const inStock = productActive && product.stock_status !== 'Out of Stock'
 
-  return [{
-    sku: product.sku,
-    productType,
-    requirements: 'LISTING',
-    attributes: {
-      ...common,
-      ...buildProductIdentity(product, marketplaceId),
-      ...buildModelNumber(product, marketplaceId),
-      item_name: attr(product.name, marketplaceId),
-      purchasable_offer: buildPurchasableOffer(listPrice, salePrice, marketplaceId),
-      fulfillment_availability: buildFulfillmentAvailability(inStock),
-      ...(product.size ? { size: attr(product.size, marketplaceId) } : {}),
+  return [
+    {
+      sku: product.sku,
+      productType,
+      requirements: 'LISTING',
+      attributes: {
+        ...common,
+        ...buildProductIdentity(product, marketplaceId),
+        ...buildModelNumber(product, marketplaceId),
+        item_name: attr(product.name, marketplaceId),
+        purchasable_offer: buildPurchasableOffer(listPrice, salePrice, marketplaceId),
+        fulfillment_availability: buildFulfillmentAvailability(inStock),
+        ...(product.size ? { size: attr(product.size, marketplaceId) } : {}),
+      },
     },
-  }]
+  ]
 }
 
 // Offer-only listing on an EXISTING ASIN. Bypasses the "may not create new ASINs for brand"
@@ -310,11 +348,11 @@ export function productToAmazonOfferListing(
   product: any,
   asin: string,
   marketplaceId: string,
-  variant?: any,
+  variant?: any
 ): AmazonListing {
   const sku = variant?.sku || product.sku
   const price = variant?.price != null ? Number(variant.price) : Number(product.base_price)
-  const mrp = variant?.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
+  const mrp = variant?.mrp ? Number(variant.mrp) : product.mrp ? Number(product.mrp) : null
   const listPrice = mrp || price
   const salePrice = mrp && mrp > price ? price : null
   const productActive = product.is_active !== false

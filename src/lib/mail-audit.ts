@@ -115,7 +115,10 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
   // write the audit row so you can see what would have been sent in /admin/audit.
   if (process.env.MAIL_DISABLED === 'true') {
     await logMail({
-      to, from, cc, bcc,
+      to,
+      from,
+      cc,
+      bcc,
       subject: o.subject,
       html: o.redactBody ? null : (o.html ?? null),
       text: o.redactBody ? null : (o.text ?? null),

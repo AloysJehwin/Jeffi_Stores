@@ -68,10 +68,17 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
     )
   } catch (err: any) {
     try {
-      await query(
-        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
-        ['logActivity', JSON.stringify({ kind: params.kind, userId: params.userId, summary: params.summary, msg: err?.message, code: err?.code, detail: err?.detail })]
-      )
+      await query(`INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`, [
+        'logActivity',
+        JSON.stringify({
+          kind: params.kind,
+          userId: params.userId,
+          summary: params.summary,
+          msg: err?.message,
+          code: err?.code,
+          detail: err?.detail,
+        }),
+      ])
     } catch {}
   }
 }

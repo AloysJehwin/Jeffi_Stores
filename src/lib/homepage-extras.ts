@@ -2,8 +2,14 @@ import { queryMany, queryOne } from '@/lib/db'
 import { getProductCards, getProductCardsByIds } from '@/lib/product-cards'
 import { VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import {
-  configId, configIds, configNumber, sectionLimit, valueStatMetrics,
-  type HomepageSection, type SectionType, type ValueStatMetric,
+  configId,
+  configIds,
+  configNumber,
+  sectionLimit,
+  valueStatMetrics,
+  type HomepageSection,
+  type SectionType,
+  type ValueStatMetric,
 } from '@/lib/homepage-sections'
 
 type SectionShape = Pick<HomepageSection, 'type' | 'config'>
@@ -49,7 +55,11 @@ const categoryTree = (root: string) => `(
   ) SELECT id FROM tree)`
 
 /** The picked product, or null once its countdown has ended or the product is gone. */
-export async function getCountdownDeal(section: SectionShape, gstEnabled: boolean, now = Date.now()): Promise<CountdownDealData | null> {
+export async function getCountdownDeal(
+  section: SectionShape,
+  gstEnabled: boolean,
+  now = Date.now()
+): Promise<CountdownDealData | null> {
   const productId = configId(section, 'productId')
   if (!productId) return null
   const raw = section.config?.endsAt
@@ -68,8 +78,15 @@ function reviewerName(first: string | null, last: string | null): string {
 
 export async function getTestimonials(section: SectionShape): Promise<Testimonial[]> {
   const rows = await queryMany<{
-    id: string; rating: number; title: string | null; comment: string; is_verified_purchase: boolean
-    product_name: string; product_slug: string; first_name: string | null; last_name: string | null
+    id: string
+    rating: number
+    title: string | null
+    comment: string
+    is_verified_purchase: boolean
+    product_name: string
+    product_slug: string
+    first_name: string | null
+    last_name: string | null
   }>(
     `SELECT r.id, r.rating, r.title, r.comment, r.is_verified_purchase,
             p.name AS product_name, p.slug AS product_slug, u.first_name, u.last_name
@@ -79,7 +96,7 @@ export async function getTestimonials(section: SectionShape): Promise<Testimonia
      WHERE r.is_approved = true AND r.rating >= $1 AND length(btrim(COALESCE(r.comment, ''))) >= 20
      ORDER BY r.rating DESC, r.is_verified_purchase DESC, r.created_at DESC
      LIMIT $2`,
-    [configNumber(section, 'minRating', 4, 5), sectionLimit(section, 6)],
+    [configNumber(section, 'minRating', 4, 5), sectionLimit(section, 6)]
   )
   return rows.map(r => ({
     id: r.id,
@@ -101,7 +118,7 @@ export async function getCategoryTabs(section: SectionShape, gstEnabled: boolean
   if (picked.length > 0) {
     const rows = await queryMany<{ id: string; name: string; slug: string }>(
       `SELECT id, name, slug FROM categories WHERE id = ANY($1::uuid[]) AND is_active = true`,
-      [picked],
+      [picked]
     )
     const byId = new Map(rows.map(r => [r.id, r]))
     categories = picked.map(id => byId.get(id)).filter((c): c is { id: string; name: string; slug: string } => !!c)
@@ -113,19 +130,21 @@ export async function getCategoryTabs(section: SectionShape, gstEnabled: boolean
        ORDER BY (SELECT count(*) FROM products p WHERE p.is_active = true AND p.category_id IN ${categoryTree('c.id')}) DESC,
                 c.display_order ASC
        LIMIT $1`,
-      [tabCount],
+      [tabCount]
     )
   }
-  const tabs = await Promise.all(categories.slice(0, tabCount).map(async c => ({
-    ...c,
-    products: await getProductCards({
-      where: `p.is_active = true AND p.category_id IN ${categoryTree('$1::uuid')}`,
-      orderBy: 'p.sales_count DESC NULLS LAST, p.created_at DESC',
-      params: [c.id],
-      limit: sectionLimit(section, 8),
-      gstEnabled,
-    }),
-  })))
+  const tabs = await Promise.all(
+    categories.slice(0, tabCount).map(async c => ({
+      ...c,
+      products: await getProductCards({
+        where: `p.is_active = true AND p.category_id IN ${categoryTree('$1::uuid')}`,
+        orderBy: 'p.sales_count DESC NULLS LAST, p.created_at DESC',
+        params: [c.id],
+        limit: sectionLimit(section, 8),
+        gstEnabled,
+      }),
+    }))
+  )
   return tabs.filter(t => t.products.length > 0)
 }
 
@@ -196,11 +215,9 @@ export async function getValueStats(section: SectionShape): Promise<ValueStat[]>
        (SELECT count(*) FROM products WHERE is_active = true) AS products,
        (SELECT count(DISTINCT lower(btrim(a.city))) FROM orders o JOIN addresses a ON a.id = o.shipping_address_id
          WHERE o.status <> 'cancelled') AS cities,
-       (SELECT count(DISTINCT user_id) FROM orders WHERE status <> 'cancelled') AS customers`,
+       (SELECT count(DISTINCT user_id) FROM orders WHERE status <> 'cancelled') AS customers`
   )
-  return metrics
-    .map(m => ({ ...m, value: Number(row?.[m.metric] ?? 0) }))
-    .filter(s => s.value > 0)
+  return metrics.map(m => ({ ...m, value: Number(row?.[m.metric] ?? 0) })).filter(s => s.value > 0)
 }
 
 const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean) => Promise<unknown>>> = {
@@ -213,16 +230,21 @@ const LOADERS: Partial<Record<SectionType, (s: SectionShape, gstEnabled: boolean
 }
 
 /** Data for the section types that load their own, keyed by section id. A failing section is skipped. */
-export async function loadSectionExtras(sections: HomepageSection[], gstEnabled: boolean): Promise<Map<string, unknown>> {
-  const entries = await Promise.all(sections.map(async s => {
-    const load = LOADERS[s.type]
-    if (!load) return null
-    try {
-      return [s.id, await load(s, gstEnabled)] as const
-    } catch (err) {
-      console.error('[homepage-extras]', s.type, err)
-      return null
-    }
-  }))
+export async function loadSectionExtras(
+  sections: HomepageSection[],
+  gstEnabled: boolean
+): Promise<Map<string, unknown>> {
+  const entries = await Promise.all(
+    sections.map(async s => {
+      const load = LOADERS[s.type]
+      if (!load) return null
+      try {
+        return [s.id, await load(s, gstEnabled)] as const
+      } catch (err) {
+        console.error('[homepage-extras]', s.type, err)
+        return null
+      }
+    })
+  )
   return new Map(entries.filter((e): e is readonly [string, unknown] => e !== null))
 }

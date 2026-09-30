@@ -19,7 +19,12 @@ const COLOR_ACCENT = '#7cb900'
 
 const STORE_ADDR = 'SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092'
 
-interface StoreHeading { name: string; phone: string; email: string; web: string }
+interface StoreHeading {
+  name: string
+  phone: string
+  email: string
+  web: string
+}
 
 function drawHeader(doc: any, store: StoreHeading, logo?: string | Buffer) {
   doc.rect(0, 0, PAGE_W, 80).fillColor(COLOR_DARK).fill()
@@ -31,12 +36,20 @@ function drawHeader(doc: any, store: StoreHeading, logo?: string | Buffer) {
   doc.text(store.name.toUpperCase(), ML + 64, 22, { lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor('#cfe1c5')
   doc.text(STORE_ADDR, ML + 64, 46, { width: CW - 64, lineBreak: false })
-  doc.text([store.phone, store.email, store.web].filter(Boolean).join('  |  '), ML + 64, 58, { width: CW - 64, lineBreak: false })
+  doc.text([store.phone, store.email, store.web].filter(Boolean).join('  |  '), ML + 64, 58, {
+    width: CW - 64,
+    lineBreak: false,
+  })
 }
 
 function drawFooter(doc: any, store: StoreHeading, pageNum: number, totalPages: number) {
   const y = PAGE_H - 36
-  doc.moveTo(ML, y).lineTo(PAGE_W - MR, y).lineWidth(0.5).strokeColor(COLOR_RULE).stroke()
+  doc
+    .moveTo(ML, y)
+    .lineTo(PAGE_W - MR, y)
+    .lineWidth(0.5)
+    .strokeColor(COLOR_RULE)
+    .stroke()
   doc.font('Helvetica').fontSize(8).fillColor(COLOR_MUTED)
   doc.text(`© ${new Date().getFullYear()} ${store.name} · ${store.web}`, ML, y + 8, { lineBreak: false })
   doc.text(`Page ${pageNum} of ${totalPages}`, PAGE_W - MR - 80, y + 8, { width: 80, align: 'right', lineBreak: false })
@@ -84,7 +97,10 @@ function renderSection(doc: any, section: Section, startY: number, drawHeaderFn:
     for (const item of section.body) {
       const lineHeight = doc.heightOfString(item, { width: CW - 18, lineGap: 1.5 })
       y = ensureRoom(doc, lineHeight + 6, y, drawHeaderFn)
-      doc.circle(ML + 4, y + 5, 1.5).fillColor(COLOR_ACCENT).fill()
+      doc
+        .circle(ML + 4, y + 5, 1.5)
+        .fillColor(COLOR_ACCENT)
+        .fill()
       doc.fillColor(COLOR_BODY)
       doc.text(item, ML + 14, y, { width: CW - 18, lineGap: 1.5, align: 'justify' })
       y = doc.y + 4
@@ -99,7 +115,10 @@ function renderSection(doc: any, section: Section, startY: number, drawHeaderFn:
   return y + 6
 }
 
-export async function generatePolicyPDF(policy: Policy, branding?: { logo?: string | Buffer; seal?: string | Buffer }): Promise<Buffer> {
+export async function generatePolicyPDF(
+  policy: Policy,
+  branding?: { logo?: string | Buffer; seal?: string | Buffer }
+): Promise<Buffer> {
   const identity = await getStoreIdentity()
   const store: StoreHeading = {
     name: identity.name,
@@ -132,7 +151,12 @@ export async function generatePolicyPDF(policy: Policy, branding?: { logo?: stri
     doc.text(`Last updated: ${policy.lastUpdated}`, ML, y, { lineBreak: false })
     y += 16
 
-    doc.moveTo(ML, y).lineTo(PAGE_W - MR, y).lineWidth(0.5).strokeColor(COLOR_RULE).stroke()
+    doc
+      .moveTo(ML, y)
+      .lineTo(PAGE_W - MR, y)
+      .lineWidth(0.5)
+      .strokeColor(COLOR_RULE)
+      .stroke()
     y += 14
 
     for (const section of policy.sections) {
@@ -142,7 +166,12 @@ export async function generatePolicyPDF(policy: Policy, branding?: { logo?: stri
     // Acknowledgement block on the last page (creates new page if needed)
     y = ensureRoom(doc, 60, y, drawHeaderFn)
     y += 8
-    doc.moveTo(ML, y).lineTo(PAGE_W - MR, y).lineWidth(0.5).strokeColor(COLOR_RULE).stroke()
+    doc
+      .moveTo(ML, y)
+      .lineTo(PAGE_W - MR, y)
+      .lineWidth(0.5)
+      .strokeColor(COLOR_RULE)
+      .stroke()
     y += 12
     doc.font('Helvetica').fontSize(9).fillColor(COLOR_MUTED)
     doc.text(

@@ -14,7 +14,7 @@ export interface StoreIdentity {
   email: string
   phone: string
   web: string
-  logoUrl: string   // '' means "no logo" — render the store name as text
+  logoUrl: string // '' means "no logo" — render the store name as text
 }
 
 export interface FeatureFlags {
@@ -65,7 +65,7 @@ export interface BusinessValues {
 export interface StorefrontContent {
   featuredLimit: number
   newArrivalsLimit: number
-  statsJson: string      // JSON string of [{label,value}] or ''
+  statsJson: string // JSON string of [{label,value}] or ''
   aboutCopy: string
   /** Appended after the store name in the browser tab, e.g. "Industrial Hardware & Tools". */
   metaTagline: string
@@ -91,7 +91,7 @@ export interface KeyboardShortcuts {
   crm: string
   reviews: string
   aiAgent: string
-  customShortcuts: string  // JSON: [{id,label,path,combo}]
+  customShortcuts: string // JSON: [{id,label,path,combo}]
 }
 
 export interface SiteControls {
@@ -128,13 +128,29 @@ const DEFAULTS: SiteControls = {
     inventoryValidationEnabled: true,
     smsEnabled: process.env.SMS_DISABLED !== 'true',
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
-    ondeviceSummaryEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
-    ondeviceFinetuneEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    ondeviceSummaryEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
+    ondeviceFinetuneEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
     // Desktop mirrors the master default; mobile is off by default (server fallback).
-    ondeviceSummaryDesktopEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === '1' || envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
-    ondeviceSummaryMobileEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === '1',
-    ondeviceFinetuneDesktopEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === '1' || envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
-    ondeviceFinetuneMobileEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === '1',
+    ondeviceSummaryDesktopEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === '1' ||
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
+    ondeviceSummaryMobileEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === '1',
+    ondeviceFinetuneDesktopEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === '1' ||
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    ondeviceFinetuneMobileEnabled:
+      envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE) ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === '1',
   },
   values: {
     codSurchargeFlat: envNum(process.env.COD_SURCHARGE_FLAT, 40),
@@ -149,7 +165,8 @@ const DEFAULTS: SiteControls = {
     defaultWeightG: 50,
     pickupLocation: process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores',
     sellerName: process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores',
-    sellerAddress: process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur',
+    sellerAddress:
+      process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur',
     sellerPhone: process.env.DELHIVERY_SELLER_PHONE || '07713585374',
   },
   storefront: {
@@ -158,7 +175,8 @@ const DEFAULTS: SiteControls = {
     statsJson: '',
     // The flagship's own description. Scoped like the tagline below: a tenant selling
     // something else must not inherit a hardware shop's copy on its homepage.
-    aboutCopy: 'Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.',
+    aboutCopy:
+      'Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.',
     // The flagship's trade. A tenant inherits neither — its own values come from its DB, and
     // an unset tagline simply drops from the title rather than advertising someone else's trade.
     metaTagline: 'Industrial Hardware & Tools',
@@ -188,25 +206,61 @@ const DEFAULTS: SiteControls = {
 }
 
 const KEYS = [
-  'business_name', 'business_email', 'business_phone', 'business_web', 'business_logo_url',
-  'feature_razorpay_enabled', 'feature_cod_enabled', 'feature_gst_enabled', 'feature_inventory_validation_enabled',
-  'feature_sms_enabled', 'feature_whatsapp_enabled',
-  'feature_ondevice_summary_enabled', 'feature_ondevice_finetune_enabled',
-  'feature_ondevice_summary_mobile_enabled', 'feature_ondevice_summary_desktop_enabled',
-  'feature_ondevice_finetune_mobile_enabled', 'feature_ondevice_finetune_desktop_enabled',
-  'cod_surcharge_flat', 'cod_surcharge_pct', 'shipping_min_charge', 'shipping_max_charge',
-  'order_auto_cancel_minutes', 'delhivery_origin_pincode', 'business_state_code',
+  'business_name',
+  'business_email',
+  'business_phone',
+  'business_web',
+  'business_logo_url',
+  'feature_razorpay_enabled',
+  'feature_cod_enabled',
+  'feature_gst_enabled',
+  'feature_inventory_validation_enabled',
+  'feature_sms_enabled',
+  'feature_whatsapp_enabled',
+  'feature_ondevice_summary_enabled',
+  'feature_ondevice_finetune_enabled',
+  'feature_ondevice_summary_mobile_enabled',
+  'feature_ondevice_summary_desktop_enabled',
+  'feature_ondevice_finetune_mobile_enabled',
+  'feature_ondevice_finetune_desktop_enabled',
+  'cod_surcharge_flat',
+  'cod_surcharge_pct',
+  'shipping_min_charge',
+  'shipping_max_charge',
+  'order_auto_cancel_minutes',
+  'delhivery_origin_pincode',
+  'business_state_code',
   'return_standard_charge',
-  'default_product_weight_g', 'default_weight_g',
-  'delhivery_pickup_location', 'delhivery_seller_name', 'delhivery_seller_address', 'delhivery_seller_phone',
-  'storefront_featured_limit', 'storefront_new_arrivals_limit',
-  'storefront_stats_json', 'storefront_about_copy',
-  'shortcut_new_product', 'shortcut_cash_sale', 'shortcut_quotation', 'shortcut_new_po',
-  'shortcut_orders', 'shortcut_packing_slips', 'shortcut_returns', 'shortcut_gst',
-  'shortcut_labels', 'shortcut_inventory', 'shortcut_coupons', 'shortcut_campaign',
-  'shortcut_financial', 'shortcut_customers', 'shortcut_crm', 'shortcut_reviews',
-  'shortcut_ai_agent', 'shortcut_custom',
-  'meta_tagline', 'meta_description',
+  'default_product_weight_g',
+  'default_weight_g',
+  'delhivery_pickup_location',
+  'delhivery_seller_name',
+  'delhivery_seller_address',
+  'delhivery_seller_phone',
+  'storefront_featured_limit',
+  'storefront_new_arrivals_limit',
+  'storefront_stats_json',
+  'storefront_about_copy',
+  'shortcut_new_product',
+  'shortcut_cash_sale',
+  'shortcut_quotation',
+  'shortcut_new_po',
+  'shortcut_orders',
+  'shortcut_packing_slips',
+  'shortcut_returns',
+  'shortcut_gst',
+  'shortcut_labels',
+  'shortcut_inventory',
+  'shortcut_coupons',
+  'shortcut_campaign',
+  'shortcut_financial',
+  'shortcut_customers',
+  'shortcut_crm',
+  'shortcut_reviews',
+  'shortcut_ai_agent',
+  'shortcut_custom',
+  'meta_tagline',
+  'meta_description',
 ]
 
 /**
@@ -339,10 +393,22 @@ export async function getSiteControls(): Promise<SiteControls> {
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
-        ondeviceSummaryMobileEnabled: bool('feature_ondevice_summary_mobile_enabled', d.flags.ondeviceSummaryMobileEnabled),
-        ondeviceSummaryDesktopEnabled: bool('feature_ondevice_summary_desktop_enabled', d.flags.ondeviceSummaryDesktopEnabled),
-        ondeviceFinetuneMobileEnabled: bool('feature_ondevice_finetune_mobile_enabled', d.flags.ondeviceFinetuneMobileEnabled),
-        ondeviceFinetuneDesktopEnabled: bool('feature_ondevice_finetune_desktop_enabled', d.flags.ondeviceFinetuneDesktopEnabled),
+        ondeviceSummaryMobileEnabled: bool(
+          'feature_ondevice_summary_mobile_enabled',
+          d.flags.ondeviceSummaryMobileEnabled
+        ),
+        ondeviceSummaryDesktopEnabled: bool(
+          'feature_ondevice_summary_desktop_enabled',
+          d.flags.ondeviceSummaryDesktopEnabled
+        ),
+        ondeviceFinetuneMobileEnabled: bool(
+          'feature_ondevice_finetune_mobile_enabled',
+          d.flags.ondeviceFinetuneMobileEnabled
+        ),
+        ondeviceFinetuneDesktopEnabled: bool(
+          'feature_ondevice_finetune_desktop_enabled',
+          d.flags.ondeviceFinetuneDesktopEnabled
+        ),
       },
       values: {
         codSurchargeFlat: Math.max(0, num('cod_surcharge_flat', d.values.codSurchargeFlat)),
@@ -369,24 +435,24 @@ export async function getSiteControls(): Promise<SiteControls> {
         metaDescription: str('meta_description', tenantScoped ? '' : d.storefront.metaDescription),
       },
       shortcuts: {
-        newProduct:   str('shortcut_new_product',   d.shortcuts.newProduct),
-        cashSale:     str('shortcut_cash_sale',     d.shortcuts.cashSale),
-        quotation:    str('shortcut_quotation',     d.shortcuts.quotation),
-        newPo:        str('shortcut_new_po',        d.shortcuts.newPo),
-        orders:       str('shortcut_orders',        d.shortcuts.orders),
+        newProduct: str('shortcut_new_product', d.shortcuts.newProduct),
+        cashSale: str('shortcut_cash_sale', d.shortcuts.cashSale),
+        quotation: str('shortcut_quotation', d.shortcuts.quotation),
+        newPo: str('shortcut_new_po', d.shortcuts.newPo),
+        orders: str('shortcut_orders', d.shortcuts.orders),
         packingSlips: str('shortcut_packing_slips', d.shortcuts.packingSlips),
-        returns:      str('shortcut_returns',       d.shortcuts.returns),
-        gst:          str('shortcut_gst',           d.shortcuts.gst),
-        labels:       str('shortcut_labels',        d.shortcuts.labels),
-        inventory:    str('shortcut_inventory',     d.shortcuts.inventory),
-        coupons:      str('shortcut_coupons',       d.shortcuts.coupons),
-        campaign:     str('shortcut_campaign',      d.shortcuts.campaign),
-        financial:    str('shortcut_financial',     d.shortcuts.financial),
-        customers:    str('shortcut_customers',     d.shortcuts.customers),
-        crm:          str('shortcut_crm',           d.shortcuts.crm),
-        reviews:      str('shortcut_reviews',       d.shortcuts.reviews),
-        aiAgent:      str('shortcut_ai_agent',      d.shortcuts.aiAgent),
-        customShortcuts: str('shortcut_custom',     d.shortcuts.customShortcuts),
+        returns: str('shortcut_returns', d.shortcuts.returns),
+        gst: str('shortcut_gst', d.shortcuts.gst),
+        labels: str('shortcut_labels', d.shortcuts.labels),
+        inventory: str('shortcut_inventory', d.shortcuts.inventory),
+        coupons: str('shortcut_coupons', d.shortcuts.coupons),
+        campaign: str('shortcut_campaign', d.shortcuts.campaign),
+        financial: str('shortcut_financial', d.shortcuts.financial),
+        customers: str('shortcut_customers', d.shortcuts.customers),
+        crm: str('shortcut_crm', d.shortcuts.crm),
+        reviews: str('shortcut_reviews', d.shortcuts.reviews),
+        aiAgent: str('shortcut_ai_agent', d.shortcuts.aiAgent),
+        customShortcuts: str('shortcut_custom', d.shortcuts.customShortcuts),
       },
       ownDelhivery: d.ownDelhivery,
     }
@@ -402,10 +468,7 @@ export async function getSiteControls(): Promise<SiteControls> {
       const tenantId = await resolveTenantId()
       if (tenantId) {
         const { controlPlanePool } = await import('./tenant-registry')
-        const cp = await controlPlanePool().query(
-          `SELECT own_delhivery FROM tenants WHERE id = $1`,
-          [tenantId],
-        )
+        const cp = await controlPlanePool().query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [tenantId])
         result.ownDelhivery = !!cp.rows[0]?.own_delhivery
         if (!result.ownDelhivery) result.flags.codEnabled = false
       } else {

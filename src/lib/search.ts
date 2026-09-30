@@ -48,15 +48,22 @@ export function buildProductSearchClause(
   const parts: string[] = []
 
   // Full-text prefix search (fast, index-backed).
-  parts.push(`${vectorCol} @@ to_tsquery('english', $${i})`); params.push(tsq); i++
+  parts.push(`${vectorCol} @@ to_tsquery('english', $${i})`)
+  params.push(tsq)
+  i++
   // Whole-query fuzzy fallback.
-  parts.push(`similarity(${nameCol}, $${i}::text) > 0.12`); params.push(q); i++
+  parts.push(`similarity(${nameCol}, $${i}::text) > 0.12`)
+  params.push(q)
+  i++
   // SKU prefix.
-  parts.push(`${skuCol} ILIKE $${i}`); params.push(`${q}%`); i++
+  parts.push(`${skuCol} ILIKE $${i}`)
+  params.push(`${q}%`)
+  i++
   // Per-word fuzzy match — tolerates a typo in any single word (e.g. "screwdrivr").
   for (const w of searchWords(q)) {
     parts.push(`word_similarity($${i}::text, ${nameCol}) > ${WORD_SIM_THRESHOLD}`)
-    params.push(w); i++
+    params.push(w)
+    i++
   }
 
   return { clause: `(${parts.join(' OR ')})`, params, nextIdx: i }
@@ -82,7 +89,9 @@ export function buildProductSearchRank(
   // "…Light…" (lexeme `light`). This is the reliable discriminator between "lightning"
   // and generic "light" products (the prefix `:*` query can't tell them apart because
   // the stemmer collapses "lightning"→"lightn", which "lightin" doesn't prefix).
-  const stemIdx = i; params.push(q); i++
+  const stemIdx = i
+  params.push(q)
+  i++
 
   // Tier B — per-word WORD-BOUNDARY prefix on the raw name (catches partial words that
   // literally prefix a name word, e.g. "arre" → "Arrester", before the stemmer runs).
@@ -96,9 +105,15 @@ export function buildProductSearchRank(
 
   // Tier C/D — whole-query substring + prefix FTS rank + trigram word similarity, as
   // finer discriminators so fuzzy/partial hits still order sensibly among ties.
-  const subIdx = i; params.push(`%${q}%`); i++
-  const tsIdx = i; params.push(tsq || "''"); i++
-  const simIdx = i; params.push(q); i++
+  const subIdx = i
+  params.push(`%${q}%`)
+  i++
+  const tsIdx = i
+  params.push(tsq || "''")
+  i++
+  const simIdx = i
+  params.push(q)
+  i++
 
   // Lower = better. A stemmed-lexeme match dominates (weight 4); then word-prefix;
   // then substring; then the continuous FTS/trigram scores break remaining ties.
@@ -150,11 +165,7 @@ export function buildVectorSearchClause(
   return { clause, params, nextIdx: i }
 }
 
-export function buildSearchClause(
-  raw: string,
-  columns: string[],
-  startIdx: number = 1
-): SearchClause {
+export function buildSearchClause(raw: string, columns: string[], startIdx: number = 1): SearchClause {
   const words = searchWords(raw)
   if (words.length === 0) {
     return { clause: 'TRUE', params: [], nextIdx: startIdx }

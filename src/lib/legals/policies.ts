@@ -21,14 +21,15 @@ export const policies: Policy[] = [
   {
     slug: 'merchant-agreement',
     title: 'Merchant Agreement & Acceptable Use',
-    description: 'The terms for selling on Jeffi Commerce — onboarding, your obligations, payments and settlement, and what you may and may not sell.',
+    description:
+      'The terms for selling on Jeffi Commerce — onboarding, your obligations, payments and settlement, and what you may and may not sell.',
     lastUpdated: '5 Sep 2026',
     sections: [
       {
         heading: '1. Who this covers',
         body: [
           'This agreement is between Jeffi Commerce ("the platform", "we", "us") and any business or individual ("you", "the merchant", "the seller") who onboards a store on ecom.jeffistores.in or a *.jeffistores.in subdomain.',
-          'It governs the store you run on the platform. Your own storefront\'s buyer-facing Terms, Privacy Policy, Returns and other policies are generated separately for your customers — this agreement is between you and Jeffi Commerce.',
+          "It governs the store you run on the platform. Your own storefront's buyer-facing Terms, Privacy Policy, Returns and other policies are generated separately for your customers — this agreement is between you and Jeffi Commerce.",
           'By completing onboarding and accepting the legals at the final step, you accept this agreement and the Privacy Policy.',
         ],
       },
@@ -38,7 +39,7 @@ export const policies: Policy[] = [
           'You must be at least 18 years old and legally able to run the business you are registering.',
           'You must provide accurate business details: legal business name, business type, PAN, a valid 15-digit GSTIN, and a business address with a serviceable 6-digit pincode.',
           'You must provide a valid GST certificate and any category-specific licences that apply to what you sell (see section 6).',
-          'You authorise us to generate your store\'s customer-facing legal pages, invoices and seal from the details you submit.',
+          "You authorise us to generate your store's customer-facing legal pages, invoices and seal from the details you submit.",
           'We may decline or suspend an onboarding where details are incomplete, appear fraudulent, or where a required licence for a restricted category is missing.',
         ],
       },
@@ -48,15 +49,15 @@ export const policies: Policy[] = [
           'You are the seller of record. You are responsible for your catalogue, prices, stock accuracy, product descriptions, images, and for fulfilling every order you accept.',
           'You are responsible for the legality of everything you list and sell, and for holding every licence, registration or certificate that your product category requires under Indian law.',
           'You must keep your GSTIN and business details current, raise correct tax invoices, and meet your own GST filing obligations.',
-          'You must handle your customers\' data lawfully, honour your published returns and shipping policies, and respond to customer grievances.',
+          "You must handle your customers' data lawfully, honour your published returns and shipping policies, and respond to customer grievances.",
         ],
       },
       {
         heading: '4. Payments, settlement & shipping',
         body: [
-          'Payments are collected through Razorpay. You may collect on the platform\'s account (with settlement routed to your linked bank account) or connect your own Razorpay account during onboarding.',
+          "Payments are collected through Razorpay. You may collect on the platform's account (with settlement routed to your linked bank account) or connect your own Razorpay account during onboarding.",
           'Buyer-facing shipping charges collected at checkout are retained by the platform; the actual courier cost incurred through Delhivery is reconciled against your account or prepaid wallet.',
-          'Where you use the platform\'s Delhivery account, courier costs are debited from your prepaid wallet. You must keep the wallet above its minimum balance to keep creating shipments and pickups. If you connect your own Delhivery account, you are billed by Delhivery directly.',
+          "Where you use the platform's Delhivery account, courier costs are debited from your prepaid wallet. You must keep the wallet above its minimum balance to keep creating shipments and pickups. If you connect your own Delhivery account, you are billed by Delhivery directly.",
           'Plan subscription fees are charged per your selected plan and billing interval and are non-refundable except where required by law.',
         ],
       },
@@ -65,7 +66,7 @@ export const policies: Policy[] = [
         body: [
           'You may not list or sell anything illegal to sell in India, counterfeit or infringing goods, stolen goods, weapons and ammunition, explosives, or hazardous materials outside their lawful licensed channels.',
           'No wildlife, endangered species or products derived from them.',
-          'No adult/sexual content, no tobacco to minors, and nothing that violates another party\'s intellectual property.',
+          "No adult/sexual content, no tobacco to minors, and nothing that violates another party's intellectual property.",
           'No products that are recalled, expired, or unsafe.',
         ],
       },
@@ -85,7 +86,7 @@ export const policies: Policy[] = [
           'No scraping, automated probing, denial-of-service, or attempts to access data that is not yours.',
           'No reverse-engineering the platform APIs or circumventing plan limits, wallet checks, or settlement routing.',
           'No using the platform to defraud buyers, launder money, or evade tax.',
-          'No content that is illegal, defamatory, infringing, or harmful to other merchants or to the platform\'s infrastructure.',
+          "No content that is illegal, defamatory, infringing, or harmful to other merchants or to the platform's infrastructure.",
         ],
       },
       {
@@ -237,7 +238,8 @@ export const policies: Policy[] = [
   {
     slug: 'terms-and-conditions',
     title: 'Terms & Conditions',
-    description: 'The rules of using Jeffi Stores — accounts, orders, payments, returns, and what we expect from each other.',
+    description:
+      'The rules of using Jeffi Stores — accounts, orders, payments, returns, and what we expect from each other.',
     lastUpdated: '23 Jun 2026',
     sections: [
       {
@@ -280,7 +282,7 @@ export const policies: Policy[] = [
       {
         heading: '5a. Bank Offers & Cashback',
         body: [
-          'We display bank-specific offers (cashback, instant discounts, no-cost EMI) on product pages as a convenience to you. These offers are sourced from Razorpay\'s partner banks and are subject to each bank\'s terms and conditions.',
+          "We display bank-specific offers (cashback, instant discounts, no-cost EMI) on product pages as a convenience to you. These offers are sourced from Razorpay's partner banks and are subject to each bank's terms and conditions.",
           'Jeffi Stores does not guarantee the availability, accuracy, or continued validity of any bank offer shown. Offer eligibility (minimum purchase, card type, issuing bank) is determined solely by the respective bank.',
           'Cashback and instant discounts are applied by your bank at the time of transaction settlement — they do not reduce the amount you pay at checkout. Jeffi Stores is not a party to the cashback arrangement between you and your bank.',
           'No-cost EMI is facilitated by the card-issuing bank. The interest component is subvented by the bank; Jeffi Stores does not subsidise or guarantee this.',
@@ -468,7 +470,7 @@ export const policies: Policy[] = [
     sections: [
       {
         heading: '1. Manufacturer Warranty',
-        body: 'Most products sold by Jeffi Stores carry the original manufacturer\'s warranty. The warranty period and terms vary by brand and product category. Warranty details are mentioned on the product packaging or datasheet.',
+        body: "Most products sold by Jeffi Stores carry the original manufacturer's warranty. The warranty period and terms vary by brand and product category. Warranty details are mentioned on the product packaging or datasheet.",
       },
       {
         heading: '2. What Is Covered',
@@ -493,7 +495,7 @@ export const policies: Policy[] = [
         body: [
           'Step 1: Contact us at jeffistoress@gmail.com with your order number, product details, and description of the defect.',
           'Step 2: We will coordinate with the manufacturer on your behalf.',
-          'Step 3: Depending on the manufacturer\'s process, the product may be repaired, replaced, or refunded.',
+          "Step 3: Depending on the manufacturer's process, the product may be repaired, replaced, or refunded.",
           'Step 4: Turnaround time varies by manufacturer — typically 15–30 business days.',
         ],
       },
@@ -555,7 +557,8 @@ export const policies: Policy[] = [
   {
     slug: 'grievance-redressal',
     title: 'Grievance Redressal',
-    description: 'How to raise a complaint and our escalation process — as required under the IT Act and Consumer Protection Act.',
+    description:
+      'How to raise a complaint and our escalation process — as required under the IT Act and Consumer Protection Act.',
     lastUpdated: '1 May 2025',
     sections: [
       {
@@ -592,7 +595,7 @@ export const policies: Policy[] = [
       },
       {
         heading: '5. Consumer Forum',
-        body: 'If your grievance is not resolved to your satisfaction, you may approach the National Consumer Disputes Redressal Commission (NCDRC) or the appropriate State Consumer Forum. You may also raise a complaint on the Government of India\'s consumer portal at consumerhelpline.gov.in.',
+        body: "If your grievance is not resolved to your satisfaction, you may approach the National Consumer Disputes Redressal Commission (NCDRC) or the appropriate State Consumer Forum. You may also raise a complaint on the Government of India's consumer portal at consumerhelpline.gov.in.",
       },
       {
         heading: '6. Legal Compliance',
@@ -603,5 +606,5 @@ export const policies: Policy[] = [
 ]
 
 export function getPolicyBySlug(slug: string): Policy | undefined {
-  return policies.find((p) => p.slug === slug)
+  return policies.find(p => p.slug === slug)
 }

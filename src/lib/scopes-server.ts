@@ -15,6 +15,8 @@ export async function assignableScopeKeys(tenantId: string | null): Promise<stri
     const { getTenantPlan } = await import('./plan-gate')
     const { scopes } = await getTenantPlan(tenantId)
     if (scopes.size > 0) return TENANT_SCOPE_KEYS.filter(k => scopes.has(k))
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
   return TENANT_SCOPE_KEYS
 }

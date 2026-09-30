@@ -30,7 +30,8 @@ export function aiProfileConfigured(): boolean {
 
 export async function getAiSummary(userId: string): Promise<AiCustomerSummary> {
   const row = await queryOne<{ ai_summary: string | null; ai_summary_at: string | Date | null }>(
-    `SELECT ai_summary, ai_summary_at FROM customer_profiles WHERE user_id = $1 ORDER BY ai_summary_at DESC NULLS LAST LIMIT 1`, [userId]
+    `SELECT ai_summary, ai_summary_at FROM customer_profiles WHERE user_id = $1 ORDER BY ai_summary_at DESC NULLS LAST LIMIT 1`,
+    [userId]
   )
   return { summary: row?.ai_summary || null, generatedAt: toIso(row?.ai_summary_at) }
 }
@@ -53,25 +54,36 @@ function snippet(text: string | null | undefined, max = SNIPPET): string {
 export async function collectProfileFacts(userId: string): Promise<ProfileFacts> {
   const [user, orders, topProducts, reviews, notes, conversations] = await Promise.all([
     queryOne<{ first_name: string | null; user_type: string | null; created_at: string | Date | null }>(
-      `SELECT first_name, user_type, created_at FROM users WHERE id = $1`, [userId]
+      `SELECT first_name, user_type, created_at FROM users WHERE id = $1`,
+      [userId]
     ),
     queryOne<{ n: string; ltv: string; last_at: string | Date | null }>(
       `SELECT count(*)::text AS n, COALESCE(sum(total_amount), 0)::text AS ltv, max(created_at) AS last_at
-       FROM orders WHERE user_id = $1 AND status <> 'cancelled' AND draft_of_id IS NULL`, [userId]
+       FROM orders WHERE user_id = $1 AND status <> 'cancelled' AND draft_of_id IS NULL`,
+      [userId]
     ),
     queryMany<{ name: string; orders: string; quantity: string }>(
       `SELECT oi.product_name AS name, count(DISTINCT oi.order_id)::text AS orders, COALESCE(sum(oi.quantity), 0)::text AS quantity
        FROM order_items oi JOIN orders o ON o.id = oi.order_id
        WHERE o.user_id = $1 AND o.status <> 'cancelled'
-       GROUP BY oi.product_name ORDER BY count(DISTINCT oi.order_id) DESC, sum(oi.quantity) DESC LIMIT 8`, [userId]
+       GROUP BY oi.product_name ORDER BY count(DISTINCT oi.order_id) DESC, sum(oi.quantity) DESC LIMIT 8`,
+      [userId]
     ),
-    queryMany<{ rating: number | null; product: string | null; title: string | null; comment: string | null; created_at: string | Date }>(
+    queryMany<{
+      rating: number | null
+      product: string | null
+      title: string | null
+      comment: string | null
+      created_at: string | Date
+    }>(
       `SELECT r.rating, p.name AS product, r.title, r.comment, r.created_at
        FROM product_reviews r LEFT JOIN products p ON p.id = r.product_id
-       WHERE r.user_id = $1 ORDER BY r.created_at DESC LIMIT 10`, [userId]
+       WHERE r.user_id = $1 ORDER BY r.created_at DESC LIMIT 10`,
+      [userId]
     ),
     queryMany<{ title: string | null; body: string; tags: string[] | null; created_at: string | Date }>(
-      `SELECT title, body, tags, created_at FROM customer_notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`, [userId]
+      `SELECT title, body, tags, created_at FROM customer_notes WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`,
+      [userId]
     ),
     listConversations(userId, { channels: ['chat', 'whatsapp', 'sms', 'rfq'], limit: 60 }),
   ])
@@ -82,35 +94,77 @@ export async function collectProfileFacts(userId: string): Promise<ProfileFacts>
     orderCount: Number(orders?.n) || 0,
     lifetimeValue: Number(orders?.ltv) || 0,
     lastOrderAt: toIso(orders?.last_at),
-    topProducts: topProducts.map(p => ({ name: p.name, orders: Number(p.orders) || 0, quantity: Number(p.quantity) || 0 })),
-    reviews: reviews.map(r => ({ rating: r.rating, product: r.product, title: r.title, comment: r.comment, at: toIso(r.created_at) || '' })),
-    notes: notes.map(n => ({ title: n.title, body: n.body, tags: Array.isArray(n.tags) ? n.tags : [], at: toIso(n.created_at) || '' })),
-    messages: conversations.items.map(m => ({ channel: m.channel, direction: m.direction, body: m.body, at: m.at, subject: m.subject })),
+    topProducts: topProducts.map(p => ({
+      name: p.name,
+      orders: Number(p.orders) || 0,
+      quantity: Number(p.quantity) || 0,
+    })),
+    reviews: reviews.map(r => ({
+      rating: r.rating,
+      product: r.product,
+      title: r.title,
+      comment: r.comment,
+      at: toIso(r.created_at) || '',
+    })),
+    notes: notes.map(n => ({
+      title: n.title,
+      body: n.body,
+      tags: Array.isArray(n.tags) ? n.tags : [],
+      at: toIso(n.created_at) || '',
+    })),
+    messages: conversations.items.map(m => ({
+      channel: m.channel,
+      direction: m.direction,
+      body: m.body,
+      at: m.at,
+      subject: m.subject,
+    })),
   }
 }
 
 export function buildProfilePrompt(facts: ProfileFacts): { system: string; user: string } {
   const lines: string[] = []
-  lines.push(`Customer: ${facts.firstName || 'name not recorded'}; account type: ${facts.userType || 'customer'}; member since ${day(facts.memberSince)}.`)
-  lines.push(`Orders: ${facts.orderCount}; lifetime value INR ${Math.round(facts.lifetimeValue).toLocaleString('en-IN')}; last order ${facts.lastOrderAt ? day(facts.lastOrderAt) : 'none'}.`)
-  lines.push(facts.topProducts.length
-    ? `Most bought: ${facts.topProducts.map(p => `${p.name} (${p.orders} order${p.orders === 1 ? '' : 's'})`).join('; ')}.`
-    : 'Most bought: nothing yet.')
+  lines.push(
+    `Customer: ${facts.firstName || 'name not recorded'}; account type: ${facts.userType || 'customer'}; member since ${day(facts.memberSince)}.`
+  )
+  lines.push(
+    `Orders: ${facts.orderCount}; lifetime value INR ${Math.round(facts.lifetimeValue).toLocaleString('en-IN')}; last order ${facts.lastOrderAt ? day(facts.lastOrderAt) : 'none'}.`
+  )
+  lines.push(
+    facts.topProducts.length
+      ? `Most bought: ${facts.topProducts.map(p => `${p.name} (${p.orders} order${p.orders === 1 ? '' : 's'})`).join('; ')}.`
+      : 'Most bought: nothing yet.'
+  )
   lines.push('')
   lines.push('Reviews (newest first):')
-  lines.push(...(facts.reviews.length
-    ? facts.reviews.map(r => `- [${day(r.at)}] ${r.rating ?? '?'}/5 ${r.product || 'product'}: ${snippet([r.title, r.comment].filter(Boolean).join(' - '), 240) || 'no text'}`)
-    : ['- none']))
+  lines.push(
+    ...(facts.reviews.length
+      ? facts.reviews.map(
+          r =>
+            `- [${day(r.at)}] ${r.rating ?? '?'}/5 ${r.product || 'product'}: ${snippet([r.title, r.comment].filter(Boolean).join(' - '), 240) || 'no text'}`
+        )
+      : ['- none'])
+  )
   lines.push('')
   lines.push('Staff notes (newest first):')
-  lines.push(...(facts.notes.length
-    ? facts.notes.map(n => `- [${day(n.at)}]${n.tags.length ? ` (${n.tags.join(', ')})` : ''} ${snippet([n.title, n.body].filter(Boolean).join(': '))}`)
-    : ['- none']))
+  lines.push(
+    ...(facts.notes.length
+      ? facts.notes.map(
+          n =>
+            `- [${day(n.at)}]${n.tags.length ? ` (${n.tags.join(', ')})` : ''} ${snippet([n.title, n.body].filter(Boolean).join(': '))}`
+        )
+      : ['- none'])
+  )
   lines.push('')
   lines.push('Messages (newest first; "in" = customer wrote, "out" = store wrote):')
-  lines.push(...(facts.messages.length
-    ? facts.messages.map(m => `- [${day(m.at)}] ${m.channel} ${m.direction === 'inbound' ? 'in' : 'out'}${m.subject ? ` (${m.subject})` : ''}: ${snippet(m.body) || 'no text'}`)
-    : ['- none']))
+  lines.push(
+    ...(facts.messages.length
+      ? facts.messages.map(
+          m =>
+            `- [${day(m.at)}] ${m.channel} ${m.direction === 'inbound' ? 'in' : 'out'}${m.subject ? ` (${m.subject})` : ''}: ${snippet(m.body) || 'no text'}`
+        )
+      : ['- none'])
+  )
   const system = [
     'You write short internal profiles of retail customers for the store staff who will talk to them next.',
     `Use only the facts provided. Plain text in one or two paragraphs, at most ${MAX_WORDS} words, no headings, bullet points, markdown, greetings or marketing language.`,

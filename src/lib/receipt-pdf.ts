@@ -38,8 +38,28 @@ export interface ReceiptOrder {
 }
 
 function toWords(n: number): string {
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+  const ones = [
+    '',
+    'One',
+    'Two',
+    'Three',
+    'Four',
+    'Five',
+    'Six',
+    'Seven',
+    'Eight',
+    'Nine',
+    'Ten',
+    'Eleven',
+    'Twelve',
+    'Thirteen',
+    'Fourteen',
+    'Fifteen',
+    'Sixteen',
+    'Seventeen',
+    'Eighteen',
+    'Nineteen',
+  ]
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
 
   function convert(num: number): string {
@@ -80,9 +100,7 @@ export async function generateReceiptPDF(
   const FS = 7
   const FS_SM = 6.5
 
-  function measureHeight(
-    lines: Array<{ text: string; fs?: number; bold?: boolean; gap?: number }>
-  ): number {
+  function measureHeight(lines: Array<{ text: string; fs?: number; bold?: boolean; gap?: number }>): number {
     let h = 0
     for (const l of lines) h += (l.fs ?? FS) + (l.gap ?? 1)
     return h
@@ -100,8 +118,7 @@ export async function generateReceiptPDF(
     { text: '', gap: 1 },
     { text: '', gap: 1 },
     { text: '', gap: 1 },
-    ...(order.customer_name && order.customer_name.toLowerCase() !== 'walk-in customer'
-      ? [{ text: '', gap: 1 }] : []),
+    ...(order.customer_name && order.customer_name.toLowerCase() !== 'walk-in customer' ? [{ text: '', gap: 1 }] : []),
   ]
 
   // Measure each item's WRAPPED name height (long names wrap to multiple lines) so estH is an
@@ -109,7 +126,11 @@ export async function generateReceiptPDF(
   // (the page has a fixed height until the correction at the end), exploding a long receipt into
   // hundreds of pages. Uses the same font/size/width as the item loop (colW.item = CW - 88).
   const ITEM_COL_W = CW - 88
-  const nameMeasureDoc = new PDFDocument({ size: [W, 1000], margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: true })
+  const nameMeasureDoc = new PDFDocument({
+    size: [W, 1000],
+    margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
+    autoFirstPage: true,
+  })
   nameMeasureDoc.font('Helvetica').fontSize(FS)
   let itemsH = 0
   for (const it of items) {
@@ -118,20 +139,36 @@ export async function generateReceiptPDF(
     itemsH += nameH + discH + 2
   }
   nameMeasureDoc.end()
-  const summaryLines = 1 + (order.is_igst ? (order.igst_amount > 0 ? 1 : 0) : (order.cgst_amount > 0 ? 1 : 0) + (order.sgst_amount > 0 ? 1 : 0)) + 1
+  const summaryLines =
+    1 +
+    (order.is_igst
+      ? order.igst_amount > 0
+        ? 1
+        : 0
+      : (order.cgst_amount > 0 ? 1 : 0) + (order.sgst_amount > 0 ? 1 : 0)) +
+    1
   const notesH = order.notes ? FS_SM + 6 : 0
   const footerH = 7 + 6 + 2
 
   const estH =
-    measureHeight(headerLines) + 8 +
-    9 + 2 +
-    measureHeight(metaLines) + 6 +
-    LINE_H + 4 +
-    itemsH + 4 +
-    summaryLines * LINE_H + 8 +
-    FS_SM + 6 +
+    measureHeight(headerLines) +
+    8 +
+    9 +
+    2 +
+    measureHeight(metaLines) +
+    6 +
+    LINE_H +
+    4 +
+    itemsH +
+    4 +
+    summaryLines * LINE_H +
+    8 +
+    FS_SM +
+    6 +
     notesH +
-    8 + footerH + MARGIN * 2
+    8 +
+    footerH +
+    MARGIN * 2
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -150,7 +187,9 @@ export async function generateReceiptPDF(
     let y = MARGIN
 
     function draw(str: string, opts: Record<string, unknown> = {}, fs = FS, isBold = false) {
-      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs)
+      doc
+        .font(isBold ? 'Helvetica-Bold' : 'Helvetica')
+        .fontSize(fs)
         .text(str, x, y, { width: CW, lineGap: 0, ...opts })
       if (!isBold) doc.font('Helvetica')
       y = doc.y
@@ -159,9 +198,19 @@ export async function generateReceiptPDF(
     function ruler(dashed = false, gap = 2) {
       y += gap
       if (dashed) {
-        doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.3).dash(2, { space: 1 }).stroke('#000').undash()
+        doc
+          .moveTo(x, y)
+          .lineTo(x + CW, y)
+          .lineWidth(0.3)
+          .dash(2, { space: 1 })
+          .stroke('#000')
+          .undash()
       } else {
-        doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.5).stroke('#000')
+        doc
+          .moveTo(x, y)
+          .lineTo(x + CW, y)
+          .lineWidth(0.5)
+          .stroke('#000')
       }
       y += gap
     }
@@ -184,7 +233,10 @@ export async function generateReceiptPDF(
     function metaRow(label: string, val: string) {
       const ry = y
       doc.font('Helvetica').fontSize(FS).text(label, x, ry, { width: labelW, lineGap: 0 })
-      doc.font('Helvetica').fontSize(FS).text(val, valX, ry, { width: CW - labelW, lineGap: 0 })
+      doc
+        .font('Helvetica')
+        .fontSize(FS)
+        .text(val, valX, ry, { width: CW - labelW, lineGap: 0 })
       y = Math.max(doc.y, ry + FS + 1) + 1
     }
 
@@ -217,13 +269,16 @@ export async function generateReceiptPDF(
       const mrpTotal = hasDiscount ? item.unit_price * item.quantity : 0
       const nameH = doc.heightOfString(item.product_name, { width: colW.item })
       const discH = hasDiscount ? FS_SM + 1 : 0
-      const qtyStr = item.buy_unit
-        ? `${parseFloat(String(item.quantity))} ${item.buy_unit}`
-        : String(item.quantity)
+      const qtyStr = item.buy_unit ? `${parseFloat(String(item.quantity))} ${item.buy_unit}` : String(item.quantity)
       doc.text(item.product_name, col.item, ry, { width: colW.item, lineGap: 0 })
       if (hasDiscount) {
-        doc.font('Helvetica').fontSize(FS_SM)
-          .text(`MRP ₹${fmtAmt(mrpTotal)}  Disc -₹${fmtAmt(item.discount_amount!)}`, col.item, ry + nameH, { width: colW.item, lineGap: 0 })
+        doc
+          .font('Helvetica')
+          .fontSize(FS_SM)
+          .text(`MRP ₹${fmtAmt(mrpTotal)}  Disc -₹${fmtAmt(item.discount_amount!)}`, col.item, ry + nameH, {
+            width: colW.item,
+            lineGap: 0,
+          })
         doc.font('Helvetica').fontSize(FS)
       }
       const ny = ry + Math.max(0, (nameH - FS) / 2)
@@ -239,8 +294,14 @@ export async function generateReceiptPDF(
       const ry = y
       const fs = bold ? 7.5 : FS
       const font = bold ? 'Helvetica-Bold' : 'Helvetica'
-      doc.font(font).fontSize(fs).text(label, x, ry, { width: CW - 30, lineGap: 0 })
-      doc.font(font).fontSize(fs).text(val, x + CW - 30, ry, { width: 30, align: 'right', lineGap: 0 })
+      doc
+        .font(font)
+        .fontSize(fs)
+        .text(label, x, ry, { width: CW - 30, lineGap: 0 })
+      doc
+        .font(font)
+        .fontSize(fs)
+        .text(val, x + CW - 30, ry, { width: 30, align: 'right', lineGap: 0 })
       doc.font('Helvetica')
       y = ry + fs + 2
     }
@@ -258,10 +319,10 @@ export async function generateReceiptPDF(
     ruler(false, 1)
 
     y += 2
-    doc.font('Helvetica').fontSize(FS_SM).text(
-      `Amount in words: ${toWords(order.total_amount)}`,
-      x, y, { width: CW, lineGap: 0 }
-    )
+    doc
+      .font('Helvetica')
+      .fontSize(FS_SM)
+      .text(`Amount in words: ${toWords(order.total_amount)}`, x, y, { width: CW, lineGap: 0 })
     y = doc.y + 3
 
     if (order.notes) {
@@ -271,9 +332,15 @@ export async function generateReceiptPDF(
 
     ruler(true, 2)
 
-    doc.font('Helvetica').fontSize(7).text('Thank you for your purchase!', x, y, { width: CW, align: 'center', lineGap: 0 })
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .text('Thank you for your purchase!', x, y, { width: CW, align: 'center', lineGap: 0 })
     y = doc.y + 1
-    doc.font('Helvetica').fontSize(FS_SM).text('This is a computer-generated receipt.', x, y, { width: CW, align: 'center', lineGap: 0 })
+    doc
+      .font('Helvetica')
+      .fontSize(FS_SM)
+      .text('This is a computer-generated receipt.', x, y, { width: CW, align: 'center', lineGap: 0 })
     y = doc.y
 
     doc.page.height = y + MARGIN + 2

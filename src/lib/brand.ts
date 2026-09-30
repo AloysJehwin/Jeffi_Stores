@@ -186,9 +186,7 @@ export async function storeContactLine(): Promise<string> {
 export async function storeAddressLine(): Promise<string> {
   try {
     const { queryMany } = await import('./db')
-    const rows = await queryMany<{ value: string }>(
-      `SELECT value FROM site_settings WHERE key = 'business_address'`
-    )
+    const rows = await queryMany<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'business_address'`)
     return rows[0]?.value?.trim() || ''
   } catch {
     return ''

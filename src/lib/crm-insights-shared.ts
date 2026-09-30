@@ -4,18 +4,35 @@
 
 import type { AnalyticsRange } from './queries'
 
-export const CRM_SEGMENT_KEYS = ['vip', 'loyal', 'repeat', 'one_time', 'new', 'at_risk', 'dormant', 'b2b', 'lead'] as const
-export type CrmSegmentKey = typeof CRM_SEGMENT_KEYS[number]
+export const CRM_SEGMENT_KEYS = [
+  'vip',
+  'loyal',
+  'repeat',
+  'one_time',
+  'new',
+  'at_risk',
+  'dormant',
+  'b2b',
+  'lead',
+] as const
+export type CrmSegmentKey = (typeof CRM_SEGMENT_KEYS)[number]
 export type CrmSegment = 'all' | CrmSegmentKey
 
 export const CRM_RANGES: AnalyticsRange[] = ['today', '7d', '30d', '90d', 'month', 'year']
 
-export const isCrmSegment = (v: unknown): v is CrmSegment => v === 'all' || (CRM_SEGMENT_KEYS as readonly string[]).includes(String(v))
+export const isCrmSegment = (v: unknown): v is CrmSegment =>
+  v === 'all' || (CRM_SEGMENT_KEYS as readonly string[]).includes(String(v))
 export const isCrmRange = (v: unknown): v is AnalyticsRange => (CRM_RANGES as string[]).includes(String(v))
 
 export type AttentionSeverity = 'high' | 'medium' | 'low'
 export type AttentionKind =
-  | 'vip_churn' | 'unanswered_chat' | 'unanswered_message' | 'low_review' | 'address_change' | 'return_request' | 'overdue_task'
+  | 'vip_churn'
+  | 'unanswered_chat'
+  | 'unanswered_message'
+  | 'low_review'
+  | 'address_change'
+  | 'return_request'
+  | 'overdue_task'
 
 export interface AttentionItem {
   kind: AttentionKind
@@ -129,7 +146,10 @@ export interface Intent {
   wishlistInStock: number
 }
 
-export interface SearchTerm { query: string; count: number }
+export interface SearchTerm {
+  query: string
+  count: number
+}
 
 export interface Workload {
   open: number
@@ -143,7 +163,10 @@ export interface Assignee {
   open: number
   overdue: number
 }
-export interface NotesWeek { week: string; count: number }
+export interface NotesWeek {
+  week: string
+  count: number
+}
 
 export interface B2b {
   pendingApprovals: number

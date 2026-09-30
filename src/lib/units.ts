@@ -68,9 +68,7 @@ export const UNITS: Record<Dimension, UnitDef[]> = {
     { key: 'oz', label: 'oz', toSi: 0.0283495 },
     { key: 'mt', label: 'mt (tonne)', toSi: 1000 },
   ],
-  custom: [
-    { key: 'unit', label: 'unit (custom)' },
-  ],
+  custom: [{ key: 'unit', label: 'unit (custom)' }],
 }
 
 export const ALL_DIMENSIONS: Dimension[] = ['count', 'length', 'area', 'volume', 'weight', 'custom']
@@ -109,28 +107,34 @@ export function convertSameDimension(value: number, fromUnit: UnitDef, toUnit: U
  * e.g. computeAreaFactor({length: 4, width: 8, dim_unit: 'ft'}, baseUnitKey='m2')
  *      -> 2.9729
  */
-export function computeAreaFactor(meta: { length: number; width: number; dim_unit: string }, baseUnitKey: string): number {
+export function computeAreaFactor(
+  meta: { length: number; width: number; dim_unit: string },
+  baseUnitKey: string
+): number {
   const sideUnit = getUnitDef('length', meta.dim_unit)
   const baseUnit = getUnitDef('area', baseUnitKey)
   if (!sideUnit || !baseUnit || sideUnit.toSi === undefined || baseUnit.toSi === undefined) {
     throw new Error(`Bad units: side=${meta.dim_unit} base=${baseUnitKey}`)
   }
   // sides in m → area in m² → divide by base.toSi to express in base unit
-  const areaInM2 = (meta.length * sideUnit.toSi) * (meta.width * sideUnit.toSi)
+  const areaInM2 = meta.length * sideUnit.toSi * (meta.width * sideUnit.toSi)
   return areaInM2 / baseUnit.toSi
 }
 
 /**
  * Compute the factor for a `volume` unit defined by length × width × height.
  */
-export function computeVolumeFactor(meta: { length: number; width: number; height: number; dim_unit: string }, baseUnitKey: string): number {
+export function computeVolumeFactor(
+  meta: { length: number; width: number; height: number; dim_unit: string },
+  baseUnitKey: string
+): number {
   const sideUnit = getUnitDef('length', meta.dim_unit)
   const baseUnit = getUnitDef('volume', baseUnitKey)
   if (!sideUnit || !baseUnit || sideUnit.toSi === undefined || baseUnit.toSi === undefined) {
     throw new Error(`Bad units: side=${meta.dim_unit} base=${baseUnitKey}`)
   }
   // sides in m → volume in m³ (= 1000 L) → / base.toSi (which is liters per base unit)
-  const volumeInM3 = (meta.length * sideUnit.toSi) * (meta.width * sideUnit.toSi) * (meta.height * sideUnit.toSi)
+  const volumeInM3 = meta.length * sideUnit.toSi * (meta.width * sideUnit.toSi) * (meta.height * sideUnit.toSi)
   const volumeInL = volumeInM3 * 1000
   return volumeInL / baseUnit.toSi
 }

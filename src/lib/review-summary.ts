@@ -11,7 +11,7 @@ export async function getApprovedReviewSummary(productId: string): Promise<Revie
       `SELECT COUNT(rating)::int AS total, AVG(rating)::float8 AS average
        FROM product_reviews
        WHERE product_id = $1 AND is_approved = true`,
-      [productId],
+      [productId]
     )
     return toReviewSummary(row)
   } catch (err) {

@@ -63,7 +63,10 @@ export async function storeOTP(email: string, otp: string): Promise<void> {
   await redis.set(attemptsKey, '0', 'EX', OTP_EXPIRY)
 }
 
-export async function verifyOTP(email: string, otp: string): Promise<{
+export async function verifyOTP(
+  email: string,
+  otp: string
+): Promise<{
   valid: boolean
   message: string
 }> {
@@ -78,7 +81,7 @@ export async function verifyOTP(email: string, otp: string): Promise<{
     return { valid: false, message: 'No OTP found. Please request a new one.' }
   }
 
-  const attempts = parseInt(await redis.get(attemptsKey) || '0')
+  const attempts = parseInt((await redis.get(attemptsKey)) || '0')
   if (attempts >= MAX_ATTEMPTS) {
     await redis.del(otpKey)
     await redis.del(attemptsKey)
@@ -158,7 +161,10 @@ export async function storePhoneOTP(phone: string, otp: string): Promise<void> {
   await redis.set(`otp:attempts:${id}`, '0', 'EX', OTP_EXPIRY)
 }
 
-export async function verifyPhoneOTP(phone: string, otp: string): Promise<{
+export async function verifyPhoneOTP(
+  phone: string,
+  otp: string
+): Promise<{
   valid: boolean
   message: string
 }> {
@@ -171,7 +177,7 @@ export async function verifyPhoneOTP(phone: string, otp: string): Promise<{
     return { valid: false, message: 'No OTP found. Please request a new one.' }
   }
 
-  const attempts = parseInt(await redis.get(attemptsKey) || '0')
+  const attempts = parseInt((await redis.get(attemptsKey)) || '0')
   if (attempts >= MAX_ATTEMPTS) {
     await redis.del(otpKey)
     await redis.del(attemptsKey)

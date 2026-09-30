@@ -57,7 +57,13 @@ export interface LocationBatch {
   serials?: string[]
 }
 
-function buildDisplayCode(warehouseCode: string, aisle: string, rack: string, shelf: string, bin?: string | null): string {
+function buildDisplayCode(
+  warehouseCode: string,
+  aisle: string,
+  rack: string,
+  shelf: string,
+  bin?: string | null
+): string {
   const parts = [warehouseCode, aisle, rack, shelf]
   if (bin) parts.push(bin)
   return parts.join('-')
@@ -71,10 +77,9 @@ export async function listWarehouses(): Promise<Warehouse[]> {
 }
 
 export async function getWarehouse(id: string): Promise<Warehouse | null> {
-  return queryOne<Warehouse>(
-    `SELECT id, name, code, address, is_active, created_at FROM warehouses WHERE id = $1`,
-    [id]
-  )
+  return queryOne<Warehouse>(`SELECT id, name, code, address, is_active, created_at FROM warehouses WHERE id = $1`, [
+    id,
+  ])
 }
 
 export async function createWarehouse(name: string, code: string, address?: string | null): Promise<Warehouse> {
@@ -86,14 +91,29 @@ export async function createWarehouse(name: string, code: string, address?: stri
   return row
 }
 
-export async function updateWarehouse(id: string, fields: Partial<Pick<Warehouse, 'name' | 'code' | 'address' | 'is_active'>>): Promise<Warehouse> {
+export async function updateWarehouse(
+  id: string,
+  fields: Partial<Pick<Warehouse, 'name' | 'code' | 'address' | 'is_active'>>
+): Promise<Warehouse> {
   const sets: string[] = []
   const params: unknown[] = []
   let idx = 1
-  if (fields.name !== undefined) { sets.push(`name = $${idx++}`); params.push(fields.name) }
-  if (fields.code !== undefined) { sets.push(`code = $${idx++}`); params.push(fields.code.toUpperCase()) }
-  if (fields.address !== undefined) { sets.push(`address = $${idx++}`); params.push(fields.address) }
-  if (fields.is_active !== undefined) { sets.push(`is_active = $${idx++}`); params.push(fields.is_active) }
+  if (fields.name !== undefined) {
+    sets.push(`name = $${idx++}`)
+    params.push(fields.name)
+  }
+  if (fields.code !== undefined) {
+    sets.push(`code = $${idx++}`)
+    params.push(fields.code.toUpperCase())
+  }
+  if (fields.address !== undefined) {
+    sets.push(`address = $${idx++}`)
+    params.push(fields.address)
+  }
+  if (fields.is_active !== undefined) {
+    sets.push(`is_active = $${idx++}`)
+    params.push(fields.is_active)
+  }
   if (sets.length === 0) throw new Error('No fields to update')
   params.push(id)
   const row = await queryOne<Warehouse>(
@@ -132,10 +152,7 @@ export async function listLocations(warehouseId?: string): Promise<ShelfLocation
   )
 }
 
-export async function getOrCreateOpenShelf(
-  warehouseId: string,
-  warehouseCode: string
-): Promise<string> {
+export async function getOrCreateOpenShelf(warehouseId: string, warehouseCode: string): Promise<string> {
   const existing = await queryOne<{ id: string }>(
     `SELECT id FROM shelf_locations
      WHERE warehouse_id = $1 AND aisle_code = 'OPEN' AND rack_code = 'SHELF'
@@ -184,7 +201,10 @@ export async function createLocation(
   return row
 }
 
-export async function updateLocation(id: string, fields: Partial<Pick<ShelfLocation, 'aisle_code' | 'rack_code' | 'shelf_code' | 'bin_code' | 'notes' | 'is_active'>>): Promise<ShelfLocation> {
+export async function updateLocation(
+  id: string,
+  fields: Partial<Pick<ShelfLocation, 'aisle_code' | 'rack_code' | 'shelf_code' | 'bin_code' | 'notes' | 'is_active'>>
+): Promise<ShelfLocation> {
   const current = await getLocation(id)
   if (!current) throw new Error('Location not found')
 
@@ -198,13 +218,24 @@ export async function updateLocation(id: string, fields: Partial<Pick<ShelfLocat
   const bin = 'bin_code' in fields ? fields.bin_code : current.bin_code
   const newDisplayCode = buildDisplayCode(current.warehouse_code!, aisle.toUpperCase(), rack, shelf.toUpperCase(), bin)
 
-  sets.push(`aisle_code = $${idx++}`); params.push(aisle.toUpperCase())
-  sets.push(`rack_code = $${idx++}`); params.push(rack)
-  sets.push(`shelf_code = $${idx++}`); params.push(shelf.toUpperCase())
-  sets.push(`bin_code = $${idx++}`); params.push(bin ?? null)
-  sets.push(`display_code = $${idx++}`); params.push(newDisplayCode)
-  if (fields.notes !== undefined) { sets.push(`notes = $${idx++}`); params.push(fields.notes) }
-  if (fields.is_active !== undefined) { sets.push(`is_active = $${idx++}`); params.push(fields.is_active) }
+  sets.push(`aisle_code = $${idx++}`)
+  params.push(aisle.toUpperCase())
+  sets.push(`rack_code = $${idx++}`)
+  params.push(rack)
+  sets.push(`shelf_code = $${idx++}`)
+  params.push(shelf.toUpperCase())
+  sets.push(`bin_code = $${idx++}`)
+  params.push(bin ?? null)
+  sets.push(`display_code = $${idx++}`)
+  params.push(newDisplayCode)
+  if (fields.notes !== undefined) {
+    sets.push(`notes = $${idx++}`)
+    params.push(fields.notes)
+  }
+  if (fields.is_active !== undefined) {
+    sets.push(`is_active = $${idx++}`)
+    params.push(fields.is_active)
+  }
 
   params.push(id)
   const row = await queryOne<ShelfLocation>(
@@ -276,7 +307,20 @@ export async function getBatchesAtLocation(locationId: string): Promise<Location
   )
 }
 
-export async function getStockForProduct(productId: string, variantId?: string | null, subVariantId?: string | null): Promise<{ location_id: string; warehouse_id: string; location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }[]> {
+export async function getStockForProduct(
+  productId: string,
+  variantId?: string | null,
+  subVariantId?: string | null
+): Promise<
+  {
+    location_id: string
+    warehouse_id: string
+    location_display_code: string
+    quantity: number
+    variant_id: string | null
+    sub_variant_id: string | null
+  }[]
+> {
   return queryMany(
     `SELECT ss.location_id, sl.warehouse_id, sl.display_code AS location_display_code, ss.quantity, ss.variant_id, ss.sub_variant_id
      FROM shelf_stock ss
@@ -331,7 +375,10 @@ export async function syncCentralInventory(
       [productId]
     )
   } else if (variantId) {
-    await client.query(`UPDATE product_variants SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, variantId])
+    await client.query(`UPDATE product_variants SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [
+      total,
+      variantId,
+    ])
     // Roll the product up from its active variants (this variant has no sub-variants
     // at this grain, but the product total must still reflect all variants).
     await client.query(
@@ -342,7 +389,10 @@ export async function syncCentralInventory(
       [productId]
     )
   } else {
-    await client.query(`UPDATE products SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, productId])
+    await client.query(`UPDATE products SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [
+      total,
+      productId,
+    ])
   }
 
   // When the product's inventory_sync flag is ON, derive stock_status from the
@@ -363,7 +413,7 @@ export async function syncPerishableStock(
   subVariantId: string | null
 ): Promise<void> {
   const ownClient = !clientIn
-  const client = clientIn ?? await getClient()
+  const client = clientIn ?? (await getClient())
   try {
     if (ownClient) await client.query('BEGIN')
 
@@ -391,7 +441,9 @@ export async function syncPerishableStock(
       [productId, variantId, subVariantId]
     )
     const existing = existingRes as { rows: Array<{ id: string; location_id: string }> }
-    const existingMap = new Map<string | null, string>(existing.rows.map((r: { id: string; location_id: string }) => [r.location_id, r.id]))
+    const existingMap = new Map<string | null, string>(
+      existing.rows.map((r: { id: string; location_id: string }) => [r.location_id, r.id])
+    )
 
     for (const row of batchTotals.rows) {
       const qty = parseFloat(row.total) || 0
@@ -402,7 +454,10 @@ export async function syncPerishableStock(
         if (qty === 0) {
           await client.query('DELETE FROM shelf_stock WHERE id = $1', [existingMap.get(locId)])
         } else {
-          await client.query('UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2', [qty, existingMap.get(locId)])
+          await client.query('UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2', [
+            qty,
+            existingMap.get(locId),
+          ])
         }
         existingMap.delete(locId)
       } else if (qty > 0) {
@@ -424,7 +479,11 @@ export async function syncPerishableStock(
 
     if (ownClient) await client.query('COMMIT')
   } catch (err) {
-    if (ownClient) { try { await client.query('ROLLBACK') } catch (_) {} }
+    if (ownClient) {
+      try {
+        await client.query('ROLLBACK')
+      } catch (_) {}
+    }
     throw err
   } finally {
     if (ownClient) client.release()
@@ -462,10 +521,10 @@ export async function adjustStock(
       if (newQty === 0) {
         await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [existing.rows[0].id])
       } else {
-        await client.query(
-          `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-          [newQty, existing.rows[0].id]
-        )
+        await client.query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`, [
+          newQty,
+          existing.rows[0].id,
+        ])
       }
     } else {
       newQty = Math.max(0, quantityChange)
@@ -488,7 +547,18 @@ export async function adjustStock(
     await client.query('COMMIT')
 
     if (newQty === 0) {
-      return { id: stockId, location_id: locationId, product_id: productId, variant_id: variantId, sub_variant_id: subVariantId, quantity: 0, updated_at: new Date().toISOString(), product_name: '', variant_name: null, sku: '' } as ShelfStock
+      return {
+        id: stockId,
+        location_id: locationId,
+        product_id: productId,
+        variant_id: variantId,
+        sub_variant_id: subVariantId,
+        quantity: 0,
+        updated_at: new Date().toISOString(),
+        product_name: '',
+        variant_name: null,
+        sku: '',
+      } as ShelfStock
     }
     const row = await queryOne<ShelfStock>(`SELECT * FROM shelf_stock WHERE id = $1`, [stockId])
     return row!
@@ -518,9 +588,9 @@ export async function moveStock(
     await client.query('BEGIN')
 
     // Check if product is perishable
-    const perishRow = await client.query<{ perishable: boolean }>(
-      'SELECT perishable FROM products WHERE id = $1', [productId]
-    )
+    const perishRow = await client.query<{ perishable: boolean }>('SELECT perishable FROM products WHERE id = $1', [
+      productId,
+    ])
     const isPerishable = perishRow.rows[0]?.perishable ?? false
 
     if (isPerishable) {
@@ -547,10 +617,10 @@ export async function moveStock(
 
         if (take === avail) {
           // Move entire batch to destination
-          await client.query(
-            'UPDATE product_batches SET location_id = $1, updated_at = now() WHERE id = $2',
-            [toLocationId, batch.id]
-          )
+          await client.query('UPDATE product_batches SET location_id = $1, updated_at = now() WHERE id = $2', [
+            toLocationId,
+            batch.id,
+          ])
         } else {
           // Split: reduce source batch, insert new batch at destination
           await client.query(
@@ -593,10 +663,10 @@ export async function moveStock(
       if (newFromQty === 0) {
         await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [fromRow.rows[0].id])
       } else {
-        await client.query(
-          `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-          [newFromQty, fromRow.rows[0].id]
-        )
+        await client.query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`, [
+          newFromQty,
+          fromRow.rows[0].id,
+        ])
       }
       await client.query(
         `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
@@ -614,10 +684,10 @@ export async function moveStock(
       let newToQty: number
       if (toRow.rows.length > 0) {
         newToQty = toRow.rows[0].quantity + qty
-        await client.query(
-          `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-          [newToQty, toRow.rows[0].id]
-        )
+        await client.query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`, [
+          newToQty,
+          toRow.rows[0].id,
+        ])
       } else {
         newToQty = qty
         await client.query(
@@ -667,7 +737,11 @@ export async function decrementNonPerishableShelfStock(
   } else {
     const { getClient } = await import('@/lib/db')
     const c = await getClient()
-    try { await run(c) } finally { c.release() }
+    try {
+      await run(c)
+    } finally {
+      c.release()
+    }
   }
 }
 
@@ -711,10 +785,10 @@ export async function upsertShelfStock(
     if (next <= 0) {
       await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [existing.rows[0].id])
     } else {
-      await client.query(
-        `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-        [next, existing.rows[0].id]
-      )
+      await client.query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`, [
+        next,
+        existing.rows[0].id,
+      ])
     }
   } else if (quantity > 0) {
     await client.query(

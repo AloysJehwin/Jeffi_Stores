@@ -18,10 +18,9 @@ export async function issueAdminSession(
   admin: AdminSessionAdmin,
   certCN?: string,
   extraBody?: Record<string, unknown>,
-  signals?: SessionSignals,
+  signals?: SessionSignals
 ) {
-  const displayName =
-    `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
+  const displayName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
   // Opaque server-side session: the cookie value is the session id (a uuid), NOT a JWT.
   // role/scopes/cert_cn are snapshotted onto the row for the Node middleware's gate.
   // Device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip network, fp

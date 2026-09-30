@@ -4,9 +4,7 @@
  */
 
 export function getGoogleProductCategory(product: any): string {
-  return product.categories?.google_product_category
-    || product.categories?.parent_google_product_category
-    || ''
+  return product.categories?.google_product_category || product.categories?.parent_google_product_category || ''
 }
 
 export function buildProductType(product: any): string {
@@ -34,7 +32,8 @@ export function buildProductDetails(product: any): Array<{ section: string; attr
   if (product.weight) details.push({ section: 'Specifications', attribute: 'Weight', value: `${product.weight} kg` })
   if (product.material) details.push({ section: 'Specifications', attribute: 'Material', value: product.material })
   if (product.finish) details.push({ section: 'Specifications', attribute: 'Finish', value: product.finish })
-  if (product.dimensions) details.push({ section: 'Specifications', attribute: 'Dimensions', value: product.dimensions })
+  if (product.dimensions)
+    details.push({ section: 'Specifications', attribute: 'Dimensions', value: product.dimensions })
   if (product.size) details.push({ section: 'Specifications', attribute: 'Size', value: product.size })
   if (product.hsn_code) details.push({ section: 'Tax', attribute: 'HSN Code', value: product.hsn_code })
   return details

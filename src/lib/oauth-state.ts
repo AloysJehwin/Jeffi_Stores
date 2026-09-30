@@ -49,9 +49,10 @@ export function verifyAdminState(state: string): AdminOAuthState | null {
 export function returnToAdmin(url: string): NextResponse {
   const attr = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const js = JSON.stringify(url).replace(/</g, '\\u003c')
-  const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">'
-    + `<meta http-equiv="refresh" content="0;url=${attr}"><title>Returning to admin</title></head>`
-    + `<body><script>location.replace(${js})</script><a href="${attr}">Continue to admin</a></body></html>`
+  const html =
+    '<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">' +
+    `<meta http-equiv="refresh" content="0;url=${attr}"><title>Returning to admin</title></head>` +
+    `<body><script>location.replace(${js})</script><a href="${attr}">Continue to admin</a></body></html>`
   return new NextResponse(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
   })

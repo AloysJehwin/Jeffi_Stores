@@ -13,13 +13,13 @@ export async function deleteProductCascadeTx(client: PoolClient, productId: stri
     `DELETE FROM grn_items
      WHERE product_id = $1
         OR variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`,
-    [productId],
+    [productId]
   )
   await client.query(
     `DELETE FROM purchase_order_items
      WHERE product_id = $1
         OR variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`,
-    [productId],
+    [productId]
   )
   await client.query(`DELETE FROM shelf_stock_transactions WHERE product_id = $1`, [productId])
   await client.query(`DELETE FROM shelf_stock WHERE product_id = $1`, [productId])
@@ -35,7 +35,7 @@ export async function productHasHistory(productId: string): Promise<boolean> {
     `SELECT
        (SELECT count(*) FROM order_items WHERE product_id = $1)
        + (SELECT count(*) FROM purchase_order_items WHERE product_id = $1) AS n`,
-    [productId],
+    [productId]
   )
   return Number(res.rows[0]?.n ?? 0) > 0
 }
@@ -47,6 +47,6 @@ export async function retireProduct(productId: string): Promise<'deactivated' | 
     await query(`UPDATE products SET is_active = false, updated_at = now() WHERE id = $1`, [productId])
     return 'deactivated'
   }
-  await withTransaction((client) => deleteProductCascadeTx(client, productId))
+  await withTransaction(client => deleteProductCascadeTx(client, productId))
   return 'deleted'
 }

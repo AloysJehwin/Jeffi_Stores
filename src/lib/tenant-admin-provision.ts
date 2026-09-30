@@ -13,9 +13,10 @@ const CONNECT_ATTEMPTS = 4
  * `done`, so the first connect times out. These are transient — worth retrying — unlike a SQL
  * or logic error, which will fail identically every attempt. */
 function isTransientConnError(msg: string): boolean {
-  return /Connection terminated|connection timeout|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ENETUNREACH|the database system is starting up|too many clients|Connection terminated unexpectedly/i.test(msg)
+  return /Connection terminated|connection timeout|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ENETUNREACH|the database system is starting up|too many clients|Connection terminated unexpectedly/i.test(
+    msg
+  )
 }
-
 
 /**
  * Provision the store owner as a super_admin in the tenant's own DB.
@@ -52,7 +53,9 @@ export async function provisionTenantOwnerAdmin(opts: {
       const { getTenantPlan } = await import('./plan-gate')
       const { scopes } = await getTenantPlan(opts.tenantId)
       if (scopes.size > 0) grantedScopes = TENANT_SCOPE_KEYS.filter(k => scopes.has(k))
-    } catch { /* keep the full tenant set */ }
+    } catch {
+      /* keep the full tenant set */
+    }
 
     let lastConnErr: any
     for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
@@ -64,11 +67,10 @@ export async function provisionTenantOwnerAdmin(opts: {
         if (attempt === CONNECT_ATTEMPTS || !isTransientConnError(msg)) throw err
         lastConnErr = err
         const backoff = 2000 * 2 ** (attempt - 1)
-        await new Promise((r) => setTimeout(r, backoff + Math.floor(Math.random() * 500)))
+        await new Promise(r => setTimeout(r, backoff + Math.floor(Math.random() * 500)))
       }
     }
     throw lastConnErr
-
   } catch (err: any) {
     process.stderr.write(`[provisionTenantOwnerAdmin] ${opts.tenantSlug}: ${err?.message}\n`)
     return { success: false, error: err?.message }
@@ -76,9 +78,15 @@ export async function provisionTenantOwnerAdmin(opts: {
 }
 
 async function createOwnerAdmin(
-  opts: { tenantId: string; tenantSlug: string; ownerEmail: string; ownerName: string | null; storeName?: string | null },
+  opts: {
+    tenantId: string
+    tenantSlug: string
+    ownerEmail: string
+    ownerName: string | null
+    storeName?: string | null
+  },
   grantedScopes: string[],
-  storeName: string,
+  storeName: string
 ): Promise<void> {
   // Idempotency: skip only when the owner super_admin ALREADY HAS an issued client
   // certificate. Checking for the super_admin row alone is wrong on re-provision —
@@ -177,7 +185,7 @@ async function createOwnerAdmin(
     cert.serial,
     cert.expiresAt.toISOString(),
     'super_admin',
-    { slug: opts.tenantSlug, storeName },
+    { slug: opts.tenantSlug, storeName }
   )
 }
 
@@ -190,7 +198,8 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
-     WHERE t.id = $1`, [tenantId]
+     WHERE t.id = $1`,
+    [tenantId]
   )
   const r = res.rows[0]
   if (!r?.rds_endpoint) return null

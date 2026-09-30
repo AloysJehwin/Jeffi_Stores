@@ -16,7 +16,7 @@ export const AI_ACTION_SCOPES = [
   'settings:write',
 ] as const
 
-export type AiActionScope = typeof AI_ACTION_SCOPES[number]
+export type AiActionScope = (typeof AI_ACTION_SCOPES)[number]
 
 /** Returns the scope to check, or null when the requested one is not an allowed AI scope. */
 export function resolveAiScope(requested: unknown, fallback: AiActionScope = 'products:write'): AiActionScope | null {
@@ -51,6 +51,10 @@ export function parseAiJson<T = Record<string, unknown>>(raw: string): T | null 
   } catch {
     const m = raw.match(/\{[\s\S]*\}/)
     if (!m) return null
-    try { return JSON.parse(m[0]) as T } catch { return null }
+    try {
+      return JSON.parse(m[0]) as T
+    } catch {
+      return null
+    }
   }
 }

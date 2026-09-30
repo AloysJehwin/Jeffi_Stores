@@ -48,9 +48,10 @@ interface AuditParams {
 
 export async function logAdminAudit(params: AuditParams): Promise<void> {
   try {
-    const ip = params.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || params.request?.headers.get('x-real-ip')
-      || null
+    const ip =
+      params.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      params.request?.headers.get('x-real-ip') ||
+      null
     const ua = params.request?.headers.get('user-agent') || null
     await query(
       `INSERT INTO admin_audit_log
@@ -70,15 +71,25 @@ export async function logAdminAudit(params: AuditParams): Promise<void> {
     )
   } catch (err: any) {
     try {
-      await query(
-        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
-        ['logAdminAudit', JSON.stringify({ action: params.action, entityType: params.entityType, entityId: params.entityId, msg: err?.message, code: err?.code })]
-      )
+      await query(`INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`, [
+        'logAdminAudit',
+        JSON.stringify({
+          action: params.action,
+          entityType: params.entityType,
+          entityId: params.entityId,
+          msg: err?.message,
+          code: err?.code,
+        }),
+      ])
     } catch {}
   }
 }
 
-export function diffOf<T extends Record<string, any>>(before: T | null, after: T | null, fields: (keyof T)[]): Record<string, { from: unknown; to: unknown }> {
+export function diffOf<T extends Record<string, any>>(
+  before: T | null,
+  after: T | null,
+  fields: (keyof T)[]
+): Record<string, { from: unknown; to: unknown }> {
   const out: Record<string, { from: unknown; to: unknown }> = {}
   if (!before || !after) return out
   for (const f of fields) {

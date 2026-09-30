@@ -18,8 +18,8 @@ export async function storefrontAiGate(): Promise<NextResponse | null> {
   const gate = await currentTenantPlanGate(AI_STOREFRONT_SCOPE)
   if (gate.allowed) return null
   return NextResponse.json(
-    { error: 'AI is not included in this store\'s plan', upgradeRequired: gate.upgradeRequired },
-    { status: 403 },
+    { error: "AI is not included in this store's plan", upgradeRequired: gate.upgradeRequired },
+    { status: 403 }
   )
 }
 

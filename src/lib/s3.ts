@@ -1,4 +1,11 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  CopyObjectCommand,
+  HeadObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 import { encode as encodeBlurhash } from 'blurhash'
 import { getCurrentTenant } from './tenant-context'
@@ -24,7 +31,9 @@ async function resolveBucket(): Promise<string> {
       const ctx = await lookupTenantContextBySlug(slug)
       if (ctx?.infra?.s3Bucket) return ctx.infra.s3Bucket
     }
-  } catch { /* outside a request scope (jobs) — platform bucket is correct */ }
+  } catch {
+    /* outside a request scope (jobs) — platform bucket is correct */
+  }
   return DEFAULT_BUCKET
 }
 
@@ -108,11 +117,24 @@ export async function uploadProductImage(file: File, productId: string): Promise
   const buffer = Buffer.from(await file.arrayBuffer())
   const metadata = await sharp(buffer).rotate().metadata()
   const { imageKey: s3Key, thumbnailKey: s3ThumbnailKey } = generateProductImageKeys(productId, file.name)
-  const thumbnailBuffer = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
+  const thumbnailBuffer = await sharp(buffer)
+    .rotate()
+    .resize(300, 300, { fit: 'cover' })
+    .jpeg({ quality: 80 })
+    .toBuffer()
   const blurhash = await computeBlurhash(buffer)
 
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: file.type }))
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
+  await s3Client.send(
+    new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: file.type })
+  )
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+      Body: thumbnailBuffer,
+      ContentType: 'image/jpeg',
+    })
+  )
 
   return {
     url: await getS3Url(s3Key),
@@ -129,17 +151,23 @@ export async function uploadProductImage(file: File, productId: string): Promise
   }
 }
 
-export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string, financialYear: string): Promise<string> {
+export async function uploadInvoicePDF(
+  pdfBuffer: Buffer,
+  invoiceNumber: string,
+  financialYear: string
+): Promise<string> {
   const BUCKET_NAME = await resolveBucket()
   const safeFileName = invoiceNumber.replace(/\//g, '-')
   const s3Key = `invoices/${financialYear}/${safeFileName}.pdf`
-  await s3Client.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: `${KEY_PREFIX}${s3Key}`,
-    Body: pdfBuffer,
-    ContentType: 'application/pdf',
-    ContentDisposition: `inline; filename="${safeFileName}.pdf"`,
-  }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: pdfBuffer,
+      ContentType: 'application/pdf',
+      ContentDisposition: `inline; filename="${safeFileName}.pdf"`,
+    })
+  )
   return await getS3Url(s3Key)
 }
 
@@ -151,7 +179,20 @@ export async function deleteProductImage(s3Key: string, s3ThumbnailKey: string) 
 
 export async function saveProductImages(
   productId: string,
-  images: { url: string; thumbnailUrl: string; s3Key: string; s3ThumbnailKey: string; fileName: string; fileSize: number; mimeType: string; width: number; height: number; blurhash?: string | null; altText?: string; isPrimary?: boolean }[]
+  images: {
+    url: string
+    thumbnailUrl: string
+    s3Key: string
+    s3ThumbnailKey: string
+    fileName: string
+    fileSize: number
+    mimeType: string
+    width: number
+    height: number
+    blurhash?: string | null
+    altText?: string
+    isPrimary?: boolean
+  }[]
 ) {
   const BUCKET_NAME = await resolveBucket()
   const { query } = await import('./db')
@@ -160,7 +201,23 @@ export async function saveProductImages(
     await query(
       `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key, file_name, file_size, mime_type, width, height, blurhash, alt_text, display_order, is_primary)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
-      [productId, image.url, image.thumbnailUrl, BUCKET_NAME, image.s3Key, image.s3ThumbnailKey, image.fileName, image.fileSize, image.mimeType, image.width, image.height, image.blurhash ?? null, image.altText || '', i, image.isPrimary || i === 0]
+      [
+        productId,
+        image.url,
+        image.thumbnailUrl,
+        BUCKET_NAME,
+        image.s3Key,
+        image.s3ThumbnailKey,
+        image.fileName,
+        image.fileSize,
+        image.mimeType,
+        image.width,
+        image.height,
+        image.blurhash ?? null,
+        image.altText || '',
+        i,
+        image.isPrimary || i === 0,
+      ]
     )
   }
 }
@@ -186,11 +243,29 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
 
   const metadata = await sharp(imageBuffer).rotate().metadata()
   const pngBuffer = await sharp(imageBuffer).rotate().png({ compressionLevel: 8 }).toBuffer()
-  const thumbnailBuffer = await sharp(imageBuffer).rotate().resize(300, 300, { fit: 'cover' }).png({ compressionLevel: 8 }).toBuffer()
+  const thumbnailBuffer = await sharp(imageBuffer)
+    .rotate()
+    .resize(300, 300, { fit: 'cover' })
+    .png({ compressionLevel: 8 })
+    .toBuffer()
   const blurhash = await computeBlurhash(imageBuffer)
 
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: pngBuffer, ContentType: 'image/png' }))
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/png' }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: pngBuffer,
+      ContentType: 'image/png',
+    })
+  )
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+      Body: thumbnailBuffer,
+      ContentType: 'image/png',
+    })
+  )
 
   return {
     url: await getS3Url(s3Key),
@@ -212,9 +287,15 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
 async function resolveSourceKey(canonicalKey: string): Promise<string | null> {
   const BUCKET_NAME = await resolveBucket()
   const prefixed = `${KEY_PREFIX}${canonicalKey}`
-  try { await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: prefixed })); return prefixed } catch {}
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: prefixed }))
+    return prefixed
+  } catch {}
   if (KEY_PREFIX) {
-    try { await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: canonicalKey })); return canonicalKey } catch {}
+    try {
+      await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: canonicalKey }))
+      return canonicalKey
+    } catch {}
   }
   return null
 }
@@ -222,7 +303,7 @@ async function resolveSourceKey(canonicalKey: string): Promise<string | null> {
 export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
-  productId: string,
+  productId: string
 ): Promise<{ s3Bucket: string; s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
   const BUCKET_NAME = await resolveBucket()
   const fileName = galleryS3Key.replace(/^gallery\//, '')
@@ -237,27 +318,45 @@ export async function copyGalleryImageToProduct(
   // the throw (skip that image / surface an error) rather than store a bad path.
   const srcKey = await resolveSourceKey(galleryS3Key)
   if (!srcKey) {
-    throw new Error(`Gallery source image not found on S3: ${galleryS3Key} (checked ${KEY_PREFIX}${galleryS3Key} and bare). Cannot copy to product ${productId}.`)
+    throw new Error(
+      `Gallery source image not found on S3: ${galleryS3Key} (checked ${KEY_PREFIX}${galleryS3Key} and bare). Cannot copy to product ${productId}.`
+    )
   }
 
-  await s3Client.send(new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${srcKey}`,
-    Key: `${KEY_PREFIX}${s3Key}`,
-  }))
+  await s3Client.send(
+    new CopyObjectCommand({
+      Bucket: BUCKET_NAME,
+      CopySource: `${BUCKET_NAME}/${srcKey}`,
+      Key: `${KEY_PREFIX}${s3Key}`,
+    })
+  )
 
   // Thumbnail is best-effort: if the gallery thumb is missing, reuse the full image
   // as the product thumbnail (still a product-owned key, never a gallery key).
   const srcThumbKey = await resolveSourceKey(galleryS3ThumbnailKey)
   if (srcThumbKey) {
-    await s3Client.send(new CopyObjectCommand({
-      Bucket: BUCKET_NAME,
-      CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
-      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
-    }))
-    return { s3Bucket: BUCKET_NAME, s3Key, s3ThumbnailKey, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
+    await s3Client.send(
+      new CopyObjectCommand({
+        Bucket: BUCKET_NAME,
+        CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
+        Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+      })
+    )
+    return {
+      s3Bucket: BUCKET_NAME,
+      s3Key,
+      s3ThumbnailKey,
+      url: await getS3Url(s3Key),
+      thumbnailUrl: await getS3Url(s3ThumbnailKey),
+    }
   }
-  return { s3Bucket: BUCKET_NAME, s3Key, s3ThumbnailKey: s3Key, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3Key) }
+  return {
+    s3Bucket: BUCKET_NAME,
+    s3Key,
+    s3ThumbnailKey: s3Key,
+    url: await getS3Url(s3Key),
+    thumbnailUrl: await getS3Url(s3Key),
+  }
 }
 
 export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {
@@ -274,10 +373,23 @@ export async function uploadVariantImage(file: File, variantId: string): Promise
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
   const s3Key = `products/variants/${variantId}/${timestamp}-${sanitizedName}`
   const s3ThumbnailKey = `products/variants/${variantId}/thumbnails/${timestamp}-${sanitizedName}`
-  const thumbnailBuffer = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
+  const thumbnailBuffer = await sharp(buffer)
+    .rotate()
+    .resize(300, 300, { fit: 'cover' })
+    .jpeg({ quality: 80 })
+    .toBuffer()
   const blurhash = await computeBlurhash(buffer)
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: file.type }))
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
+  await s3Client.send(
+    new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: file.type })
+  )
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+      Body: thumbnailBuffer,
+      ContentType: 'image/jpeg',
+    })
+  )
   return {
     url: await getS3Url(s3Key),
     thumbnailUrl: await getS3Url(s3ThumbnailKey),
@@ -306,10 +418,28 @@ export async function uploadReviewImage(file: File, reviewId: string): Promise<{
   const s3Key = `reviews/${reviewId}/${timestamp}-${sanitizedName}`
   const s3ThumbnailKey = `reviews/${reviewId}/thumbnails/${timestamp}-${sanitizedName}`
   const buffer = Buffer.from(await file.arrayBuffer())
-  const resized = await sharp(buffer).rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+  const resized = await sharp(buffer)
+    .rotate()
+    .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer()
   const thumbnail = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: resized, ContentType: 'image/jpeg' }))
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnail, ContentType: 'image/jpeg' }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: resized,
+      ContentType: 'image/jpeg',
+    })
+  )
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+      Body: thumbnail,
+      ContentType: 'image/jpeg',
+    })
+  )
   return { url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
 }
 
@@ -317,12 +447,14 @@ export async function uploadAvatarImage(buffer: Buffer, userId: string): Promise
   const BUCKET_NAME = await resolveBucket()
   const s3Key = `avatars/${userId}.jpg`
   const resized = await sharp(buffer).rotate().resize(256, 256, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer()
-  await s3Client.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: `${KEY_PREFIX}${s3Key}`,
-    Body: resized,
-    ContentType: 'image/jpeg',
-  }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: resized,
+      ContentType: 'image/jpeg',
+    })
+  )
   return { url: await getS3Url(s3Key), s3Key }
 }
 
@@ -337,20 +469,26 @@ export async function uploadStoreLogo(buffer: Buffer): Promise<{ url: string; s3
     .resize(600, 200, { fit: 'inside', withoutEnlargement: true })
     .png({ quality: 90 })
     .toBuffer()
-  await s3Client.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: `${KEY_PREFIX}${s3Key}`,
-    Body: resized,
-    ContentType: 'image/png',
-    CacheControl: 'public, max-age=60',
-  }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: resized,
+      ContentType: 'image/png',
+      CacheControl: 'public, max-age=60',
+    })
+  )
   return { url: `${await getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
 }
 
 // Per-owner branding asset (logo/seal) captured during onboarding — distinct from the global
 // platform store-logo above. Publicly readable (storefront + legal-doc + social use). Key is
 // owner-scoped so each tenant owner has their own.
-export async function uploadBrandingImage(buffer: Buffer, ownerId: string, kind: 'logo' | 'seal'): Promise<{ url: string; s3Key: string }> {
+export async function uploadBrandingImage(
+  buffer: Buffer,
+  ownerId: string,
+  kind: 'logo' | 'seal'
+): Promise<{ url: string; s3Key: string }> {
   const BUCKET_NAME = await resolveBucket()
   const s3Key = `branding/${ownerId}/${kind}.png`
   const resized = await sharp(buffer)
@@ -358,16 +496,17 @@ export async function uploadBrandingImage(buffer: Buffer, ownerId: string, kind:
     .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
     .png({ quality: 90 })
     .toBuffer()
-  await s3Client.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME,
-    Key: `${KEY_PREFIX}${s3Key}`,
-    Body: resized,
-    ContentType: 'image/png',
-    CacheControl: 'public, max-age=60',
-  }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${s3Key}`,
+      Body: resized,
+      ContentType: 'image/png',
+      CacheControl: 'public, max-age=60',
+    })
+  )
   return { url: `${await getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
 }
-
 
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
   const BUCKET_NAME = await resolveBucket()
@@ -400,10 +539,14 @@ export async function uploadImportFile(buffer: Buffer, fileName: string): Promis
   const BUCKET_NAME = await resolveBucket()
   const safe = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
   const key = `imports/${Date.now()}-${safe}`
-  await s3Client.send(new PutObjectCommand({
-    Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${key}`, Body: buffer,
-    ContentType: 'application/octet-stream',
-  }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${key}`,
+      Body: buffer,
+      ContentType: 'application/octet-stream',
+    })
+  )
   return key
 }
 
@@ -417,7 +560,14 @@ export async function getImportFile(key: string): Promise<Buffer> {
 /** Raw object put for non-product assets (customer note photos / voice memos). Returns the canonical key. */
 export async function putObjectBuffer(canonicalKey: string, body: Buffer, contentType: string): Promise<string> {
   const BUCKET_NAME = await resolveBucket()
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${canonicalKey}`, Body: body, ContentType: contentType }))
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: `${KEY_PREFIX}${canonicalKey}`,
+      Body: body,
+      ContentType: contentType,
+    })
+  )
   return canonicalKey
 }
 

@@ -21,12 +21,7 @@ function readCookie(name: string): string | null {
 function writeCookie(name: string, value: string): void {
   const secure = location.protocol === 'https:'
   const isProdHost = location.hostname.endsWith('jeffistores.in')
-  const parts = [
-    `${name}=${encodeURIComponent(value)}`,
-    'path=/',
-    `max-age=${MAX_AGE_S}`,
-    'samesite=strict',
-  ]
+  const parts = [`${name}=${encodeURIComponent(value)}`, 'path=/', `max-age=${MAX_AGE_S}`, 'samesite=strict']
   if (secure) parts.push('secure')
   if (isProdHost) parts.push('domain=.jeffistores.in')
   document.cookie = parts.join('; ')
@@ -79,7 +74,7 @@ async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input)
   const digest = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
+    .map(b => b.toString(16).padStart(2, '0'))
     .join('')
 }
 

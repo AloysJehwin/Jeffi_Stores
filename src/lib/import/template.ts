@@ -1,7 +1,13 @@
 import ExcelJS from 'exceljs'
 import {
-  ALL_COLUMNS, columnByHeader, columnsForSheet, keyColumnsFor, sheetFor,
-  SHEET_ORDER, type ImportColumn, type SheetName,
+  ALL_COLUMNS,
+  columnByHeader,
+  columnsForSheet,
+  keyColumnsFor,
+  sheetFor,
+  SHEET_ORDER,
+  type ImportColumn,
+  type SheetName,
 } from './columns'
 import { ENUMS } from './enums'
 
@@ -18,17 +24,17 @@ import { ENUMS } from './enums'
 
 const DATA_ROWS = 500
 const REQUIRED_FILL = 'FFF4B183' // stronger orange — required headers
-const KEY_FILL = 'FFA6A6A6'      // mid grey — link/key columns
+const KEY_FILL = 'FFA6A6A6' // mid grey — link/key columns
 
 // Header-band fill per sheet — saturated, clearly distinct hues so sheets read apart at a glance.
 const SHEET_FILL: Record<SheetName, string> = {
-  'Products': 'FF2E75B6',              // blue
-  'Variants': 'FF548235',              // green
-  'Sub-variants': 'FFBF8F00',          // amber
-  'Product · Shipping': 'FF9DC3E6',    // light blue
-  'Product · Compliance': 'FFA9D08E',  // light green
+  Products: 'FF2E75B6', // blue
+  Variants: 'FF548235', // green
+  'Sub-variants': 'FFBF8F00', // amber
+  'Product · Shipping': 'FF9DC3E6', // light blue
+  'Product · Compliance': 'FFA9D08E', // light green
   'Product · SEO & Audience': 'FFF4B183', // peach
-  'Product · Digital': 'FFB4A7D6',     // violet
+  'Product · Digital': 'FFB4A7D6', // violet
 }
 // The tab colour (the coloured strip on the sheet tab), same family as the header band.
 const TAB_COLOR: Record<SheetName, string> = SHEET_FILL
@@ -43,17 +49,31 @@ function dropdownValues(col: ImportColumn): string[] | null {
 
 function colRef(n: number): string {
   let s = ''
-  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26) }
+  while (n > 0) {
+    const m = (n - 1) % 26
+    s = String.fromCharCode(65 + m) + s
+    n = Math.floor((n - 1) / 26)
+  }
   return s
 }
 
 // A column entry for a rendered sheet: either a catalog column or a synthetic key column.
-interface SheetCol { header: string; help: string; required: boolean; col?: ImportColumn; isKey: boolean }
+interface SheetCol {
+  header: string
+  help: string
+  required: boolean
+  col?: ImportColumn
+  isKey: boolean
+}
 
 function sheetColumns(sheet: SheetName): SheetCol[] {
   const keys = keyColumnsFor(sheet).map(k => ({ header: k.header, help: k.help, required: true, isKey: true }))
   const cols = columnsForSheet(sheet).map(c => ({
-    header: c.header, help: c.help || '', required: !!c.required, col: c, isKey: false,
+    header: c.header,
+    help: c.help || '',
+    required: !!c.required,
+    col: c,
+    isKey: false,
   }))
   return [...keys, ...cols]
 }
@@ -89,19 +109,27 @@ function buildGuideSheet(wb: ExcelJS.Workbook): void {
   ]
   const head = ws.getRow(1)
   head.font = { bold: true }
-  head.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } } })
+  head.eachCell(c => {
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } }
+  })
 
   // Intro block above the field rows.
   ws.insertRow(1, ['How to use this workbook'])
   ws.getRow(1).font = { bold: true, size: 13 }
-  ws.insertRow(2, ['Fill the Products sheet first (sku is the key). Then Variants (link each to a product by parent_sku), then Sub-variants (parent_sku + variant_sku). Attribute sheets extend a product by its sku. Removing a product row and re-syncing DELETES that product from the store (sheet-sourced products only).'])
+  ws.insertRow(2, [
+    'Fill the Products sheet first (sku is the key). Then Variants (link each to a product by parent_sku), then Sub-variants (parent_sku + variant_sku). Attribute sheets extend a product by its sku. Removing a product row and re-syncing DELETES that product from the store (sheet-sourced products only).',
+  ])
   ws.getRow(2).font = { italic: true, color: { argb: 'FF666666' } }
   ws.getRow(2).height = 28
   ws.insertRow(3, [])
 
   for (const sheet of SHEET_ORDER) {
     for (const sc of sheetColumns(sheet)) {
-      const accepted = sc.col ? (dropdownValues(sc.col)?.join(', ') || '') : (sc.isKey ? 'must match a SKU on the linked sheet' : '')
+      const accepted = sc.col
+        ? dropdownValues(sc.col)?.join(', ') || ''
+        : sc.isKey
+          ? 'must match a SKU on the linked sheet'
+          : ''
       const row = ws.addRow({
         sheet,
         field: sc.header,
@@ -125,7 +153,8 @@ function buildDataSheet(wb: ExcelJS.Workbook, sheet: SheetName): void {
   const cols = sheetColumns(sheet)
 
   ws.columns = cols.map(sc => ({
-    header: sc.header, key: sc.header,
+    header: sc.header,
+    key: sc.header,
     width: Math.min(Math.max(sc.header.length + 2, 12), 40),
   }))
 
@@ -137,7 +166,7 @@ function buildDataSheet(wb: ExcelJS.Workbook, sheet: SheetName): void {
     hc.value = sc.header
     // Required + key columns keep their own emphatic fills; the rest carry the sheet's band colour.
     const fill = sc.required ? REQUIRED_FILL : sc.isKey ? KEY_FILL : SHEET_FILL[sheet]
-    hc.font = { bold: true, color: { argb: (sc.required || sc.isKey) ? 'FF1F1F1F' : headerText } }
+    hc.font = { bold: true, color: { argb: sc.required || sc.isKey ? 'FF1F1F1F' : headerText } }
     hc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }
     hc.border = { bottom: { style: 'thin', color: { argb: 'FF999999' } } }
     const help = helpRow.getCell(i + 1)
@@ -148,7 +177,12 @@ function buildDataSheet(wb: ExcelJS.Workbook, sheet: SheetName): void {
   helpRow.commit()
 
   for (const row of exampleFor(sheet)) {
-    ws.addRow(cols.reduce<Record<string, string>>((acc, sc) => { acc[sc.header] = row[sc.header] ?? ''; return acc }, {}))
+    ws.addRow(
+      cols.reduce<Record<string, string>>((acc, sc) => {
+        acc[sc.header] = row[sc.header] ?? ''
+        return acc
+      }, {})
+    )
   }
 
   // Data validation: enum/bool list dropdowns, and cross-sheet SKU dropdowns for key columns.
@@ -166,7 +200,10 @@ function buildDataSheet(wb: ExcelJS.Workbook, sheet: SheetName): void {
     if (!formulae) return
     for (let r = 3; r <= DATA_ROWS; r++) {
       ws.getCell(`${letter}${r}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae, showErrorMessage: false,
+        type: 'list',
+        allowBlank: true,
+        formulae,
+        showErrorMessage: false,
       }
     }
   })
@@ -176,19 +213,63 @@ function buildDataSheet(wb: ExcelJS.Workbook, sheet: SheetName): void {
 function exampleFor(sheet: SheetName): Record<string, string>[] {
   switch (sheet) {
     case 'Products':
-      return [{ sku: 'TSHIRT-001', name: 'Cotton T-Shirt', category: 'Apparel', brand: 'Acme', base_price: '499', mrp: '699', gst_percentage: '5', has_variants: 'TRUE', variant_type: 'Color', image_urls: 'https://example.com/front.jpg|https://example.com/back.jpg' }]
+      return [
+        {
+          sku: 'TSHIRT-001',
+          name: 'Cotton T-Shirt',
+          category: 'Apparel',
+          brand: 'Acme',
+          base_price: '499',
+          mrp: '699',
+          gst_percentage: '5',
+          has_variants: 'TRUE',
+          variant_type: 'Color',
+          image_urls: 'https://example.com/front.jpg|https://example.com/back.jpg',
+        },
+      ]
     case 'Variants':
       return [
-        { parent_sku: 'TSHIRT-001', 'variant.sku': 'TSHIRT-001-RED', 'variant.variant_name': 'Red', 'variant.price': '499', 'variant.image_urls': 'https://example.com/red-1.jpg|https://example.com/red-2.jpg', 'variant.sub_variant_type_on': 'TRUE' },
-        { parent_sku: 'TSHIRT-001', 'variant.sku': 'TSHIRT-001-BLU', 'variant.variant_name': 'Blue', 'variant.price': '499', 'variant.image_urls': 'https://example.com/blue-1.jpg', 'variant.inventory_quantity': '30', 'variant.stock_status': 'In Stock' },
+        {
+          parent_sku: 'TSHIRT-001',
+          'variant.sku': 'TSHIRT-001-RED',
+          'variant.variant_name': 'Red',
+          'variant.price': '499',
+          'variant.image_urls': 'https://example.com/red-1.jpg|https://example.com/red-2.jpg',
+          'variant.sub_variant_type_on': 'TRUE',
+        },
+        {
+          parent_sku: 'TSHIRT-001',
+          'variant.sku': 'TSHIRT-001-BLU',
+          'variant.variant_name': 'Blue',
+          'variant.price': '499',
+          'variant.image_urls': 'https://example.com/blue-1.jpg',
+          'variant.inventory_quantity': '30',
+          'variant.stock_status': 'In Stock',
+        },
       ]
     case 'Sub-variants':
       return [
-        { parent_sku: 'TSHIRT-001', variant_sku: 'TSHIRT-001-RED', 'sub_variant.sub_variant_name': 'Red / M', 'sub_variant.sku': 'TSHIRT-001-RED-M', 'sub_variant.price': '499', 'sub_variant.stock_status': 'In Stock' },
-        { parent_sku: 'TSHIRT-001', variant_sku: 'TSHIRT-001-RED', 'sub_variant.sub_variant_name': 'Red / L', 'sub_variant.sku': 'TSHIRT-001-RED-L', 'sub_variant.price': '499', 'sub_variant.stock_status': 'In Stock' },
+        {
+          parent_sku: 'TSHIRT-001',
+          variant_sku: 'TSHIRT-001-RED',
+          'sub_variant.sub_variant_name': 'Red / M',
+          'sub_variant.sku': 'TSHIRT-001-RED-M',
+          'sub_variant.price': '499',
+          'sub_variant.stock_status': 'In Stock',
+        },
+        {
+          parent_sku: 'TSHIRT-001',
+          variant_sku: 'TSHIRT-001-RED',
+          'sub_variant.sub_variant_name': 'Red / L',
+          'sub_variant.sku': 'TSHIRT-001-RED-L',
+          'sub_variant.price': '499',
+          'sub_variant.stock_status': 'In Stock',
+        },
       ]
     case 'Product · Shipping':
-      return [{ sku: 'TSHIRT-001', weight_grams: '200', length_cm: '25', breadth_cm: '20', height_cm: '2', fragile: 'FALSE' }]
+      return [
+        { sku: 'TSHIRT-001', weight_grams: '200', length_cm: '25', breadth_cm: '20', height_cm: '2', fragile: 'FALSE' },
+      ]
     default:
       return [{ sku: 'TSHIRT-001' }]
   }

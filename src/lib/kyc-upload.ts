@@ -20,16 +20,18 @@ export async function uploadKycDocument(opts: {
   const ext = opts.originalFilename.split('.').pop()?.toLowerCase() || 'bin'
   const key = `kyc/${opts.ownerId}/${randomUUID()}.${ext}`
 
-  await getS3Client().send(new PutObjectCommand({
-    Bucket: kycBucket(),
-    Key: key,
-    Body: opts.buffer,
-    ContentType: opts.mimeType,
-    Metadata: {
-      owner_id: opts.ownerId,
-      original_filename: opts.originalFilename,
-    },
-  }))
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: kycBucket(),
+      Key: key,
+      Body: opts.buffer,
+      ContentType: opts.mimeType,
+      Metadata: {
+        owner_id: opts.ownerId,
+        original_filename: opts.originalFilename,
+      },
+    })
+  )
 
   return key
 }

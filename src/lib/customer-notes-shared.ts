@@ -1,6 +1,14 @@
 // Client-safe types and constants for customer notes (no server imports).
 
-export const NOTE_TAGS = ['measurement', 'custom-order', 'complaint', 'follow-up', 'delivery', 'payment', 'other'] as const
+export const NOTE_TAGS = [
+  'measurement',
+  'custom-order',
+  'complaint',
+  'follow-up',
+  'delivery',
+  'payment',
+  'other',
+] as const
 export type NoteTag = (typeof NOTE_TAGS)[number]
 export type NoteSource = 'admin_panel' | 'staff_form'
 

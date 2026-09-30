@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3'
 
 /**
  * Tenant DB backup storage in the platform S3 bucket (jeffi-stores-bucket).
@@ -19,24 +25,27 @@ function getS3Client(): S3Client {
 /** Platform bucket — same resolution as KYC uploads. */
 function backupBucket(): string {
   const b =
-    process.env.PLATFORM_S3_BUCKET ||
-    process.env.S3_BUCKET_NAME ||
-    process.env.S3_BUCKET ||
-    'jeffi-stores-bucket'
+    process.env.PLATFORM_S3_BUCKET || process.env.S3_BUCKET_NAME || process.env.S3_BUCKET || 'jeffi-stores-bucket'
   if (!b) throw new Error('No S3 bucket configured for tenant backups')
   return b
 }
 
 const PREFIX = 'tenant-backups'
-function ownerPrefix(ownerId: string) { return `${PREFIX}/by-owner/${ownerId}/` }
-function slugPrefix(slug: string) { return `${PREFIX}/by-slug/${slug}/` }
+function ownerPrefix(ownerId: string) {
+  return `${PREFIX}/by-owner/${ownerId}/`
+}
+function slugPrefix(slug: string) {
+  return `${PREFIX}/by-slug/${slug}/`
+}
 
 // S3 keys can't contain ':' cleanly in all tooling — use a filesystem-safe stamp.
-function stamp(iso: string) { return iso.replace(/[:.]/g, '-') }
+function stamp(iso: string) {
+  return iso.replace(/[:.]/g, '-')
+}
 
 export interface BackupRef {
   key: string
-  capturedAt: string   // ISO, parsed back from the key stamp
+  capturedAt: string // ISO, parsed back from the key stamp
   sizeBytes?: number
 }
 
@@ -58,8 +67,20 @@ export async function putTenantBackup(opts: {
   const bucket = backupBucket()
   const common = { Bucket: bucket, Body: opts.buffer, ContentType: 'application/gzip' as const }
   await Promise.all([
-    s3.send(new PutObjectCommand({ ...common, Key: ownerKey, Metadata: { owner_id: opts.ownerId, slug: opts.slug, captured_at: iso } })),
-    s3.send(new PutObjectCommand({ ...common, Key: slugKey, Metadata: { owner_id: opts.ownerId, slug: opts.slug, captured_at: iso } })),
+    s3.send(
+      new PutObjectCommand({
+        ...common,
+        Key: ownerKey,
+        Metadata: { owner_id: opts.ownerId, slug: opts.slug, captured_at: iso },
+      })
+    ),
+    s3.send(
+      new PutObjectCommand({
+        ...common,
+        Key: slugKey,
+        Metadata: { owner_id: opts.ownerId, slug: opts.slug, captured_at: iso },
+      })
+    ),
   ])
   return { ownerKey, slugKey }
 }
@@ -79,8 +100,8 @@ async function listPrefix(prefix: string): Promise<BackupRef[]> {
   const s3 = getS3Client()
   const res = await s3.send(new ListObjectsV2Command({ Bucket: backupBucket(), Prefix: prefix }))
   return (res.Contents ?? [])
-    .filter((o) => o.Key && o.Key.endsWith('.sql.gz'))
-    .map((o) => ({ key: o.Key!, capturedAt: capturedAtFromKey(o.Key!), sizeBytes: o.Size }))
+    .filter(o => o.Key && o.Key.endsWith('.sql.gz'))
+    .map(o => ({ key: o.Key!, capturedAt: capturedAtFromKey(o.Key!), sizeBytes: o.Size }))
 }
 
 /**
@@ -115,10 +136,12 @@ async function deleteKeys(keys: string[]): Promise<number> {
   let deleted = 0
   for (let i = 0; i < keys.length; i += 1000) {
     const batch = keys.slice(i, i + 1000)
-    await s3.send(new DeleteObjectsCommand({
-      Bucket: bucket,
-      Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
-    }))
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: batch.map(Key => ({ Key })), Quiet: true },
+      })
+    )
     deleted += batch.length
   }
   return deleted
@@ -138,9 +161,9 @@ export async function deleteTenantBackups(opts: { ownerId: string; slug: string 
     listPrefix(ownerPrefix(opts.ownerId)).catch(() => []),
     listPrefix(slugPrefix(opts.slug)).catch(() => []),
   ])
-  const slugStamps = new Set(slugObjs.map((o) => o.capturedAt))
-  const ownerKeysForSlug = ownerObjs.filter((o) => slugStamps.has(o.capturedAt)).map((o) => o.key)
-  const slugKeys = slugObjs.map((o) => o.key)
+  const slugStamps = new Set(slugObjs.map(o => o.capturedAt))
+  const ownerKeysForSlug = ownerObjs.filter(o => slugStamps.has(o.capturedAt)).map(o => o.key)
+  const slugKeys = slugObjs.map(o => o.key)
   const deleted = await deleteKeys([...ownerKeysForSlug, ...slugKeys])
   return { deleted }
 }

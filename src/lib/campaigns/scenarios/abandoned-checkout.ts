@@ -1,10 +1,5 @@
 import { queryMany } from '@/lib/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
@@ -27,7 +22,8 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
   kind: 'abandoned_checkout',
   name: 'Abandoned Checkout',
   description: 'Order auto-cancelled after the 10-minute payment window expired',
-  trigger: 'Fires when an order is auto-cancelled because Razorpay payment didn\'t complete within the 10-minute window. Only orders cancelled within ~15 min of creation are treated as auto-cancels (not manual cancellations days later). Sends at most once per cooldown window per user.',
+  trigger:
+    "Fires when an order is auto-cancelled because Razorpay payment didn't complete within the 10-minute window. Only orders cancelled within ~15 min of creation are treated as auto-cancels (not manual cancellations days later). Sends at most once per cooldown window per user.",
   defaultParams: {
     minMinutesAfterCancel: 15,
     autoCancelMaxMinutes: 15,
@@ -36,15 +32,45 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     whatsappEnabled: false,
   },
   paramSchema: {
-    minMinutesAfterCancel: { type: 'integer', min: 1, max: 120, label: 'Minimum minutes after cancel', description: 'Wait at least this many minutes after the order was cancelled' },
-    autoCancelMaxMinutes:  { type: 'integer', min: 5, max: 120, label: 'Auto-cancel detection (minutes)', description: 'Only treat as auto-cancel if cancelled within N minutes of order creation. Filters out manual late cancellations.' },
-    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)',     description: 'Skip users sent this campaign within N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',       description: 'Hard limit per sweep' },
-    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
+    minMinutesAfterCancel: {
+      type: 'integer',
+      min: 1,
+      max: 120,
+      label: 'Minimum minutes after cancel',
+      description: 'Wait at least this many minutes after the order was cancelled',
+    },
+    autoCancelMaxMinutes: {
+      type: 'integer',
+      min: 5,
+      max: 120,
+      label: 'Auto-cancel detection (minutes)',
+      description:
+        'Only treat as auto-cancel if cancelled within N minutes of order creation. Filters out manual late cancellations.',
+    },
+    sendCooldownDays: {
+      type: 'integer',
+      min: 1,
+      max: 30,
+      label: 'Per-user cooldown (days)',
+      description: 'Skip users sent this campaign within N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
   async findEligible({ campaign, params }) {
-    return queryMany<Row>(`
+    return queryMany<Row>(
+      `
       SELECT DISTINCT ON (o.user_id)
         o.id, o.user_id, o.order_number, o.total_amount::text
       FROM orders o
@@ -64,11 +90,29 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         )
       ORDER BY o.user_id, o.updated_at DESC
       LIMIT $5
-    `, [campaign.kind, campaign.delay_hours, params.minMinutesAfterCancel, params.sendCooldownDays, params.maxRecipientsPerSweep, params.autoCancelMaxMinutes])
+    `,
+      [
+        campaign.kind,
+        campaign.delay_hours,
+        params.minMinutesAfterCancel,
+        params.sendCooldownDays,
+        params.maxRecipientsPerSweep,
+        params.autoCancelMaxMinutes,
+      ]
+    )
   },
 
   async findSuppressed({ campaign, params }) {
-    const rows = await queryMany<{ id: string; user_id: string; order_number: string; total_amount: string; reason: string; reason_detail: string | null; blocked_until: string | null }>(`
+    const rows = await queryMany<{
+      id: string
+      user_id: string
+      order_number: string
+      total_amount: string
+      reason: string
+      reason_detail: string | null
+      blocked_until: string | null
+    }>(
+      `
       WITH latest_cancelled AS (
         SELECT DISTINCT ON (o.user_id)
           o.id::text, o.user_id::text, o.order_number, o.total_amount::text, o.updated_at
@@ -108,7 +152,15 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
       LIMIT 200
-    `, [campaign.kind, campaign.delay_hours, params.minMinutesAfterCancel, params.sendCooldownDays, params.autoCancelMaxMinutes])
+    `,
+      [
+        campaign.kind,
+        campaign.delay_hours,
+        params.minMinutesAfterCancel,
+        params.sendCooldownDays,
+        params.autoCancelMaxMinutes,
+      ]
+    )
     return rows.map(r => ({
       user_id: r.user_id,
       reference_id: r.id,
@@ -123,7 +175,14 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const items = await queryMany<{ name: string; quantity: number; unit_price: number; product_slug: string | null; image_url: string | null }>(`
+    const items = await queryMany<{
+      name: string
+      quantity: number
+      unit_price: number
+      product_slug: string | null
+      image_url: string | null
+    }>(
+      `
       SELECT oi.product_name AS name,
              oi.quantity::float AS quantity,
              oi.unit_price::float AS unit_price,
@@ -133,7 +192,9 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1::uuid
       LIMIT 8
-    `, [row.id])
+    `,
+      [row.id]
+    )
 
     const itemsHtml = renderItemRows(
       items.map(i => ({

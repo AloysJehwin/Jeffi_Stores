@@ -1,13 +1,30 @@
 import { queryMany, queryOne } from './db'
 import { getS3Url } from './s3'
 import {
-  CONVERSATION_CHANNELS, clampConversationLimit, emptyChannelCounts, isConversationChannel,
-  type ConversationAttachment, type ConversationChannel, type ConversationDirection,
-  type ConversationItem, type ConversationSummary,
+  CONVERSATION_CHANNELS,
+  clampConversationLimit,
+  emptyChannelCounts,
+  isConversationChannel,
+  type ConversationAttachment,
+  type ConversationChannel,
+  type ConversationDirection,
+  type ConversationItem,
+  type ConversationSummary,
 } from './customer-conversations-shared'
 
-export type { ConversationAttachment, ConversationChannel, ConversationDirection, ConversationItem, ConversationSummary }
-export { CONVERSATION_CHANNELS, isConversationChannel, parseChannels, clampConversationLimit } from './customer-conversations-shared'
+export type {
+  ConversationAttachment,
+  ConversationChannel,
+  ConversationDirection,
+  ConversationItem,
+  ConversationSummary,
+}
+export {
+  CONVERSATION_CHANNELS,
+  isConversationChannel,
+  parseChannels,
+  clampConversationLimit,
+} from './customer-conversations-shared'
 
 export interface ConversationRow {
   id: string
@@ -106,27 +123,56 @@ export function buildConversationsSql(channels: ConversationChannel[]): string {
 }
 
 const ENTITIES: Record<string, string> = {
-  order: 'Order', orders: 'Order', return: 'Return', rfq: 'RFQ', quotations: 'Quotation', quotation: 'Quotation',
-  support_session: 'Chat', purchase_orders: 'Purchase order', product_reviews: 'Review', review: 'Review',
-  campaign: 'Campaign', email_campaigns: 'Campaign', address_change: 'Address change',
+  order: 'Order',
+  orders: 'Order',
+  return: 'Return',
+  rfq: 'RFQ',
+  quotations: 'Quotation',
+  quotation: 'Quotation',
+  support_session: 'Chat',
+  purchase_orders: 'Purchase order',
+  product_reviews: 'Review',
+  review: 'Review',
+  campaign: 'Campaign',
+  email_campaigns: 'Campaign',
+  address_change: 'Address change',
 }
 
 export function entityHref(entityType: string | null, entityId: string | null, userId: string): string | null {
   if (!entityType || !entityId) return null
   switch (entityType) {
-    case 'order': case 'orders': return `/admin/orders/${entityId}`
-    case 'rfq': return `/admin/business/rfqs/${entityId}`
-    case 'quotation': case 'quotations': return `/admin/quotations/${entityId}`
-    case 'support_session': return `/admin/customers/${userId}?chat=true`
-    default: return null
+    case 'order':
+    case 'orders':
+      return `/admin/orders/${entityId}`
+    case 'rfq':
+      return `/admin/business/rfqs/${entityId}`
+    case 'quotation':
+    case 'quotations':
+      return `/admin/quotations/${entityId}`
+    case 'support_session':
+      return `/admin/customers/${userId}?chat=true`
+    default:
+      return null
   }
 }
 
 function humanizeToken(value: string): string {
-  return value.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().replace(/^\w/, c => c.toUpperCase())
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+    .replace(/^\w/, c => c.toUpperCase())
 }
 
-const ENTITY_DECODE: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'" }
+const ENTITY_DECODE: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: ' ',
+  '#39': "'",
+}
 
 export function normalizeBody(raw: string | null | undefined): string {
   if (!raw) return ''
@@ -147,26 +193,34 @@ function toIso(value: string | Date): string {
 function threadLabelFor(row: ConversationRow): string | null {
   if (row.thread_label) return row.thread_label
   if (row.channel !== 'email' || !row.thread_id) return null
-  if (row.entity_type && row.entity_id) return `${ENTITIES[row.entity_type] ?? humanizeToken(row.entity_type)} ${row.entity_id.slice(0, 8)}`
+  if (row.entity_type && row.entity_id)
+    return `${ENTITIES[row.entity_type] ?? humanizeToken(row.entity_type)} ${row.entity_id.slice(0, 8)}`
   return row.subject
 }
 
 async function mapAttachments(list: ConversationRow['attachments']): Promise<ConversationAttachment[]> {
   if (!Array.isArray(list) || list.length === 0) return []
-  return Promise.all(list.map(async a => ({
-    kind: a.kind,
-    url: await getS3Url(a.s3_key),
-    thumbnailUrl: a.s3_thumbnail_key ? await getS3Url(a.s3_thumbnail_key) : null,
-  })))
+  return Promise.all(
+    list.map(async a => ({
+      kind: a.kind,
+      url: await getS3Url(a.s3_key),
+      thumbnailUrl: a.s3_thumbnail_key ? await getS3Url(a.s3_thumbnail_key) : null,
+    }))
+  )
 }
 
 export async function mapConversationRow(row: ConversationRow, userId: string): Promise<ConversationItem> {
   const channel = isConversationChannel(row.channel) ? row.channel : 'email'
-  const direction: ConversationDirection = row.direction === 'inbound' ? 'inbound' : row.direction === 'internal' ? 'internal' : 'outbound'
-  const subject = (channel === 'whatsapp' || channel === 'sms') && row.subject ? humanizeToken(row.subject) : row.subject
-  const href = channel === 'chat' ? entityHref('support_session', row.thread_id, userId)
-    : channel === 'rfq' ? entityHref('rfq', row.thread_id, userId)
-    : entityHref(row.entity_type, row.entity_id, userId)
+  const direction: ConversationDirection =
+    row.direction === 'inbound' ? 'inbound' : row.direction === 'internal' ? 'internal' : 'outbound'
+  const subject =
+    (channel === 'whatsapp' || channel === 'sms') && row.subject ? humanizeToken(row.subject) : row.subject
+  const href =
+    channel === 'chat'
+      ? entityHref('support_session', row.thread_id, userId)
+      : channel === 'rfq'
+        ? entityHref('rfq', row.thread_id, userId)
+        : entityHref(row.entity_type, row.entity_id, userId)
   return {
     id: row.id,
     channel,
@@ -185,13 +239,19 @@ export async function mapConversationRow(row: ConversationRow, userId: string): 
   }
 }
 
-export function derivePage<T extends { at: string }>(items: T[], limit: number): { items: T[]; nextBefore: string | null } {
+export function derivePage<T extends { at: string }>(
+  items: T[],
+  limit: number
+): { items: T[]; nextBefore: string | null } {
   if (items.length <= limit) return { items, nextBefore: null }
   const page = items.slice(0, limit)
   return { items: page, nextBefore: page[page.length - 1].at }
 }
 
-export async function listConversations(userId: string, opts: ListConversationsOptions = {}): Promise<{ items: ConversationItem[]; nextBefore: string | null }> {
+export async function listConversations(
+  userId: string,
+  opts: ListConversationsOptions = {}
+): Promise<{ items: ConversationItem[]; nextBefore: string | null }> {
   const channels = opts.channels?.length ? opts.channels.filter(isConversationChannel) : [...CONVERSATION_CHANNELS]
   if (channels.length === 0) throw new Error('No valid channels')
   const limit = clampConversationLimit(opts.limit)
@@ -270,7 +330,15 @@ export function summarizeRow(row: SummaryRow | null): ConversationSummary {
   }
 }
 
-export async function conversationSummary(userId: string, email: string | null | undefined, phone: string | null | undefined): Promise<ConversationSummary> {
-  const row = await queryOne<SummaryRow>(SUMMARY_SQL, [userId, email?.trim() ? email.trim().toLowerCase() : null, phoneLast10(phone)])
+export async function conversationSummary(
+  userId: string,
+  email: string | null | undefined,
+  phone: string | null | undefined
+): Promise<ConversationSummary> {
+  const row = await queryOne<SummaryRow>(SUMMARY_SQL, [
+    userId,
+    email?.trim() ? email.trim().toLowerCase() : null,
+    phoneLast10(phone),
+  ])
   return summarizeRow(row)
 }

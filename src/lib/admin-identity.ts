@@ -51,7 +51,10 @@ function serialToHex(serial: string): string {
   try {
     let n = BigInt(serial)
     let hex = ''
-    while (n > 0n) { hex = (n % 16n).toString(16) + hex; n = n / 16n }
+    while (n > 0n) {
+      hex = (n % 16n).toString(16) + hex
+      n = n / 16n
+    }
     return hex || '0'
   } catch {
     return serial.toLowerCase()
@@ -78,7 +81,11 @@ export async function enforceCertGate(
 
   const certPresent = !!certSerial || (!!certCN && certCN !== 'Admin User')
   if (!certPresent) {
-    return { ok: false, status: 403, error: 'A client certificate is required to sign in. Please install your admin certificate and try again.' }
+    return {
+      ok: false,
+      status: 403,
+      error: 'A client certificate is required to sign in. Please install your admin certificate and try again.',
+    }
   }
 
   if (certSerial) {
@@ -90,7 +97,11 @@ export async function enforceCertGate(
       [serialHex]
     )
     if (!cert) {
-      return { ok: false, status: 403, error: 'Certificate not recognized or expired. Please contact your administrator.' }
+      return {
+        ok: false,
+        status: 403,
+        error: 'Certificate not recognized or expired. Please contact your administrator.',
+      }
     }
     const certOwner = await queryOne<{ role: string }>(`SELECT role FROM admins WHERE id = $1`, [cert.admin_id])
     const certBelongsToThisAccount = cert.admin_id === admin.id

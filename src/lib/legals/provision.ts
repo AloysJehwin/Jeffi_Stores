@@ -33,17 +33,21 @@ export async function generateTenantLegals(tenantId: string, _endpoint?: string)
   // Write the policies blob to the tenant's bucket (public-read via CloudFront/OAC like other assets).
   const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
   const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: 'legal/policies.json',
-    Body: body,
-    ContentType: 'application/json',
-    CacheControl: 'public, max-age=300',
-  }))
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: 'legal/policies.json',
+      Body: body,
+      ContentType: 'application/json',
+      CacheControl: 'public, max-age=300',
+    })
+  )
 
   // Record generation on the KYC row (best-effort).
-  await controlPlanePool().query(
-    `UPDATE tenant_kyc SET legals_accepted_version=COALESCE(legals_accepted_version,$2), updated_at=now() WHERE tenant_id=$1`,
-    [tenantId, POLICY_VERSION],
-  ).catch(() => {})
+  await controlPlanePool()
+    .query(
+      `UPDATE tenant_kyc SET legals_accepted_version=COALESCE(legals_accepted_version,$2), updated_at=now() WHERE tenant_id=$1`,
+      [tenantId, POLICY_VERSION]
+    )
+    .catch(() => {})
 }

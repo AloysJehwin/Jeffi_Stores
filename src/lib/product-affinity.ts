@@ -13,7 +13,7 @@ export async function frequentlyBoughtWith(productIds: string[], limit: number):
      GROUP BY oi2.product_id
      ORDER BY COUNT(DISTINCT oi2.order_id) DESC, oi2.product_id
      LIMIT $2`,
-    [productIds, limit],
+    [productIds, limit]
   )
   return rows.map(r => r.product_id)
 }
@@ -37,7 +37,7 @@ export async function alsoViewedWith(productId: string, limit: number): Promise<
      GROUP BY pv.product_id
      ORDER BY COUNT(DISTINCT v.who) DESC, pv.product_id
      LIMIT $2`,
-    [productId, limit],
+    [productId, limit]
   )
   return rows.map(r => r.product_id)
 }

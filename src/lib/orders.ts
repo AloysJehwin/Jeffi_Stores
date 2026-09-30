@@ -18,14 +18,17 @@ interface CancelOptions {
 }
 
 export async function cancelOrder(orderId: string, opts: CancelOptions): Promise<CancelResult> {
-  const order = await queryOne<any>(`
+  const order = await queryOne<any>(
+    `
     SELECT o.id, o.order_number, o.status, o.payment_status, o.user_id, o.order_type,
       o.customer_name, o.customer_email, o.total_amount,
       json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
     FROM orders o
     LEFT JOIN users u ON o.user_id = u.id
     WHERE o.id = $1
-  `, [orderId])
+  `,
+    [orderId]
+  )
 
   if (!order) {
     return { success: false, error: 'Order not found', status: 404 }
@@ -44,8 +47,7 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
   }
 
   const isUnpaidPending =
-    order.status === 'pending' &&
-    (order.payment_status === 'unpaid' || order.payment_status === 'failed')
+    order.status === 'pending' && (order.payment_status === 'unpaid' || order.payment_status === 'failed')
 
   if (isUnpaidPending) {
     const restoreToCart = opts.restoreToCart === true && order.order_type !== 'direct'
@@ -62,10 +64,10 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
           [order.user_id, item.product_id, item.variant_id || null]
         )
         if (existingCartItem) {
-          await query(
-            'UPDATE cart_items SET quantity = cart_items.quantity + $1, updated_at = NOW() WHERE id = $2',
-            [item.quantity, existingCartItem.id]
-          )
+          await query('UPDATE cart_items SET quantity = cart_items.quantity + $1, updated_at = NOW() WHERE id = $2', [
+            item.quantity,
+            existingCartItem.id,
+          ])
         } else {
           await query(
             'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4, $5)',
@@ -83,9 +85,8 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
     if (opts.reason === 'auto_cancel_unpaid') {
       const user = order.users
       const userEmail = user?.email || order.customer_email
-      const userName = (user
-        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-        : order.customer_name) || 'Customer'
+      const userName =
+        (user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name) || 'Customer'
 
       let redirectPath = '/products'
       if (order.order_type === 'direct') {
@@ -133,9 +134,10 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
         kind: 'order_status',
         referenceId: orderId,
         referenceType: 'orders',
-        summary: opts.reason === 'auto_cancel_unpaid'
-          ? `Order #${order.order_number} auto-cancelled (payment timeout)`
-          : `Cancelled order #${order.order_number}`,
+        summary:
+          opts.reason === 'auto_cancel_unpaid'
+            ? `Order #${order.order_number} auto-cancelled (payment timeout)`
+            : `Cancelled order #${order.order_number}`,
         metadata: { order_status: 'cancelled', reason: opts.reason },
       }).catch(() => {})
     }
@@ -143,10 +145,7 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
     return { success: true, directCancel: true, restoredToCart: restoreToCart }
   }
 
-  await query(
-    `UPDATE orders SET status = 'cancel_requested', updated_at = NOW() WHERE id = $1`,
-    [orderId]
-  )
+  await query(`UPDATE orders SET status = 'cancel_requested', updated_at = NOW() WHERE id = $1`, [orderId])
 
   if (order.user_id) {
     logActivity({
@@ -164,14 +163,9 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
   const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
 
   if (userEmail && userName) {
-    sendOrderStatusUpdate(
-      userEmail,
-      userName,
-      order.order_number,
-      orderId,
-      'cancel_requested',
-      order.status
-    ).catch(() => {})
+    sendOrderStatusUpdate(userEmail, userName, order.order_number, orderId, 'cancel_requested', order.status).catch(
+      () => {}
+    )
   }
 
   return { success: true, directCancel: false, restoredToCart: false, cancelRequested: true }

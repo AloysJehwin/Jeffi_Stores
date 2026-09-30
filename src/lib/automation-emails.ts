@@ -134,7 +134,14 @@ export async function sendCampaignEmailRendered(params: {
 }
 
 export async function fetchUserContext(userId: string): Promise<UserContext | null> {
-  const row = await queryOne<{ id: string; email: string; first_name: string | null; last_name: string | null; unsubscribe_token: string; is_business: boolean }>(
+  const row = await queryOne<{
+    id: string
+    email: string
+    first_name: string | null
+    last_name: string | null
+    unsubscribe_token: string
+    is_business: boolean
+  }>(
     `SELECT u.id, u.email, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token,
             (bp.approval_status = 'approved') AS is_business
      FROM users u
@@ -168,16 +175,18 @@ export interface EmailItem {
 
 export function renderItemRows(items: EmailItem[]): string {
   if (!items.length) return ''
-  const rows = items.map(i => {
-    const img = i.imageUrl || PLACEHOLDER_IMAGE
-    const qty = i.quantity != null ? `${i.quantity}${i.unitLabel ? ` ${i.unitLabel}` : ''}` : ''
-    const priceCell = i.price != null
-      ? `<td align="right" valign="top" style="padding:12px 0 12px 12px;color:#1a3a4a;font-weight:600;font-size:14px;white-space:nowrap;">₹${Math.round(i.price).toLocaleString('en-IN')}</td>`
-      : ''
-    const nameCell = i.productUrl
-      ? `<a href="${i.productUrl}" style="color:#1a3a4a;text-decoration:none;font-weight:600;font-size:15px;">${i.name}</a>`
-      : `<span style="color:#1a3a4a;font-weight:600;font-size:15px;">${i.name}</span>`
-    return `<tr>
+  const rows = items
+    .map(i => {
+      const img = i.imageUrl || PLACEHOLDER_IMAGE
+      const qty = i.quantity != null ? `${i.quantity}${i.unitLabel ? ` ${i.unitLabel}` : ''}` : ''
+      const priceCell =
+        i.price != null
+          ? `<td align="right" valign="top" style="padding:12px 0 12px 12px;color:#1a3a4a;font-weight:600;font-size:14px;white-space:nowrap;">₹${Math.round(i.price).toLocaleString('en-IN')}</td>`
+          : ''
+      const nameCell = i.productUrl
+        ? `<a href="${i.productUrl}" style="color:#1a3a4a;text-decoration:none;font-weight:600;font-size:15px;">${i.name}</a>`
+        : `<span style="color:#1a3a4a;font-weight:600;font-size:15px;">${i.name}</span>`
+      return `<tr>
       <td valign="top" style="padding:12px 12px 12px 0;width:80px;">
         <img src="${img}" alt="${i.name.replace(/"/g, '&quot;')}" width="72" height="72" style="display:block;border-radius:6px;border:1px solid #e5e7eb;background:#f5f5f5;object-fit:cover;width:72px;height:72px;" />
       </td>
@@ -187,15 +196,23 @@ export function renderItemRows(items: EmailItem[]): string {
       </td>
       ${priceCell}
     </tr>`
-  }).join('')
+    })
+    .join('')
   return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0;">${rows}</table>`
 }
 
-export function renderHeroProduct(item: { name: string; imageUrl?: string | null; productUrl?: string | null; oldPrice?: number; newPrice?: number }): string {
+export function renderHeroProduct(item: {
+  name: string
+  imageUrl?: string | null
+  productUrl?: string | null
+  oldPrice?: number
+  newPrice?: number
+}): string {
   const img = item.imageUrl || PLACEHOLDER_IMAGE
-  const priceBlock = item.newPrice != null
-    ? `<div style="margin:12px 0 0;">${item.oldPrice != null && item.oldPrice !== item.newPrice ? `<span style="color:#999;text-decoration:line-through;font-size:14px;">₹${Math.round(item.oldPrice).toLocaleString('en-IN')}</span>&nbsp;&nbsp;` : ''}<strong style="color:#e07b3f;font-size:22px;">₹${Math.round(item.newPrice).toLocaleString('en-IN')}</strong></div>`
-    : ''
+  const priceBlock =
+    item.newPrice != null
+      ? `<div style="margin:12px 0 0;">${item.oldPrice != null && item.oldPrice !== item.newPrice ? `<span style="color:#999;text-decoration:line-through;font-size:14px;">₹${Math.round(item.oldPrice).toLocaleString('en-IN')}</span>&nbsp;&nbsp;` : ''}<strong style="color:#e07b3f;font-size:22px;">₹${Math.round(item.newPrice).toLocaleString('en-IN')}</strong></div>`
+      : ''
   const nameWrap = item.productUrl
     ? `<a href="${item.productUrl}" style="color:#1a3a4a;text-decoration:none;">${item.name}</a>`
     : item.name
@@ -214,7 +231,10 @@ export function renderHeroProduct(item: { name: string; imageUrl?: string | null
     </table>`
 }
 
-export async function resolveCoupon(campaign: Campaign, _userId: string): Promise<{ couponCode: string; discountPercent: number }> {
+export async function resolveCoupon(
+  campaign: Campaign,
+  _userId: string
+): Promise<{ couponCode: string; discountPercent: number }> {
   if (campaign.coupon_id) {
     const info = await getAssignedCouponCode(campaign.coupon_id)
     if (info) {
@@ -233,7 +253,10 @@ export async function resolveCoupon(campaign: Campaign, _userId: string): Promis
   return { couponCode: '', discountPercent: campaign.discount_percent }
 }
 
-export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ name: string; quantity: number; price: number }>) {
+export async function sendAbandonedCartEmail(
+  userId: string,
+  cartItems: Array<{ name: string; quantity: number; price: number }>
+) {
   const campaign = await getCampaign('abandoned_cart')
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
@@ -260,7 +283,10 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
   })
 }
 
-export async function sendAbandonedCheckoutEmail(userId: string, order: { id: string; order_number: string; total_amount: string | number }) {
+export async function sendAbandonedCheckoutEmail(
+  userId: string,
+  order: { id: string; order_number: string; total_amount: string | number }
+) {
   const campaign = await getCampaign('abandoned_checkout')
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
@@ -408,15 +434,33 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
   const baseUrl = await storeBaseUrlAsync()
 
   const sampleItems = [
-    { name: 'Sample Product A', quantity: 2, price: 500, imageUrl: 'https://placehold.co/120x120/e07b3f/ffffff?text=A', productUrl: '#' },
-    { name: 'Sample Product B', quantity: 1, price: 1200, imageUrl: 'https://placehold.co/120x120/1a3a4a/ffffff?text=B', productUrl: '#' },
+    {
+      name: 'Sample Product A',
+      quantity: 2,
+      price: 500,
+      imageUrl: 'https://placehold.co/120x120/e07b3f/ffffff?text=A',
+      productUrl: '#',
+    },
+    {
+      name: 'Sample Product B',
+      quantity: 1,
+      price: 1200,
+      imageUrl: 'https://placehold.co/120x120/1a3a4a/ffffff?text=B',
+      productUrl: '#',
+    },
   ]
   const sampleVars: Record<string, string | number> = {
     firstName: 'Sample',
     itemCount: sampleItems.length,
     cartItems: renderItemRows(sampleItems),
     itemsHtml: renderItemRows(sampleItems),
-    productCard: renderHeroProduct({ name: 'Sample Product', imageUrl: 'https://placehold.co/280x280/e07b3f/ffffff?text=Product', productUrl: '#', oldPrice: 999, newPrice: 799 }),
+    productCard: renderHeroProduct({
+      name: 'Sample Product',
+      imageUrl: 'https://placehold.co/280x280/e07b3f/ffffff?text=Product',
+      productUrl: '#',
+      oldPrice: 999,
+      newPrice: 799,
+    }),
     orderNumber: 'TEST-12345',
     total: '2200.00',
     discountPercent: campaign.discount_percent || 10,
@@ -430,7 +474,11 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
 
   const subject = `[TEST] ${renderTemplate(campaign.subject_template, sampleVars)}`
   const body = renderTemplate(campaign.body_template, sampleVars)
-  const html = baseLayout(subject, body + `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`)
+  const html = baseLayout(
+    subject,
+    body +
+      `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`
+  )
 
   try {
     await sendAuditedMail({

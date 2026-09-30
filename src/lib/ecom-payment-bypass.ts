@@ -17,7 +17,10 @@ const DEFAULT_ALLOWED = 'aloysjehwin@gmail.com'
 
 function allowed(): string[] {
   const raw = process.env.ECOM_PAYMENT_BYPASS_EMAILS ?? DEFAULT_ALLOWED
-  return raw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+  return raw
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
 }
 
 export function isPaymentBypassed(email: string | null | undefined): boolean {

@@ -64,7 +64,6 @@ export function extractSessionSignals(req: SignalRequest): SessionSignals {
   }
 }
 
-
 // For server components and actions, which have no Request object to hand over. Outside a request
 // scope (scripts, cron, tests) next/headers throws and the caller falls back to no signals.
 export async function ambientSessionSignals(): Promise<SessionSignals | undefined> {

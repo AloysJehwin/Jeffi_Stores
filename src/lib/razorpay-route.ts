@@ -72,7 +72,9 @@ async function gatewayFeePaise(rz: any, paymentId: string, grossPaise: number): 
     const payment = await rz.payments.fetch(paymentId)
     const fee = Number(payment?.fee)
     if (Number.isFinite(fee) && fee >= 0) return Math.round(fee)
-  } catch { /* fall through to the estimate */ }
+  } catch {
+    /* fall through to the estimate */
+  }
   return Math.round(grossPaise * FALLBACK_GATEWAY_FEE_PCT * GST_MULTIPLIER)
 }
 
@@ -92,7 +94,8 @@ export function normalizeIndianPhone(raw: string | null | undefined): string | n
 
 export interface LinkedAccountInput {
   businessName: string
-  businessType: 'proprietorship' | 'partnership' | 'private_limited' | 'public_limited' | 'llp' | 'ngo' | 'not_yet_registered'
+  businessType:
+    'proprietorship' | 'partnership' | 'private_limited' | 'public_limited' | 'llp' | 'ngo' | 'not_yet_registered'
   legalBusinessName: string
   businessDescription?: string
   profileCategory: string
@@ -137,13 +140,13 @@ export interface TransferResult {
  * proprietor's personal PAN, and an unregistered business has none at all.
  */
 const COMPANY_PAN_CHARS: Record<LinkedAccountInput['businessType'], string[]> = {
-  proprietorship:     [],
+  proprietorship: [],
   not_yet_registered: [],
-  partnership:        ['F'],
-  llp:                ['F'],
-  private_limited:    ['C'],
-  public_limited:     ['C'],
-  ngo:                ['T', 'A', 'B'],
+  partnership: ['F'],
+  llp: ['F'],
+  private_limited: ['C'],
+  public_limited: ['C'],
+  ngo: ['T', 'A', 'B'],
 }
 
 const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/
@@ -158,9 +161,11 @@ const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/
  */
 export function isValidCompanyPan(
   pan: string | null | undefined,
-  businessType: LinkedAccountInput['businessType'],
+  businessType: LinkedAccountInput['businessType']
 ): boolean {
-  const p = String(pan ?? '').trim().toUpperCase()
+  const p = String(pan ?? '')
+    .trim()
+    .toUpperCase()
   if (!PAN_SHAPE.test(p)) return false
   return COMPANY_PAN_CHARS[businessType]?.includes(p[3]) ?? false
 }
@@ -283,7 +288,11 @@ export async function createRouteStakeholder(
  */
 export async function configureRouteSettlement(
   accountId: string,
-  { accountNumber, ifsc, beneficiaryName }: { accountNumber: string | null; ifsc: string | null; beneficiaryName: string | null }
+  {
+    accountNumber,
+    ifsc,
+    beneficiaryName,
+  }: { accountNumber: string | null; ifsc: string | null; beneficiaryName: string | null }
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const rz = getRazorpayInstance()
@@ -322,7 +331,7 @@ export async function configureRouteSettlement(
  */
 export async function markLinkedAccountDeprovisioned(
   accountId: string,
-  slug: string,
+  slug: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const rz = getRazorpayInstance()
@@ -378,23 +387,25 @@ export async function transferToLinkedAccount(opts: {
   const transfers = await (rz as any).api.post({
     url: `/payments/${opts.paymentId}/transfers`,
     data: {
-      transfers: [{
-        account: opts.linkedAccountId,
-        amount: tenantShare,
-        currency: 'INR',
-        notes: {
-          order_id: opts.orderId ?? '',
-          tenant_slug: opts.tenantSlug ?? '',
-          gross_amount: opts.grossAmountPaise,
-          platform_commission: platformCommission,
-          gateway_fee: gatewayFee,
-          transfer_fee: transferFee,
-          delhivery_charge: delhivery,
+      transfers: [
+        {
+          account: opts.linkedAccountId,
+          amount: tenantShare,
+          currency: 'INR',
+          notes: {
+            order_id: opts.orderId ?? '',
+            tenant_slug: opts.tenantSlug ?? '',
+            gross_amount: opts.grossAmountPaise,
+            platform_commission: platformCommission,
+            gateway_fee: gatewayFee,
+            transfer_fee: transferFee,
+            delhivery_charge: delhivery,
+          },
+          linked_account_notes: ['order_id', 'tenant_slug'],
+          on_hold: true,
+          on_hold_until: nextPayoutReleaseTs(opts.dailyPayout),
         },
-        linked_account_notes: ['order_id', 'tenant_slug'],
-        on_hold: true,
-        on_hold_until: nextPayoutReleaseTs(opts.dailyPayout),
-      }],
+      ],
     },
   })
 
@@ -438,7 +449,7 @@ export interface RouteTransfer {
  * treat it as "no transfer exists" — an empty `transfers` array is the real no-transfer case.
  */
 export async function fetchTransfersForPayment(
-  paymentId: string,
+  paymentId: string
 ): Promise<{ ok: true; transfers: RouteTransfer[] } | { ok: false; error: string }> {
   try {
     const rz = getRazorpayInstance()
@@ -482,10 +493,7 @@ export interface ReversalOutcome {
  * Never throws: a refund to the buyer must not be blocked by a failed clawback. The shortfall is
  * returned as `unrecoveredPaise` for the caller to record as tenant debt and retry.
  */
-export async function reverseTransfersForRefund(
-  paymentId: string,
-  refundPaise: number,
-): Promise<ReversalOutcome> {
+export async function reverseTransfersForRefund(paymentId: string, refundPaise: number): Promise<ReversalOutcome> {
   const out: ReversalOutcome = { reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }
   if (!(refundPaise > 0)) return out
 
@@ -565,34 +573,43 @@ export async function recordCodSettlement(opts: {
   const tenantSharePaise = Math.max(0, grossPaise - commissionPaise - delhiveryPaise)
 
   // tenant_transactions row (COD, no gateway txn id)
-  await pool.query(
-    `INSERT INTO tenant_transactions
+  await pool
+    .query(
+      `INSERT INTO tenant_transactions
        (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod, status, occurred_at)
      VALUES ($1,$2,$3,$4,$5,0,'cod_remittance',true,'settled',now())
      ON CONFLICT DO NOTHING`,
-    [opts.tenantId, opts.orderRef, opts.grossAmountInr,
-     tenantSharePaise / 100, commissionPaise / 100]
-  ).catch(() => {})
+      [opts.tenantId, opts.orderRef, opts.grossAmountInr, tenantSharePaise / 100, commissionPaise / 100]
+    )
+    .catch(() => {})
 
   // settlement_ledger entries: +cod_remittance (platform received), then the deductions.
   // The delhivery row is omitted when the wallet already carried the charge, so the ledger
   // never shows a deduction the tenant did not actually take here.
-  await pool.query(
-    `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
+  await pool
+    .query(
+      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
      VALUES
        ($1, 'cod_remittance', $2, $3, now()),
        ($1, 'commission', $4, $5, now())`,
-    [opts.tenantId,
-     opts.grossAmountInr, `COD collected — order ${opts.orderRef}`,
-     -(commissionPaise / 100), `Platform commission (${(rate * 100).toFixed(1)}%) — order ${opts.orderRef}`]
-  ).catch(() => {})
+      [
+        opts.tenantId,
+        opts.grossAmountInr,
+        `COD collected — order ${opts.orderRef}`,
+        -(commissionPaise / 100),
+        `Platform commission (${(rate * 100).toFixed(1)}%) — order ${opts.orderRef}`,
+      ]
+    )
+    .catch(() => {})
 
   if (delhiveryPaise > 0) {
-    await pool.query(
-      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
+    await pool
+      .query(
+        `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
        VALUES ($1, 'delhivery_correction', $2, $3, now())`,
-      [opts.tenantId, -(delhiveryPaise / 100), `Delhivery charge (actual) — order ${opts.orderRef}`]
-    ).catch(() => {})
+        [opts.tenantId, -(delhiveryPaise / 100), `Delhivery charge (actual) — order ${opts.orderRef}`]
+      )
+      .catch(() => {})
   }
 }
 
@@ -621,29 +638,38 @@ export async function recordRefundSettlement(opts: {
   const pool = controlPlanePool()
 
   const suffix = opts.note ? ` — ${opts.note}` : ''
-  await pool.query(
-    `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
+  await pool
+    .query(
+      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
      SELECT $1, 'refund', $2, t.id, $3, now()
        FROM (SELECT id FROM tenant_transactions WHERE tenant_id = $1 AND order_ref = $4) t
      UNION ALL
      SELECT $1, 'refund', $2, NULL, $3, now()
       WHERE NOT EXISTS (SELECT 1 FROM tenant_transactions WHERE tenant_id = $1 AND order_ref = $4)`,
-    [opts.tenantId, -Math.abs(opts.reversedInr), `Refund reversed — order ${opts.orderRef}${suffix}`, opts.orderRef]
-  ).catch(() => {})
+      [opts.tenantId, -Math.abs(opts.reversedInr), `Refund reversed — order ${opts.orderRef}${suffix}`, opts.orderRef]
+    )
+    .catch(() => {})
 
   if (opts.unrecoveredInr > 0) {
-    await pool.query(
-      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
+    await pool
+      .query(
+        `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
        VALUES ($1, 'refund', $2, $3, now())`,
-      [opts.tenantId, -Math.abs(opts.unrecoveredInr),
-       `Refund NOT reversed (owed by tenant) — order ${opts.orderRef}${suffix}`]
-    ).catch(() => {})
+        [
+          opts.tenantId,
+          -Math.abs(opts.unrecoveredInr),
+          `Refund NOT reversed (owed by tenant) — order ${opts.orderRef}${suffix}`,
+        ]
+      )
+      .catch(() => {})
   }
 
-  await pool.query(
-    `UPDATE tenant_transactions SET status = 'refunded' WHERE tenant_id = $1 AND order_ref = $2`,
-    [opts.tenantId, opts.orderRef]
-  ).catch(() => {})
+  await pool
+    .query(`UPDATE tenant_transactions SET status = 'refunded' WHERE tenant_id = $1 AND order_ref = $2`, [
+      opts.tenantId,
+      opts.orderRef,
+    ])
+    .catch(() => {})
 }
 
 /**
@@ -672,20 +698,32 @@ export async function recordTenantTransaction(opts: {
   const tenantShare = opts.split ? opts.split.tenantShareInr : opts.grossAmountInr
   const commission = opts.split ? opts.split.platformCommissionInr : 0
   const gatewayFee = opts.split ? opts.split.gatewayFeeInr : 0
-  await controlPlanePool().query(
-    `INSERT INTO tenant_transactions
+  await controlPlanePool()
+    .query(
+      `INSERT INTO tenant_transactions
        (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod, gateway_txn_id, status, occurred_at)
      VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,$8,'captured',now())
      ON CONFLICT (tenant_id, order_ref) DO NOTHING`,
-    [opts.tenantId, opts.orderRef, opts.grossAmountInr, tenantShare, commission, gatewayFee,
-     !!opts.isCod, opts.gatewayTxnId ?? null],
-  ).catch(() => {})
+      [
+        opts.tenantId,
+        opts.orderRef,
+        opts.grossAmountInr,
+        tenantShare,
+        commission,
+        gatewayFee,
+        !!opts.isCod,
+        opts.gatewayTxnId ?? null,
+      ]
+    )
+    .catch(() => {})
 
   // Self-heal the transfer.processed race: the webhook may have fired (and matched 0 rows)
   // before this INSERT committed. If the transfer is already processed at Razorpay, settle now.
   // Order of the two events no longer matters. Best-effort; never blocks payment handling.
   if (opts.split && opts.gatewayTxnId && opts.gatewayTxnId.startsWith('trf_')) {
-    settleTenantTransaction({ tenantId: opts.tenantId, orderRef: opts.orderRef, transferId: opts.gatewayTxnId }).catch(() => {})
+    settleTenantTransaction({ tenantId: opts.tenantId, orderRef: opts.orderRef, transferId: opts.gatewayTxnId }).catch(
+      () => {}
+    )
   }
 }
 
@@ -723,11 +761,14 @@ export async function settleTenantTransaction(opts: {
   const where = opts.orderRef
     ? { clause: 'order_ref = $2', val: opts.orderRef }
     : { clause: 'gateway_txn_id = $2', val: opts.transferId! }
-  const row = await pool.query(
-    `SELECT id, order_ref, gateway_txn_id, tenant_share, platform_commission, gateway_fee, is_cod, status
+  const row = await pool
+    .query(
+      `SELECT id, order_ref, gateway_txn_id, tenant_share, platform_commission, gateway_fee, is_cod, status
        FROM tenant_transactions WHERE tenant_id = $1 AND ${where.clause} LIMIT 1`,
-    [opts.tenantId, where.val]
-  ).then(r => r.rows[0]).catch(() => null)
+      [opts.tenantId, where.val]
+    )
+    .then(r => r.rows[0])
+    .catch(() => null)
   if (!row || row.status !== 'captured' || row.is_cod) return 'noop'
 
   if (opts.verifyLive && row.gateway_txn_id?.startsWith('trf_')) {
@@ -735,19 +776,23 @@ export async function settleTenantTransaction(opts: {
     if (!live || live.status !== 'processed' || live.onHold) return 'noop'
   }
 
-  const flipped = await pool.query(
-    `UPDATE tenant_transactions SET status = 'settled'
+  const flipped = await pool
+    .query(
+      `UPDATE tenant_transactions SET status = 'settled'
       WHERE id = $1 AND status = 'captured' RETURNING id`,
-    [row.id]
-  ).then(r => r.rowCount ?? 0).catch(() => 0)
+      [row.id]
+    )
+    .then(r => r.rowCount ?? 0)
+    .catch(() => 0)
   if (!flipped) return 'noop'
 
   // Prepaid settlement ledger — mirror the COD shape, guarded so it writes once per order.
   const tenantShare = Number(row.tenant_share) || 0
   const commission = Number(row.platform_commission) || 0
   const gatewayFee = Number(row.gateway_fee) || 0
-  await pool.query(
-    `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
+  await pool
+    .query(
+      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
      SELECT * FROM (VALUES
         ($1::uuid, 'order_capture', $2::numeric, $5::uuid, $6::text, now()),
         ($1::uuid, 'commission',    $3::numeric, $5::uuid, $7::text, now()),
@@ -756,11 +801,18 @@ export async function settleTenantTransaction(opts: {
      WHERE NOT EXISTS (
        SELECT 1 FROM settlement_ledger
         WHERE tenant_id = $1 AND txn_id = $5 AND entry_type = 'order_capture')`,
-    [opts.tenantId, tenantShare, -Math.abs(commission), -Math.abs(gatewayFee), row.id,
-     `Order settled (tenant share) — order ${row.order_ref}`,
-     `Platform commission — order ${row.order_ref}`,
-     `Gateway fee — order ${row.order_ref}`]
-  ).catch(() => {})
+      [
+        opts.tenantId,
+        tenantShare,
+        -Math.abs(commission),
+        -Math.abs(gatewayFee),
+        row.id,
+        `Order settled (tenant share) — order ${row.order_ref}`,
+        `Platform commission — order ${row.order_ref}`,
+        `Gateway fee — order ${row.order_ref}`,
+      ]
+    )
+    .catch(() => {})
 
   return 'settled'
 }
@@ -781,20 +833,30 @@ export async function reconcileCapturedTransactions(opts?: {
   const limit = opts?.limit ?? 200
   const args: any[] = [age, limit]
   let scope = ''
-  if (opts?.tenantId) { args.push(opts.tenantId); scope = `AND tenant_id = $${args.length}` }
-  const rows = await pool.query(
-    `SELECT tenant_id, gateway_txn_id FROM tenant_transactions
+  if (opts?.tenantId) {
+    args.push(opts.tenantId)
+    scope = `AND tenant_id = $${args.length}`
+  }
+  const rows = await pool
+    .query(
+      `SELECT tenant_id, gateway_txn_id FROM tenant_transactions
       WHERE status = 'captured' AND is_cod = false
         AND gateway_txn_id LIKE 'trf_%'
         AND occurred_at < now() - ($1 || ' minutes')::interval
         ${scope}
       ORDER BY occurred_at ASC LIMIT $2`,
-    args
-  ).then(r => r.rows).catch(() => [])
+      args
+    )
+    .then(r => r.rows)
+    .catch(() => [])
 
   let settled = 0
   for (const r of rows) {
-    const res = await settleTenantTransaction({ tenantId: r.tenant_id, transferId: r.gateway_txn_id, verifyLive: true }).catch(() => 'noop' as const)
+    const res = await settleTenantTransaction({
+      tenantId: r.tenant_id,
+      transferId: r.gateway_txn_id,
+      verifyLive: true,
+    }).catch(() => 'noop' as const)
     if (res === 'settled') settled++
   }
   return { scanned: rows.length, settled }
@@ -805,11 +867,11 @@ export async function reconcileCapturedTransactions(opts?: {
  */
 export function mapBusinessType(kycType: string): LinkedAccountInput['businessType'] {
   const map: Record<string, LinkedAccountInput['businessType']> = {
-    proprietor:  'proprietorship',
+    proprietor: 'proprietorship',
     partnership: 'partnership',
-    pvt_ltd:     'private_limited',
-    llp:         'llp',
-    other:       'not_yet_registered',
+    pvt_ltd: 'private_limited',
+    llp: 'llp',
+    other: 'not_yet_registered',
   }
   return map[kycType] ?? 'not_yet_registered'
 }
@@ -823,9 +885,12 @@ export function inferProfileCategory(productCategories: string | null): { catego
   // 'e_commerce' are not members of 'ecommerce' and were rejected with
   // "Invalid business subcategory for business category: ecommerce".
   const cats = (productCategories ?? '').toLowerCase()
-  if (cats.includes('electronics') || cats.includes('gadget')) return { category: 'ecommerce', subcategory: 'electronics_and_furniture' }
-  if (cats.includes('fashion') || cats.includes('apparel')) return { category: 'ecommerce', subcategory: 'fashion_and_lifestyle' }
-  if (cats.includes('food') || cats.includes('groceri')) return { category: 'food', subcategory: 'online_food_ordering' }
+  if (cats.includes('electronics') || cats.includes('gadget'))
+    return { category: 'ecommerce', subcategory: 'electronics_and_furniture' }
+  if (cats.includes('fashion') || cats.includes('apparel'))
+    return { category: 'ecommerce', subcategory: 'fashion_and_lifestyle' }
+  if (cats.includes('food') || cats.includes('groceri'))
+    return { category: 'food', subcategory: 'online_food_ordering' }
   if (cats.includes('health') || cats.includes('beauty')) return { category: 'healthcare', subcategory: 'pharmacy' }
   return { category: 'ecommerce', subcategory: 'ecommerce_marketplace' }
 }

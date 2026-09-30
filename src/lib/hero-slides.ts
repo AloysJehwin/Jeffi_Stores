@@ -67,7 +67,5 @@ export async function getActiveHeroSlides(): Promise<HeroSlide[]> {
 
 /** All hero slides (admin management view). */
 export async function getAllHeroSlides(): Promise<HeroSlide[]> {
-  return queryMany<HeroSlide>(
-    `SELECT * FROM hero_slides ORDER BY display_order ASC, created_at ASC`
-  )
+  return queryMany<HeroSlide>(`SELECT * FROM hero_slides ORDER BY display_order ASC, created_at ASC`)
 }

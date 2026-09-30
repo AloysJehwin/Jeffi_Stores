@@ -66,9 +66,8 @@ async function getSuperAdminId(): Promise<string | null> {
 export async function createAutoTask(params: CreateAutoTaskParams): Promise<string | null> {
   try {
     const superAdminId = await getSuperAdminId()
-    const dueDate = params.dueInDays != null
-      ? new Date(Date.now() + params.dueInDays * 86400000).toISOString().slice(0, 10)
-      : null
+    const dueDate =
+      params.dueInDays != null ? new Date(Date.now() + params.dueInDays * 86400000).toISOString().slice(0, 10) : null
 
     const result = await query<{ id: string }>(
       `INSERT INTO customer_tasks

@@ -17,11 +17,22 @@ const statusHandlers = new Set<StatusHandler>()
 let retryMs = 1000
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-function emitStatus(s: StreamStatus) { statusHandlers.forEach(h => { try { h(s) } catch { /* listener bug */ } }) }
+function emitStatus(s: StreamStatus) {
+  statusHandlers.forEach(h => {
+    try {
+      h(s)
+    } catch {
+      /* listener bug */
+    }
+  })
+}
 
 function scheduleRetry() {
   if (retryTimer || handlers.size === 0) return
-  retryTimer = setTimeout(() => { retryTimer = null; connect() }, retryMs)
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    connect()
+  }, retryMs)
   retryMs = Math.min(retryMs * 2, 30_000)
 }
 
@@ -33,11 +44,25 @@ function connect() {
     scheduleRetry()
     return
   }
-  es.onopen = () => { retryMs = 1000; emitStatus('open') }
-  es.onmessage = (e) => {
+  es.onopen = () => {
+    retryMs = 1000
+    emitStatus('open')
+  }
+  es.onmessage = e => {
     let frame: AdminEventFrame | null = null
-    try { frame = JSON.parse(e.data) } catch { return }
-    if (frame) handlers.forEach(h => { try { h(frame!) } catch { /* listener bug */ } })
+    try {
+      frame = JSON.parse(e.data)
+    } catch {
+      return
+    }
+    if (frame)
+      handlers.forEach(h => {
+        try {
+          h(frame!)
+        } catch {
+          /* listener bug */
+        }
+      })
   }
   es.onerror = () => {
     es?.close()
@@ -57,7 +82,10 @@ export function subscribeAdminEvents(handler: Handler, onStatus?: StatusHandler)
     if (handlers.size === 0) {
       es?.close()
       es = null
-      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
       emitStatus('closed')
     }
   }
@@ -68,7 +96,10 @@ export function reconnectAdminEvents() {
   if (handlers.size === 0) return
   es?.close()
   es = null
-  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = null
+  }
   retryMs = 1000
   connect()
 }

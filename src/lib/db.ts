@@ -85,7 +85,9 @@ function buildDefaultPool(): Pool {
       config.connectionString = cleanUrl
       const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
       if (!fs.existsSync(certPath)) {
-        throw new Error(`RDS TLS certificate not found at ${certPath}. Download from https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`)
+        throw new Error(
+          `RDS TLS certificate not found at ${certPath}. Download from https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`
+        )
       }
       config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
     } else {
@@ -123,7 +125,9 @@ function attachErrorHandler(p: Pool): Pool {
   // so the pool self-heals on its own. We must keep this listener registered so
   // an idle-client error does not crash the process as an unhandled 'error'
   // event — but we deliberately do NOTHING here.
-  p.on('error', () => { /* idle-client error — pool already evicted it; no action needed */ })
+  p.on('error', () => {
+    /* idle-client error — pool already evicted it; no action needed */
+  })
   return p
 }
 
@@ -134,14 +138,17 @@ function getPool(explicitTenant?: TenantContextType | null): Pool {
   // fell back to the platform DB. Passing ctx explicitly is the robust path.
   const tenant = explicitTenant ?? getCurrentTenant()
   if (!tenant) {
-    if (!pool) { pool = buildDefaultPool(); dbGlobal.__appPool = pool }
+    if (!pool) {
+      pool = buildDefaultPool()
+      dbGlobal.__appPool = pool
+    }
     return pool
   }
   // Fail closed: falling back to the platform DB here leaks flagship data onto a tenant host.
   if (!tenant.infra || !tenant.infra.rdsEndpoint) {
     throw new Error(
       `Tenant "${tenant.slug}" has no RDS endpoint configured (tenant_infra.rds_endpoint is null) — ` +
-      `refusing to fall back to the platform database.`
+        `refusing to fall back to the platform database.`
     )
   }
   // Per-tenant pool, lazily built + cached by tenant id.
@@ -251,9 +258,12 @@ export async function getClient(): Promise<PoolClient> {
     await client.query(`SELECT set_config('audit.admin_id', $1, false)`, [adminId]).catch(() => {})
     const originalRelease = client.release.bind(client)
     ;(client as any).release = (err?: Error | boolean) => {
-      client.query(`SELECT set_config('audit.admin_id', '', false)`).catch(() => {}).finally(() => {
-        originalRelease(err as any)
-      })
+      client
+        .query(`SELECT set_config('audit.admin_id', '', false)`)
+        .catch(() => {})
+        .finally(() => {
+          originalRelease(err as any)
+        })
     }
   }
   return client

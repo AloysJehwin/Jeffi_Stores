@@ -1,14 +1,7 @@
 import { query, queryMany } from './db'
 import { hasScope } from './scopes'
 
-export type AdminNotificationCategory =
-  | 'orders'
-  | 'returns'
-  | 'reviews'
-  | 'b2b'
-  | 'support'
-  | 'kyc'
-  | 'inventory'
+export type AdminNotificationCategory = 'orders' | 'returns' | 'reviews' | 'b2b' | 'support' | 'kyc' | 'inventory'
 
 export type AdminNotificationSeverity = 'info' | 'warning' | 'critical'
 
@@ -68,10 +61,10 @@ export async function createAdminNotification(params: CreateParams): Promise<voi
     )
   } catch (err: any) {
     try {
-      await query(
-        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
-        ['createAdminNotification', JSON.stringify({ type: params.type, title: params.title, msg: err?.message, code: err?.code })]
-      )
+      await query(`INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`, [
+        'createAdminNotification',
+        JSON.stringify({ type: params.type, title: params.title, msg: err?.message, code: err?.code }),
+      ])
     } catch {}
   }
 }
@@ -108,8 +101,5 @@ export async function markRead(ids: string[]): Promise<void> {
 }
 
 export async function markAllRead(): Promise<void> {
-  await query(
-    `UPDATE admin_notifications SET is_read = true, read_at = now() WHERE is_read = false`,
-    []
-  )
+  await query(`UPDATE admin_notifications SET is_read = true, read_at = now() WHERE is_read = false`, [])
 }

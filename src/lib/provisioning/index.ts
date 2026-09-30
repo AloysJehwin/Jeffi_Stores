@@ -13,8 +13,6 @@ let cached: ProvisioningProvider | null = null
 
 export function getProvisioningProvider(): ProvisioningProvider {
   if (cached) return cached
-  cached = process.env.PROVISIONING_PROVIDER === 'aws'
-    ? new AwsProvisioningProvider()
-    : new StubProvisioningProvider()
+  cached = process.env.PROVISIONING_PROVIDER === 'aws' ? new AwsProvisioningProvider() : new StubProvisioningProvider()
   return cached
 }

@@ -6,7 +6,11 @@ import { humanizeLabel } from '@/lib/format'
  * "length_range_mm" meet. specKeySql must stay its exact SQL twin.
  */
 export function canonicalSpecKey(raw: string): string {
-  return raw.replace(/[()]/g, '').replace(/[_\s]+/g, ' ').trim().toLowerCase()
+  return raw
+    .replace(/[()]/g, '')
+    .replace(/[_\s]+/g, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 export function specKeySql(expr: string): string {
@@ -50,7 +54,14 @@ export const COLUMN_SPEC_ALIASES = {
   grade: ['grade', 'material grade'],
   color: ['color', 'colour'],
   size: ['size', 'sizes'],
-  compliance_standard: ['compliance standard', 'compliance standards', 'compliance', 'standard', 'standards', 'standard compliance'],
+  compliance_standard: [
+    'compliance standard',
+    'compliance standards',
+    'compliance',
+    'standard',
+    'standards',
+    'standard compliance',
+  ],
   safety_rating: ['safety rating'],
   brand_part_number: ['part number', 'brand part number'],
   hsn_code: ['hsn code', 'hsn'],

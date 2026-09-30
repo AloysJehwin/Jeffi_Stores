@@ -53,10 +53,7 @@ export async function mergeGuestToUser(guestUserId: string, actualUserId: string
  * @param authUserId Optional authenticated user ID
  * @returns The user ID to use for cart/wishlist operations
  */
-export async function getUserIdForSession(
-  sessionId: string | undefined,
-  authUserId?: string
-): Promise<string> {
+export async function getUserIdForSession(sessionId: string | undefined, authUserId?: string): Promise<string> {
   // If user is authenticated, return their ID
   if (authUserId) {
     return authUserId

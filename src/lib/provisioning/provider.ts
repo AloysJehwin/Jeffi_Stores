@@ -9,13 +9,13 @@
 // after crashes) — treat "already exists / already owned" as success.
 
 export interface CreateDbInstanceArgs {
-  dbInstanceId: string        // jeffi-tenant-{slug}
+  dbInstanceId: string // jeffi-tenant-{slug}
   paramGroup: string
   maxConnections: number
 }
 
 export interface AppInstanceArgs {
-  name: string              // jeffi-tenant-{slug} / jeffi-pool
+  name: string // jeffi-tenant-{slug} / jeffi-pool
   instanceType: string
   userData?: string
 }
@@ -76,7 +76,7 @@ export interface ProvisioningProvider {
    */
   ensureAppInstance(
     args: AppInstanceArgs,
-    onLaunched?: (instanceId: string) => Promise<void>,
+    onLaunched?: (instanceId: string) => Promise<void>
   ): Promise<{ instanceId: string; ip: string }>
 
   /** Terminate an app instance (dedicated-tenant teardown / pool delete). Idempotent. */

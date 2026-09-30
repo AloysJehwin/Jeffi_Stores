@@ -19,22 +19,21 @@ export interface TenantWallet {
 async function ensureWalletRow(tenantId: string): Promise<void> {
   await controlPlanePool().query(
     `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
-    [tenantId],
+    [tenantId]
   )
 }
 
 export async function getTenantWallet(tenantId: string, ledgerLimit = 50): Promise<TenantWallet> {
   const pool = controlPlanePool()
-  const w = await pool.query(
-    `SELECT balance, min_balance, currency FROM tenant_wallets WHERE tenant_id = $1`,
-    [tenantId],
-  )
+  const w = await pool.query(`SELECT balance, min_balance, currency FROM tenant_wallets WHERE tenant_id = $1`, [
+    tenantId,
+  ])
   const row = w.rows[0]
   const ledger = await pool.query(
     `SELECT entry_type, amount, order_ref, awb, note, occurred_at
        FROM wallet_ledger WHERE tenant_id = $1
       ORDER BY occurred_at DESC LIMIT $2`,
-    [tenantId, ledgerLimit],
+    [tenantId, ledgerLimit]
   )
   return {
     balance: row ? Number(row.balance) : 0,
@@ -47,7 +46,7 @@ export async function getTenantWallet(tenantId: string, ledgerLimit = 50): Promi
 export async function walletBelowMinimum(tenantId: string): Promise<boolean> {
   const res = await controlPlanePool().query(
     `SELECT balance < min_balance AS below FROM tenant_wallets WHERE tenant_id = $1`,
-    [tenantId],
+    [tenantId]
   )
   return !!res.rows[0]?.below
 }
@@ -59,15 +58,17 @@ export async function walletBelowMinimum(tenantId: string): Promise<boolean> {
  * row means no balance yet — treat as below minimum only if a positive minimum is configured.
  */
 export async function walletBlocksShipment(tenantId: string): Promise<boolean> {
-  const res = await controlPlanePool().query(
-    `SELECT t.own_delhivery,
+  const res = await controlPlanePool()
+    .query(
+      `SELECT t.own_delhivery,
             COALESCE(w.balance, 0) < COALESCE(w.min_balance, 0) AS below,
             w.tenant_id IS NULL AS no_wallet
        FROM tenants t
        LEFT JOIN tenant_wallets w ON w.tenant_id = t.id
       WHERE t.id = $1`,
-    [tenantId],
-  ).catch(() => null)
+      [tenantId]
+    )
+    .catch(() => null)
   const row = res?.rows[0]
   if (!row || row.own_delhivery) return false
   return !!row.below
@@ -81,12 +82,14 @@ export async function walletBlocksShipment(tenantId: string): Promise<boolean> {
  * user-facing reason.
  */
 export async function assertWalletCanCreateRvp(tenantId: string): Promise<string | null> {
-  const res = await controlPlanePool().query(
-    `SELECT t.own_delhivery, COALESCE(w.balance, 0) AS balance
+  const res = await controlPlanePool()
+    .query(
+      `SELECT t.own_delhivery, COALESCE(w.balance, 0) AS balance
        FROM tenants t LEFT JOIN tenant_wallets w ON w.tenant_id = t.id
       WHERE t.id = $1`,
-    [tenantId],
-  ).catch(() => null)
+      [tenantId]
+    )
+    .catch(() => null)
   const row = res?.rows[0]
   if (!row || row.own_delhivery) return null
   const balance = Number(row.balance) || 0
@@ -118,30 +121,27 @@ export async function rechargeWallet(opts: {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
-    await client.query(
-      `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
-      [opts.tenantId],
-    )
+    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [
+      opts.tenantId,
+    ])
     // ON CONFLICT DO NOTHING + rowCount is the whole guard: the loser of a concurrent race
     // inserts nothing and must NOT move the balance. A check-then-insert cannot do this.
     const ins = await client.query(
       `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, external_ref, note)
        VALUES ($1, 'recharge', $2, $3, $4)
        ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
-      [opts.tenantId, opts.amountInr, opts.externalRef ?? null, opts.note ?? 'Wallet recharge'],
+      [opts.tenantId, opts.amountInr, opts.externalRef ?? null, opts.note ?? 'Wallet recharge']
     )
     if (ins.rowCount === 0) {
       // Already credited for this reference — return the current balance untouched.
-      const cur = await client.query(
-        `SELECT balance FROM tenant_wallets WHERE tenant_id = $1`, [opts.tenantId],
-      )
+      const cur = await client.query(`SELECT balance FROM tenant_wallets WHERE tenant_id = $1`, [opts.tenantId])
       await client.query('COMMIT')
       return { ok: true, balance: Number(cur.rows[0]?.balance ?? 0), alreadyCredited: true }
     }
     const upd = await client.query(
       `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now()
         WHERE tenant_id = $1 RETURNING balance`,
-      [opts.tenantId, opts.amountInr],
+      [opts.tenantId, opts.amountInr]
     )
     await client.query('COMMIT')
     return { ok: true, balance: Number(upd.rows[0].balance) }
@@ -155,7 +155,11 @@ export async function rechargeWallet(opts: {
 
 export const WALLET_PICKUP_MIN_FLOOR_INR = 500 // balance must stay at/above this after a pickup
 
-export interface PickupEstimateItem { awb: string; orderRef?: string | null; estimateInr: number }
+export interface PickupEstimateItem {
+  awb: string
+  orderRef?: string | null
+  estimateInr: number
+}
 
 /**
  * Charge the estimated Delhivery cost for one or more AWBs (platform-Delhivery tenants only). Called
@@ -188,13 +192,15 @@ export async function chargeDeliveryEstimate(opts: {
   if (!client) return { ok: false, error: 'Failed to open wallet transaction.' }
   try {
     await client.query('BEGIN')
-    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [opts.tenantId])
+    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [
+      opts.tenantId,
+    ])
 
     // AWBs that already carry a debit are not re-charged and don't count toward the required sum.
     const awbs = items.map(i => i.awb)
     const existing = await client.query(
       `SELECT awb FROM wallet_ledger WHERE tenant_id = $1 AND entry_type = 'debit' AND awb = ANY($2::text[])`,
-      [opts.tenantId, awbs],
+      [opts.tenantId, awbs]
     )
     const already = new Set(existing.rows.map((r: any) => r.awb))
     const toCharge = items.filter(i => !already.has(i.awb))
@@ -203,7 +209,10 @@ export async function chargeDeliveryEstimate(opts: {
     const balRow = await client.query(`SELECT balance FROM tenant_wallets WHERE tenant_id = $1`, [opts.tenantId])
     const balance = Number(balRow.rows[0]?.balance ?? 0)
 
-    if (sum === 0) { await client.query('COMMIT'); return { ok: true, chargedInr: 0, balance } }
+    if (sum === 0) {
+      await client.query('COMMIT')
+      return { ok: true, chargedInr: 0, balance }
+    }
 
     if (balance - sum < floor) {
       await client.query('ROLLBACK')
@@ -218,12 +227,12 @@ export async function chargeDeliveryEstimate(opts: {
         `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
          VALUES ($1, 'debit', $2, $3, $4, $5)
          ON CONFLICT (tenant_id, awb) WHERE awb IS NOT NULL AND entry_type = 'debit' DO NOTHING`,
-        [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `Pickup estimate — AWB ${i.awb}`],
+        [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `Pickup estimate — AWB ${i.awb}`]
       )
     }
     const upd = await client.query(
       `UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1 RETURNING balance`,
-      [opts.tenantId, sum],
+      [opts.tenantId, sum]
     )
     await client.query('COMMIT')
     return { ok: true, chargedInr: sum, balance: Number(upd.rows[0].balance) }
@@ -257,7 +266,7 @@ export async function refundEstimateForAwbs(opts: {
       const net = await client.query(
         `SELECT COALESCE(SUM(amount), 0) AS net FROM wallet_ledger
           WHERE tenant_id = $1 AND awb = $2 AND entry_type IN ('debit', 'adjustment')`,
-        [opts.tenantId, awb],
+        [opts.tenantId, awb]
       )
       const currentNet = Number(net.rows[0]?.net ?? 0)
       if (currentNet >= 0) continue // nothing owed for this AWB
@@ -265,15 +274,15 @@ export async function refundEstimateForAwbs(opts: {
       await client.query(
         `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, note)
          VALUES ($1, 'adjustment', $2, $3, $4)`,
-        [opts.tenantId, credit, awb, `Pickup estimate refund — AWB ${awb} (pickup failed)`],
+        [opts.tenantId, credit, awb, `Pickup estimate refund — AWB ${awb} (pickup failed)`]
       )
       refunded += credit
     }
     if (refunded > 0) {
-      await client.query(
-        `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`,
-        [opts.tenantId, refunded],
-      )
+      await client.query(`UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`, [
+        opts.tenantId,
+        refunded,
+      ])
     }
     await client.query('COMMIT')
     return { ok: true, refundedInr: refunded }
@@ -306,22 +315,26 @@ export async function debitWalletForAwb(opts: {
   if (!client) return false
   try {
     await client.query('BEGIN')
-    await client.query(
-      `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
-      [opts.tenantId],
-    )
+    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [
+      opts.tenantId,
+    ])
     const ins = await client.query(
       `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
        VALUES ($1, 'debit', $2, $3, $4, $5)
        ON CONFLICT (tenant_id, awb) WHERE awb IS NOT NULL AND entry_type = 'debit' DO NOTHING`,
-      [opts.tenantId, -Math.abs(opts.amountInr), opts.orderRef ?? null, opts.awb,
-       opts.note ?? `Delhivery charge — AWB ${opts.awb}`],
+      [
+        opts.tenantId,
+        -Math.abs(opts.amountInr),
+        opts.orderRef ?? null,
+        opts.awb,
+        opts.note ?? `Delhivery charge — AWB ${opts.awb}`,
+      ]
     )
     if (ins.rowCount && ins.rowCount > 0) {
-      await client.query(
-        `UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1`,
-        [opts.tenantId, Math.abs(opts.amountInr)],
-      )
+      await client.query(`UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1`, [
+        opts.tenantId,
+        Math.abs(opts.amountInr),
+      ])
     }
     await client.query('COMMIT')
     // Either branch is durably settled: a fresh debit committed, or the AWB was already charged
@@ -359,10 +372,12 @@ export async function settleDelhiveryCostToWallet(opts: {
   // would no-op and leave the ESTIMATE on the books forever. Reconcile instead: net the AWB to the
   // real invoiced amount (refund estimate, debit actual) in one movement. Fresh AWBs (no prior
   // debit — e.g. own historical flows) take the plain idempotent debit.
-  const existing = await pool.query(
-    `SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'debit' LIMIT 1`,
-    [opts.tenantId, opts.awb],
-  ).catch(() => null)
+  const existing = await pool
+    .query(`SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'debit' LIMIT 1`, [
+      opts.tenantId,
+      opts.awb,
+    ])
+    .catch(() => null)
   if (existing && (existing.rowCount ?? 0) > 0) {
     const res = await correctWalletDebitForAwb({
       tenantId: opts.tenantId,
@@ -403,14 +418,13 @@ export async function correctWalletDebitForAwb(opts: {
   if (!client) return { ok: false, error: 'Failed to open wallet transaction.' }
   try {
     await client.query('BEGIN')
-    await client.query(
-      `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`,
-      [opts.tenantId],
-    )
+    await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [
+      opts.tenantId,
+    ])
     const net = await client.query(
       `SELECT COALESCE(SUM(amount), 0) AS net FROM wallet_ledger
         WHERE tenant_id = $1 AND awb = $2 AND entry_type IN ('debit', 'adjustment')`,
-      [opts.tenantId, opts.awb],
+      [opts.tenantId, opts.awb]
     )
     const currentNet = Number(net.rows[0]?.net ?? 0)
     const target = -Math.abs(opts.newAmountInr)
@@ -422,13 +436,18 @@ export async function correctWalletDebitForAwb(opts: {
     await client.query(
       `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
        VALUES ($1, 'adjustment', $2, $3, $4, $5)`,
-      [opts.tenantId, delta, opts.orderRef ?? null, opts.awb,
-       opts.note ?? `Delhivery charge correction — AWB ${opts.awb}`],
+      [
+        opts.tenantId,
+        delta,
+        opts.orderRef ?? null,
+        opts.awb,
+        opts.note ?? `Delhivery charge correction — AWB ${opts.awb}`,
+      ]
     )
-    await client.query(
-      `UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`,
-      [opts.tenantId, delta],
-    )
+    await client.query(`UPDATE tenant_wallets SET balance = balance + $2, updated_at = now() WHERE tenant_id = $1`, [
+      opts.tenantId,
+      delta,
+    ])
     await client.query('COMMIT')
     return { ok: true, outcome: 'adjusted', delta }
   } catch (e: any) {
@@ -468,15 +487,15 @@ export interface ReconcileResult {
 export async function reconcileDelhiveryBilling(
   rows: BillingReconcileRow[],
   tenantId: string,
-  period: string,
+  period: string
 ): Promise<ReconcileResult[]> {
   const results: ReconcileResult[] = []
   if (!tenantId || !period || rows.length === 0) return results
 
   const pool = controlPlanePool()
   const flag = await pool.query(`SELECT own_delhivery FROM tenants WHERE id = $1`, [tenantId]).catch(() => null)
-  if (!flag?.rows[0]) return rows.map((r) => ({ awb: r.awb, outcome: 'error' as const }))
-  if (flag.rows[0].own_delhivery) return rows.map((r) => ({ awb: r.awb, outcome: 'exempt' as const }))
+  if (!flag?.rows[0]) return rows.map(r => ({ awb: r.awb, outcome: 'error' as const }))
+  if (flag.rows[0].own_delhivery) return rows.map(r => ({ awb: r.awb, outcome: 'exempt' as const }))
 
   for (const row of rows) {
     const awb = String(row.awb || '').trim()
@@ -488,14 +507,17 @@ export async function reconcileDelhiveryBilling(
 
     const marker = `adj:${awb}:${period}`
     const client = await pool.connect().catch(() => null)
-    if (!client) { results.push({ awb, outcome: 'error' }); continue }
+    if (!client) {
+      results.push({ awb, outcome: 'error' })
+      continue
+    }
     try {
       await client.query('BEGIN')
 
       const dup = await client.query(
         `SELECT 1 FROM wallet_ledger
           WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'adjustment' AND note LIKE $3 LIMIT 1`,
-        [tenantId, awb, `${marker}%`],
+        [tenantId, awb, `${marker}%`]
       )
       if (dup.rowCount && dup.rowCount > 0) {
         await client.query('ROLLBACK')
@@ -506,7 +528,7 @@ export async function reconcileDelhiveryBilling(
       const debitRes = await client.query(
         `SELECT amount FROM wallet_ledger
           WHERE tenant_id = $1 AND awb = $2 AND entry_type = 'debit' LIMIT 1`,
-        [tenantId, awb],
+        [tenantId, awb]
       )
       if (debitRes.rowCount === 0) {
         await client.query('ROLLBACK')
@@ -525,12 +547,12 @@ export async function reconcileDelhiveryBilling(
       await client.query(
         `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, note)
          VALUES ($1, 'adjustment', $2, $3, $4)`,
-        [tenantId, -delta, awb, `${marker} — Delhivery billing true-up (${period})`],
+        [tenantId, -delta, awb, `${marker} — Delhivery billing true-up (${period})`]
       )
-      await client.query(
-        `UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1`,
-        [tenantId, delta],
-      )
+      await client.query(`UPDATE tenant_wallets SET balance = balance - $2, updated_at = now() WHERE tenant_id = $1`, [
+        tenantId,
+        delta,
+      ])
       await client.query('COMMIT')
       results.push({ awb, outcome: 'adjusted', delta })
     } catch {

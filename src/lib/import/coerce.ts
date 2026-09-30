@@ -41,10 +41,18 @@ export function coerceCell(raw: unknown, coerce: Coercer): CoerceResult {
       return { value: d.toISOString().slice(0, 10) }
     }
     case 'csv':
-      return { value: s.split(',').map(x => x.trim()).filter(Boolean) }
+      return {
+        value: s
+          .split(',')
+          .map(x => x.trim())
+          .filter(Boolean),
+      }
     case 'json': {
-      try { return { value: JSON.parse(s) } }
-      catch { return { value: undefined, error: `not valid JSON: "${s.slice(0, 40)}"` } }
+      try {
+        return { value: JSON.parse(s) }
+      } catch {
+        return { value: undefined, error: `not valid JSON: "${s.slice(0, 40)}"` }
+      }
     }
     default:
       return { value: s }
@@ -61,7 +69,10 @@ export function parseImageUrls(raw: unknown): string[] {
   const out: string[] = []
   for (const part of s.split('|')) {
     const u = part.trim()
-    if (u && !seen.has(u)) { seen.add(u); out.push(u) }
+    if (u && !seen.has(u)) {
+      seen.add(u)
+      out.push(u)
+    }
   }
   return out
 }

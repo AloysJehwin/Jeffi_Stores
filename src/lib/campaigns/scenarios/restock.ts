@@ -27,15 +27,27 @@ export const restock: ScenarioModule<Params, Row> = {
   kind: 'restock',
   name: 'Back in Stock',
   description: 'Wishlisted product back in stock',
-  trigger: 'Fires when a product on a customer\'s wishlist transitions from out-of-stock (snapshot_in_stock=false) back to in-stock (inventory_quantity>0). One send per product per restock event; the wishlist snapshot is updated after sending so the next out→in transition will trigger again.',
+  trigger:
+    "Fires when a product on a customer's wishlist transitions from out-of-stock (snapshot_in_stock=false) back to in-stock (inventory_quantity>0). One send per product per restock event; the wishlist snapshot is updated after sending so the next out→in transition will trigger again.",
   defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false },
   paramSchema: {
-    maxWatchesPerSweep: { type: 'integer', min: 1, max: 1000, label: 'Max watches per run', description: 'Hard limit on wishlist rows scanned' },
-    whatsappEnabled:    { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
+    maxWatchesPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 1000,
+      label: 'Max watches per run',
+      description: 'Hard limit on wishlist rows scanned',
+    },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
   async findEligible({ params }) {
-    return queryMany<Row>(`
+    return queryMany<Row>(
+      `
       SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
              p.base_price::text AS current_price,
              (p.inventory_quantity > 0) AS current_in_stock
@@ -47,7 +59,9 @@ export const restock: ScenarioModule<Params, Row> = {
         AND wi.snapshot_in_stock = FALSE
         AND p.inventory_quantity > 0
       LIMIT $1
-    `, [params.maxWatchesPerSweep])
+    `,
+      [params.maxWatchesPerSweep]
+    )
   },
 
   async send(row, { campaign, params }) {

@@ -16,21 +16,43 @@
  */
 export const METRO_PINS_3 = new Set<string>([
   // Delhi / NCR
-  '110', '111', '112',
+  '110',
+  '111',
+  '112',
   // Mumbai (incl. suburbs, Thane, Navi Mumbai)
-  '400', '401', '402', '403', '410', '421',
+  '400',
+  '401',
+  '402',
+  '403',
+  '410',
+  '421',
   // Bangalore / Bengaluru
-  '560', '561', '562', '563',
+  '560',
+  '561',
+  '562',
+  '563',
   // Chennai
-  '600', '601', '602', '603',
+  '600',
+  '601',
+  '602',
+  '603',
   // Hyderabad / Secunderabad
-  '500', '501', '502', '503',
+  '500',
+  '501',
+  '502',
+  '503',
   // Kolkata
-  '700', '711', '712',
+  '700',
+  '711',
+  '712',
   // Pune
-  '411', '412', '413',
+  '411',
+  '412',
+  '413',
   // Ahmedabad
-  '380', '382', '383',
+  '380',
+  '382',
+  '383',
 ])
 
 /**
@@ -66,7 +88,12 @@ function addDays(from: Date, days: number): Date {
  * handlingDays is floored at 2 (minimum dispatch time); extraDays floored at 0.
  * originPin (the default-warehouse ship-from pin) makes transit origin-aware.
  */
-export function computeEdd(opts: { pin: string; originPin?: string; handlingDays?: number; extraDays?: number }): string {
+export function computeEdd(opts: {
+  pin: string
+  originPin?: string
+  handlingDays?: number
+  extraDays?: number
+}): string {
   const handling = Math.max(2, Number(opts.handlingDays ?? 2) || 0)
   const extra = Math.max(0, Number(opts.extraDays ?? 0) || 0)
   const tat = handling + transitDays(opts.pin, opts.originPin) + extra

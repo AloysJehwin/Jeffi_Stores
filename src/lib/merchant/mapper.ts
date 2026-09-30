@@ -1,7 +1,4 @@
-import {
-  buildProductHighlights,
-  buildProductDetails,
-} from '@/lib/google-merchant-helpers'
+import { buildProductHighlights, buildProductDetails } from '@/lib/google-merchant-helpers'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 const TARGET_COUNTRY = 'IN'
@@ -13,11 +10,13 @@ function buildOfferId(sku: string): string {
 }
 
 function buildShipping(price: number) {
-  return [{
-    country: TARGET_COUNTRY,
-    service: 'Standard',
-    price: { value: '0', currency: 'INR' },
-  }]
+  return [
+    {
+      country: TARGET_COUNTRY,
+      service: 'Standard',
+      price: { value: '0', currency: 'INR' },
+    },
+  ]
 }
 
 function buildAdditionalImages(product: any, primaryId?: string): Array<{ link: string }> {
@@ -83,7 +82,7 @@ export function productToGmcItems(product: any): any[] {
       .filter((v: any) => v.price != null)
       .map((v: any) => {
         const price = Number(v.price)
-        const mrp = v.mrp ? Number(v.mrp) : (product.mrp ? Number(product.mrp) : null)
+        const mrp = v.mrp ? Number(v.mrp) : product.mrp ? Number(product.mrp) : null
         const hasSale = mrp && mrp > price
 
         return {
@@ -91,9 +90,13 @@ export function productToGmcItems(product: any): any[] {
           offerId: buildOfferId(v.sku),
           title: `${product.name} - ${v.variant_name}`,
           link: `${BASE_URL}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
-          price: { value: (hasSale ? (mrp || price) : (mrp || price)).toFixed(2), currency: 'INR' },
+          price: { value: (hasSale ? mrp || price : mrp || price).toFixed(2), currency: 'INR' },
           salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-          availability: !productActive ? 'out of stock' : (v.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock'),
+          availability: !productActive
+            ? 'out of stock'
+            : v.stock_status !== 'Out of Stock'
+              ? 'in stock'
+              : 'out of stock',
           itemGroupId: buildOfferId(product.sku),
           sizes: v.variant_name ? [v.variant_name] : undefined,
           gtin: v.gtin || product.gtin || undefined,
@@ -108,15 +111,21 @@ export function productToGmcItems(product: any): any[] {
   const mrp = product.mrp ? Number(product.mrp) : null
   const hasSale = mrp && mrp > price
 
-  return [{
-    ...common,
-    offerId: buildOfferId(product.sku),
-    title: product.name,
-    link: `${BASE_URL}/products/${product.slug}`,
-    price: { value: (mrp || price).toFixed(2), currency: 'INR' },
-    salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-    availability: !productActive ? 'out of stock' : (product.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock'),
-    sizes: product.size ? [product.size] : undefined,
-    costOfGoodsSold: cogs(product.cost_price),
-  }]
+  return [
+    {
+      ...common,
+      offerId: buildOfferId(product.sku),
+      title: product.name,
+      link: `${BASE_URL}/products/${product.slug}`,
+      price: { value: (mrp || price).toFixed(2), currency: 'INR' },
+      salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
+      availability: !productActive
+        ? 'out of stock'
+        : product.stock_status !== 'Out of Stock'
+          ? 'in stock'
+          : 'out of stock',
+      sizes: product.size ? [product.size] : undefined,
+      costOfGoodsSold: cogs(product.cost_price),
+    },
+  ]
 }

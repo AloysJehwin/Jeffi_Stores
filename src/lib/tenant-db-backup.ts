@@ -40,7 +40,7 @@ async function listTables(db: Pool | PoolClient): Promise<string[]> {
     `SELECT table_name
        FROM information_schema.tables
       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-      ORDER BY table_name`,
+      ORDER BY table_name`
   )
   return res.rows.map((r: any) => r.table_name)
 }
@@ -65,8 +65,8 @@ export async function dumpTenantDb(db: Pool | PoolClient, opts?: { database?: st
   for (const t of tableNames) {
     const q = quoteIdent(t)
     const res = await db.query(`SELECT * FROM public.${q}`)
-    const columns = res.fields.map((f) => f.name)
-    const rows = res.rows.map((row: any) => columns.map((c) => row[c]))
+    const columns = res.fields.map(f => f.name)
+    const rows = res.rows.map((row: any) => columns.map(c => row[c]))
     tables.push({ table: t, columns, rows })
   }
 
@@ -93,7 +93,10 @@ function reviveValue(v: any): any {
  * Runs inside one transaction with replication-role=replica so FK/trigger order is moot;
  * each table is TRUNCATEd first (idempotent re-runs) then bulk-inserted in chunks.
  */
-export async function restoreTenantDb(db: Pool | PoolClient, buffer: Buffer): Promise<{ tables: number; rows: number }> {
+export async function restoreTenantDb(
+  db: Pool | PoolClient,
+  buffer: Buffer
+): Promise<{ tables: number; rows: number }> {
   const json = (await gunzip(buffer)).toString('utf8')
   const archive = JSON.parse(json) as Archive
   if (archive.version !== ARCHIVE_VERSION) {
@@ -112,7 +115,10 @@ export async function restoreTenantDb(db: Pool | PoolClient, buffer: Buffer): Pr
     for (const t of archive.tables) {
       const q = quoteIdent(t.table)
       await client.query(`TRUNCATE public.${q} CASCADE`)
-      if (t.rows.length === 0) { tableCount++; continue }
+      if (t.rows.length === 0) {
+        tableCount++
+        continue
+      }
 
       const cols = t.columns.map(quoteIdent).join(', ')
       // Chunk multi-row INSERTs to stay well under the 65535 bind-param limit.
@@ -127,12 +133,9 @@ export async function restoreTenantDb(db: Pool | PoolClient, buffer: Buffer): Pr
         chunk.forEach((row, r) => {
           const ph = row.map((_, c) => `$${r * perRow + c + 1}`)
           tuples.push(`(${ph.join(', ')})`)
-          row.forEach((v) => values.push(reviveValue(v)))
+          row.forEach(v => values.push(reviveValue(v)))
         })
-        await client.query(
-          `INSERT INTO public.${q} (${cols}) VALUES ${tuples.join(', ')}`,
-          values,
-        )
+        await client.query(`INSERT INTO public.${q} (${cols}) VALUES ${tuples.join(', ')}`, values)
         rowCount += chunk.length
       }
       tableCount++

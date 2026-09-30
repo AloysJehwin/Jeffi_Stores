@@ -46,7 +46,8 @@ export async function verifyStaffToken(token: string | undefined | null): Promis
   if (!token) return null
   try {
     const { payload } = await jwtVerify(token, secret())
-    if (payload.type !== 'staff' || typeof payload.adminId !== 'string' || typeof payload.email !== 'string') return null
+    if (payload.type !== 'staff' || typeof payload.adminId !== 'string' || typeof payload.email !== 'string')
+      return null
     return {
       adminId: payload.adminId,
       tenantId: typeof payload.tenantId === 'string' ? payload.tenantId : null,
@@ -59,7 +60,10 @@ export async function verifyStaffToken(token: string | undefined | null): Promis
 }
 
 /** Claims from the request cookie, bound to the tenant of the current host. */
-export async function staffSessionFromRequest(req: NextRequest, currentTenantId: string | null): Promise<StaffTokenClaims | null> {
+export async function staffSessionFromRequest(
+  req: NextRequest,
+  currentTenantId: string | null
+): Promise<StaffTokenClaims | null> {
   const s = await verifyStaffToken(req.cookies.get(STAFF_COOKIE)?.value)
   if (!s) return null
   if ((s.tenantId ?? null) !== (currentTenantId ?? null)) return null

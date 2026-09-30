@@ -60,7 +60,11 @@ export async function sendOrderConfirmedSMS(params: {
   orderNumber: string
   total: number
 }): Promise<boolean> {
-  const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(params.total)
+  const amount = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(params.total)
   const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
   return sendSMS(
     params.phone,
@@ -85,10 +89,7 @@ export async function sendOrderShippedSMS(params: {
   )
 }
 
-export async function sendOrderDeliveredSMS(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
+export async function sendOrderDeliveredSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
   const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
   return sendSMS(
     params.phone,
@@ -111,10 +112,7 @@ export async function sendOrderCancelledSMS(params: {
   )
 }
 
-export async function sendOTPSMS(params: {
-  phone?: string | null
-  otp: string
-}): Promise<boolean> {
+export async function sendOTPSMS(params: { phone?: string | null; otp: string }): Promise<boolean> {
   const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
@@ -136,10 +134,7 @@ export async function sendVariantChangeRequestedSMS(params: {
   )
 }
 
-export async function sendPaymentFailedSMS(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
+export async function sendPaymentFailedSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
   const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
   return sendSMS(
     params.phone,
@@ -148,10 +143,7 @@ export async function sendPaymentFailedSMS(params: {
   )
 }
 
-export async function sendOutForDeliverySMS(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
+export async function sendOutForDeliverySMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
   const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,

@@ -5,7 +5,8 @@ import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
-const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
+const SELLER_ADD =
+  process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
 export interface PincodeServiceability {
@@ -30,15 +31,24 @@ export interface PincodeServiceability {
 export async function checkPincodeServiceability(pincode: string, tenantId?: string): Promise<PincodeServiceability> {
   const token = await resolveDelhiveryToken(tenantId)
   const pin = String(pincode ?? '').replace(/\D/g, '')
-  if (!/^\d{6}$/.test(pin)) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'A pincode is six digits.' }
-  if (!token) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Delivery partner not configured.' }
+  if (!/^\d{6}$/.test(pin))
+    return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'A pincode is six digits.' }
+  if (!token)
+    return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Delivery partner not configured.' }
 
   try {
-    const res = await fetch(
-      `https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pin}`,
-      { headers: { Authorization: `Token ${token}`, Accept: 'application/json' }, cache: 'no-store' },
-    )
-    if (!res.ok) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: `Could not check this pincode (${res.status}).` }
+    const res = await fetch(`https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pin}`, {
+      headers: { Authorization: `Token ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    })
+    if (!res.ok)
+      return {
+        serviceable: false,
+        pickup: false,
+        cod: false,
+        prepaid: false,
+        error: `Could not check this pincode (${res.status}).`,
+      }
     const data = await res.json().catch(() => null)
     const entry = data?.delivery_codes?.[0]?.postal_code
     if (!entry) return { serviceable: false, pickup: false, cod: false, prepaid: false }
@@ -52,7 +62,13 @@ export async function checkPincodeServiceability(pincode: string, tenantId?: str
       state: entry.state_code ?? undefined,
     }
   } catch {
-    return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Could not reach the delivery partner.' }
+    return {
+      serviceable: false,
+      pickup: false,
+      cod: false,
+      prepaid: false,
+      error: 'Could not reach the delivery partner.',
+    }
   }
 }
 
@@ -65,10 +81,10 @@ export type DelhiveryTokenCheck = 'valid' | 'invalid' | 'unverified'
 // (network failure, 5xx) is 'unverified', so an outage on their side is never read as a bad token.
 export async function verifyDelhiveryToken(token: string): Promise<DelhiveryTokenCheck> {
   try {
-    const res = await fetch(
-      'https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=110001',
-      { headers: { Authorization: `Token ${token}`, Accept: 'application/json' }, cache: 'no-store' },
-    )
+    const res = await fetch('https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=110001', {
+      headers: { Authorization: `Token ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    })
     if (res.ok) return 'valid'
     if (res.status === 401 || res.status === 403) return 'invalid'
     return 'unverified'
@@ -77,7 +93,10 @@ export async function verifyDelhiveryToken(token: string): Promise<DelhiveryToke
   }
 }
 
-export async function deactivateDelhiveryPickupLocation(name: string, tenantId?: string): Promise<{ ok: boolean; error?: string }> {
+export async function deactivateDelhiveryPickupLocation(
+  name: string,
+  tenantId?: string
+): Promise<{ ok: boolean; error?: string }> {
   const token = await resolveDelhiveryToken(tenantId)
   if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
   if (!name) return { ok: false, error: 'no pickup location name' }
@@ -175,12 +194,15 @@ export async function createDelhiveryPickupLocation(params: {
     const message = JSON.stringify(data).toLowerCase()
 
     const created = res.ok && data && data.success !== false
-    const alreadyExists = message.includes('already exists') || message.includes('duplicate') || message.includes('warehouse name')
+    const alreadyExists =
+      message.includes('already exists') || message.includes('duplicate') || message.includes('warehouse name')
 
     if (created || alreadyExists) {
       // Delhivery has no working GET-list API for this token, so we mirror every warehouse we
       // register into our own table and list from there. Upsert keeps re-registration idempotent.
-      await upsertPickupLocation({ name, pin: pincode, phone, address, city, state, tenantId: params.tenantId }).catch(() => {})
+      await upsertPickupLocation({ name, pin: pincode, phone, address, city, state, tenantId: params.tenantId }).catch(
+        () => {}
+      )
       return { ok: true }
     }
 
@@ -245,7 +267,15 @@ export async function listDelhiveryPickupLocations(tenantId?: string): Promise<D
     }
 
     const tid = tenantId ?? null
-    const result = await query<{ name: string; pin: string; phone: string; address: string; city: string; state: string; active: boolean }>(
+    const result = await query<{
+      name: string
+      pin: string
+      phone: string
+      address: string
+      city: string
+      state: string
+      active: boolean
+    }>(
       `SELECT name, pin, phone, address, city, state, active FROM delhivery_pickup_locations
        WHERE COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE($1::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
          AND active = true
@@ -275,7 +305,10 @@ export async function listDelhiveryPickupLocations(tenantId?: string): Promise<D
 // (name, pincode, phone, address) into the delhivery_* site_settings so the buyer delivery charge, EDD
 // origin, and shipment pickup all switch to it. The seller name mirrors the warehouse name unless a row
 // carries a distinct one (we only store one name). Returns the resolved name on success.
-export async function setDefaultPickupLocation(name: string, tenantId?: string): Promise<{ ok: boolean; error?: string }> {
+export async function setDefaultPickupLocation(
+  name: string,
+  tenantId?: string
+): Promise<{ ok: boolean; error?: string }> {
   if (!name) return { ok: false, error: 'no pickup location name' }
   const tid = tenantId ?? null
   const found = await query<{ name: string; pin: string; phone: string; address: string }>(
@@ -287,7 +320,10 @@ export async function setDefaultPickupLocation(name: string, tenantId?: string):
   const row = found.rows[0]
   if (!row) return { ok: false, error: 'Warehouse not found' }
   if (!/^\d{6}$/.test(String(row.pin ?? ''))) {
-    return { ok: false, error: 'This warehouse has no ship-from pincode on file. Re-add it with a pincode before setting it as default.' }
+    return {
+      ok: false,
+      error: 'This warehouse has no ship-from pincode on file. Re-add it with a pincode before setting it as default.',
+    }
   }
 
   const settings: Array<[string, string]> = [
@@ -336,7 +372,9 @@ export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: stri
     try {
       const { refundEstimateForAwbs } = await import('./wallet')
       await refundEstimateForAwbs({ tenantId, awbs: [awbNumber] })
-    } catch { /* wallet refund best-effort */ }
+    } catch {
+      /* wallet refund best-effort */
+    }
   }
 }
 
@@ -373,48 +411,59 @@ export async function createRVPShipment(params: {
   const RETURN_STATE = wh?.state || ''
 
   const {
-    consigneeName, address, pin, city, state,
-    invoiceRef, totalAmount, orderDate, weightKg, productDesc, quantity,
+    consigneeName,
+    address,
+    pin,
+    city,
+    state,
+    invoiceRef,
+    totalAmount,
+    orderDate,
+    weightKg,
+    productDesc,
+    quantity,
   } = params
 
   const rawPhone = params.phone.replace(/\D/g, '')
   const phone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
 
   const shipmentPayload = {
-    shipments: [{
-      name: consigneeName,
-      add: address,
-      pin,
-      city,
-      state,
-      country: 'India',
-      phone,
-      order: `RVP-${invoiceRef}`,
-      payment_mode: 'Pickup',
-      order_type: 'reverse',
-      return_name: RETURN_NAME,
-      return_pin: RETURN_PIN,
-      return_city: RETURN_CITY,
-      return_phone: RETURN_PHONE,
-      return_add: RETURN_ADD,
-      return_state: RETURN_STATE,
-      return_country: 'India',
-      products_desc: productDesc,
-      hsn_code: '7318',
-      cod_amount: '0',
-      order_date: orderDate,
-      total_amount: totalAmount,
-      seller_add: RETURN_ADD,
-      seller_name: RETURN_NAME,
-      seller_inv: invoiceRef,
-      quantity: String(quantity),
-      waybill: '',
-      shipment_width: '15',
-      shipment_height: '15',
-      shipment_length: '20',
-      weight: String(weightKg),
-      qc_type: 'non_param',
-    }],
+    shipments: [
+      {
+        name: consigneeName,
+        add: address,
+        pin,
+        city,
+        state,
+        country: 'India',
+        phone,
+        order: `RVP-${invoiceRef}`,
+        payment_mode: 'Pickup',
+        order_type: 'reverse',
+        return_name: RETURN_NAME,
+        return_pin: RETURN_PIN,
+        return_city: RETURN_CITY,
+        return_phone: RETURN_PHONE,
+        return_add: RETURN_ADD,
+        return_state: RETURN_STATE,
+        return_country: 'India',
+        products_desc: productDesc,
+        hsn_code: '7318',
+        cod_amount: '0',
+        order_date: orderDate,
+        total_amount: totalAmount,
+        seller_add: RETURN_ADD,
+        seller_name: RETURN_NAME,
+        seller_inv: invoiceRef,
+        quantity: String(quantity),
+        waybill: '',
+        shipment_width: '15',
+        shipment_height: '15',
+        shipment_length: '20',
+        weight: String(weightKg),
+        qc_type: 'non_param',
+      },
+    ],
     pickup_location: { name: PICKUP_LOCATION },
   }
 
@@ -508,15 +557,16 @@ export interface InvoiceChargeQuery {
  * Still resolves to null rather than throwing (the caller treats charges as optional), but now
  * logs why, because a silent null is what hid this.
  */
-export async function fetchDelhiveryInvoiceCharges(
-  q: InvoiceChargeQuery
-): Promise<DelhiveryInvoiceCharges | null> {
+export async function fetchDelhiveryInvoiceCharges(q: InvoiceChargeQuery): Promise<DelhiveryInvoiceCharges | null> {
   const token = await resolveDelhiveryToken(q.tenantId)
   if (!token) return null
 
   if (!q.originPin || !q.destPin || !q.chargedWeightG) {
     console.warn('[delhivery] invoice charges skipped — missing params', {
-      awb: q.awb, originPin: q.originPin, destPin: q.destPin, chargedWeightG: q.chargedWeightG,
+      awb: q.awb,
+      originPin: q.originPin,
+      destPin: q.destPin,
+      chargedWeightG: q.chargedWeightG,
     })
     return null
   }
@@ -532,14 +582,11 @@ export async function fetchDelhiveryInvoiceCharges(
   })
 
   try {
-    const res = await fetch(
-      `https://track.delhivery.com/api/kinko/v1/invoice/charges/.json?${params}`,
-      {
-        headers: { Authorization: `Token ${token}` },
-        signal: AbortSignal.timeout(10_000),
-        cache: 'no-store',
-      }
-    )
+    const res = await fetch(`https://track.delhivery.com/api/kinko/v1/invoice/charges/.json?${params}`, {
+      headers: { Authorization: `Token ${token}` },
+      signal: AbortSignal.timeout(10_000),
+      cache: 'no-store',
+    })
 
     const body = await res.text()
     if (!res.ok) {
@@ -548,7 +595,9 @@ export async function fetchDelhiveryInvoiceCharges(
     }
 
     let data: unknown
-    try { data = JSON.parse(body) } catch {
+    try {
+      data = JSON.parse(body)
+    } catch {
       console.warn(`[delhivery] invoice charges non-JSON for ${q.awb}: ${body.slice(0, 200)}`)
       return null
     }
@@ -567,9 +616,10 @@ export async function fetchDelhiveryInvoiceCharges(
       return 0
     }
 
-    const tax = record.tax_data && typeof record.tax_data === 'object'
-      ? Object.values(record.tax_data as Record<string, unknown>).reduce<number>((s, v) => s + num(v), 0)
-      : 0
+    const tax =
+      record.tax_data && typeof record.tax_data === 'object'
+        ? Object.values(record.tax_data as Record<string, unknown>).reduce<number>((s, v) => s + num(v), 0)
+        : 0
 
     return {
       total: num(record.total_amount),

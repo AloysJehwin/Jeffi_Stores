@@ -8,16 +8,25 @@ import type { ToolDef } from '../tools'
 import { ok, err } from '../tool-envelope'
 import { ocrImage, ocrPdfPages } from '../vision'
 
-function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
 
 // ─── Signal agents (pure JS, run in parallel, no latency) ────────────────────
 
 /** Agent 1: cosine similarity from embeddings (0–1) */
-function embeddingSignal(sim: number): number { return clamp(sim, 0, 1) }
+function embeddingSignal(sim: number): number {
+  return clamp(sim, 0, 1)
+}
 
 /** Agent 2: Jaccard token overlap between query and product name (0–1) */
 function tokenOverlapSignal(queryText: string, name: string): number {
-  const tok = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean)
+  const tok = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
   const qToks = new Set(tok(queryText))
   const nToks = tok(name)
   if (!qToks.size || !nToks.length) return 0
@@ -28,7 +37,8 @@ function tokenOverlapSignal(queryText: string, name: string): number {
 /** Agent 3: exact match on spec numbers — dimensions, grades, standards (0 or 1) */
 function specNumberSignal(queryText: string, name: string): number {
   // extract tokens that look like specs: M8, M20, DIN933, 48mm, 2.5mm², 8.8, 6013, 3.15, etc.
-  const specRe = /\b(?:[mM]\d+|[dD][iI][nN]\s*\d+|[iI][sS][oO]\s*\d+|\d+(?:\.\d+)?(?:mm|cm|m|kg|kn|kw|hp|bar|psi|inch|"|')?\s*(?:x\s*\d+(?:\.\d+)?(?:mm|cm)?)?|\d+\.\d+)\b/g
+  const specRe =
+    /\b(?:[mM]\d+|[dD][iI][nN]\s*\d+|[iI][sS][oO]\s*\d+|\d+(?:\.\d+)?(?:mm|cm|m|kg|kn|kw|hp|bar|psi|inch|"|')?\s*(?:x\s*\d+(?:\.\d+)?(?:mm|cm)?)?|\d+\.\d+)\b/g
   const qSpecs = new Set((queryText.match(specRe) || []).map(s => s.toLowerCase().replace(/\s+/g, '')))
   const nSpecs = new Set((name.match(specRe) || []).map(s => s.toLowerCase().replace(/\s+/g, '')))
   if (!qSpecs.size) return 0.5 // no specs in query — neutral, don't penalise
@@ -40,13 +50,17 @@ function specNumberSignal(queryText: string, name: string): number {
 function skuFragmentSignal(queryText: string, sku: string | null): number {
   if (!sku) return 0.5 // no SKU — neutral
   const skuNorm = sku.toLowerCase()
-  const tokens = queryText.toLowerCase().replace(/[^a-z0-9-]/g, ' ').split(/\s+/).filter(t => t.length >= 3)
+  const tokens = queryText
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length >= 3)
   return tokens.some(t => skuNorm.includes(t)) ? 1 : 0.5
 }
 
 /** Fast-path aggregator: weighted combination of the four JS signal agents */
 function aggregateSignals(sim: number, tokenOverlap: number, specNum: number, skuFrag: number): number {
-  const score = sim * 0.50 + tokenOverlap * 0.20 + specNum * 0.20 + skuFrag * 0.10
+  const score = sim * 0.5 + tokenOverlap * 0.2 + specNum * 0.2 + skuFrag * 0.1
   return Math.round(clamp(score * 100, 0, 100))
 }
 
@@ -81,7 +95,11 @@ function fmtINR(n: number | string | null | undefined): string {
 }
 function fmtDate(d: string | Date | null | undefined): string {
   if (!d) return '—'
-  try { return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) } catch { return String(d) }
+  try {
+    return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  } catch {
+    return String(d)
+  }
 }
 
 const ORDER_STATUS_FLOW = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
@@ -89,12 +107,17 @@ const PAYMENT_MODES = ['cash', 'card', 'upi', 'bank_transfer', 'cheque', 'razorp
 
 const list_quotations: ToolDef = {
   name: 'list_quotations',
-  description: 'Recent quotations, optionally filtered by status (draft|final|cancelled), by customer (substring on consignee_name/email), or by days back. Returns quote_number, customer, total, status.',
+  description:
+    'Recent quotations, optionally filtered by status (draft|final|cancelled), by customer (substring on consignee_name/email), or by days back. Returns quote_number, customer, total, status.',
   inputSchema: {
     type: 'object',
     properties: {
       status: { type: 'string', description: 'draft | final | cancelled' },
-      customerId: { type: 'string', description: 'Substring match on consignee_name or consignee_email — quotations are not strictly tied to a users.id, so this is a fuzzy filter.' },
+      customerId: {
+        type: 'string',
+        description:
+          'Substring match on consignee_name or consignee_email — quotations are not strictly tied to a users.id, so this is a fuzzy filter.',
+      },
       daysBack: { type: 'integer', default: 30, minimum: 1, maximum: 365 },
       limit: { type: 'integer', default: 20, minimum: 1, maximum: 100 },
     },
@@ -105,7 +128,10 @@ const list_quotations: ToolDef = {
     const days = clamp(typeof daysBack === 'number' ? daysBack : 30, 1, 365)
     const params: unknown[] = [days]
     const where = [`q.created_at > NOW() - ($1 || ' days')::interval`]
-    if (status) { params.push(String(status)); where.push(`q.status = $${params.length}`) }
+    if (status) {
+      params.push(String(status))
+      where.push(`q.status = $${params.length}`)
+    }
     if (customerId) {
       params.push(`%${String(customerId)}%`)
       where.push(`(q.consignee_name ILIKE $${params.length} OR q.consignee_email ILIKE $${params.length})`)
@@ -162,7 +188,8 @@ const get_quotation: ToolDef = {
 
 const list_invoices: ToolDef = {
   name: 'list_invoices',
-  description: 'Recent invoices (drawn from orders.invoice_number IS NOT NULL). Filter by payment_status (paid|unpaid|partial|refunded), customer fragment, or days back.',
+  description:
+    'Recent invoices (drawn from orders.invoice_number IS NOT NULL). Filter by payment_status (paid|unpaid|partial|refunded), customer fragment, or days back.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -177,9 +204,15 @@ const list_invoices: ToolDef = {
     const lim = clamp(typeof limit === 'number' ? limit : 20, 1, 100)
     const days = clamp(typeof daysBack === 'number' ? daysBack : 30, 1, 365)
     const params: unknown[] = [days]
-    const where = [`o.invoice_number IS NOT NULL`, `o.source != 'cash_sale'`,
-                   `COALESCE(o.invoice_date, o.created_at) > NOW() - ($1 || ' days')::interval`]
-    if (status) { params.push(String(status)); where.push(`o.payment_status = $${params.length}`) }
+    const where = [
+      `o.invoice_number IS NOT NULL`,
+      `o.source != 'cash_sale'`,
+      `COALESCE(o.invoice_date, o.created_at) > NOW() - ($1 || ' days')::interval`,
+    ]
+    if (status) {
+      params.push(String(status))
+      where.push(`o.payment_status = $${params.length}`)
+    }
     if (customerId) {
       params.push(`%${String(customerId)}%`)
       where.push(`(o.customer_name ILIKE $${params.length} OR o.customer_email ILIKE $${params.length})`)
@@ -239,7 +272,8 @@ const get_invoice: ToolDef = {
 
 const list_cash_sales: ToolDef = {
   name: 'list_cash_sales',
-  description: 'Recent cash sales (walk-in invoices). Returns sale_number, invoice_number, customer, total, payment_mode.',
+  description:
+    'Recent cash sales (walk-in invoices). Returns sale_number, invoice_number, customer, total, payment_mode.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -313,17 +347,21 @@ interface QuotationItemInput {
   gstRate?: number
 }
 
-function vec(arr: number[]): string { return '[' + arr.join(',') + ']' }
+function vec(arr: number[]): string {
+  return '[' + arr.join(',') + ']'
+}
 
 const match_quotation_items: ToolDef = {
   name: 'match_quotation_items',
-  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search + text overlap scoring (0–100). Score ≥ 90 with a clear lead = matched (auto-add). Score 45–89 = ambiguous (admin confirms). Score < 45 = unmatched. Returns a quotation_resolver UI block for admin confirmation. Use BEFORE propose_create_quotation. Pass ALL lines in a SINGLE call (up to 50 lines). DOES NOT create anything — read-only.',
+  description:
+    'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search + text overlap scoring (0–100). Score ≥ 90 with a clear lead = matched (auto-add). Score 45–89 = ambiguous (admin confirms). Score < 45 = unmatched. Returns a quotation_resolver UI block for admin confirmation. Use BEFORE propose_create_quotation. Pass ALL lines in a SINGLE call (up to 50 lines). DOES NOT create anything — read-only.',
   inputSchema: {
     type: 'object',
     properties: {
       lines: {
         type: 'string',
-        description: 'JSON array string: [{"requestedText":"<item as the customer wrote it>","qty":50}, {"requestedText":"<another item>","qty":200}]. Each line.qty must be > 0.',
+        description:
+          'JSON array string: [{"requestedText":"<item as the customer wrote it>","qty":50}, {"requestedText":"<another item>","qty":200}]. Each line.qty must be > 0.',
       },
     },
     required: ['lines'],
@@ -345,7 +383,14 @@ const match_quotation_items: ToolDef = {
       requestedText: string
       qty: number
       status: 'matched' | 'ambiguous' | 'unmatched'
-      candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number; score: number }>
+      candidates: Array<{
+        productId: string
+        name: string
+        sku: string | null
+        price: number
+        sim: number
+        score: number
+      }>
     }> = []
 
     for (const line of parsed) {
@@ -394,7 +439,12 @@ const match_quotation_items: ToolDef = {
       // Text fallback: when HNSW returns 0 product candidates (replica unreachable or no embeddings),
       // do an ILIKE search on the primary DB so we still surface obvious name matches
       if (productSimMap.size === 0) {
-        const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/).filter(w => w.length >= 3)
+        const words = text
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, ' ')
+          .trim()
+          .split(/\s+/)
+          .filter(w => w.length >= 3)
         if (words.length > 0) {
           // Try each significant word as an ILIKE pattern; use the longest word first for selectivity
           const sorted = [...words].sort((a, b) => b.length - a.length)
@@ -416,9 +466,20 @@ const match_quotation_items: ToolDef = {
         .slice(0, 15)
         .map(([id]) => id)
       const candidates: Array<{
-        productId: string; name: string; sku: string | null; price: number; sim: number; score: number
+        productId: string
+        name: string
+        sku: string | null
+        price: number
+        sim: number
+        score: number
         imageUrl?: string | null
-        variants?: Array<{ id: string; name: string; sku: string | null; price: number; subVariants?: Array<{ id: string; name: string; sku: string | null; price: number }> }>
+        variants?: Array<{
+          id: string
+          name: string
+          sku: string | null
+          price: number
+          subVariants?: Array<{ id: string; name: string; sku: string | null; price: number }>
+        }>
       }> = []
       if (productIds.length > 0) {
         const rows = await queryMany<{ id: string; name: string; sku: string | null; price: number }>(
@@ -429,16 +490,18 @@ const match_quotation_items: ToolDef = {
           [productIds]
         )
         // Run all four JS signal agents in parallel per candidate
-        const scored = await Promise.all(rows.map(async r => {
-          const sim = productSimMap.get(r.id) ?? 0
-          const [tokenOverlap, specNum, skuFrag] = await Promise.all([
-            Promise.resolve(tokenOverlapSignal(text, r.name)),
-            Promise.resolve(specNumberSignal(text, r.name)),
-            Promise.resolve(skuFragmentSignal(text, r.sku)),
-          ])
-          const score = aggregateSignals(embeddingSignal(sim), tokenOverlap, specNum, skuFrag)
-          return { productId: r.id, name: r.name, sku: r.sku, price: Number(r.price) || 0, sim, score }
-        }))
+        const scored = await Promise.all(
+          rows.map(async r => {
+            const sim = productSimMap.get(r.id) ?? 0
+            const [tokenOverlap, specNum, skuFrag] = await Promise.all([
+              Promise.resolve(tokenOverlapSignal(text, r.name)),
+              Promise.resolve(specNumberSignal(text, r.name)),
+              Promise.resolve(skuFragmentSignal(text, r.sku)),
+            ])
+            const score = aggregateSignals(embeddingSignal(sim), tokenOverlap, specNum, skuFrag)
+            return { productId: r.id, name: r.name, sku: r.sku, price: Number(r.price) || 0, sim, score }
+          })
+        )
         candidates.push(...scored)
       }
       candidates.sort((a, b) => b.score - a.score)
@@ -452,14 +515,22 @@ const match_quotation_items: ToolDef = {
 
       let status: 'matched' | 'ambiguous' | 'unmatched'
       if (candidates.length === 0 || candidates[0].score < 45) status = 'unmatched'
-      else if (candidates[0].score >= 80 && (candidates.length === 1 || candidates[0].score - candidates[1].score >= 5)) status = 'matched'
+      else if (candidates[0].score >= 80 && (candidates.length === 1 || candidates[0].score - candidates[1].score >= 5))
+        status = 'matched'
       else status = 'ambiguous'
 
       // Enrich top-3 candidates with image + variant/subvariant data
       const topCandidates = candidates.slice(0, 3)
       const enrichIds = topCandidates.map(c => c.productId)
       if (enrichIds.length > 0) {
-        type VariantRow = { product_id: string; id: string; name: string; sku: string | null; price: number; sub_variants: string }
+        type VariantRow = {
+          product_id: string
+          id: string
+          name: string
+          sku: string | null
+          price: number
+          sub_variants: string
+        }
         const [images, variantRows] = await Promise.all([
           queryMany<{ product_id: string; url: string }>(
             `SELECT DISTINCT ON (product_id) product_id::text, image_url AS url
@@ -499,7 +570,11 @@ const match_quotation_items: ToolDef = {
           if (pvs.length > 0) {
             c.variants = pvs.map(v => {
               let subVariants: Array<{ id: string; name: string; sku: string | null; price: number }> = []
-              try { subVariants = JSON.parse(v.sub_variants) } catch { /* ok */ }
+              try {
+                subVariants = JSON.parse(v.sub_variants)
+              } catch {
+                /* ok */
+              }
               return { id: v.id, name: v.name, sku: v.sku, price: v.price, subVariants }
             })
           }
@@ -521,9 +596,11 @@ const match_quotation_items: ToolDef = {
     }
 
     return ok({
-      summary: `Resolved ${counts.matched}/${results.length} lines exactly` +
+      summary:
+        `Resolved ${counts.matched}/${results.length} lines exactly` +
         (counts.ambiguous > 0 ? `, ${counts.ambiguous} need confirmation` : '') +
-        (counts.unmatched > 0 ? `, ${counts.unmatched} unmatched` : '') + '.',
+        (counts.unmatched > 0 ? `, ${counts.unmatched} unmatched` : '') +
+        '.',
       count: results.length,
       data: { lines: results, counts },
       uiBlocks: [
@@ -540,7 +617,8 @@ const match_quotation_items: ToolDef = {
 
 const extract_quotation_lines_from_attachment: ToolDef = {
   name: 'extract_quotation_lines_from_attachment',
-  description: 'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty}], then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
+  description:
+    'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty}], then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -581,8 +659,9 @@ const extract_quotation_lines_from_attachment: ToolDef = {
       let text = ''
       try {
         const pdfParseMod = await import('pdf-parse')
-        const pdfParse = (pdfParseMod as { default?: (b: Buffer) => Promise<{ text: string }>; }).default
-          || (pdfParseMod as unknown as (b: Buffer) => Promise<{ text: string }>)
+        const pdfParse =
+          (pdfParseMod as { default?: (b: Buffer) => Promise<{ text: string }> }).default ||
+          (pdfParseMod as unknown as (b: Buffer) => Promise<{ text: string }>)
         const parsed = await pdfParse(row.data)
         text = (parsed?.text || '').trim()
       } catch {
@@ -599,21 +678,25 @@ const extract_quotation_lines_from_attachment: ToolDef = {
           )
         }
         text = visionResult.text
-        await query(
-          `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
-          [id, text]
-        ).catch(() => {})
+        await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
+          () => {}
+        )
         return ok({
           summary: `Vision OCR extracted ${text.length} chars from ${visionResult.pages || '?'} page(s) of "${row.filename || 'PDF'}".`,
           data: { text, mime_type: row.mime_type, filename: row.filename },
-          meta: { cached: false, char_count: text.length, source: 'vision_ocr', pages: visionResult.pages, model: visionResult.model },
+          meta: {
+            cached: false,
+            char_count: text.length,
+            source: 'vision_ocr',
+            pages: visionResult.pages,
+            model: visionResult.model,
+          },
         })
       }
 
-      await query(
-        `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
-        [id, text]
-      ).catch(() => {})
+      await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
+        () => {}
+      )
       return ok({
         summary: `Extracted ${text.length} chars from PDF "${row.filename || 'upload'}".`,
         data: { text, mime_type: row.mime_type, filename: row.filename },
@@ -631,10 +714,9 @@ const extract_quotation_lines_from_attachment: ToolDef = {
         )
       }
       const text = visionResult.text
-      await query(
-        `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
-        [id, text]
-      ).catch(() => {})
+      await query(`UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`, [id, text]).catch(
+        () => {}
+      )
       return ok({
         summary: `Vision OCR extracted ${text.length} chars from "${row.filename || 'image'}".`,
         data: { text, mime_type: row.mime_type, filename: row.filename },
@@ -648,13 +730,24 @@ const extract_quotation_lines_from_attachment: ToolDef = {
 
 const propose_create_quotation: ToolDef = {
   name: 'propose_create_quotation',
-  description: 'Propose creating a draft quotation for a customer with the given line items. Pass items as a JSON-stringified array. If unitPrice is omitted, the variant min-price (or product base_price) is used. Admin must approve before the draft is created.',
+  description:
+    'Propose creating a draft quotation for a customer with the given line items. Pass items as a JSON-stringified array. If unitPrice is omitted, the variant min-price (or product base_price) is used. Admin must approve before the draft is created.',
   inputSchema: {
     type: 'object',
     properties: {
-      customerEmail: { type: 'string', description: 'Email of the consignee (and buyer, since buyer_same defaults true).' },
-      addressId: { type: 'string', description: 'UUID of a saved address from the addresses table. Pass this when the admin picks an address via the choice_picker instead of typing individual fields.' },
-      consigneeName: { type: 'string', description: 'Override consignee name. If omitted, looked up from users table.' },
+      customerEmail: {
+        type: 'string',
+        description: 'Email of the consignee (and buyer, since buyer_same defaults true).',
+      },
+      addressId: {
+        type: 'string',
+        description:
+          'UUID of a saved address from the addresses table. Pass this when the admin picks an address via the choice_picker instead of typing individual fields.',
+      },
+      consigneeName: {
+        type: 'string',
+        description: 'Override consignee name. If omitted, looked up from users table.',
+      },
       consigneePhone: { type: 'string', description: 'Override consignee phone.' },
       consigneeAddr1: { type: 'string', description: 'Address line 1.' },
       consigneeAddr2: { type: 'string', description: 'Address line 2.' },
@@ -674,7 +767,8 @@ const propose_create_quotation: ToolDef = {
       buyerEmail: { type: 'string' },
       items: {
         type: 'string',
-        description: 'JSON array: [{productId, quantity, unitPrice?, discountPct?, variantId?, subVariantId?, unit?, buyUnit?, hsnCode?, gstRate?}]',
+        description:
+          'JSON array: [{productId, quantity, unitPrice?, discountPct?, variantId?, subVariantId?, unit?, buyUnit?, hsnCode?, gstRate?}]',
       },
       notes: { type: 'string', description: 'Optional internal notes for the quotation.' },
       quoteDate: { type: 'string', description: 'ISO date string YYYY-MM-DD. Defaults to today.' },
@@ -682,14 +776,31 @@ const propose_create_quotation: ToolDef = {
     required: ['customerEmail', 'items'],
   },
   mutating: true,
-  handler: async (args) => {
+  handler: async args => {
     const {
-      customerEmail, addressId,
-      consigneeName: nameOverride, consigneePhone, consigneeAddr1, consigneeAddr2,
-      consigneeCity, consigneeState, consigneeGstin, consigneePincode,
-      buyerSame, buyerName, buyerAddr1, buyerAddr2, buyerCity, buyerState,
-      buyerGstin, buyerPhone, buyerPincode, buyerEmail,
-      items, notes, quoteDate,
+      customerEmail,
+      addressId,
+      consigneeName: nameOverride,
+      consigneePhone,
+      consigneeAddr1,
+      consigneeAddr2,
+      consigneeCity,
+      consigneeState,
+      consigneeGstin,
+      consigneePincode,
+      buyerSame,
+      buyerName,
+      buyerAddr1,
+      buyerAddr2,
+      buyerCity,
+      buyerState,
+      buyerGstin,
+      buyerPhone,
+      buyerPincode,
+      buyerEmail,
+      items,
+      notes,
+      quoteDate,
     } = args as Record<string, any>
 
     const email = String(customerEmail || '').trim()
@@ -700,15 +811,22 @@ const propose_create_quotation: ToolDef = {
       const raw = typeof items === 'string' ? JSON.parse(items) : items
       if (!Array.isArray(raw)) throw new Error('not an array')
       parsed = raw as QuotationItemInput[]
-    } catch { throw new Error('items must be a JSON array') }
+    } catch {
+      throw new Error('items must be a JSON array')
+    }
     if (parsed.length < 1 || parsed.length > 50) throw new Error('items: provide 1-50 lines')
 
     const productIds = parsed.map(i => String(i.productId || '')).filter(Boolean)
     if (productIds.length !== parsed.length) throw new Error('every item needs a productId')
 
     const products = await queryMany<{
-      id: string; name: string; sku: string; gst_percentage: string;
-      hsn_code: string | null; price: string; base_price: string
+      id: string
+      name: string
+      sku: string
+      gst_percentage: string
+      hsn_code: string | null
+      price: string
+      base_price: string
     }>(
       `SELECT p.id::text, p.name, p.sku, COALESCE(p.gst_percentage, 18)::text AS gst_percentage,
               p.hsn_code,
@@ -718,13 +836,20 @@ const propose_create_quotation: ToolDef = {
       [productIds]
     )
     if (products.length !== new Set(productIds).size) {
-      throw new Error(`Only ${products.length} of ${new Set(productIds).size} unique productIds resolved to active products`)
+      throw new Error(
+        `Only ${products.length} of ${new Set(productIds).size} unique productIds resolved to active products`
+      )
     }
     const pById = new Map(products.map(p => [p.id, p]))
 
     const customer = await queryOne<{
-      user_id: string; first_name: string | null; last_name: string | null; phone: string | null;
-      business_address: string | null; gst_number: string | null; company_name: string | null;
+      user_id: string
+      first_name: string | null
+      last_name: string | null
+      phone: string | null
+      business_address: string | null
+      gst_number: string | null
+      company_name: string | null
     }>(
       `SELECT u.id::text AS user_id, u.first_name, u.last_name, u.phone,
               bp.business_address,
@@ -742,16 +867,22 @@ const propose_create_quotation: ToolDef = {
     const consigneeNameResolved = nameOverride
       ? String(nameOverride).trim()
       : customer
-        ? (customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || emailPrefix)
+        ? customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || emailPrefix
         : emailPrefix
 
     // Fetch saved addresses for the user (or resolve a specific one by ID)
     const savedAddresses = customer?.user_id
       ? await queryMany<{
-          id: string; full_name: string; phone: string;
-          address_line1: string; address_line2: string | null;
-          city: string; state: string; postal_code: string;
-          is_default: boolean; address_type: string;
+          id: string
+          full_name: string
+          phone: string
+          address_line1: string
+          address_line2: string | null
+          city: string
+          state: string
+          postal_code: string
+          is_default: boolean
+          address_type: string
         }>(
           `SELECT id::text, full_name, phone, address_line1, address_line2,
                   city, state, postal_code, is_default, address_type
@@ -763,9 +894,7 @@ const propose_create_quotation: ToolDef = {
       : []
 
     // If a specific addressId was passed (from picker), resolve it directly
-    const pickedAddr = addressId
-      ? (savedAddresses.find(a => a.id === String(addressId)) ?? null)
-      : null
+    const pickedAddr = addressId ? (savedAddresses.find(a => a.id === String(addressId)) ?? null) : null
 
     // Address disambiguation: if no explicit address and no picked ID, and multiple saved addresses exist
     const hasExplicitAddress = !!(consigneeAddr1 || consigneeCity || consigneeState || consigneePincode)
@@ -783,9 +912,10 @@ const propose_create_quotation: ToolDef = {
     }
 
     // Use the picked address, or the single/default saved address if no explicit fields provided
-    const addrToUse = pickedAddr
-      ?? (!hasExplicitAddress && savedAddresses.length === 1 ? savedAddresses[0] : null)
-      ?? (!hasExplicitAddress ? (savedAddresses.find(a => a.is_default) ?? null) : null)
+    const addrToUse =
+      pickedAddr ??
+      (!hasExplicitAddress && savedAddresses.length === 1 ? savedAddresses[0] : null) ??
+      (!hasExplicitAddress ? (savedAddresses.find(a => a.is_default) ?? null) : null)
 
     const previewItems = parsed.map(it => {
       const p = pById.get(String(it.productId))!
@@ -793,7 +923,7 @@ const propose_create_quotation: ToolDef = {
       if (!isFinite(qty) || qty <= 0) throw new Error(`Invalid quantity for ${p.name}`)
       const unitPrice = it.unitPrice != null && Number(it.unitPrice) > 0 ? Number(it.unitPrice) : Number(p.price)
       const discountPct = Number(it.discountPct) || 0
-      const gstRate = it.gstRate != null ? Number(it.gstRate) : (Number(p.gst_percentage) || 18)
+      const gstRate = it.gstRate != null ? Number(it.gstRate) : Number(p.gst_percentage) || 18
       const hsnCode = it.hsnCode || p.hsn_code || null
       const unit = it.unit || 'PCS'
       const buyUnit = it.buyUnit || null
@@ -801,14 +931,24 @@ const propose_create_quotation: ToolDef = {
       const subVariantId = it.subVariantId || null
       const lineAmount = lineItemExGst(qty, unitPrice, discountPct)
       return {
-        productId: p.id, variantId, subVariantId,
-        description: p.name, sku: p.sku, hsnCode, gstRate,
-        quantity: qty, unit, buyUnit, unitPrice, discountPct, lineAmount,
+        productId: p.id,
+        variantId,
+        subVariantId,
+        description: p.name,
+        sku: p.sku,
+        hsnCode,
+        gstRate,
+        quantity: qty,
+        unit,
+        buyUnit,
+        unitPrice,
+        discountPct,
+        lineAmount,
       }
     })
 
     const subtotal = previewItems.reduce((s, i) => s + i.lineAmount, 0)
-    const cgst = previewItems.reduce((s, i) => s + i.lineAmount * i.gstRate / 200, 0)
+    const cgst = previewItems.reduce((s, i) => s + (i.lineAmount * i.gstRate) / 200, 0)
     const sgst = cgst
     const total = round2(subtotal + cgst + sgst)
 
@@ -866,7 +1006,22 @@ const propose_create_quotation: ToolDef = {
           pairs: [
             { key: 'Customer', value: `${consigneeNameResolved} <${email}>` },
             ...(payload.consignee_phone ? [{ key: 'Phone', value: payload.consignee_phone }] : []),
-            ...(payload.consignee_addr1 ? [{ key: 'Address', value: [payload.consignee_addr1, payload.consignee_addr2, payload.consignee_city, payload.consignee_state, payload.consignee_pincode].filter(Boolean).join(', ') }] : []),
+            ...(payload.consignee_addr1
+              ? [
+                  {
+                    key: 'Address',
+                    value: [
+                      payload.consignee_addr1,
+                      payload.consignee_addr2,
+                      payload.consignee_city,
+                      payload.consignee_state,
+                      payload.consignee_pincode,
+                    ]
+                      .filter(Boolean)
+                      .join(', '),
+                  },
+                ]
+              : []),
             ...(payload.consignee_gstin ? [{ key: 'GSTIN', value: payload.consignee_gstin }] : []),
           ],
         },
@@ -889,7 +1044,11 @@ const propose_create_quotation: ToolDef = {
             { key: 'Total', value: `₹${fmtINR(total)}` },
           ],
         },
-        { type: 'text', value: `${previewItems.length} line item${previewItems.length === 1 ? '' : 's'} · status will be "draft" — admin can finalise after creation.`, weight: 'muted' },
+        {
+          type: 'text',
+          value: `${previewItems.length} line item${previewItems.length === 1 ? '' : 's'} · status will be "draft" — admin can finalise after creation.`,
+          weight: 'muted',
+        },
       ],
     }
   },
@@ -897,7 +1056,8 @@ const propose_create_quotation: ToolDef = {
 
 const propose_send_quotation_email: ToolDef = {
   name: 'propose_send_quotation_email',
-  description: 'Propose sending the quotation PDF link to the customer. Defaults toEmail to the quotation\'s consignee_email. Admin must approve before send.',
+  description:
+    "Propose sending the quotation PDF link to the customer. Defaults toEmail to the quotation's consignee_email. Admin must approve before send.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -910,8 +1070,14 @@ const propose_send_quotation_email: ToolDef = {
   handler: async ({ quotationId, quoteNumber, toEmail }) => {
     if (!quotationId && !quoteNumber) throw new Error('Provide quotationId or quoteNumber')
     const q = await queryOne<{
-      id: string; quote_number: string; status: string; consignee_email: string | null;
-      consignee_name: string | null; total_amount: string; view_token: string; quote_date: string
+      id: string
+      quote_number: string
+      status: string
+      consignee_email: string | null
+      consignee_name: string | null
+      total_amount: string
+      view_token: string
+      quote_date: string
     }>(
       `SELECT id::text, quote_number, status, consignee_email, consignee_name,
               total_amount::text, view_token::text, quote_date
@@ -921,7 +1087,8 @@ const propose_send_quotation_email: ToolDef = {
     )
     if (!q) throw new Error('Quotation not found')
     const recipient = String(toEmail || q.consignee_email || '').trim()
-    if (!recipient.includes('@')) throw new Error('No valid recipient — pass toEmail or set consignee_email on the quotation first')
+    if (!recipient.includes('@'))
+      throw new Error('No valid recipient — pass toEmail or set consignee_email on the quotation first')
     if (q.status === 'cancelled') {
       return { proposed: false, info: `Quotation ${q.quote_number} is cancelled — email not appropriate.` }
     }
@@ -951,7 +1118,11 @@ const propose_send_quotation_email: ToolDef = {
             { key: 'Valid until', value: fmtDate(validUntil) },
           ],
         },
-        { type: 'text', value: `Customer will receive the public link https://quotation.jeffistores.in/${q.view_token}.`, weight: 'muted' },
+        {
+          type: 'text',
+          value: `Customer will receive the public link https://quotation.jeffistores.in/${q.view_token}.`,
+          weight: 'muted',
+        },
       ],
     }
   },
@@ -959,7 +1130,8 @@ const propose_send_quotation_email: ToolDef = {
 
 const propose_mark_invoice_paid: ToolDef = {
   name: 'propose_mark_invoice_paid',
-  description: 'Propose marking an invoice (an order with invoice_number) as paid. Records payment_mode and an optional paidAt date. Admin must approve.',
+  description:
+    'Propose marking an invoice (an order with invoice_number) as paid. Records payment_mode and an optional paidAt date. Admin must approve.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -973,14 +1145,20 @@ const propose_mark_invoice_paid: ToolDef = {
   mutating: true,
   handler: async ({ invoiceId, invoiceNumber, paymentMode, paidAt }) => {
     if (!invoiceId && !invoiceNumber) throw new Error('Provide invoiceId or invoiceNumber')
-    const mode = String(paymentMode || '').trim().toLowerCase()
+    const mode = String(paymentMode || '')
+      .trim()
+      .toLowerCase()
     if (!PAYMENT_MODES.includes(mode)) throw new Error(`paymentMode must be one of: ${PAYMENT_MODES.join(', ')}`)
     const dateStr = String(paidAt || '').trim()
     if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('paidAt must be YYYY-MM-DD')
 
     const inv = await queryOne<{
-      id: string; order_number: string; invoice_number: string;
-      total_amount: string; payment_status: string; customer_name: string | null
+      id: string
+      order_number: string
+      invoice_number: string
+      total_amount: string
+      payment_status: string
+      customer_name: string | null
     }>(
       `SELECT id::text, order_number, invoice_number, total_amount::text, payment_status, customer_name
          FROM orders
@@ -1041,7 +1219,9 @@ const propose_update_order_status: ToolDef = {
   mutating: true,
   handler: async ({ orderId, orderNumber, newStatus, awbNumber }) => {
     if (!orderId && !orderNumber) throw new Error('Provide orderId or orderNumber')
-    const status = String(newStatus || '').trim().toLowerCase()
+    const status = String(newStatus || '')
+      .trim()
+      .toLowerCase()
     if (!ORDER_STATUS_FLOW.includes(status)) {
       throw new Error(`newStatus must be one of: ${ORDER_STATUS_FLOW.join(', ')}`)
     }
@@ -1049,8 +1229,13 @@ const propose_update_order_status: ToolDef = {
     if (awb && awb.length > 64) throw new Error('awbNumber too long (max 64)')
 
     const o = await queryOne<{
-      id: string; order_number: string; status: string; payment_status: string;
-      customer_name: string | null; total_amount: string; awb_number: string | null
+      id: string
+      order_number: string
+      status: string
+      payment_status: string
+      customer_name: string | null
+      total_amount: string
+      awb_number: string | null
     }>(
       `SELECT id::text, order_number, status, payment_status, customer_name,
               total_amount::text, awb_number
@@ -1083,14 +1268,16 @@ const propose_update_order_status: ToolDef = {
     ]
     if (isRegression) {
       blocks.push({
-        type: 'callout', tone: 'warn',
+        type: 'callout',
+        tone: 'warn',
         title: 'Status regression',
         message: `Moving from "${o.status}" back to "${status}" is unusual — confirm this is intentional.`,
       })
     }
     if (status === 'shipped' && !awb && !o.awb_number) {
       blocks.push({
-        type: 'callout', tone: 'info',
+        type: 'callout',
+        tone: 'info',
         message: 'Marking shipped without an AWB number — customer-facing tracking will be empty.',
       })
     }

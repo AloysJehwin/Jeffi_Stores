@@ -27,9 +27,9 @@ export interface AsinBackfillReport {
   gtin: number
   keyword: number
   unmatched: number
-  applied: number          // rows written (0 on dry run)
+  applied: number // rows written (0 on dry run)
   dryRun: boolean
-  rows: AsinBackfillRow[]   // sample (capped) for review
+  rows: AsinBackfillRow[] // sample (capped) for review
 }
 
 async function matchWithBackoff(input: Parameters<typeof matchAsin>[0]) {
@@ -48,16 +48,19 @@ async function matchWithBackoff(input: Parameters<typeof matchAsin>[0]) {
 
 async function runPool<T>(items: T[], worker: (item: T) => Promise<void>): Promise<void> {
   let i = 0
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
-    while (i < items.length) await worker(items[i++])
-  }))
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
+      while (i < items.length) await worker(items[i++])
+    })
+  )
 }
 
 // Fetch ASIN-less units to match: variants of active products, plus simple (no-variant) products.
 async function fetchTargets(brand: string | undefined, limit: number): Promise<AsinBackfillRow[]> {
   const brandClause = brand ? `AND b.name = $1` : ''
   const args: any[] = brand ? [brand] : []
-  const variants = await queryMany<any>(`
+  const variants = await queryMany<any>(
+    `
     SELECT pv.id, pv.sku, pv.gtin, pv.mpn, pv.variant_name,
            p.name AS product_name, p.gtin AS product_gtin, p.mpn AS product_mpn, b.name AS brand
       FROM product_variants pv
@@ -68,38 +71,55 @@ async function fetchTargets(brand: string | undefined, limit: number): Promise<A
        ${brandClause}
      ORDER BY p.name, pv.variant_name
      LIMIT ${limit}
-  `, args).catch(() => [])
+  `,
+    args
+  ).catch(() => [])
 
-  const simples = await queryMany<any>(`
+  const simples = await queryMany<any>(
+    `
     SELECT p.id, p.sku, p.gtin, p.mpn, p.name AS product_name, b.name AS brand
       FROM products p LEFT JOIN brands b ON b.id = p.brand_id
      WHERE p.is_active = true AND p.has_variants = false AND (p.asin IS NULL OR p.asin = '')
        ${brandClause}
      ORDER BY p.name
      LIMIT ${limit}
-  `, args).catch(() => [])
+  `,
+    args
+  ).catch(() => [])
 
   const rows: AsinBackfillRow[] = []
   for (const v of variants) {
     rows.push({
-      level: 'variant', id: v.id, sku: v.sku,
+      level: 'variant',
+      id: v.id,
+      sku: v.sku,
       name: `${v.brand || ''} ${v.product_name} ${v.variant_name || ''}`.trim(),
-      brand: v.brand || '', gtin: v.gtin || v.product_gtin || null, mpn: v.mpn || v.product_mpn || null,
-      asin: null, confidence: null,
+      brand: v.brand || '',
+      gtin: v.gtin || v.product_gtin || null,
+      mpn: v.mpn || v.product_mpn || null,
+      asin: null,
+      confidence: null,
     })
   }
   for (const p of simples) {
     rows.push({
-      level: 'product', id: p.id, sku: p.sku,
+      level: 'product',
+      id: p.id,
+      sku: p.sku,
       name: `${p.brand || ''} ${p.product_name}`.trim(),
-      brand: p.brand || '', gtin: p.gtin || null, mpn: p.mpn || null,
-      asin: null, confidence: null,
+      brand: p.brand || '',
+      gtin: p.gtin || null,
+      mpn: p.mpn || null,
+      asin: null,
+      confidence: null,
     })
   }
   return rows
 }
 
-export async function backfillAsins(opts: { dryRun?: boolean; brand?: string; limit?: number } = {}): Promise<AsinBackfillReport> {
+export async function backfillAsins(
+  opts: { dryRun?: boolean; brand?: string; limit?: number } = {}
+): Promise<AsinBackfillReport> {
   const dryRun = opts.dryRun !== false // default to dry run for safety
   const limit = Math.min(5000, Math.max(1, opts.limit || 2000))
 
@@ -109,8 +129,13 @@ export async function backfillAsins(opts: { dryRun?: boolean; brand?: string; li
 
   const targets = await fetchTargets(opts.brand, limit)
 
-  await runPool(targets, async (row) => {
-    const m = await matchWithBackoff({ gtin: row.gtin || undefined, mpn: row.mpn || undefined, brand: row.brand, name: row.name })
+  await runPool(targets, async row => {
+    const m = await matchWithBackoff({
+      gtin: row.gtin || undefined,
+      mpn: row.mpn || undefined,
+      brand: row.brand,
+      name: row.name,
+    })
     if (m?.asin) {
       row.asin = m.asin
       row.confidence = m.matchType === 'gtin' ? 'gtin' : 'keyword'
@@ -136,7 +161,9 @@ export async function backfillAsins(opts: { dryRun?: boolean; brand?: string; li
           )
         }
         applied++
-      } catch { /* skip row on error */ }
+      } catch {
+        /* skip row on error */
+      }
     }
   }
 

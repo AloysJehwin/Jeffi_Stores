@@ -1,4 +1,5 @@
-export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
+export type AdvancedFilterFieldType =
+  'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
 
 export interface AdvancedFilterField {
   name: string | [string, string]
@@ -36,9 +37,17 @@ export function specKeyFromParam(param: string): string | null {
   return key && key.length <= 120 ? key : null
 }
 
-const YES_NO = [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]
-const vh = (name: string, label: string, section: string): AdvancedFilterField =>
-  ({ name, label, type: 'value-help', section, placeholder: `Any ${label.toLowerCase()}` })
+const YES_NO = [
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' },
+]
+const vh = (name: string, label: string, section: string): AdvancedFilterField => ({
+  name,
+  label,
+  type: 'value-help',
+  section,
+  placeholder: `Any ${label.toLowerCase()}`,
+})
 
 /** Every product-list filter; the Controls page offers the same set. Technical-spec fields are added per store. */
 export const ADMIN_PRODUCT_FILTER_FIELDS: AdvancedFilterField[] = [
@@ -47,7 +56,17 @@ export const ADMIN_PRODUCT_FILTER_FIELDS: AdvancedFilterField[] = [
   { name: 'is_digital', label: 'Digital Product', type: 'boolean', section: 'Product Type' },
   { name: 'is_bundle', label: 'Bundle', type: 'boolean', section: 'Product Type' },
   { name: 'is_subscription', label: 'Subscription', type: 'boolean', section: 'Product Type' },
-  { name: 'condition', label: 'Condition', type: 'toggle', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
+  {
+    name: 'condition',
+    label: 'Condition',
+    type: 'toggle',
+    section: 'Product Type',
+    options: [
+      { value: 'new', label: 'New' },
+      { value: 'used', label: 'Used' },
+      { value: 'refurbished', label: 'Refurbished' },
+    ],
+  },
   vh('ai_product_type', 'Product Type (AI)', 'Product Type'),
   vh('variant_type', 'Variant Type', 'Product Type'),
   vh('supplier', 'Supplier', 'Product Type'),
@@ -57,7 +76,19 @@ export const ADMIN_PRODUCT_FILTER_FIELDS: AdvancedFilterField[] = [
   { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
   { name: ['mrp_min', 'mrp_max'], label: 'MRP Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
   { name: ['discount_min', 'discount_max'], label: 'Discount (%)', type: 'range', section: 'Pricing & Tax' },
-  { name: 'gst_percentage', label: 'GST %', type: 'multi-select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
+  {
+    name: 'gst_percentage',
+    label: 'GST %',
+    type: 'multi-select',
+    section: 'Pricing & Tax',
+    options: [
+      { value: '0', label: '0%' },
+      { value: '5', label: '5%' },
+      { value: '12', label: '12%' },
+      { value: '18', label: '18%' },
+      { value: '28', label: '28%' },
+    ],
+  },
   vh('hsn_code', 'HSN Code', 'Pricing & Tax'),
   vh('tax_class', 'Tax Class', 'Pricing & Tax'),
   { name: 'is_cod_allowed', label: 'COD Allowed', type: 'boolean', section: 'Pricing & Tax' },
@@ -65,7 +96,17 @@ export const ADMIN_PRODUCT_FILTER_FIELDS: AdvancedFilterField[] = [
 
   { name: ['stock_min', 'stock_max'], label: 'Stock Quantity', type: 'range', section: 'Inventory & Logistics' },
   { name: 'inventory_sync', label: 'Inventory Sync', type: 'boolean', section: 'Inventory & Logistics' },
-  { name: 'shipping_class', label: 'Shipping Class', type: 'multi-select', section: 'Inventory & Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
+  {
+    name: 'shipping_class',
+    label: 'Shipping Class',
+    type: 'multi-select',
+    section: 'Inventory & Logistics',
+    options: [
+      { value: 'standard', label: 'Standard' },
+      { value: 'express', label: 'Express' },
+      { value: 'freight', label: 'Freight' },
+    ],
+  },
   { name: 'is_oversized', label: 'Oversized', type: 'boolean', section: 'Inventory & Logistics' },
   vh('country_of_origin', 'Country of Origin', 'Inventory & Logistics'),
   vh('package_type', 'Package Type', 'Inventory & Logistics'),

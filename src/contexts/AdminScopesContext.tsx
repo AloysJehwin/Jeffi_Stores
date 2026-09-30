@@ -39,7 +39,11 @@ export function useCanUseAi(scope: string): boolean {
 }
 
 /** Renders its children only when useCanUseAi(scope) holds. */
-export function RequireAi({ scope, children, fallback = null }: {
+export function RequireAi({
+  scope,
+  children,
+  fallback = null,
+}: {
   scope: string
   children: ReactNode
   fallback?: ReactNode
@@ -48,7 +52,11 @@ export function RequireAi({ scope, children, fallback = null }: {
 }
 
 /** Renders its children only when the admin holds the write scope. */
-export function RequireWrite({ scope, children, fallback = null }: {
+export function RequireWrite({
+  scope,
+  children,
+  fallback = null,
+}: {
   scope: string
   children: ReactNode
   fallback?: ReactNode

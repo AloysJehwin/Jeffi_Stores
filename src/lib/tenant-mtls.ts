@@ -38,7 +38,11 @@ export function decodeClientCertHeader(raw: string | null | undefined): string |
   if (!raw || !raw.trim() || raw === '-') return null
   let pem = raw.trim()
   if (pem.includes('%')) {
-    try { pem = decodeURIComponent(pem) } catch { return null }
+    try {
+      pem = decodeURIComponent(pem)
+    } catch {
+      return null
+    }
   }
   pem = pem.replace(/\s*\\n\s*/g, '\n')
   return pem.includes('BEGIN CERTIFICATE') ? pem : null
@@ -77,7 +81,7 @@ export async function verifyTenantClientCert(certPem: string | null, tenantId: s
   const serial = (cert.serialNumber || '').toUpperCase()
   const r = await controlPlanePool().query(
     'SELECT revoked_at FROM tenant_admin_certs WHERE serial = $1 AND tenant_id = $2',
-    [serial, tenantId],
+    [serial, tenantId]
   )
   const row = r.rows[0]
   if (!row) return { ok: false, reason: 'unknown_serial', serial }

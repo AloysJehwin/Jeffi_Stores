@@ -32,7 +32,9 @@ function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string
   const masterUser = process.env.TENANT_RDS_MASTER_USER || 'postgres'
   const masterPassword = process.env.RDS_MASTER_PASSWORD
   if (!masterPassword) {
-    throw new Error('RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for the schema fan-out')
+    throw new Error(
+      'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for the schema fan-out'
+    )
   }
   const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
   const ssl = fs.existsSync(certPath)
@@ -93,8 +95,21 @@ async function recordRun(tenantId: string, gitSha: string, status: 'success' | '
 
 // Connection-level failures that a second attempt can reasonably clear; anything else is a real
 // schema problem and retrying would only repeat it.
-const TRANSIENT_PG_CODES = new Set(['08000', '08001', '08003', '08004', '08006', '08007', '57P01', '57P02', '57P03', '53300', '53400'])
-const TRANSIENT_MESSAGE = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout|Connection terminated|server closed the connection/i
+const TRANSIENT_PG_CODES = new Set([
+  '08000',
+  '08001',
+  '08003',
+  '08004',
+  '08006',
+  '08007',
+  '57P01',
+  '57P02',
+  '57P03',
+  '53300',
+  '53400',
+])
+const TRANSIENT_MESSAGE =
+  /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|EPIPE|timeout|Connection terminated|server closed the connection/i
 const RETRY_DELAY_MS = 3000
 
 export function isTransientDbError(err: unknown): boolean {
@@ -110,7 +125,13 @@ export function isTransientDbError(err: unknown): boolean {
  * (an error inside a DO block reports the block's inner statement via internalQuery instead).
  */
 export function describeSqlError(err: unknown, sql: string): string {
-  const e = err as { message?: string; code?: string; position?: string | number; internalQuery?: string; where?: string } | null
+  const e = err as {
+    message?: string
+    code?: string
+    position?: string | number
+    internalQuery?: string
+    where?: string
+  } | null
   const base = String(e?.message ?? err)
   const code = e?.code ? ` (code ${e.code})` : ''
   const pos = Number(e?.position)
@@ -122,7 +143,10 @@ export function describeSqlError(err: unknown, sql: string): string {
   } else if (e?.internalQuery) {
     near = e.internalQuery
   }
-  near = near.replace(/--[^\n]*/g, '').replace(/\s+/g, ' ').trim()
+  near = near
+    .replace(/--[^\n]*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
   if (near.length > 220) near = `${near.slice(0, 220)}...`
   return near ? `${base}${code} near: ${near}` : `${base}${code}`
 }
@@ -132,7 +156,10 @@ export function missingColumns(desired: Map<string, string[]>, live: Map<string,
   const missing: string[] = []
   for (const [table, cols] of desired) {
     const have = live.get(table)
-    if (!have) { missing.push(`${table}.*`); continue }
+    if (!have) {
+      missing.push(`${table}.*`)
+      continue
+    }
     for (const c of cols) if (!have.has(c)) missing.push(`${table}.${c}`)
   }
   return missing
@@ -160,7 +187,11 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
  * with what the files declare, so a column the reconciliation could not add is a failure here
  * instead of a silent gap discovered at request time.
  */
-export async function applySchemaToTenant(pool: Pool, schemaSql: string, desired: Map<string, string[]>): Promise<void> {
+export async function applySchemaToTenant(
+  pool: Pool,
+  schemaSql: string,
+  desired: Map<string, string[]>
+): Promise<void> {
   let attempt = 0
   for (;;) {
     attempt++
@@ -168,13 +199,18 @@ export async function applySchemaToTenant(pool: Pool, schemaSql: string, desired
       await pool.query(schemaSql)
       break
     } catch (err) {
-      if (attempt === 1 && isTransientDbError(err)) { await sleep(RETRY_DELAY_MS); continue }
+      if (attempt === 1 && isTransientDbError(err)) {
+        await sleep(RETRY_DELAY_MS)
+        continue
+      }
       throw new Error(describeSqlError(err, schemaSql))
     }
   }
   const missing = missingColumns(desired, await liveColumns(pool))
   if (missing.length > 0) {
-    throw new Error(`post-apply verification: ${missing.length} column(s) still missing: ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ', ...' : ''}`)
+    throw new Error(
+      `post-apply verification: ${missing.length} column(s) still missing: ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ', ...' : ''}`
+    )
   }
 }
 
@@ -198,7 +234,10 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
   const desired = desiredTableColumns()
 
   for (const t of targets) {
-    if (await alreadyApplied(t.id, gitSha)) { result.skipped++; continue }
+    if (await alreadyApplied(t.id, gitSha)) {
+      result.skipped++
+      continue
+    }
 
     let pool: Pool | null = null
     try {
@@ -219,16 +258,20 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
   return result
 }
 
-interface MigrationFile { filename: string; sql: string }
+interface MigrationFile {
+  filename: string
+  sql: string
+}
 
 /** Read database/migrations/*.sql in filename order (mirrors deploy/run-migrations.sh). */
 function readMigrationFiles(): MigrationFile[] {
   const dir = path.join(process.cwd(), 'database', 'migrations')
   if (!fs.existsSync(dir)) return []
-  return fs.readdirSync(dir)
-    .filter((f) => f.endsWith('.sql'))
+  return fs
+    .readdirSync(dir)
+    .filter(f => f.endsWith('.sql'))
     .sort()
-    .map((filename) => ({ filename, sql: fs.readFileSync(path.join(dir, filename), 'utf8') }))
+    .map(filename => ({ filename, sql: fs.readFileSync(path.join(dir, filename), 'utf8') }))
 }
 
 const SCHEMA_MIGRATIONS_DDL = `
@@ -263,8 +306,11 @@ export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutRes
       const doneRes = await pool.query('SELECT filename FROM schema_migrations')
       const done = new Set<string>(doneRes.rows.map((r: { filename: string }) => r.filename))
 
-      const pending = files.filter((f) => !done.has(f.filename))
-      if (pending.length === 0) { result.skipped++; continue }
+      const pending = files.filter(f => !done.has(f.filename))
+      if (pending.length === 0) {
+        result.skipped++
+        continue
+      }
 
       for (const f of pending) {
         await pool.query(f.sql)
@@ -286,7 +332,10 @@ export async function runMigrationFilesFanout(gitSha: string): Promise<FanoutRes
 }
 
 export interface TenantMigrationRun {
-  git_sha: string; status: string; error: string | null; ran_at: string
+  git_sha: string
+  status: string
+  error: string | null
+  ran_at: string
 }
 
 /** Migration history for one tenant, newest first — answers "is this store on current code?". */
@@ -302,9 +351,16 @@ export async function getTenantMigrationRuns(tenantId: string, limit = 10): Prom
 }
 
 /** Admin visibility: latest migration run per tenant. */
-export async function getMigrationRuns(limit = 100): Promise<Array<{
-  tenant_id: string; slug: string; git_sha: string; status: string; error: string | null; ran_at: string
-}>> {
+export async function getMigrationRuns(limit = 100): Promise<
+  Array<{
+    tenant_id: string
+    slug: string
+    git_sha: string
+    status: string
+    error: string | null
+    ran_at: string
+  }>
+> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT m.tenant_id, t.slug, m.git_sha, m.status, m.error, m.ran_at

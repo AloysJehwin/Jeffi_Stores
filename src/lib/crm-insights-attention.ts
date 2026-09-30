@@ -1,6 +1,12 @@
 import { queryMany } from './db'
 import {
-  CUSTOMER_AGG_CTE, CUSTOMER_SENDERS, OPEN_TASK, SEGMENT_PREDICATES, SESSION_STATE_CTE, UNANSWERED_INBOUND_WHERE, lowReviewsSql,
+  CUSTOMER_AGG_CTE,
+  CUSTOMER_SENDERS,
+  OPEN_TASK,
+  SEGMENT_PREDICATES,
+  SESSION_STATE_CTE,
+  UNANSWERED_INBOUND_WHERE,
+  lowReviewsSql,
 } from './crm-insights-sql'
 import type { AttentionItem, AttentionKind, AttentionSeverity } from './crm-insights-shared'
 
@@ -89,50 +95,55 @@ export async function getCrmAttention(limit = 20): Promise<AttentionItem[]> {
 
   const items: AttentionItem[] = [
     ...vips.map(r => ({
-      kind: 'vip_churn' as const, severity: 'high' as const,
+      kind: 'vip_churn' as const,
+      severity: 'high' as const,
       label: personName(r as Person),
       sub: `VIP at high churn risk, LTV ${rsStr(parseFloat(r.ltv || '0'))}, health ${r.score ?? 'n/a'}`,
       href: `/admin/customers/${r.id}`,
     })),
     ...chats.map(r => ({
-      kind: 'unanswered_chat' as const, severity: 'high' as const,
+      kind: 'unanswered_chat' as const,
+      severity: 'high' as const,
       label: personName(r as Person, 'Anonymous chat'),
       sub: `Chat waiting for a reply since ${agoStr(r.last_customer)}`,
       href: r.user_id ? `/admin/customers/${r.user_id}?chat=true` : '/admin/customers',
     })),
     ...messages.map(r => ({
-      kind: 'unanswered_message' as const, severity: 'high' as const,
+      kind: 'unanswered_message' as const,
+      severity: 'high' as const,
       label: personName(r as Person, r.from_number || 'Unknown number'),
       sub: `Inbound ${r.channel || 'message'} unanswered since ${agoStr(r.sent_at)}`,
       href: r.user_id ? `/admin/customers/${r.user_id}` : '/admin/customers',
     })),
     ...reviews.map(r => ({
-      kind: 'low_review' as const, severity: 'medium' as const,
+      kind: 'low_review' as const,
+      severity: 'medium' as const,
       label: `${r.rating} star review on ${r.product_name || 'a product'}`,
       sub: `${personName(r as Person)}, ${agoStr(r.created_at)}`,
       href: r.user_id ? `/admin/customers/${r.user_id}` : '/admin/reviews?filter=all',
     })),
     ...addresses.map(r => ({
-      kind: 'address_change' as const, severity: 'medium' as const,
+      kind: 'address_change' as const,
+      severity: 'medium' as const,
       label: `Address change on #${r.order_number || String(r.order_id).slice(0, 8)}`,
       sub: `${personName(r as Person, r.customer_name || 'Customer')}, requested ${agoStr(r.created_at)}`,
       href: `/admin/orders/${r.order_id}`,
     })),
     ...returns.map(r => ({
-      kind: 'return_request' as const, severity: 'medium' as const,
+      kind: 'return_request' as const,
+      severity: 'medium' as const,
       label: `${r.type === 'replacement' ? 'Replacement' : 'Return'} on #${r.order_number || String(r.order_id || '').slice(0, 8)}`,
       sub: `${personName(r as Person, r.customer_name || 'Customer')}, pending approval since ${agoStr(r.created_at)}`,
       href: r.order_id ? `/admin/orders/${r.order_id}` : '/admin/returns',
     })),
     ...tasks.map(r => ({
-      kind: 'overdue_task' as const, severity: 'low' as const,
+      kind: 'overdue_task' as const,
+      severity: 'low' as const,
       label: r.title || 'Task',
       sub: `${personName(r as Person)}, due ${agoStr(r.due_date)}`,
       href: `/admin/customers/${r.user_id}`,
     })),
   ]
 
-  return items
-    .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity])
-    .slice(0, limit)
+  return items.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]).slice(0, limit)
 }

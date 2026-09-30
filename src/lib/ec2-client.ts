@@ -15,11 +15,19 @@ const API_VERSION = '2016-11-15'
 async function ec2(params: Record<string, string>): Promise<string> {
   const body = new URLSearchParams({ Version: API_VERSION, ...params }).toString()
   const request = new HttpRequest({
-    method: 'POST', protocol: 'https:', hostname: EC2_HOST, path: '/',
+    method: 'POST',
+    protocol: 'https:',
+    hostname: EC2_HOST,
+    path: '/',
     headers: { host: EC2_HOST, 'content-type': 'application/x-www-form-urlencoded' },
     body,
   })
-  const signer = new SignatureV4({ service: 'ec2', region: 'us-east-1', credentials: defaultProvider(), sha256: Sha256 })
+  const signer = new SignatureV4({
+    service: 'ec2',
+    region: 'us-east-1',
+    credentials: defaultProvider(),
+    sha256: Sha256,
+  })
   const signed = await signer.sign(request)
   const res = await fetch(`https://${EC2_HOST}/`, { method: 'POST', headers: signed.headers as any, body })
   const text = await res.text()
@@ -33,10 +41,13 @@ function xmlTag(xml: string, tag: string): string | null {
 }
 
 function xmlTagAll(xml: string, tag: string): string[] {
-  return [...xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'g'))].map((m) => m[1])
+  return [...xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'g'))].map(m => m[1])
 }
 
-export interface InstanceState { instanceType: string; state: string }
+export interface InstanceState {
+  instanceType: string
+  state: string
+}
 
 export async function describeInstance(instanceId: string): Promise<InstanceState> {
   const xml = await ec2({ Action: 'DescribeInstances', 'InstanceId.1': instanceId })
@@ -84,11 +95,11 @@ export async function waitForState(instanceId: string, want: string, timeoutMs =
       // for a state it can never reach.
       if (everSeen) throw e
     }
-    await new Promise((r) => setTimeout(r, 8000))
+    await new Promise(r => setTimeout(r, 8000))
   }
   throw new Error(
     `EC2 ${instanceId} did not reach '${want}' within ${timeoutMs}ms` +
-    (everSeen ? '' : ' (never became visible to DescribeInstances)')
+      (everSeen ? '' : ' (never became visible to DescribeInstances)')
   )
 }
 
@@ -97,7 +108,7 @@ export async function waitForState(instanceId: string, want: string, timeoutMs =
 export interface RunInstanceArgs {
   instanceType: string
   name: string
-  userData?: string            // shell/cloud-config; base64-encoded here
+  userData?: string // shell/cloud-config; base64-encoded here
 }
 
 /** Launch a new EC2 running the app image. Config (AMI, SG, subnet, key, IAM profile) from env,
@@ -196,7 +207,10 @@ export async function currentPublicIp(): Promise<string | null> {
 /** Authorize a single CIDR on a TCP port in a security group. Idempotent: an existing
  * identical rule (InvalidPermission.Duplicate) is treated as success. */
 export async function authorizeSgIngress(args: {
-  groupId: string; cidr: string; port: number; description?: string
+  groupId: string
+  cidr: string
+  port: number
+  description?: string
 }): Promise<void> {
   try {
     await ec2({
@@ -215,9 +229,7 @@ export async function authorizeSgIngress(args: {
 }
 
 /** Revoke a previously authorized CIDR/port. Idempotent: NotFound is success. */
-export async function revokeSgIngress(args: {
-  groupId: string; cidr: string; port: number
-}): Promise<void> {
+export async function revokeSgIngress(args: { groupId: string; cidr: string; port: number }): Promise<void> {
   try {
     await ec2({
       Action: 'RevokeSecurityGroupIngress',

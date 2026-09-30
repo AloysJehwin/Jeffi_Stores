@@ -76,7 +76,11 @@ export interface AdminJWTPayload {
   [key: string]: any
 }
 
-export async function verifyToken(token: string, current?: string | null | SessionSignals, opts?: { touch?: boolean }): Promise<JWTPayload | null> {
+export async function verifyToken(
+  token: string,
+  current?: string | null | SessionSignals,
+  opts?: { touch?: boolean }
+): Promise<JWTPayload | null> {
   // Opaque admin-session resolve (token = the sid). Used by middleware + admin server
   // components. authCertCN comes from the snapshot on the session row. `current` carries the
   // request's device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip, fp);
@@ -173,7 +177,10 @@ export async function requireAdminScope(
 }
 
 /** `passive`: a tab checking in on its own (session check, event stream, bell poll), not the admin acting. */
-export async function authenticateAdmin(request: NextRequest, opts?: { passive?: boolean }): Promise<AdminJWTPayload | null> {
+export async function authenticateAdmin(
+  request: NextRequest,
+  opts?: { passive?: boolean }
+): Promise<AdminJWTPayload | null> {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
   const sid = getTokenFromRequest(request, adminCookieNameForHost(host))
   if (!sid) return null
@@ -230,10 +237,7 @@ export async function authenticateServiceAccount(request: NextRequest): Promise<
   return sa
 }
 
-export async function requireUserScope(
-  request: NextRequest,
-  scope: string
-): Promise<UserJWTPayload | NextResponse> {
+export async function requireUserScope(request: NextRequest, scope: string): Promise<UserJWTPayload | NextResponse> {
   const user = await authenticateUser(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(user.scopes ?? []).includes(scope)) {
@@ -256,18 +260,31 @@ export async function generateReviewToken(payload: ReviewTokenPayload): Promise<
     .sign(JWT_SECRET)
 }
 
-export async function verifyUserToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+export async function verifyUserToken(
+  token: string,
+  current?: string | null | SessionSignals
+): Promise<UserJWTPayload | null> {
   const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid: s.sid }
 }
 
-export async function verifyBusinessToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+export async function verifyBusinessToken(
+  token: string,
+  current?: string | null | SessionSignals
+): Promise<UserJWTPayload | null> {
   const s = await resolveSession(token, current === undefined ? await ambientSessionSignals() : current)
   if (!s || s.principalType !== 'business') return null
   // Default unknown → 'pending' (fail-closed): the middleware gates pending/rejected, so
   // a session without a snapshotted status must NOT be treated as approved.
-  return { userId: s.principalId, email: s.email || '', isBusiness: true, approvalStatus: s.approvalStatus || 'pending', scopes: s.scopes, sid: s.sid }
+  return {
+    userId: s.principalId,
+    email: s.email || '',
+    isBusiness: true,
+    approvalStatus: s.approvalStatus || 'pending',
+    scopes: s.scopes,
+    sid: s.sid,
+  }
 }
 
 export async function verifyReviewToken(token: string): Promise<ReviewTokenPayload | null> {

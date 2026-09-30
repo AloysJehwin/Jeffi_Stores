@@ -27,7 +27,10 @@ export interface AiChatRequest {
   cacheNamespace?: string
 }
 
-export interface AiToolCall { name: string; arguments: Record<string, unknown> }
+export interface AiToolCall {
+  name: string
+  arguments: Record<string, unknown>
+}
 
 export interface AiChatResponse {
   content: string
@@ -40,7 +43,11 @@ export interface AiChatResponse {
 }
 
 export class AiClientError extends Error {
-  constructor(message: string, public readonly provider: string, public readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public readonly provider: string,
+    public readonly cause?: unknown
+  ) {
     super(message)
     this.name = 'AiClientError'
   }
@@ -50,14 +57,16 @@ const GATEWAY_URL = (process.env.AI_GATEWAY_URL || 'http://100.82.208.8:8080').r
 const GATEWAY_TIMEOUT_MS = Number(process.env.AI_GATEWAY_TIMEOUT_MS) || 130_000
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
-  const cacheNamespace = req.cacheNamespace ?? await (async () => {
-    try {
-      const { resolveTenantId } = await import('@/lib/tenant-context')
-      return (await resolveTenantId()) ?? 'platform'
-    } catch {
-      return 'platform'
-    }
-  })()
+  const cacheNamespace =
+    req.cacheNamespace ??
+    (await (async () => {
+      try {
+        const { resolveTenantId } = await import('@/lib/tenant-context')
+        return (await resolveTenantId()) ?? 'platform'
+      } catch {
+        return 'platform'
+      }
+    })())
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), GATEWAY_TIMEOUT_MS)
   try {
@@ -96,7 +105,14 @@ export async function aiEmbed(input: string | string[], model?: string): Promise
   return data.embeddings as number[][]
 }
 
-export interface AiVisionResult { ok: boolean; text: string; model: string; pages?: number; error?: string; hint?: string }
+export interface AiVisionResult {
+  ok: boolean
+  text: string
+  model: string
+  pages?: number
+  error?: string
+  hint?: string
+}
 
 /** Vision/OCR via the gateway. `images` are base64 (no data: prefix). */
 export async function aiVision(images: string[], prompt: string, model?: string): Promise<AiVisionResult> {
@@ -112,7 +128,12 @@ export async function aiVision(images: string[], prompt: string, model?: string)
     if (!res.ok) return { ok: false, text: '', model: model || '', error: `AI gateway vision HTTP ${res.status}` }
     return (await res.json()) as AiVisionResult
   } catch (err) {
-    return { ok: false, text: '', model: model || '', error: err instanceof Error ? err.message : 'vision request failed' }
+    return {
+      ok: false,
+      text: '',
+      model: model || '',
+      error: err instanceof Error ? err.message : 'vision request failed',
+    }
   } finally {
     clearTimeout(t)
   }

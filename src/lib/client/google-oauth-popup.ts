@@ -20,7 +20,7 @@ export function openGoogleOAuthPopup({
   height = 600,
   returnTo,
 }: GoogleOAuthPopupOptions): Promise<GoogleOAuthResult> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     if (typeof window === 'undefined') {
       resolve({ accessToken: null, error: 'window unavailable' })
       return
@@ -35,10 +35,13 @@ export function openGoogleOAuthPopup({
       // e.g. https://acme.jeffistores.in → https://jeffistores.in
       //      https://admin-acme.jeffistores.in → https://jeffistores.in
       //      https://ecom.jeffistores.in → https://jeffistores.in
-      return origin.replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
-        // Strip app subdomains on non-jeffistores hosts too (e.g. certificate.localhost:3000 →
-        // localhost:3000), so the callback lands on the one registered dev redirect URI.
-        .replace(/^(https?:\/\/)(business|ecom|admin|certificate)\./, '$1')
+      return (
+        origin
+          .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
+          // Strip app subdomains on non-jeffistores hosts too (e.g. certificate.localhost:3000 →
+          // localhost:3000), so the callback lands on the one registered dev redirect URI.
+          .replace(/^(https?:\/\/)(business|ecom|admin|certificate)\./, '$1')
+      )
     }
     const mainOrigin = stripAppSubdomain(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
@@ -83,14 +86,19 @@ export function openGoogleOAuthPopup({
       window.removeEventListener('message', onMessage)
       window.clearInterval(closedInterval)
       window.clearTimeout(timeoutId)
-      try { popup.close() } catch {}
+      try {
+        popup.close()
+      } catch {}
       resolve(result)
     }
 
     // Safety net: resolve after 3 min so googleLoading never stays true forever
-    const timeoutId = window.setTimeout(() => {
-      finish({ accessToken: null, error: 'Sign-in timed out. Please try again.' })
-    }, 3 * 60 * 1000)
+    const timeoutId = window.setTimeout(
+      () => {
+        finish({ accessToken: null, error: 'Sign-in timed out. Please try again.' })
+      },
+      3 * 60 * 1000
+    )
 
     const onMessage = (event: MessageEvent) => {
       // Accept postMessage from the main origin (callback page) even when on an app subdomain

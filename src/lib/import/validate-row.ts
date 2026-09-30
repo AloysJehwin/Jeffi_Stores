@@ -42,8 +42,13 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       if (!sku) errors.push('product row is missing sku')
       if (!name) errors.push('product row is missing name')
       const group: ProductGroup = {
-        sku, name, values: row.values, imageUrls: row.imageUrls,
-        rowNumber: row.rowNumber, variants: [], errors,
+        sku,
+        name,
+        values: row.values,
+        imageUrls: row.imageUrls,
+        rowNumber: row.rowNumber,
+        variants: [],
+        errors,
       }
       if (sku && byProductSku.has(sku)) {
         group.errors.push(`duplicate product sku "${sku}" in file (also row ${byProductSku.get(sku)!.rowNumber})`)
@@ -58,7 +63,10 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
     if (row.rowType === 'variant') {
       const parent = row.parentSku && byProductSku.get(row.parentSku)
       if (!parent) {
-        orphans.push({ rowNumber: row.rowNumber, message: `variant references unknown parent_sku "${row.parentSku ?? ''}"` })
+        orphans.push({
+          rowNumber: row.rowNumber,
+          message: `variant references unknown parent_sku "${row.parentSku ?? ''}"`,
+        })
         continue
       }
       const sku = String(row.values.sku ?? '').trim()
@@ -79,7 +87,10 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
     if (row.rowType === 'sub_variant') {
       const parent = row.parentSku && byProductSku.get(row.parentSku)
       if (!parent) {
-        orphans.push({ rowNumber: row.rowNumber, message: `sub_variant references unknown parent_sku "${row.parentSku ?? ''}"` })
+        orphans.push({
+          rowNumber: row.rowNumber,
+          message: `sub_variant references unknown parent_sku "${row.parentSku ?? ''}"`,
+        })
         continue
       }
       const variant = parent.variants.find(v => v.sku && v.sku === row.variantSku)
@@ -88,7 +99,8 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
         continue
       }
       const errs = [...row.errors]
-      if (!String(row.values.sub_variant_name ?? '').trim()) errs.push('sub_variant row is missing sub_variant.sub_variant_name')
+      if (!String(row.values.sub_variant_name ?? '').trim())
+        errs.push('sub_variant row is missing sub_variant.sub_variant_name')
       if (errs.length) parent.errors.push(`${rowRef(row)}: ${errs.join('; ')}`)
       variant.subVariants.push({ values: row.values, rowNumber: row.rowNumber })
     }

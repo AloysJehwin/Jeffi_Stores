@@ -13,7 +13,10 @@ import { loadGoogleServiceAccount } from '../google-credentials'
 // when post.tenant_id === null.
 
 export class IntegrationNotConnectedError extends Error {
-  constructor(public provider: string, tenantId: string) {
+  constructor(
+    public provider: string,
+    tenantId: string
+  ) {
     super(`Integration '${provider}' is not connected for tenant ${tenantId}`)
     this.name = 'IntegrationNotConnectedError'
   }
@@ -85,7 +88,7 @@ export interface GoogleSheetsCreds {
  * platform sentinel); when omitted, the current ALS tenant is used. A connected provider is
  * required either way — this never falls back to a platform Google account. */
 export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<GoogleSheetsCreds> {
-  const id = tenantId ?? await resolveTenantId()
+  const id = tenantId ?? (await resolveTenantId())
   const cfg = id ? await tenantConfigFor(id, 'google_sheets') : null
   const refreshToken = cfg?.oauth_refresh_token
   if (refreshToken) {
@@ -96,8 +99,10 @@ export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<Googl
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: clientId, client_secret: clientSecret,
-        refresh_token: String(refreshToken), grant_type: 'refresh_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: String(refreshToken),
+        grant_type: 'refresh_token',
       }),
     })
     const data = await res.json().catch(() => null)
@@ -105,7 +110,10 @@ export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<Googl
       const reason = data?.error_description || data?.error || 'token_refresh_failed'
       throw new Error(`Google Sheets token refresh failed: ${reason}`)
     }
-    return { accessToken: String(data.access_token), spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null }
+    return {
+      accessToken: String(data.access_token),
+      spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null,
+    }
   }
   throw new IntegrationNotConnectedError('google_sheets', id ?? 'platform')
 }
@@ -140,7 +148,7 @@ export async function resolveAmazonCreds(): Promise<AmazonCreds> {
  * an explicit `tenantId` for callers that run off the ALS context (e.g. the sync-statuses cron);
  * when omitted, the current ALS tenant is used. */
 export async function resolveDelhiveryToken(tenantId?: string): Promise<string> {
-  const id = tenantId ?? await resolveTenantId()
+  const id = tenantId ?? (await resolveTenantId())
   if (id) {
     const cfg = await tenantConfigFor(id, 'delhivery')
     if (cfg?.token) return String(cfg.token)
@@ -171,7 +179,7 @@ export interface RazorpayCreds {
  * the webhook/verify Route split short-circuits when a tenant collects directly. Pass an explicit
  * `tenantId` for callers off the ALS context; when omitted, the current ALS tenant is used. */
 export async function resolveRazorpayCreds(tenantId?: string): Promise<RazorpayCreds> {
-  const id = tenantId ?? await resolveTenantId()
+  const id = tenantId ?? (await resolveTenantId())
   if (id) {
     const cfg = await tenantConfigFor(id, 'razorpay')
     if (cfg?.key_id && cfg?.key_secret) {

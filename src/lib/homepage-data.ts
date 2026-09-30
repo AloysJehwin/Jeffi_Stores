@@ -1,7 +1,12 @@
 import { queryMany } from '@/lib/db'
 import {
-  productRowKey, productSource, sectionLimit, visibleSections, withDefaults,
-  type HomepageSection, type ProductSource,
+  productRowKey,
+  productSource,
+  sectionLimit,
+  visibleSections,
+  withDefaults,
+  type HomepageSection,
+  type ProductSource,
 } from '@/lib/homepage-sections'
 
 export async function getConfiguredSections(): Promise<HomepageSection[]> {
@@ -10,7 +15,7 @@ export async function getConfiguredSections(): Promise<HomepageSection[]> {
       `SELECT id, type, title, subtitle, eyebrow, cta_label, cta_url, config,
               display_order, is_active, starts_at, ends_at
        FROM homepage_sections
-       ORDER BY display_order ASC, created_at ASC`,
+       ORDER BY display_order ASC, created_at ASC`
     )
     // Window filtering happens in JS, never SQL: a SQL NOW() would be baked into the
     // page's ISR cache entry and never re-evaluate.
@@ -38,9 +43,7 @@ function sourceClause(source: ProductSource, categorySlug: string | null): Sourc
       return { where: 'p.is_active = true AND p.mrp > p.price', orderBy: '(p.mrp - p.price) DESC' }
     case 'category':
       return {
-        where: categorySlug
-          ? 'p.is_active = true AND c.slug = $2'
-          : 'p.is_active = true',
+        where: categorySlug ? 'p.is_active = true AND c.slug = $2' : 'p.is_active = true',
         orderBy: 'p.created_at DESC',
       }
     case 'featured':
@@ -60,7 +63,7 @@ export interface ProductRowQueryDeps {
 export function buildProductRowSql(
   source: ProductSource,
   categorySlug: string | null,
-  deps: ProductRowQueryDeps,
+  deps: ProductRowQueryDeps
 ): string {
   const { where, orderBy } = sourceClause(source, categorySlug)
   return buildProductCardSql({ where, orderBy, limit: '$1' }, deps)
@@ -69,7 +72,7 @@ export function buildProductRowSql(
 /** The card-ready SELECT every product row uses, for any WHERE / ORDER BY / LIMIT placeholder. */
 export function buildProductCardSql(
   { where, orderBy, limit }: { where: string; orderBy: string; limit: string },
-  deps: ProductRowQueryDeps,
+  deps: ProductRowQueryDeps
 ): string {
   return `
     SELECT p.*,
@@ -97,7 +100,9 @@ export function buildProductCardSql(
  * Which product rows a page needs, de-duplicated. Two rows configured identically
  * (same source, limit and category) resolve to one query.
  */
-export function planProductRows(sections: HomepageSection[]): Map<string, { source: ProductSource; limit: number; categorySlug: string | null }> {
+export function planProductRows(
+  sections: HomepageSection[]
+): Map<string, { source: ProductSource; limit: number; categorySlug: string | null }> {
   const plan = new Map<string, { source: ProductSource; limit: number; categorySlug: string | null }>()
   for (const s of sections) {
     if (s.type !== 'product_row') continue

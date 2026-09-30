@@ -24,11 +24,29 @@ export type SectionType =
   | 'value_stats'
 
 export const SECTION_TYPES: SectionType[] = [
-  'hero', 'offer_slider', 'trust_strip', 'category_grid', 'brand_carousel', 'product_row',
-  'category_showcase', 'deal_of_the_day', 'promo_banner', 'featured_for_you',
-  'benefits', 'why_us', 'about', 'business_cta',
-  'countdown_deal', 'testimonials', 'recently_viewed', 'category_tabs', 'bundle_spotlight',
-  'back_in_stock', 'blog_teaser', 'social_strip', 'value_stats',
+  'hero',
+  'offer_slider',
+  'trust_strip',
+  'category_grid',
+  'brand_carousel',
+  'product_row',
+  'category_showcase',
+  'deal_of_the_day',
+  'promo_banner',
+  'featured_for_you',
+  'benefits',
+  'why_us',
+  'about',
+  'business_cta',
+  'countdown_deal',
+  'testimonials',
+  'recently_viewed',
+  'category_tabs',
+  'bundle_spotlight',
+  'back_in_stock',
+  'blog_teaser',
+  'social_strip',
+  'value_stats',
 ]
 
 /** Which query backs a product_row. Collapses the separate featured/new/best-seller fetches. */
@@ -59,29 +77,70 @@ export interface SectionMeta {
 }
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {
-  hero:              { label: 'Hero slides',      description: 'Full-width rotating banner at the top of the page.', singleton: true },
-  offer_slider:      { label: 'Offer slider',     description: 'Centered offer cards with left and right peek, each linking to its filtered products.', singleton: true },
-  trust_strip:       { label: 'Trust strip',      description: 'Row of delivery, returns and payment reassurances.' },
-  category_grid:     { label: 'Shop by category', description: 'Grid or carousel of top-level categories.' },
-  brand_carousel:    { label: 'Shop by brand',    description: 'Grid or carousel of brands you stock.' },
-  product_row:       { label: 'Product row',      description: 'Featured, new arrivals, best sellers, on sale, or one category.' },
+  hero: { label: 'Hero slides', description: 'Full-width rotating banner at the top of the page.', singleton: true },
+  offer_slider: {
+    label: 'Offer slider',
+    description: 'Centered offer cards with left and right peek, each linking to its filtered products.',
+    singleton: true,
+  },
+  trust_strip: { label: 'Trust strip', description: 'Row of delivery, returns and payment reassurances.' },
+  category_grid: { label: 'Shop by category', description: 'Grid or carousel of top-level categories.' },
+  brand_carousel: { label: 'Shop by brand', description: 'Grid or carousel of brands you stock.' },
+  product_row: { label: 'Product row', description: 'Featured, new arrivals, best sellers, on sale, or one category.' },
   category_showcase: { label: 'Category showcase', description: 'Large category cards with product thumbnails.' },
-  deal_of_the_day:   { label: 'Deal of the day',  description: 'A small set of highlighted offers.' },
-  promo_banner:      { label: 'Promo banner',     description: 'Seasonal or sale banner. Supports a start and end date.' },
-  featured_for_you:  { label: 'Featured for you', description: 'Personalised picks. Hidden for signed-out visitors.', singleton: true },
-  benefits:          { label: 'Benefits',         description: 'Why-shop-with-us tiles.' },
-  why_us:            { label: 'Why us',           description: 'Three larger cards explaining what sets the store apart.', singleton: true },
-  about:             { label: 'About',            description: 'Store story with stats.', singleton: true },
-  business_cta:      { label: 'Business CTA',     description: 'Banner promoting the B2B/bulk experience.', singleton: true },
-  countdown_deal:    { label: 'Countdown deal',   description: 'One product in a full-width banner with a live countdown. Hides itself when the timer ends.' },
-  testimonials:      { label: 'Testimonials',     description: 'Approved customer reviews, highest rated first.', singleton: true },
-  recently_viewed:   { label: 'Recently viewed',  description: 'Each visitor\'s own recently viewed products. Hidden until they have viewed enough.', singleton: true },
-  category_tabs:     { label: 'Category tabs',    description: 'Tabs for your top categories, each showing its best sellers.' },
-  bundle_spotlight:  { label: 'Bundle spotlight', description: 'Products sold as bundles, or ones you pick, with their saving.' },
-  back_in_stock:     { label: 'Back in stock',    description: 'Products that sold out and have just been restocked.', singleton: true },
-  blog_teaser:       { label: 'Guides and articles', description: 'Cards linking to your guides, articles or blog posts.', singleton: true },
-  social_strip:      { label: 'Social strip',     description: 'A row of photos linking to your social posts.', singleton: true },
-  value_stats:       { label: 'Store stats',      description: 'Animated live numbers: orders shipped, products, cities served, customers.', singleton: true },
+  deal_of_the_day: { label: 'Deal of the day', description: 'A small set of highlighted offers.' },
+  promo_banner: { label: 'Promo banner', description: 'Seasonal or sale banner. Supports a start and end date.' },
+  featured_for_you: {
+    label: 'Featured for you',
+    description: 'Personalised picks. Hidden for signed-out visitors.',
+    singleton: true,
+  },
+  benefits: { label: 'Benefits', description: 'Why-shop-with-us tiles.' },
+  why_us: { label: 'Why us', description: 'Three larger cards explaining what sets the store apart.', singleton: true },
+  about: { label: 'About', description: 'Store story with stats.', singleton: true },
+  business_cta: { label: 'Business CTA', description: 'Banner promoting the B2B/bulk experience.', singleton: true },
+  countdown_deal: {
+    label: 'Countdown deal',
+    description: 'One product in a full-width banner with a live countdown. Hides itself when the timer ends.',
+  },
+  testimonials: {
+    label: 'Testimonials',
+    description: 'Approved customer reviews, highest rated first.',
+    singleton: true,
+  },
+  recently_viewed: {
+    label: 'Recently viewed',
+    description: "Each visitor's own recently viewed products. Hidden until they have viewed enough.",
+    singleton: true,
+  },
+  category_tabs: {
+    label: 'Category tabs',
+    description: 'Tabs for your top categories, each showing its best sellers.',
+  },
+  bundle_spotlight: {
+    label: 'Bundle spotlight',
+    description: 'Products sold as bundles, or ones you pick, with their saving.',
+  },
+  back_in_stock: {
+    label: 'Back in stock',
+    description: 'Products that sold out and have just been restocked.',
+    singleton: true,
+  },
+  blog_teaser: {
+    label: 'Guides and articles',
+    description: 'Cards linking to your guides, articles or blog posts.',
+    singleton: true,
+  },
+  social_strip: {
+    label: 'Social strip',
+    description: 'A row of photos linking to your social posts.',
+    singleton: true,
+  },
+  value_stats: {
+    label: 'Store stats',
+    description: 'Animated live numbers: orders shipped, products, cities served, customers.',
+    singleton: true,
+  },
 }
 
 export interface SectionCopy {
@@ -96,13 +155,13 @@ export interface SectionCopy {
 
 /** Copy the storefront renders when a section leaves a field empty; the admin shows the same text. */
 export const SECTION_COPY_DEFAULTS = {
-  product_row:       { title: 'Products', ctaLabel: 'View All', ctaUrl: '/products' },
-  category_grid:     { eyebrow: 'Explore', title: 'Shop by Category' },
-  brand_carousel:    { eyebrow: 'Trusted Names', title: 'Shop by Brand' },
+  product_row: { title: 'Products', ctaLabel: 'View All', ctaUrl: '/products' },
+  category_grid: { eyebrow: 'Explore', title: 'Shop by Category' },
+  brand_carousel: { eyebrow: 'Trusted Names', title: 'Shop by Brand' },
   category_showcase: { eyebrow: 'Shop by Category', title: 'Top Categories' },
-  deal_of_the_day:   { eyebrow: 'Limited Time', title: 'Deal of the Day' },
-  featured_for_you:  { eyebrow: 'Picked for you', title: 'Featured For You' },
-  why_us:            { eyebrow: 'Why us', title: 'Built for Industry' },
+  deal_of_the_day: { eyebrow: 'Limited Time', title: 'Deal of the Day' },
+  featured_for_you: { eyebrow: 'Picked for you', title: 'Featured For You' },
+  why_us: { eyebrow: 'Why us', title: 'Built for Industry' },
   about: {
     eyebrow: 'About Us',
     title: 'Your Trusted Hardware Partner',
@@ -114,18 +173,19 @@ export const SECTION_COPY_DEFAULTS = {
   business_cta: {
     eyebrow: 'For Business',
     title: 'Buying for a business?',
-    subtitle: 'Bulk discounts, GSTIN invoicing, and a dedicated account manager. Trusted by 500+ businesses across India.',
+    subtitle:
+      'Bulk discounts, GSTIN invoicing, and a dedicated account manager. Trusted by 500+ businesses across India.',
     ctaLabel: 'Register Now',
   },
-  countdown_deal:    { eyebrow: 'Limited time', title: 'Deal ends soon', ctaLabel: 'Grab the deal' },
-  testimonials:      { eyebrow: 'Customer reviews', title: 'What our customers say' },
-  recently_viewed:   { title: 'Recently viewed' },
-  category_tabs:     { eyebrow: 'Best sellers', title: 'Top picks by category' },
-  bundle_spotlight:  { eyebrow: 'Better together', title: 'Bundle deals' },
-  back_in_stock:     { eyebrow: 'Restocked', title: 'Back in stock' },
-  blog_teaser:       { eyebrow: 'Guides', title: 'Tips and how-tos' },
-  social_strip:      { eyebrow: 'Follow along', title: 'Find us on social', ctaLabel: 'Follow us' },
-  value_stats:       { eyebrow: 'By the numbers', title: 'Trusted by our customers' },
+  countdown_deal: { eyebrow: 'Limited time', title: 'Deal ends soon', ctaLabel: 'Grab the deal' },
+  testimonials: { eyebrow: 'Customer reviews', title: 'What our customers say' },
+  recently_viewed: { title: 'Recently viewed' },
+  category_tabs: { eyebrow: 'Best sellers', title: 'Top picks by category' },
+  bundle_spotlight: { eyebrow: 'Better together', title: 'Bundle deals' },
+  back_in_stock: { eyebrow: 'Restocked', title: 'Back in stock' },
+  blog_teaser: { eyebrow: 'Guides', title: 'Tips and how-tos' },
+  social_strip: { eyebrow: 'Follow along', title: 'Find us on social', ctaLabel: 'Follow us' },
+  value_stats: { eyebrow: 'By the numbers', title: 'Trusted by our customers' },
 } satisfies Partial<Record<SectionType, SectionCopy>>
 
 export function sectionCopyDefaults(type: SectionType): SectionCopy {
@@ -141,9 +201,21 @@ export const SECTION_TILE_DEFAULTS = {
     { icon: 'CreditCard', label: 'Cash on delivery available' },
   ],
   benefits: [
-    { icon: 'Receipt', title: 'Save up to 18% with GST', sub: 'Claim input tax credit on every purchase with a valid GSTIN invoice' },
-    { icon: 'CreditCard', title: 'Bulk order discounts', sub: 'Special pricing for businesses ordering in volume — contact us for a quote' },
-    { icon: 'Clock', title: 'Dedicated account manager', sub: 'Registered businesses get priority support and a personal account manager' },
+    {
+      icon: 'Receipt',
+      title: 'Save up to 18% with GST',
+      sub: 'Claim input tax credit on every purchase with a valid GSTIN invoice',
+    },
+    {
+      icon: 'CreditCard',
+      title: 'Bulk order discounts',
+      sub: 'Special pricing for businesses ordering in volume — contact us for a quote',
+    },
+    {
+      icon: 'Clock',
+      title: 'Dedicated account manager',
+      sub: 'Registered businesses get priority support and a personal account manager',
+    },
   ],
   why_us: [
     {
@@ -176,10 +248,16 @@ export function resolveAboutStats(statsJson: string): { value: string; label: st
   if (statsJson.trim()) {
     try {
       const parsed = JSON.parse(statsJson)
-      if (Array.isArray(parsed) && parsed.length && parsed.every(s => s && typeof s.value === 'string' && typeof s.label === 'string')) {
+      if (
+        Array.isArray(parsed) &&
+        parsed.length &&
+        parsed.every(s => s && typeof s.value === 'string' && typeof s.label === 'string')
+      ) {
         return parsed
       }
-    } catch { /* fall through to the built-in tiles */ }
+    } catch {
+      /* fall through to the built-in tiles */
+    }
   }
   return SECTION_TILE_DEFAULTS.about
 }
@@ -213,9 +291,7 @@ export function sectionLayout(section: Pick<HomepageSection, 'config'>): Section
 
 export function productSource(section: Pick<HomepageSection, 'config'>): ProductSource {
   const s = section.config?.source
-  return s === 'new_arrivals' || s === 'best_sellers' || s === 'on_sale' || s === 'category'
-    ? s
-    : 'featured'
+  return s === 'new_arrivals' || s === 'best_sellers' || s === 'on_sale' || s === 'category' ? s : 'featured'
 }
 
 /** Cache key so two rows with identical settings cost one query. */
@@ -225,7 +301,12 @@ export function productRowKey(section: Pick<HomepageSection, 'config'>, limit: n
 }
 
 /** A positive whole-number config value, capped, else the fallback. */
-export function configNumber(section: Pick<HomepageSection, 'config'>, key: string, fallback: number, max = 100): number {
+export function configNumber(
+  section: Pick<HomepageSection, 'config'>,
+  key: string,
+  fallback: number,
+  max = 100
+): number {
   const raw = section.config?.[key]
   const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10)
   return Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), max) : fallback
@@ -258,7 +339,7 @@ export function justLandedDays(section: Pick<HomepageSection, 'config'>): number
 export function launchedWithin(
   product: { launch_date?: unknown; created_at?: unknown },
   days: number,
-  now = Date.now(),
+  now = Date.now()
 ): boolean {
   const raw = product.launch_date || product.created_at
   const t = raw ? Date.parse(String(raw)) : NaN
@@ -284,7 +365,9 @@ export function friendlyCount(n: number): string {
 }
 
 /** The stats a Store stats section shows, in catalogue order, each with its label. */
-export function valueStatMetrics(section: Pick<HomepageSection, 'config'>): { metric: ValueStatMetric; label: string }[] {
+export function valueStatMetrics(
+  section: Pick<HomepageSection, 'config'>
+): { metric: ValueStatMetric; label: string }[] {
   const raw = section.config?.metrics
   if (!Array.isArray(raw)) return VALUE_STAT_METRICS.filter(m => DEFAULT_VALUE_STATS.includes(m.metric))
   const picked = new Map<string, string>()
@@ -294,9 +377,10 @@ export function valueStatMetrics(section: Pick<HomepageSection, 'config'>): { me
       picked.set((r as Record<string, unknown>).metric as string, typeof label === 'string' ? label.trim() : '')
     }
   }
-  return VALUE_STAT_METRICS
-    .filter(m => picked.has(m.metric))
-    .map(m => ({ metric: m.metric, label: picked.get(m.metric) || m.label }))
+  return VALUE_STAT_METRICS.filter(m => picked.has(m.metric)).map(m => ({
+    metric: m.metric,
+    label: picked.get(m.metric) || m.label,
+  }))
 }
 
 // Scheduling is evaluated here rather than in SQL: a SQL NOW() would be frozen into the
@@ -308,9 +392,7 @@ export function isWithinWindow(section: Pick<HomepageSection, 'starts_at' | 'end
 }
 
 export function visibleSections(sections: HomepageSection[], now = Date.now()): HomepageSection[] {
-  return sections
-    .filter(s => s.is_active && isWithinWindow(s, now))
-    .sort((a, b) => a.display_order - b.display_order)
+  return sections.filter(s => s.is_active && isWithinWindow(s, now)).sort((a, b) => a.display_order - b.display_order)
 }
 
 type DefaultSection = Omit<HomepageSection, 'id' | 'is_active' | 'starts_at' | 'ends_at'>
@@ -318,7 +400,7 @@ type DefaultSection = Omit<HomepageSection, 'id' | 'is_active' | 'starts_at' | '
 const d = (
   type: SectionType,
   display_order: number,
-  extra: Partial<Omit<DefaultSection, 'type' | 'display_order'>> = {},
+  extra: Partial<Omit<DefaultSection, 'type' | 'display_order'>> = {}
 ): DefaultSection => ({
   type,
   title: null,
@@ -339,7 +421,11 @@ export const DEFAULT_SECTIONS: DefaultSection[] = [
   d('category_grid', 2, { title: 'Shop by Category', eyebrow: 'Browse' }),
   d('product_row', 3, { title: 'Featured Products', eyebrow: 'Handpicked', config: { source: 'featured' } }),
   d('brand_carousel', 4, { title: 'Shop by Brand', eyebrow: 'Trusted Names' }),
-  d('product_row', 5, { title: 'New Arrivals', eyebrow: 'Just In', config: { source: 'new_arrivals', justLanded: true } }),
+  d('product_row', 5, {
+    title: 'New Arrivals',
+    eyebrow: 'Just In',
+    config: { source: 'new_arrivals', justLanded: true },
+  }),
   d('category_showcase', 6, { title: 'Shop by Category', eyebrow: 'Explore' }),
   d('featured_for_you', 7),
   d('recently_viewed', 8),

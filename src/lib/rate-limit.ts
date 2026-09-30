@@ -6,39 +6,37 @@ export interface RateLimitConfig {
 }
 
 const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
-  { pattern: /^\/api\/admin\/login/,          config: { windowSecs: 60,  max: 5   } },
-  { pattern: /^\/api\/admin\/mfa\//,          config: { windowSecs: 60,  max: 10  } },
-  { pattern: /^\/api\/auth\/send-otp/,        config: { windowSecs: 60,  max: 5   } },
-  { pattern: /^\/api\/auth\/verify-otp/,      config: { windowSecs: 60,  max: 10  } },
-  { pattern: /^\/api\/auth\/login/,           config: { windowSecs: 60,  max: 10  } },
-  { pattern: /^\/api\/auth\/signup/,          config: { windowSecs: 60,  max: 5   } },
+  { pattern: /^\/api\/admin\/login/, config: { windowSecs: 60, max: 5 } },
+  { pattern: /^\/api\/admin\/mfa\//, config: { windowSecs: 60, max: 10 } },
+  { pattern: /^\/api\/auth\/send-otp/, config: { windowSecs: 60, max: 5 } },
+  { pattern: /^\/api\/auth\/verify-otp/, config: { windowSecs: 60, max: 10 } },
+  { pattern: /^\/api\/auth\/login/, config: { windowSecs: 60, max: 10 } },
+  { pattern: /^\/api\/auth\/signup/, config: { windowSecs: 60, max: 5 } },
   // Session re-binding runs for every signed-in browser, many of which share one carrier IP.
   // It does nothing without a valid key signature, so the login-grade limit below is not needed.
-  { pattern: /^\/api\/auth\/rt$/,             config: { windowSecs: 10,  max: 60  } },
-  { pattern: /^\/api\/auth\//,                config: { windowSecs: 60,  max: 20  } },
-  { pattern: /^\/api\/search/,               config: { windowSecs: 10,  max: 20  } },
-  { pattern: /^\/api\/products/,             config: { windowSecs: 10,  max: 30  } },
-  { pattern: /^\/api\/coupons/,              config: { windowSecs: 60,  max: 10  } },
-  { pattern: /^\/api\/orders\/create/,       config: { windowSecs: 60,  max: 10  } },
-  { pattern: /^\/api\/upload/,               config: { windowSecs: 60,  max: 20  } },
-  { pattern: /^\/api\/forms\//,              config: { windowSecs: 60,  max: 10  } },
+  { pattern: /^\/api\/auth\/rt$/, config: { windowSecs: 10, max: 60 } },
+  { pattern: /^\/api\/auth\//, config: { windowSecs: 60, max: 20 } },
+  { pattern: /^\/api\/search/, config: { windowSecs: 10, max: 20 } },
+  { pattern: /^\/api\/products/, config: { windowSecs: 10, max: 30 } },
+  { pattern: /^\/api\/coupons/, config: { windowSecs: 60, max: 10 } },
+  { pattern: /^\/api\/orders\/create/, config: { windowSecs: 60, max: 10 } },
+  { pattern: /^\/api\/upload/, config: { windowSecs: 60, max: 20 } },
+  { pattern: /^\/api\/forms\//, config: { windowSecs: 60, max: 10 } },
   // Staff capture surface (email-OTP, no client cert): login-grade limits on auth, normal on the rest.
-  { pattern: /^\/api\/staff\/auth\//,        config: { windowSecs: 60,  max: 5   } },
-  { pattern: /^\/api\/certportal\/auth\//,   config: { windowSecs: 60,  max: 5   } },
-  { pattern: /^\/api\/staff\//,              config: { windowSecs: 10,  max: 30  } },
-  { pattern: /^\/api\/admin\/session\//,    config: { windowSecs: 60,  max: 30  } },
-  { pattern: /^\/api\/support\//,            config: { windowSecs: 10,  max: 15  } },
-  { pattern: /^\/api\/webhooks\//,           config: { windowSecs: 10,  max: 200 } },
-  { pattern: /^\/api\//,                     config: { windowSecs: 10,  max: 60  } },
+  { pattern: /^\/api\/staff\/auth\//, config: { windowSecs: 60, max: 5 } },
+  { pattern: /^\/api\/certportal\/auth\//, config: { windowSecs: 60, max: 5 } },
+  { pattern: /^\/api\/staff\//, config: { windowSecs: 10, max: 30 } },
+  { pattern: /^\/api\/admin\/session\//, config: { windowSecs: 60, max: 30 } },
+  { pattern: /^\/api\/support\//, config: { windowSecs: 10, max: 15 } },
+  { pattern: /^\/api\/webhooks\//, config: { windowSecs: 10, max: 200 } },
+  { pattern: /^\/api\//, config: { windowSecs: 10, max: 60 } },
 ]
 
 const memStore = new Map<string, { count: number; expiry: number }>()
 
 function getClientIp(request: NextRequest): string {
   return (
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    '127.0.0.1'
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || '127.0.0.1'
   )
 }
 

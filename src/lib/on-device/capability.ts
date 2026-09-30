@@ -77,7 +77,9 @@ function detectMobile(): boolean {
   try {
     if ((navigator as any).userAgentData?.mobile) return true
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
 function detectWifi(nav: NavigatorWithGPU): boolean | null {
@@ -95,7 +97,9 @@ async function isModelCached(): Promise<boolean> {
     const c = await caches.open(MODEL_CACHE_NAME)
     const keys = await c.keys()
     return keys.length > 0
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
 async function storageQuotaMB(): Promise<number | null> {
@@ -103,7 +107,9 @@ async function storageQuotaMB(): Promise<number | null> {
     if (!navigator.storage?.estimate) return null
     const est = await navigator.storage.estimate()
     return mb(est.quota)
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
@@ -160,7 +166,9 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
         const info = await adapter.requestAdapterInfo()
         details.gpuVendor = info?.vendor || null
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Memory gate — relaxed for mobile (Safari/Firefox don't expose deviceMemory)
     if (!details.isMobile) {

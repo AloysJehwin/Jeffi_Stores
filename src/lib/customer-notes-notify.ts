@@ -8,7 +8,13 @@ function esc(s: string): string {
 }
 
 function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleString('en-IN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleString('en-IN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const EXTRA_CSS = `
@@ -16,7 +22,13 @@ const EXTRA_CSS = `
   .thumb { width: 96px; height: 96px; object-fit: cover; border-radius: 6px; margin: 0 6px 6px 0; border: 1px solid #e0e0e0; }
 `
 
-function shell(brand: string, title: string, intro: string, content: string, cta: { href: string; label: string } | null): string {
+function shell(
+  brand: string,
+  title: string,
+  intro: string,
+  content: string,
+  cta: { href: string; label: string } | null
+): string {
   return mailShell({
     brand,
     kicker: 'Customer Notes',
@@ -35,12 +47,24 @@ function noteCard(n: CustomerNote & { customerName?: string }, adminBase: string
   const photos = n.attachments.filter(a => a.kind === 'image')
   const audio = n.attachments.filter(a => a.kind === 'audio')
   const rows: string[] = []
-  if (n.customerName) rows.push(`<div class="info-row"><span class="info-label">Customer:</span><span><a href="${adminBase}/customers/${n.userId}" style="color:#2563eb;">${esc(n.customerName)}</a></span></div>`)
-  if (n.orderNumber) rows.push(`<div class="info-row"><span class="info-label">Order:</span><span>${esc(n.orderNumber)}</span></div>`)
-  if (n.adminUsername) rows.push(`<div class="info-row"><span class="info-label">Added by:</span><span>${esc(n.adminUsername)}</span></div>`)
-  rows.push(`<div class="info-row"><span class="info-label">Source:</span><span>${n.source === 'staff_form' ? 'Staff form' : 'Admin panel'}</span></div>`)
+  if (n.customerName)
+    rows.push(
+      `<div class="info-row"><span class="info-label">Customer:</span><span><a href="${adminBase}/customers/${n.userId}" style="color:#2563eb;">${esc(n.customerName)}</a></span></div>`
+    )
+  if (n.orderNumber)
+    rows.push(`<div class="info-row"><span class="info-label">Order:</span><span>${esc(n.orderNumber)}</span></div>`)
+  if (n.adminUsername)
+    rows.push(
+      `<div class="info-row"><span class="info-label">Added by:</span><span>${esc(n.adminUsername)}</span></div>`
+    )
+  rows.push(
+    `<div class="info-row"><span class="info-label">Source:</span><span>${n.source === 'staff_form' ? 'Staff form' : 'Admin panel'}</span></div>`
+  )
   rows.push(`<div class="info-row"><span class="info-label">Added:</span><span>${fmtDate(n.createdAt)}</span></div>`)
-  if (n.sharedWithCustomer) rows.push(`<div class="info-row"><span class="info-label">Visibility:</span><span style="color:#28a745;font-weight:bold;">Shared with customer</span></div>`)
+  if (n.sharedWithCustomer)
+    rows.push(
+      `<div class="info-row"><span class="info-label">Visibility:</span><span style="color:#28a745;font-weight:bold;">Shared with customer</span></div>`
+    )
   return `
             <div class="card">
               ${n.title ? `<h3 style="margin-top: 0;">${esc(n.title)}</h3>` : ''}
@@ -53,7 +77,10 @@ function noteCard(n: CustomerNote & { customerName?: string }, adminBase: string
 }
 
 /** Tell the store owner(s) a staff member captured a note (best-effort, never throws). */
-export async function notifyOwnersOfNote(note: CustomerNote, actor: { email: string; name: string | null }): Promise<void> {
+export async function notifyOwnersOfNote(
+  note: CustomerNote,
+  actor: { email: string; name: string | null }
+): Promise<void> {
   try {
     const recipients = await ownerAdminEmails(actor.email)
     if (recipients.length === 0) return
@@ -67,14 +94,23 @@ export async function notifyOwnersOfNote(note: CustomerNote, actor: { email: str
       noteCard(note, adminBase),
       { href: `${adminBase}/customers/${note.userId}`, label: 'Open Customer' }
     )
-    await Promise.all(recipients.map(r =>
-      sendAuditedMail({
-        from: adminMailFrom(), to: r.email, subject, html,
-        kind: 'admin_notification', templateName: 'customer_note_created',
-        entityType: 'customer_note', entityId: note.id,
-      }).catch(() => {})
-    ))
-  } catch { /* notification is best-effort */ }
+    await Promise.all(
+      recipients.map(r =>
+        sendAuditedMail({
+          from: adminMailFrom(),
+          to: r.email,
+          subject,
+          html,
+          kind: 'admin_notification',
+          templateName: 'customer_note_created',
+          entityType: 'customer_note',
+          entityId: note.id,
+        }).catch(() => {})
+      )
+    )
+  } catch {
+    /* notification is best-effort */
+  }
 }
 
 /** Daily digest of notes added in the last `hours` hours, sent to owners. Returns the count. */
@@ -94,12 +130,19 @@ export async function sendNotesDigest(hours = 24): Promise<number> {
     notes.map(n => noteCard(n, adminBase)).join('\n'),
     { href: `${adminBase}/customers`, label: 'Open Customers' }
   )
-  await Promise.all(recipients.map(r =>
-    sendAuditedMail({
-      from: adminMailFrom(), to: r.email, subject: `${count} added today - ${brand}`, html,
-      kind: 'admin_notification', templateName: 'customer_notes_digest',
-      entityType: null, entityId: null,
-    }).catch(() => {})
-  ))
+  await Promise.all(
+    recipients.map(r =>
+      sendAuditedMail({
+        from: adminMailFrom(),
+        to: r.email,
+        subject: `${count} added today - ${brand}`,
+        html,
+        kind: 'admin_notification',
+        templateName: 'customer_notes_digest',
+        entityType: null,
+        entityId: null,
+      }).catch(() => {})
+    )
+  )
   return notes.length
 }

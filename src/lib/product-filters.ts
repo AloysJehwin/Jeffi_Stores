@@ -27,8 +27,15 @@ export interface FilterClauses {
   nextIdx: number
 }
 
-function inClause(column: string, raw: string, startIdx: number): { clause: string; params: string[]; nextIdx: number } | null {
-  const values = raw.split(',').map(v => v.trim()).filter(Boolean)
+function inClause(
+  column: string,
+  raw: string,
+  startIdx: number
+): { clause: string; params: string[]; nextIdx: number } | null {
+  const values = raw
+    .split(',')
+    .map(v => v.trim())
+    .filter(Boolean)
   if (values.length === 0) return null
   let i = startIdx
   const placeholders = values.map(() => `$${i++}`)
@@ -42,31 +49,38 @@ export function buildProductFilterClauses(params: ProductFilterParams, paramInde
 
   if (params.minPrice != null && params.minPrice !== '') {
     conditions.push(`${PRICE_SQL}::numeric >= $${i}::numeric`)
-    bound.push(params.minPrice); i++
+    bound.push(params.minPrice)
+    i++
   }
   if (params.maxPrice != null && params.maxPrice !== '') {
     conditions.push(`${PRICE_SQL}::numeric <= $${i}::numeric`)
-    bound.push(params.maxPrice); i++
+    bound.push(params.maxPrice)
+    i++
   }
   if (params.inStock === '1') conditions.push(`p.stock_status != 'Out of Stock'`)
   if (params.onSale === '1') conditions.push(`p.discount_pct > 0`)
 
   if (params.brand) {
-    const brandVals = params.brand.split(',').map(v => v.trim()).filter(Boolean)
+    const brandVals = params.brand
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean)
     if (brandVals.length) {
       const placeholders = brandVals.map(() => `$${i++}`)
-      conditions.push(`p.brand_id IN (SELECT id FROM brands WHERE id::text IN (${placeholders.join(', ')}) OR slug IN (${placeholders.join(', ')}))`)
+      conditions.push(
+        `p.brand_id IN (SELECT id FROM brands WHERE id::text IN (${placeholders.join(', ')}) OR slug IN (${placeholders.join(', ')}))`
+      )
       bound.push(...brandVals)
     }
   }
 
   const inFilters: Array<[string, string | undefined]> = [
-    ['p.color',               params.color],
-    ['p.grade',               params.grade],
-    ['p.material',            params.material],
-    ['p.finish',              params.finish],
+    ['p.color', params.color],
+    ['p.grade', params.grade],
+    ['p.material', params.material],
+    ['p.finish', params.finish],
     ['p.compliance_standard', params.compliance],
-    ['p.country_of_origin',   params.origin],
+    ['p.country_of_origin', params.origin],
   ]
   for (const [column, raw] of inFilters) {
     if (raw == null || raw === '') continue
@@ -83,12 +97,14 @@ export function buildProductFilterClauses(params: ProductFilterParams, paramInde
       WHERE pv.product_id = p.id AND pv.is_active = true
         AND pv.variant_type = $${i} AND pv.variant_name = $${i + 1}
     )`)
-    bound.push(params.variantType, params.variantValue); i += 2
+    bound.push(params.variantType, params.variantValue)
+    i += 2
   }
 
   if (params.specKey && params.specValue) {
     conditions.push(`p.specifications @> jsonb_build_object($${i}::text, $${i + 1}::text)`)
-    bound.push(params.specKey, params.specValue); i += 2
+    bound.push(params.specKey, params.specValue)
+    i += 2
   }
 
   if (params.offer != null && params.offer !== '') {
@@ -98,7 +114,8 @@ export function buildProductFilterClauses(params: ProductFilterParams, paramInde
       WHERE poi.product_id = p.id AND po.is_active = true
         AND (po.slug = $${i} OR po.id::text = $${i})
     )`)
-    bound.push(params.offer); i++
+    bound.push(params.offer)
+    i++
   }
 
   return { conditions, params: bound, nextIdx: i }
@@ -151,7 +168,19 @@ function facetQuery(column: string, baseWhere: string): string {
 export async function getFilterFacets(baseConditions: string[], baseParams: any[]): Promise<FilterFacets> {
   const baseWhere = baseConditions.length ? baseConditions.join(' AND ') : 'TRUE'
 
-  const [brands, colors, grades, materials, finishes, compliances, origins, aggregates, variantTypes, variantValues, specRows] = await Promise.all([
+  const [
+    brands,
+    colors,
+    grades,
+    materials,
+    finishes,
+    compliances,
+    origins,
+    aggregates,
+    variantTypes,
+    variantValues,
+    specRows,
+  ] = await Promise.all([
     queryMany<{ id: string; name: string; count: string }>(
       `SELECT b.id, b.name, COUNT(p.id)::text AS count
        FROM brands b JOIN products p ON p.brand_id = b.id

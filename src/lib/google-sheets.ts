@@ -1,10 +1,7 @@
 import { createSign } from 'crypto'
 import { queryMany } from './db'
 import { loadGoogleServiceAccount } from './google-credentials'
-import {
-  buildProductHighlights,
-  buildProductDetails,
-} from './google-merchant-helpers'
+import { buildProductHighlights, buildProductDetails } from './google-merchant-helpers'
 
 // Spreadsheet ID is environment-driven: local dev points GOOGLE_SHEET_ID at a test
 // sheet, production falls back to the real Merchant feed sheet.
@@ -16,13 +13,46 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 // "is bundle" is the only header with a space, matching the template verbatim).
 // 40 columns => spreadsheet range A:AN.
 const HEADERS = [
-  'id', 'title', 'description', 'availability', 'availability_date', 'expiration_date',
-  'link', 'mobile_link', 'image_link', 'price', 'sale_price', 'sale_price_effective_date',
-  'identifier_exists', 'gtin', 'mpn', 'brand', 'product_highlight', 'product_detail',
-  'additional_image_link', 'condition', 'adult', 'color', 'size', 'size_type', 'size_system',
-  'gender', 'material', 'pattern', 'age_group', 'multipack', 'is bundle', 'unit_pricing_measure',
-  'unit_pricing_base_measure', 'energy_efficiency_class', 'min_energy_efficiency_class',
-  'max_energy_efficiency', 'item_group_id', 'video_link', 'virtual_model_link', 'cost_of_goods_sold',
+  'id',
+  'title',
+  'description',
+  'availability',
+  'availability_date',
+  'expiration_date',
+  'link',
+  'mobile_link',
+  'image_link',
+  'price',
+  'sale_price',
+  'sale_price_effective_date',
+  'identifier_exists',
+  'gtin',
+  'mpn',
+  'brand',
+  'product_highlight',
+  'product_detail',
+  'additional_image_link',
+  'condition',
+  'adult',
+  'color',
+  'size',
+  'size_type',
+  'size_system',
+  'gender',
+  'material',
+  'pattern',
+  'age_group',
+  'multipack',
+  'is bundle',
+  'unit_pricing_measure',
+  'unit_pricing_base_measure',
+  'energy_efficiency_class',
+  'min_energy_efficiency_class',
+  'max_energy_efficiency',
+  'item_group_id',
+  'video_link',
+  'virtual_model_link',
+  'cost_of_goods_sold',
 ]
 const LAST_COL = 'AN' // 40th column
 
@@ -46,13 +76,15 @@ async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
 
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
-  const payload = Buffer.from(JSON.stringify({
-    iss: creds.client_email,
-    scope: SCOPES,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  })).toString('base64url')
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: creds.client_email,
+      scope: SCOPES,
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600,
+    })
+  ).toString('base64url')
 
   const signer = createSign('RSA-SHA256')
   signer.update(header + '.' + payload)
@@ -104,54 +136,56 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
     for (const variant of product.product_variants) {
       const sellingPrice = variant.price
       if (sellingPrice == null) continue
-      const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
+      const variantMrp = variant.mrp ? Number(variant.mrp) : product.mrp ? Number(product.mrp) : null
       const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
       // Inactive product => force out_of_stock regardless of stock_status.
       const availability = !productActive
         ? 'out_of_stock'
-        : (variant.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock')
+        : variant.stock_status !== 'Out of Stock'
+          ? 'in_stock'
+          : 'out_of_stock'
 
       rows.push([
-        variant.sku,                                                         // 1  id
-        `${product.name} - ${variant.variant_name}`,                         // 2  title
-        description,                                                         // 3  description
-        availability,                                                        // 4  availability
-        '',                                                                  // 5  availability_date
-        '',                                                                  // 6  expiration_date
+        variant.sku, // 1  id
+        `${product.name} - ${variant.variant_name}`, // 2  title
+        description, // 3  description
+        availability, // 4  availability
+        '', // 5  availability_date
+        '', // 6  expiration_date
         `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}`, // 7 link
-        '',                                                                  // 8  mobile_link
-        imageUrl,                                                            // 9  image_link
-        `${Number(variantMrp || sellingPrice).toFixed(2)} INR`,              // 10 price
-        hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',        // 11 sale_price
-        '',                                                                  // 12 sale_price_effective_date
-        (variant.mpn || product.mpn || variant.gtin || product.gtin || brandName) ? 'yes' : 'no', // 13 identifier_exists
-        variant.gtin || product.gtin || '',                                  // 14 gtin
-        variant.mpn || product.mpn || '',                                    // 15 mpn
-        brandName,                                                           // 16 brand
-        highlightsStr,                                                       // 17 product_highlight
-        detailsStr,                                                          // 18 product_detail
-        additionalImages,                                                    // 19 additional_image_link
-        'new',                                                               // 20 condition
-        'no',                                                                // 21 adult
-        '',                                                                  // 22 color
-        variant.variant_name || '',                                          // 23 size
-        '',                                                                  // 24 size_type
-        '',                                                                  // 25 size_system
-        '',                                                                  // 26 gender
-        material,                                                            // 27 material
-        '',                                                                  // 28 pattern
-        '',                                                                  // 29 age_group
-        '',                                                                  // 30 multipack
-        'no',                                                                // 31 is bundle
-        '',                                                                  // 32 unit_pricing_measure
-        '',                                                                  // 33 unit_pricing_base_measure
-        '',                                                                  // 34 energy_efficiency_class
-        '',                                                                  // 35 min_energy_efficiency_class
-        '',                                                                  // 36 max_energy_efficiency
-        product.sku,                                                         // 37 item_group_id
-        '',                                                                  // 38 video_link
-        '',                                                                  // 39 virtual_model_link
-        cogs(variant.cost_price ?? product.cost_price),                      // 40 cost_of_goods_sold
+        '', // 8  mobile_link
+        imageUrl, // 9  image_link
+        `${Number(variantMrp || sellingPrice).toFixed(2)} INR`, // 10 price
+        hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '', // 11 sale_price
+        '', // 12 sale_price_effective_date
+        variant.mpn || product.mpn || variant.gtin || product.gtin || brandName ? 'yes' : 'no', // 13 identifier_exists
+        variant.gtin || product.gtin || '', // 14 gtin
+        variant.mpn || product.mpn || '', // 15 mpn
+        brandName, // 16 brand
+        highlightsStr, // 17 product_highlight
+        detailsStr, // 18 product_detail
+        additionalImages, // 19 additional_image_link
+        'new', // 20 condition
+        'no', // 21 adult
+        '', // 22 color
+        variant.variant_name || '', // 23 size
+        '', // 24 size_type
+        '', // 25 size_system
+        '', // 26 gender
+        material, // 27 material
+        '', // 28 pattern
+        '', // 29 age_group
+        '', // 30 multipack
+        'no', // 31 is bundle
+        '', // 32 unit_pricing_measure
+        '', // 33 unit_pricing_base_measure
+        '', // 34 energy_efficiency_class
+        '', // 35 min_energy_efficiency_class
+        '', // 36 max_energy_efficiency
+        product.sku, // 37 item_group_id
+        '', // 38 video_link
+        '', // 39 virtual_model_link
+        cogs(variant.cost_price ?? product.cost_price), // 40 cost_of_goods_sold
       ])
     }
   } else {
@@ -160,49 +194,51 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
     const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
     const availability = !productActive
       ? 'out_of_stock'
-      : (product.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock')
+      : product.stock_status !== 'Out of Stock'
+        ? 'in_stock'
+        : 'out_of_stock'
 
     rows.push([
-      product.sku,                                                           // 1  id
-      product.name,                                                          // 2  title
-      description,                                                           // 3  description
-      availability,                                                          // 4  availability
-      '',                                                                    // 5  availability_date
-      '',                                                                    // 6  expiration_date
-      `${baseUrl}/products/${product.slug}`,                                 // 7  link
-      '',                                                                    // 8  mobile_link
-      imageUrl,                                                              // 9  image_link
-      `${Number(productMrp || sellingPrice).toFixed(2)} INR`,                // 10 price
-      hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',          // 11 sale_price
-      '',                                                                    // 12 sale_price_effective_date
-      (product.mpn || product.gtin || brandName) ? 'yes' : 'no',             // 13 identifier_exists
-      product.gtin || '',                                                    // 14 gtin
-      product.mpn || '',                                                     // 15 mpn
-      brandName,                                                             // 16 brand
-      highlightsStr,                                                         // 17 product_highlight
-      detailsStr,                                                            // 18 product_detail
-      additionalImages,                                                      // 19 additional_image_link
-      'new',                                                                 // 20 condition
-      'no',                                                                  // 21 adult
-      '',                                                                    // 22 color
-      product.size || '',                                                    // 23 size
-      '',                                                                    // 24 size_type
-      '',                                                                    // 25 size_system
-      '',                                                                    // 26 gender
-      material,                                                              // 27 material
-      '',                                                                    // 28 pattern
-      '',                                                                    // 29 age_group
-      '',                                                                    // 30 multipack
-      'no',                                                                  // 31 is bundle
-      '',                                                                    // 32 unit_pricing_measure
-      '',                                                                    // 33 unit_pricing_base_measure
-      '',                                                                    // 34 energy_efficiency_class
-      '',                                                                    // 35 min_energy_efficiency_class
-      '',                                                                    // 36 max_energy_efficiency
-      '',                                                                    // 37 item_group_id
-      '',                                                                    // 38 video_link
-      '',                                                                    // 39 virtual_model_link
-      cogs(product.cost_price),                                              // 40 cost_of_goods_sold
+      product.sku, // 1  id
+      product.name, // 2  title
+      description, // 3  description
+      availability, // 4  availability
+      '', // 5  availability_date
+      '', // 6  expiration_date
+      `${baseUrl}/products/${product.slug}`, // 7  link
+      '', // 8  mobile_link
+      imageUrl, // 9  image_link
+      `${Number(productMrp || sellingPrice).toFixed(2)} INR`, // 10 price
+      hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '', // 11 sale_price
+      '', // 12 sale_price_effective_date
+      product.mpn || product.gtin || brandName ? 'yes' : 'no', // 13 identifier_exists
+      product.gtin || '', // 14 gtin
+      product.mpn || '', // 15 mpn
+      brandName, // 16 brand
+      highlightsStr, // 17 product_highlight
+      detailsStr, // 18 product_detail
+      additionalImages, // 19 additional_image_link
+      'new', // 20 condition
+      'no', // 21 adult
+      '', // 22 color
+      product.size || '', // 23 size
+      '', // 24 size_type
+      '', // 25 size_system
+      '', // 26 gender
+      material, // 27 material
+      '', // 28 pattern
+      '', // 29 age_group
+      '', // 30 multipack
+      'no', // 31 is bundle
+      '', // 32 unit_pricing_measure
+      '', // 33 unit_pricing_base_measure
+      '', // 34 energy_efficiency_class
+      '', // 35 min_energy_efficiency_class
+      '', // 36 max_energy_efficiency
+      '', // 37 item_group_id
+      '', // 38 video_link
+      '', // 39 virtual_model_link
+      cogs(product.cost_price), // 40 cost_of_goods_sold
     ])
   }
 
@@ -241,7 +277,8 @@ async function fetchAllProducts(limit?: number) {
 
 async function fetchProduct(productId: string) {
   const { queryOne } = await import('./db')
-  return queryOne(`
+  return queryOne(
+    `
     SELECT p.*,
       json_build_object(
         'id', c.id, 'name', c.name, 'slug', c.slug,
@@ -265,10 +302,14 @@ async function fetchProduct(productId: string) {
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.id = $1
-  `, [productId])
+  `,
+    [productId]
+  )
 }
 
-export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inserted: number; updated: number; skipped: number }> {
+export async function syncAllProductsToSheet(
+  testLimit?: number
+): Promise<{ inserted: number; updated: number; skipped: number }> {
   const token = await getAccessToken()
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const products = await fetchAllProducts(testLimit)
@@ -316,14 +357,11 @@ export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inse
   }
 
   if (updateBatch.length > 0) {
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ valueInputOption: 'RAW', data: updateBatch }),
-      }
-    )
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ valueInputOption: 'RAW', data: updateBatch }),
+    })
   }
 
   if (toAppend.length > 0) {
@@ -389,14 +427,11 @@ export async function syncProductToSheet(productId: string): Promise<void> {
           range: { sheetId: 455679373, dimension: 'ROWS', startIndex: rowIdx, endIndex: rowIdx + 1 },
         },
       }))
-      await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requests }),
-        }
-      )
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests }),
+      })
     }
 
     if (newRows.length > 0) {
@@ -435,28 +470,21 @@ async function removeProductFromSheet(sku: string, token: string) {
         range: { sheetId: 455679373, dimension: 'ROWS', startIndex: rowIdx, endIndex: rowIdx + 1 },
       },
     }))
-    await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests }),
-      }
-    )
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}:batchUpdate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requests }),
+    })
   }
 }
 
 // Read a value matrix from any spreadsheet with a caller-supplied OAuth access token — the
 // tenant-scoped counterpart to the write helpers above, which use the platform service account.
 // Used by the Data Source Google-sheet sync, which resolves the tenant's own token first.
-export async function readSheetValues(
-  spreadsheetId: string,
-  range: string,
-  accessToken: string,
-): Promise<string[][]> {
+export async function readSheetValues(spreadsheetId: string, range: string, accessToken: string): Promise<string[][]> {
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json().catch(() => null)
   if (!res.ok) {
@@ -471,33 +499,26 @@ export async function readSheetValues(
 // access token — the file is one this app creates, so it is always reachable under the drive.file
 // scope (unlike copying a shared master, which 404s for any account that didn't create it). Returns
 // the new spreadsheet id. Used by the Data Source "Create sheet from template" flow.
-export async function createSheetFromWorkbook(
-  title: string,
-  xlsx: Buffer,
-  accessToken: string,
-): Promise<string> {
+export async function createSheetFromWorkbook(title: string, xlsx: Buffer, accessToken: string): Promise<string> {
   const boundary = 'jeffi-ds-' + xlsx.length.toString(36)
   const metadata = { name: title, mimeType: 'application/vnd.google-apps.spreadsheet' }
   const body = Buffer.concat([
     Buffer.from(
       `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-      `${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`,
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`
     ),
     xlsx,
     Buffer.from(`\r\n--${boundary}--\r\n`),
   ])
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
-      body: new Uint8Array(body),
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
     },
-  )
+    body: new Uint8Array(body),
+  })
   const data = await res.json().catch(() => null)
   if (!res.ok || !data?.id) {
     const reason = data?.error?.message || `drive create failed (${res.status})`
@@ -510,7 +531,7 @@ export async function createSheetFromWorkbook(
 export async function listSheetTitles(spreadsheetId: string, accessToken: string): Promise<string[]> {
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json().catch(() => null)
   if (!res.ok) throw new Error(data?.error?.message || `sheets metadata failed (${res.status})`)
@@ -519,12 +540,16 @@ export async function listSheetTitles(spreadsheetId: string, accessToken: string
 }
 
 // Several ranges in one round trip; the result is aligned to `ranges` (an unreadable range yields []).
-export async function readSheetValuesBatch(spreadsheetId: string, ranges: string[], accessToken: string): Promise<string[][][]> {
+export async function readSheetValuesBatch(
+  spreadsheetId: string,
+  ranges: string[],
+  accessToken: string
+): Promise<string[][][]> {
   if (ranges.length === 0) return []
   const qs = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&')
   const res = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values:batchGet?${qs}&majorDimension=ROWS`,
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json().catch(() => null)
   if (!res.ok) throw new Error(data?.error?.message || `sheets batch read failed (${res.status})`)
