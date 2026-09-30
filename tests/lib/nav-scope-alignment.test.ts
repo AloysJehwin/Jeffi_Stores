@@ -7,9 +7,11 @@ const LAYOUT = path.join(process.cwd(), 'src/app/admin/layout.tsx')
 
 function navLinks(): { href: string; scope: string }[] {
   const src = fs.readFileSync(LAYOUT, 'utf8')
-  return [...src.matchAll(/\{ href: '(\/admin\/[^']*)', label: '[^']*', scope: '([a-z0-9_]+:(?:read|write))'/g)].map(
-    m => ({ href: m[1], scope: m[2] })
-  )
+  return [
+    ...src.matchAll(
+      /href: '(\/admin\/[^']*)',\s*(?:[a-zA-Z]+: (?:'[^']*'|true|false),\s*)*?scope: '([a-z0-9_]+:(?:read|write))'/g
+    ),
+  ].map(m => ({ href: m[1], scope: m[2] }))
 }
 
 /**
