@@ -29,7 +29,7 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fieldLabel, value, context, scope }),
       })
-      const data = await res.json() as { result?: string; error?: string }
+      const data = (await res.json()) as { result?: string; error?: string }
       if (!res.ok || !data.result) {
         setError(data.error || 'Enrichment failed')
         return
@@ -83,16 +83,18 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
                 </svg>
               ) : (
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                  />
                 </svg>
               )}
             </button>
           </div>
         </RequireAi>
       </div>
-      {error && (
-        <p className="text-[11px] text-red-500 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className="text-[11px] text-red-500 dark:text-red-400">{error}</p>}
     </div>
   )
 }

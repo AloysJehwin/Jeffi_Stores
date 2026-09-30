@@ -14,7 +14,7 @@ interface Props {
 }
 
 function buildScopeGrid(SCOPES: ScopeDefinition[]) {
-  const byBase: Record<string, { read?: typeof ADMIN_SCOPES[0]; write?: typeof ADMIN_SCOPES[0] }> = {}
+  const byBase: Record<string, { read?: (typeof ADMIN_SCOPES)[0]; write?: (typeof ADMIN_SCOPES)[0] }> = {}
   for (const s of SCOPES) {
     const base = s.key.replace(/:read$|:write$/, '')
     byBase[base] = byBase[base] || {}
@@ -22,7 +22,7 @@ function buildScopeGrid(SCOPES: ScopeDefinition[]) {
     else if (s.key.endsWith(':write')) byBase[base].write = s
   }
 
-  const groups: Record<string, { read?: typeof ADMIN_SCOPES[0]; write?: typeof ADMIN_SCOPES[0] }[]> = {}
+  const groups: Record<string, { read?: (typeof ADMIN_SCOPES)[0]; write?: (typeof ADMIN_SCOPES)[0] }[]> = {}
   for (const pair of Object.values(byBase)) {
     const ref = pair.read || pair.write!
     const group = ref.group || 'General'
@@ -32,9 +32,27 @@ function buildScopeGrid(SCOPES: ScopeDefinition[]) {
   return groups
 }
 
-const GROUP_ORDER = ['Dashboard', 'Catalogue', 'Sales', 'Fulfilment', 'Finance', 'Marketing', 'AI', 'Business', 'Settings', 'General']
+const GROUP_ORDER = [
+  'Dashboard',
+  'Catalogue',
+  'Sales',
+  'Fulfilment',
+  'Finance',
+  'Marketing',
+  'AI',
+  'Business',
+  'Settings',
+  'General',
+]
 
-export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll, includePlatformScopes = false, allowedKeys }: Props) {
+export default function ScopeGrid({
+  selected,
+  onToggle,
+  onSelectAll,
+  onClearAll,
+  includePlatformScopes = false,
+  allowedKeys,
+}: Props) {
   const base = assignableScopes(includePlatformScopes)
   const SCOPE_GRID = buildScopeGrid(allowedKeys ? base.filter(s => allowedKeys.includes(s.key)) : base)
   const orderedGroups = GROUP_ORDER.filter(g => SCOPE_GRID[g])
@@ -44,13 +62,21 @@ export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll,
       {(onSelectAll || onClearAll) && (
         <div className="flex items-center gap-1 text-xs font-medium">
           {onSelectAll && (
-            <button type="button" onClick={onSelectAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
+            <button
+              type="button"
+              onClick={onSelectAll}
+              className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
+            >
               Select All
             </button>
           )}
           {onSelectAll && onClearAll && <span className="text-foreground-secondary">|</span>}
           {onClearAll && (
-            <button type="button" onClick={onClearAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
+            >
               Clear All
             </button>
           )}
@@ -73,10 +99,16 @@ export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll,
                         : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                     }`}
                   >
-                    <p className={`text-sm font-semibold leading-tight ${selected.includes(read.key) ? 'text-secondary-400' : 'text-foreground'}`}>{read.label}</p>
+                    <p
+                      className={`text-sm font-semibold leading-tight ${selected.includes(read.key) ? 'text-secondary-400' : 'text-foreground'}`}
+                    >
+                      {read.label}
+                    </p>
                     <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{read.description}</p>
                   </button>
-                ) : <div />}
+                ) : (
+                  <div />
+                )}
 
                 {write ? (
                   <button
@@ -88,10 +120,16 @@ export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll,
                         : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                     }`}
                   >
-                    <p className={`text-sm font-semibold leading-tight ${selected.includes(write.key) ? 'text-amber-400' : 'text-foreground'}`}>{write.label}</p>
+                    <p
+                      className={`text-sm font-semibold leading-tight ${selected.includes(write.key) ? 'text-amber-400' : 'text-foreground'}`}
+                    >
+                      {write.label}
+                    </p>
                     <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{write.description}</p>
                   </button>
-                ) : <div />}
+                ) : (
+                  <div />
+                )}
               </div>
             ))}
           </div>

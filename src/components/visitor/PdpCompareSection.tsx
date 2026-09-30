@@ -25,22 +25,33 @@ const SPEC_KEYS: { label: string; key: keyof CompareProduct | ((p: any) => strin
 
 // Compact spec rows from raw product data passed as extraData
 const EXTRA_SPEC_ROWS: { label: string; key: (p: any) => string | null }[] = [
-  { label: 'Material',       key: p => p.material ?? null },
-  { label: 'Finish',         key: p => p.finish ?? null },
-  { label: 'Variant',        key: p => p.variant_type ?? null },
-  { label: 'Condition',      key: p => p.condition ?? null },
-  { label: 'Color',          key: p => p.color ?? null },
-  { label: 'Weight',         key: p => p.weight != null ? `${p.weight} ${p.weight_unit ?? 'kg'}` : null },
-  { label: 'Net Weight',     key: p => p.net_weight_grams != null ? `${p.net_weight_grams} g` : null },
-  { label: 'Volume',         key: p => p.volume_ml != null ? `${p.volume_ml} ml` : null },
-  { label: 'Origin',         key: p => p.country_of_origin ?? null },
-  { label: 'Warranty',       key: p => p.warranty_months != null ? `${p.warranty_months} month${p.warranty_months !== 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null },
-  { label: 'Compliance',     key: p => p.compliance_standard ?? null },
-  { label: 'Safety Rating',  key: p => p.safety_rating ?? null },
+  { label: 'Material', key: p => p.material ?? null },
+  { label: 'Finish', key: p => p.finish ?? null },
+  { label: 'Variant', key: p => p.variant_type ?? null },
+  { label: 'Condition', key: p => p.condition ?? null },
+  { label: 'Color', key: p => p.color ?? null },
+  { label: 'Weight', key: p => (p.weight != null ? `${p.weight} ${p.weight_unit ?? 'kg'}` : null) },
+  { label: 'Net Weight', key: p => (p.net_weight_grams != null ? `${p.net_weight_grams} g` : null) },
+  { label: 'Volume', key: p => (p.volume_ml != null ? `${p.volume_ml} ml` : null) },
+  { label: 'Origin', key: p => p.country_of_origin ?? null },
+  {
+    label: 'Warranty',
+    key: p =>
+      p.warranty_months != null
+        ? `${p.warranty_months} month${p.warranty_months !== 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}`
+        : null,
+  },
+  { label: 'Compliance', key: p => p.compliance_standard ?? null },
+  { label: 'Safety Rating', key: p => p.safety_rating ?? null },
   { label: 'Certifications', key: p => (p.certifications as string[] | null)?.join(', ') || null },
-  { label: 'Hazards',        key: p => [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean).join(', ') || null },
-  { label: 'HSN Code',       key: p => p.hsn_code ?? null },
-  { label: 'GST',            key: p => p.gst_percentage != null ? `${parseFloat(String(p.gst_percentage))}%` : null },
+  {
+    label: 'Hazards',
+    key: p =>
+      [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean).join(', ') ||
+      null,
+  },
+  { label: 'HSN Code', key: p => p.hsn_code ?? null },
+  { label: 'GST', key: p => (p.gst_percentage != null ? `${parseFloat(String(p.gst_percentage))}%` : null) },
 ]
 
 interface FullProduct extends CompareProduct {
@@ -73,21 +84,16 @@ interface PdpCompareSectionFullProps {
 
 export default function PdpCompareSection({ currentProduct, relatedProducts }: PdpCompareSectionFullProps) {
   // Start with current product + up to 2 related products
-  const initialSlots: FullProduct[] = [
-    currentProduct,
-    ...relatedProducts.slice(0, 2),
-  ]
+  const initialSlots: FullProduct[] = [currentProduct, ...relatedProducts.slice(0, 2)]
   const [slots, setSlots] = useState<FullProduct[]>(initialSlots)
 
   const compareUrl = `/compare?ids=${slots.map(p => p.id).join(',')}`
 
   // Build spec rows — only show rows where at least one product has data
-  const specRows = EXTRA_SPEC_ROWS.filter(row =>
-    slots.some(p => row.key(p) != null)
-  )
+  const specRows = EXTRA_SPEC_ROWS.filter(row => slots.some(p => row.key(p) != null))
 
   function swap(slotIdx: number, replacement: FullProduct) {
-    setSlots(prev => prev.map((p, i) => i === slotIdx ? replacement : p))
+    setSlots(prev => prev.map((p, i) => (i === slotIdx ? replacement : p)))
   }
 
   // Available swaps for each non-current slot
@@ -102,7 +108,13 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
           className="text-sm text-accent-500 hover:text-accent-600 font-medium flex items-center gap-1.5 group"
         >
           Full Comparison
-          <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg
+            className="w-4 h-4 group-hover:translate-x-0.5 transition-transform"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </Link>
@@ -116,20 +128,34 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
               <td className="w-24 sm:w-28" />
               {slots.map((p, i) => {
                 const isCurrent = i === 0
-                const discount = p.mrp && p.mrp > p.price
-                  ? Math.round(((p.mrp - p.price) / p.mrp) * 100)
-                  : 0
+                const discount = p.mrp && p.mrp > p.price ? Math.round(((p.mrp - p.price) / p.mrp) * 100) : 0
 
                 return (
-                  <td key={p.id} className="pb-4 px-2 align-top text-center" style={{ width: `${Math.floor(80 / slots.length)}%` }}>
+                  <td
+                    key={p.id}
+                    className="pb-4 px-2 align-top text-center"
+                    style={{ width: `${Math.floor(80 / slots.length)}%` }}
+                  >
                     {/* Image */}
-                    <div className={`mx-auto mb-2 w-16 h-16 rounded-lg border overflow-hidden bg-surface-secondary ${isCurrent ? 'border-accent-400 ring-2 ring-accent-200 dark:ring-accent-800' : 'border-border-default'}`}>
+                    <div
+                      className={`mx-auto mb-2 w-16 h-16 rounded-lg border overflow-hidden bg-surface-secondary ${isCurrent ? 'border-accent-400 ring-2 ring-accent-200 dark:ring-accent-800' : 'border-border-default'}`}
+                    >
                       {p.image ? (
                         <img src={p.image} alt={p.name} className="w-full h-full object-contain p-1" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <svg className="w-6 h-6 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <svg
+                            className="w-6 h-6 text-foreground-muted"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
                           </svg>
                         </div>
                       )}
@@ -139,7 +165,10 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
                     {isCurrent ? (
                       <p className="text-xs font-semibold text-foreground line-clamp-2 leading-snug mb-1">{p.name}</p>
                     ) : (
-                      <Link href={`/products/${p.slug}`} className="text-xs font-semibold text-foreground hover:text-accent-500 line-clamp-2 leading-snug mb-1 block">
+                      <Link
+                        href={`/products/${p.slug}`}
+                        className="text-xs font-semibold text-foreground hover:text-accent-500 line-clamp-2 leading-snug mb-1 block"
+                      >
                         {p.name}
                       </Link>
                     )}
@@ -163,7 +192,7 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
                       <SwapSelect
                         current={p}
                         options={allOptions.filter(o => !slots.some((s, si) => si !== i && s.id === o.id))}
-                        onSwap={(replacement) => swap(i, replacement)}
+                        onSwap={replacement => swap(i, replacement)}
                       />
                     )}
                   </td>
@@ -174,12 +203,17 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
           <tbody>
             {/* Brand row always shown */}
             <tr className="border-t border-border-default">
-              <td className="py-2.5 pr-3 text-xs font-semibold text-foreground-muted uppercase tracking-wide whitespace-nowrap">Brand</td>
+              <td className="py-2.5 pr-3 text-xs font-semibold text-foreground-muted uppercase tracking-wide whitespace-nowrap">
+                Brand
+              </td>
               {slots.map((p, i) => {
                 const base = slots[0].brandName
                 const isDiff = i > 0 && p.brandName !== base
                 return (
-                  <td key={p.id} className={`py-2.5 px-2 text-xs text-center font-medium ${isDiff ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
+                  <td
+                    key={p.id}
+                    className={`py-2.5 px-2 text-xs text-center font-medium ${isDiff ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
+                  >
                     {p.brandName ?? <span className="text-foreground-muted">—</span>}
                   </td>
                 )
@@ -190,12 +224,17 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
               const base = values[0]
               return (
                 <tr key={row.label} className="border-t border-border-default">
-                  <td className="py-2.5 pr-3 text-xs font-semibold text-foreground-muted uppercase tracking-wide whitespace-nowrap">{row.label}</td>
+                  <td className="py-2.5 pr-3 text-xs font-semibold text-foreground-muted uppercase tracking-wide whitespace-nowrap">
+                    {row.label}
+                  </td>
                   {slots.map((p, i) => {
                     const val = row.key(p)
                     const isDiff = i > 0 && val !== base
                     return (
-                      <td key={p.id} className={`py-2.5 px-2 text-xs text-center ${isDiff ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-foreground'}`}>
+                      <td
+                        key={p.id}
+                        className={`py-2.5 px-2 text-xs text-center ${isDiff ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-foreground'}`}
+                      >
                         {val ?? <span className="text-foreground-muted">—</span>}
                       </td>
                     )
@@ -213,7 +252,11 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
           className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-accent-500 hover:bg-accent-600 px-5 py-2.5 rounded-xl transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+            />
           </svg>
           View Full Comparison
         </Link>
@@ -222,7 +265,11 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
   )
 }
 
-function SwapSelect({ current, options, onSwap }: {
+function SwapSelect({
+  current,
+  options,
+  onSwap,
+}: {
   current: FullProduct
   options: FullProduct[]
   onSwap: (p: FullProduct) => void
@@ -251,24 +298,49 @@ function SwapSelect({ current, options, onSwap }: {
           {options.map(o => (
             <button
               key={o.id}
-              onMouseDown={() => { onSwap(o); setOpen(false) }}
+              onMouseDown={() => {
+                onSwap(o)
+                setOpen(false)
+              }}
               className={`w-full flex items-center gap-2.5 px-3 py-2 hover:bg-surface-secondary transition-colors text-left ${o.id === current.id ? 'bg-accent-50 dark:bg-accent-900/20' : ''}`}
             >
               {o.image ? (
-                <img src={o.image} alt="" className="w-7 h-7 rounded border border-border-default object-contain flex-shrink-0 bg-surface-secondary p-0.5" />
+                <img
+                  src={o.image}
+                  alt=""
+                  className="w-7 h-7 rounded border border-border-default object-contain flex-shrink-0 bg-surface-secondary p-0.5"
+                />
               ) : (
                 <div className="w-7 h-7 rounded border border-border-default bg-surface-secondary flex-shrink-0 flex items-center justify-center">
-                  <svg className="w-3.5 h-3.5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <svg
+                    className="w-3.5 h-3.5 text-foreground-muted"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
                   </svg>
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">{o.name}</p>
-                <p className="text-[10px] text-foreground-muted">₹{o.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-[10px] text-foreground-muted">
+                  ₹{o.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
               </div>
               {o.id === current.id && (
-                <svg className="w-3.5 h-3.5 text-accent-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <svg
+                  className="w-3.5 h-3.5 text-accent-500 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               )}

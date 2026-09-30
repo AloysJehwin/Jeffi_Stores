@@ -46,7 +46,8 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
         try {
           setSource('on-device')
           const final = await generateCartInsight(signals, isMobile, partial => setText(partial))
-          setText(final); setState('done')
+          setText(final)
+          setState('done')
           return
         } catch {
           // fall through to server
@@ -62,17 +63,28 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cart: items }),
         })
-        if (res.status === 403) { setAiOff(true); return }
+        if (res.status === 403) {
+          setAiOff(true)
+          return
+        }
         if (!res.ok) throw new Error('ollama failed')
-        const data = await res.json() as { text?: string }
+        const data = (await res.json()) as { text?: string }
         if (!data.text) throw new Error('empty')
-        setText(data.text); setState('done')
+        setText(data.text)
+        setState('done')
       } catch {
         setState('idle')
       }
     })
     return () => disposeSummarizer()
-  }, [state, items, ondeviceEnabled, aiEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
+  }, [
+    state,
+    items,
+    ondeviceEnabled,
+    aiEnabled,
+    flags.ondeviceSummaryMobileEnabled,
+    flags.ondeviceSummaryDesktopEnabled,
+  ])
 
   // Only render once real text has started streaming — never flash a loading box
   // that would then vanish on devices where the model can't load (most mobiles).
@@ -80,11 +92,18 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
 
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 mt-4 mb-4 bg-surface-elevated rounded-xl border border-border-default">
-      <svg className="w-4 h-4 text-accent-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+      <svg
+        className="w-4 h-4 text-accent-500 flex-shrink-0 mt-0.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        strokeWidth={2}
+      >
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
       <p className="text-sm text-foreground leading-relaxed flex-1">
-        {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
+        {text}
+        {state === 'loading' && <span className="animate-pulse">▍</span>}
       </p>
       <span className="text-[9px] text-foreground-muted self-start mt-0.5 flex-shrink-0">{source}</span>
     </div>

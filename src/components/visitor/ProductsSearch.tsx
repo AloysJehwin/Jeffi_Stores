@@ -37,7 +37,15 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-export default function ProductsSearch({ defaultValue, portalHeader, basePath = '/products' }: { defaultValue?: string; portalHeader?: string; basePath?: string }) {
+export default function ProductsSearch({
+  defaultValue,
+  portalHeader,
+  basePath = '/products',
+}: {
+  defaultValue?: string
+  portalHeader?: string
+  basePath?: string
+}) {
   const [query, setQuery] = useState(defaultValue || '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -115,7 +123,10 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Escape') { setOpen(false); return }
+    if (e.key === 'Escape') {
+      setOpen(false)
+      return
+    }
     if (!open) {
       if (e.key === 'Enter') {
         e.preventDefault()
@@ -159,7 +170,9 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (query.trim().length >= 2 && hasResults) setOpen(true) }}
+            onFocus={() => {
+              if (query.trim().length >= 2 && hasResults) setOpen(true)
+            }}
             placeholder="Search products..."
             autoComplete="off"
             className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
@@ -185,7 +198,9 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
               <div className="py-1">
                 {categories.length > 0 && (
                   <>
-                    <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Categories</p>
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                      Categories
+                    </p>
                     {categories.map((cat, idx) => (
                       <Link
                         key={cat.id}
@@ -194,11 +209,23 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
                         className={`flex items-center gap-2 px-3 py-2 transition-colors text-sm ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                       >
                         <span className="flex-shrink-0 w-6 h-6 rounded bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          <svg
+                            className="w-3 h-3 text-accent-600 dark:text-accent-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                            />
                           </svg>
                         </span>
-                        <span className="text-foreground"><Highlight text={cat.name} query={query} /></span>
+                        <span className="text-foreground">
+                          <Highlight text={cat.name} query={query} />
+                        </span>
                       </Link>
                     ))}
                   </>
@@ -206,13 +233,17 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
 
                 {products.length > 0 && (
                   <>
-                    <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Products</p>
+                    <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                      Products
+                    </p>
                     {products.map((product, idx) => {
                       const itemIdx = categories.length + idx
-                      const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
-                      const displayPrice = product.has_variants && product.variant_min_price
-                        ? product.variant_min_price
-                        : (product.price_ex_gst || product.base_price)
+                      const primaryImage =
+                        product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
+                      const displayPrice =
+                        product.has_variants && product.variant_min_price
+                          ? product.variant_min_price
+                          : product.price_ex_gst || product.base_price
 
                       return (
                         <Link
@@ -223,11 +254,25 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
                         >
                           <div className="w-9 h-9 bg-surface-secondary rounded flex-shrink-0 overflow-hidden border border-border-default">
                             {primaryImage ? (
-                              <img src={primaryImage.thumbnail_url} alt={product.name} className="w-full h-full object-contain p-0.5" />
+                              <img
+                                src={primaryImage.thumbnail_url}
+                                alt={product.name}
+                                className="w-full h-full object-contain p-0.5"
+                              />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg
+                                  className="w-4 h-4 text-foreground-muted"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
                                 </svg>
                               </div>
                             )}
@@ -237,7 +282,8 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
                               <Highlight text={product.name} query={query} />
                             </p>
                             <p className="text-xs text-accent-600 dark:text-accent-400 font-semibold">
-                              {product.has_variants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {product.has_variants ? 'From ' : ''}&#x20B9;
+                              {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
                           </div>
                         </Link>
@@ -253,7 +299,12 @@ export default function ProductsSearch({ defaultValue, portalHeader, basePath = 
                     className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
                     </svg>
                     See all results for &quot;{query}&quot;
                   </Link>

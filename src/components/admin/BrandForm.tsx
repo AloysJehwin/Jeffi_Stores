@@ -13,10 +13,17 @@ interface BrandFormProps {
   backUrl?: string
   isDraft?: boolean
   submitLabel?: string
-  hasReturns?: boolean  // false = Basic plan, hides return/replacement policy section
+  hasReturns?: boolean // false = Basic plan, hides return/replacement policy section
 }
 
-export default function BrandForm({ action, brand, backUrl, isDraft = false, submitLabel, hasReturns = true }: BrandFormProps) {
+export default function BrandForm({
+  action,
+  brand,
+  backUrl,
+  isDraft = false,
+  submitLabel,
+  hasReturns = true,
+}: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
@@ -35,7 +42,13 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
 
   function handleAIFill(values: Record<string, unknown>) {
     if (values.name) setBrandName(String(values.name))
-    if (values.slug) setInput('slug', String(values.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+    if (values.slug)
+      setInput(
+        'slug',
+        String(values.slug)
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '-')
+      )
     if (values.description) setDescription(String(values.description))
     if (values.website) setInput('website', String(values.website))
     if (values.is_active != null) setIsActive(Boolean(values.is_active))
@@ -61,11 +74,18 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
   }
 
   function generateSlug(name: string) {
-    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      className="bg-surface-elevated rounded-lg shadow-sm border border-border-default"
+    >
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {error && (
@@ -193,58 +213,76 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
       </div>
 
       {hasReturns && (
-      <div className="px-4 sm:px-6 py-5 border-t border-border-default">
-        <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
-        <p className="text-xs text-foreground-muted mb-4">Brand policy takes priority over category policy on the product page.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-              <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
-            </div>
-            {returnAllowed && (
-              <div>
-                <label htmlFor="return_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Return window (days)
-                </label>
-                <input
-                  type="number"
-                  id="return_window_days"
-                  name="return_window_days"
-                  min={1}
-                  max={90}
-                  value={returnDays}
-                  onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+        <div className="px-4 sm:px-6 py-5 border-t border-border-default">
+          <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
+          <p className="text-xs text-foreground-muted mb-4">
+            Brand policy takes priority over category policy on the product page.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
+                <Toggle
+                  id="return_allowed"
+                  checked={returnAllowed}
+                  onChange={setReturnAllowed}
+                  label="Returns Allowed"
                 />
               </div>
-            )}
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-              <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+              {returnAllowed && (
+                <div>
+                  <label
+                    htmlFor="return_window_days"
+                    className="block text-sm font-medium text-foreground-secondary mb-1"
+                  >
+                    Return window (days)
+                  </label>
+                  <input
+                    type="number"
+                    id="return_window_days"
+                    name="return_window_days"
+                    min={1}
+                    max={90}
+                    value={returnDays}
+                    onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  />
+                </div>
+              )}
             </div>
-            {replacementAllowed && (
-              <div>
-                <label htmlFor="replacement_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Replacement window (days)
-                </label>
-                <input
-                  type="number"
-                  id="replacement_window_days"
-                  name="replacement_window_days"
-                  min={1}
-                  max={90}
-                  value={replacementDays}
-                  onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
+                <Toggle
+                  id="replacement_allowed"
+                  checked={replacementAllowed}
+                  onChange={setReplacementAllowed}
+                  label="Replacement Allowed"
                 />
               </div>
-            )}
+              {replacementAllowed && (
+                <div>
+                  <label
+                    htmlFor="replacement_window_days"
+                    className="block text-sm font-medium text-foreground-secondary mb-1"
+                  >
+                    Replacement window (days)
+                  </label>
+                  <input
+                    type="number"
+                    id="replacement_window_days"
+                    name="replacement_window_days"
+                    min={1}
+                    max={90}
+                    value={replacementDays}
+                    onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       )}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
         <Link
@@ -255,18 +293,31 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
         </Link>
         {isDraft ? (
           <>
-            <button type="submit" name="intent" value="draft" disabled={isSubmitting}
-              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50">
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
               {isSubmitting ? 'Saving…' : 'Save Draft'}
             </button>
-            <button type="submit" name="intent" value="publish" disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50">
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
               {isSubmitting ? 'Publishing…' : 'Publish'}
             </button>
           </>
         ) : (
-          <button type="submit" disabled={isSubmitting}
-            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             {isSubmitting ? 'Saving...' : submitLabel || (brand ? 'Update Brand' : 'Create Brand')}
           </button>
         )}

@@ -2,7 +2,14 @@
 
 import { configNumber } from '@/lib/homepage-sections'
 import {
-  Grid, LimitField, NumberField, Text, copyHint, sectionCopy, useSectionBinding, type EditorProps,
+  Grid,
+  LimitField,
+  NumberField,
+  Text,
+  copyHint,
+  sectionCopy,
+  useSectionBinding,
+  type EditorProps,
 } from './fields'
 
 export default function RecentlyViewedEditor(props: EditorProps) {

@@ -21,35 +21,36 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
 
   const currentSort = searchParams.get('sort') || 'created_at'
   const currentOrder = searchParams.get('order')
-  const currentValue = currentSort === 'base_price' && currentOrder === 'desc'
-    ? 'base_price&order=desc'
-    : currentSort
+  const currentValue = currentSort === 'base_price' && currentOrder === 'desc' ? 'base_price&order=desc' : currentSort
 
   const selectedOption = SORT_OPTIONS.find(o => o.value === currentValue) || SORT_OPTIONS[0]
 
-  const handleSelect = useCallback((value: string) => {
-    const params = new URLSearchParams(searchParams.toString())
+  const handleSelect = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString())
 
-    if (value.includes('&order=')) {
-      const [sort, order] = value.split('&order=')
-      params.set('sort', sort)
-      params.set('order', order)
-    } else if (value === 'base_price') {
-      params.set('sort', value)
-      params.set('order', 'asc')
-    } else if (value === 'name') {
-      params.set('sort', value)
-      params.set('order', 'asc')
-    } else {
-      params.set('sort', value)
-      params.delete('order')
-    }
+      if (value.includes('&order=')) {
+        const [sort, order] = value.split('&order=')
+        params.set('sort', sort)
+        params.set('order', order)
+      } else if (value === 'base_price') {
+        params.set('sort', value)
+        params.set('order', 'asc')
+      } else if (value === 'name') {
+        params.set('sort', value)
+        params.set('order', 'asc')
+      } else {
+        params.set('sort', value)
+        params.delete('order')
+      }
 
-    startTransition(() => {
-      router.replace(basePath + `?${params.toString()}`)
-    })
-    setIsOpen(false)
-  }, [searchParams, router])
+      startTransition(() => {
+        router.replace(basePath + `?${params.toString()}`)
+      })
+      setIsOpen(false)
+    },
+    [searchParams, router]
+  )
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -65,7 +66,7 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children
       if (items[highlightedIndex]) {
-        (items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
+        ;(items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
       }
     }
   }, [highlightedIndex, isOpen])
@@ -123,7 +124,7 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
             }
           }}
           onKeyDown={handleKeyDown}
-      className={`px-3 py-1.5 h-9 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 w-44
+          className={`px-3 py-1.5 h-9 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 w-44
             ${isPending ? 'opacity-60' : ''}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-border-secondary hover:border-gray-400'}
           `}
@@ -161,7 +162,13 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
                   >
                     <span>{option.label}</span>
                     {option.value === currentValue && (
-                      <svg className="w-4 h-4 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg
+                        className="w-4 h-4 text-accent-500 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}

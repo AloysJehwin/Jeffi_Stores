@@ -10,16 +10,66 @@ import AIEnrichButton from './AIEnrichButton'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 const ICON_OPTIONS = [
-  'Anchor', 'Anvil', 'Aperture', 'Axe', 'Battery', 'BatteryCharging',
-  'Bolt', 'Box', 'Boxes', 'Brush', 'Cable', 'CircuitBoard', 'Cog',
-  'Cpu', 'Disc', 'Disc2', 'Drill', 'Filter', 'Flame', 'Flashlight',
-  'FlaskConical', 'Forklift', 'Gauge', 'Grip', 'Hammer', 'Hexagon',
-  'HardHat', 'Layers', 'Link', 'Link2', 'Magnet', 'Microchip',
-  'Nut', 'Package', 'Paintbrush', 'PaintRoller', 'PencilRuler',
-  'Pickaxe', 'Pipette', 'Plug', 'PlugZap', 'Ruler', 'Satellite',
-  'ScanLine', 'Scissors', 'Settings', 'Shield', 'Shovel', 'Spade',
-  'SprayCan', 'TestTube', 'Thermometer', 'ToolCase', 'Toolbox',
-  'Truck', 'Warehouse', 'Weight', 'Wind', 'Wrench', 'Zap',
+  'Anchor',
+  'Anvil',
+  'Aperture',
+  'Axe',
+  'Battery',
+  'BatteryCharging',
+  'Bolt',
+  'Box',
+  'Boxes',
+  'Brush',
+  'Cable',
+  'CircuitBoard',
+  'Cog',
+  'Cpu',
+  'Disc',
+  'Disc2',
+  'Drill',
+  'Filter',
+  'Flame',
+  'Flashlight',
+  'FlaskConical',
+  'Forklift',
+  'Gauge',
+  'Grip',
+  'Hammer',
+  'Hexagon',
+  'HardHat',
+  'Layers',
+  'Link',
+  'Link2',
+  'Magnet',
+  'Microchip',
+  'Nut',
+  'Package',
+  'Paintbrush',
+  'PaintRoller',
+  'PencilRuler',
+  'Pickaxe',
+  'Pipette',
+  'Plug',
+  'PlugZap',
+  'Ruler',
+  'Satellite',
+  'ScanLine',
+  'Scissors',
+  'Settings',
+  'Shield',
+  'Shovel',
+  'Spade',
+  'SprayCan',
+  'TestTube',
+  'Thermometer',
+  'ToolCase',
+  'Toolbox',
+  'Truck',
+  'Warehouse',
+  'Weight',
+  'Wind',
+  'Wrench',
+  'Zap',
 ]
 
 interface Category {
@@ -48,39 +98,110 @@ function IconPreview({ name, className }: { name: string; className?: string }) 
 }
 
 const NAME_MAP: Record<string, string> = {
-  bolt: 'Bolt', bolts: 'Bolt',
-  screw: 'Cog', screws: 'Cog', screwdriver: 'Wrench',
-  nut: 'Nut', nuts: 'Nut',
-  washer: 'Disc', washers: 'Disc',
+  bolt: 'Bolt',
+  bolts: 'Bolt',
+  screw: 'Cog',
+  screws: 'Cog',
+  screwdriver: 'Wrench',
+  nut: 'Nut',
+  nuts: 'Nut',
+  washer: 'Disc',
+  washers: 'Disc',
   drill: 'Drill',
-  hammer: 'Hammer', hammers: 'Hammer',
-  wrench: 'Wrench', wrenches: 'Wrench', torque: 'Wrench', adjustable: 'Wrench',
-  plier: 'Grip', pliers: 'Grip',
-  socket: 'Hexagon', sockets: 'Hexagon',
+  hammer: 'Hammer',
+  hammers: 'Hammer',
+  wrench: 'Wrench',
+  wrenches: 'Wrench',
+  torque: 'Wrench',
+  adjustable: 'Wrench',
+  plier: 'Grip',
+  pliers: 'Grip',
+  socket: 'Hexagon',
+  sockets: 'Hexagon',
   hand: 'Toolbox',
-  measuring: 'Ruler', measure: 'Ruler', gauge: 'Gauge', meter: 'Gauge',
-  cutting: 'Scissors', blade: 'Scissors', saw: 'Scissors', cutter: 'Scissors',
-  abrasive: 'ScanLine', abrasives: 'ScanLine', grinding: 'ScanLine', sandpaper: 'ScanLine',
-  welding: 'Flame', weld: 'Flame', aluminum: 'Flame',
-  belt: 'Link', belts: 'Link',
-  chain: 'Link2', chains: 'Link2',
-  coupling: 'Boxes', couplings: 'Boxes',
-  threaded: 'Anchor', rod: 'Anchor', rods: 'Anchor', anchor: 'Anchor', anchors: 'Anchor',
-  hose: 'Waves', clamp: 'Waves', clamps: 'Waves', clip: 'Waves',
-  crimping: 'Zap', terminal: 'Zap', terminals: 'Zap', cable: 'Cable', wire: 'Cable', electrical: 'PlugZap', electric: 'PlugZap',
-  bearing: 'Aperture', bearings: 'Aperture',
-  pulley: 'Disc', wheel: 'Disc', wheels: 'Disc',
-  transmission: 'Cog', drive: 'Cog',
-  fastener: 'Bolt', fasteners: 'Bolt',
-  safety: 'Shield', protective: 'Shield', protection: 'Shield',
-  lubricant: 'FlaskConical', lubricants: 'FlaskConical', chemical: 'FlaskConical', chemicals: 'FlaskConical', oil: 'FlaskConical', grease: 'FlaskConical',
-  handling: 'Truck', lifting: 'Truck', trolley: 'Truck',
-  pipe: 'Filter', pipes: 'Filter', plumbing: 'Filter', valve: 'Filter', valves: 'Filter', fitting: 'Filter', fittings: 'Filter',
-  motor: 'Cpu', motors: 'Cpu', engine: 'Cpu', pneumatic: 'Cpu', hydraulic: 'Cpu', cylinder: 'Cpu',
-  paint: 'Paintbrush', coating: 'PaintRoller', brush: 'Paintbrush',
-  spring: 'Magnet', springs: 'Magnet', coil: 'Magnet',
-  tool: 'Wrench', tools: 'Wrench', equipment: 'Toolbox',
-  industrial: 'Factory', component: 'Boxes', components: 'Boxes',
+  measuring: 'Ruler',
+  measure: 'Ruler',
+  gauge: 'Gauge',
+  meter: 'Gauge',
+  cutting: 'Scissors',
+  blade: 'Scissors',
+  saw: 'Scissors',
+  cutter: 'Scissors',
+  abrasive: 'ScanLine',
+  abrasives: 'ScanLine',
+  grinding: 'ScanLine',
+  sandpaper: 'ScanLine',
+  welding: 'Flame',
+  weld: 'Flame',
+  aluminum: 'Flame',
+  belt: 'Link',
+  belts: 'Link',
+  chain: 'Link2',
+  chains: 'Link2',
+  coupling: 'Boxes',
+  couplings: 'Boxes',
+  threaded: 'Anchor',
+  rod: 'Anchor',
+  rods: 'Anchor',
+  anchor: 'Anchor',
+  anchors: 'Anchor',
+  hose: 'Waves',
+  clamp: 'Waves',
+  clamps: 'Waves',
+  clip: 'Waves',
+  crimping: 'Zap',
+  terminal: 'Zap',
+  terminals: 'Zap',
+  cable: 'Cable',
+  wire: 'Cable',
+  electrical: 'PlugZap',
+  electric: 'PlugZap',
+  bearing: 'Aperture',
+  bearings: 'Aperture',
+  pulley: 'Disc',
+  wheel: 'Disc',
+  wheels: 'Disc',
+  transmission: 'Cog',
+  drive: 'Cog',
+  fastener: 'Bolt',
+  fasteners: 'Bolt',
+  safety: 'Shield',
+  protective: 'Shield',
+  protection: 'Shield',
+  lubricant: 'FlaskConical',
+  lubricants: 'FlaskConical',
+  chemical: 'FlaskConical',
+  chemicals: 'FlaskConical',
+  oil: 'FlaskConical',
+  grease: 'FlaskConical',
+  handling: 'Truck',
+  lifting: 'Truck',
+  trolley: 'Truck',
+  pipe: 'Filter',
+  pipes: 'Filter',
+  plumbing: 'Filter',
+  valve: 'Filter',
+  valves: 'Filter',
+  fitting: 'Filter',
+  fittings: 'Filter',
+  motor: 'Cpu',
+  motors: 'Cpu',
+  engine: 'Cpu',
+  pneumatic: 'Cpu',
+  hydraulic: 'Cpu',
+  cylinder: 'Cpu',
+  paint: 'Paintbrush',
+  coating: 'PaintRoller',
+  brush: 'Paintbrush',
+  spring: 'Magnet',
+  springs: 'Magnet',
+  coil: 'Magnet',
+  tool: 'Wrench',
+  tools: 'Wrench',
+  equipment: 'Toolbox',
+  industrial: 'Factory',
+  component: 'Boxes',
+  components: 'Boxes',
 }
 
 function resolveIconByName(name: string): string {
@@ -95,17 +216,24 @@ function resolveIconByName(name: string): string {
   return 'Package'
 }
 
-export default function CategoryForm({ categories, action, category, backUrl, isDraft = false, submitLabel }: CategoryFormProps) {
+export default function CategoryForm({
+  categories,
+  action,
+  category,
+  backUrl,
+  isDraft = false,
+  submitLabel,
+}: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
 
-  const parentCat = isSubcat
-    ? categories.find(c => c.id === category.parent_category_id) ?? null
-    : null
+  const parentCat = isSubcat ? (categories.find(c => c.id === category.parent_category_id) ?? null) : null
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedIcon, setSelectedIcon] = useState<string>(category?.icon_name || resolveIconByName(category?.name || ''))
+  const [selectedIcon, setSelectedIcon] = useState<string>(
+    category?.icon_name || resolveIconByName(category?.name || '')
+  )
   const [iconSearch, setIconSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -129,8 +257,8 @@ export default function CategoryForm({ categories, action, category, backUrl, is
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
 
-  const filteredIcons = useMemo(() =>
-    ICON_OPTIONS.filter(n => n.toLowerCase().includes(iconSearch.toLowerCase())),
+  const filteredIcons = useMemo(
+    () => ICON_OPTIONS.filter(n => n.toLowerCase().includes(iconSearch.toLowerCase())),
     [iconSearch]
   )
 
@@ -144,7 +272,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       })
-      const data = await res.json() as { iconName?: string }
+      const data = (await res.json()) as { iconName?: string }
       if (data.iconName) setSelectedIcon(data.iconName)
     } finally {
       setGenerating(false)
@@ -194,9 +322,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-foreground-secondary mb-2">
-              Category Icon
-            </label>
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">Category Icon</label>
 
             <input type="hidden" name="icon_name" value={selectedIcon} />
 
@@ -254,7 +380,11 @@ export default function CategoryForm({ categories, action, category, backUrl, is
                       key={name}
                       type="button"
                       title={name}
-                      onClick={() => { setSelectedIcon(name); setShowPicker(false); setIconSearch('') }}
+                      onClick={() => {
+                        setSelectedIcon(name)
+                        setShowPicker(false)
+                        setIconSearch('')
+                      }}
                       className={`p-2 rounded-md flex items-center justify-center transition-colors ${
                         selectedIcon === name
                           ? 'bg-accent-500 text-white'
@@ -324,7 +454,10 @@ export default function CategoryForm({ categories, action, category, backUrl, is
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="google_product_category" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label
+              htmlFor="google_product_category"
+              className="block text-sm font-medium text-foreground-secondary mb-2"
+            >
               Google Product Category
             </label>
             <input
@@ -337,7 +470,12 @@ export default function CategoryForm({ categories, action, category, backUrl, is
             />
             <p className="text-xs text-foreground-muted mt-1">
               Google taxonomy path or ID for Merchant Center.{' '}
-              <a href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt" target="_blank" rel="noopener noreferrer" className="text-accent-500 underline">
+              <a
+                href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-500 underline"
+              >
                 Google Product Taxonomy
               </a>
             </p>
@@ -378,7 +516,9 @@ export default function CategoryForm({ categories, action, category, backUrl, is
 
       <div className="px-4 sm:px-6 py-5 border-t border-border-default">
         <h2 className="text-base font-semibold text-foreground mb-1">Return &amp; Replacement Policy</h2>
-        <p className="text-xs text-foreground-muted mb-4">Category policy is the default. Brand policy can override per product.</p>
+        <p className="text-xs text-foreground-muted mb-4">
+          Category policy is the default. Brand policy can override per product.
+        </p>
 
         <input type="hidden" name="policy_override" value={overriding ? 'true' : 'false'} />
 
@@ -386,13 +526,20 @@ export default function CategoryForm({ categories, action, category, backUrl, is
           <div className="flex items-center gap-3 flex-wrap">
             <span className="inline-flex items-center gap-1.5 text-sm bg-surface-secondary border border-border-secondary text-foreground-secondary px-3 py-1.5 rounded-full">
               <svg className="w-3.5 h-3.5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
               Inherited from {parentCat?.name ?? 'parent category'}
               {' — '}
               {(parentCat?.return_allowed ?? true) ? `Returns ${parentCat?.return_window_days ?? 7}d` : 'No returns'}
               {' · '}
-              {(parentCat?.replacement_allowed ?? true) ? `Replacement ${parentCat?.replacement_window_days ?? 7}d` : 'No replacement'}
+              {(parentCat?.replacement_allowed ?? true)
+                ? `Replacement ${parentCat?.replacement_window_days ?? 7}d`
+                : 'No replacement'}
             </span>
             <button
               type="button"
@@ -417,11 +564,19 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-                  <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
+                  <Toggle
+                    id="return_allowed"
+                    checked={returnAllowed}
+                    onChange={setReturnAllowed}
+                    label="Returns Allowed"
+                  />
                 </div>
                 {returnAllowed && (
                   <div>
-                    <label htmlFor="return_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                    <label
+                      htmlFor="return_window_days"
+                      className="block text-sm font-medium text-foreground-secondary mb-1"
+                    >
                       Return window (days)
                     </label>
                     <input
@@ -440,11 +595,19 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-                  <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+                  <Toggle
+                    id="replacement_allowed"
+                    checked={replacementAllowed}
+                    onChange={setReplacementAllowed}
+                    label="Replacement Allowed"
+                  />
                 </div>
                 {replacementAllowed && (
                   <div>
-                    <label htmlFor="replacement_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                    <label
+                      htmlFor="replacement_window_days"
+                      className="block text-sm font-medium text-foreground-secondary mb-1"
+                    >
                       Replacement window (days)
                     </label>
                     <input
@@ -474,19 +637,32 @@ export default function CategoryForm({ categories, action, category, backUrl, is
         </Link>
         {isDraft ? (
           <RequireWrite scope="categories:write">
-            <button type="submit" name="intent" value="draft" disabled={isSubmitting}
-              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50">
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
               {isSubmitting ? 'Saving…' : 'Save Draft'}
             </button>
-            <button type="submit" name="intent" value="publish" disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50">
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
               {isSubmitting ? 'Publishing…' : 'Publish'}
             </button>
           </RequireWrite>
         ) : (
           <RequireWrite scope="categories:write">
-            <button type="submit" disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {isSubmitting ? 'Saving…' : submitLabel || (category ? 'Update Category' : 'Create Category')}
             </button>
           </RequireWrite>

@@ -3,8 +3,16 @@
 import AdminImage from '@/components/admin/AdminImage'
 import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
 import {
-  CtaFields, Grid, HeadingFields, LABEL_CLASS, Text, TextArea,
-  copyHint, sectionCopy, useSectionBinding, type EditorProps,
+  CtaFields,
+  Grid,
+  HeadingFields,
+  LABEL_CLASS,
+  Text,
+  TextArea,
+  copyHint,
+  sectionCopy,
+  useSectionBinding,
+  type EditorProps,
 } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
@@ -66,7 +74,11 @@ export default function AboutEditor(props: EditorProps) {
         max={4}
         onCommit={items => b.saveConfig({ stats: items })}
       />
-      <CtaFields props={props} urlPlaceholder="/about" hint="The main button. A second button always opens all products." />
+      <CtaFields
+        props={props}
+        urlPlaceholder="/about"
+        hint="The main button. A second button always opens all products."
+      />
     </Grid>
   )
 }

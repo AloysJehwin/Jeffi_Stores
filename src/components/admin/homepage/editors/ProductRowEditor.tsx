@@ -2,8 +2,18 @@
 
 import { configNumber, productSource } from '@/lib/homepage-sections'
 import {
-  CtaFields, Grid, HeadingFields, LayoutField, LimitField, Note, NumberField, Select, ToggleField,
-  useSectionBinding, type EditorProps, type SectionOptions,
+  CtaFields,
+  Grid,
+  HeadingFields,
+  LayoutField,
+  LimitField,
+  Note,
+  NumberField,
+  Select,
+  ToggleField,
+  useSectionBinding,
+  type EditorProps,
+  type SectionOptions,
 } from './fields'
 
 const SOURCES = [
@@ -61,7 +71,9 @@ export default function ProductRowEditor(props: EditorProps) {
           disabled={!canWrite}
           onChange={v => b.saveConfig({ categorySlug: v || null })}
         />
-      ) : <div />}
+      ) : (
+        <div />
+      )}
 
       <LimitField props={props} />
       <LayoutField props={props} />
@@ -80,7 +92,9 @@ export default function ProductRowEditor(props: EditorProps) {
           disabled={!canWrite}
           onCommit={v => b.saveConfig({ newWithinDays: Math.min(v, 365) })}
         />
-      ) : <div />}
+      ) : (
+        <div />
+      )}
 
       <HeadingFields props={props} eyebrowHint="Small line above the heading, e.g. Handpicked." />
       <CtaFields props={props} />

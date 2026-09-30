@@ -10,11 +10,11 @@ import { renderTextWithLinks } from '@/components/ui/Linkify'
 interface Message {
   id: string
   sender: 'user' | 'admin' | 'bot'
-  message: string        // plain text OR JSON-serialised BotPayload
+  message: string // plain text OR JSON-serialised BotPayload
   created_at?: string
   sender_name?: string
   is_closing?: boolean
-  payload?: BotPayload   // parsed once, stored here to avoid re-parsing on every render
+  payload?: BotPayload // parsed once, stored here to avoid re-parsing on every render
 }
 
 interface Session {
@@ -33,7 +33,12 @@ const QUICK_REPLIES = [
   { label: 'Latest order', query: 'latest order' },
 ]
 
-const CLOSING_PHRASES = ['thank you for contacting', 'have a great day', 'your issue has been resolved', "don't hesitate to reach out"]
+const CLOSING_PHRASES = [
+  'thank you for contacting',
+  'have a great day',
+  'your issue has been resolved',
+  "don't hesitate to reach out",
+]
 
 function parsePayload(message: string): BotPayload | null {
   try {
@@ -69,46 +74,85 @@ function OrderStatusBadge({ status }: { status: string }) {
     returned: 'bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300',
   }
   return (
-    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${map[status] ?? 'bg-gray-100 text-gray-700'}`}>
+    <span
+      className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${map[status] ?? 'bg-gray-100 text-gray-700'}`}
+    >
       {status}
     </span>
   )
 }
 
 function NavIcon({ icon }: { icon?: BotNavLink['icon'] }) {
-  if (icon === 'orders') return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-    </svg>
-  )
-  if (icon === 'addresses') return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  )
-  if (icon === 'invoices') return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-    </svg>
-  )
-  if (icon === 'track') return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-    </svg>
-  )
+  if (icon === 'orders')
+    return (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+        />
+      </svg>
+    )
+  if (icon === 'addresses')
+    return (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+        />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )
+  if (icon === 'invoices')
+    return (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
+        />
+      </svg>
+    )
+  if (icon === 'track')
+    return (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+        />
+      </svg>
+    )
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+      />
     </svg>
   )
 }
 
-function ActionButton({ action, onQuery, compact }: { action: BotAction; onQuery: (q: string) => void; compact?: boolean }) {
+function ActionButton({
+  action,
+  onQuery,
+  compact,
+}: {
+  action: BotAction
+  onQuery: (q: string) => void
+  compact?: boolean
+}) {
   const router = useRouter()
   const cls = compact
-    ? "px-2.5 py-1 text-xs font-medium rounded-lg border border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors"
-    : "flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors text-center"
+    ? 'px-2.5 py-1 text-xs font-medium rounded-lg border border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors'
+    : 'flex-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors text-center'
 
   if (action.query) {
     return (
@@ -146,7 +190,9 @@ function OrderCard({ order, context, onClick }: { order: BotOrderCard; context: 
         <OrderStatusBadge status={order.status} />
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-xs text-foreground-muted">{date} · {amt}</span>
+        <span className="text-xs text-foreground-muted">
+          {date} · {amt}
+        </span>
         <span className="text-xs text-primary-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
           {contextLabel[context] ?? 'Select'} →
         </span>
@@ -244,12 +290,19 @@ function PayloadRenderer({ payload, onQuery, onOrderSelect }: PayloadRendererPro
           {payload.links.map((link, i) => (
             <button
               key={i}
-              onClick={() => link.query ? onQuery(link.query) : router.push(link.url!)}
+              onClick={() => (link.query ? onQuery(link.query) : router.push(link.url!))}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface hover:bg-surface-elevated border border-border-default hover:border-primary-300 dark:hover:border-primary-700 transition-all text-left"
             >
-              <span className="text-primary-500 shrink-0"><NavIcon icon={link.icon} /></span>
+              <span className="text-primary-500 shrink-0">
+                <NavIcon icon={link.icon} />
+              </span>
               <span className="text-sm font-medium text-foreground">{link.label}</span>
-              <svg className="w-3.5 h-3.5 ml-auto text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-3.5 h-3.5 ml-auto text-foreground-muted"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -298,7 +351,7 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
         text: "hey! i'm Jeffi, your support assistant. what can i help you with?",
         chips: QUICK_REPLIES.map(qr => ({ label: qr.label, query: qr.query })),
       },
-    }
+    },
   ])
   const [input, setInput] = useState('')
   const [session, setSession] = useState<Session | null>(null)
@@ -336,7 +389,10 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       const data = await res.json()
       if (!data.session) return
 
-      const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`, { credentials: 'include', headers: ph })
+      const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`, {
+        credentials: 'include',
+        headers: ph,
+      })
       if (!msgsRes.ok) return
       const msgsData = await msgsRes.json()
 
@@ -389,24 +445,37 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     setMessages(prev => [...prev, userMsg])
     setIsSending(true)
     try {
-      const res = await fetch(`/api/support/bot?msg=${encodeURIComponent(query)}`, { credentials: 'include', headers: ph })
+      const res = await fetch(`/api/support/bot?msg=${encodeURIComponent(query)}`, {
+        credentials: 'include',
+        headers: ph,
+      })
       const data = await res.json()
       let payload: BotPayload
       if (res.ok && data.payload) {
         payload = data.payload
       } else {
         // Never render a raw server `error` string to the customer.
-        payload = { type: 'text', text: "i'm having trouble with that right now — please try again or connect to a support agent." }
+        payload = {
+          type: 'text',
+          text: "i'm having trouble with that right now — please try again or connect to a support agent.",
+        }
       }
       setMessages(prev => [...prev, { id: Date.now().toString() + 'b', sender: 'bot', message: '', payload }])
       setShowConnectPrompt(true)
     } catch {
-      setMessages(prev => [...prev, {
-        id: Date.now().toString() + 'b',
-        sender: 'bot',
-        message: '',
-        payload: { type: 'text_actions', text: 'Something went wrong. Please try again.', actions: [{ label: 'Try Again', query }] },
-      }])
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString() + 'b',
+          sender: 'bot',
+          message: '',
+          payload: {
+            type: 'text_actions',
+            text: 'Something went wrong. Please try again.',
+            actions: [{ label: 'Try Again', query }],
+          },
+        },
+      ])
     } finally {
       setIsSending(false)
     }
@@ -425,12 +494,17 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       setSession(data.session)
       setMode('live')
       setShowConnectPrompt(false)
-      setMessages([{
-        id: 'live-start',
-        sender: 'bot',
-        message: '',
-        payload: { type: 'text', text: "you're now in the support queue — an agent will join shortly. feel free to describe your issue while you wait." },
-      }])
+      setMessages([
+        {
+          id: 'live-start',
+          sender: 'bot',
+          message: '',
+          payload: {
+            type: 'text',
+            text: "you're now in the support queue — an agent will join shortly. feel free to describe your issue while you wait.",
+          },
+        },
+      ])
       lastMessageIdRef.current = null
       showToast('Support agent notified. We will respond shortly.', 'success')
     } catch (err: any) {
@@ -479,16 +553,18 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     setMode('bot')
     setShowConnectPrompt(false)
     setShowEndSessionPrompt(false)
-    setMessages([{
-      id: 'end',
-      sender: 'bot',
-      message: '',
-      payload: {
-        type: 'chips',
-        text: 'chat ended. need more help?',
-        chips: QUICK_REPLIES.map(qr => ({ label: qr.label, query: qr.query })),
+    setMessages([
+      {
+        id: 'end',
+        sender: 'bot',
+        message: '',
+        payload: {
+          type: 'chips',
+          text: 'chat ended. need more help?',
+          chips: QUICK_REPLIES.map(qr => ({ label: qr.label, query: qr.query })),
+        },
       },
-    }])
+    ])
     lastMessageIdRef.current = null
   }
 
@@ -525,7 +601,7 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     }
 
     const payload = msg.payload ?? (msg.message ? parsePayload(msg.message) : null)
-    const fallbackText = (!payload && msg.message) ? msg.message : null
+    const fallbackText = !payload && msg.message ? msg.message : null
 
     return (
       <div key={msg.id} className="flex justify-start">
@@ -536,11 +612,7 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
             </p>
           )}
           {payload ? (
-            <PayloadRenderer
-              payload={payload}
-              onQuery={handleBotQuery}
-              onOrderSelect={handleOrderSelect}
-            />
+            <PayloadRenderer payload={payload} onQuery={handleBotQuery} onOrderSelect={handleOrderSelect} />
           ) : (
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderTextWithLinks(fallbackText ?? '')}</p>
           )}
@@ -556,15 +628,20 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+              />
             </svg>
           </div>
           <div>
             <p className="font-semibold text-sm leading-none">
-              {mode === 'bot' ? 'Jeffi' : (adminName ? adminName : 'Support Agent')}
+              {mode === 'bot' ? 'Jeffi' : adminName ? adminName : 'Support Agent'}
             </p>
             <p className="text-white/70 text-xs mt-0.5">
-              {mode === 'bot' ? 'Support Assistant' : (adminName ? `${storeName} Support` : 'Connecting...')}
+              {mode === 'bot' ? 'Support Assistant' : adminName ? `${storeName} Support` : 'Connecting...'}
             </p>
           </div>
         </div>
@@ -586,9 +663,18 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
           <div className="flex justify-start">
             <div className="bg-surface border border-border-default rounded-2xl rounded-bl-sm px-3.5 py-2.5">
               <div className="flex gap-1 items-center">
-                <span className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span
+                  className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce"
+                  style={{ animationDelay: '0ms' }}
+                />
+                <span
+                  className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce"
+                  style={{ animationDelay: '150ms' }}
+                />
+                <span
+                  className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce"
+                  style={{ animationDelay: '300ms' }}
+                />
               </div>
             </div>
           </div>
@@ -597,7 +683,9 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
         {mode === 'bot' && showConnectPrompt && !isSending && (
           <div className="flex justify-start pt-1">
             <div className="bg-surface border border-border-default rounded-2xl rounded-bl-sm px-3.5 py-3 max-w-[85%]">
-              <p className="text-sm text-foreground mb-3">Still need help? Connect to a live support agent and we&apos;ll assist you directly.</p>
+              <p className="text-sm text-foreground mb-3">
+                Still need help? Connect to a live support agent and we&apos;ll assist you directly.
+              </p>
               <button
                 onClick={connectToAgent}
                 disabled={isConnecting}
@@ -630,7 +718,12 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
               className="px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
               </svg>
             </button>
           </div>

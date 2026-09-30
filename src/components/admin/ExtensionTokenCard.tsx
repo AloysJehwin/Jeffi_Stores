@@ -22,7 +22,8 @@ export default function ExtensionTokenCard() {
         body: JSON.stringify({ scopes: ['products:write'], ttl: 86400 }),
       })
       if (res.status === 401) throw new Error('Your admin session expired — reload and sign in, then try again.')
-      if (res.status === 403) throw new Error('Your account lacks the products:write permission needed for the extension token.')
+      if (res.status === 403)
+        throw new Error('Your account lacks the products:write permission needed for the extension token.')
       if (!res.ok) throw new Error(`Failed to generate token (HTTP ${res.status}).`)
       const data = await res.json()
       if (!data?.token) throw new Error('No token returned by the server.')
@@ -50,16 +51,29 @@ export default function ExtensionTokenCard() {
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       <div className="px-6 py-4 border-b border-border-default">
         <h2 className="text-lg font-semibold text-foreground">Chrome Extension Token</h2>
-        <p className="text-sm text-foreground-muted mt-1">Generate a scoped upload token for the Jeffi Gallery Uploader extension.</p>
+        <p className="text-sm text-foreground-muted mt-1">
+          Generate a scoped upload token for the Jeffi Gallery Uploader extension.
+        </p>
       </div>
       <div className="p-4 sm:p-6 space-y-3">
         <div className="flex items-center gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default font-mono text-sm text-foreground-secondary">
-          {token
-            ? <input readOnly value={token} onFocus={e => e.currentTarget.select()} className="flex-1 bg-transparent outline-none" />
-            : <span className="flex-1 truncate">eyJ••••••••••••••••••••••••••••••</span>}
+          {token ? (
+            <input
+              readOnly
+              value={token}
+              onFocus={e => e.currentTarget.select()}
+              className="flex-1 bg-transparent outline-none"
+            />
+          ) : (
+            <span className="flex-1 truncate">eyJ••••••••••••••••••••••••••••••</span>
+          )}
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
-        {token && <p className="text-xs text-amber-600 dark:text-amber-400">Auto-copy unavailable on this origin — select the token above and copy it manually.</p>}
+        {token && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Auto-copy unavailable on this origin — select the token above and copy it manually.
+          </p>
+        )}
         <RequireWrite scope="settings:write">
           <button
             onClick={handleCopy}
@@ -68,7 +82,10 @@ export default function ExtensionTokenCard() {
             {copied ? 'Copied!' : 'Copy Token'}
           </button>
         </RequireWrite>
-        <p className="text-xs text-foreground-muted">Scoped to product image uploads only, valid 24 hours. Generate a fresh token when it expires. Your login session is never shared.</p>
+        <p className="text-xs text-foreground-muted">
+          Scoped to product image uploads only, valid 24 hours. Generate a fresh token when it expires. Your login
+          session is never shared.
+        </p>
       </div>
     </div>
   )

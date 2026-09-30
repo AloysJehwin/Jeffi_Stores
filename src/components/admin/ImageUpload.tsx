@@ -30,7 +30,12 @@ interface ImageUploadProps {
   productId: string
   maxImages?: number
   existingImages?: ExistingImage[]
-  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImages: { id: string; isPrimary: boolean }[], orderedKeys: string[]) => void
+  onImagesChange?: (
+    files: File[],
+    existingImagesToKeep: ExistingImage[],
+    galleryImages: { id: string; isPrimary: boolean }[],
+    orderedKeys: string[]
+  ) => void
 }
 
 export default function ImageUpload({
@@ -175,7 +180,9 @@ export default function ImageUpload({
     notifyChange(updated)
   }
 
-  const openGallery = useCallback(() => { setShowGallery(true) }, [])
+  const openGallery = useCallback(() => {
+    setShowGallery(true)
+  }, [])
 
   function handleUseGalleryImages(picked: GalleryImage[]) {
     setShowGallery(false)
@@ -249,7 +256,8 @@ export default function ImageUpload({
       {images.length > 0 && (
         <div>
           <p className="text-xs text-foreground-muted mb-2">
-            <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
+            <span className="hidden sm:inline">Drag</span>
+            <span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {images.map((image, index) => (
@@ -263,10 +271,16 @@ export default function ImageUpload({
                 onDragOver={e => e.preventDefault()}
               >
                 <div className="aspect-square rounded-lg overflow-hidden border-2 border-border-default hover:border-accent-500 transition-colors select-none">
-                  <ImgWithSkeleton src={image.previewUrl} alt={image.fileName} className="w-full h-full object-cover pointer-events-none" />
+                  <ImgWithSkeleton
+                    src={image.previewUrl}
+                    alt={image.fileName}
+                    className="w-full h-full object-cover pointer-events-none"
+                  />
                 </div>
                 {image.isPrimary && (
-                  <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-1 rounded">Primary</div>
+                  <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-1 rounded">
+                    Primary
+                  </div>
                 )}
                 <div className="absolute top-2 right-2 bg-black/50 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                   {index + 1}
@@ -322,8 +336,18 @@ export default function ImageUpload({
 
       {images.length === 0 && (
         <div className="border-2 border-dashed border-border-secondary rounded-lg p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            className="mx-auto h-12 w-12 text-foreground-muted"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           <p className="mt-2 text-sm text-foreground-secondary">No images selected yet</p>
         </div>

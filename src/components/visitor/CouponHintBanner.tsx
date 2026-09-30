@@ -24,15 +24,16 @@ export default function CouponHintBanner() {
 
     fetch('/api/user/review-coupons')
       .then(r => r.json())
-      .then(data => { if (data.coupon) setCoupon(data.coupon) })
+      .then(data => {
+        if (data.coupon) setCoupon(data.coupon)
+      })
       .catch(() => {})
   }, [user, searchParams])
 
   if (!coupon || dismissed || searchParams.get('couponCode')) return null
 
-  const discountText = coupon.discount_type === 'percentage'
-    ? `${coupon.discount_value}% off`
-    : `₹${coupon.discount_value} off`
+  const discountText =
+    coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`
 
   const apply = () => {
     const url = new URL(window.location.href)
@@ -49,7 +50,9 @@ export default function CouponHintBanner() {
         <button onClick={apply} className="text-amber-700 font-semibold hover:text-amber-900 transition-colors">
           Apply →
         </button>
-        <button onClick={() => setDismissed(true)} className="text-amber-400 hover:text-amber-600">×</button>
+        <button onClick={() => setDismissed(true)} className="text-amber-400 hover:text-amber-600">
+          ×
+        </button>
       </div>
     </div>
   )

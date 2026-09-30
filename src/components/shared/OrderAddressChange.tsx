@@ -39,23 +39,47 @@ interface Props {
   onChanged: () => void
 }
 
-const norm = (v: unknown) => String(v ?? '').trim().toLowerCase()
-const MATCH_FIELDS: (keyof AddressLike)[] = ['full_name', 'address_line1', 'address_line2', 'landmark', 'city', 'state', 'postal_code', 'phone']
+const norm = (v: unknown) =>
+  String(v ?? '')
+    .trim()
+    .toLowerCase()
+const MATCH_FIELDS: (keyof AddressLike)[] = [
+  'full_name',
+  'address_line1',
+  'address_line2',
+  'landmark',
+  'city',
+  'state',
+  'postal_code',
+  'phone',
+]
 const isSame = (a: AddressLike, b: AddressLike | null) => !!b && MATCH_FIELDS.every(f => norm(a[f]) === norm(b[f]))
 
 function AddressLines({ a }: { a: AddressLike }) {
   return (
     <>
       <p className="font-semibold text-foreground">{a.full_name}</p>
-      <p className="text-sm">{a.address_line1}{a.address_line2 ? `, ${a.address_line2}` : ''}</p>
+      <p className="text-sm">
+        {a.address_line1}
+        {a.address_line2 ? `, ${a.address_line2}` : ''}
+      </p>
       {a.landmark && <p className="text-sm">Landmark: {a.landmark}</p>}
-      <p className="text-sm">{a.city}, {a.state} {a.postal_code}</p>
+      <p className="text-sm">
+        {a.city}, {a.state} {a.postal_code}
+      </p>
       <p className="text-sm">Phone: {a.phone}</p>
     </>
   )
 }
 
-export default function OrderAddressChange({ orderId, canChange, request, currentAddress, portalHeader, onChanged }: Props) {
+export default function OrderAddressChange({
+  orderId,
+  canChange,
+  request,
+  currentAddress,
+  portalHeader,
+  onChanged,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [addresses, setAddresses] = useState<SavedAddress[]>([])
@@ -79,9 +103,15 @@ export default function OrderAddressChange({ orderId, canChange, request, curren
         if (!res.ok) throw new Error(data.error || 'Could not load your saved addresses')
         if (!cancelled) setAddresses(data.addresses || [])
       })
-      .catch(err => { if (!cancelled) setError(err.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .catch(err => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -136,7 +166,9 @@ export default function OrderAddressChange({ orderId, canChange, request, curren
           <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-0.5 mb-2">
             Waiting for the store to approve. Your order ships to the new address only after approval.
           </p>
-          <div className="text-foreground-secondary"><AddressLines a={request.newAddress} /></div>
+          <div className="text-foreground-secondary">
+            <AddressLines a={request.newAddress} />
+          </div>
           {canChange && (
             <button
               type="button"
@@ -172,14 +204,19 @@ export default function OrderAddressChange({ orderId, canChange, request, curren
             <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-1">
                 <h3 className="text-lg font-bold text-foreground">Change Delivery Address</h3>
-                <button onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-foreground-muted hover:text-foreground transition-colors">
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="p-1 text-foreground-muted hover:text-foreground transition-colors"
+                >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
               <p className="text-sm text-foreground-secondary mb-4">
-                Pick one of your saved addresses. The store reviews the request, and the address changes only after it is approved.
+                Pick one of your saved addresses. The store reviews the request, and the address changes only after it
+                is approved.
               </p>
 
               {loading ? (
@@ -214,12 +251,18 @@ export default function OrderAddressChange({ orderId, canChange, request, curren
                         <div className="flex-1 text-foreground-secondary">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             {current && (
-                              <span className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-0.5 rounded">Current delivery address</span>
+                              <span className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-0.5 rounded">
+                                Current delivery address
+                              </span>
                             )}
                             {address.is_default && (
-                              <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded">Default</span>
+                              <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded">
+                                Default
+                              </span>
                             )}
-                            <span className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-0.5 rounded capitalize">{address.address_type}</span>
+                            <span className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-0.5 rounded capitalize">
+                              {address.address_type}
+                            </span>
                           </div>
                           <AddressLines a={address} />
                         </div>
@@ -265,7 +308,7 @@ export default function OrderAddressChange({ orderId, canChange, request, curren
       <AddressFormModal
         isOpen={showAddForm}
         onClose={() => setShowAddForm(false)}
-        onSaved={(address) => {
+        onSaved={address => {
           setAddresses(prev => [address as SavedAddress, ...prev.filter(a => a.id !== address.id)])
           setSelectedId(address.id)
           setShowAddForm(false)

@@ -90,7 +90,9 @@ export default function ProductStockMovements({ productId }: { productId: string
                     <th className="px-4 py-2 text-right text-xs font-medium text-foreground-secondary">Qty Change</th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-foreground-secondary">Stock After</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Reference</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Batch / Serial</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">
+                      Batch / Serial
+                    </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Notes</th>
                   </tr>
                 </thead>
@@ -98,33 +100,55 @@ export default function ProductStockMovements({ productId }: { productId: string
                   {rows.map(tx => (
                     <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-2 whitespace-nowrap text-foreground-secondary">
-                        <div>{new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                        <div className="text-[11px] text-foreground-muted">{new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div>
+                          {new Date(tx.created_at).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
+                        <div className="text-[11px] text-foreground-muted">
+                          {new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[tx.transaction_type] || 'bg-surface-secondary text-foreground-secondary'}`}>
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[tx.transaction_type] || 'bg-surface-secondary text-foreground-secondary'}`}
+                        >
                           {TYPE_LABELS[tx.transaction_type] || tx.transaction_type}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-foreground-secondary">{tx.variant_name || '—'}</td>
-                      <td className={`px-4 py-2 text-right font-mono font-medium ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                      <td
+                        className={`px-4 py-2 text-right font-mono font-medium ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                      >
+                        {tx.quantity_change > 0 ? '+' : ''}
+                        {tx.quantity_change}
                       </td>
                       <td className="px-4 py-2 text-right font-mono text-foreground-secondary">
                         {tx.quantity_after ?? '—'}
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
                         {tx.reference_type === 'order' && tx.reference_id ? (
-                          <Link href={ap(`/admin/orders/${tx.reference_id}`)} className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium">
+                          <Link
+                            href={ap(`/admin/orders/${tx.reference_id}`)}
+                            className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium"
+                          >
                             {tx.reference_label || 'Order'}
                           </Link>
                         ) : tx.reference_type === 'cash_sale' && tx.reference_id ? (
-                          <span className="text-foreground-secondary font-medium">{tx.reference_label || 'Cash Sale'}</span>
+                          <span className="text-foreground-secondary font-medium">
+                            {tx.reference_label || 'Cash Sale'}
+                          </span>
                         ) : tx.reference_type === 'grn' ? (
                           <span className="text-foreground-secondary font-medium">{tx.reference_label || 'GRN'}</span>
                         ) : tx.reference_type ? (
-                          <span className="text-foreground-secondary capitalize">{tx.reference_type.replace(/_/g, ' ')}</span>
-                        ) : '—'}
+                          <span className="text-foreground-secondary capitalize">
+                            {tx.reference_type.replace(/_/g, ' ')}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="px-4 py-2 text-foreground-secondary">
                         {tx.serial_number ? (
@@ -133,10 +157,19 @@ export default function ProductStockMovements({ productId }: { productId: string
                           <div>
                             <span className="font-mono text-xs">{tx.lot_number}</span>
                             {tx.expiry_date && (
-                              <div className="text-[11px] text-foreground-muted">Exp: {new Date(tx.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                              <div className="text-[11px] text-foreground-muted">
+                                Exp:{' '}
+                                {new Date(tx.expiry_date).toLocaleDateString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </div>
                             )}
                           </div>
-                        ) : '—'}
+                        ) : (
+                          '—'
+                        )}
                       </td>
                       <td className="px-4 py-2 text-foreground-secondary max-w-[200px] truncate">{tx.notes || '—'}</td>
                     </tr>
@@ -155,7 +188,9 @@ export default function ProductStockMovements({ productId }: { productId: string
                     >
                       Prev
                     </button>
-                    <span className="px-2 py-1 text-foreground-secondary">{page} / {pages}</span>
+                    <span className="px-2 py-1 text-foreground-secondary">
+                      {page} / {pages}
+                    </span>
                     <button
                       onClick={() => setPage(p => Math.min(pages, p + 1))}
                       disabled={page === pages}

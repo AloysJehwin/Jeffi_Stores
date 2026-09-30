@@ -63,14 +63,19 @@ export default function SortableHeader({
   }
 
   return (
-    <th ref={ref} className={`relative px-6 py-3 text-xs font-medium text-foreground-muted uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}>
+    <th
+      ref={ref}
+      className={`relative px-6 py-3 text-xs font-medium text-foreground-muted uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'} ${className}`}
+    >
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
         className={`inline-flex items-center gap-1.5 group hover:text-foreground transition-colors ${isActive ? 'text-secondary-600 dark:text-secondary-400' : ''}`}
       >
         <span>{label}</span>
-        <span className={`transition-colors ${isActive ? 'text-secondary-500 dark:text-secondary-400' : 'text-foreground-muted group-hover:text-foreground-secondary'}`}>
+        <span
+          className={`transition-colors ${isActive ? 'text-secondary-500 dark:text-secondary-400' : 'text-foreground-muted group-hover:text-foreground-secondary'}`}
+        >
           {isActive && activeDir === 'asc' ? (
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -81,14 +86,20 @@ export default function SortableHeader({
             </svg>
           ) : (
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"
+              />
             </svg>
           )}
         </span>
       </button>
 
       {open && (
-        <div className={`absolute top-full mt-1 z-30 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden min-w-[140px] ${align === 'right' ? 'right-0' : 'left-0'}`}>
+        <div
+          className={`absolute top-full mt-1 z-30 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden min-w-[140px] ${align === 'right' ? 'right-0' : 'left-0'}`}
+        >
           {options.map(opt => (
             <button
               key={opt.value}
@@ -101,7 +112,13 @@ export default function SortableHeader({
               }`}
             >
               {isActive && activeDir === opt.value && (
-                <svg className="w-3 h-3 shrink-0 text-secondary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <svg
+                  className="w-3 h-3 shrink-0 text-secondary-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               )}

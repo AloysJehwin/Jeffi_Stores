@@ -6,7 +6,8 @@ import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import type { HomepageSection, PreviewItem } from '@/lib/homepage-sections'
 
-type PreviewKind = 'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
+type PreviewKind =
+  'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
 
 interface PreviewResponse {
   kind: PreviewKind
@@ -39,17 +40,20 @@ function PreviewTile({ kind, item }: { kind: Exclude<PreviewKind, 'none'>; item:
   if (kind === 'brands') {
     return (
       <div className="w-full h-full flex items-center justify-center bg-accent-500/10">
-        <span className="text-accent-600 dark:text-accent-400 text-sm font-black">{item.name.slice(0, 2).toUpperCase()}</span>
+        <span className="text-accent-600 dark:text-accent-400 text-sm font-black">
+          {item.name.slice(0, 2).toUpperCase()}
+        </span>
       </div>
     )
   }
-  const icon = kind === 'categories'
-    ? <CategoryIcon categoryName={item.name} className="w-7 h-7 text-primary-600 dark:text-primary-400" />
-    : kind === 'hero'
-      ? undefined
-      : kind === 'links'
-        ? <Link2 className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
-        : <Package className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
+  const icon =
+    kind === 'categories' ? (
+      <CategoryIcon categoryName={item.name} className="w-7 h-7 text-primary-600 dark:text-primary-400" />
+    ) : kind === 'hero' ? undefined : kind === 'links' ? (
+      <Link2 className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
+    ) : (
+      <Package className="w-6 h-6 text-foreground-muted" aria-hidden="true" />
+    )
   return <AdminImage src={item.image_url} alt="" className="w-full h-full object-cover" fallback={icon} />
 }
 
@@ -102,9 +106,7 @@ export default function SectionPreview({ section }: { section: HomepageSection }
   }
   if (!data || data.kind === 'none') {
     return (
-      <p className="text-xs text-foreground-muted py-2">
-        This section has no product or media content to preview.
-      </p>
+      <p className="text-xs text-foreground-muted py-2">This section has no product or media content to preview.</p>
     )
   }
   if (data.items.length === 0) {

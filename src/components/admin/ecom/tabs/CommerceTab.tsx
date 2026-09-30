@@ -15,17 +15,25 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: 'go
   return (
     <div className="rounded-lg border border-border-default bg-surface-secondary px-4 py-3 min-w-0">
       <div className="text-xs uppercase tracking-wide text-foreground-muted">{label}</div>
-      <div className={`text-lg font-semibold mt-0.5 break-words ${
-        tone === 'good' ? 'text-green-600 dark:text-green-400'
-        : tone === 'bad' ? 'text-red-600 dark:text-red-400'
-        : 'text-foreground'
-      }`}>{value}</div>
+      <div
+        className={`text-lg font-semibold mt-0.5 break-words ${
+          tone === 'good'
+            ? 'text-green-600 dark:text-green-400'
+            : tone === 'bad'
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-foreground'
+        }`}
+      >
+        {value}
+      </div>
     </div>
   )
 }
 
 export default function CommerceTab({
-  tenant: t, billing, bank,
+  tenant: t,
+  billing,
+  bank,
 }: {
   tenant: TenantDetail
   billing: Billing
@@ -44,7 +52,10 @@ export default function CommerceTab({
       <Section
         title="Money"
         action={
-          <Link href={`/admin/ecom/billing/${t.id}`} className="text-sm text-accent-600 dark:text-accent-400 hover:underline">
+          <Link
+            href={`/admin/ecom/billing/${t.id}`}
+            className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
+          >
             Full billing →
           </Link>
         }
@@ -92,9 +103,11 @@ export default function CommerceTab({
                 <Field
                   wide
                   label="Name mismatch"
-                  value={<span className="text-amber-600 dark:text-amber-400 text-xs">
-                    entered “{bank.holder_name}”, bank returned “{bank.verified_name}”
-                  </span>}
+                  value={
+                    <span className="text-amber-600 dark:text-amber-400 text-xs">
+                      entered “{bank.holder_name}”, bank returned “{bank.verified_name}”
+                    </span>
+                  }
                 />
               )}
             </FieldGrid>
@@ -106,7 +119,7 @@ export default function CommerceTab({
             <p className="text-sm text-foreground-muted">No ledger entries.</p>
           ) : (
             <ul className="space-y-2.5">
-              {ledger.slice(0, 8).map((e) => {
+              {ledger.slice(0, 8).map(e => {
                 const amt = Number(e.amount)
                 return (
                   <li key={e.id} className="flex items-start justify-between gap-3 text-sm min-w-0">
@@ -115,8 +128,11 @@ export default function CommerceTab({
                       {e.note && <div className="text-xs text-foreground-muted break-words">{e.note}</div>}
                     </div>
                     <div className="text-right shrink-0">
-                      <div className={amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                        {amt >= 0 ? '+' : ''}{inr(amt)}
+                      <div
+                        className={amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+                      >
+                        {amt >= 0 ? '+' : ''}
+                        {inr(amt)}
                       </div>
                       <div className="text-xs text-foreground-muted">
                         {new Date(e.occurred_at).toLocaleDateString('en-IN')}
@@ -146,14 +162,18 @@ export default function CommerceTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {txns.slice(0, 15).map((x) => (
+                {txns.slice(0, 15).map(x => (
                   <tr key={x.id}>
-                    <td className="py-2.5"><Mono>{x.order_ref || '—'}</Mono></td>
+                    <td className="py-2.5">
+                      <Mono>{x.order_ref || '—'}</Mono>
+                    </td>
                     <td className="py-2.5 text-foreground">{inr(Number(x.gross_amount))}</td>
                     <td className="py-2.5 text-foreground-muted">{inr(Number(x.platform_commission))}</td>
                     <td className="py-2.5 text-foreground-muted">{inr(Number(x.gateway_fee))}</td>
                     <td className="py-2.5 text-xs text-foreground-muted">{x.is_cod ? 'COD' : x.gateway}</td>
-                    <td className="py-2.5"><StatusPill status={x.status} /></td>
+                    <td className="py-2.5">
+                      <StatusPill status={x.status} />
+                    </td>
                     <td className="py-2.5 text-xs text-foreground-muted">
                       {new Date(x.occurred_at).toLocaleDateString('en-IN')}
                     </td>
@@ -164,7 +184,13 @@ export default function CommerceTab({
           </div>
           {txns.length > 15 && (
             <p className="text-xs text-foreground-muted mt-3">
-              Showing 15 of {txns.length}. <Link href={`/admin/ecom/billing/${t.id}`} className="text-accent-600 dark:text-accent-400 hover:underline">See all →</Link>
+              Showing 15 of {txns.length}.{' '}
+              <Link
+                href={`/admin/ecom/billing/${t.id}`}
+                className="text-accent-600 dark:text-accent-400 hover:underline"
+              >
+                See all →
+              </Link>
             </p>
           )}
         </Section>

@@ -21,11 +21,12 @@ export default function TwoFactorCard() {
       const res = await fetch('/api/admin/mfa/recovery-codes', { credentials: 'include' })
       const data = await res.json()
       if (res.ok) setStatus(data)
-    } catch {
-    }
+    } catch {}
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   async function regenerate() {
     const ok = await confirm({
@@ -54,9 +55,7 @@ export default function TwoFactorCard() {
   }
 
   if (!status) {
-    return (
-      <div className="text-sm text-foreground-muted">Loading…</div>
-    )
+    return <div className="text-sm text-foreground-muted">Loading…</div>
   }
 
   return (
@@ -64,7 +63,8 @@ export default function TwoFactorCard() {
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-sm text-foreground">
-            Status: {status.mfa_enabled ? (
+            Status:{' '}
+            {status.mfa_enabled ? (
               <span className="font-semibold text-green-600 dark:text-green-400">Enabled</span>
             ) : (
               <span className="font-semibold text-red-600 dark:text-red-400">Not enabled</span>
@@ -72,7 +72,12 @@ export default function TwoFactorCard() {
           </p>
           {status.mfa_enrolled_at && (
             <p className="text-xs text-foreground-muted mt-0.5">
-              Enrolled on {new Date(status.mfa_enrolled_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              Enrolled on{' '}
+              {new Date(status.mfa_enrolled_at).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
             </p>
           )}
           <p className="text-xs text-foreground-muted mt-0.5">
@@ -103,7 +108,9 @@ export default function TwoFactorCard() {
             Save these codes — they will not be shown again.
           </p>
           <div className="grid grid-cols-2 gap-2 font-mono text-sm bg-white dark:bg-black/40 p-3 rounded">
-            {newCodes.map(c => <div key={c}>{c}</div>)}
+            {newCodes.map(c => (
+              <div key={c}>{c}</div>
+            ))}
           </div>
           <button
             type="button"

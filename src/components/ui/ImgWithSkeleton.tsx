@@ -27,21 +27,20 @@ export default function ImgWithSkeleton({ src, alt, className, blurhash }: ImgWi
 
   return (
     <div className="relative w-full h-full">
-      {!loaded && (
-        blurhash
-          ? <BlurhashCanvas hash={blurhash} />
-          : (
-            <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-                  animation: 'img-shimmer 1.4s infinite',
-                }}
-              />
-            </div>
-          )
-      )}
+      {!loaded &&
+        (blurhash ? (
+          <BlurhashCanvas hash={blurhash} />
+        ) : (
+          <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                animation: 'img-shimmer 1.4s infinite',
+              }}
+            />
+          </div>
+        ))}
       <img
         ref={imgRef}
         src={src}

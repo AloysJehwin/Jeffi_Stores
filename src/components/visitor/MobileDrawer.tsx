@@ -29,7 +29,9 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
     } else {
       document.body.style.overflow = ''
     }
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [isOpen])
 
   return (
@@ -91,9 +93,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             >
               <span className="font-medium">Cart</span>
               {cartCount > 0 && (
-                <span className="bg-accent-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
-                  {cartCount}
-                </span>
+                <span className="bg-accent-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{cartCount}</span>
               )}
             </Link>
             <Link
@@ -120,7 +120,9 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">{user.firstName} {user.lastName}</p>
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {user.firstName} {user.lastName}
+                    </p>
                     <p className="text-xs text-foreground-muted truncate">{user.email}</p>
                   </div>
                 </div>
@@ -138,7 +140,10 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => { logout(); onClose() }}
+                  onClick={() => {
+                    logout()
+                    onClose()
+                  }}
                   className="px-4 py-3 rounded-lg text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors"
                 >
                   Logout

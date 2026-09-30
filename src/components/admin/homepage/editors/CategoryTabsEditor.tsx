@@ -1,7 +1,15 @@
 'use client'
 
 import { configIds, configNumber } from '@/lib/homepage-sections'
-import { Grid, HeadingFields, LABEL_CLASS, LimitField, NumberField, useSectionBinding, type EditorProps } from './fields'
+import {
+  Grid,
+  HeadingFields,
+  LABEL_CLASS,
+  LimitField,
+  NumberField,
+  useSectionBinding,
+  type EditorProps,
+} from './fields'
 
 const MAX_TABS = 8
 
@@ -39,7 +47,10 @@ export default function CategoryTabsEditor(props: EditorProps) {
           {categories.map(c => {
             const position = picked.indexOf(c.value)
             return (
-              <label key={c.value} className="flex items-center gap-2 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-foreground cursor-pointer">
+              <label
+                key={c.value}
+                className="flex items-center gap-2 rounded-lg border border-border-default px-2.5 py-1.5 text-sm text-foreground cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={position >= 0}
@@ -48,7 +59,9 @@ export default function CategoryTabsEditor(props: EditorProps) {
                   className="accent-accent-500"
                 />
                 <span className="flex-1 truncate">{c.label}</span>
-                {position >= 0 && <span className="text-[11px] text-foreground-muted tabular-nums">{position + 1}</span>}
+                {position >= 0 && (
+                  <span className="text-[11px] text-foreground-muted tabular-nums">{position + 1}</span>
+                )}
               </label>
             )
           })}

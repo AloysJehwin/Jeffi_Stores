@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 
-export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCreated?: () => void; allowedScopeKeys?: string[] }) {
+export default function CreateAdminForm({
+  onCreated,
+  allowedScopeKeys,
+}: {
+  onCreated?: () => void
+  allowedScopeKeys?: string[]
+}) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -30,9 +36,7 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
   function toggleScope(scope: string) {
     setForm(prev => ({
       ...prev,
-      scopes: prev.scopes.includes(scope)
-        ? prev.scopes.filter(s => s !== scope)
-        : [...prev.scopes, scope],
+      scopes: prev.scopes.includes(scope) ? prev.scopes.filter(s => s !== scope) : [...prev.scopes, scope],
     }))
   }
 
@@ -117,7 +121,9 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
         <div className="space-y-3">
           <div>
             <p className="text-sm text-green-700 dark:text-green-400">Admin</p>
-            <p className="font-mono font-bold text-green-900 dark:text-green-200">{certInfo.fullName || certInfo.email}</p>
+            <p className="font-mono font-bold text-green-900 dark:text-green-200">
+              {certInfo.fullName || certInfo.email}
+            </p>
             <p className="text-xs text-green-700 dark:text-green-400">{certInfo.email}</p>
           </div>
           {certInfo.p12Password && (
@@ -137,14 +143,18 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
           {certInfo.expiresAt && (
             <div>
               <p className="text-sm text-green-700 dark:text-green-400">Expires</p>
-              <p className="text-green-800 dark:text-green-300">{new Date(certInfo.expiresAt).toLocaleDateString('en-IN')}</p>
+              <p className="text-green-800 dark:text-green-300">
+                {new Date(certInfo.expiresAt).toLocaleDateString('en-IN')}
+              </p>
             </div>
           )}
         </div>
         {certInfo.portalInvite ? (
           <p className="text-sm text-green-800 dark:text-green-300 bg-green-100 dark:bg-green-800/40 px-3 py-2 rounded mt-4">
             An invitation was sent. The admin downloads their certificate once from{' '}
-            <a href={certInfo.portalUrl} className="underline font-medium" target="_blank" rel="noreferrer">{certInfo.portalUrl.replace('https://', '')}</a>{' '}
+            <a href={certInfo.portalUrl} className="underline font-medium" target="_blank" rel="noreferrer">
+              {certInfo.portalUrl.replace('https://', '')}
+            </a>{' '}
             by signing in with this Google account. No certificate file or password is shown here.
           </p>
         ) : (
@@ -152,8 +162,12 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
             The .p12 certificate file has been downloaded. Save the password above — it will not be shown again.
             {certInfo.portalUrl && (
               <>
-                {' '}The admin can also fetch it once from{' '}
-                <a href={certInfo.portalUrl} className="underline font-medium" target="_blank" rel="noreferrer">{certInfo.portalUrl.replace('https://', '')}</a>.
+                {' '}
+                The admin can also fetch it once from{' '}
+                <a href={certInfo.portalUrl} className="underline font-medium" target="_blank" rel="noreferrer">
+                  {certInfo.portalUrl.replace('https://', '')}
+                </a>
+                .
               </>
             )}
           </p>
@@ -161,7 +175,12 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
         {!certInfo.emailSent && (
           <div className="flex items-start gap-2 mt-3 px-3 py-2.5 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
             <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <p className="text-xs text-red-700 dark:text-red-300">
               Email delivery failed — use the <strong>Resend Email</strong> button in the Admin Users table to retry.
@@ -169,11 +188,16 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
           </div>
         )}
         {certInfo.emailSent && (
-          <p className="text-xs text-green-700 dark:text-green-400 mt-2">Certificate emailed to the admin&apos;s address.</p>
+          <p className="text-xs text-green-700 dark:text-green-400 mt-2">
+            Certificate emailed to the admin&apos;s address.
+          </p>
         )}
         <button
           type="button"
-          onClick={() => { setCertInfo(null); setIsOpen(false) }}
+          onClick={() => {
+            setCertInfo(null)
+            setIsOpen(false)
+          }}
           className="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
         >
           Done
@@ -204,7 +228,9 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="admin-first-name" className="block text-sm font-medium text-foreground-secondary mb-1">First Name *</label>
+          <label htmlFor="admin-first-name" className="block text-sm font-medium text-foreground-secondary mb-1">
+            First Name *
+          </label>
           <input
             id="admin-first-name"
             type="text"
@@ -215,7 +241,9 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
           />
         </div>
         <div>
-          <label htmlFor="admin-last-name" className="block text-sm font-medium text-foreground-secondary mb-1">Last Name *</label>
+          <label htmlFor="admin-last-name" className="block text-sm font-medium text-foreground-secondary mb-1">
+            Last Name *
+          </label>
           <input
             id="admin-last-name"
             type="text"
@@ -228,7 +256,9 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
       </div>
 
       <div>
-        <label htmlFor="admin-email" className="block text-sm font-medium text-foreground-secondary mb-1">Email *</label>
+        <label htmlFor="admin-email" className="block text-sm font-medium text-foreground-secondary mb-1">
+          Email *
+        </label>
         <input
           id="admin-email"
           type="email"
@@ -261,7 +291,13 @@ export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCre
 
       <div>
         <label className="block text-sm font-medium text-foreground-secondary mb-2">Scopes</label>
-        <ScopeGrid selected={form.scopes} onToggle={toggleScope} onSelectAll={selectAllScopes} onClearAll={clearAllScopes} allowedKeys={allowedScopeKeys} />
+        <ScopeGrid
+          selected={form.scopes}
+          onToggle={toggleScope}
+          onSelectAll={selectAllScopes}
+          onClearAll={clearAllScopes}
+          allowedKeys={allowedScopeKeys}
+        />
       </div>
 
       <div className="flex gap-3 pt-2">

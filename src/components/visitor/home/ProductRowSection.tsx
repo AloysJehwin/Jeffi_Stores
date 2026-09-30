@@ -58,12 +58,20 @@ export default function ProductRowSection({
               <div className={accentBarClassName} />
               {heading}
             </div>
-          ) : heading}
+          ) : (
+            heading
+          )}
           {viewAllHref && (
-            <Link href={viewAllHref} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+            <Link
+              href={viewAllHref}
+              className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
+            >
               {inlineViewAllArrow ? (
                 <>
-                  {viewAllLabel} <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  {viewAllLabel}{' '}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
                 </>
               ) : (
                 <>
@@ -78,13 +86,9 @@ export default function ProductRowSection({
         </div>
 
         {carousel ? (
-          <SectionCarousel ariaLabel={title}>
-            {cards}
-          </SectionCarousel>
+          <SectionCarousel ariaLabel={title}>{cards}</SectionCarousel>
         ) : (
-          <div className={gridClassName}>
-            {cards}
-          </div>
+          <div className={gridClassName}>{cards}</div>
         )}
 
         {footerCta && (

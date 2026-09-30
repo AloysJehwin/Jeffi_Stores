@@ -25,11 +25,29 @@ export interface SpecGroup {
 type SpecColumn =
   | AliasedColumn
   | HandlingFlag
-  | 'sku' | 'mpn' | 'gtin' | 'barcode' | 'isbn' | 'gst_percentage'
-  | 'dimensions' | 'net_weight_grams' | 'volume_ml'
-  | 'is_digital' | 'license_type' | 'file_format' | 'platform_compatibility'
-  | 'certifications' | 'warranty_months' | 'warranty_type' | 'country_of_origin' | 'shelf_life_days'
-  | 'condition' | 'age_min' | 'age_max' | 'target_gender' | 'target_audience'
+  | 'sku'
+  | 'mpn'
+  | 'gtin'
+  | 'barcode'
+  | 'isbn'
+  | 'gst_percentage'
+  | 'dimensions'
+  | 'net_weight_grams'
+  | 'volume_ml'
+  | 'is_digital'
+  | 'license_type'
+  | 'file_format'
+  | 'platform_compatibility'
+  | 'certifications'
+  | 'warranty_months'
+  | 'warranty_type'
+  | 'country_of_origin'
+  | 'shelf_life_days'
+  | 'condition'
+  | 'age_min'
+  | 'age_max'
+  | 'target_gender'
+  | 'target_audience'
 
 export type SpecSource = Partial<Record<SpecColumn, string | number | boolean | string[] | null>> & {
   brands?: { name?: string | null } | null
@@ -39,9 +57,26 @@ export type SpecSource = Partial<Record<SpecColumn, string | number | boolean | 
 const HANDLING_FLAGS: HandlingFlag[] = ['fragile', 'hazardous', 'flammable', 'perishable']
 
 const INTERNAL_SPEC_KEYS: ReadonlySet<string> = new Set([
-  'sku', 'mrp', 'price', 'cost', 'cost price', 'selling price', 'gst', 'gst rate', 'tax', 'supplier', 'category',
-  'barcode', 'ean', 'asin', 'stock', 'inventory',
-  'package type', 'packing type', 'packaging type', 'package dimensions',
+  'sku',
+  'mrp',
+  'price',
+  'cost',
+  'cost price',
+  'selling price',
+  'gst',
+  'gst rate',
+  'tax',
+  'supplier',
+  'category',
+  'barcode',
+  'ean',
+  'asin',
+  'stock',
+  'inventory',
+  'package type',
+  'packing type',
+  'packaging type',
+  'package dimensions',
 ])
 
 const text = (value: unknown): string => specValues(value).join(', ')
@@ -149,9 +184,15 @@ export function buildSpecGroups(product: SpecSource): { handling: HandlingFlag[]
           ]
         : []),
     ]),
-    group('technical', 'Technical specifications', specs
-      .filter(entry => !ALIASED_SPEC_KEYS.has(entry.key) && !INTERNAL_SPEC_KEYS.has(entry.key) && entry.key !== 'dimensions')
-      .map(entry => row(entry.label, entry.values.join(', ')))),
+    group(
+      'technical',
+      'Technical specifications',
+      specs
+        .filter(
+          entry => !ALIASED_SPEC_KEYS.has(entry.key) && !INTERNAL_SPEC_KEYS.has(entry.key) && entry.key !== 'dimensions'
+        )
+        .map(entry => row(entry.label, entry.values.join(', ')))
+    ),
     group('standards', 'Standards and safety', [
       row('Compliance', compliance.join(', '), { chips: compliance }),
       row('Certifications', certifications.join(', '), { chips: certifications }),
@@ -162,11 +203,16 @@ export function buildSpecGroups(product: SpecSource): { handling: HandlingFlag[]
       row('Country of origin', origin && countryName(origin)),
       row('Shelf life', shelfLife(positive(p.shelf_life_days))),
       row('Condition', condition.toLowerCase() === 'new' ? '' : humanizeLabel(condition)),
-      row('Suitable for', [
-        ageRange(positive(p.age_min), positive(p.age_max)),
-        gender.toLowerCase() === 'unisex' ? '' : humanizeLabel(gender),
-        ...list(p.target_audience),
-      ].filter(Boolean).join(', ')),
+      row(
+        'Suitable for',
+        [
+          ageRange(positive(p.age_min), positive(p.age_max)),
+          gender.toLowerCase() === 'unisex' ? '' : humanizeLabel(gender),
+          ...list(p.target_audience),
+        ]
+          .filter(Boolean)
+          .join(', ')
+      ),
     ]),
     group('codes', 'Product codes', [
       row('SKU', text(p.sku), { copy: true }),

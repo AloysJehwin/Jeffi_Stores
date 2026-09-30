@@ -131,12 +131,16 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
     // (a) local lot-number match across all items needing selection
     for (const item of itemsNeedingSelection) {
       const b = item.batches.find(x => (x.lot_number || '').toLowerCase() === c.toLowerCase())
-      if (b) { selectBatchOn(item, b); return }
+      if (b) {
+        selectBatchOn(item, b)
+        return
+      }
     }
     // (b) fall back to resolve: a scanned serial → its batch_id
     try {
       const res = await fetch('/api/admin/scan/resolve', {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: c }),
       })
@@ -144,10 +148,15 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
       if (data?.kind === 'serial' && data.serial?.batch_id) {
         for (const item of itemsNeedingSelection) {
           const b = item.batches.find(x => x.id === data.serial.batch_id)
-          if (b) { selectBatchOn(item, b); return }
+          if (b) {
+            selectBatchOn(item, b)
+            return
+          }
         }
       }
-    } catch { /* ignore lookup failure */ }
+    } catch {
+      /* ignore lookup failure */
+    }
     setScanMsg({ text: `No matching batch for "${c}"`, kind: 'err' })
   }
 
@@ -171,10 +180,12 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
     onConfirm(assignments)
   }
 
-  const canConfirm = itemsWithNoBatches.length === 0 && itemsNeedingSelection.every(item => {
-    const allocated = getAllocated(item.order_item_id)
-    return allocated >= item.required_qty
-  })
+  const canConfirm =
+    itemsWithNoBatches.length === 0 &&
+    itemsNeedingSelection.every(item => {
+      const allocated = getAllocated(item.order_item_id)
+      return allocated >= item.required_qty
+    })
 
   return (
     <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50">
@@ -182,31 +193,56 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Assign Batches</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Select batches per item — quantities auto-filled (FIFO). Scan a lot label or a unit&apos;s serial to select.</p>
+            <p className="text-sm text-foreground-muted mt-0.5">
+              Select batches per item — quantities auto-filled (FIFO). Scan a lot label or a unit&apos;s serial to
+              select.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {scanMsg ? (
-              <span className={`text-xs font-medium px-2 py-1 rounded ${
-                scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                : scanMsg.kind === 'err' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
-              }`}>{scanMsg.text}</span>
+              <span
+                className={`text-xs font-medium px-2 py-1 rounded ${
+                  scanMsg.kind === 'ok'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : scanMsg.kind === 'err'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
+                }`}
+              >
+                {scanMsg.text}
+              </span>
             ) : (
               <button
                 type="button"
                 onClick={() => setScanEnabled(v => !v)}
-                title={scanEnabled ? 'Scanner mode on — scan a lot label or a unit serial' : 'Click to select manually, or turn on scanner mode'}
+                title={
+                  scanEnabled
+                    ? 'Scanner mode on — scan a lot label or a unit serial'
+                    : 'Click to select manually, or turn on scanner mode'
+                }
                 className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
                   scanEnabled
                     ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
                     : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
                 }`}
               >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14"
+                  />
+                </svg>
                 {scanEnabled ? 'Scan: on' : 'Scan: off'}
               </button>
             )}
-            <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+            <button
+              onClick={onCancel}
+              className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none"
+            >
+              ×
+            </button>
           </div>
         </div>
 
@@ -217,7 +253,8 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
               <ul className="text-sm text-red-600 dark:text-red-400 list-disc ml-4 space-y-0.5">
                 {itemsWithNoBatches.map(i => (
                   <li key={i.order_item_id}>
-                    {i.product_name}{i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
+                    {i.product_name}
+                    {i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
                   </li>
                 ))}
               </ul>
@@ -234,15 +271,20 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="font-semibold text-foreground text-sm">
-                      {item.product_name}{item.variant_name ? ` / ${item.variant_name}` : ''}
+                      {item.product_name}
+                      {item.variant_name ? ` / ${item.variant_name}` : ''}
                     </p>
                     <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
                   </div>
-                  <div className={`text-sm font-semibold px-2 py-0.5 rounded ${
-                    isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                    : isFullyAllocated ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
+                  <div
+                    className={`text-sm font-semibold px-2 py-0.5 rounded ${
+                      isOver
+                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                        : isFullyAllocated
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}
+                  >
                     {allocated} / {item.required_qty}
                   </div>
                 </div>
@@ -266,24 +308,38 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                           <tr
                             key={batch.id}
                             className={`transition-colors ${isChecked ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface cursor-pointer'}`}
-                            onClick={() => toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)}
+                            onClick={() =>
+                              toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)
+                            }
                           >
                             <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isChecked}
-                                onChange={() => toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)}
+                                onChange={() =>
+                                  toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)
+                                }
                                 className="accent-accent-500"
                               />
                             </td>
                             <td className="px-3 py-2.5 font-mono text-xs text-foreground">
                               {batch.lot_number || <span className="text-foreground-muted">—</span>}
-                              {idx === 0 && <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1.5 py-0.5 rounded font-medium">FIFO</span>}
+                              {idx === 0 && (
+                                <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1.5 py-0.5 rounded font-medium">
+                                  FIFO
+                                </span>
+                              )}
                             </td>
                             <td className={`px-3 py-2.5 text-xs ${expiryColor(batch.expiry_date)}`}>
-                              {batch.expiry_date
-                                ? new Date(batch.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                                : <span className="text-foreground-muted">—</span>}
+                              {batch.expiry_date ? (
+                                new Date(batch.expiry_date).toLocaleDateString('en-IN', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              ) : (
+                                <span className="text-foreground-muted">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-2.5 text-xs text-foreground">
                               {batch.quantity_remaining}
@@ -296,10 +352,14 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                                 <div className="flex items-center gap-1">
                                   <button
                                     type="button"
-                                    onClick={() => setQty(item.order_item_id, batch.id, qty - 1, batch.quantity_remaining)}
+                                    onClick={() =>
+                                      setQty(item.order_item_id, batch.id, qty - 1, batch.quantity_remaining)
+                                    }
                                     disabled={qty <= 1}
                                     className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                  >‹</button>
+                                  >
+                                    ‹
+                                  </button>
                                   <input
                                     type="number"
                                     min={1}
@@ -313,10 +373,14 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                                   />
                                   <button
                                     type="button"
-                                    onClick={() => setQty(item.order_item_id, batch.id, qty + 1, batch.quantity_remaining)}
+                                    onClick={() =>
+                                      setQty(item.order_item_id, batch.id, qty + 1, batch.quantity_remaining)
+                                    }
                                     disabled={qty >= batch.quantity_remaining}
                                     className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                  >›</button>
+                                  >
+                                    ›
+                                  </button>
                                 </div>
                               ) : (
                                 <span className="text-foreground-muted text-xs">—</span>
@@ -332,7 +396,10 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                   </table>
                 </div>
                 {isOver && (
-                  <p className="text-xs text-orange-600 mt-1">⚠ Allocated {allocated} exceeds required {item.required_qty} — reduce qty in one of the selected batches.</p>
+                  <p className="text-xs text-orange-600 mt-1">
+                    ⚠ Allocated {allocated} exceeds required {item.required_qty} — reduce qty in one of the selected
+                    batches.
+                  </p>
                 )}
               </div>
             )

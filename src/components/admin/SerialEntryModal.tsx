@@ -92,7 +92,7 @@ export function SerialPicker({
         onChange(keep)
       })
       .finally(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.product_id, item.variant_id, item.sub_variant_id])
 
   function toggle(sn: string) {
@@ -123,15 +123,9 @@ export function SerialPicker({
   const [scanFieldsKey, setScanFieldsKey] = useState(0)
   // Pre-assigned serials (e.g. auto-recorded from a scan) count as VALID even if the
   // in-stock availability query no longer returns them (a reserved serial).
-  const preassignedSet = useMemo(
-    () => new Set((item.preassigned ?? []).map(s => s.toLowerCase())),
-    [item.preassigned]
-  )
+  const preassignedSet = useMemo(() => new Set((item.preassigned ?? []).map(s => s.toLowerCase())), [item.preassigned])
   const availSet = useMemo(
-    () => new Set([
-      ...available.map(s => s.serial_number.toLowerCase()),
-      ...preassignedSet,
-    ]),
+    () => new Set([...available.map(s => s.serial_number.toLowerCase()), ...preassignedSet]),
     [available, preassignedSet]
   )
 
@@ -148,9 +142,7 @@ export function SerialPicker({
       // Seed from what this line already holds (scanned serials arrive as
       // `preassigned`), falling back to the live selection so switching modes
       // never discards work.
-      const held = (item.preassigned ?? []).length > 0
-        ? (item.preassigned ?? [])
-        : Array.from(selected)
+      const held = (item.preassigned ?? []).length > 0 ? (item.preassigned ?? []) : Array.from(selected)
       const pre = held.slice(0, serialsNeeded(item))
       const seeded = Array.from({ length: serialsNeeded(item) }, (_, i) => pre[i] ?? '')
       setEntries(seeded)
@@ -166,7 +158,7 @@ export function SerialPicker({
       }
       onChange(autoSelected)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanEnabled, item.required_serials, item.required_qty, available.length])
 
   // Put the cursor in the first field once scan mode is active and serials loaded,
@@ -175,7 +167,7 @@ export function SerialPicker({
     if (!scanEnabled || loading || available.length === 0) return
     const el = fieldRefs.current[0]
     if (el) el.focus()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanEnabled, loading, available.length])
 
   // Sync valid+unique entries into `selected` so confirm sees them.
@@ -189,8 +181,7 @@ export function SerialPicker({
       const match = available.find(s => s.serial_number.toLowerCase() === sn.toLowerCase())
       // Accept a serial that's in stock OR already pre-assigned to this line (a
       // reserved serial may no longer be in the in-stock list but is still valid).
-      const canonical = match?.serial_number
-        ?? (item.preassigned ?? []).find(p => p.toLowerCase() === sn.toLowerCase())
+      const canonical = match?.serial_number ?? (item.preassigned ?? []).find(p => p.toLowerCase() === sn.toLowerCase())
       if (!canonical) continue // invalid — not in stock and not pre-assigned
       if (seen.has(canonical)) continue // duplicate
       seen.add(canonical)
@@ -204,7 +195,10 @@ export function SerialPicker({
   // run the single validation/commit. No per-keystroke work → no dropped chars.
   function commitFieldFromDom(i: number) {
     const domVal = fieldRefs.current[i]?.value ?? dirtyRef.current[i] ?? ''
-    if ((entries[i] ?? '') === domVal) { commitEntries([...entries]); return }
+    if ((entries[i] ?? '') === domVal) {
+      commitEntries([...entries])
+      return
+    }
     const next = [...entries]
     next[i] = domVal
     delete dirtyRef.current[i]
@@ -215,7 +209,10 @@ export function SerialPicker({
     for (let step = 1; step <= serialsNeeded(item); step++) {
       const idx = (from + step) % serialsNeeded(item)
       const el = fieldRefs.current[idx]
-      if (el && !el.value) { el.focus(); return }
+      if (el && !el.value) {
+        el.focus()
+        return
+      }
     }
   }
 
@@ -244,9 +241,10 @@ export function SerialPicker({
     }
   }
   const filtered = search
-    ? availableWithPre.filter(s =>
-        s.serial_number.toLowerCase().includes(search.toLowerCase()) ||
-        (s.lot_number || '').toLowerCase().includes(search.toLowerCase())
+    ? availableWithPre.filter(
+        s =>
+          s.serial_number.toLowerCase().includes(search.toLowerCase()) ||
+          (s.lot_number || '').toLowerCase().includes(search.toLowerCase())
       )
     : availableWithPre
 
@@ -266,21 +264,32 @@ export function SerialPicker({
     <div>
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm font-semibold text-foreground">
-          {item.product_name}{item.variant_name ? ` / ${item.variant_name}` : ''}
+          {item.product_name}
+          {item.variant_name ? ` / ${item.variant_name}` : ''}
         </p>
         <div className="flex items-center gap-2">
           {scanMsg && (
-            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-              scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : scanMsg.kind === 'err' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-              : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
-            }`}>{scanMsg.text}</span>
+            <span
+              className={`text-xs font-medium px-2 py-0.5 rounded ${
+                scanMsg.kind === 'ok'
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : scanMsg.kind === 'err'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
+              }`}
+            >
+              {scanMsg.text}
+            </span>
           )}
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-            isOver  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-            : isOk  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-          }`}>
+          <span
+            className={`text-xs font-semibold px-2 py-0.5 rounded ${
+              isOver
+                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                : isOk
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+            }`}
+          >
             {selected.size} / {serialsNeeded(item)} selected
           </span>
         </div>
@@ -305,7 +314,9 @@ export function SerialPicker({
                 <div key={`${scanFieldsKey}-${i}`} className="flex items-center gap-1.5">
                   <span className="text-xs text-foreground-muted w-5 shrink-0 text-right">{i + 1}.</span>
                   <input
-                    ref={el => { fieldRefs.current[i] = el }}
+                    ref={el => {
+                      fieldRefs.current[i] = el
+                    }}
                     type="text"
                     defaultValue={val}
                     onInput={e => {
@@ -337,7 +348,9 @@ export function SerialPicker({
             Scan or type each serial. Must match an in-stock serial for this product ({available.length} available).
             {(() => {
               const bad = entries.some(e => e.trim() && !availSet.has(e.trim().toLowerCase()))
-              const dups = new Set(entries.map(e => e.trim().toLowerCase()).filter(Boolean)).size !== entries.filter(e => e.trim()).length
+              const dups =
+                new Set(entries.map(e => e.trim().toLowerCase()).filter(Boolean)).size !==
+                entries.filter(e => e.trim()).length
               if (bad) return <span className="text-red-500 font-medium"> Some serials are not in stock.</span>
               if (dups) return <span className="text-red-500 font-medium"> Duplicate serials entered.</span>
               return null
@@ -367,43 +380,58 @@ export function SerialPicker({
                     className="w-full flex items-center justify-between px-3 py-2 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors text-left border-b border-border-default"
                   >
                     <div className="flex items-center gap-2">
-                      <svg className={`w-3 h-3 text-foreground-muted transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg
+                        className={`w-3 h-3 text-foreground-muted transition-transform ${collapsed ? '-rotate-90' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                       <span className="text-xs font-semibold text-foreground">{batch.lotLabel}</span>
-                      <span className="text-xs text-foreground-muted">{batch.serials.length} serial{batch.serials.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-foreground-muted">
+                        {batch.serials.length} serial{batch.serials.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
                     {batchSelected > 0 && (
-                      <span className="text-xs font-semibold text-secondary-600 dark:text-secondary-400">{batchSelected} selected</span>
+                      <span className="text-xs font-semibold text-secondary-600 dark:text-secondary-400">
+                        {batchSelected} selected
+                      </span>
                     )}
                   </button>
-                  {!collapsed && batch.serials.map(s => {
-                    const checked = selected.has(s.serial_number)
-                    const disabled = !checked && selected.size >= serialsNeeded(item)
-                    return (
-                      <label
-                        key={s.serial_number}
-                        className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors border-b border-border-default last:border-0 ${
-                          checked ? 'bg-secondary-50 dark:bg-secondary-900/20' : disabled ? 'opacity-40' : 'hover:bg-surface-secondary'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() => toggle(s.serial_number)}
-                          className="accent-secondary-500 shrink-0"
-                        />
-                        <span className="text-sm font-mono text-foreground flex-1">{s.serial_number}</span>
-                      </label>
-                    )
-                  })}
+                  {!collapsed &&
+                    batch.serials.map(s => {
+                      const checked = selected.has(s.serial_number)
+                      const disabled = !checked && selected.size >= serialsNeeded(item)
+                      return (
+                        <label
+                          key={s.serial_number}
+                          className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors border-b border-border-default last:border-0 ${
+                            checked
+                              ? 'bg-secondary-50 dark:bg-secondary-900/20'
+                              : disabled
+                                ? 'opacity-40'
+                                : 'hover:bg-surface-secondary'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => toggle(s.serial_number)}
+                            className="accent-secondary-500 shrink-0"
+                          />
+                          <span className="text-sm font-mono text-foreground flex-1">{s.serial_number}</span>
+                        </label>
+                      )
+                    })}
                 </div>
               )
             })}
           </div>
           <p className="text-xs text-foreground-muted mt-1.5">
-            {available.length} serial{available.length !== 1 ? 's' : ''} in stock across {batches.length} batch{batches.length !== 1 ? 'es' : ''} — select exactly {serialsNeeded(item)}
+            {available.length} serial{available.length !== 1 ? 's' : ''} in stock across {batches.length} batch
+            {batches.length !== 1 ? 'es' : ''} — select exactly {serialsNeeded(item)}
           </p>
         </>
       )}
@@ -418,17 +446,17 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
   const [scanEnabled, setScanEnabled] = useState(true)
 
   const [selections, setSelections] = useState<Record<string, Set<string>>>(() =>
-    Object.fromEntries(itemsNeedingEntry.map(i => [
-      i.order_item_id,
-      // Seed with any pre-assigned serials (e.g. auto-recorded from a scan), capped
-      // at the required serial count. The SerialPicker fills the remaining delta.
-      new Set<string>((i.preassigned ?? []).slice(0, serialsNeeded(i))),
-    ]))
+    Object.fromEntries(
+      itemsNeedingEntry.map(i => [
+        i.order_item_id,
+        // Seed with any pre-assigned serials (e.g. auto-recorded from a scan), capped
+        // at the required serial count. The SerialPicker fills the remaining delta.
+        new Set<string>((i.preassigned ?? []).slice(0, serialsNeeded(i))),
+      ])
+    )
   )
 
-  const canConfirm = itemsNeedingEntry.every(item =>
-    selections[item.order_item_id]?.size === serialsNeeded(item)
-  )
+  const canConfirm = itemsNeedingEntry.every(item => selections[item.order_item_id]?.size === serialsNeeded(item))
 
   function handleConfirm() {
     const assignments: SerialAssignment[] = []
@@ -446,23 +474,42 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Select Serial Numbers</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Serials grouped by batch — top {(itemsNeedingEntry[0] ? serialsNeeded(itemsNeedingEntry[0]) : undefined) ?? 'N'} pre-selected</p>
+            <p className="text-sm text-foreground-muted mt-0.5">
+              Serials grouped by batch — top{' '}
+              {(itemsNeedingEntry[0] ? serialsNeeded(itemsNeedingEntry[0]) : undefined) ?? 'N'} pre-selected
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setScanEnabled(v => !v)}
-              title={scanEnabled ? 'Scanner mode on — scan a serial to select it' : 'Click to select manually, or turn on scanner mode'}
+              title={
+                scanEnabled
+                  ? 'Scanner mode on — scan a serial to select it'
+                  : 'Click to select manually, or turn on scanner mode'
+              }
               className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
                 scanEnabled
                   ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
                   : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
               }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14"
+                />
+              </svg>
               {scanEnabled ? 'Scan: on' : 'Scan: off'}
             </button>
-            <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+            <button
+              onClick={onCancel}
+              className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none"
+            >
+              ×
+            </button>
           </div>
         </div>
 

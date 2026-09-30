@@ -68,12 +68,7 @@ export default function PromoBannerEditor(props: EditorProps) {
 
       <HeadingFields props={props} eyebrowHint="Small line above the heading, e.g. Limited offer." />
 
-      <Text
-        label="Subtitle"
-        value={section.subtitle ?? ''}
-        disabled={!canWrite}
-        onCommit={b.subtitle}
-      />
+      <Text label="Subtitle" value={section.subtitle ?? ''} disabled={!canWrite} onCommit={b.subtitle} />
       <Select
         label="Background colour"
         value={b.str('background')}

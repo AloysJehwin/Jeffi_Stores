@@ -16,7 +16,10 @@ const VIEWS: { value: string; label: string }[] = [
 ]
 
 export default function ProductBreakdownChart({
-  byCategory, byBrand, byStock, byInventoryValue,
+  byCategory,
+  byBrand,
+  byStock,
+  byInventoryValue,
 }: {
   byCategory: BreakdownSlice[]
   byBrand: BreakdownSlice[]
@@ -26,17 +29,12 @@ export default function ProductBreakdownChart({
   const [view, setView] = useState('category')
   const isMoney = view === 'inventory'
   const data =
-    view === 'brand' ? byBrand
-    : view === 'stock' ? byStock
-    : view === 'inventory' ? byInventoryValue
-    : byCategory
+    view === 'brand' ? byBrand : view === 'stock' ? byStock : view === 'inventory' ? byInventoryValue : byCategory
   const rows = data.filter(d => d.value > 0)
   const max = Math.max(1, ...rows.map(d => d.value))
   const total = rows.reduce((s, d) => s + d.value, 0)
 
-  const fmt = (v: number) => isMoney
-    ? `Rs. ${Math.round(v).toLocaleString('en-IN')}`
-    : v.toLocaleString('en-IN')
+  const fmt = (v: number) => (isMoney ? `Rs. ${Math.round(v).toLocaleString('en-IN')}` : v.toLocaleString('en-IN'))
 
   return (
     <div className="bg-surface-elevated border border-border-default rounded-lg shadow-sm p-4 h-full flex flex-col overflow-hidden">

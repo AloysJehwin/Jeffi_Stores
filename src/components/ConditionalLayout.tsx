@@ -14,12 +14,34 @@ import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 import NumberInputWheelGuard from './NumberInputWheelGuard'
 
-export default function ConditionalLayout({ children, initialStoreConfig, isFormsSubdomain, isDocumentSubdomain, isBusinessSubdomain, isAdminSubdomain, isEcomSubdomain, isCertPortalSubdomain }: { children: React.ReactNode; initialStoreConfig?: StoreConfig; isFormsSubdomain?: boolean; isDocumentSubdomain?: boolean; isBusinessSubdomain?: boolean; isAdminSubdomain?: boolean; isEcomSubdomain?: boolean; isCertPortalSubdomain?: boolean }) {
+export default function ConditionalLayout({
+  children,
+  initialStoreConfig,
+  isFormsSubdomain,
+  isDocumentSubdomain,
+  isBusinessSubdomain,
+  isAdminSubdomain,
+  isEcomSubdomain,
+  isCertPortalSubdomain,
+}: {
+  children: React.ReactNode
+  initialStoreConfig?: StoreConfig
+  isFormsSubdomain?: boolean
+  isDocumentSubdomain?: boolean
+  isBusinessSubdomain?: boolean
+  isAdminSubdomain?: boolean
+  isEcomSubdomain?: boolean
+  isCertPortalSubdomain?: boolean
+}) {
   const pathname = usePathname()
   const isAdminPage = isAdminSubdomain || pathname?.startsWith('/admin')
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
-  const isDocumentPage = isDocumentSubdomain || pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
+  const isDocumentPage =
+    isDocumentSubdomain ||
+    pathname?.startsWith('/invoice/') ||
+    pathname?.startsWith('/quotation/') ||
+    pathname?.startsWith('/purchaseorder/')
   const isEcomPage = isEcomSubdomain || pathname?.startsWith('/ecom')
   const isCertPortalPage = isCertPortalSubdomain || pathname?.startsWith('/certportal')
   const isStaffPage = pathname?.startsWith('/staff')
@@ -54,9 +76,7 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
                   <div className="flex flex-col min-h-[100dvh] bg-surface">
                     <PageTracker />
                     <Header />
-                    <main className="flex-1 bg-surface pt-16 lg:pt-20">
-                      {children}
-                    </main>
+                    <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
                   </div>
                   <CompareBar />
                   <PolicyConsentGate />

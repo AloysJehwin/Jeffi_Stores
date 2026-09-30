@@ -32,7 +32,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
 
   useEffect(() => {
     fetch(`/api/products?limit=${limit}&sort=newest&is_active=true`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (data?.products) setProducts(data.products.slice(0, limit))
       })
@@ -45,19 +45,22 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
     <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
       <h3 className="text-lg font-bold text-foreground mb-4">{title}</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {products.map((product) => {
+        {products.map(product => {
           const primaryImage = product.product_images?.find(i => i.is_primary) || product.product_images?.[0]
           const hasVariants = product.has_variants
-          const displayPrice = hasVariants && product.variant_min_price
-            ? Number(product.variant_min_price)
-            : Number(product.base_price)
+          const displayPrice =
+            hasVariants && product.variant_min_price ? Number(product.variant_min_price) : Number(product.base_price)
           const effectiveStock = hasVariants
             ? Number(product.variant_stock_total ?? 0)
-            : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-          const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-          const mrpDiscount = mrp && mrp > displayPrice
-            ? Math.round(((mrp - displayPrice) / mrp) * 100)
-            : 0
+            : product.stock_status !== 'Out of Stock'
+              ? 1
+              : 0
+          const mrp = product.mrp
+            ? Number(product.mrp)
+            : product.variant_min_mrp
+              ? Number(product.variant_min_mrp)
+              : null
+          const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
 
           return (
             <ProductCard

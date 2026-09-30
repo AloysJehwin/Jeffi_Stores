@@ -29,7 +29,7 @@ const QUICK_REPLIES = [
     category: 'Greeting',
     replies: [
       'Hello! Thank you for reaching out to {store} support. How can I help you today?',
-      'Hi! I\'m here to assist you. Let me look into this for you right away.',
+      "Hi! I'm here to assist you. Let me look into this for you right away.",
     ],
   },
   {
@@ -61,7 +61,7 @@ const QUICK_REPLIES = [
     replies: [
       'Is there anything else I can help you with?',
       'Thank you for contacting {store} support. Have a great day!',
-      'Your issue has been resolved. Please don\'t hesitate to reach out if you need further assistance.',
+      "Your issue has been resolved. Please don't hesitate to reach out if you need further assistance.",
     ],
   },
 ]
@@ -95,7 +95,9 @@ function renderBotText(raw: string): string {
       return [payload.text, ...(payload.orders || []).map(orderLine)].join('\n')
     case 'order_detail': {
       const o = payload.order
-      return o ? `Order #${o.order_number}\nStatus: ${o.status}\nPayment: ${o.payment_status}\nTotal: ${fmtAmt(o.total_amount)}` : raw
+      return o
+        ? `Order #${o.order_number}\nStatus: ${o.status}\nPayment: ${o.payment_status}\nTotal: ${fmtAmt(o.total_amount)}`
+        : raw
     }
     default:
       return payload.text || raw
@@ -149,10 +151,13 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
       ])
       const meData = await meRes.json()
       const u = meData.user || {}
-      const username = (u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : (u.email || '')
+      const username = u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.email || ''
       setAdminUsername(username)
 
-      if (!sessionRes.ok) { setIsLoading(false); return }
+      if (!sessionRes.ok) {
+        setIsLoading(false)
+        return
+      }
       const data = await sessionRes.json()
       if (data.session) {
         const existingAdmin = data.session.admin_name
@@ -321,7 +326,8 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
           <h2 className="font-semibold text-foreground">Support Chat</h2>
         </div>
         <p className="text-sm text-foreground-muted">
-          This session is already being handled by <span className="font-semibold text-foreground">{session.admin_name}</span>.
+          This session is already being handled by{' '}
+          <span className="font-semibold text-foreground">{session.admin_name}</span>.
         </p>
       </div>
     )
@@ -336,7 +342,9 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-secondary transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className={`w-2.5 h-2.5 rounded-full ${sessionClosed ? 'bg-foreground-muted' : 'bg-green-500 animate-pulse'}`} />
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${sessionClosed ? 'bg-foreground-muted' : 'bg-green-500 animate-pulse'}`}
+          />
           <span className="font-semibold text-foreground">
             {sessionClosed ? 'Support Chat (Ended)' : 'Live Support Chat'}
           </span>
@@ -344,7 +352,12 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
             {messages.length} message{messages.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <svg className={`w-4 h-4 text-foreground-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className={`w-4 h-4 text-foreground-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -359,16 +372,16 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
             ) : (
               messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.sender === 'admin'
-                      ? 'bg-accent-500 text-white rounded-br-sm'
-                      : msg.sender === 'bot'
-                      ? 'bg-surface-secondary border border-border-default text-foreground-muted rounded-bl-sm italic'
-                      : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
-                  }`}>
-                    {msg.sender === 'user' && (
-                      <p className="text-xs font-semibold text-accent-500 mb-0.5">Customer</p>
-                    )}
+                  <div
+                    className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                      msg.sender === 'admin'
+                        ? 'bg-accent-500 text-white rounded-br-sm'
+                        : msg.sender === 'bot'
+                          ? 'bg-surface-secondary border border-border-default text-foreground-muted rounded-bl-sm italic'
+                          : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
+                    }`}
+                  >
+                    {msg.sender === 'user' && <p className="text-xs font-semibold text-accent-500 mb-0.5">Customer</p>}
                     {msg.sender === 'bot' && (
                       <p className="text-xs font-semibold text-foreground-muted mb-0.5">Jeffi (auto-reply)</p>
                     )}
@@ -441,7 +454,12 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     }`}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
                     </svg>
                   </button>
                   <textarea
@@ -458,7 +476,12 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
                     </svg>
                   </button>
                 </div>

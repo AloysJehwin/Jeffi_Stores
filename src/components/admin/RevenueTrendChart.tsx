@@ -62,8 +62,11 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
         const json = await res.json()
         if (json.trend) setData(json.trend)
       }
-    } catch { /* keep previous data on failure */ }
-    finally { setLoading(false) }
+    } catch {
+      /* keep previous data on failure */
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -94,8 +97,13 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
               {yTicks.map((t, i) => (
                 <g key={i}>
                   <line
-                    x1={PAD.left} x2={VIEW_W - PAD.right} y1={y(t)} y2={y(t)}
-                    className="stroke-border-default" strokeWidth={1} strokeDasharray={i === 0 ? undefined : '3 3'}
+                    x1={PAD.left}
+                    x2={VIEW_W - PAD.right}
+                    y1={y(t)}
+                    y2={y(t)}
+                    className="stroke-border-default"
+                    strokeWidth={1}
+                    strokeDasharray={i === 0 ? undefined : '3 3'}
                   />
                   <text x={PAD.left - 4} y={y(t) + 3} textAnchor="end" className="fill-foreground-muted" fontSize={9}>
                     {t >= 1000 ? `${Math.round(t / 1000)}k` : Math.round(t)}
@@ -103,22 +111,41 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
                 </g>
               ))}
 
-              {months.map((m, i) => (
-                (i % xStep === 0 || i === months.length - 1) && (
-                  <text key={m} x={x(i)} y={VIEW_H - 6} textAnchor="middle" className="fill-foreground-muted" fontSize={9}>
-                    {shortMonth(m)}
-                  </text>
-                )
-              ))}
+              {months.map(
+                (m, i) =>
+                  (i % xStep === 0 || i === months.length - 1) && (
+                    <text
+                      key={m}
+                      x={x(i)}
+                      y={VIEW_H - 6}
+                      textAnchor="middle"
+                      className="fill-foreground-muted"
+                      fontSize={9}
+                    >
+                      {shortMonth(m)}
+                    </text>
+                  )
+              )}
 
               {hover !== null && (
-                <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH} className="stroke-border-default" strokeWidth={1} />
+                <line
+                  x1={x(hover)}
+                  x2={x(hover)}
+                  y1={PAD.top}
+                  y2={PAD.top + plotH}
+                  className="stroke-border-default"
+                  strokeWidth={1}
+                />
               )}
 
               {activeSeries.map(s => (
                 <g key={s.source}>
                   <polyline
-                    fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
                     points={s.points.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
                   />
                   {s.points.map((v, i) => (
@@ -131,7 +158,9 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
                 <rect
                   key={m}
                   x={x(i) - plotW / (2 * Math.max(1, months.length - 1 || 1))}
-                  y={PAD.top} width={Math.max(8, plotW / Math.max(1, months.length))} height={plotH}
+                  y={PAD.top}
+                  width={Math.max(8, plotW / Math.max(1, months.length))}
+                  height={plotH}
                   fill="transparent"
                   onMouseEnter={() => setHover(i)}
                   onMouseLeave={() => setHover(null)}
@@ -143,11 +172,17 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
               <div
                 className="absolute z-10 text-[11px] rounded px-2.5 py-2 shadow-lg pointer-events-none"
                 style={{
-                  backgroundColor: '#1e2030', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.08)',
-                  left: `${(x(hover) / VIEW_W) * 100}%`, top: 0, transform: 'translateX(-50%)',
+                  backgroundColor: '#1e2030',
+                  color: '#e2e8f0',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  left: `${(x(hover) / VIEW_W) * 100}%`,
+                  top: 0,
+                  transform: 'translateX(-50%)',
                 }}
               >
-                <div className="font-semibold mb-1">{shortMonth(months[hover])} {months[hover].split('-')[0]}</div>
+                <div className="font-semibold mb-1">
+                  {shortMonth(months[hover])} {months[hover].split('-')[0]}
+                </div>
                 {activeSeries.map(s => (
                   <div key={s.source} className="flex items-center gap-1.5 whitespace-nowrap">
                     <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />

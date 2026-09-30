@@ -32,10 +32,24 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({
-  id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
-  effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
-  extraDeliveryDays = 0, handlingDays = 2,
-  fragile, hazardous, flammable, badge,
+  id,
+  name,
+  slug,
+  hasVariants,
+  displayPrice,
+  mrp,
+  mrpDiscount,
+  effectiveStock,
+  primaryImage,
+  brandName,
+  categoryName,
+  discountPct = 0,
+  extraDeliveryDays = 0,
+  handlingDays = 2,
+  fragile,
+  hazardous,
+  flammable,
+  badge,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -47,7 +61,9 @@ export default function ProductCard({
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
-    resolveEdd(!!user, handlingDays, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+    resolveEdd(!!user, handlingDays, extraDeliveryDays).then(v => {
+      if (v) setEdd(v)
+    })
   }, [user, handlingDays, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -57,7 +73,9 @@ export default function ProductCard({
     if (!showQuickView) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
+    return () => {
+      document.body.style.overflow = prev
+    }
   }, [showQuickView])
 
   function startLongPress(e: React.TouchEvent) {
@@ -73,68 +91,84 @@ export default function ProductCard({
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
-  const handleWishlist = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!user) {
-      showConfirm({
-        title: 'Sign In Required',
-        message: 'Please sign in to save items to your wishlist.',
-        confirmText: 'Sign In',
-        cancelText: 'Maybe Later',
-        type: 'info',
-        onConfirm: () => router.push(`/login?redirect=/products/${slug}`),
-      })
-      return
-    }
-    setWishlistLoading(true)
-    try {
-      if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include' })
-        if (res.ok) { setIsInWishlist(false); showToast('Removed from wishlist', 'success') }
-      } else {
-        const res = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: id }),
-          credentials: 'include',
+  const handleWishlist = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (!user) {
+        showConfirm({
+          title: 'Sign In Required',
+          message: 'Please sign in to save items to your wishlist.',
+          confirmText: 'Sign In',
+          cancelText: 'Maybe Later',
+          type: 'info',
+          onConfirm: () => router.push(`/login?redirect=/products/${slug}`),
         })
-        if (res.ok) { setIsInWishlist(true); showToast('Added to wishlist!', 'success') }
+        return
       }
-    } catch {
-      showToast('Failed to update wishlist', 'error')
-    } finally {
-      setWishlistLoading(false)
-    }
-  }, [id, slug, isInWishlist, user])
+      setWishlistLoading(true)
+      try {
+        if (isInWishlist) {
+          const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include' })
+          if (res.ok) {
+            setIsInWishlist(false)
+            showToast('Removed from wishlist', 'success')
+          }
+        } else {
+          const res = await fetch('/api/wishlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: id }),
+            credentials: 'include',
+          })
+          if (res.ok) {
+            setIsInWishlist(true)
+            showToast('Added to wishlist!', 'success')
+          }
+        }
+      } catch {
+        showToast('Failed to update wishlist', 'error')
+      } finally {
+        setWishlistLoading(false)
+      }
+    },
+    [id, slug, isInWishlist, user]
+  )
 
-  const handleShare = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const url = `${window.location.origin}/products/${slug}`
-    const shareData = { title: name, text: `Check out ${name}`, url }
-    if (navigator.share) {
-      try { await navigator.share(shareData) } catch {}
-    } else {
-      await navigator.clipboard.writeText(url)
-      showToast('Link copied to clipboard!', 'success')
-    }
-  }, [slug, name])
+  const handleShare = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const url = `${window.location.origin}/products/${slug}`
+      const shareData = { title: name, text: `Check out ${name}`, url }
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData)
+        } catch {}
+      } else {
+        await navigator.clipboard.writeText(url)
+        showToast('Link copied to clipboard!', 'success')
+      }
+    },
+    [slug, name]
+  )
 
   return (
     <>
       <Link
         href={`/products/${slug}`}
         className="group"
-        onTouchStart={(e) => startLongPress(e)}
+        onTouchStart={e => startLongPress(e)}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
-        onContextMenu={(e) => e.preventDefault()}
-        onClick={(e) => { if (longPressFired.current) e.preventDefault() }}
+        onContextMenu={e => e.preventDefault()}
+        onClick={e => {
+          if (longPressFired.current) e.preventDefault()
+        }}
       >
         <div
           className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={e => e.preventDefault()}
           style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
         >
           {/* Image */}
@@ -159,7 +193,12 @@ export default function ProductCard({
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <svg className="w-20 h-20 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
                 </svg>
               </div>
             )}
@@ -204,8 +243,19 @@ export default function ProductCard({
                   aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                   className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
                 >
-                  <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
+                    fill={isInWishlist ? 'currentColor' : 'none'}
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    style={{ color: isInWishlist ? '#ef4444' : undefined }}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                    />
                   </svg>
                 </button>
                 <button
@@ -214,7 +264,11 @@ export default function ProductCard({
                   className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                    />
                   </svg>
                 </button>
               </div>
@@ -226,7 +280,8 @@ export default function ProductCard({
             <div className="mt-auto">
               <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
                 <span className="text-base sm:text-xl font-bold text-primary-600 dark:text-primary-400 leading-tight">
-                  {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {hasVariants ? 'From ' : ''}&#x20B9;
+                  {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 {mrp && mrp > Number(displayPrice) && (
                   <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
@@ -236,7 +291,9 @@ export default function ProductCard({
               </div>
               {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
-                <span className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <span
+                  className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}
+                >
                   {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
                 </span>
                 <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
@@ -245,7 +302,10 @@ export default function ProductCard({
               </div>
               {edd && effectiveStock > 0 && (
                 <p className="text-[10px] text-foreground-muted mt-0.5">
-                  Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                  Deliver by{' '}
+                  <span className="font-medium text-foreground">
+                    {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  </span>
                 </p>
               )}
             </div>
@@ -258,8 +318,11 @@ export default function ProductCard({
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div
             className="absolute inset-0 bg-black/50"
-            onTouchEnd={(e) => { e.preventDefault(); setShowQuickView(false) }}
-            onTouchMove={(e) => e.preventDefault()}
+            onTouchEnd={e => {
+              e.preventDefault()
+              setShowQuickView(false)
+            }}
+            onTouchMove={e => e.preventDefault()}
             onClick={() => setShowQuickView(false)}
           />
           <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl p-5 pb-8 animate-slide-up">
@@ -271,8 +334,18 @@ export default function ProductCard({
                   <img src={primaryImage.image_url} alt={name} className="w-full h-full object-contain p-1" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <svg
+                      className="w-8 h-8 text-foreground-muted"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                   </div>
                 )}
@@ -286,7 +359,8 @@ export default function ProductCard({
 
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {hasVariants ? 'From ' : ''}&#x20B9;
+                {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {mrp && mrp > Number(displayPrice) && (
                 <>
@@ -301,11 +375,13 @@ export default function ProductCard({
             </div>
 
             <div className="flex items-center gap-2 mb-5">
-              <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full ${
-                effectiveStock > 0
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-              }`}>
+              <span
+                className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full ${
+                  effectiveStock > 0
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                }`}
+              >
                 <span className={`w-1.5 h-1.5 rounded-full ${effectiveStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                 {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
               </span>

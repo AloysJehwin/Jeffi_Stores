@@ -30,7 +30,12 @@ export default function DeleteCampaignButton({ id, title }: { id: string; title:
   if (!canWrite) return null
 
   return (
-    <button type="button" onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+    <button
+      type="button"
+      onClick={handleDelete}
+      disabled={loading}
+      className="text-red-500 hover:underline text-sm disabled:opacity-50"
+    >
       {loading ? 'Deleting…' : 'Delete'}
     </button>
   )

@@ -27,9 +27,17 @@ export default function CountdownDealBanner({ product, endsAt, eyebrow, title, c
       <div className="container mx-auto px-4">
         <div className="overflow-hidden rounded-2xl border border-border-default bg-gradient-to-br from-primary-500/10 via-surface-elevated to-accent-500/10">
           <div className="grid md:grid-cols-2 items-center gap-6 md:gap-10 p-5 md:p-10">
-            <Link href={href} className="relative block w-full max-w-sm mx-auto aspect-square rounded-xl bg-surface-elevated overflow-hidden">
+            <Link
+              href={href}
+              className="relative block w-full max-w-sm mx-auto aspect-square rounded-xl bg-surface-elevated overflow-hidden"
+            >
               {image ? (
-                <StoreImage src={image.image_url} alt={product.name} blurhash={image.blurhash} className="w-full h-full object-contain p-4" />
+                <StoreImage
+                  src={image.image_url}
+                  alt={product.name}
+                  blurhash={image.blurhash}
+                  className="w-full h-full object-contain p-4"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="w-16 h-16 text-foreground-muted" aria-hidden="true" />
@@ -43,12 +51,19 @@ export default function CountdownDealBanner({ product, endsAt, eyebrow, title, c
             </Link>
 
             <div className="flex flex-col items-center md:items-start text-center md:text-left gap-3">
-              <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em]">{eyebrow ?? COPY.eyebrow}</p>
+              <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em]">
+                {eyebrow ?? COPY.eyebrow}
+              </p>
               <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
               {product.brandName && (
-                <p className="text-xs font-medium uppercase tracking-wide text-accent-600 dark:text-accent-400">{product.brandName}</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-accent-600 dark:text-accent-400">
+                  {product.brandName}
+                </p>
               )}
-              <Link href={href} className="text-lg md:text-xl font-semibold text-foreground hover:text-accent-600 transition-colors">
+              <Link
+                href={href}
+                className="text-lg md:text-xl font-semibold text-foreground hover:text-accent-600 transition-colors"
+              >
                 {product.name}
               </Link>
               <div className="flex items-baseline gap-3">
@@ -56,12 +71,16 @@ export default function CountdownDealBanner({ product, endsAt, eyebrow, title, c
                   {product.hasVariants ? 'From ' : ''}&#x20B9;{inr(Number(product.displayPrice))}
                 </span>
                 {showMrp && (
-                  <span className="text-base text-foreground-muted line-through">&#x20B9;{inr(Number(product.mrp))}</span>
+                  <span className="text-base text-foreground-muted line-through">
+                    &#x20B9;{inr(Number(product.mrp))}
+                  </span>
                 )}
               </div>
               {endsAt && (
                 <div className="flex flex-col items-center md:items-start gap-1.5">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Offer ends in</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                    Offer ends in
+                  </span>
                   <DealCountdown endsAt={endsAt} />
                 </div>
               )}

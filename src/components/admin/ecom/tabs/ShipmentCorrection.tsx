@@ -4,7 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function ShipmentCorrection({
-  tenantId, orderId, awb, currentBilled, alreadyBilled,
+  tenantId,
+  orderId,
+  awb,
+  currentBilled,
+  alreadyBilled,
 }: {
   tenantId: string
   orderId: string
@@ -21,8 +25,14 @@ export default function ShipmentCorrection({
 
   async function submit() {
     const value = Number(amount)
-    if (!(value >= 0)) { setErr('Enter a valid amount'); return }
-    if (!note.trim()) { setErr('A proof note is required'); return }
+    if (!(value >= 0)) {
+      setErr('Enter a valid amount')
+      return
+    }
+    if (!note.trim()) {
+      setErr('A proof note is required')
+      return
+    }
     setBusy(true)
     setErr(null)
     try {
@@ -32,7 +42,10 @@ export default function ShipmentCorrection({
         body: JSON.stringify({ chargedAmount: value, proofNote: note.trim() }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setErr(data?.error || 'Correction failed'); return }
+      if (!res.ok) {
+        setErr(data?.error || 'Correction failed')
+        return
+      }
       setOpen(false)
       router.refresh()
     } catch {
@@ -63,22 +76,33 @@ export default function ShipmentCorrection({
         inputMode="decimal"
         placeholder="Actual billed ₹"
         value={amount}
-        onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
+        onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
       />
       <input
         className="w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
         placeholder="Proof / reference"
         value={note}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={e => setNote(e.target.value)}
       />
       {err && <div className="text-[11px] text-red-600 dark:text-red-400">{err}</div>}
       <div className="flex gap-2">
-        <button type="button" onClick={submit} disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="text-xs px-3 py-1.5 rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50"
+        >
           {busy ? 'Saving…' : 'Apply'}
         </button>
-        <button type="button" onClick={() => { setOpen(false); setErr(null) }} disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg border border-border-default text-foreground hover:bg-surface-secondary">
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false)
+            setErr(null)
+          }}
+          disabled={busy}
+          className="text-xs px-3 py-1.5 rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
+        >
           Cancel
         </button>
       </div>

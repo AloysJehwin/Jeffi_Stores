@@ -27,7 +27,12 @@ type BulkAction = 'add' | 'remove'
 
 const FILTER_THRESHOLD = 12
 
-export default function OfferProductPicker({ offerId, canWrite, categoryOptions, brandOptions }: {
+export default function OfferProductPicker({
+  offerId,
+  canWrite,
+  categoryOptions,
+  brandOptions,
+}: {
   offerId: string
   canWrite: boolean
   categoryOptions: AssignOption[]
@@ -59,16 +64,23 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
     }
   }, [offerId, showToast])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   useEffect(() => {
     const q = query.trim()
     if (debounce.current) clearTimeout(debounce.current)
-    if (q.length < 2) { setResults([]); return }
+    if (q.length < 2) {
+      setResults([])
+      return
+    }
     debounce.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/admin/product-offers/${offerId}/products?q=${encodeURIComponent(q)}`, { credentials: 'include' })
+        const res = await fetch(`/api/admin/product-offers/${offerId}/products?q=${encodeURIComponent(q)}`, {
+          credentials: 'include',
+        })
         const d = await res.json().catch(() => ({}))
         setResults(Array.isArray(d.items) ? d.items : [])
       } catch {
@@ -77,7 +89,9 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
         setSearching(false)
       }
     }, 250)
-    return () => { if (debounce.current) clearTimeout(debounce.current) }
+    return () => {
+      if (debounce.current) clearTimeout(debounce.current)
+    }
   }, [query, offerId])
 
   async function persist(next: PickedProduct[]) {
@@ -89,8 +103,16 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
         credentials: 'include',
         body: JSON.stringify({ productIds: next.map(p => p.id) }),
       })
-      if (!res.ok) { showToast('Failed to save products', 'error'); await load() }
-    } catch { showToast('Failed to save products', 'error'); await load() } finally { setSaving(false) }
+      if (!res.ok) {
+        showToast('Failed to save products', 'error')
+        await load()
+      }
+    } catch {
+      showToast('Failed to save products', 'error')
+      await load()
+    } finally {
+      setSaving(false)
+    }
   }
 
   function add(item: SuggestItem) {
@@ -128,12 +150,20 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
         body: JSON.stringify({ action, [kind === 'category' ? 'categoryId' : 'brandId']: option.value }),
       })
       const d = await res.json().catch(() => ({}))
-      if (!res.ok) { showToast(d.error || 'Failed to update products', 'error'); return }
+      if (!res.ok) {
+        showToast(d.error || 'Failed to update products', 'error')
+        return
+      }
       const n: number = d.changed ?? 0
       const noun = `product${n === 1 ? '' : 's'}`
-      const message = action === 'add'
-        ? (n ? `Added ${n} ${noun} from ${option.name}` : `Everything in ${option.name} is already in this offer`)
-        : (n ? `Removed ${n} ${noun} from ${option.name}` : `No products from ${option.name} were in this offer`)
+      const message =
+        action === 'add'
+          ? n
+            ? `Added ${n} ${noun} from ${option.name}`
+            : `Everything in ${option.name} is already in this offer`
+          : n
+            ? `Removed ${n} ${noun} from ${option.name}`
+            : `No products from ${option.name} were in this offer`
       showToast(message, 'success')
       await load()
     } catch {
@@ -153,7 +183,8 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">Products in this offer</h2>
         <span className="text-xs text-foreground-muted">
-          {loading ? 'Loading…' : `${members.length} assigned`}{saving || bulkBusy ? ' · saving…' : ''}
+          {loading ? 'Loading…' : `${members.length} assigned`}
+          {saving || bulkBusy ? ' · saving…' : ''}
         </span>
       </div>
 
@@ -176,17 +207,26 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
                   {results.map(item => {
                     const already = members.some(m => m.id === item.id)
                     return (
-                      <button key={item.id} type="button" onClick={() => add(item)} disabled={already}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary disabled:opacity-40 flex items-center justify-between gap-2">
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => add(item)}
+                        disabled={already}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary disabled:opacity-40 flex items-center justify-between gap-2"
+                      >
                         <span className="min-w-0">
                           <span className="block truncate text-foreground">{item.label}</span>
-                          {item.sublabel && <span className="block truncate text-[11px] text-foreground-muted">{item.sublabel}</span>}
+                          {item.sublabel && (
+                            <span className="block truncate text-[11px] text-foreground-muted">{item.sublabel}</span>
+                          )}
                         </span>
                         {already && <span className="text-[10px] text-foreground-muted shrink-0">added</span>}
                       </button>
                     )
                   })}
-                  {!searching && results.length === 0 && <p className="px-3 py-2 text-xs text-foreground-muted">No matches</p>}
+                  {!searching && results.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-foreground-muted">No matches</p>
+                  )}
                 </div>
               )}
             </div>
@@ -231,12 +271,25 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
             <p className="text-xs text-foreground-muted">No assigned products match &quot;{filter.trim()}&quot;.</p>
           )}
           {visible.map(m => (
-            <span key={m.id} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full bg-surface-secondary border border-border-default text-xs text-foreground">
-              <span className="max-w-[16rem] truncate">{m.name}{m.sku ? ` · ${m.sku}` : ''}</span>
+            <span
+              key={m.id}
+              className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full bg-surface-secondary border border-border-default text-xs text-foreground"
+            >
+              <span className="max-w-[16rem] truncate">
+                {m.name}
+                {m.sku ? ` · ${m.sku}` : ''}
+              </span>
               {canWrite && (
-                <button type="button" onClick={() => remove(m.id)} title="Remove" disabled={busy}
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40">
-                  <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" /></svg>
+                <button
+                  type="button"
+                  onClick={() => remove(m.id)}
+                  title="Remove"
+                  disabled={busy}
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40"
+                >
+                  <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />
+                  </svg>
                 </button>
               )}
             </span>
@@ -247,7 +300,14 @@ export default function OfferProductPicker({ offerId, canWrite, categoryOptions,
   )
 }
 
-function BulkAssign({ label, placeholder, hint, options, disabled, onRun }: {
+function BulkAssign({
+  label,
+  placeholder,
+  hint,
+  options,
+  disabled,
+  onRun,
+}: {
   label: string
   placeholder: string
   hint: string

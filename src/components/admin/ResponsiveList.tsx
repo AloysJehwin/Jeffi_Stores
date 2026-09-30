@@ -47,7 +47,7 @@ export default function ResponsiveList<T>({
     <>
       <div className={`md:hidden space-y-3 ${className}`}>
         {!isEmpty
-          ? items.map((item) => <Fragment key={getKey(item)}>{renderCard(item)}</Fragment>)
+          ? items.map(item => <Fragment key={getKey(item)}>{renderCard(item)}</Fragment>)
           : !hasOwnEmptyState && (emptyState ?? DEFAULT_EMPTY)}
         {pagination}
       </div>

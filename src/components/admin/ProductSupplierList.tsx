@@ -15,14 +15,22 @@ export interface SupplierRow {
 }
 
 interface Props {
-  suppliers: { id: string; name: string }[]  // master supplier list
+  suppliers: { id: string; name: string }[] // master supplier list
   value: SupplierRow[]
   onChange: (rows: SupplierRow[]) => void
   note?: string
 }
 
 export function emptySupplierRow(): SupplierRow {
-  return { supplier_id: '', unit_cost: '', is_preferred: false, moq: '', lead_time_days: '', notes: '', currency: 'INR' }
+  return {
+    supplier_id: '',
+    unit_cost: '',
+    is_preferred: false,
+    moq: '',
+    lead_time_days: '',
+    notes: '',
+    currency: 'INR',
+  }
 }
 
 export default function ProductSupplierList({ suppliers, value, onChange, note }: Props) {
@@ -34,7 +42,10 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
     let min = Infinity
     rows.forEach((r, i) => {
       const c = parseFloat(r.unit_cost)
-      if (Number.isFinite(c) && c >= 0 && c < min) { min = c; idx = i }
+      if (Number.isFinite(c) && c >= 0 && c < min) {
+        min = c
+        idx = i
+      }
     })
     return idx
   }, [rows])
@@ -77,13 +88,13 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                       sm
                       value={row.supplier_id}
                       placeholder="Select supplier"
-                      onChange={(v) => update(i, { supplier_id: v })}
+                      onChange={v => update(i, { supplier_id: v })}
                       options={[
                         { value: '', label: 'Select supplier' },
                         ...suppliers.map(s => ({
                           value: s.id,
                           // keep the current row's own supplier selectable; hide others already chosen
-                          label: (chosen.has(s.id) && s.id !== row.supplier_id) ? `${s.name} (added)` : s.name,
+                          label: chosen.has(s.id) && s.id !== row.supplier_id ? `${s.name} (added)` : s.name,
                         })),
                       ]}
                     />
@@ -92,9 +103,11 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                     <div className="relative">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-foreground-muted">₹</span>
                       <input
-                        type="number" step="0.01" min="0"
+                        type="number"
+                        step="0.01"
+                        min="0"
                         value={row.unit_cost}
-                        onChange={(e) => update(i, { unit_cost: e.target.value })}
+                        onChange={e => update(i, { unit_cost: e.target.value })}
                         placeholder="Buy price"
                         className="w-full pl-5 pr-2 py-1.5 text-sm rounded border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       />
@@ -109,7 +122,9 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                     <Star className="w-4 h-4" fill={row.is_preferred ? 'currentColor' : 'none'} />
                   </button>
                   {isBest && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">Best price</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">
+                      Best price
+                    </span>
                   )}
                   <button
                     type="button"
@@ -122,23 +137,27 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 pl-0.5">
                   <input
-                    type="number" step="0.01" min="0"
+                    type="number"
+                    step="0.01"
+                    min="0"
                     value={row.moq || ''}
-                    onChange={(e) => update(i, { moq: e.target.value })}
+                    onChange={e => update(i, { moq: e.target.value })}
                     placeholder="MOQ"
                     className="w-24 px-2 py-1 text-xs rounded border border-border-secondary bg-surface text-foreground"
                   />
                   <input
-                    type="number" step="1" min="0"
+                    type="number"
+                    step="1"
+                    min="0"
                     value={row.lead_time_days || ''}
-                    onChange={(e) => update(i, { lead_time_days: e.target.value })}
+                    onChange={e => update(i, { lead_time_days: e.target.value })}
                     placeholder="Lead days"
                     className="w-24 px-2 py-1 text-xs rounded border border-border-secondary bg-surface text-foreground"
                   />
                   <input
                     type="text"
                     value={row.notes || ''}
-                    onChange={(e) => update(i, { notes: e.target.value })}
+                    onChange={e => update(i, { notes: e.target.value })}
                     placeholder="Notes"
                     className="flex-1 min-w-[100px] px-2 py-1 text-xs rounded border border-border-secondary bg-surface text-foreground"
                   />
@@ -157,7 +176,8 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
         <Plus className="w-4 h-4" /> Add supplier
       </button>
       <p className="text-xs text-foreground-muted mt-1">
-        {note ?? 'Product-level — inherited by all variants. The lowest price is highlighted; ★ marks your preferred supplier.'}
+        {note ??
+          'Product-level — inherited by all variants. The lowest price is highlighted; ★ marks your preferred supplier.'}
       </p>
     </div>
   )

@@ -8,18 +8,32 @@ import { navItems } from '@/components/visitor/AccountSidebar'
 export function AccountMobileTabBar() {
   const pathname = usePathname()
   const { user } = useAuth()
-  const items = (user?.isBusiness && user.approvalStatus === 'approved')
-    ? [...navItems, { href: '/account/quotes', label: 'My Quotes', exact: false, icon: (
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-        </svg>
-      )}]
-    : navItems
+  const items =
+    user?.isBusiness && user.approvalStatus === 'approved'
+      ? [
+          ...navItems,
+          {
+            href: '/account/quotes',
+            label: 'My Quotes',
+            exact: false,
+            icon: (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                />
+              </svg>
+            ),
+          },
+        ]
+      : navItems
   return (
     <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
         <div className="flex">
-          {items.map((item) => {
+          {items.map(item => {
             const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
             return (
               <Link
@@ -32,7 +46,9 @@ export function AccountMobileTabBar() {
                 }`}
               >
                 <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -65,7 +81,9 @@ export default function AccountMobileHeader() {
             )}
           </Link>
           <div>
-            <p className="text-xl font-bold text-white">{user.firstName} {user.lastName}</p>
+            <p className="text-xl font-bold text-white">
+              {user.firstName} {user.lastName}
+            </p>
             <p className="text-sm text-white/70 mt-0.5">{user.email}</p>
           </div>
         </div>
@@ -74,7 +92,7 @@ export default function AccountMobileHeader() {
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map((item) => {
+            {navItems.map(item => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
               return (
                 <Link
@@ -87,7 +105,9 @@ export default function AccountMobileHeader() {
                   }`}
                 >
                   <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                    {item.label}
+                  </span>
                 </Link>
               )
             })}

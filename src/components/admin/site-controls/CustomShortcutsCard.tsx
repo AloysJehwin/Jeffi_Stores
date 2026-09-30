@@ -14,7 +14,27 @@ export interface CustomShortcut {
 
 // Keys Chrome reserves with a plain Ctrl/⌘ modifier — blocked here. Use a
 // ⌘/Ctrl + Shift combo to assign any of these.
-const RESERVED_MOD_KEYS = new Set(['r','f','l','t','w','n','a','c','v','x','z','y','p','s','d','h','j','u','q'])
+const RESERVED_MOD_KEYS = new Set([
+  'r',
+  'f',
+  'l',
+  't',
+  'w',
+  'n',
+  'a',
+  'c',
+  'v',
+  'x',
+  'z',
+  'y',
+  'p',
+  's',
+  'd',
+  'h',
+  'j',
+  'u',
+  'q',
+])
 
 function parseComboDisplay(raw: string, isMac: boolean): string {
   const v = raw.toLowerCase().trim()
@@ -66,7 +86,12 @@ async function saveCustom(shortcuts: CustomShortcut[]): Promise<boolean> {
 }
 
 function ShortcutRow({
-  shortcut, isMac, allShortcuts, canWrite, onDelete, onChange,
+  shortcut,
+  isMac,
+  allShortcuts,
+  canWrite,
+  onDelete,
+  onChange,
 }: {
   shortcut: CustomShortcut
   isMac: boolean
@@ -83,9 +108,9 @@ function ShortcutRow({
 
   const modName = isMac ? '⌘' : 'Ctrl'
   const modifierOptions = [
-    { value: 'mod',       label: `${modName} + key` },
+    { value: 'mod', label: `${modName} + key` },
     { value: 'mod+shift', label: `${modName} + Shift + key` },
-    { value: 'f',         label: 'F-key only' },
+    { value: 'f', label: 'F-key only' },
   ]
   const fkeyOptions = Array.from({ length: 12 }, (_, i) => ({ value: `f${i + 1}`, label: `F${i + 1}` }))
 
@@ -104,7 +129,8 @@ function ShortcutRow({
       showToast(`${parseComboDisplay(combo, isMac)} is already assigned to another shortcut`, 'error')
       return
     }
-    setKey(k); setDisplay(k.toUpperCase())
+    setKey(k)
+    setDisplay(k.toUpperCase())
     onChange({ ...shortcut, combo })
   }
 
@@ -113,12 +139,18 @@ function ShortcutRow({
     if (mod === 'f') {
       const fkey = /^f([1-9]|1[0-2])$/.test(key) ? key : 'f1'
       setKey(fkey)
-      if (isDuplicate(fkey, shortcut.id)) { showToast(`${fkey.toUpperCase()} is already assigned to another shortcut`, 'error'); return }
+      if (isDuplicate(fkey, shortcut.id)) {
+        showToast(`${fkey.toUpperCase()} is already assigned to another shortcut`, 'error')
+        return
+      }
       onChange({ ...shortcut, combo: fkey })
     } else {
       if (key) {
         const combo = buildCombo(mod, key)
-        if (isDuplicate(combo, shortcut.id)) { showToast(`${parseComboDisplay(combo, isMac)} is already assigned to another shortcut`, 'error'); return }
+        if (isDuplicate(combo, shortcut.id)) {
+          showToast(`${parseComboDisplay(combo, isMac)} is already assigned to another shortcut`, 'error')
+          return
+        }
         onChange({ ...shortcut, combo })
       }
     }
@@ -136,8 +168,12 @@ function ShortcutRow({
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 px-3 rounded-lg border border-border-default bg-surface-secondary">
-      <span className="w-32 shrink-0 text-sm font-medium text-foreground truncate" title={shortcut.label}>{shortcut.label}</span>
-      <span className="flex-1 min-w-0 text-xs text-foreground-muted font-mono truncate" title={shortcut.path}>{shortcut.path}</span>
+      <span className="w-32 shrink-0 text-sm font-medium text-foreground truncate" title={shortcut.label}>
+        {shortcut.label}
+      </span>
+      <span className="flex-1 min-w-0 text-xs text-foreground-muted font-mono truncate" title={shortcut.path}>
+        {shortcut.path}
+      </span>
       <kbd className="w-24 shrink-0 inline-flex items-center justify-center px-2 py-1.5 rounded-lg border border-border-secondary bg-surface text-xs font-mono text-foreground-secondary select-none">
         {preview}
       </kbd>
@@ -150,7 +186,10 @@ function ShortcutRow({
             value={/^f([1-9]|1[0-2])$/.test(key) ? key : 'f1'}
             options={fkeyOptions}
             onChange={k => {
-              if (isDuplicate(k, shortcut.id)) { showToast(`${k.toUpperCase()} is already assigned to another shortcut`, 'error'); return }
+              if (isDuplicate(k, shortcut.id)) {
+                showToast(`${k.toUpperCase()} is already assigned to another shortcut`, 'error')
+                return
+              }
               setKey(k)
               onChange({ ...shortcut, combo: k })
             }}
@@ -186,12 +225,7 @@ function ShortcutRow({
   )
 }
 
-export default function CustomShortcutsCard({
-  initial, isMac,
-}: {
-  initial: CustomShortcut[]
-  isMac: boolean
-}) {
+export default function CustomShortcutsCard({ initial, isMac }: { initial: CustomShortcut[]; isMac: boolean }) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [shortcuts, setShortcuts] = useState<CustomShortcut[]>(initial)
@@ -199,7 +233,9 @@ export default function CustomShortcutsCard({
   const [newLabel, setNewLabel] = useState('')
   const [newPath, setNewPath] = useState('/admin/')
 
-  useEffect(() => { publishCustomList(shortcuts) }, [shortcuts])
+  useEffect(() => {
+    publishCustomList(shortcuts)
+  }, [shortcuts])
 
   async function persist(next: CustomShortcut[]) {
     setSaving(true)
@@ -209,7 +245,7 @@ export default function CustomShortcutsCard({
   }
 
   function handleChange(updated: CustomShortcut) {
-    const next = shortcuts.map(s => s.id === updated.id ? updated : s)
+    const next = shortcuts.map(s => (s.id === updated.id ? updated : s))
     setShortcuts(next)
     persist(next)
   }
@@ -264,7 +300,9 @@ export default function CustomShortcutsCard({
           type="text"
           value={newLabel}
           onChange={e => setNewLabel(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handleAdd()
+          }}
           placeholder="Label"
           className="w-36 px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
@@ -278,10 +316,14 @@ export default function CustomShortcutsCard({
               let p = u.pathname + u.search + u.hash
               if (u.hostname.startsWith('admin.') && !p.startsWith('/admin')) p = '/admin' + p
               v = p
-            } catch { /* not a full URL */ }
+            } catch {
+              /* not a full URL */
+            }
             setNewPath(v)
           }}
-          onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handleAdd()
+          }}
           placeholder="/admin/... or paste full URL"
           className="flex-1 px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"
         />

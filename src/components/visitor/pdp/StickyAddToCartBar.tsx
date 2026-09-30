@@ -23,17 +23,30 @@ interface StickyAddToCartBarProps {
 }
 
 /** Slim bottom bar that appears once the main Buy Now / Add to Cart buttons have scrolled away. */
-export default function StickyAddToCartBar({ action, name, image, price, mrp, unitLabel, quantity, adding, onAdd }: StickyAddToCartBarProps) {
+export default function StickyAddToCartBar({
+  action,
+  name,
+  image,
+  price,
+  mrp,
+  unitLabel,
+  quantity,
+  adding,
+  onAdd,
+}: StickyAddToCartBarProps) {
   const [pastControls, setPastControls] = useState(false)
   const { compareList } = useCompare()
 
   useEffect(() => {
     const el = document.getElementById(PDP_BUY_BUTTONS_ID)
     if (!el || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(([entry]) => {
-      const visibleTop = entry.rootBounds?.top ?? HEADER_OFFSET_PX
-      setPastControls(!entry.isIntersecting && entry.boundingClientRect.bottom <= visibleTop)
-    }, { rootMargin: `-${HEADER_OFFSET_PX}px 0px 0px 0px` })
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const visibleTop = entry.rootBounds?.top ?? HEADER_OFFSET_PX
+        setPastControls(!entry.isIntersecting && entry.boundingClientRect.bottom <= visibleTop)
+      },
+      { rootMargin: `-${HEADER_OFFSET_PX}px 0px 0px 0px` }
+    )
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
@@ -59,7 +72,11 @@ export default function StickyAddToCartBar({ action, name, image, price, mrp, un
           <p className="flex items-baseline gap-x-2 text-sm whitespace-nowrap overflow-hidden">
             <span className="font-bold text-primary-600 dark:text-primary-400">Rs. {formatRupees(price)}</span>
             {unit && <span className="text-xs text-foreground-secondary">/ {unit}</span>}
-            {showMrp && <span className="hidden sm:inline text-xs text-foreground-muted line-through">Rs. {formatRupees(Number(mrp))}</span>}
+            {showMrp && (
+              <span className="hidden sm:inline text-xs text-foreground-muted line-through">
+                Rs. {formatRupees(Number(mrp))}
+              </span>
+            )}
             {quantity !== 1 && <span className="text-xs text-foreground-muted">Qty {quantity}</span>}
           </p>
         </div>
@@ -70,7 +87,12 @@ export default function StickyAddToCartBar({ action, name, image, price, mrp, un
             disabled={adding}
             className="shrink-0 inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 sm:px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {adding && <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" aria-hidden="true" />}
+            {adding && (
+              <span
+                className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                aria-hidden="true"
+              />
+            )}
             {adding ? 'Adding...' : 'Add to Cart'}
           </button>
         ) : (

@@ -18,7 +18,14 @@ export function renderTextWithLinks(text: string): React.ReactNode {
       const trail = m ? m[2] : ''
       return (
         <React.Fragment key={i}>
-          <a href={url} target="_blank" rel="noopener noreferrer" className="underline text-accent-600 dark:text-accent-400 break-all">{url}</a>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-accent-600 dark:text-accent-400 break-all"
+          >
+            {url}
+          </a>
           {trail}
         </React.Fragment>
       )
