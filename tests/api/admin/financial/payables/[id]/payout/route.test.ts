@@ -39,12 +39,12 @@ vi.stubGlobal('fetch', mockFetch)
 
 // Dynamically import the route module AFTER env stubs are applied so
 // module-level constants (RZP_KEY etc.) capture the stubbed values.
-let POST: typeof import('@/app/api/admin/financial/payables/[id]/payout/route').POST
+let POST: typeof import('@/app/api/(admin)/admin/financial/payables/[id]/payout/route').POST
 
 beforeEach(async () => {
   vi.clearAllMocks()
   if (!POST) {
-    const mod = await import('@/app/api/admin/financial/payables/[id]/payout/route')
+    const mod = await import('@/app/api/(admin)/admin/financial/payables/[id]/payout/route')
     POST = mod.POST
   }
 })

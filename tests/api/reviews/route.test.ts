@@ -29,7 +29,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { GET, PATCH, POST } from '@/app/api/reviews/route'
+import { GET, PATCH, POST } from '@/app/api/(public)/reviews/route'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
 import { sendNewReviewNotification } from '@/lib/email'

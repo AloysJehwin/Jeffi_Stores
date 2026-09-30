@@ -18,7 +18,7 @@ vi.mock('@/lib/auth/mfa', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/mfa/recovery-codes/route'
+import { GET, POST } from '@/app/api/(admin)/admin/mfa/recovery-codes/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { query, queryOne } from '@/lib/shared/db'
 import { generateRecoveryCodes } from '@/lib/auth/mfa'

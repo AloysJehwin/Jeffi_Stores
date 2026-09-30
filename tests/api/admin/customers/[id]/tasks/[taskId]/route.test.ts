@@ -10,7 +10,7 @@ vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn() }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { PATCH, DELETE } from '@/app/api/admin/customers/[id]/tasks/[taskId]/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/customers/[id]/tasks/[taskId]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

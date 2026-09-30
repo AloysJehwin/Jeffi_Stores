@@ -62,7 +62,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/webhooks/razorpay/route'
+import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
 import * as db from '@/lib/shared/db'
 import * as email from '@/lib/email'
 import * as autoTasks from '@/lib/shared/auto-tasks'

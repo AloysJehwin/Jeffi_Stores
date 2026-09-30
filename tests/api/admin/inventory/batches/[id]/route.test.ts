@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('@/lib/catalog/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
 
-import { DELETE } from '@/app/api/admin/inventory/batches/[id]/route'
+import { DELETE } from '@/app/api/(admin)/admin/inventory/batches/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'

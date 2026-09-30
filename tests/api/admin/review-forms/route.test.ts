@@ -21,7 +21,7 @@ vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 2 }),
 }))
 
-import { GET, POST } from '@/app/api/admin/review-forms/route'
+import { GET, POST } from '@/app/api/(admin)/admin/review-forms/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryCount } from '@/lib/shared/db'

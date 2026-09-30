@@ -17,8 +17,8 @@ vi.mock('@/lib/shared/db', () => ({
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
-import { GET, POST, PATCH } from '@/app/api/admin/homepage-sections/route'
-import { PATCH as PATCH_ONE, DELETE } from '@/app/api/admin/homepage-sections/[id]/route'
+import { GET, POST, PATCH } from '@/app/api/(admin)/admin/homepage-sections/route'
+import { PATCH as PATCH_ONE, DELETE } from '@/app/api/(admin)/admin/homepage-sections/[id]/route'
 
 const ADMIN_ID = '11111111-1111-4111-8111-111111111111'
 const admin = { adminId: ADMIN_ID, role: 'super_admin', scopes: [] }

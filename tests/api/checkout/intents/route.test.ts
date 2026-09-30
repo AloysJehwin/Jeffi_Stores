@@ -46,7 +46,7 @@ vi.mock('@/lib/orders/checkout-intent', () => ({
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
-import { POST } from '@/app/api/checkout/intents/route'
+import { POST } from '@/app/api/(public)/checkout/intents/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { resolveBuyNowItem, loadActiveCart } from '@/lib/orders/order-commit'
 import { signIntent } from '@/lib/orders/checkout-intent'

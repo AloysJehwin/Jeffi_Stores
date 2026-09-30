@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/icon-suggest', () => ({
   suggestIcon: vi.fn(),
 }))
 
-import { POST } from '@/app/api/admin/categories/suggest-icon/route'
+import { POST } from '@/app/api/(admin)/admin/categories/suggest-icon/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { suggestIcon } from '@/lib/shared/icon-suggest'

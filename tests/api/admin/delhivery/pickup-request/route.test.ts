@@ -17,7 +17,7 @@ vi.stubGlobal('fetch', mockFetch)
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, PATCH, POST } from '@/app/api/admin/delhivery/pickup-request/route'
+import { GET, PATCH, POST } from '@/app/api/(admin)/admin/delhivery/pickup-request/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne } from '@/lib/shared/db'

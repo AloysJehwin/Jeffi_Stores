@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { PATCH } from '@/app/api/admin/cron/config/route'
+import { PATCH } from '@/app/api/(admin)/admin/cron/config/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { withTransaction } from '@/lib/shared/db'

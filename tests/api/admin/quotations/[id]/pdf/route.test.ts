@@ -23,7 +23,7 @@ vi.mock('@/lib/documents/quotation-pdf', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/quotations/[id]/pdf/route'
+import { GET } from '@/app/api/(admin)/admin/quotations/[id]/pdf/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

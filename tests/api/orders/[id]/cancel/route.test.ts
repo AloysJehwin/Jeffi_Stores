@@ -7,7 +7,7 @@ vi.mock('@/lib/orders/orders', () => ({
   cancelOrder: vi.fn(),
 }))
 
-import { POST } from '@/app/api/orders/[id]/cancel/route'
+import { POST } from '@/app/api/(public)/orders/[id]/cancel/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as orders from '@/lib/orders/orders'
 

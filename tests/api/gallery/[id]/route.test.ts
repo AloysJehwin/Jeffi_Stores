@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/s3', () => ({
   uploadGalleryImage: vi.fn(),
 }))
 
-import { DELETE } from '@/app/api/gallery/[id]/route'
+import { DELETE } from '@/app/api/(public)/gallery/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryOne, query } from '@/lib/shared/db'
 import { deleteGalleryImage } from '@/lib/shared/s3'

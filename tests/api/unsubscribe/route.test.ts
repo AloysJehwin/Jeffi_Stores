@@ -6,7 +6,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/unsubscribe/route'
+import { GET, POST } from '@/app/api/(public)/unsubscribe/route'
 import * as db from '@/lib/shared/db'
 
 function makeGet(search = '') {

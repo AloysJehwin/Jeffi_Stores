@@ -16,7 +16,7 @@ import glob from 'fast-glob'
  */
 const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Auth / self-service: the member is proving who they are or acting on themselves.
-  'src/app/admin/login/page.tsx',
+  'src/app/(admin)/admin/login/page.tsx',
   'src/components/admin/AdminSessionController.tsx',
   'src/components/admin/AccessDenied.tsx',
   'src/components/admin/TwoFactorCard.tsx',
@@ -28,32 +28,32 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/components/admin/ecom/tabs/KycActionButtons.tsx',
   'src/components/admin/ecom/TenantActions.tsx',
   'src/components/admin/ecom/PurgeCustomerButton.tsx',
-  'src/app/admin/ecom/billing/[id]/AccountModeToggle.tsx',
-  'src/app/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
+  'src/app/(admin)/admin/ecom/billing/[id]/AccountModeToggle.tsx',
+  'src/app/(admin)/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
-  'src/app/admin/ecom/billing/[id]/DnsResyncButton.tsx',
-  'src/app/admin/ecom/billing/[id]/ReconcileButton.tsx',
+  'src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
+  'src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
   'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',
   'src/components/admin/AdminUserActions.tsx',
   'src/components/admin/ServiceAccountRevokeButton.tsx',
-  'src/app/admin/service-accounts/add/page.tsx',
+  'src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
-  'src/app/admin/audit/AdminAuditClient.tsx',
+  'src/app/(admin)/admin/audit/AdminAuditClient.tsx',
   // Dashboard shell: its only POST is a fire-and-forget payout reconciliation on mount,
   // not a user action. Each mutating tab (receivables/payables/cod) gates on financial:write.
-  'src/app/admin/financial/FinancialClient.tsx',
+  'src/app/(admin)/admin/financial/FinancialClient.tsx',
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
-  'src/app/admin/products/ProductsTableClient.tsx',
-  'src/app/admin/invoices/InvoicesClient.tsx',
-  'src/app/admin/quotations/QuotationsClient.tsx',
+  'src/app/(admin)/admin/products/ProductsTableClient.tsx',
+  'src/app/(admin)/admin/invoices/InvoicesClient.tsx',
+  'src/app/(admin)/admin/quotations/QuotationsClient.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
-  'src/app/admin/packing-slips/PackingSlipsClient.tsx',
-  'src/app/admin/labels/LabelsClient.tsx',
+  'src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
+  'src/app/(admin)/admin/labels/LabelsClient.tsx',
   'src/components/admin/BatchSerialLabelPicker.tsx',
-  'src/app/admin/products/_components/ProductLabelModal.tsx',
+  'src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
   'src/components/admin/BatchPickerModal.tsx',
@@ -64,7 +64,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
 ])
 
 function mutatingClientComponents(): string[] {
-  const files = glob.sync(['src/app/admin/**/*.tsx', 'src/components/admin/**/*.tsx'], { cwd: process.cwd() })
+  const files = glob.sync(['src/app/\\(admin\\)/admin/**/*.tsx', 'src/components/admin/**/*.tsx'], {
+    cwd: process.cwd(),
+  })
   const out: string[] = []
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')

@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/google-sheets', () => ({ syncAllProductsToSheet: vi.fn() }))
 
-import { POST } from '@/app/api/admin/merchant/sheet-sync/route'
+import { POST } from '@/app/api/(admin)/admin/merchant/sheet-sync/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { syncAllProductsToSheet } from '@/lib/shared/google-sheets'

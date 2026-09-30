@@ -16,7 +16,7 @@ vi.mock('@/lib/merchant/sync', () => ({
   sendSyncFailureEmail: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/merchant/status/route'
+import { GET } from '@/app/api/(admin)/admin/merchant/status/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getLastSyncStatus } from '@/lib/merchant/sync'

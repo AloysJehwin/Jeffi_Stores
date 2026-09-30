@@ -10,7 +10,7 @@ vi.mock('@/lib/documents/po-pdf', () => ({
   generatePurchaseOrderPDF: vi.fn(),
 }))
 
-import { GET } from '@/app/api/public/purchaseorder/[token]/pdf/route'
+import { GET } from '@/app/api/(public)/public/purchaseorder/[token]/pdf/route'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { generatePurchaseOrderPDF } from '@/lib/documents/po-pdf'
 

@@ -9,7 +9,7 @@ vi.mock('@/lib/shared/template-vars', () => ({
   substituteVars: vi.fn(),
 }))
 
-import { POST } from '@/app/api/admin/mailer/preview/route'
+import { POST } from '@/app/api/(admin)/admin/mailer/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'

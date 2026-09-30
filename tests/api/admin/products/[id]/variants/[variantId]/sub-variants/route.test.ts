@@ -31,7 +31,7 @@ vi.mock('@/lib/shared/validate', () => {
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST, PUT, DELETE } from '@/app/api/admin/products/[id]/variants/[variantId]/sub-variants/route'
+import { GET, POST, PUT, DELETE } from '@/app/api/(admin)/admin/products/[id]/variants/[variantId]/sub-variants/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'

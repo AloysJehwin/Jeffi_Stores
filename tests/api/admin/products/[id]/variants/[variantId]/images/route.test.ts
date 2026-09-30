@@ -23,7 +23,7 @@ vi.mock('@/lib/shared/s3', () => ({
   currentBucket: vi.fn().mockResolvedValue('jeffi-stores-bucket'),
 }))
 
-import { GET, POST, DELETE, PATCH } from '@/app/api/admin/products/[id]/variants/[variantId]/images/route'
+import { GET, POST, DELETE, PATCH } from '@/app/api/(admin)/admin/products/[id]/variants/[variantId]/images/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, query } from '@/lib/shared/db'

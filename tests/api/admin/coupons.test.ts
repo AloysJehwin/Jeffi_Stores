@@ -44,8 +44,8 @@ vi.mock('@/lib/shared/validate', () => {
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as couponsGET, POST as couponsPOST } from '@/app/api/admin/coupons/route'
-import { PATCH as couponPATCH, DELETE as couponDELETE } from '@/app/api/admin/coupons/[id]/route'
+import { GET as couponsGET, POST as couponsPOST } from '@/app/api/(admin)/admin/coupons/route'
+import { PATCH as couponPATCH, DELETE as couponDELETE } from '@/app/api/(admin)/admin/coupons/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query, queryCount } from '@/lib/shared/db'

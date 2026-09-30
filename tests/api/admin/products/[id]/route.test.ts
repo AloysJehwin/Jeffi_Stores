@@ -34,7 +34,7 @@ vi.mock('next/cache', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, PATCH } from '@/app/api/admin/products/[id]/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/products/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { query } from '@/lib/shared/db'
 import { getProduct } from '@/lib/queries'

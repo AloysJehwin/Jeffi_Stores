@@ -5,8 +5,8 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn() }))
 
-import { GET as getDownload } from '@/app/api/admin/service-accounts/[id]/download/route'
-import { GET as getSA, DELETE as deleteSA } from '@/app/api/admin/service-accounts/[id]/route'
+import { GET as getDownload } from '@/app/api/(admin)/admin/service-accounts/[id]/download/route'
+import { GET as getSA, DELETE as deleteSA } from '@/app/api/(admin)/admin/service-accounts/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

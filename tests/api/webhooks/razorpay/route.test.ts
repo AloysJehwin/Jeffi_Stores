@@ -14,7 +14,7 @@ vi.mock('@/lib/email', () => ({
 vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn() }))
 vi.mock('@/lib/shared/marketing', () => ({ attributeConversion: vi.fn() }))
 
-import { POST } from '@/app/api/webhooks/razorpay/route'
+import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import crypto from 'crypto'
 

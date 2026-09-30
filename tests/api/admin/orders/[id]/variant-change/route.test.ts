@@ -13,7 +13,7 @@ vi.mock('@/lib/orders/variant-change', () => ({
   loadVariantPriceRow: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/admin/orders/[id]/variant-change/route'
+import { GET, POST } from '@/app/api/(admin)/admin/orders/[id]/variant-change/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as scopes from '@/lib/auth/scopes'
 import * as db from '@/lib/shared/db'

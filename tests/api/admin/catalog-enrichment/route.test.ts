@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
 
-import { GET } from '@/app/api/admin/catalog-enrichment/route'
+import { GET } from '@/app/api/(admin)/admin/catalog-enrichment/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne } from '@/lib/shared/db'

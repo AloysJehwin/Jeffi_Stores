@@ -6,7 +6,7 @@ vi.mock('https', () => ({
   },
 }))
 
-import { GET } from '@/app/api/pincode/[pin]/route'
+import { GET } from '@/app/api/(public)/pincode/[pin]/route'
 import https from 'https'
 
 const mockHttpsGet = vi.mocked(https.get)

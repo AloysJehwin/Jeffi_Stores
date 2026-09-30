@@ -22,12 +22,12 @@ beforeEach(() => {
 
 describe('GET /api/cron/cancel-stale-orders', () => {
   it('returns 401 with wrong secret', async () => {
-    const { GET } = await import('@/app/api/cron/cancel-stale-orders/route')
+    const { GET } = await import('@/app/api/(internal)/cron/cancel-stale-orders/route')
     expect((await GET(makeReq('wrong-secret'))).status).toBe(401)
   })
 
   it('returns 200 with no stale orders', async () => {
-    const { GET } = await import('@/app/api/cron/cancel-stale-orders/route')
+    const { GET } = await import('@/app/api/(internal)/cron/cancel-stale-orders/route')
     const res = await GET(makeReq())
     expect(res.status).toBe(200)
     expect((await res.json()).cancelled).toBe(0)
@@ -39,7 +39,7 @@ describe('GET /api/cron/cancel-stale-orders', () => {
       { id: 'o2', order_number: 'ORD-002', order_type: 'direct' },
     ])
     mockCancelOrder.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false, reason: 'locked' })
-    const { GET } = await import('@/app/api/cron/cancel-stale-orders/route')
+    const { GET } = await import('@/app/api/(internal)/cron/cancel-stale-orders/route')
     const res = await GET(makeReq())
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -49,7 +49,7 @@ describe('GET /api/cron/cancel-stale-orders', () => {
 
   it('returns 500 on unexpected error', async () => {
     mockQueryMany.mockRejectedValue(new Error('db fail'))
-    const { GET } = await import('@/app/api/cron/cancel-stale-orders/route')
+    const { GET } = await import('@/app/api/(internal)/cron/cancel-stale-orders/route')
     expect((await GET(makeReq())).status).toBe(500)
   })
 })

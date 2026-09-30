@@ -36,7 +36,7 @@ vi.mock('@/lib/shared/activity', () => ({
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
-import { POST } from '@/app/api/coupons/apply/route'
+import { POST } from '@/app/api/(public)/coupons/apply/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 

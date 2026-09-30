@@ -57,7 +57,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
-import { GET, POST, DELETE } from '@/app/api/wishlist/route'
+import { GET, POST, DELETE } from '@/app/api/(public)/wishlist/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 

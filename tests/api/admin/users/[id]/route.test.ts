@@ -27,7 +27,7 @@ vi.mock('@/lib/auth/scopes', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { PATCH, DELETE } from '@/app/api/admin/users/[id]/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/users/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { query, queryOne } from '@/lib/shared/db'
 

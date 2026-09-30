@@ -15,7 +15,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { PATCH } from '@/app/api/admin/categories/[id]/route'
+import { PATCH } from '@/app/api/(admin)/admin/categories/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

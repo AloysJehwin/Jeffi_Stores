@@ -29,7 +29,7 @@ vi.mock('@/lib/catalog/shelf', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, PATCH } from '@/app/api/admin/inventory/stock/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/inventory/stock/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getClient, queryOne, query, queryMany } from '@/lib/shared/db'

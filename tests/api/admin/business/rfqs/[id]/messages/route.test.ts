@@ -19,7 +19,7 @@ vi.mock('@/lib/shared/db', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET, POST } from '@/app/api/admin/business/rfqs/[id]/messages/route'
+import { GET, POST } from '@/app/api/(admin)/admin/business/rfqs/[id]/messages/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
 

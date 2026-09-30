@@ -16,7 +16,7 @@ vi.mock('@/lib/campaigns/scenarios/_registry', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, PATCH, DELETE } from '@/app/api/admin/campaigns/scenarios/[kind]/route'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/campaigns/scenarios/[kind]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'

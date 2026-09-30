@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/auth-sessions', () => ({ sweepExpiredAdminSessions: vi.fn() }))
 
-import { GET } from '@/app/api/cron/sweep-sessions/route'
+import { GET } from '@/app/api/(internal)/cron/sweep-sessions/route'
 import { sweepExpiredAdminSessions } from '@/lib/auth/auth-sessions'
 
 const mockSweep = vi.mocked(sweepExpiredAdminSessions)

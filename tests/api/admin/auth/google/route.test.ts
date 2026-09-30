@@ -19,7 +19,7 @@ vi.mock('@/lib/shared/activity', () => ({ logActivity: mockLogActivity }))
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { POST } from '@/app/api/admin/auth/google/route'
+import { POST } from '@/app/api/(admin)/admin/auth/google/route'
 
 function makePost(body: object, headers: Record<string, string> = {}) {
   return new Request('http://localhost/api/admin/auth/google', {

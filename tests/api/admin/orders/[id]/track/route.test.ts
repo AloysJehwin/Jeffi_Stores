@@ -16,7 +16,7 @@ vi.mock('@/lib/email', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/orders/[id]/track/route'
+import { GET } from '@/app/api/(admin)/admin/orders/[id]/track/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
@@ -151,7 +151,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
     vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany: vi.fn() }))
     vi.mock('@/lib/email', () => ({ sendOrderStatusUpdate: vi.fn() }))
 
-    const { GET: GETFresh } = await import('@/app/api/admin/orders/[id]/track/route')
+    const { GET: GETFresh } = await import('@/app/api/(admin)/admin/orders/[id]/track/route')
     const { authenticateAdmin: authFresh } = await import('@/lib/auth/jwt')
     const { hasScope: scopeFresh } = await import('@/lib/auth/scopes')
     const { queryOne: queryOneFresh } = await import('@/lib/shared/db')

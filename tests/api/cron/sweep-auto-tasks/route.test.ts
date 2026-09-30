@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn() }))
 
-import { GET } from '@/app/api/cron/sweep-auto-tasks/route'
+import { GET } from '@/app/api/(internal)/cron/sweep-auto-tasks/route'
 import { queryMany } from '@/lib/shared/db'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 

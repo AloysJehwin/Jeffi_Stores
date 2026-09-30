@@ -10,7 +10,7 @@ vi.mock('@/lib/shared/s3', () => ({
   uploadAvatarImage: vi.fn(),
 }))
 
-import { POST } from '@/app/api/user/avatar/route'
+import { POST } from '@/app/api/(public)/user/avatar/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as s3 from '@/lib/shared/s3'

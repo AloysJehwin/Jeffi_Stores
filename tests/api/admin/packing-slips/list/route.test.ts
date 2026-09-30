@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/packing-slips/list/route'
+import { GET } from '@/app/api/(admin)/admin/packing-slips/list/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

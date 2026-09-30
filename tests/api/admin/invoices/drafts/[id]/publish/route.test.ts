@@ -12,7 +12,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/invoices/drafts/[id]/publish/route'
+import { POST } from '@/app/api/(admin)/admin/invoices/drafts/[id]/publish/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'

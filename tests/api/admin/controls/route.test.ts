@@ -25,7 +25,7 @@ vi.mock('@/lib/shared/s3', () => ({
   }),
 }))
 
-import { GET, POST } from '@/app/api/admin/controls/route'
+import { GET, POST } from '@/app/api/(admin)/admin/controls/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query, withTransaction } from '@/lib/shared/db'

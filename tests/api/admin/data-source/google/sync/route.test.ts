@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/google-sheets', async () => {
   return { ...actual, listSheetTitles: vi.fn(), readSheetValues: vi.fn(), readSheetValuesBatch: vi.fn() }
 })
 
-import { POST } from '@/app/api/admin/data-source/google/sync/route'
+import { POST } from '@/app/api/(admin)/admin/data-source/google/sync/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { listSheetTitles, readSheetValues, readSheetValuesBatch } from '@/lib/shared/google-sheets'
 import { enqueueImportJob } from '@/lib/import/jobs'

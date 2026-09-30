@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 
-import { POST } from '@/app/api/admin/returns/[id]/valuate/route'
+import { POST } from '@/app/api/(admin)/admin/returns/[id]/valuate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'

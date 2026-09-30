@@ -10,7 +10,7 @@ vi.mock('@/lib/documents/quotation-pdf', () => ({
   generateQuotationPDF: vi.fn(),
 }))
 
-import { GET } from '@/app/api/public/quotation/[token]/pdf/route'
+import { GET } from '@/app/api/(public)/public/quotation/[token]/pdf/route'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { generateQuotationPDF } from '@/lib/documents/quotation-pdf'
 

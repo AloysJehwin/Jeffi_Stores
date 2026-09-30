@@ -63,7 +63,7 @@ vi.mock('@/lib/shared/ecom-emails', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/ecom/kyc/[tenantId]/approve/route'
+import { POST } from '@/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import {
   approveKyc,

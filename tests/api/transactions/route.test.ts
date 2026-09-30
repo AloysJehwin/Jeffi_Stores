@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryCount: vi.fn(),
 }))
 
-import { GET } from '@/app/api/transactions/route'
+import { GET } from '@/app/api/(public)/transactions/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

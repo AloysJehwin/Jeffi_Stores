@@ -36,8 +36,8 @@ vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn(),
 }))
 
-import { GET as poRouteGET, POST as poRoutePOST } from '@/app/api/admin/inventory/po/route'
-import { GET, PATCH } from '@/app/api/admin/inventory/po/[id]/route'
+import { GET as poRouteGET, POST as poRoutePOST } from '@/app/api/(admin)/admin/inventory/po/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/inventory/po/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'

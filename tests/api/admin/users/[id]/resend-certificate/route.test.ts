@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendAdminCertificateEmail: vi.fn() }))
 
-import { POST } from '@/app/api/admin/users/[id]/resend-certificate/route'
+import { POST } from '@/app/api/(admin)/admin/users/[id]/resend-certificate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 import { sendAdminCertificateEmail } from '@/lib/email'

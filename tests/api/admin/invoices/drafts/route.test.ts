@@ -26,7 +26,7 @@ vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn().mockReturnValue(100),
 }))
 
-import { GET, POST } from '@/app/api/admin/invoices/drafts/route'
+import { GET, POST } from '@/app/api/(admin)/admin/invoices/drafts/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, withTransaction } from '@/lib/shared/db'

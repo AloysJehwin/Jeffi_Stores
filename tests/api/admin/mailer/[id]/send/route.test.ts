@@ -22,7 +22,7 @@ vi.mock('@/lib/shared/email-campaigns', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/mailer/[id]/send/route'
+import { POST } from '@/app/api/(admin)/admin/mailer/[id]/send/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

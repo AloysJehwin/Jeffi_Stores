@@ -9,7 +9,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-import { GET, POST, DELETE } from '@/app/api/user/search-history/route'
+import { GET, POST, DELETE } from '@/app/api/(public)/user/search-history/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

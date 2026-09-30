@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/auth/jwt', () => ({ verifyReviewToken: vi.fn() }))
 
-import { OPTIONS, POST } from '@/app/api/reviews/amp/route'
+import { OPTIONS, POST } from '@/app/api/(public)/reviews/amp/route'
 import { verifyReviewToken } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
 

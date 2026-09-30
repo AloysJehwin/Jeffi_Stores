@@ -15,7 +15,7 @@ vi.mock('@/lib/catalog/pricing', () => ({ lineItemExGst: vi.fn().mockReturnValue
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, PATCH, DELETE } from '@/app/api/admin/quotations/[id]/route'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/quotations/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne } from '@/lib/shared/db'

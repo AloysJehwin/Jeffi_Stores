@@ -11,7 +11,7 @@ vi.mock('nodemailer', () => ({
   default: { createTransport: vi.fn().mockReturnValue({ sendMail: vi.fn() }) },
 }))
 
-import { POST } from '@/app/api/forms/[slug]/submit/route'
+import { POST } from '@/app/api/(public)/forms/[slug]/submit/route'
 import { queryOne, withTransaction } from '@/lib/shared/db'
 import { uploadGalleryImage } from '@/lib/shared/s3'
 

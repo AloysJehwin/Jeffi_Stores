@@ -4,7 +4,7 @@ vi.mock('@/lib/orders/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
 }))
 
-import { POST } from '@/app/api/products/[id]/buy-now-quote/route'
+import { POST } from '@/app/api/(public)/products/[id]/buy-now-quote/route'
 import { resolveBuyNowItem } from '@/lib/orders/order-commit'
 
 const mockResolve = vi.mocked(resolveBuyNowItem)

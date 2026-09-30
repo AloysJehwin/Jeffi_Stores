@@ -10,7 +10,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ---------------------------------------------------------------------------
 
-import { GET } from '@/app/api/store-settings/route'
+import { GET } from '@/app/api/(public)/store-settings/route'
 import { queryOne } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)

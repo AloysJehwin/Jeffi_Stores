@@ -13,7 +13,7 @@ vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: vi.fn(),
 }))
 
-import { POST } from '@/app/api/ai-assistant/feedback/route'
+import { POST } from '@/app/api/(public)/ai-assistant/feedback/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query } from '@/lib/shared/db'
 

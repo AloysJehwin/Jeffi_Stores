@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/auth-sessions', () => ({ touchSession: vi.fn() }))
 
-import { POST } from '@/app/api/admin/session/heartbeat/route'
+import { POST } from '@/app/api/(admin)/admin/session/heartbeat/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { touchSession } from '@/lib/auth/auth-sessions'
 

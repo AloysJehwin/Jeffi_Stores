@@ -12,7 +12,7 @@ vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/business/customers/[id]/route'
+import { GET } from '@/app/api/(admin)/admin/business/customers/[id]/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, queryMany } from '@/lib/shared/db'
 

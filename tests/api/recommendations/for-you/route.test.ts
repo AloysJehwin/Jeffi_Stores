@@ -12,7 +12,7 @@ vi.mock('@/lib/catalog/recommendations', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/recommendations/for-you/route'
+import { GET } from '@/app/api/(public)/recommendations/for-you/route'
 import { query } from '@/lib/shared/db'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { getFeaturedForUser, getBestSellerCards } from '@/lib/catalog/recommendations'

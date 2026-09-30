@@ -16,7 +16,7 @@ vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { PATCH, DELETE } from '@/app/api/admin/products/[id]/variants/[variantId]/units/[unitId]/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/products/[id]/variants/[variantId]/units/[unitId]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction, query as dbQuery } from '@/lib/shared/db'

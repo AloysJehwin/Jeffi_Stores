@@ -23,7 +23,7 @@ vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { GET, POST } from '@/app/api/admin/customers/[id]/whatsapp/route'
+import { GET, POST } from '@/app/api/(admin)/admin/customers/[id]/whatsapp/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

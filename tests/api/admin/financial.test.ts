@@ -27,8 +27,8 @@ vi.mock('@/lib/catalog/gst', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as plGET } from '@/app/api/admin/financial/pl/route'
-import { GET as receivablesGET } from '@/app/api/admin/financial/receivables/route'
+import { GET as plGET } from '@/app/api/(admin)/admin/financial/pl/route'
+import { GET as receivablesGET } from '@/app/api/(admin)/admin/financial/receivables/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getPLReport, getReceivablesAging } from '@/lib/payments/financial'

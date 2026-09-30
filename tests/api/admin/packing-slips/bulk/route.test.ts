@@ -22,7 +22,7 @@ vi.mock('@/lib/documents/packing-slip-pdf', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/packing-slips/bulk/route'
+import { POST } from '@/app/api/(admin)/admin/packing-slips/bulk/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

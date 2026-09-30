@@ -23,7 +23,7 @@ vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { POST } from '@/app/api/admin/catalog-enrichment/run-all/route'
+import { POST } from '@/app/api/(admin)/admin/catalog-enrichment/run-all/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { aiChat } from '@/lib/shared/ai-client'

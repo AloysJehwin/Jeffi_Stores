@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/customer-conversations', async () => {
   return { ...actual, listConversations: vi.fn() }
 })
 
-import { GET } from '@/app/api/admin/customers/[id]/conversations/route'
+import { GET } from '@/app/api/(admin)/admin/customers/[id]/conversations/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { listConversations } from '@/lib/shared/customer-conversations'

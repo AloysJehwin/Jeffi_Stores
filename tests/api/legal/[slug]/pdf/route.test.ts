@@ -7,7 +7,7 @@ vi.mock('@/lib/documents/policy-pdf', () => ({
   generatePolicyPDF: vi.fn(),
 }))
 
-import { GET } from '@/app/api/legal/[slug]/pdf/route'
+import { GET } from '@/app/api/(public)/legal/[slug]/pdf/route'
 import { getPolicyBySlug } from '@/lib/legals/policies'
 import { generatePolicyPDF } from '@/lib/documents/policy-pdf'
 

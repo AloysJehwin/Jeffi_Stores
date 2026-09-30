@@ -29,7 +29,7 @@ vi.mock('@/lib/shared/email-business', () => ({
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/business/rfqs/[id]/convert-to-quotation/route'
+import { POST } from '@/app/api/(admin)/admin/business/rfqs/[id]/convert-to-quotation/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
 import { sendRfqConvertedToQuotationEmail } from '@/lib/shared/email-business'

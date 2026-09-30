@@ -17,7 +17,7 @@ vi.mock('@/lib/queries', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/customers/route'
+import { GET } from '@/app/api/(admin)/admin/customers/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCustomers } from '@/lib/queries'

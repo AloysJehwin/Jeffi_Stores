@@ -21,7 +21,7 @@ vi.mock('@/lib/shared/s3', () => ({
   fetchRemoteImage: vi.fn(),
 }))
 
-import { POST, OPTIONS } from '@/app/api/gallery/upload/route'
+import { POST, OPTIONS } from '@/app/api/(public)/gallery/upload/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { uploadGalleryImage, fetchRemoteImage } from '@/lib/shared/s3'

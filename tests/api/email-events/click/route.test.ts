@@ -7,7 +7,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { GET } from '@/app/api/email-events/click/route'
+import { GET } from '@/app/api/(public)/email-events/click/route'
 import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)

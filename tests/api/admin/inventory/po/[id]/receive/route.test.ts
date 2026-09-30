@@ -34,7 +34,7 @@ vi.mock('@/lib/shared/validate', async () => {
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/inventory/po/[id]/receive/route'
+import { POST } from '@/app/api/(admin)/admin/inventory/po/[id]/receive/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/shared/db'

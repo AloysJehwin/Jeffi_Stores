@@ -10,7 +10,7 @@ import path from 'path'
  * too, or fireRouteTransfer takes the no-linked-account branch, records the gross with no split,
  * and never moves the seller's money. This is the exact bug that left an ₹11.80 order unsplit.
  */
-const TRANSFER_ROUTES = ['src/app/api/razorpay/verify/route.ts', 'src/app/api/webhooks/razorpay/route.ts']
+const TRANSFER_ROUTES = ['src/app/api/(public)/razorpay/verify/route.ts', 'src/app/api/(public)/webhooks/razorpay/route.ts']
 
 function fireRouteTransferQuery(file: string): string {
   const src = fs.readFileSync(path.join(process.cwd(), file), 'utf8')

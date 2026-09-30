@@ -43,7 +43,7 @@ vi.mock('@/lib/shared/validate', () => {
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET, POST } from '@/app/api/admin/campaigns/route'
+import { GET, POST } from '@/app/api/(admin)/admin/campaigns/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query } from '@/lib/shared/db'

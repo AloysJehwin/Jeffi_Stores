@@ -23,7 +23,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { GET } from '@/app/api/support/bot/route'
+import { GET } from '@/app/api/(public)/support/bot/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makeRequest(msg: string, headers: Record<string, string> = {}) {

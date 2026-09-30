@@ -21,7 +21,7 @@ vi.mock('@/lib/documents/label-pdf', () => ({
   generateSerialLabelPDF: vi.fn().mockResolvedValue(Buffer.from('serial-pdf')),
 }))
 
-import { POST } from '@/app/api/admin/labels/batch/route'
+import { POST } from '@/app/api/(admin)/admin/labels/batch/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

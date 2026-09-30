@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
 vi.mock('@/lib/documents/invoice', () => ({ generateOrderInvoice: vi.fn().mockResolvedValue(null) }))
 
-import { GET, POST } from '@/app/api/admin/financial/cod-remittance/route'
+import { GET, POST } from '@/app/api/(admin)/admin/financial/cod-remittance/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryMany, query } from '@/lib/shared/db'
 

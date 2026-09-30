@@ -11,7 +11,7 @@ vi.mock('https', () => {
 })
 
 import https from 'https'
-import { GET } from '@/app/api/delivery-check/route'
+import { GET } from '@/app/api/(public)/delivery-check/route'
 
 function makeReq(pincode?: string) {
   const url = new URL('http://localhost/api/delivery-check')

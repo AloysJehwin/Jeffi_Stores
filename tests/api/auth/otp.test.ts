@@ -28,8 +28,8 @@ vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
-import { POST as sendOtpPOST } from '@/app/api/auth/send-otp/route'
-import { POST as verifyOtpPOST } from '@/app/api/auth/verify-otp/route'
+import { POST as sendOtpPOST } from '@/app/api/(public)/auth/send-otp/route'
+import { POST as verifyOtpPOST } from '@/app/api/(public)/auth/verify-otp/route'
 import * as otpLib from '@/lib/auth/otp'
 import * as db from '@/lib/shared/db'
 import * as emailLib from '@/lib/email'

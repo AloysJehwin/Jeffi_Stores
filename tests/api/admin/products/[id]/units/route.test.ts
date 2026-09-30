@@ -16,7 +16,7 @@ vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/admin/products/[id]/units/route'
+import { GET, POST } from '@/app/api/(admin)/admin/products/[id]/units/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction, query as dbQuery } from '@/lib/shared/db'

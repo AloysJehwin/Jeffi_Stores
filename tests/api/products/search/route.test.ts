@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/rag', () => ({
 }))
 vi.mock('@/lib/shared/storefront-ai', () => ({ storefrontAiAllowed: vi.fn() }))
 
-import { GET } from '@/app/api/products/search/route'
+import { GET } from '@/app/api/(public)/products/search/route'
 import { queryMany } from '@/lib/shared/db'
 import { embed, runWithHnswTuning } from '@/lib/shared/rag'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'

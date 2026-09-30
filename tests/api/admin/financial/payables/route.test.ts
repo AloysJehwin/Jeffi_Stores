@@ -15,7 +15,7 @@ vi.mock('@/lib/payments/financial', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/financial/payables/route'
+import { GET, POST } from '@/app/api/(admin)/admin/financial/payables/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

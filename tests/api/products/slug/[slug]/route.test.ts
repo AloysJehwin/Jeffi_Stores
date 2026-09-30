@@ -30,7 +30,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 
 // ── import handler AFTER mocks ───────────────────────────────────────────────
-import { GET } from '@/app/api/products/slug/[slug]/route'
+import { GET } from '@/app/api/(public)/products/slug/[slug]/route'
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 const fullProduct = {

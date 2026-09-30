@@ -26,7 +26,7 @@ vi.mock('@/lib/documents/invoice', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/invoices/drafts/[id]/finalize/route'
+import { POST } from '@/app/api/(admin)/admin/invoices/drafts/[id]/finalize/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'

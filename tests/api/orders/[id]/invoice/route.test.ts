@@ -26,7 +26,7 @@ vi.mock('@/lib/documents/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('invoice-data')),
 }))
 
-import { GET, POST } from '@/app/api/orders/[id]/invoice/route'
+import { GET, POST } from '@/app/api/(public)/orders/[id]/invoice/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as invoicePdf from '@/lib/documents/invoice-pdf'

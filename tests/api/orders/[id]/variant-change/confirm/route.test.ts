@@ -21,7 +21,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 vi.mock('@/lib/orders/variant-change', () => ({ applyVariantChange: vi.fn() }))
 vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 
-import { POST } from '@/app/api/orders/[id]/variant-change/confirm/route'
+import { POST } from '@/app/api/(public)/orders/[id]/variant-change/confirm/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

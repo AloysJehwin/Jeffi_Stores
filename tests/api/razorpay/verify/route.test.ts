@@ -60,7 +60,7 @@ vi.mock('@/lib/orders/variant-change', () => ({
   settleVariantChangePayment: vi.fn(),
 }))
 
-import { POST } from '@/app/api/razorpay/verify/route'
+import { POST } from '@/app/api/(public)/razorpay/verify/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as orderCommit from '@/lib/orders/order-commit'

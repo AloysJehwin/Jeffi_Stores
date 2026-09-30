@@ -15,7 +15,7 @@ vi.mock('@/lib/shared/auto-tasks', () => ({
   completeAutoTask: vi.fn(),
 }))
 
-import { GET } from '@/app/api/cron/compute-health/route'
+import { GET } from '@/app/api/(internal)/cron/compute-health/route'
 import { queryMany } from '@/lib/shared/db'
 import { recomputeHealth, getHealth } from '@/lib/shared/customer-health'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'

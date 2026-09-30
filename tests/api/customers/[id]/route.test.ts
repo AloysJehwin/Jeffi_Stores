@@ -20,7 +20,7 @@ vi.mock('@/lib/shared/auto-tasks', () => ({
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { GET, PATCH } from '@/app/api/customers/[id]/route'
+import { GET, PATCH } from '@/app/api/(public)/customers/[id]/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'

@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/validate', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/shelving/locations/route'
+import { GET, POST } from '@/app/api/(admin)/admin/shelving/locations/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { listLocations, createLocation } from '@/lib/catalog/shelf'

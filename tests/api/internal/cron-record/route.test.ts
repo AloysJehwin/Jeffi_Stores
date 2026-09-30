@@ -7,7 +7,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { POST } from '@/app/api/internal/cron-record/route'
+import { POST } from '@/app/api/(internal)/internal/cron-record/route'
 import { query, queryOne } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)

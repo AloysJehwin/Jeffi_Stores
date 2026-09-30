@@ -9,7 +9,7 @@ const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.
 vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
 
 import { NextResponse } from 'next/server'
-import { GET } from '@/app/api/admin/audit/message-log/route'
+import { GET } from '@/app/api/(admin)/admin/audit/message-log/route'
 import { queryMany, queryCount } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)

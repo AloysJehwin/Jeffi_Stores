@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/crm-insights', () => ({
   getCrmInsights: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/crm/insights/route'
+import { GET } from '@/app/api/(admin)/admin/crm/insights/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCrmInsights } from '@/lib/shared/crm-insights'

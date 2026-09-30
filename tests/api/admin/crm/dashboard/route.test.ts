@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/admin-crm', () => ({
   getCrmDashboardData: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/crm/dashboard/route'
+import { GET } from '@/app/api/(admin)/admin/crm/dashboard/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCrmDashboardData } from '@/lib/shared/admin-crm'

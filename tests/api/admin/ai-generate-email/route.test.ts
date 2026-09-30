@@ -13,7 +13,7 @@ vi.mock('@/lib/catalog/brand', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/ai-generate-email/route'
+import { POST } from '@/app/api/(admin)/admin/ai-generate-email/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { aiChat } from '@/lib/shared/ai-client'

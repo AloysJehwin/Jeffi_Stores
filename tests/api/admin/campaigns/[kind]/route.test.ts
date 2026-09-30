@@ -16,7 +16,7 @@ vi.mock('@/lib/campaigns/template-validation', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, PATCH } from '@/app/api/admin/campaigns/[kind]/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/campaigns/[kind]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'

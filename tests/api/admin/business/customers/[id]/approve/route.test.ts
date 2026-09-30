@@ -19,7 +19,7 @@ vi.mock('@/lib/shared/email-business', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/business/customers/[id]/approve/route'
+import { POST } from '@/app/api/(admin)/admin/business/customers/[id]/approve/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { query, queryOne } from '@/lib/shared/db'
 import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/shared/email-business'

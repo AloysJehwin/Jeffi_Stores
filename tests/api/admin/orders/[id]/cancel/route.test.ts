@@ -15,7 +15,7 @@ vi.mock('@/lib/orders/order-stock', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/cancel/route'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/cancel/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

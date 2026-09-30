@@ -62,7 +62,7 @@ vi.mock('@/lib/admin-agent/tools', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/agent/chat/route'
+import { POST } from '@/app/api/(admin)/admin/agent/chat/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'

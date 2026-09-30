@@ -26,7 +26,7 @@ vi.mock('@/lib/documents/brochure-pdf', () => ({
   }),
 }))
 
-import { POST } from '@/app/api/admin/brochure/route'
+import { POST } from '@/app/api/(admin)/admin/brochure/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getBrochureProductsByIds } from '@/lib/queries'

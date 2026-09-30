@@ -15,7 +15,7 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/campaigns/scenarios/dry-run/route'
+import { POST } from '@/app/api/(admin)/admin/campaigns/scenarios/dry-run/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, getClient } from '@/lib/shared/db'

@@ -45,7 +45,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { POST } from '@/app/api/customer-agent/chat/route'
+import { POST } from '@/app/api/(public)/customer-agent/chat/route'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 import { getCustomerTool } from '@/lib/customer-agent/tools'

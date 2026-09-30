@@ -5,8 +5,8 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { GET as productsGET } from '@/app/api/admin/products/attribute-values/route'
-import { GET as controlsGET } from '@/app/api/admin/controls/attribute-values/route'
+import { GET as productsGET } from '@/app/api/(admin)/admin/products/attribute-values/route'
+import { GET as controlsGET } from '@/app/api/(admin)/admin/controls/attribute-values/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

@@ -14,7 +14,7 @@ vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { GET } from '@/app/api/admin/audit/mail-log/route'
+import { GET } from '@/app/api/(admin)/admin/audit/mail-log/route'
 import { queryMany, queryCount } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
