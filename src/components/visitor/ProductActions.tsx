@@ -313,12 +313,17 @@ export default function ProductActions({
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 
-  const inCart = cartItems.some(
+  // Show View cart when this product is in the cart. Prefer an exact variant +
+  // sub-variant match, but fall back to a product-level match so it still shows
+  // when the selected variant differs from what was added (or none is selected yet).
+  const productInCart = cartItems.some(ci => ci.product_id === productId)
+  const exactInCart = cartItems.some(
     ci =>
       ci.product_id === productId &&
       (ci.variant_id ?? null) === (selectedVariantId ?? null) &&
       (ci.sub_variant_id ?? null) === (selectedSubVariantId ?? null)
   )
+  const inCart = exactInCart || productInCart
   const displaySku = hasVariants && selectedVariant ? selectedSubVariant?.sku || selectedVariant.sku : sku
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
