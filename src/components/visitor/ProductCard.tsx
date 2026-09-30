@@ -58,7 +58,7 @@ export default function ProductCard({
   const router = useRouter()
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
-  const [showQuickView, setShowQuickView] = useState(false)
+  const [quickAddSignal, setQuickAddSignal] = useState(0)
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
@@ -70,21 +70,12 @@ export default function ProductCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
 
-  useEffect(() => {
-    if (!showQuickView) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [showQuickView])
-
   function startLongPress(e: React.TouchEvent) {
     e.preventDefault()
     longPressFired.current = false
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true
-      setShowQuickView(true)
+      setQuickAddSignal(n => n + 1)
     }, 450)
   }
 
@@ -250,6 +241,7 @@ export default function ProductCard({
                   displayPrice={displayPrice}
                   mrp={mrp}
                   discountPct={discountPct ?? mrpDiscount}
+                  openSignal={quickAddSignal}
                 />
                 <div className="hidden sm:flex items-center gap-1.5">
                   <button
@@ -329,91 +321,6 @@ export default function ProductCard({
         </div>
       </Link>
 
-      {/* Mobile quick-view bottom sheet — long-press only, hidden on md+ */}
-      {showQuickView && (
-        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onTouchEnd={e => {
-              e.preventDefault()
-              setShowQuickView(false)
-            }}
-            onTouchMove={e => e.preventDefault()}
-            onClick={() => setShowQuickView(false)}
-          />
-          <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl p-5 pb-8 animate-slide-up">
-            <div className="w-10 h-1 bg-border-default rounded-full mx-auto mb-4" />
-
-            <div className="flex gap-4 mb-4">
-              <div className="w-20 h-20 rounded-xl border border-border-default bg-surface-secondary flex-shrink-0 overflow-hidden">
-                {primaryImage ? (
-                  <img src={primaryImage.image_url} alt={name} className="w-full h-full object-contain p-1" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-foreground-muted"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base text-foreground leading-snug mb-1">{name}</h3>
-                {brandName && <p className="text-xs text-foreground-muted">{brandName}</p>}
-                {categoryName && <p className="text-xs text-foreground-muted">{categoryName}</p>}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {hasVariants ? 'From ' : ''}&#x20B9;
-                {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              {mrp && mrp > Number(displayPrice) && (
-                <>
-                  <span className="text-sm text-foreground-muted line-through">
-                    &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-xs font-semibold bg-accent-500 text-white px-2 py-0.5 rounded-full">
-                    {mrpDiscount}% off
-                  </span>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 mb-5">
-              <span
-                className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full ${
-                  effectiveStock > 0
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${effectiveStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-                {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
-              </span>
-              <span className="text-xs text-foreground-muted">{gstEnabled ? 'Incl. all taxes' : 'Tax-free'}</span>
-            </div>
-
-            <Link
-              href={`/products/${slug}`}
-              onClick={() => setShowQuickView(false)}
-              className="block w-full text-center bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3 rounded-xl transition-colors"
-            >
-              View Full Details
-            </Link>
-          </div>
-        </div>
-      )}
     </>
   )
 }

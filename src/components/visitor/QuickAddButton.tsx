@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCart } from '@/contexts/CartContext'
@@ -19,6 +19,8 @@ interface QuickAddButtonProps {
   displayPrice?: number
   mrp?: number | null
   discountPct?: number
+  // Increment to open the picker from outside (e.g. a card long-press). 0 = no external open.
+  openSignal?: number
 }
 
 const MAX_QTY = 10
@@ -35,6 +37,7 @@ export default function QuickAddButton({
   displayPrice,
   mrp,
   discountPct,
+  openSignal = 0,
 }: QuickAddButtonProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -43,7 +46,10 @@ export default function QuickAddButton({
   const [open, setOpen] = useState(false)
   const [qty, setQty] = useState(1)
   const [adding, setAdding] = useState(false)
-  const wrapRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (openSignal > 0 && inStock) setOpen(true)
+  }, [openSignal, inStock])
 
   const stop = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -78,16 +84,13 @@ export default function QuickAddButton({
 
   useEffect(() => {
     if (!open) return
-    const onDown = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
+    // The picker renders in a portal with its own backdrop that closes on click.
+    // An outside-click check would misfire for clicks inside that portal, so only Escape closes here.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('pointerdown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('pointerdown', onDown)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
@@ -118,7 +121,7 @@ export default function QuickAddButton({
   const label = hasVariants ? `Choose options for ${productName}` : `Quick add ${productName} to cart`
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div className="relative">
       <button
         type="button"
         onClick={onButtonClick}
