@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
+import QuantityInput from '@/components/shared/QuantityInput'
 
 interface VariantImage {
   id: string
@@ -123,6 +124,7 @@ export default function QuickAddPicker({
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
+  const [quantityRaw, setQuantityRaw] = useState('1')
 
   useEffect(() => {
     let cancelled = false
@@ -232,7 +234,8 @@ export default function QuickAddPicker({
 
   useEffect(() => {
     setQuantity(qtyMin)
-  }, [selectedVariantId, effectiveUnitKey, qtyMin])
+    setQuantityRaw(isContinuous ? Number(qtyMin.toFixed(6)).toString() : String(qtyMin))
+  }, [selectedVariantId, effectiveUnitKey, qtyMin, isContinuous])
 
   useEffect(() => {
     const subs = selectedVariant?.sub_variants ?? []
@@ -248,23 +251,11 @@ export default function QuickAddPicker({
     }
   }, [selectedVariantId])
 
-  const dec = useCallback(
-    (e: React.MouseEvent) => {
-      onStop(e)
-      setQuantity(q => Math.max(qtyMin, round2(q - qtyStep)))
-    },
-    [onStop, qtyMin, qtyStep]
-  )
-  const inc = useCallback(
-    (e: React.MouseEvent) => {
-      onStop(e)
-      setQuantity(q => {
-        const next = round2(q + qtyStep)
-        return qtyMax != null ? Math.min(qtyMax, next) : next
-      })
-    },
-    [onStop, qtyMax, qtyStep]
-  )
+  const selectedInStock =
+    (selectedSubVariantId
+      ? subVariants.find(s => s.id === selectedSubVariantId)?.stock_status
+      : selectedVariant?.stock_status) !== 'Out of Stock'
+  const pickerStock = selectedInStock ? Number.MAX_SAFE_INTEGER : 0
 
   const onConfirm = useCallback(async () => {
     if (adding) return
@@ -303,7 +294,6 @@ export default function QuickAddPicker({
     subVariants.length,
   ])
 
-  const qtyDisplay = isContinuous ? Number(quantity.toFixed(6)).toString() : String(quantity)
 
   const body = (
     <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto" onClick={onStop}>
@@ -458,34 +448,21 @@ export default function QuickAddPicker({
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">
-              Quantity
-              {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
-                <>
-                  {' '}
-                  (<UnitLabel label={effectiveUnitLabel} />)
-                </>
-              ) : (
-                ''
-              )}
-            </span>
-            <div className="flex items-center gap-1">
-              <StepButton onClick={dec} disabled={quantity <= qtyMin} label="Decrease quantity">
-                &#8722;
-              </StepButton>
-              <span className="min-w-[3rem] text-center text-sm font-semibold text-foreground tabular-nums">
-                {qtyDisplay}
-              </span>
-              <StepButton
-                onClick={inc}
-                disabled={qtyMax != null && quantity >= qtyMax}
-                label="Increase quantity"
-              >
-                &#43;
-              </StepButton>
-            </div>
-          </div>
+          <QuantityInput
+            dimension={sellUnit?.dimension ?? 'count'}
+            quantity={quantity}
+            quantityRaw={quantityRaw}
+            unitLabel={effectiveUnitLabel}
+            unitKey={effectiveUnitKey}
+            effectiveStock={pickerStock}
+            qtyStep={qtyStep}
+            qtyMin={qtyMin}
+            qtyMax={qtyMax}
+            onChange={(qty, raw) => {
+              setQuantity(qty)
+              setQuantityRaw(raw)
+            }}
+          />
 
           <button
             type="button"
@@ -528,28 +505,4 @@ export default function QuickAddPicker({
   )
 
   return createPortal(overlay, document.body)
-}
-
-function StepButton({
-  onClick,
-  disabled,
-  label,
-  children,
-}: {
-  onClick: (e: React.MouseEvent) => void
-  disabled: boolean
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className="w-7 h-7 rounded-full border border-border-default bg-surface-secondary text-foreground flex items-center justify-center text-base leading-none disabled:opacity-40 hover:border-accent-400 transition-colors"
-    >
-      {children}
-    </button>
-  )
 }
