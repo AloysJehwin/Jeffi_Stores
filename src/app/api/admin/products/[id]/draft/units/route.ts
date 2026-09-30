@@ -6,7 +6,9 @@ import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // Live base unit at a scope, or null. Used to detect a real base-unit CHANGE so
 // the block only fires when load-bearing fields differ from what stock was recorded under.
@@ -23,9 +25,7 @@ async function liveBaseUnit(productId: string, variantId: string | null, subVari
 }
 
 async function getAllDraftUnits(productId: string): Promise<any[]> {
-  const row = await queryOne<{ units: any[] }>(
-    `SELECT units FROM product_drafts WHERE product_id = $1`, [productId]
-  )
+  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE product_id = $1`, [productId])
   return Array.isArray(row?.units) ? row!.units : []
 }
 
@@ -52,11 +52,17 @@ export async function GET(req: NextRequest, { params }: Params) {
   // Ensure stable ids
   let changed = false
   const all = raw.map((u: any, i: number) => {
-    if (!u.id) { changed = true; return { ...u, id: `draft-unit-${i}` } }
+    if (!u.id) {
+      changed = true
+      return { ...u, id: `draft-unit-${i}` }
+    }
     return u
   })
   if (changed) {
-    await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(all)])
+    await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+      id,
+      JSON.stringify(all),
+    ])
   }
 
   let units = all.filter((u: any) => !u._cleared && scopeMatch(u, variantId, subVariantId))
@@ -76,7 +82,11 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   const base = units.find((u: any) => u.is_base) ?? null
-  return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: (base as any).unit, dimension: (base as any).dimension }] : [] })
+  return NextResponse.json({
+    units,
+    inherited: false,
+    rules: base ? [{ unit: (base as any).unit, dimension: (base as any).dimension }] : [],
+  })
 }
 
 // POST — add a unit for this scope into draft.units JSONB
@@ -101,7 +111,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (live) {
       const reason = await assertUnitChangeAllowed(
         { query },
-        { productId: id, variantId: variantId || null, subVariantId: subVariantId || null, label: live.display_label || live.unit },
+        {
+          productId: id,
+          variantId: variantId || null,
+          subVariantId: subVariantId || null,
+          label: live.display_label || live.unit,
+        },
         changedUnitFields({ factor: body.factor, dimension: body.dimension, qty_step: body.qty_step }, live)
       )
       if (reason) return NextResponse.json({ error: reason, canOverride: true }, { status: 409 })
@@ -122,13 +137,18 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (body.is_base) {
     // Replace existing base unit in this scope
     const idx = all.findIndex((u: any) => u.is_base && scopeMatch(u, variantId, subVariantId))
-    if (idx >= 0) { updated = [...all]; updated[idx] = newUnit }
-    else updated = [...all, newUnit]
+    if (idx >= 0) {
+      updated = [...all]
+      updated[idx] = newUnit
+    } else updated = [...all, newUnit]
   } else {
     updated = [...all, newUnit]
   }
 
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(updated)])
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(updated),
+  ])
   return NextResponse.json({ success: true, unit: newUnit })
 }
 
@@ -145,6 +165,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const all = await getAllDraftUnits(id)
   const updated = all.filter((u: any) => u.id !== unitId)
 
-  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(updated)])
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(updated),
+  ])
   return NextResponse.json({ success: true })
 }

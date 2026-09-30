@@ -24,11 +24,14 @@ export async function GET(request: NextRequest) {
     if (orderId) {
       const user = await authenticateUser(request)
       if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      const reviews = await queryMany(`
+      const reviews = await queryMany(
+        `
         SELECT pr.* FROM product_reviews pr
         JOIN order_items oi ON oi.product_id = pr.product_id
         WHERE oi.order_id = $1 AND pr.user_id = $2
-      `, [orderId, user.userId])
+      `,
+        [orderId, user.userId]
+      )
       return NextResponse.json({ reviews: reviews || [] })
     }
 
@@ -36,7 +39,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
     }
 
-    const reviews = await queryMany(`
+    const reviews = await queryMany(
+      `
       SELECT
         pr.*,
         json_build_object('first_name', u.first_name, 'last_name', u.last_name) AS users
@@ -44,7 +48,9 @@ export async function GET(request: NextRequest) {
       LEFT JOIN users u ON pr.user_id = u.id
       WHERE pr.product_id = $1
       ORDER BY pr.created_at DESC
-    `, [productId])
+    `,
+      [productId]
+    )
 
     return NextResponse.json({ reviews: reviews || [] })
   } catch {
@@ -75,10 +81,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
     }
 
-    const existing = await queryOne(
-      'SELECT id FROM product_reviews WHERE id = $1 AND user_id = $2',
-      [reviewId, user.userId]
-    )
+    const existing = await queryOne('SELECT id FROM product_reviews WHERE id = $1 AND user_id = $2', [
+      reviewId,
+      user.userId,
+    ])
     if (!existing) {
       return NextResponse.json({ error: 'Review not found' }, { status: 404 })
     }
@@ -133,21 +139,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
     }
 
-    const existingReview = await queryOne(
-      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
-      [productId, user.userId]
-    )
+    const existingReview = await queryOne('SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2', [
+      productId,
+      user.userId,
+    ])
 
     if (existingReview) {
       return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
     }
 
-    const hasPurchased = await queryOne(`
+    const hasPurchased = await queryOne(
+      `
       SELECT oi.id FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE oi.product_id = $1 AND o.user_id = $2 AND o.status = 'delivered'
       LIMIT 1
-    `, [productId, user.userId])
+    `,
+      [productId, user.userId]
+    )
 
     const review = await queryOne(
       `INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_verified_purchase, is_approved)
@@ -176,29 +185,23 @@ export async function POST(request: NextRequest) {
         urls.push(url)
         thumbnailUrls.push(thumbnailUrl)
       }
-      await query(
-        'UPDATE product_reviews SET image_urls = $1, image_thumbnail_urls = $2 WHERE id = $3',
-        [urls, thumbnailUrls, review.id]
-      )
+      await query('UPDATE product_reviews SET image_urls = $1, image_thumbnail_urls = $2 WHERE id = $3', [
+        urls,
+        thumbnailUrls,
+        review.id,
+      ])
       review.image_urls = urls
       review.image_thumbnail_urls = thumbnailUrls
     }
 
-    const userDetails = await queryOne(
-      'SELECT first_name, last_name, email FROM users WHERE id = $1',
-      [user.userId]
-    )
+    const userDetails = await queryOne('SELECT first_name, last_name, email FROM users WHERE id = $1', [user.userId])
 
-    const product = await queryOne(
-      'SELECT name, slug FROM products WHERE id = $1',
-      [productId]
-    )
+    const product = await queryOne('SELECT name, slug FROM products WHERE id = $1', [productId])
 
     if (userDetails && product) {
       try {
         await sendNewReviewNotification(review, userDetails, product)
-      } catch {
-      }
+      } catch {}
     }
 
     createAdminNotification({
@@ -227,7 +230,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: 'Review submitted successfully!',
-      review
+      review,
     })
   } catch {
     return NextResponse.json({ error: 'Failed to submit review' }, { status: 500 })

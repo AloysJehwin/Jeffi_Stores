@@ -8,7 +8,11 @@ export const dynamic = 'force-dynamic'
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 
-interface GoogleTokenPayload { sub: string; email: string; email_verified?: boolean }
+interface GoogleTokenPayload {
+  sub: string
+  email: string
+  email_verified?: boolean
+}
 
 async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
   try {
@@ -69,7 +73,9 @@ export async function POST(request: NextRequest) {
 
     // Backfill google_id on first Google login (email already matched an admin).
     if (!admin.google_id) {
-      query(`UPDATE users SET google_id = $1 WHERE id = $2 AND google_id IS NULL`, [payload.sub, admin.user_id]).catch(() => {})
+      query(`UPDATE users SET google_id = $1 WHERE id = $2 AND google_id IS NULL`, [payload.sub, admin.user_id]).catch(
+        () => {}
+      )
     }
 
     const purpose = admin.mfa_enabled ? 'verify' : 'enroll'

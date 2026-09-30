@@ -9,7 +9,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const body = await request.json()
@@ -33,7 +34,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { id } = await params
   const admin = await authenticateAdmin(_request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     await deleteLocation(id)

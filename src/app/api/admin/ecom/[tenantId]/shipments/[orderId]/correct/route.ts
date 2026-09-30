@@ -33,7 +33,10 @@ export async function POST(
   const tenant = await getTenant(tenantId)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
   if (tenant.own_delhivery === true) {
-    return NextResponse.json({ error: 'Own-Delhivery tenants are billed by Delhivery directly; no wallet correction applies.' }, { status: 409 })
+    return NextResponse.json(
+      { error: 'Own-Delhivery tenants are billed by Delhivery directly; no wallet correction applies.' },
+      { status: 409 }
+    )
   }
 
   const parsed = parseBody(Schema, await request.json().catch(() => null))
@@ -64,13 +67,19 @@ export async function POST(
     if (chargedAmount > 0) {
       if (isCorrection) {
         const res = await correctWalletDebitForAwb({
-          tenantId, awb: order.awb_number, orderRef: order.order_number,
-          newAmountInr: chargedAmount, note: walletNote,
+          tenantId,
+          awb: order.awb_number,
+          orderRef: order.order_number,
+          newAmountInr: chargedAmount,
+          note: walletNote,
         }).catch(() => ({ ok: false as const, error: 'wallet correction failed' }))
         settled = res.ok
       } else {
         settled = await settleDelhiveryCostToWallet({
-          tenantId, awb: order.awb_number, orderRef: order.order_number, amountInr: chargedAmount,
+          tenantId,
+          awb: order.awb_number,
+          orderRef: order.order_number,
+          amountInr: chargedAmount,
         }).catch(() => false)
       }
     }

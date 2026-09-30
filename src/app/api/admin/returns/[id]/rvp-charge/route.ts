@@ -28,7 +28,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'A valid delivery charge (0 or more) is required.' }, { status: 400 })
     }
 
-    const rr = await queryOne<{ id: string; rvp_awb_number: string | null; order_id: string; order_number: string; user_id: string | null }>(
+    const rr = await queryOne<{
+      id: string
+      rvp_awb_number: string | null
+      order_id: string
+      order_number: string
+      user_id: string | null
+    }>(
       `SELECT rr.id, rr.rvp_awb_number, rr.order_id, o.order_number, o.user_id
        FROM return_requests rr JOIN orders o ON o.id = rr.order_id
        WHERE rr.id = $1`,
@@ -36,7 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
     if (!rr) return NextResponse.json({ error: 'Return request not found' }, { status: 404 })
     if (!rr.rvp_awb_number) {
-      return NextResponse.json({ error: 'Create the RVP shipment (AWB) before setting its delivery charge.' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'Create the RVP shipment (AWB) before setting its delivery charge.' },
+        { status: 409 }
+      )
     }
 
     await query(`UPDATE return_requests SET rvp_delivery_charge = $1, updated_at = NOW() WHERE id = $2`, [charge, id])
@@ -70,7 +79,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       success: true,
       charge,
       walletCharged: walletResult.ok,
-      walletWarning: walletResult.ok ? undefined : (walletResult.error || 'Charge could not be applied to the wallet.'),
+      walletWarning: walletResult.ok ? undefined : walletResult.error || 'Charge could not be applied to the wallet.',
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

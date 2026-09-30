@@ -78,10 +78,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
-  await query(
-    `UPDATE business_rfqs SET status=$1, admin_note=$2, reviewed_at=NOW() WHERE id=$3`,
-    [status, adminNote || null, id]
-  )
+  await query(`UPDATE business_rfqs SET status=$1, admin_note=$2, reviewed_at=NOW() WHERE id=$3`, [
+    status,
+    adminNote || null,
+    id,
+  ])
 
   return NextResponse.json({ ok: true })
 }

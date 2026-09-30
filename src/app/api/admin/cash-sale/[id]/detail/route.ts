@@ -7,14 +7,12 @@ import { syncPerishableStock } from '@/lib/shelf'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { id } = await params
 
@@ -31,20 +29,18 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { id } = await params
     const body = await request.json()
     if (body.action !== 'cancel') return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       const sale = await client.query(`SELECT status FROM cash_sales WHERE id = $1 FOR UPDATE`, [id])
       if (!sale.rows[0]) throw new Error('Sale not found')
       if (sale.rows[0].status === 'cancelled') throw new Error('Sale is already cancelled')
@@ -68,7 +64,11 @@ export async function PATCH(
         // and reference_id=saleId (it does not distinguish cash sales), so match
         // that here — matching 'cash_sale' would find nothing and skip the batch
         // restore entirely.
-        const batchMovements = await client.query<{ batch_id: string; quantity_change: string; serial_number: string | null }>(
+        const batchMovements = await client.query<{
+          batch_id: string
+          quantity_change: string
+          serial_number: string | null
+        }>(
           `SELECT batch_id, quantity_change, serial_number FROM inventory_transactions
            WHERE reference_type = 'order' AND reference_id = $1
              AND product_id = $2
@@ -83,7 +83,8 @@ export async function PATCH(
           for (const mv of batchMovements.rows) {
             const restoreQty = Math.abs(parseFloat(mv.quantity_change))
             const br = await client.query<{ quantity_remaining: string }>(
-              `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [mv.batch_id]
+              `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`,
+              [mv.batch_id]
             )
             stockBefore = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
             const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
@@ -107,7 +108,9 @@ export async function PATCH(
           }
         } else if (item.sub_variant_id) {
           const row = await client.query<{ inventory_quantity: number }>(
-            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`, [item.sub_variant_id])
+            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [item.sub_variant_id]
+          )
           stockBefore = parseFloat(row.rows[0]?.inventory_quantity as any) || 0
           await client.query(
             `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
@@ -115,20 +118,24 @@ export async function PATCH(
           )
         } else if (item.variant_id) {
           const row = await client.query<{ inventory_quantity: number }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`, [item.variant_id])
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity as any) || 0
-          await client.query(
-            `UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
-            [qty, item.variant_id]
+            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+            [item.variant_id]
           )
+          stockBefore = parseFloat(row.rows[0]?.inventory_quantity as any) || 0
+          await client.query(`UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`, [
+            qty,
+            item.variant_id,
+          ])
         } else {
           const row = await client.query<{ inventory_quantity: number }>(
-            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`, [item.product_id])
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity as any) || 0
-          await client.query(
-            `UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
-            [qty, item.product_id]
+            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+            [item.product_id]
           )
+          stockBefore = parseFloat(row.rows[0]?.inventory_quantity as any) || 0
+          await client.query(`UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`, [
+            qty,
+            item.product_id,
+          ])
         }
 
         if (batchMovements.rows.length === 0) {
@@ -161,7 +168,8 @@ export async function PATCH(
       for (const item of items.rows) {
         if (!item.product_id) continue
         const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
-          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
+          'SELECT perishable, serialized FROM products WHERE id = $1',
+          [item.product_id]
         )
         if (!perishRow.rows[0]?.perishable && !perishRow.rows[0]?.serialized) continue
         const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
@@ -174,7 +182,8 @@ export async function PATCH(
       for (const item of items.rows) {
         if (!item.product_id) continue
         const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
-          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
+          'SELECT perishable, serialized FROM products WHERE id = $1',
+          [item.product_id]
         )
         if (perishRow.rows[0]?.perishable || perishRow.rows[0]?.serialized) continue
         await client.query(

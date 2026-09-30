@@ -4,7 +4,7 @@ import { SignJWT } from 'jose'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_TTL = 86400   // 24 h
+const MAX_TTL = 86400 // 24 h
 const DEFAULT_TTL = 3600 // 1 h
 
 if (!process.env.JWT_SECRET) {

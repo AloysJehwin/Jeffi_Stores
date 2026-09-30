@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'settings:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'settings:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
     const { searchParams } = new URL(request.url)
@@ -31,17 +32,16 @@ export async function GET(request: NextRequest) {
     }
 
     if (cert.downloaded_at) {
-      return new NextResponse('Certificate has already been downloaded. Contact a super admin to regenerate.', { status: 410 })
+      return new NextResponse('Certificate has already been downloaded. Contact a super admin to regenerate.', {
+        status: 410,
+      })
     }
 
     if (cert.is_revoked) {
       return new NextResponse('Certificate has been revoked', { status: 410 })
     }
 
-    await queryOne(
-      'UPDATE admin_certificates SET downloaded_at = NOW() WHERE id = $1 RETURNING id',
-      [cert.id]
-    )
+    await queryOne('UPDATE admin_certificates SET downloaded_at = NOW() WHERE id = $1 RETURNING id', [cert.id])
 
     return NextResponse.json({
       message: 'Certificate marked as downloaded. The certificate file was provided during admin creation.',

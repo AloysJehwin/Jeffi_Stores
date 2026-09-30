@@ -8,12 +8,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const campaign = await queryOne(
-    'SELECT * FROM email_campaigns WHERE id = $1',
-    [id]
-  )
+  const campaign = await queryOne('SELECT * FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { searchParams } = new URL(request.url)
@@ -34,7 +32,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -47,8 +46,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // Normalise scheduled_at to IST-aware timestamp
   const rawSched = body.scheduled_at as string | undefined | null
   const scheduled_at = rawSched
-    ? (rawSched.includes('+') || rawSched.endsWith('Z') ? rawSched : `${rawSched}:00+05:30`)
-    : (rawSched === null ? null : undefined)
+    ? rawSched.includes('+') || rawSched.endsWith('Z')
+      ? rawSched
+      : `${rawSched}:00+05:30`
+    : rawSched === null
+      ? null
+      : undefined
 
   await query(
     `UPDATE email_campaigns SET
@@ -60,7 +63,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       audience_filter = COALESCE($6, audience_filter),
       scheduled_at = $7
      WHERE id = $8`,
-    [title, template_key, subject, template_data ? JSON.stringify(template_data) : null, audience_type, audience_filter ? JSON.stringify(audience_filter) : null, scheduled_at || null, id]
+    [
+      title,
+      template_key,
+      subject,
+      template_data ? JSON.stringify(template_data) : null,
+      audience_type,
+      audience_filter ? JSON.stringify(audience_filter) : null,
+      scheduled_at || null,
+      id,
+    ]
   )
 
   return NextResponse.json({ success: true })
@@ -70,7 +82,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })

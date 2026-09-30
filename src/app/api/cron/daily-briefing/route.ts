@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendAuditedMail } from '@/lib/mail-audit'
-import {
-  collectBriefingData,
-  narrate,
-  renderBriefingEmail,
-  briefingFromAsync,
-} from '@/lib/daily-briefing'
+import { collectBriefingData, narrate, renderBriefingEmail, briefingFromAsync } from '@/lib/daily-briefing'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +63,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No active admins with email' }, { status: 500 })
   }
 
-  let sent = 0, failed = 0
+  let sent = 0,
+    failed = 0
   const briefingFrom = await briefingFromAsync()
   for (const to of recipients) {
     try {

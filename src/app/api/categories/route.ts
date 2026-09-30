@@ -6,7 +6,6 @@ export async function OPTIONS() {
 }
 
 export async function GET(_request: NextRequest) {
-
   const categories = await queryMany(
     'SELECT id, name, slug, parent_category_id, image_url, display_order FROM categories WHERE is_active = true ORDER BY display_order ASC, name ASC',
     []

@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   try {
-    const result = parsed.data.provider === 'google_merchant'
-      ? await (await import('@/lib/merchant/sync')).syncAllProductsToMerchant()
-      : await (await import('@/lib/amazon/sync')).syncAllProductsToAmazon()
+    const result =
+      parsed.data.provider === 'google_merchant'
+        ? await (await import('@/lib/merchant/sync')).syncAllProductsToMerchant()
+        : await (await import('@/lib/amazon/sync')).syncAllProductsToAmazon()
     return NextResponse.json({ ok: true, provider: parsed.data.provider, result })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'sync failed' }, { status: 500 })

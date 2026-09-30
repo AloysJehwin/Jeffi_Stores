@@ -7,10 +7,7 @@ export async function POST(request: NextRequest) {
     const { email, otp } = body
 
     if (!email || !otp) {
-      return NextResponse.json(
-        { error: 'Email and OTP are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
     }
 
     // Verify OTP using Redis
@@ -26,9 +23,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('OTP verification error:', error)
-    return NextResponse.json(
-      { error: 'Failed to verify OTP' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to verify OTP' }, { status: 500 })
   }
 }

@@ -49,9 +49,22 @@ export async function POST(request: NextRequest) {
     const record = await queryOne(
       `INSERT INTO gallery_images (image_url, thumbnail_url, s3_key, s3_thumbnail_key, s3_bucket, file_name, file_size, mime_type, width, height, blurhash, source_url, custom_name, category_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-      [result.url, result.thumbnailUrl, result.s3Key, result.s3ThumbnailKey,
-       process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-       result.fileName, result.fileSize, 'image/png', result.width, result.height, result.blurhash, sourceUrl, customName, categoryId]
+      [
+        result.url,
+        result.thumbnailUrl,
+        result.s3Key,
+        result.s3ThumbnailKey,
+        process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+        result.fileName,
+        result.fileSize,
+        'image/png',
+        result.width,
+        result.height,
+        result.blurhash,
+        sourceUrl,
+        customName,
+        categoryId,
+      ]
     )
 
     return NextResponse.json(record)

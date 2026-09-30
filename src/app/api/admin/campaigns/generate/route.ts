@@ -10,11 +10,16 @@ const MAX_ATTEMPTS = 3
 
 // Parse the model's JSON, tolerating markdown fences and leading prose. Returns
 // the object, or null if nothing parseable was found.
-function tryParse(text: string): { name?: string; kind?: string; subject_template?: string; body_template?: string } | null {
+function tryParse(
+  text: string
+): { name?: string; kind?: string; subject_template?: string; body_template?: string } | null {
   try {
     return JSON.parse(text)
   } catch {
-    const match = text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').match(/\{[\s\S]*\}/)
+    const match = text
+      .replace(/^```[\w]*\n?/, '')
+      .replace(/\n?```$/, '')
+      .match(/\{[\s\S]*\}/)
     if (!match) return null
     try {
       return JSON.parse(match[0])
@@ -75,7 +80,8 @@ Match tone to the trigger context given by the user (cart abandon = warm urgency
   } else {
     contextLines.push(`Scenario: not yet selected — write generic copy.`)
   }
-  if (discountPercent > 0) contextLines.push(`Discount: ${discountPercent}% (you may reference {couponCode} and {discountPercent})`)
+  if (discountPercent > 0)
+    contextLines.push(`Discount: ${discountPercent}% (you may reference {couponCode} and {discountPercent})`)
   else contextLines.push(`Discount: 0% (do not mention coupons or discounts)`)
   contextLines.push(`Campaign label (admin-facing): ${campaignName || '(no name yet)'}`)
   contextLines.push(`Admin instructions: ${prompt}`)

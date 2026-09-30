@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkSendPhoneOtpRateLimit(cleaned)
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: `Please wait ${rateLimit.retryAfter}s before requesting another OTP.`, retryAfter: rateLimit.retryAfter },
+        {
+          error: `Please wait ${rateLimit.retryAfter}s before requesting another OTP.`,
+          retryAfter: rateLimit.retryAfter,
+        },
         { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
       )
     }

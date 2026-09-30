@@ -41,9 +41,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
 async function couponEmail(coupon: Coupon, email: string) {
   const brand = await currentBrandNameAsync()
-  const discountText = coupon.discount_type === 'percentage'
-    ? `${coupon.discount_value}% off`
-    : `₹${coupon.discount_value} off`
+  const discountText =
+    coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`
   const validLine = coupon.valid_until
     ? `<p class="muted" style="margin:8px 0 0;">Valid until ${new Date(coupon.valid_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>`
     : ''
@@ -62,7 +61,9 @@ async function couponEmail(coupon: Coupon, email: string) {
       </div>
       <div class="cta"><a href="${BASE_URL}/products" class="button">Shop Now at ${brand}</a></div>
     `,
-    footerLines: [`&copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#666;">jeffistores.in</a>`],
+    footerLines: [
+      `&copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#666;">jeffistores.in</a>`,
+    ],
     extraCss: `
       .coupon { background-color: white; border: 2px dashed #2563eb; border-radius: 8px; padding: 20px 24px; text-align: center; margin: 20px 0; }
       .coupon-code { font-size: 28px; font-weight: 900; letter-spacing: 4px; color: #2563eb; margin: 0; }
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     [slug]
   )
   if (!form) return NextResponse.json({ error: 'Form not found' }, { status: 404 })
-  if (!form.is_active) return NextResponse.json({ error: 'This form is no longer accepting submissions' }, { status: 410 })
+  if (!form.is_active)
+    return NextResponse.json({ error: 'This form is no longer accepting submissions' }, { status: 410 })
 
   let formData: FormData
   try {
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
   }
 
-  const email = (formData.get('email') as string || '').trim().toLowerCase()
+  const email = ((formData.get('email') as string) || '').trim().toLowerCase()
   const file = formData.get('screenshot') as File | null
   const customFields: CustomField[] = form.custom_fields || []
 
@@ -111,11 +113,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  const existing = await queryOne(
-    'SELECT id FROM review_form_submissions WHERE form_id = $1 AND email = $2',
-    [form.id, email]
-  )
-  if (existing) return NextResponse.json({ error: 'This email has already submitted a review for this form' }, { status: 409 })
+  const existing = await queryOne('SELECT id FROM review_form_submissions WHERE form_id = $1 AND email = $2', [
+    form.id,
+    email,
+  ])
+  if (existing)
+    return NextResponse.json({ error: 'This email has already submitted a review for this form' }, { status: 409 })
 
   const screenshotBuffer = Buffer.from(await file.arrayBuffer())
   let screenshotUrl: string
@@ -159,10 +162,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        VALUES ($1,$2,$3,$4,$5,'pending')`,
       [form.id, email, screenshotUrl, coupon?.code || null, JSON.stringify(extraFields)]
     )
-    await client.query(
-      'UPDATE review_forms SET submissions_count = submissions_count + 1 WHERE id = $1',
-      [form.id]
-    )
+    await client.query('UPDATE review_forms SET submissions_count = submissions_count + 1 WHERE id = $1', [form.id])
   })
 
   if (coupon) {

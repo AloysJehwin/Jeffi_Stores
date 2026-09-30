@@ -46,7 +46,9 @@ export async function POST(request: NextRequest) {
     `Field: ${fieldLabel}`,
     `Current value: ${value.trim()}`,
     `Enrich this field value.`,
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   try {
     const r = await aiChat({

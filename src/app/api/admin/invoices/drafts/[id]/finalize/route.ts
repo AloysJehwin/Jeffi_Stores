@@ -14,7 +14,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     let batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = []
     let serialAssignments: { order_item_id: string; serial_number: string }[] = []
@@ -36,19 +37,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const isOnlineOrder = order.source === 'online' || order.source === 'business'
     // If already delivered, keep status unchanged; otherwise move online/business→processing, offline→delivered
-    const targetStatus = order.status === 'delivered' ? 'delivered' : (isOnlineOrder ? 'processing' : 'delivered')
+    const targetStatus = order.status === 'delivered' ? 'delivered' : isOnlineOrder ? 'processing' : 'delivered'
 
     // Basic-plan tenants have no inventory module — the flag is locked off for them.
     // When off, skip stock deduction entirely (nothing to deduct), same as order-create.
     const { inventoryValidationEnabled } = await getFeatureFlags()
 
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [id])
 
-      const itemsResult = await client.query(
-        `SELECT * FROM order_items WHERE order_id = $1`,
-        [id]
-      )
+      const itemsResult = await client.query(`SELECT * FROM order_items WHERE order_id = $1`, [id])
       const items = itemsResult.rows
 
       if (!items.length) {
@@ -82,12 +80,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             id,
             'processing',
             undefined,
-            pdfBuffer,
+            pdfBuffer
           )
         } catch (_) {}
       } else if (!isOnlineOrder && order.customer_email) {
         try {
-          await sendInvoiceFinalizedEmail(order.customer_email, order.customer_name, result.invoiceNumber, Number(order.total_amount), order.order_number)
+          await sendInvoiceFinalizedEmail(
+            order.customer_email,
+            order.customer_name,
+            result.invoiceNumber,
+            Number(order.total_amount),
+            order.order_number
+          )
         } catch (_) {}
       }
     }

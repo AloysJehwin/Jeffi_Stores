@@ -16,10 +16,7 @@ const UpdateAddressSchema = z.object({
   postal_code: zIndianPin.optional(),
 })
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const user = await authenticateUser(request)
@@ -57,10 +54,11 @@ export async function PATCH(
     const normalizedPhone = `+91${cleanedPhone}`
 
     if (is_default) {
-      await query(
-        'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2 AND id != $3',
-        [userId, address_type, addressId]
-      )
+      await query('UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2 AND id != $3', [
+        userId,
+        address_type,
+        addressId,
+      ])
     }
 
     const address = await queryOne(
@@ -70,9 +68,21 @@ export async function PATCH(
         phone = $10, is_default = $11, updated_at = NOW()
        WHERE id = $12 AND user_id = $13
        RETURNING *`,
-      [address_type, full_name, address_line1, address_line2 || null,
-       landmark || null, city, state, postal_code, country || 'India',
-       normalizedPhone, is_default || false, addressId, userId]
+      [
+        address_type,
+        full_name,
+        address_line1,
+        address_line2 || null,
+        landmark || null,
+        city,
+        state,
+        postal_code,
+        country || 'India',
+        normalizedPhone,
+        is_default || false,
+        addressId,
+        userId,
+      ]
     )
 
     if (!address) {
@@ -94,10 +104,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const user = await authenticateUser(request)
@@ -108,10 +115,10 @@ export async function DELETE(
     const userId = user.userId
     const addressId = id
 
-    const address = await queryOne(
-      'SELECT is_default FROM addresses WHERE id = $1 AND user_id = $2',
-      [addressId, userId]
-    )
+    const address = await queryOne('SELECT is_default FROM addresses WHERE id = $1 AND user_id = $2', [
+      addressId,
+      userId,
+    ])
 
     if (!address) {
       return NextResponse.json({ error: 'Address not found' }, { status: 404 })
@@ -125,19 +132,10 @@ export async function DELETE(
     }
 
     // Null out FK references in orders — snapshot columns preserve the actual address data
-    await query(
-      'UPDATE orders SET shipping_address_id = NULL WHERE shipping_address_id = $1',
-      [addressId]
-    )
-    await query(
-      'UPDATE orders SET billing_address_id = NULL WHERE billing_address_id = $1',
-      [addressId]
-    )
+    await query('UPDATE orders SET shipping_address_id = NULL WHERE shipping_address_id = $1', [addressId])
+    await query('UPDATE orders SET billing_address_id = NULL WHERE billing_address_id = $1', [addressId])
 
-    await query(
-      'DELETE FROM addresses WHERE id = $1 AND user_id = $2',
-      [addressId, userId]
-    )
+    await query('DELETE FROM addresses WHERE id = $1 AND user_id = $2', [addressId, userId])
 
     logActivity({
       userId,

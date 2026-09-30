@@ -50,9 +50,10 @@ const PUBLIC_COUPONS_SQL = `
 `
 
 function discountAt(coupon: PublicCoupon, subtotal: number): number {
-  const raw = coupon.discount_type === 'percentage'
-    ? Math.min((subtotal * coupon.discount_value) / 100, coupon.max_discount ?? Infinity)
-    : coupon.discount_value
+  const raw =
+    coupon.discount_type === 'percentage'
+      ? Math.min((subtotal * coupon.discount_value) / 100, coupon.max_discount ?? Infinity)
+      : coupon.discount_value
   return round2(Math.max(0, Math.min(raw, subtotal)))
 }
 

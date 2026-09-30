@@ -35,7 +35,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'This order does not belong to you.' }, { status: 403 })
     }
     if (vcr.order_status !== 'confirmed' || vcr.awb_number) {
-      return NextResponse.json({ error: 'This order can no longer be changed (it has moved to fulfilment).' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'This order can no longer be changed (it has moved to fulfilment).' },
+        { status: 400 }
+      )
     }
 
     const priceDiff = Number(vcr.price_diff)
@@ -43,14 +46,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // ── REFUND: partial Razorpay refund of the difference, then apply ──────────
     if (settlement === 'refund') {
-      if (!(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
+      if (!(await isRazorpayEnabled()))
+        return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
       const paymentOrderId = vcr.original_order_id || orderId
       const payment = await queryOne<any>(
         `SELECT id, transaction_id, gateway_response FROM payments
          WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
         [paymentOrderId]
       )
-      if (!payment?.transaction_id) return NextResponse.json({ error: 'No Razorpay payment found to refund against.' }, { status: 400 })
+      if (!payment?.transaction_id)
+        return NextResponse.json({ error: 'No Razorpay payment found to refund against.' }, { status: 400 })
 
       const diffPaise = Math.round(Math.abs(priceDiff) * 100)
       // Tenant-aware: an own_razorpay tenant collected on THEIR keys, so refunding from platform
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (outcome.unrecoveredPaise > 0) {
           console.error(
             `[variant-change] transfer reversal INCOMPLETE order=${orderId} payment=${payment.transaction_id} ` +
-            `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+              `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
           )
         }
         if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
@@ -87,29 +92,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         }
       }
 
-      const existing = typeof payment.gateway_response === 'string' ? JSON.parse(payment.gateway_response) : (payment.gateway_response || {})
+      const existing =
+        typeof payment.gateway_response === 'string'
+          ? JSON.parse(payment.gateway_response)
+          : payment.gateway_response || {}
       // Keep payment_status = 'paid' (this is a partial diff refund, not a full refund).
-      await query(
-        `UPDATE payments SET gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-        [JSON.stringify({ ...existing, variantChangeRefund: refund }), payment.id]
-      )
-      await query(`UPDATE variant_change_requests SET refund_id = $1, updated_at = NOW() WHERE id = $2`, [refund.id, vcr.id])
+      await query(`UPDATE payments SET gateway_response = $1, updated_at = NOW() WHERE id = $2`, [
+        JSON.stringify({ ...existing, variantChangeRefund: refund }),
+        payment.id,
+      ])
+      await query(`UPDATE variant_change_requests SET refund_id = $1, updated_at = NOW() WHERE id = $2`, [
+        refund.id,
+        vcr.id,
+      ])
 
       const applied = await applyVariantChange(vcr.id)
-      if (!applied.applied) return NextResponse.json({ error: `Could not apply change: ${applied.reason}` }, { status: 409 })
+      if (!applied.applied)
+        return NextResponse.json({ error: `Could not apply change: ${applied.reason}` }, { status: 409 })
       return NextResponse.json({ success: true, settlement: 'refund', refundId: refund.id })
     }
 
     // ── COD adjust / no-diff: just apply ───────────────────────────────────────
     if (settlement === 'cod_adjust' || settlement === 'none') {
       const applied = await applyVariantChange(vcr.id)
-      if (!applied.applied) return NextResponse.json({ error: `Could not apply change: ${applied.reason}` }, { status: 409 })
+      if (!applied.applied)
+        return NextResponse.json({ error: `Could not apply change: ${applied.reason}` }, { status: 409 })
       return NextResponse.json({ success: true, settlement })
     }
 
     // ── COLLECT: create a Razorpay order for the extra; apply on verify ────────
     if (settlement === 'collect') {
-      if (!(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
+      if (!(await isRazorpayEnabled()))
+        return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
       const diffPaise = Math.round(Math.abs(priceDiff) * 100)
       if (diffPaise <= 0) return NextResponse.json({ error: 'Nothing to collect.' }, { status: 400 })
       // Collect the extra on the tenant's own account (own_razorpay) or the platform account
@@ -128,9 +142,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         [rzpOrder.id, vcr.id]
       )
       if (vcr.user_id) {
-        logActivity({ userId: vcr.user_id, kind: 'variant_change', referenceId: orderId, referenceType: 'orders',
+        logActivity({
+          userId: vcr.user_id,
+          kind: 'variant_change',
+          referenceId: orderId,
+          referenceType: 'orders',
           summary: `Customer accepted variant change on #${vcr.order_number}; collecting ₹${Math.abs(priceDiff).toFixed(2)}`,
-          metadata: { vcrId: vcr.id, razorpayOrderId: rzpOrder.id } }).catch(() => {})
+          metadata: { vcrId: vcr.id, razorpayOrderId: rzpOrder.id },
+        }).catch(() => {})
       }
       return NextResponse.json({
         success: true,

@@ -5,7 +5,9 @@ import { storefrontAiAllowed } from '@/lib/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 
-function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
+function vec(arr: number[]) {
+  return '[' + arr.join(',') + ']'
+}
 
 async function semanticSearch(q: string, limit: number, excludeId: string): Promise<any[]> {
   try {
@@ -25,7 +27,8 @@ async function semanticSearch(q: string, limit: number, excludeId: string): Prom
     }
     if (variantIds.length) {
       const vp = await queryMany<{ product_id: string }>(
-        `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`, [variantIds]
+        `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`,
+        [variantIds]
       )
       for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
     }

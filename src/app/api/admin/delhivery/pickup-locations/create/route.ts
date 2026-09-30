@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
   const city = String(body?.city || '').trim() || undefined
   const state = String(body?.state || '').trim() || undefined
 
-  if (!name || !address) return NextResponse.json({ error: 'Warehouse name and address are required.' }, { status: 400 })
+  if (!name || !address)
+    return NextResponse.json({ error: 'Warehouse name and address are required.' }, { status: 400 })
   if (phone.length < 10) return NextResponse.json({ error: 'A 10-digit phone number is required.' }, { status: 400 })
   if (!/^\d{6}$/.test(pincode)) return NextResponse.json({ error: 'A six-digit pincode is required.' }, { status: 400 })
 
@@ -38,9 +39,18 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await createDelhiveryPickupLocation({
-    name, phone, pincode, address, registeredName, email, city, state, tenantId: tenantId ?? undefined,
+    name,
+    phone,
+    pincode,
+    address,
+    registeredName,
+    email,
+    city,
+    state,
+    tenantId: tenantId ?? undefined,
   })
-  if (!result.ok) return NextResponse.json({ error: result.error || 'Could not create the warehouse.' }, { status: 502 })
+  if (!result.ok)
+    return NextResponse.json({ error: result.error || 'Could not create the warehouse.' }, { status: 502 })
 
   return NextResponse.json({ ok: true, name })
 }

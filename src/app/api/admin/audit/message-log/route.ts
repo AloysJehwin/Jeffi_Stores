@@ -47,10 +47,7 @@ export async function GET(request: NextRequest) {
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     ),
-    queryCount(
-      `SELECT COUNT(*) FROM message_logs ${whereSql}`,
-      params.slice(0, params.length - 2)
-    ),
+    queryCount(`SELECT COUNT(*) FROM message_logs ${whereSql}`, params.slice(0, params.length - 2)),
   ])
 
   return NextResponse.json({ rows, total, page, pageSize })

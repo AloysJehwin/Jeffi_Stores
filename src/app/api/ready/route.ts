@@ -44,8 +44,5 @@ export async function GET() {
     checks.redis = `fail: ${e?.message || 'error'}`
   }
 
-  return NextResponse.json(
-    { status: ok ? 'ready' : 'not_ready', checks },
-    { status: ok ? 200 : 503 },
-  )
+  return NextResponse.json({ status: ok ? 'ready' : 'not_ready', checks }, { status: ok ? 200 : 503 })
 }

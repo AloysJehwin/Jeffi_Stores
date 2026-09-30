@@ -49,8 +49,12 @@ export async function POST(request: NextRequest) {
     const pdfBuffer = await generateBrochurePDF(products, { store, title, promo, showPrices })
 
     // Unique filename per brochure: <title-slug>-<date>-<random>.pdf
-    const slug = (title || 'brochure')
-      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'brochure'
+    const slug =
+      (title || 'brochure')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40) || 'brochure'
     const stamp = new Date().toISOString().slice(0, 10)
     const rand = Math.random().toString(36).slice(2, 8)
     const filename = `${slug}-${stamp}-${rand}.pdf`

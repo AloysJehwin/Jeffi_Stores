@@ -14,6 +14,6 @@ export async function GET() {
       freeThreshold: settings.enabled ? settings.freeThreshold : 0,
       weightLimitKg: settings.freeWeightCeilingKg > 0 ? settings.freeWeightCeilingKg : 3,
     },
-    { headers: { 'Cache-Control': 'private, no-store' } },
+    { headers: { 'Cache-Control': 'private, no-store' } }
   )
 }

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
-import { createTenant, linkOwnerTenant, hasVerifiedBank, saveSubscriptionId, listPlans, getOwnerTenants } from '@/lib/tenant-registry'
+import {
+  createTenant,
+  linkOwnerTenant,
+  hasVerifiedBank,
+  saveSubscriptionId,
+  listPlans,
+  getOwnerTenants,
+} from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
@@ -61,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   // 3. Create Razorpay Subscription and get hosted checkout URL.
   const plans = await listPlans()
-  const plan = plans.find((p) => p.slug === parsed.data.planSlug)
+  const plan = plans.find(p => p.slug === parsed.data.planSlug)
 
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   const callbackUrl = `${baseUrl}/onboard/success?tenant=${result.slug}`

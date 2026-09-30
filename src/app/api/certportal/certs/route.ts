@@ -22,10 +22,7 @@ export async function GET(request: NextRequest) {
   const now = Date.now()
   const certs = rows.map((r: any) => {
     const expired = new Date(r.expires_at).getTime() <= now
-    const status = r.revoked_at ? 'revoked'
-      : expired ? 'expired'
-      : r.downloaded_at ? 'downloaded'
-      : 'available'
+    const status = r.revoked_at ? 'revoked' : expired ? 'expired' : r.downloaded_at ? 'downloaded' : 'available'
     return {
       serial: r.serial,
       commonName: r.common_name,

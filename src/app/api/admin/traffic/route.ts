@@ -8,13 +8,28 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'dashboard:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'dashboard:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7'), 1), 90)
 
-  const [funnel, topPages, topReferrers, dailySessions, devices, browsers, hourly, sessionDepths, topProducts, conversionLaggards, topSearchTerms, noResultSearches] = await Promise.all([
-    queryMany<{ page: string; sessions: string; users: string }>(`
+  const [
+    funnel,
+    topPages,
+    topReferrers,
+    dailySessions,
+    devices,
+    browsers,
+    hourly,
+    sessionDepths,
+    topProducts,
+    conversionLaggards,
+    topSearchTerms,
+    noResultSearches,
+  ] = await Promise.all([
+    queryMany<{ page: string; sessions: string; users: string }>(
+      `
       SELECT
         page,
         COUNT(DISTINCT session_id) AS sessions,
@@ -23,18 +38,24 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
         AND page IN ('home','categories','category','product','cart','checkout','order_placed')
       GROUP BY page
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ path: string; hits: string; sessions: string }>(`
+    queryMany<{ path: string; hits: string; sessions: string }>(
+      `
       SELECT path, COUNT(*) AS hits, COUNT(DISTINCT session_id) AS sessions
       FROM page_events
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY path
       ORDER BY hits DESC
       LIMIT 15
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ referrer: string; sessions: string }>(`
+    queryMany<{ referrer: string; sessions: string }>(
+      `
       SELECT
         COALESCE(NULLIF(referrer, ''), 'Direct') AS referrer,
         COUNT(DISTINCT session_id) AS sessions
@@ -43,9 +64,12 @@ export async function GET(req: NextRequest) {
       GROUP BY referrer
       ORDER BY sessions DESC
       LIMIT 10
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ date: string; sessions: string; pageviews: string }>(`
+    queryMany<{ date: string; sessions: string; pageviews: string }>(
+      `
       SELECT
         DATE(created_at AT TIME ZONE 'Asia/Kolkata') AS date,
         COUNT(DISTINCT session_id) AS sessions,
@@ -54,9 +78,12 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY DATE(created_at AT TIME ZONE 'Asia/Kolkata')
       ORDER BY date ASC
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ type: string; sessions: string }>(`
+    queryMany<{ type: string; sessions: string }>(
+      `
       SELECT
         CASE
           WHEN user_agent ILIKE '%mobile%' OR user_agent ILIKE '%android%' OR user_agent ILIKE '%iphone%' THEN 'Mobile'
@@ -68,9 +95,12 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY type
       ORDER BY sessions DESC
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ browser: string; sessions: string }>(`
+    queryMany<{ browser: string; sessions: string }>(
+      `
       SELECT
         CASE
           WHEN user_agent ILIKE '%edg/%' OR user_agent ILIKE '%edge/%' THEN 'Edge'
@@ -86,9 +116,12 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY browser
       ORDER BY sessions DESC
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ hour: string; hits: string }>(`
+    queryMany<{ hour: string; hits: string }>(
+      `
       SELECT
         EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Kolkata')::int AS hour,
         COUNT(*) AS hits
@@ -96,16 +129,31 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY hour
       ORDER BY hour ASC
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ session_id: string; depth: string }>(`
+    queryMany<{ session_id: string; depth: string }>(
+      `
       SELECT session_id, COUNT(*) AS depth
       FROM page_events
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY session_id
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ product_id: string; name: string; slug: string; views: string; unique_viewers: string; orders: string; revenue: string; cart_adds: string }>(`
+    queryMany<{
+      product_id: string
+      name: string
+      slug: string
+      views: string
+      unique_viewers: string
+      orders: string
+      revenue: string
+      cart_adds: string
+    }>(
+      `
       SELECT
         pv.product_id,
         p.name,
@@ -137,9 +185,12 @@ export async function GET(req: NextRequest) {
       GROUP BY pv.product_id, p.name, p.slug, o.orders, o.revenue, c.cart_adds
       ORDER BY views DESC
       LIMIT 15
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ product_id: string; name: string; slug: string; views: string; orders: string }>(`
+    queryMany<{ product_id: string; name: string; slug: string; views: string; orders: string }>(
+      `
       SELECT
         pv.product_id,
         p.name,
@@ -162,9 +213,12 @@ export async function GET(req: NextRequest) {
       HAVING COUNT(*) >= 20 AND COALESCE(o.orders, 0) = 0
       ORDER BY views DESC
       LIMIT 10
-    `, [days]),
+    `,
+      [days]
+    ),
 
-    queryMany<{ query: string; searches: string; clicks: string }>(`
+    queryMany<{ query: string; searches: string; clicks: string }>(
+      `
       SELECT
         LOWER(TRIM(query)) AS query,
         COUNT(*) AS searches,
@@ -175,9 +229,12 @@ export async function GET(req: NextRequest) {
       GROUP BY LOWER(TRIM(query))
       ORDER BY searches DESC
       LIMIT 15
-    `, [days]).catch(() => [] as { query: string; searches: string; clicks: string }[]),
+    `,
+      [days]
+    ).catch(() => [] as { query: string; searches: string; clicks: string }[]),
 
-    queryMany<{ query: string; searches: string }>(`
+    queryMany<{ query: string; searches: string }>(
+      `
       SELECT
         LOWER(TRIM(query)) AS query,
         COUNT(*) AS searches
@@ -188,12 +245,16 @@ export async function GET(req: NextRequest) {
       GROUP BY LOWER(TRIM(query))
       ORDER BY searches DESC
       LIMIT 10
-    `, [days]).catch(() => [] as { query: string; searches: string }[]),
+    `,
+      [days]
+    ).catch(() => [] as { query: string; searches: string }[]),
   ])
 
   const funnelOrder = ['home', 'categories', 'category', 'product', 'cart', 'checkout', 'order_placed']
   const funnelMap: Record<string, { sessions: number; users: number }> = {}
-  funnel.forEach(r => { funnelMap[r.page] = { sessions: parseInt(r.sessions), users: parseInt(r.users) } })
+  funnel.forEach(r => {
+    funnelMap[r.page] = { sessions: parseInt(r.sessions), users: parseInt(r.users) }
+  })
 
   const funnelSteps = funnelOrder.map(page => ({
     page,
@@ -209,12 +270,12 @@ export async function GET(req: NextRequest) {
   const depths = sessionDepths.map(r => parseInt(r.depth))
   const bouncedSessions = depths.filter(d => d === 1).length
   const bounceRate = depths.length > 0 ? Math.round((bouncedSessions / depths.length) * 100) : 0
-  const avgPages = depths.length > 0
-    ? Math.round((depths.reduce((a, b) => a + b, 0) / depths.length) * 10) / 10
-    : 0
+  const avgPages = depths.length > 0 ? Math.round((depths.reduce((a, b) => a + b, 0) / depths.length) * 10) / 10 : 0
 
   const hourMap: Record<number, number> = {}
-  hourly.forEach(r => { hourMap[parseInt(r.hour)] = parseInt(r.hits) })
+  hourly.forEach(r => {
+    hourMap[parseInt(r.hour)] = parseInt(r.hits)
+  })
   const hourlyData = Array.from({ length: 24 }, (_, h) => ({ hour: h, hits: hourMap[h] || 0 }))
 
   return NextResponse.json({
@@ -224,7 +285,11 @@ export async function GET(req: NextRequest) {
     })),
     topPages: topPages.map(r => ({ path: r.path, hits: parseInt(r.hits), sessions: parseInt(r.sessions) })),
     topReferrers: topReferrers.map(r => ({ referrer: r.referrer, sessions: parseInt(r.sessions) })),
-    dailySessions: dailySessions.map(r => ({ date: r.date, sessions: parseInt(r.sessions), pageviews: parseInt(r.pageviews) })),
+    dailySessions: dailySessions.map(r => ({
+      date: r.date,
+      sessions: parseInt(r.sessions),
+      pageviews: parseInt(r.pageviews),
+    })),
     devices: devices.map(r => ({ type: r.type, sessions: parseInt(r.sessions) })),
     browsers: browsers.map(r => ({ browser: r.browser, sessions: parseInt(r.sessions) })),
     hourly: hourlyData,

@@ -10,10 +10,7 @@ import { getBusinessValues } from '@/lib/site-controls'
 
 const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'other']
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const authUser = await authenticateUser(request)
@@ -41,7 +38,8 @@ export async function GET(
          AND DATE_TRUNC('month', rr.created_at) = DATE_TRUNC('month', NOW())`,
       [authUser.userId]
     )
-    const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)
+    const monthlyLimitReached =
+      parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)
 
     // Refund breakdown so the customer sees the actual amount and, when the return charge covers
     // it, an explanation instead of a bare "refund processed".
@@ -54,16 +52,18 @@ export async function GET(
       refundBreakdown = { grossRefund, charge, netRefund }
     }
 
-    return NextResponse.json({ returnRequest: returnRequest || null, returnItems: returnItems || [], monthlyLimitReached, refundBreakdown })
+    return NextResponse.json({
+      returnRequest: returnRequest || null,
+      returnItems: returnItems || [],
+      monthlyLimitReached,
+      refundBreakdown,
+    })
   } catch (err) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const authUser = await authenticateUser(request)
@@ -139,9 +139,12 @@ export async function POST(
       [authUser.userId]
     )
     if (parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)) {
-      return NextResponse.json({
-        error: 'You have already used your return or replacement for this month. Only 1 is allowed per month.',
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: 'You have already used your return or replacement for this month. Only 1 is allowed per month.',
+        },
+        { status: 400 }
+      )
     }
 
     // Build validated item rows, cap quantity at ordered quantity
@@ -154,7 +157,7 @@ export async function POST(
     })
 
     let returnRequest: any
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       const result = await client.query(
         `INSERT INTO return_requests (order_id, user_id, type, reason, description, image_urls)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -182,10 +185,7 @@ export async function POST(
         )
       }
 
-      await client.query(
-        `UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
-        [id]
-      )
+      await client.query(`UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`, [id])
     })
 
     const itemsSummary = validatedItems.map((i: any) => i.product_name).join(', ')
@@ -209,7 +209,8 @@ export async function POST(
       dueInDays: 1,
     }).catch(() => {})
 
-    const customerName = `${order.first_name || ''} ${order.last_name || ''}`.trim() || order.customer_name || 'Customer'
+    const customerName =
+      `${order.first_name || ''} ${order.last_name || ''}`.trim() || order.customer_name || 'Customer'
     const customerEmail = order.user_email || order.customer_email
 
     const admins = await queryMany(

@@ -6,7 +6,9 @@ import { queryOne } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // Revoke one of the logged-in admin's own sessions. Ownership-checked: the target
 // row's principal must match the authenticated admin.

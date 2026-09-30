@@ -4,9 +4,21 @@ import { queryOne } from '@/lib/db'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { adminCookieNameForHost } from '@/lib/admin-cookie'
 import {
-  BIND_COOKIE, BIND_ENDPOINT, BIND_TTL_S, PROOF_HEADER, bindingMode, normHost, parsePublicJwk,
-  verifyProof, loadSessionKey, registerSessionKey, consumeRefresh, mintBindCookie, logBinding,
-  sidHashOf, canRegisterKey,
+  BIND_COOKIE,
+  BIND_ENDPOINT,
+  BIND_TTL_S,
+  PROOF_HEADER,
+  bindingMode,
+  normHost,
+  parsePublicJwk,
+  verifyProof,
+  loadSessionKey,
+  registerSessionKey,
+  consumeRefresh,
+  mintBindCookie,
+  logBinding,
+  sidHashOf,
+  canRegisterKey,
 } from '@/lib/session-binding'
 
 export const dynamic = 'force-dynamic'
@@ -64,7 +76,10 @@ export async function POST(request: NextRequest) {
         logBinding({ sessionId, principalType: type, reason: 'registration_closed', path: BIND_ENDPOINT, host })
         continue
       }
-      if (!verifyProof(offeredKey, proof, 'POST', BIND_ENDPOINT).ok) { staleClock = true; continue }
+      if (!verifyProof(offeredKey, proof, 'POST', BIND_ENDPOINT).ok) {
+        staleClock = true
+        continue
+      }
       key = await registerSessionKey(sessionId, offeredKey, host)
       if (!key) continue
     }
@@ -76,7 +91,14 @@ export async function POST(request: NextRequest) {
       continue
     }
     if (key.host !== host) {
-      logBinding({ sessionId, principalType: type, reason: 'host_mismatch', path: BIND_ENDPOINT, host, boundHost: key.host })
+      logBinding({
+        sessionId,
+        principalType: type,
+        reason: 'host_mismatch',
+        path: BIND_ENDPOINT,
+        host,
+        boundHost: key.host,
+      })
       continue
     }
     if (!(await consumeRefresh(sessionId, checked.ts))) {

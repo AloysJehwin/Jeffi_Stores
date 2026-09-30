@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const source = searchParams.get('source') || ''
@@ -30,37 +31,83 @@ export async function GET(request: NextRequest) {
     const showOrders = !source || source !== 'cash_sale'
     const showCashSales = !source || source === 'cash_sale'
 
-    if (source && source !== 'cash_sale') { orderConditions.push(`o.source = $${i++}`); params.push(source) }
+    if (source && source !== 'cash_sale') {
+      orderConditions.push(`o.source = $${i++}`)
+      params.push(source)
+    }
     if (payment) {
-      if (showOrders) { orderConditions.push(`o.payment_status = $${i}`) }
-      if (showCashSales) { csConditions.push(`cs.payment_status = $${i}`) }
-      params.push(payment); i++
+      if (showOrders) {
+        orderConditions.push(`o.payment_status = $${i}`)
+      }
+      if (showCashSales) {
+        csConditions.push(`cs.payment_status = $${i}`)
+      }
+      params.push(payment)
+      i++
     }
     if (from) {
-      if (showOrders) { orderConditions.push(`o.invoice_date >= $${i}`) }
-      if (showCashSales) { csConditions.push(`cs.invoice_date >= $${i}`) }
-      params.push(from); i++
+      if (showOrders) {
+        orderConditions.push(`o.invoice_date >= $${i}`)
+      }
+      if (showCashSales) {
+        csConditions.push(`cs.invoice_date >= $${i}`)
+      }
+      params.push(from)
+      i++
     }
     if (to) {
-      if (showOrders) { orderConditions.push(`o.invoice_date < ($${i}::date + interval '1 day')`) }
-      if (showCashSales) { csConditions.push(`cs.invoice_date < ($${i}::date + interval '1 day')`) }
-      params.push(to); i++
+      if (showOrders) {
+        orderConditions.push(`o.invoice_date < ($${i}::date + interval '1 day')`)
+      }
+      if (showCashSales) {
+        csConditions.push(`cs.invoice_date < ($${i}::date + interval '1 day')`)
+      }
+      params.push(to)
+      i++
     }
     if (search) {
       if (showOrders && showCashSales) {
-        const sc = buildVectorSearchClause(search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+        const sc = buildVectorSearchClause(
+          search,
+          'o.search_vector',
+          ['o.customer_name'],
+          ['o.invoice_number', 'o.order_number'],
+          i,
+          'simple'
+        )
         orderConditions.push(sc.clause)
-        const csSc = buildVectorSearchClause(search, 'cs.search_vector', ['cs.customer_name'], ['cs.invoice_number', 'cs.sale_number'], i, 'simple')
+        const csSc = buildVectorSearchClause(
+          search,
+          'cs.search_vector',
+          ['cs.customer_name'],
+          ['cs.invoice_number', 'cs.sale_number'],
+          i,
+          'simple'
+        )
         csConditions.push(csSc.clause)
         params.push(...sc.params)
         i = sc.nextIdx
       } else if (showOrders) {
-        const sc = buildVectorSearchClause(search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+        const sc = buildVectorSearchClause(
+          search,
+          'o.search_vector',
+          ['o.customer_name'],
+          ['o.invoice_number', 'o.order_number'],
+          i,
+          'simple'
+        )
         orderConditions.push(sc.clause)
         params.push(...sc.params)
         i = sc.nextIdx
       } else if (showCashSales) {
-        const sc = buildVectorSearchClause(search, 'cs.search_vector', ['cs.customer_name'], ['cs.invoice_number', 'cs.sale_number'], i, 'simple')
+        const sc = buildVectorSearchClause(
+          search,
+          'cs.search_vector',
+          ['cs.customer_name'],
+          ['cs.invoice_number', 'cs.sale_number'],
+          i,
+          'simple'
+        )
         csConditions.push(sc.clause)
         params.push(...sc.params)
         i = sc.nextIdx
@@ -70,7 +117,8 @@ export async function GET(request: NextRequest) {
     const orderWhere = `WHERE ${orderConditions.join(' AND ')}`
     const csWhere = `WHERE ${csConditions.join(' AND ')}`
 
-    const orderQuery = showOrders ? `
+    const orderQuery = showOrders
+      ? `
       SELECT
         o.id, o.order_number, o.invoice_number, o.invoice_date,
         o.customer_name, o.customer_phone, o.customer_email,
@@ -82,9 +130,11 @@ export async function GET(request: NextRequest) {
       FROM orders o
       LEFT JOIN invoices inv ON inv.order_id = o.id
       ${orderWhere}
-    ` : null
+    `
+      : null
 
-    const csQuery = showCashSales ? `
+    const csQuery = showCashSales
+      ? `
       SELECT
         cs.id, cs.sale_number AS order_number, cs.invoice_number, cs.invoice_date,
         cs.customer_name, NULL::text AS customer_phone, NULL::text AS customer_email,
@@ -95,13 +145,18 @@ export async function GET(request: NextRequest) {
         cs.created_at
       FROM cash_sales cs
       ${csWhere}
-    ` : null
+    `
+      : null
 
     const unionQuery = [orderQuery, csQuery].filter(Boolean).join('\nUNION ALL\n')
     // Whitelisted server-side sort over the full combined set (before LIMIT/OFFSET).
     const SORT_COLS: Record<string, string> = {
-      invoice_number: 'invoice_number', invoice_date: 'invoice_date', customer_name: 'customer_name',
-      total_amount: 'total_amount', payment_status: 'payment_status', source: 'source',
+      invoice_number: 'invoice_number',
+      invoice_date: 'invoice_date',
+      customer_name: 'customer_name',
+      total_amount: 'total_amount',
+      payment_status: 'payment_status',
+      source: 'source',
     }
     const sortCol = SORT_COLS[searchParams.get('sort') || ''] || 'invoice_number'
     const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'

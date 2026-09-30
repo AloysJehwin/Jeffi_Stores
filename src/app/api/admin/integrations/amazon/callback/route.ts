@@ -41,8 +41,10 @@ export async function GET(request: NextRequest) {
     if (!clientId || !clientSecret) return returnToAdmin(`${backTo}?connected=0&error=not_configured`)
 
     const body = new URLSearchParams({
-      grant_type: 'authorization_code', code,
-      client_id: clientId, client_secret: clientSecret,
+      grant_type: 'authorization_code',
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
     })
     const res = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
@@ -58,9 +60,11 @@ export async function GET(request: NextRequest) {
     const sellerId = params.get('selling_partner_id') || ''
     const marketplaceId = params.get('marketplace_id') || 'A21TJRUUN4KGV'
     const normalized = {
-      client_id: clientId, client_secret: clientSecret,
+      client_id: clientId,
+      client_secret: clientSecret,
       refresh_token: data.refresh_token,
-      seller_id: sellerId, marketplace_id: marketplaceId,
+      seller_id: sellerId,
+      marketplace_id: marketplaceId,
     }
 
     await saveIntegrationCredential({
@@ -73,6 +77,8 @@ export async function GET(request: NextRequest) {
 
     return returnToAdmin(`${backTo}?connected=amazon`)
   } catch (e: any) {
-    return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(
+      `${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`
+    )
   }
 }

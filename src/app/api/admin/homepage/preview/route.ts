@@ -5,15 +5,31 @@ import { hasScope } from '@/lib/scopes'
 import { queryMany } from '@/lib/db'
 import { buildProductRowSql } from '@/lib/homepage-data'
 import {
-  productSource, sectionLimit, resolveAboutStats, configId, friendlyCount, safeHref, SECTION_TYPES, SECTION_COPY_DEFAULTS,
-  type SectionType, type HomepageSection, type PreviewItem,
+  productSource,
+  sectionLimit,
+  resolveAboutStats,
+  configId,
+  friendlyCount,
+  safeHref,
+  SECTION_TYPES,
+  SECTION_COPY_DEFAULTS,
+  type SectionType,
+  type HomepageSection,
+  type PreviewItem,
 } from '@/lib/homepage-sections'
 import {
-  getBackInStock, getBundles, getCategoryTabs, getCountdownDeal, getTestimonials, getValueStats,
+  getBackInStock,
+  getBundles,
+  getCategoryTabs,
+  getCountdownDeal,
+  getTestimonials,
+  getValueStats,
 } from '@/lib/homepage-extras'
 import {
-  VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL,
-  VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL,
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
 import { getFeatureFlags, getStorefrontContent } from '@/lib/site-controls'
 import { getEditableHomepage } from '@/lib/homepage-draft'
@@ -23,7 +39,8 @@ export const dynamic = 'force-dynamic'
 
 const PREVIEW_LIMIT = 8
 
-type PreviewKind = 'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
+type PreviewKind =
+  'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'
 
 interface PreviewResult {
   kind: PreviewKind
@@ -70,7 +87,12 @@ async function productRow(config: Record<string, unknown>): Promise<PreviewItem[
   })
   const params: unknown[] = [limit]
   if (source === 'category' && categorySlug) params.push(categorySlug)
-  const rows = await queryMany<{ id: string; name: string; variant_min_price: number | null; product_images?: unknown }>(sql, params)
+  const rows = await queryMany<{
+    id: string
+    name: string
+    variant_min_price: number | null
+    product_images?: unknown
+  }>(sql, params)
   return rows.map(r => ({ id: r.id, name: r.name, image_url: firstImage(r), price: r.variant_min_price }))
 }
 
@@ -141,11 +163,14 @@ async function topBrands(): Promise<PreviewItem[]> {
 
 async function heroItems(): Promise<PreviewItem[]> {
   const { heroSlides } = await getEditableHomepage()
-  return heroSlides.filter(s => s.is_active).slice(0, PREVIEW_LIMIT).map(s => ({
-    id: s.id,
-    name: s.title || 'Slide',
-    image_url: s.image_url,
-  }))
+  return heroSlides
+    .filter(s => s.is_active)
+    .slice(0, PREVIEW_LIMIT)
+    .map(s => ({
+      id: s.id,
+      name: s.title || 'Slide',
+      image_url: s.image_url,
+    }))
 }
 
 async function offerItems(config: Record<string, unknown>): Promise<PreviewItem[]> {
@@ -160,13 +185,15 @@ async function offerItems(config: Record<string, unknown>): Promise<PreviewItem[
 }
 
 const isStat = (s: unknown): s is { value: string; label: string } =>
-  !!s && typeof s === 'object'
-  && typeof (s as Record<string, unknown>).value === 'string'
-  && typeof (s as Record<string, unknown>).label === 'string'
+  !!s &&
+  typeof s === 'object' &&
+  typeof (s as Record<string, unknown>).value === 'string' &&
+  typeof (s as Record<string, unknown>).label === 'string'
 
 // The About photo followed by its stat tiles, resolved the way the storefront resolves them.
 async function aboutItems(config: Record<string, unknown>): Promise<PreviewItem[]> {
-  const imageUrl = typeof config.imageUrl === 'string' && config.imageUrl ? config.imageUrl : SECTION_COPY_DEFAULTS.about.imageUrl
+  const imageUrl =
+    typeof config.imageUrl === 'string' && config.imageUrl ? config.imageUrl : SECTION_COPY_DEFAULTS.about.imageUrl
   const own = Array.isArray(config.stats) ? config.stats.filter(isStat) : []
   const stats = own.length > 0 ? own : resolveAboutStats((await getStorefrontContent()).statsJson)
   return [
@@ -175,18 +202,27 @@ async function aboutItems(config: Record<string, unknown>): Promise<PreviewItem[
   ]
 }
 
-const productItem = (r: { id: string; name: string; variant_min_price?: number | null; product_images?: unknown }): PreviewItem =>
-  ({ id: r.id, name: r.name, image_url: firstImage(r), price: r.variant_min_price ?? null })
+const productItem = (r: {
+  id: string
+  name: string
+  variant_min_price?: number | null
+  product_images?: unknown
+}): PreviewItem => ({ id: r.id, name: r.name, image_url: firstImage(r), price: r.variant_min_price ?? null })
 
 const shape = (type: SectionType, config: Record<string, unknown>) => ({ type, config })
 
 async function countdownDeal(config: Record<string, unknown>): Promise<PreviewResult> {
-  if (!configId({ config }, 'productId')) return { kind: 'products', items: [], note: 'Pick a deal product to preview this banner.' }
+  if (!configId({ config }, 'productId'))
+    return { kind: 'products', items: [], note: 'Pick a deal product to preview this banner.' }
   const { gstEnabled } = await getFeatureFlags()
   const deal = await getCountdownDeal(shape('countdown_deal', config), gstEnabled)
   return deal
     ? { kind: 'products', items: [productItem(deal.product)] }
-    : { kind: 'products', items: [], note: 'The countdown has ended or the product is no longer live, so this banner is hidden.' }
+    : {
+        kind: 'products',
+        items: [],
+        note: 'The countdown has ended or the product is no longer live, so this banner is hidden.',
+      }
 }
 
 async function withGst<T>(load: (gstEnabled: boolean) => Promise<T>): Promise<T> {
@@ -219,7 +255,12 @@ const RESOLVERS: Partial<Record<SectionType, (config: Record<string, unknown>) =
   countdown_deal: countdownDeal,
   testimonials: async c => ({
     kind: 'reviews',
-    items: (await getTestimonials(shape('testimonials', c))).map(t => ({ id: t.id, name: t.author, image_url: null, value: `${t.rating}/5` })),
+    items: (await getTestimonials(shape('testimonials', c))).map(t => ({
+      id: t.id,
+      name: t.author,
+      image_url: null,
+      value: `${t.rating}/5`,
+    })),
   }),
   recently_viewed: async () => ({
     kind: 'none',
@@ -228,22 +269,34 @@ const RESOLVERS: Partial<Record<SectionType, (config: Record<string, unknown>) =
   }),
   category_tabs: async c => ({
     kind: 'categories',
-    items: (await withGst(gst => getCategoryTabs(shape('category_tabs', c), gst)))
-      .map(t => ({ id: t.id, name: `${t.name} · ${t.products.length}`, image_url: firstImage(t.products[0] ?? {}) })),
+    items: (await withGst(gst => getCategoryTabs(shape('category_tabs', c), gst))).map(t => ({
+      id: t.id,
+      name: `${t.name} · ${t.products.length}`,
+      image_url: firstImage(t.products[0] ?? {}),
+    })),
   }),
   bundle_spotlight: async c => ({
     kind: 'products',
-    items: (await withGst(gst => getBundles(shape('bundle_spotlight', c), gst))).slice(0, PREVIEW_LIMIT).map(productItem),
+    items: (await withGst(gst => getBundles(shape('bundle_spotlight', c), gst)))
+      .slice(0, PREVIEW_LIMIT)
+      .map(productItem),
   }),
   back_in_stock: async c => ({
     kind: 'products',
-    items: (await withGst(gst => getBackInStock(shape('back_in_stock', c), gst))).slice(0, PREVIEW_LIMIT).map(productItem),
+    items: (await withGst(gst => getBackInStock(shape('back_in_stock', c), gst)))
+      .slice(0, PREVIEW_LIMIT)
+      .map(productItem),
   }),
   blog_teaser: async c => ({ kind: 'links', items: tileItems(c, 'title', 'Article') }),
   social_strip: async c => ({ kind: 'links', items: tileItems(c, 'caption', 'Post') }),
   value_stats: async c => ({
     kind: 'stats',
-    items: (await getValueStats(shape('value_stats', c))).map(s => ({ id: s.metric, name: s.label, image_url: null, value: friendlyCount(s.value) })),
+    items: (await getValueStats(shape('value_stats', c))).map(s => ({
+      id: s.metric,
+      name: s.label,
+      image_url: null,
+      value: friendlyCount(s.value),
+    })),
   }),
 }
 

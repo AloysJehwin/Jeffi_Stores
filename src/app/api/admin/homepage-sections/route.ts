@@ -6,7 +6,12 @@ import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
 import { SECTION_TYPES, type SectionType } from '@/lib/homepage-sections'
 import {
-  applyDraftOrder, endsBeforeStart, getEditableHomepage, nextDisplayOrder, withHomepageDraft, type DraftSection,
+  applyDraftOrder,
+  endsBeforeStart,
+  getEditableHomepage,
+  nextDisplayOrder,
+  withHomepageDraft,
+  type DraftSection,
 } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'

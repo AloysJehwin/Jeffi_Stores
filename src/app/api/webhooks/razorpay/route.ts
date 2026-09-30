@@ -6,8 +6,12 @@ import { createAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
-  loadActiveCart, cartSubtotal, cartTaxAmount, cartItemsForHash,
-  validateCouponForUser, commitOrder,
+  loadActiveCart,
+  cartSubtotal,
+  cartTaxAmount,
+  cartItemsForHash,
+  validateCouponForUser,
+  commitOrder,
 } from '@/lib/order-commit'
 import { createDraftInvoice } from '@/lib/invoice'
 import { getFeatureFlags } from '@/lib/site-controls'
@@ -33,10 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
     }
 
-    const expectedSignature = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(rawBody)
-      .digest('hex')
+    const expectedSignature = crypto.createHmac('sha256', webhookSecret).update(rawBody).digest('hex')
 
     if (expectedSignature !== webhookSignature) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
@@ -69,7 +70,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function resolveWebhookTenantId(payment: any, orderRef: string): Promise<{ tenantId: string; slug: string } | null> {
+async function resolveWebhookTenantId(
+  payment: any,
+  orderRef: string
+): Promise<{ tenantId: string; slug: string } | null> {
   // getCurrentTenant() is empty on the webhook (Razorpay hits a fixed URL, no host), so the
   // tenant is carried in the Razorpay order notes (set at create-order) and copied onto the
   // captured payment. Fall back to the ALS context for the platform's own store.
@@ -96,13 +100,14 @@ async function fireRouteTransfer(opts: {
   payment: any
 }) {
   const resolved = await resolveWebhookTenantId(opts.payment, opts.orderRef)
-  if (!resolved) return  // platform's own store — no tenant billing
+  if (!resolved) return // platform's own store — no tenant billing
 
   const pool = controlPlanePool()
   // Same owner-bank fallback as the verify path: a re-provisioned tenant's acc_xxx lives on the
   // owner-scoped tenant_bank_accounts row, not the tenant row. Resolve it the way billing does.
-  const row = await pool.query(
-    `SELECT COALESCE(
+  const row = await pool
+    .query(
+      `SELECT COALESCE(
               (SELECT b.linked_account_id FROM tenant_bank_accounts b
                  JOIN owner_tenants ot ON ot.owner_id = b.owner_id
                 WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
@@ -110,8 +115,10 @@ async function fireRouteTransfer(opts: {
               t.razorpay_linked_account_id
             ) AS razorpay_linked_account_id,
             t.daily_payout, t.own_razorpay
-       FROM tenants t WHERE t.id=$1 AND t.status='active'`, [resolved.tenantId]
-  ).catch(() => null)
+       FROM tenants t WHERE t.id=$1 AND t.status='active'`,
+      [resolved.tenantId]
+    )
+    .catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
   const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
@@ -121,7 +128,12 @@ async function fireRouteTransfer(opts: {
   const { isOwn } = await resolveRazorpayCreds(resolved.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
   const ownRazorpay = ownRazorpayFlag && isOwn
   if (ownRazorpayFlag !== isOwn) {
-    console.warn('[fireRouteTransfer:webhook] own_razorpay/creds mismatch', { tenantId: resolved.tenantId, orderRef: opts.orderRef, ownRazorpayFlag, isOwn })
+    console.warn('[fireRouteTransfer:webhook] own_razorpay/creds mismatch', {
+      tenantId: resolved.tenantId,
+      orderRef: opts.orderRef,
+      ownRazorpayFlag,
+      isOwn,
+    })
   }
 
   if (ownRazorpay) {
@@ -209,7 +221,11 @@ async function handlePaymentCaptured(payment: any) {
       [razorpayOrderId]
     )
     if (vcr) {
-      await settleVariantChangePayment({ razorpayOrderId, razorpayPaymentId, amountPaise: Number(payment.amount) || 0 }).catch(() => {})
+      await settleVariantChangePayment({
+        razorpayOrderId,
+        razorpayPaymentId,
+        amountPaise: Number(payment.amount) || 0,
+      }).catch(() => {})
       return
     }
     // Draft-token flow: no payments row yet — try pending_payment_intents fallback
@@ -221,7 +237,7 @@ async function handlePaymentCaptured(payment: any) {
   const orderId = paymentRecord.order_id
 
   let flippedToPaid = false
-  await withTransaction(async (client) => {
+  await withTransaction(async client => {
     const upd = await client.query(
       `UPDATE orders SET payment_status = 'paid',
         status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
@@ -244,7 +260,9 @@ async function handlePaymentCaptured(payment: any) {
     )
 
     if (paymentRecord.user_id) {
-      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [paymentRecord.user_id])
+      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [
+        paymentRecord.user_id,
+      ])
     }
   })
 
@@ -257,7 +275,14 @@ async function handlePaymentCaptured(payment: any) {
       const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
       sendOrderConfirmationEmail(user.email, order, orderItems || []).catch(() => {})
       sendNewOrderNotification(order, orderItems || [], user).catch(() => {})
-      sendPaymentStatusUpdate(user.email, userName, order.order_number, orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
+      sendPaymentStatusUpdate(
+        user.email,
+        userName,
+        order.order_number,
+        orderId,
+        'paid',
+        parseFloat(order.total_amount)
+      ).catch(() => {})
       attributeConversion(paymentRecord.user_id, orderId).catch(() => {})
     }
   }
@@ -330,7 +355,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
   if (!order || order.payment_status === 'paid') return
 
   let flippedToPaid = false
-  await withTransaction(async (client) => {
+  await withTransaction(async client => {
     const upd = await client.query(
       `UPDATE orders SET
         payment_status = 'paid',
@@ -346,11 +371,18 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
        VALUES ($1, 'razorpay_link', $2, $3, 'completed', $4)
        ON CONFLICT DO NOTHING`,
-      [order.id, paymentLink.payments?.[0]?.payment_id || linkId, parseFloat(order.total_amount), JSON.stringify(paymentLink)]
+      [
+        order.id,
+        paymentLink.payments?.[0]?.payment_id || linkId,
+        parseFloat(order.total_amount),
+        JSON.stringify(paymentLink),
+      ]
     )
 
     if (order.user_id) {
-      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [order.user_id])
+      await client.query('DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE', [
+        order.user_id,
+      ])
     }
   })
 
@@ -362,7 +394,14 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
       sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
       sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
-      sendPaymentStatusUpdate(user.email, userName, order.order_number, order.id, 'paid', parseFloat(order.total_amount)).catch(() => {})
+      sendPaymentStatusUpdate(
+        user.email,
+        userName,
+        order.order_number,
+        order.id,
+        'paid',
+        parseFloat(order.total_amount)
+      ).catch(() => {})
     }
   }
 
@@ -383,10 +422,15 @@ async function handleQrCodeCredited(qrCode: any) {
   const qrId = qrCode?.id
   if (!qrId) return
 
-  const order = await queryOne<{ id: string; payment_status: string; total_amount: string; shipping_amount: string; order_number: string }>(
-    `SELECT id, payment_status, total_amount, shipping_amount, order_number FROM orders WHERE razorpay_qr_id = $1`,
-    [qrId]
-  )
+  const order = await queryOne<{
+    id: string
+    payment_status: string
+    total_amount: string
+    shipping_amount: string
+    order_number: string
+  }>(`SELECT id, payment_status, total_amount, shipping_amount, order_number FROM orders WHERE razorpay_qr_id = $1`, [
+    qrId,
+  ])
   if (!order || order.payment_status === 'paid') return
 
   const upd = await query(
@@ -433,10 +477,10 @@ async function handleTransferProcessed(transfer: any) {
   // Resolve the tenant for this transfer, then settle idempotently (flips status AND writes the
   // prepaid settlement ledger). If the tenant_transactions row hasn't been inserted yet (the race),
   // recordTenantTransaction's own post-insert self-check settles it once it lands.
-  const owner = await controlPlanePool().query(
-    `SELECT tenant_id FROM tenant_transactions WHERE gateway_txn_id = $1 LIMIT 1`,
-    [transferId]
-  ).then(r => r.rows[0]).catch(() => null)
+  const owner = await controlPlanePool()
+    .query(`SELECT tenant_id FROM tenant_transactions WHERE gateway_txn_id = $1 LIMIT 1`, [transferId])
+    .then(r => r.rows[0])
+    .catch(() => null)
   if (!owner) return
   const { settleTenantTransaction } = await import('@/lib/razorpay-route')
   await settleTenantTransaction({ tenantId: owner.tenant_id, transferId }).catch(() => {})
@@ -450,11 +494,13 @@ async function handleTransferProcessed(transfer: any) {
 async function handleTransferReversed(transfer: any) {
   const transferId = (transfer?.id ?? '').toString().trim()
   if (!transferId) return
-  await controlPlanePool().query(
-    `UPDATE tenant_transactions SET status = 'refunded'
+  await controlPlanePool()
+    .query(
+      `UPDATE tenant_transactions SET status = 'refunded'
      WHERE gateway_txn_id = $1 AND status <> 'refunded'`,
-    [transferId]
-  ).catch(() => {})
+      [transferId]
+    )
+    .catch(() => {})
 }
 
 /**
@@ -480,14 +526,13 @@ async function handleRefund(refund: any) {
   const orderId = updated?.rows?.[0]?.order_id
   if (!orderId) return // already recorded by the in-app refund path
 
-  await query(
-    `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
-    [orderId]
-  ).catch(() => {})
+  await query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId]).catch(
+    () => {}
+  )
 
-  const order = await queryOne<{ order_number: string }>(
-    `SELECT order_number FROM orders WHERE id = $1`, [orderId]
-  ).catch(() => null)
+  const order = await queryOne<{ order_number: string }>(`SELECT order_number FROM orders WHERE id = $1`, [
+    orderId,
+  ]).catch(() => null)
   if (!order?.order_number) return
   // Razorpay hits a fixed URL with no tenant host, so ALS is empty here — the tenant is carried
   // in the refund's own notes (copied from the payment), same as every other handler in this file.
@@ -509,7 +554,10 @@ async function handleRefund(refund: any) {
 async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId: string, payment: any) {
   // Atomically claim the intent — prevents double-commit with verify route
   const intent = await queryOne<{
-    id: string; draft_token: string; user_id: string; amount_paise: number
+    id: string
+    draft_token: string
+    user_id: string
+    amount_paise: number
   }>(
     `UPDATE pending_payment_intents SET committed = true
      WHERE razorpay_order_id = $1 AND committed = false
@@ -563,18 +611,25 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     subtotal = cartSubtotal(cartItems, gstEnabled)
     taxAmount = cartTaxAmount(cartItems, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
-    const product = await queryOne<any>(`SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`, [draft.buyNowItem.productId])
+    const product = await queryOne<any>(
+      `SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`,
+      [draft.buyNowItem.productId]
+    )
     if (!product) return
     const variant = draft.buyNowItem.variantId
-      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [
+          draft.buyNowItem.variantId,
+        ])
       : null
     const subVariant = draft.buyNowItem.subVariantId
-      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [
+          draft.buyNowItem.subVariantId,
+        ])
       : null
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
     const gstRate = parseFloat(String(product.gst_percentage || '0'))
-    taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
+    taxAmount = gstEnabled ? subtotal - subtotal / (1 + gstRate / 100) : 0
   } else {
     return
   }
@@ -585,31 +640,53 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const created = draft.mode === 'cart'
-    ? await commitOrder({
-        mode: 'cart', userId: intent.user_id, user, addressId: draft.addressId,
-        notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
-        codFeeAmount: draft.codFeeAmount,
-        cartItems, subtotal, taxAmount, appliedDiscount,
-        businessDiscountAmount: draft.businessDiscountAmount,
-        paymentRecord: {
-          gatewayOrderId: razorpayOrderId, paymentId: razorpayPaymentId,
-          signature: '', amountPaise: capturedPaise,
-        },
-      })
-    : await commitOrder({
-        mode: 'buyNow', userId: intent.user_id, user, addressId: draft.addressId,
-        notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
-        codFeeAmount: draft.codFeeAmount,
-        item: draft.buyNowItem!, product: buyNowSnapshot!.product,
-        variant: buyNowSnapshot!.variant, subVariant: buyNowSnapshot!.subVariant,
-        subtotal, taxAmount, appliedDiscount,
-        businessDiscountAmount: draft.businessDiscountAmount,
-        paymentRecord: {
-          gatewayOrderId: razorpayOrderId, paymentId: razorpayPaymentId,
-          signature: '', amountPaise: capturedPaise,
-        },
-      })
+  const created =
+    draft.mode === 'cart'
+      ? await commitOrder({
+          mode: 'cart',
+          userId: intent.user_id,
+          user,
+          addressId: draft.addressId,
+          notes: draft.notes,
+          couponId: draft.couponId,
+          shippingAmount: draft.shippingAmount,
+          codFeeAmount: draft.codFeeAmount,
+          cartItems,
+          subtotal,
+          taxAmount,
+          appliedDiscount,
+          businessDiscountAmount: draft.businessDiscountAmount,
+          paymentRecord: {
+            gatewayOrderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+            signature: '',
+            amountPaise: capturedPaise,
+          },
+        })
+      : await commitOrder({
+          mode: 'buyNow',
+          userId: intent.user_id,
+          user,
+          addressId: draft.addressId,
+          notes: draft.notes,
+          couponId: draft.couponId,
+          shippingAmount: draft.shippingAmount,
+          codFeeAmount: draft.codFeeAmount,
+          item: draft.buyNowItem!,
+          product: buyNowSnapshot!.product,
+          variant: buyNowSnapshot!.variant,
+          subVariant: buyNowSnapshot!.subVariant,
+          subtotal,
+          taxAmount,
+          appliedDiscount,
+          businessDiscountAmount: draft.businessDiscountAmount,
+          paymentRecord: {
+            gatewayOrderId: razorpayOrderId,
+            paymentId: razorpayPaymentId,
+            signature: '',
+            amountPaise: capturedPaise,
+          },
+        })
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
   createDraftInvoice(created.id).catch(() => {})
@@ -617,10 +694,27 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
   sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
   sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
-  sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
-  logActivity({ userId: intent.user_id, kind: 'order_placed', referenceId: created.id, referenceType: 'orders',
-    summary: `Placed order #${created.order_number} via webhook recovery`, metadata: { orderNumber: created.order_number, total: created.total_amount } }).catch(() => {})
-  recordImplicitSignalsForProducts(intent.user_id, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+  sendPaymentStatusUpdate(
+    user.email,
+    userName,
+    created.order_number,
+    created.id,
+    'paid',
+    parseFloat(created.total_amount)
+  ).catch(() => {})
+  logActivity({
+    userId: intent.user_id,
+    kind: 'order_placed',
+    referenceId: created.id,
+    referenceType: 'orders',
+    summary: `Placed order #${created.order_number} via webhook recovery`,
+    metadata: { orderNumber: created.order_number, total: created.total_amount },
+  }).catch(() => {})
+  recordImplicitSignalsForProducts(
+    intent.user_id,
+    (orderItems || []).map((i: any) => i.product_id),
+    'purchased'
+  ).catch(() => {})
   attributeConversion(intent.user_id, created.id).catch(() => {})
 
   // The intent claim above (committed=false → true, RETURNING) already elected a single winner,

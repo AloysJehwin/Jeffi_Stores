@@ -17,10 +17,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   // Writing to a customer by hand is the mailer module. The route lives under /orders/, which
   // every plan has, so without this check the plan restriction could be bypassed from here.
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
+    return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
 
   const raw = await request.json().catch(() => null)
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -28,7 +30,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!parsed.ok) return parsed.response
   const { subject, body, isHtml } = parsed.data
 
-  const order = await queryOne<{ id: string; order_number: string; customer_name: string; customer_email: string; users?: { email: string; first_name: string; last_name: string } }>(
+  const order = await queryOne<{
+    id: string
+    order_number: string
+    customer_name: string
+    customer_email: string
+    users?: { email: string; first_name: string; last_name: string }
+  }>(
     `SELECT o.id, o.order_number, o.customer_name, o.customer_email,
        json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
      FROM orders o

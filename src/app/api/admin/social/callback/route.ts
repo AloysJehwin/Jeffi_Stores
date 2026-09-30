@@ -42,20 +42,29 @@ export async function GET(request: NextRequest) {
 
     const tokenExpiry = new Date(Date.now() + expiresInSec * 1000)
     await saveTenantSocialAccount({
-      tenantId: state.tenantId, provider: 'facebook',
-      pageId: accounts.pageId, pageName: accounts.pageName,
-      accessTokenEnc: encryptToken(accounts.pageAccessToken), tokenExpiry,
+      tenantId: state.tenantId,
+      provider: 'facebook',
+      pageId: accounts.pageId,
+      pageName: accounts.pageName,
+      accessTokenEnc: encryptToken(accounts.pageAccessToken),
+      tokenExpiry,
     })
     if (accounts.igUserId) {
       await saveTenantSocialAccount({
-        tenantId: state.tenantId, provider: 'instagram',
-        pageId: accounts.pageId, pageName: accounts.pageName, igUserId: accounts.igUserId,
-        accessTokenEnc: encryptToken(accounts.pageAccessToken), tokenExpiry,
+        tenantId: state.tenantId,
+        provider: 'instagram',
+        pageId: accounts.pageId,
+        pageName: accounts.pageName,
+        igUserId: accounts.igUserId,
+        accessTokenEnc: encryptToken(accounts.pageAccessToken),
+        tokenExpiry,
       })
     }
 
     return returnToAdmin(`${backTo}?connected=meta`)
   } catch (e: any) {
-    return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(
+      `${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`
+    )
   }
 }

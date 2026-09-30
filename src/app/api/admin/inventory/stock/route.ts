@@ -8,20 +8,22 @@ import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/shelf'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { parseBody, zUuid } from '@/lib/validate'
 
-const PatchSchema = z.object({
-  product_id: zUuid,
-  variant_id: zUuid.nullish(),
-  sub_variant_id: zUuid.nullish(),
-  // Either supply new_quantity (base units, legacy) OR unit_id + quantity_in_unit (unit-aware)
-  new_quantity: z.coerce.number().min(0).optional(),
-  unit_id: zUuid.nullish(),
-  quantity_in_unit: z.coerce.number().positive().optional(),
-  notes: z.string().nullish(),
-  warehouse_id: zUuid.nullish(),
-  location_id: zUuid.nullish(),
-}).refine(d => d.new_quantity !== undefined || (d.unit_id && d.quantity_in_unit !== undefined), {
-  message: 'Provide either new_quantity or both unit_id and quantity_in_unit',
-})
+const PatchSchema = z
+  .object({
+    product_id: zUuid,
+    variant_id: zUuid.nullish(),
+    sub_variant_id: zUuid.nullish(),
+    // Either supply new_quantity (base units, legacy) OR unit_id + quantity_in_unit (unit-aware)
+    new_quantity: z.coerce.number().min(0).optional(),
+    unit_id: zUuid.nullish(),
+    quantity_in_unit: z.coerce.number().positive().optional(),
+    notes: z.string().nullish(),
+    warehouse_id: zUuid.nullish(),
+    location_id: zUuid.nullish(),
+  })
+  .refine(d => d.new_quantity !== undefined || (d.unit_id && d.quantity_in_unit !== undefined), {
+    message: 'Provide either new_quantity or both unit_id and quantity_in_unit',
+  })
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'ledger'
@@ -43,17 +46,32 @@ export async function GET(request: NextRequest) {
       const conditions: string[] = ['pb.quantity_remaining > 0']
       const params: any[] = []
       let i = 1
-      if (productId) { conditions.push(`pb.product_id = $${i++}`); params.push(productId) }
-      if (variantId) { conditions.push(`pb.variant_id = $${i++}`); params.push(variantId) }
-      if (subVariantId) { conditions.push(`pb.sub_variant_id = $${i++}`); params.push(subVariantId) }
+      if (productId) {
+        conditions.push(`pb.product_id = $${i++}`)
+        params.push(productId)
+      }
+      if (variantId) {
+        conditions.push(`pb.variant_id = $${i++}`)
+        params.push(variantId)
+      }
+      if (subVariantId) {
+        conditions.push(`pb.sub_variant_id = $${i++}`)
+        params.push(subVariantId)
+      }
       if (search) {
-        conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i} OR pb.lot_number ILIKE $${i})`)
-        params.push(`%${search}%`); i++
+        conditions.push(
+          `(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i} OR pb.lot_number ILIKE $${i})`
+        )
+        params.push(`%${search}%`)
+        i++
       }
       if (stockStatus === 'expired') conditions.push(`pb.expiry_date < CURRENT_DATE`)
-      if (stockStatus === 'expiring_soon') conditions.push(`pb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`)
+      if (stockStatus === 'expiring_soon')
+        conditions.push(`pb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`)
       const where = conditions.join(' AND ')
-      const rows = await import('@/lib/db').then(m => m.queryMany<any>(`
+      const rows = await import('@/lib/db').then(m =>
+        m.queryMany<any>(
+          `
         SELECT
           pb.id AS batch_id,
           pb.lot_number,
@@ -80,7 +98,10 @@ export async function GET(request: NextRequest) {
         LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
         WHERE ${where}
         ORDER BY pb.expiry_date ASC NULLS LAST, p.name, pv.variant_name
-      `, params))
+      `,
+          params
+        )
+      )
       return NextResponse.json({ batches: rows || [] })
     }
 
@@ -121,7 +142,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const raw = await request.json().catch(() => null)
     if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -136,9 +158,13 @@ export async function PATCH(request: NextRequest) {
     let quantityInUnit: number | null = null
 
     if (parsed.data.unit_id && parsed.data.quantity_in_unit !== undefined) {
-      const unitRow = await queryOne<{ id: string; factor: string; display_label: string | null; unit: string; dimension: string }>(
-        'SELECT id, factor, display_label, unit, dimension FROM product_units WHERE id = $1', [parsed.data.unit_id]
-      )
+      const unitRow = await queryOne<{
+        id: string
+        factor: string
+        display_label: string | null
+        unit: string
+        dimension: string
+      }>('SELECT id, factor, display_label, unit, dimension FROM product_units WHERE id = $1', [parsed.data.unit_id])
       if (!unitRow) return NextResponse.json({ error: 'Unit not found' }, { status: 400 })
       unitId = unitRow.id
       unitLabel = unitRow.display_label || unitRow.unit
@@ -150,11 +176,15 @@ export async function PATCH(request: NextRequest) {
     // quantity written here would be overwritten at the next sync and could leave
     // units without serials.
     const tracked = await queryOne<{ perishable: boolean; serialized: boolean }>(
-      `SELECT perishable, serialized FROM products WHERE id = $1`, [product_id]
+      `SELECT perishable, serialized FROM products WHERE id = $1`,
+      [product_id]
     )
     if (tracked?.perishable || tracked?.serialized) {
       return NextResponse.json(
-        { error: 'This product is perishable or serialized. Receive stock through a GRN and remove it by batch or serial.' },
+        {
+          error:
+            'This product is perishable or serialized. Receive stock through a GRN and remove it by batch or serial.',
+        },
         { status: 409 }
       )
     }
@@ -166,37 +196,49 @@ export async function PATCH(request: NextRequest) {
       let currentQty: number
       if (sub_variant_id) {
         const cur = await client.query<{ inventory_quantity: number }>(
-          'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1', [sub_variant_id])
+          'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1',
+          [sub_variant_id]
+        )
         currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
       } else if (variant_id) {
         const cur = await client.query<{ inventory_quantity: number }>(
-          'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variant_id])
+          'SELECT inventory_quantity FROM product_variants WHERE id = $1',
+          [variant_id]
+        )
         currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
       } else {
         const cur = await client.query<{ inventory_quantity: number }>(
-          'SELECT inventory_quantity FROM products WHERE id = $1', [product_id])
+          'SELECT inventory_quantity FROM products WHERE id = $1',
+          [product_id]
+        )
         currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
       }
 
       // Compute new base-unit quantity
       // Unit-aware: operator enters qty in sell unit → convert to base units via factor
       // Legacy: operator enters base units directly
-      const newQuantityBase = quantityInUnit !== null
-        ? Math.round(quantityInUnit * unitFactor * 1000) / 1000
-        : parsed.data.new_quantity!
+      const newQuantityBase =
+        quantityInUnit !== null ? Math.round(quantityInUnit * unitFactor * 1000) / 1000 : parsed.data.new_quantity!
       const change = Math.round((newQuantityBase - currentQty) * 1000) / 1000
 
       if (sub_variant_id) {
-        await client.query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [newQuantityBase, sub_variant_id])
+        await client.query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
+          newQuantityBase,
+          sub_variant_id,
+        ])
       } else if (variant_id) {
-        await client.query('UPDATE product_variants SET inventory_quantity = $1 WHERE id = $2', [newQuantityBase, variant_id])
+        await client.query('UPDATE product_variants SET inventory_quantity = $1 WHERE id = $2', [
+          newQuantityBase,
+          variant_id,
+        ])
       } else {
         await client.query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [newQuantityBase, product_id])
       }
 
-      const autoNote = quantityInUnit !== null
-        ? `Manual adjustment: ${quantityInUnit} ${unitLabel} = ${newQuantityBase} base units`
-        : `Manual adjustment to ${newQuantityBase}`
+      const autoNote =
+        quantityInUnit !== null
+          ? `Manual adjustment: ${quantityInUnit} ${unitLabel} = ${newQuantityBase} base units`
+          : `Manual adjustment to ${newQuantityBase}`
 
       await logStockMovement(client, {
         productId: product_id,
@@ -228,8 +270,8 @@ export async function PATCH(request: NextRequest) {
           [parsed.data.warehouse_id, product_id]
         )
         if (wRow && !wRow.perishable && !wRow.serialized) {
-          const locationId = parsed.data.location_id ||
-            await getOrCreateOpenShelf(parsed.data.warehouse_id, wRow.code)
+          const locationId =
+            parsed.data.location_id || (await getOrCreateOpenShelf(parsed.data.warehouse_id, wRow.code))
           // Remove stock from any other locations for this product/variant (reassignment)
           await queryOne(
             `DELETE FROM shelf_stock
@@ -239,14 +281,17 @@ export async function PATCH(request: NextRequest) {
                AND location_id != $4`,
             [product_id, variant_id ?? null, sub_variant_id ?? null, locationId]
           )
-          await upsertShelfStock({ query }, {
-            locationId,
-            productId: product_id,
-            variantId: variant_id ?? null,
-            subVariantId: sub_variant_id ?? null,
-            quantity: newQuantityBase,
-            mode: 'set',
-          })
+          await upsertShelfStock(
+            { query },
+            {
+              locationId,
+              productId: product_id,
+              variantId: variant_id ?? null,
+              subVariantId: sub_variant_id ?? null,
+              quantity: newQuantityBase,
+              mode: 'set',
+            }
+          )
         }
       }
 
@@ -258,7 +303,15 @@ export async function PATCH(request: NextRequest) {
         entityId: product_id,
         summary: `Adjusted stock for "${product?.name || 'product'}" from ${currentQty} to ${newQuantityBase}${quantityInUnit !== null ? ` (entered ${quantityInUnit} ${unitLabel})` : ''}${sub_variant_id ? ' (sub-variant)' : variant_id ? ' (variant)' : ''}`,
         diff: { quantity: { from: currentQty, to: newQuantityBase } },
-        metadata: { product_id, variant_id: variant_id || null, sub_variant_id: sub_variant_id || null, change, unit_id: unitId, quantity_in_unit: quantityInUnit, notes: notes || null },
+        metadata: {
+          product_id,
+          variant_id: variant_id || null,
+          sub_variant_id: sub_variant_id || null,
+          change,
+          unit_id: unitId,
+          quantity_in_unit: quantityInUnit,
+          notes: notes || null,
+        },
         request,
       }).catch(() => {})
 

@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
 
     const cartUserId = userId
 
-    const cartItems = await queryMany(`
+    const cartItems = await queryMany(
+      `
       SELECT
         ci.*,
         json_build_object(
@@ -120,7 +121,9 @@ export async function POST(request: NextRequest) {
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
       WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = FALSE
-    `, [cartUserId])
+    `,
+      [cartUserId]
+    )
 
     if (!cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
@@ -129,20 +132,26 @@ export async function POST(request: NextRequest) {
     const inactiveItems = cartItems.filter((item: any) => item.products?.is_active === false)
     if (inactiveItems.length > 0) {
       const names = inactiveItems.map((item: any) => item.products?.name || 'Unknown').join(', ')
-      return NextResponse.json({
-        error: `Some items in your cart are no longer available: ${names}. Please remove them before placing your order.`,
-        inactiveProductIds: inactiveItems.map((item: any) => item.product_id),
-      }, { status: 422 })
+      return NextResponse.json(
+        {
+          error: `Some items in your cart are no longer available: ${names}. Please remove them before placing your order.`,
+          inactiveProductIds: inactiveItems.map((item: any) => item.product_id),
+        },
+        { status: 422 }
+      )
     }
 
     if (isCod) {
       const codBlockedItems = cartItems.filter((item: any) => item.products?.is_cod_allowed === false)
       if (codBlockedItems.length > 0) {
         const names = codBlockedItems.map((item: any) => item.products?.name || 'Unknown').join(', ')
-        return NextResponse.json({
-          error: `COD is not available for: ${names}. Please choose online payment.`,
-          codBlockedProductIds: codBlockedItems.map((item: any) => item.product_id),
-        }, { status: 422 })
+        return NextResponse.json(
+          {
+            error: `COD is not available for: ${names}. Please choose online payment.`,
+            codBlockedProductIds: codBlockedItems.map((item: any) => item.product_id),
+          },
+          { status: 422 }
+        )
       }
     }
 
@@ -155,15 +164,15 @@ export async function POST(request: NextRequest) {
             inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
             exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
           },
-          false,
+          false
         )
       }
       const pia = parseFloat(item.price_at_addition)
-      return (pia > 0) ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      return pia > 0 ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
     }
 
     const subtotal: number = cartItems.reduce((sum: number, item: any) => {
-      return sum + (lineUnitPrice(item) * parseFloat(item.quantity))
+      return sum + lineUnitPrice(item) * parseFloat(item.quantity)
     }, 0)
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -180,17 +189,19 @@ export async function POST(request: NextRequest) {
         const pct = catId ? (bizDiscountMap[catId] ?? 0) : 0
         if (pct > 0) {
           const linePrice = lineUnitPrice(item)
-          businessDiscountAmount += linePrice * parseFloat((item as any).quantity) * pct / 100
+          businessDiscountAmount += (linePrice * parseFloat((item as any).quantity) * pct) / 100
         }
       }
       businessDiscountAmount = round2(businessDiscountAmount)
     }
 
-    const taxAmount = !isGSTEnabled ? 0 : cartItems.reduce((sum: number, item: any) => {
-      const lineTotal = lineUnitPrice(item) * parseFloat(item.quantity)
-      const gstRate = parseFloat(item.products.gst_percentage || '0')
-      return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
-    }, 0)
+    const taxAmount = !isGSTEnabled
+      ? 0
+      : cartItems.reduce((sum: number, item: any) => {
+          const lineTotal = lineUnitPrice(item) * parseFloat(item.quantity)
+          const gstRate = parseFloat(item.products.gst_percentage || '0')
+          return sum + (lineTotal - lineTotal / (1 + gstRate / 100))
+        }, 0)
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
     // Serviceability gate: the buyer's pincode must be one Delhivery actually delivers to.
@@ -199,10 +210,16 @@ export async function POST(request: NextRequest) {
     if (destinationPin) {
       const service = await checkPincodeServiceability(destinationPin)
       if (!service.serviceable) {
-        return NextResponse.json({ error: 'Delivery is not available to this pincode.', unserviceable: true }, { status: 422 })
+        return NextResponse.json(
+          { error: 'Delivery is not available to this pincode.', unserviceable: true },
+          { status: 422 }
+        )
       }
       if (isCod && !service.cod) {
-        return NextResponse.json({ error: 'Cash on delivery is not available to this pincode. Please choose online payment.' }, { status: 422 })
+        return NextResponse.json(
+          { error: 'Cash on delivery is not available to this pincode. Please choose online payment.' },
+          { status: 422 }
+        )
       }
     }
     // Server re-quotes with the correct COD flag; fall back to the client-quoted
@@ -211,7 +228,12 @@ export async function POST(request: NextRequest) {
     const quote = destinationPin
       ? await quoteShipping({
           destinationPin,
-          items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, subVariantId: c.sub_variant_id, quantity: Number(c.quantity) })),
+          items: cartItems.map((c: any) => ({
+            productId: c.product_id,
+            variantId: c.variant_id,
+            subVariantId: c.sub_variant_id,
+            quantity: Number(c.quantity),
+          })),
           subtotal,
           isCod,
         })
@@ -220,12 +242,10 @@ export async function POST(request: NextRequest) {
     // otherwise fall back to the client-quoted values so the charged total matches
     // what the customer saw instead of silently dropping shipping to 0.
     const quoteResolved = quote.shipping > 0
-    const appliedShipping = quoteResolved ? quote.shipping : (clientShipping != null ? round2(clientShipping) : 0)
+    const appliedShipping = quoteResolved ? quote.shipping : clientShipping != null ? round2(clientShipping) : 0
     // COD fee only ever applies to COD orders. Prefer the live quote's codFee when the
     // quote resolved; else fall back to the client value (still gated on isCod).
-    const appliedCodFee = !isCod ? 0
-      : quoteResolved ? quote.codFee
-      : (clientCodFee != null ? round2(clientCodFee) : 0)
+    const appliedCodFee = !isCod ? 0 : quoteResolved ? quote.codFee : clientCodFee != null ? round2(clientCodFee) : 0
 
     const _eddPin = String(destinationPin || '')
     const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
@@ -233,13 +253,14 @@ export async function POST(request: NextRequest) {
     const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
     const _edd = computeEdd({ pin: _eddPin, originPin: _eddOrigin, handlingDays: _eddHandling, extraDays: _eddExtra })
 
-    const order = await withTransaction(async (client) => {
+    const order = await withTransaction(async client => {
       let shippingAddressId = null
       let billingAddressId = null
       let shippingAddressSnapshot = null
 
       if (shippingAddress) {
-        const fullName = shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
+        const fullName =
+          shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
         const phone = shippingAddress.phone || user.phone || '0000000000'
 
         const existingAddress = await client.query(
@@ -258,10 +279,20 @@ export async function POST(request: NextRequest) {
             `INSERT INTO addresses (user_id, address_type, full_name, phone, address_line1, address_line2, landmark, city, state, postal_code, country, is_default)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
-            [userId, 'both', fullName, phone, shippingAddress.addressLine1,
-             shippingAddress.addressLine2 || null, shippingAddress.landmark || null,
-             shippingAddress.city, shippingAddress.state, shippingAddress.postalCode,
-             shippingAddress.country || 'India', false]
+            [
+              userId,
+              'both',
+              fullName,
+              phone,
+              shippingAddress.addressLine1,
+              shippingAddress.addressLine2 || null,
+              shippingAddress.landmark || null,
+              shippingAddress.city,
+              shippingAddress.state,
+              shippingAddress.postalCode,
+              shippingAddress.country || 'India',
+              false,
+            ]
           )
 
           if (addressResult.rows[0]) {
@@ -327,7 +358,10 @@ export async function POST(request: NextRequest) {
       )
       if (existingUnpaidResult.rows[0]) {
         const existing = existingUnpaidResult.rows[0]
-        throw Object.assign(new Error('EXISTING_UNPAID_ORDER'), { existingOrderId: existing.id, existingOrderNumber: existing.order_number })
+        throw Object.assign(new Error('EXISTING_UNPAID_ORDER'), {
+          existingOrderId: existing.id,
+          existingOrderNumber: existing.order_number,
+        })
       }
 
       const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
@@ -345,80 +379,125 @@ export async function POST(request: NextRequest) {
         `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date, cod_fee_amount)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
          RETURNING *`,
-        [orderNumber, userId, user.email, user.phone,
-         `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', isCod ? 'cod_pending' : 'unpaid', isCod ? 'cod' : isManual ? 'manual' : 'razorpay', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, txTotal, shippingAddressId, billingAddressId,
-         notes || null,
-         isGSTEnabled ? orderTaxableAmount : 0,
-         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
-         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
-         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
-         _edd, round2(appliedCodFee)]
+        [
+          orderNumber,
+          userId,
+          user.email,
+          user.phone,
+          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
+          'pending',
+          isCod ? 'cod_pending' : 'unpaid',
+          isCod ? 'cod' : isManual ? 'manual' : 'razorpay',
+          subtotal,
+          round2(appliedDiscount),
+          round2(businessDiscountAmount),
+          round2(taxAmount),
+          appliedShipping,
+          txTotal,
+          shippingAddressId,
+          billingAddressId,
+          notes || null,
+          isGSTEnabled ? orderTaxableAmount : 0,
+          isGSTEnabled ? orderCgst : 0,
+          isGSTEnabled ? orderSgst : 0,
+          isGSTEnabled ? orderIgst : 0,
+          isIGST,
+          shippingAddressSnapshot
+            ? JSON.stringify(shippingAddressSnapshot)
+            : addrSnapshot
+              ? JSON.stringify(addrSnapshot)
+              : null,
+          shippingAddressSnapshot
+            ? JSON.stringify(shippingAddressSnapshot)
+            : addrSnapshot
+              ? JSON.stringify(addrSnapshot)
+              : null,
+          _edd,
+          round2(appliedCodFee),
+        ]
       )
 
       const createdOrder = orderResult.rows[0]
 
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
-        const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
+        const tax = isGSTEnabled && gst ? gst.totalTax : itemTax || 0
         const catId = (item as any).products?.category_id
         const bizPct = catId ? (bizDiscountMap[catId] ?? 0) : 0
-        const itemBizDiscount = bizPct > 0 ? round2(itemTotal * bizPct / 100) : 0
+        const itemBizDiscount = bizPct > 0 ? round2((itemTotal * bizPct) / 100) : 0
 
         // Product-level discount: discount_pct lives on the product and applies to all variants
         const variantDiscPct = Number((item as any).products?.discount_pct ?? 0)
         const mrpUnitPrice = variantDiscPct > 0 ? unitPrice / (1 - variantDiscPct / 100) : unitPrice
-        const itemProductDiscount = variantDiscPct > 0 ? round2((mrpUnitPrice - unitPrice) * parseFloat(item.quantity)) : 0
+        const itemProductDiscount =
+          variantDiscPct > 0 ? round2((mrpUnitPrice - unitPrice) * parseFloat(item.quantity)) : 0
 
         const totalItemDiscount = round2(itemBizDiscount + itemProductDiscount)
-        const itemMrp = item.sub_variant?.mrp != null ? Number(item.sub_variant.mrp)
-          : item.variant?.mrp != null ? Number(item.variant.mrp)
-          : item.products?.mrp != null ? Number(item.products.mrp)
-          : null
-        const snapWeightGrams = item.sub_variant?.weight_grams ?? item.variant?.weight_grams ?? item.products?.weight_grams ?? 500
-        const snapPackageType = item.sub_variant?.package_type ?? item.variant?.package_type ?? item.products?.package_type ?? null
+        const itemMrp =
+          item.sub_variant?.mrp != null
+            ? Number(item.sub_variant.mrp)
+            : item.variant?.mrp != null
+              ? Number(item.variant.mrp)
+              : item.products?.mrp != null
+                ? Number(item.products.mrp)
+                : null
+        const snapWeightGrams =
+          item.sub_variant?.weight_grams ?? item.variant?.weight_grams ?? item.products?.weight_grams ?? 500
+        const snapPackageType =
+          item.sub_variant?.package_type ?? item.variant?.package_type ?? item.products?.package_type ?? null
         const snapLengthCm = item.sub_variant?.length_cm ?? item.variant?.length_cm ?? item.products?.length_cm ?? null
-        const snapBreadthCm = item.sub_variant?.breadth_cm ?? item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
+        const snapBreadthCm =
+          item.sub_variant?.breadth_cm ?? item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
         const snapHeightCm = item.sub_variant?.height_cm ?? item.variant?.height_cm ?? item.products?.height_cm ?? null
         await client.query(
           `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, weight_grams, package_type, length_cm, breadth_cm, height_cm)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
-          [createdOrder.id, item.product_id, item.variant?.id || null,
-           item.sub_variant?.id || null,
-           item.sub_variant
-             ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
-             : (item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name),
-           item.sub_variant?.sku || item.variant?.sku || item.products.sku,
-           item.sub_variant
-             ? `${item.variant?.variant_name ? item.variant.variant_name + ' / ' : ''}${item.sub_variant.sub_variant_name}`
-             : (item.variant?.variant_name || null),
-           item.quantity, unitPrice, itemTotal, totalItemDiscount, round2(tax),
-           isGSTEnabled ? (item.products.hsn_code || null) : null,
-           isGSTEnabled ? gstRate : null,
-           isGSTEnabled && gst ? gst.taxableAmount : 0,
-           isGSTEnabled && gst ? gst.cgst : 0,
-           isGSTEnabled && gst ? gst.sgst : 0,
-           isGSTEnabled && gst ? gst.igst : 0,
-           item.buy_mode || 'unit',
-           item.buy_unit || null,
-           itemMrp,
-           snapWeightGrams, snapPackageType, snapLengthCm, snapBreadthCm, snapHeightCm]
+          [
+            createdOrder.id,
+            item.product_id,
+            item.variant?.id || null,
+            item.sub_variant?.id || null,
+            item.sub_variant
+              ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
+              : item.variant
+                ? `${item.products.name} - ${item.variant.variant_name}`
+                : item.products.name,
+            item.sub_variant?.sku || item.variant?.sku || item.products.sku,
+            item.sub_variant
+              ? `${item.variant?.variant_name ? item.variant.variant_name + ' / ' : ''}${item.sub_variant.sub_variant_name}`
+              : item.variant?.variant_name || null,
+            item.quantity,
+            unitPrice,
+            itemTotal,
+            totalItemDiscount,
+            round2(tax),
+            isGSTEnabled ? item.products.hsn_code || null : null,
+            isGSTEnabled ? gstRate : null,
+            isGSTEnabled && gst ? gst.taxableAmount : 0,
+            isGSTEnabled && gst ? gst.cgst : 0,
+            isGSTEnabled && gst ? gst.sgst : 0,
+            isGSTEnabled && gst ? gst.igst : 0,
+            item.buy_mode || 'unit',
+            item.buy_unit || null,
+            itemMrp,
+            snapWeightGrams,
+            snapPackageType,
+            snapLengthCm,
+            snapBreadthCm,
+            snapHeightCm,
+          ]
         )
       }
 
-      await client.query(
-        `DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE`,
-        [cartUserId]
-      )
+      await client.query(`DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE`, [
+        cartUserId,
+      ])
 
       if (couponId && appliedDiscount > 0) {
         await client.query(
           `INSERT INTO coupon_usage (coupon_id, user_id, order_id, discount_amount) VALUES ($1, $2, $3, $4)`,
           [couponId, userId, createdOrder.id, round2(appliedDiscount)]
         )
-        await client.query(
-          `UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`,
-          [couponId]
-        )
+        await client.query(`UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`, [couponId])
       }
 
       return createdOrder
@@ -426,15 +505,16 @@ export async function POST(request: NextRequest) {
 
     const orderItems = cartItems.map((item: any) => {
       const _pia4 = parseFloat(item.price_at_addition)
-      const unitPrice = (_pia4 > 0)
-        ? _pia4
-        : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      const unitPrice =
+        _pia4 > 0 ? _pia4 : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       return {
         order_id: order.id,
         product_id: item.product_id,
         product_name: item.sub_variant
           ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
-          : (item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name),
+          : item.variant
+            ? `${item.products.name} - ${item.variant.variant_name}`
+            : item.products.name,
         product_sku: item.sub_variant?.sku || item.variant?.sku || item.products.sku,
         quantity: item.quantity,
         unit_price: unitPrice,
@@ -451,7 +531,11 @@ export async function POST(request: NextRequest) {
       sendOrderConfirmationEmail(user.email, confirmedOrder, orderItems).catch(() => {})
       sendNewOrderNotification(confirmedOrder, orderItems, user).catch(() => {})
       if (user.notification_channel === 'sms' && user.phone) {
-        sendOrderConfirmedSMS({ phone: user.phone, orderNumber: order.order_number, total: Number(order.total_amount) }).catch(() => {})
+        sendOrderConfirmedSMS({
+          phone: user.phone,
+          orderNumber: order.order_number,
+          total: Number(order.total_amount),
+        }).catch(() => {})
       }
     }
 
@@ -464,7 +548,11 @@ export async function POST(request: NextRequest) {
       metadata: { orderNumber: order.order_number, total: order.total_amount, itemCount: orderItems.length },
     }).catch(() => {})
 
-    recordImplicitSignalsForProducts(userId, orderItems.map(i => i.product_id), 'purchased').catch(() => {})
+    recordImplicitSignalsForProducts(
+      userId,
+      orderItems.map(i => i.product_id),
+      'purchased'
+    ).catch(() => {})
 
     if (Number(order.total_amount) >= 50000) {
       createAutoTask({
@@ -490,11 +578,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (err: any) {
     if (err?.message === 'EXISTING_UNPAID_ORDER') {
-      return NextResponse.json({
-        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
-        existingOrderId: err.existingOrderId,
-        existingOrderNumber: err.existingOrderNumber,
-      }, { status: 409 })
+      return NextResponse.json(
+        {
+          error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
+          existingOrderId: err.existingOrderId,
+          existingOrderNumber: err.existingOrderNumber,
+        },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

@@ -6,9 +6,7 @@ import { parseBody, zUuid } from '@/lib/validate'
 import { checkPincodeServiceability } from '@/lib/delhivery'
 import { logActivity } from '@/lib/activity'
 import { createAdminNotification } from '@/lib/admin-notify'
-import {
-  addressChangeBlockReason, snapshotAddress, sameAddress, ADDRESS_SNAPSHOT_COLUMNS,
-} from '@/lib/address-change'
+import { addressChangeBlockReason, snapshotAddress, sameAddress, ADDRESS_SNAPSHOT_COLUMNS } from '@/lib/address-change'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +26,9 @@ async function loadOwnedOrder(request: NextRequest, orderId: string, userId: str
   if (!isBusiness) {
     return queryOne<any>(`${select} WHERE o.id = $1 AND o.status != 'draft' AND o.user_id = $2`, [orderId, userId])
   }
-  const biz = await queryOne<{ email: string; phone: string | null }>('SELECT email, phone FROM users WHERE id = $1', [userId])
+  const biz = await queryOne<{ email: string; phone: string | null }>('SELECT email, phone FROM users WHERE id = $1', [
+    userId,
+  ])
   return queryOne<any>(
     `${select} WHERE o.id = $1 AND o.status != 'draft' AND (
        o.user_id = $2 OR
@@ -70,7 +70,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (String(newAddress.postal_code) !== String(order.current_address?.postal_code ?? '')) {
       const service = await checkPincodeServiceability(newAddress.postal_code)
       if (!service.serviceable) {
-        return NextResponse.json({ error: service.error || 'Delivery is not available to this pincode.', unserviceable: true }, { status: 422 })
+        return NextResponse.json(
+          { error: service.error || 'Delivery is not available to this pincode.', unserviceable: true },
+          { status: 422 }
+        )
       }
       const isCod = order.payment_mode === 'cod' || String(order.payment_status || '').startsWith('cod')
       if (isCod && !service.cod) {
@@ -86,14 +89,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, created_at`,
         [
-          orderId, authUser.userId, order.shipping_address_id ?? null, address.id,
+          orderId,
+          authUser.userId,
+          order.shipping_address_id ?? null,
+          address.id,
           order.current_address ? JSON.stringify(snapshotAddress(order.current_address)) : null,
           JSON.stringify(newAddress),
         ]
       )
     } catch (err: any) {
       if (err?.code === '23505') {
-        return NextResponse.json({ error: 'An address change request is already pending for this order.' }, { status: 409 })
+        return NextResponse.json(
+          { error: 'An address change request is already pending for this order.' },
+          { status: 409 }
+        )
       }
       throw err
     }
@@ -141,7 +150,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         RETURNING id`,
       [orderId, authUser.userId]
     )
-    if (!withdrawn) return NextResponse.json({ error: 'No pending address change request for this order.' }, { status: 404 })
+    if (!withdrawn)
+      return NextResponse.json({ error: 'No pending address change request for this order.' }, { status: 404 })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

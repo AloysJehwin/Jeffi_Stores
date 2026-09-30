@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // For each draft, count how many of its line items are short on stock.
     // A line is "short" when the chosen sub_variant / variant / product has
@@ -115,13 +116,23 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const {
-      customerName, customerPhone, customerEmail,
-      addressLine1, addressLine2, city, state, postalCode,
-      buyerGstin, paymentMode, notes, items,
+      customerName,
+      customerPhone,
+      customerEmail,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      buyerGstin,
+      paymentMode,
+      notes,
+      items,
     } = body
 
     if (!customerName) {
@@ -169,7 +180,7 @@ export async function POST(request: NextRequest) {
         unit_price: unitPrice,
         mrp: unitPrice,
         discount_pct: discPct,
-        discount_amount: discPct > 0 ? round2(baseQty * unitPrice / (1 + gstRate / 100) * (discPct / 100)) : 0,
+        discount_amount: discPct > 0 ? round2(((baseQty * unitPrice) / (1 + gstRate / 100)) * (discPct / 100)) : 0,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
         cgst_amount: round2(gst.cgst),
@@ -182,12 +193,20 @@ export async function POST(request: NextRequest) {
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     const totalAmount = round2(subtotal)
 
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       const addrResult = await client.query(
         `INSERT INTO addresses (full_name, address_line1, address_line2, city, state, postal_code, phone, address_type)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'shipping')
          RETURNING id`,
-        [customerName, addressLine1 || '', addressLine2 || null, city || '', state || '', postalCode || '', customerPhone || '']
+        [
+          customerName,
+          addressLine1 || '',
+          addressLine2 || null,
+          city || '',
+          state || '',
+          postalCode || '',
+          customerPhone || '',
+        ]
       )
       const addressId = addrResult.rows[0].id
 
@@ -210,8 +229,13 @@ export async function POST(request: NextRequest) {
           $15, $15, $16
         ) RETURNING id, order_number`,
         [
-          orderNumber, customerName, customerPhone || '', customerEmail || '',
-          subtotal, taxAmount, totalAmount,
+          orderNumber,
+          customerName,
+          customerPhone || '',
+          customerEmail || '',
+          subtotal,
+          taxAmount,
+          totalAmount,
           round2(totalTaxable),
           round2(totalCgst),
           round2(totalSgst),
@@ -234,13 +258,30 @@ export async function POST(request: NextRequest) {
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
           [
-            orderId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null,
-            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit,
-            item.sold_unit_factor ?? null, item.base_quantity ?? null,
-            item.unit_price, item.mrp, item.discount_pct, item.discount_amount,
-            item.tax_amount, item.total_price, item.taxable_amount,
-            item.cgst_amount, item.sgst_amount, item.igst_amount,
+            orderId,
+            item.product_id,
+            item.product_name,
+            item.product_sku,
+            item.variant_id,
+            item.sub_variant_id,
+            item.variant_name,
+            item.sub_variant_name ?? null,
+            item.hsn_code,
+            item.gst_rate,
+            item.quantity,
+            item.buy_unit,
+            item.sold_unit_factor ?? null,
+            item.base_quantity ?? null,
+            item.unit_price,
+            item.mrp,
+            item.discount_pct,
+            item.discount_amount,
+            item.tax_amount,
+            item.total_price,
+            item.taxable_amount,
+            item.cgst_amount,
+            item.sgst_amount,
+            item.igst_amount,
           ]
         )
       }

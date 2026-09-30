@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
   if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
   let body: { scenario?: string; subject?: string }
-  try { body = await request.json() } catch {
+  try {
+    body = await request.json()
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -49,10 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Scenario too short' }, { status: 400 })
   }
 
-  const userPrompt = [
-    body.subject ? `Subject: ${body.subject}` : null,
-    scenario,
-  ].filter(Boolean).join('\n')
+  const userPrompt = [body.subject ? `Subject: ${body.subject}` : null, scenario].filter(Boolean).join('\n')
 
   try {
     const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/brand')
@@ -104,7 +103,10 @@ function extractHtml(raw: string): string {
   if (html) return html
 
   // 2. Strip markdown fences, then parse.
-  const stripped = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+  const stripped = raw
+    .replace(/^```[\w]*\n?/, '')
+    .replace(/\n?```$/, '')
+    .trim()
   html = tryParse(stripped)
   if (html) return html
 

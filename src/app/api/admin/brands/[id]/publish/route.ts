@@ -5,7 +5,9 @@ import { queryOne, query, withTransaction } from '@/lib/db'
 import type { PoolClient } from 'pg'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
@@ -16,20 +18,24 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const draft = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
-    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
+    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`,
+    [id]
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
   const f = draft.fields as any
-  const prevIsActive = await queryOne<{ is_active: boolean }>(
-    `SELECT is_active FROM brands WHERE id = $1`, [id]
-  )
+  const prevIsActive = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM brands WHERE id = $1`, [id])
 
   try {
     await withTransaction(async (client: PoolClient) => {
-      const slug = f.slug || (f.name
-        ? f.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-        : null)
+      const slug =
+        f.slug ||
+        (f.name
+          ? f.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+          : null)
 
       await client.query(
         `UPDATE brands SET
@@ -60,10 +66,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
 
       if (f.is_active != null && f.is_active !== prevIsActive?.is_active) {
-        await client.query(
-          `UPDATE products SET is_active = $1 WHERE brand_id = $2`,
-          [f.is_active, id]
-        )
+        await client.query(`UPDATE products SET is_active = $1 WHERE brand_id = $2`, [f.is_active, id])
       }
 
       await client.query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [id])

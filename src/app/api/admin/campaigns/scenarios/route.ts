@@ -86,9 +86,24 @@ export async function GET(req: NextRequest) {
     sendCooldownDays: 1,
     maxRecipientsPerSweep: 50,
   }
-  const UNIVERSAL_SCHEMA: Record<string, { type: string; min?: number; max?: number; label: string; description?: string }> = {
-    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
+  const UNIVERSAL_SCHEMA: Record<
+    string,
+    { type: string; min?: number; max?: number; label: string; description?: string }
+  > = {
+    sendCooldownDays: {
+      type: 'integer',
+      min: 1,
+      max: 30,
+      label: 'Per-user cooldown (days)',
+      description: 'Skip users sent this campaign within N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
   }
 
   const scenarios = listScenarios().map(s => {

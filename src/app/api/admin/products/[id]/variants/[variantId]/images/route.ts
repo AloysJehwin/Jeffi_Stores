@@ -22,7 +22,8 @@ export async function GET(request: NextRequest, { params }: Params) {
   const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const images = await queryMany(
     `SELECT * FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC, created_at ASC`,
@@ -35,19 +36,14 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
-    const variant = await queryOne(
-      `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
-      [variantId, id]
-    )
+    const variant = await queryOne(`SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`, [variantId, id])
     if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
 
-    const existing = await queryMany(
-      `SELECT id FROM variant_images WHERE variant_id = $1`,
-      [variantId]
-    )
+    const existing = await queryMany(`SELECT id FROM variant_images WHERE variant_id = $1`, [variantId])
     if (existing.length >= MAX_IMAGES) {
       return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per variant` }, { status: 400 })
     }
@@ -61,10 +57,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       const parsedJson = parseBody(GalleryPostSchema, rawJson)
       if (!parsedJson.ok) return parsedJson.response
       const { gallery_image_id } = parsedJson.data
-      const gimg = await queryOne(
-        `SELECT * FROM gallery_images WHERE id = $1`,
-        [gallery_image_id]
-      )
+      const gimg = await queryOne(`SELECT * FROM gallery_images WHERE id = $1`, [gallery_image_id])
       if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
       const imageUrl = gimg.image_url || (gimg.s3_key ? await getS3Url(gimg.s3_key) : null)
       const thumbnailUrl = gimg.thumbnail_url || (gimg.s3_thumbnail_key ? await getS3Url(gimg.s3_thumbnail_key) : null)
@@ -73,12 +66,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       try {
         const head = await fetch(imageUrl, { method: 'HEAD' })
         if (!head.ok) {
-          return NextResponse.json({
-            error: `Gallery image file is missing from storage (HTTP ${head.status}). The original file may have been deleted. Please re-upload it.`
-          }, { status: 410 })
+          return NextResponse.json(
+            {
+              error: `Gallery image file is missing from storage (HTTP ${head.status}). The original file may have been deleted. Please re-upload it.`,
+            },
+            { status: 410 }
+          )
         }
       } catch {
-        return NextResponse.json({ error: 'Could not reach gallery image storage. Try again or re-upload the image.' }, { status: 502 })
+        return NextResponse.json(
+          { error: 'Could not reach gallery image storage. Try again or re-upload the image.' },
+          { status: 502 }
+        )
       }
       const image = await queryOne(
         `INSERT INTO variant_images
@@ -87,11 +86,20 @@ export async function POST(request: NextRequest, { params }: Params) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING *`,
         [
-          variantId, imageUrl, thumbnailUrl,
-          gimg.s3_bucket || await currentBucket(),
-          gimg.s3_key, gimg.s3_thumbnail_key,
-          gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-          gimg.width, gimg.height, gimg.blurhash ?? null, existing.length, isPrimary,
+          variantId,
+          imageUrl,
+          thumbnailUrl,
+          gimg.s3_bucket || (await currentBucket()),
+          gimg.s3_key,
+          gimg.s3_thumbnail_key,
+          gimg.custom_name || gimg.file_name,
+          gimg.file_size,
+          gimg.mime_type,
+          gimg.width,
+          gimg.height,
+          gimg.blurhash ?? null,
+          existing.length,
+          isPrimary,
         ]
       )
       return NextResponse.json({ image })
@@ -110,11 +118,20 @@ export async function POST(request: NextRequest, { params }: Params) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
-        variantId, result.url, result.thumbnailUrl,
+        variantId,
+        result.url,
+        result.thumbnailUrl,
         result.s3Bucket,
-        result.s3Key, result.s3ThumbnailKey,
-        result.fileName, result.fileSize, result.mimeType,
-        result.width, result.height, result.blurhash, existing.length, isPrimary,
+        result.s3Key,
+        result.s3ThumbnailKey,
+        result.fileName,
+        result.fileSize,
+        result.mimeType,
+        result.width,
+        result.height,
+        result.blurhash,
+        existing.length,
+        isPrimary,
       ]
     )
     return NextResponse.json({ image })
@@ -127,7 +144,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -135,10 +153,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!parsedDel.ok) return parsedDel.response
   const { imageId } = parsedDel.data
 
-  const image = await queryOne(
-    `SELECT * FROM variant_images WHERE id = $1 AND variant_id = $2`,
-    [imageId, variantId]
-  )
+  const image = await queryOne(`SELECT * FROM variant_images WHERE id = $1 AND variant_id = $2`, [imageId, variantId])
   if (!image) return NextResponse.json({ error: 'Image not found' }, { status: 404 })
 
   if (image.s3_key) {
@@ -160,7 +175,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawPatch = await request.json().catch(() => null)
   if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

@@ -5,12 +5,14 @@ import { queryOne, queryMany, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 async function getAllDraftSubVariants(productId: string): Promise<any[]> {
-  const row = await queryOne<{ sub_variants: any[] }>(
-    `SELECT sub_variants FROM product_drafts WHERE product_id = $1`, [productId]
-  )
+  const row = await queryOne<{ sub_variants: any[] }>(`SELECT sub_variants FROM product_drafts WHERE product_id = $1`, [
+    productId,
+  ])
   return Array.isArray(row?.sub_variants) ? row!.sub_variants : []
 }
 
@@ -54,10 +56,9 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   if (!touched) {
     // Untouched in this draft → return the live rows.
-    const live = await queryMany(
-      `SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`,
-      [variantId]
-    )
+    const live = await queryMany(`SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`, [
+      variantId,
+    ])
     return NextResponse.json({ sub_variants: live })
   }
 
@@ -89,8 +90,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     variant_id: variantId,
   }
   const updated = [...all, newSv]
-  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(updated)])
+  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(updated),
+  ])
   return NextResponse.json({ sub_variant: newSv }, { status: 201 })
 }
 
@@ -116,8 +119,10 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     filtered.push({ _cleared: true, id: `cleared-sv-${Date.now()}`, variant_id: variantId, original_id: svId })
   }
 
-  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(filtered)])
+  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(filtered),
+  ])
   return NextResponse.json({ success: true })
 }
 
@@ -142,13 +147,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (idx >= 0) {
     // Merge the edit onto the existing (seeded or staged) row; mark it edited so
     // publish reliably detects a change even for an unchanged-id live row.
-    updated = all.map((sv: any) => sv.id === svId ? { ...sv, ...updates, _edited: true } : sv)
+    updated = all.map((sv: any) => (sv.id === svId ? { ...sv, ...updates, _edited: true } : sv))
   } else {
     // Row not found even after seeding (e.g. a brand-new id from the client) — add it.
     updated = [...all, { ...body, variant_id: variantId, _edited: true }]
   }
 
-  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(updated)])
+  await query(`UPDATE product_drafts SET sub_variants = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(updated),
+  ])
   return NextResponse.json({ sub_variant: updated.find((sv: any) => sv.id === svId) })
 }

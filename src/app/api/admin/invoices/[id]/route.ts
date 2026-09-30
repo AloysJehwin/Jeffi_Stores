@@ -3,7 +3,14 @@ import { productLabel } from '@/lib/product-label'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
-import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear, round2 } from '@/lib/gst'
+import {
+  isInterState,
+  calculateGST,
+  generateInvoiceNumber,
+  getNextInvoiceSequence,
+  getFinancialYear,
+  round2,
+} from '@/lib/gst'
 import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
@@ -13,28 +20,34 @@ import { getFeatureFlags } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const order = await queryOne<any>(
-      `SELECT id, source, invoice_number, status FROM orders WHERE id = $1`,
-      [id]
-    )
+    const order = await queryOne<any>(`SELECT id, source, invoice_number, status FROM orders WHERE id = $1`, [id])
     if (!order) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
-    if (order.source !== 'offline') return NextResponse.json({ error: 'Only offline invoices can be edited' }, { status: 400 })
+    if (order.source !== 'offline')
+      return NextResponse.json({ error: 'Only offline invoices can be edited' }, { status: 400 })
 
     const body = await request.json()
     const {
-      customerName, customerPhone, customerEmail,
-      addressLine1, addressLine2, city, state, postalCode,
-      buyerGstin, paymentMode, invoiceDate, notes, items,
+      customerName,
+      customerPhone,
+      customerEmail,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      buyerGstin,
+      paymentMode,
+      invoiceDate,
+      notes,
+      items,
     } = body
 
     if (!customerName || !items?.length) {
@@ -119,7 +132,7 @@ export async function PATCH(
         unit_price: unitPrice,
         mrp: unitPrice,
         discount_pct: discPct,
-        discount_amount: discPct > 0 ? round2(baseQty * unitPrice / (1 + gstRate / 100) * (discPct / 100)) : 0,
+        discount_amount: discPct > 0 ? round2(((baseQty * unitPrice) / (1 + gstRate / 100)) * (discPct / 100)) : 0,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
         cgst_amount: round2(gst.cgst),
@@ -134,11 +147,13 @@ export async function PATCH(
     const isPaid = paymentMode !== 'credit'
     const effectiveDate = invoiceDate || new Date().toISOString().slice(0, 10)
 
-    const result = await withTransaction(async (client) => {
-      const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; sub_variant_id: string | null; quantity: string }>(
-        `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
-        [id]
-      )
+    const result = await withTransaction(async client => {
+      const existingResult = await client.query<{
+        product_id: string | null
+        variant_id: string | null
+        sub_variant_id: string | null
+        quantity: string
+      }>(`SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`, [id])
 
       const existingQtyMap = new Map<string, number>()
       for (const r of existingResult.rows) {
@@ -148,7 +163,7 @@ export async function PATCH(
 
       const insufficientItems: string[] = []
 
-      for (const item of (inventoryValidationEnabled ? processedItems : [])) {
+      for (const item of inventoryValidationEnabled ? processedItems : []) {
         if (!item.product_id) continue
         const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
         const previousQty = existingQtyMap.get(key) ?? 0
@@ -170,9 +185,7 @@ export async function PATCH(
           [item.buy_unit || null, item.product_id, item.variant_id || null]
         )
         const u = unitRow.rows[0]
-        const extraQty = (u?.dimension === 'count' && u?.factor)
-          ? rawExtra * parseFloat(u.factor)
-          : rawExtra
+        const extraQty = u?.dimension === 'count' && u?.factor ? rawExtra * parseFloat(u.factor) : rawExtra
 
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
@@ -181,9 +194,7 @@ export async function PATCH(
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
           if (stock < extraQty) {
-            insufficientItems.push(
-              `${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`
-            )
+            insufficientItems.push(`${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`)
           }
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
@@ -192,9 +203,7 @@ export async function PATCH(
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
           if (stock < extraQty) {
-            insufficientItems.push(
-              `${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`
-            )
+            insufficientItems.push(`${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`)
           }
         } else {
           const inv = await client.query<{ inventory_quantity: string }>(
@@ -222,12 +231,21 @@ export async function PATCH(
           updated_at = NOW()
         WHERE id = $18`,
         [
-          customerName, customerPhone || null, customerEmail || null,
-          buyerGstin || null, orderIsIgst,
-          subtotal, taxAmount, round2(totalTaxable),
-          round2(totalCgst), round2(totalSgst), round2(totalIgst),
-          totalAmount, isPaid ? 'paid' : 'unpaid',
-          effectiveDate, notes || null,
+          customerName,
+          customerPhone || null,
+          customerEmail || null,
+          buyerGstin || null,
+          orderIsIgst,
+          subtotal,
+          taxAmount,
+          round2(totalTaxable),
+          round2(totalCgst),
+          round2(totalSgst),
+          round2(totalIgst),
+          totalAmount,
+          isPaid ? 'paid' : 'unpaid',
+          effectiveDate,
+          notes || null,
           moveToDraft ? 'draft' : order.status,
           moveToDraft ? null : order.invoice_number,
           id,
@@ -260,14 +278,37 @@ export async function PATCH(
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING id`,
           [
-            id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null, item.hsn_code, item.gst_rate,
-            item.quantity, item.buy_unit, item.sold_unit_factor ?? null, item.base_quantity ?? null,
-            item.unit_price, item.mrp, item.discount_pct, item.discount_amount, item.total_price,
-            item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
+            id,
+            item.product_id,
+            item.product_name,
+            item.product_sku,
+            item.variant_id,
+            item.sub_variant_id,
+            item.variant_name,
+            item.sub_variant_name ?? null,
+            item.hsn_code,
+            item.gst_rate,
+            item.quantity,
+            item.buy_unit,
+            item.sold_unit_factor ?? null,
+            item.base_quantity ?? null,
+            item.unit_price,
+            item.mrp,
+            item.discount_pct,
+            item.discount_amount,
+            item.total_price,
+            item.taxable_amount,
+            item.cgst_amount,
+            item.sgst_amount,
+            item.igst_amount,
+            item.tax_amount,
           ]
         )
-        savedItemIds.push({ product_id: item.product_id, variant_id: item.variant_id ?? null, order_item_id: inserted.rows[0].id })
+        savedItemIds.push({
+          product_id: item.product_id,
+          variant_id: item.variant_id ?? null,
+          order_item_id: inserted.rows[0].id,
+        })
       }
 
       if (!moveToDraft && inventoryValidationEnabled) {
@@ -293,12 +334,11 @@ export async function PATCH(
             [item.buy_unit || null, item.product_id, item.variant_id || null]
           )
           const u2 = unitRow2.rows[0]
-          const extraQty = (u2?.dimension === 'count' && u2?.factor)
-            ? rawExtra * parseFloat(u2.factor)
-            : rawExtra
+          const extraQty = u2?.dimension === 'count' && u2?.factor ? rawExtra * parseFloat(u2.factor) : rawExtra
 
           const prodRow = await client.query<{ perishable: boolean; serialized: boolean }>(
-            `SELECT perishable, serialized FROM products WHERE id = $1`, [item.product_id]
+            `SELECT perishable, serialized FROM products WHERE id = $1`,
+            [item.product_id]
           )
           const { perishable, serialized } = prodRow.rows[0] ?? { perishable: false, serialized: false }
 
@@ -306,7 +346,12 @@ export async function PATCH(
 
           if (perishable) {
             // Deduct from batches FIFO (earliest expiry first)
-            const batches = await client.query<{ id: string; quantity_remaining: string; lot_number: string | null; expiry_date: string | null }>(
+            const batches = await client.query<{
+              id: string
+              quantity_remaining: string
+              lot_number: string | null
+              expiry_date: string | null
+            }>(
               `SELECT id, quantity_remaining, lot_number, expiry_date
                FROM product_batches
                WHERE product_id = $1
@@ -432,10 +477,10 @@ export async function PATCH(
                 [item.product_id]
               )
               stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-              await client.query(
-                `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-                [extraQty, item.product_id]
-              )
+              await client.query(`UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`, [
+                extraQty,
+                item.product_id,
+              ])
             }
             await logStockMovement(client, {
               productId: item.product_id!,
@@ -447,7 +492,13 @@ export async function PATCH(
               referenceId: id,
               currentStock: stockBefore,
             })
-            await decrementNonPerishableShelfStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null, extraQty)
+            await decrementNonPerishableShelfStock(
+              client,
+              item.product_id!,
+              item.variant_id || null,
+              item.sub_variant_id || null,
+              extraQty
+            )
           }
         }
       }

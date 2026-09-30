@@ -69,9 +69,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
     }
 
-    const payload = idToken
-      ? await verifyGoogleToken(idToken)
-      : await verifyGoogleAccessToken(accessToken)
+    const payload = idToken ? await verifyGoogleToken(idToken) : await verifyGoogleAccessToken(accessToken)
     if (!payload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const email = payload.email.toLowerCase()
@@ -95,10 +93,19 @@ export async function POST(request: NextRequest) {
       if (bizUser) {
         // Link google_id if not already set and log them in as their business account.
         if (!bizUser.google_id) {
-          await query('UPDATE users SET google_id = $1, auth_provider = $2 WHERE id = $3', [googleId, 'google', bizUser.id])
+          await query('UPDATE users SET google_id = $1, auth_provider = $2 WHERE id = $3', [
+            googleId,
+            'google',
+            bizUser.id,
+          ])
         }
         await query('UPDATE users SET last_login = NOW() WHERE id = $1', [bizUser.id])
-        logActivity({ userId: bizUser.id, kind: 'login', summary: 'Logged in via Google', metadata: { provider: 'google' } }).catch(() => {})
+        logActivity({
+          userId: bizUser.id,
+          kind: 'login',
+          summary: 'Logged in via Google',
+          metadata: { provider: 'google' },
+        }).catch(() => {})
         user = { ...bizUser, google_id: bizUser.google_id || googleId }
       }
     }
@@ -111,7 +118,12 @@ export async function POST(request: NextRequest) {
         [email, firstName, lastName, googleId]
       )
       if (user) {
-        logActivity({ userId: user.id, kind: 'signup', summary: 'Signed up via Google', metadata: { provider: 'google' } }).catch(() => {})
+        logActivity({
+          userId: user.id,
+          kind: 'signup',
+          summary: 'Signed up via Google',
+          metadata: { provider: 'google' },
+        }).catch(() => {})
       }
     } else {
       if (!user.google_id) {
@@ -121,7 +133,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Account is inactive' }, { status: 403 })
       }
       await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
-      logActivity({ userId: user.id, kind: 'login', summary: 'Logged in via Google', metadata: { provider: 'google' } }).catch(() => {})
+      logActivity({
+        userId: user.id,
+        kind: 'login',
+        summary: 'Logged in via Google',
+        metadata: { provider: 'google' },
+      }).catch(() => {})
     }
 
     if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
@@ -143,10 +160,9 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
     const guestSessionId = cookieStore.get('session_id')?.value
     if (guestSessionId?.startsWith('guest_')) {
-      const guestUser = await queryOne<any>(
-        'SELECT id FROM users WHERE session_id = $1 AND is_guest = true',
-        [guestSessionId]
-      )
+      const guestUser = await queryOne<any>('SELECT id FROM users WHERE session_id = $1 AND is_guest = true', [
+        guestSessionId,
+      ])
       if (guestUser) {
         await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, user.id]).catch(() => {})
       }

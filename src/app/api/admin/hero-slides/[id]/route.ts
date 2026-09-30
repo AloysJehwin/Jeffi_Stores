@@ -29,11 +29,23 @@ const patchSchema = z.object({
 
 // Map camelCase request keys to snake_case DB columns.
 const COLUMN_MAP: Record<string, string> = {
-  title: 'title', subtitle: 'subtitle', badgeText: 'badge_text', badgeColor: 'badge_color',
-  imageUrl: 'image_url', imageUrlMobile: 'image_url_mobile', ctaLabel: 'cta_label', ctaUrl: 'cta_url',
-  filterCategory: 'filter_category', filterBrand: 'filter_brand', filterGrade: 'filter_grade',
-  filterMaterial: 'filter_material', filterMinPrice: 'filter_min_price', filterMaxPrice: 'filter_max_price',
-  filterInStock: 'filter_in_stock', filterOnSale: 'filter_on_sale', isActive: 'is_active',
+  title: 'title',
+  subtitle: 'subtitle',
+  badgeText: 'badge_text',
+  badgeColor: 'badge_color',
+  imageUrl: 'image_url',
+  imageUrlMobile: 'image_url_mobile',
+  ctaLabel: 'cta_label',
+  ctaUrl: 'cta_url',
+  filterCategory: 'filter_category',
+  filterBrand: 'filter_brand',
+  filterGrade: 'filter_grade',
+  filterMaterial: 'filter_material',
+  filterMinPrice: 'filter_min_price',
+  filterMaxPrice: 'filter_max_price',
+  filterInStock: 'filter_in_stock',
+  filterOnSale: 'filter_on_sale',
+  isActive: 'is_active',
 }
 
 // PATCH /api/admin/hero-slides/[id] — update one draft slide (partial).

@@ -5,15 +5,13 @@ import { queryOne } from '@/lib/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { resolveShipmentStatus } from '@/lib/shipment-status'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const rr = await queryOne<{ rvp_awb_number: string | null }>(
       `SELECT rvp_awb_number FROM return_requests WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
@@ -24,13 +22,10 @@ export async function GET(
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
-    const res = await fetch(
-      `https://track.delhivery.com/api/v1/packages/json/?waybill=${rr.rvp_awb_number}`,
-      {
-        headers: { Authorization: `Token ${TOKEN}` },
-        next: { revalidate: 60 },
-      }
-    )
+    const res = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${rr.rvp_awb_number}`, {
+      headers: { Authorization: `Token ${TOKEN}` },
+      next: { revalidate: 60 },
+    })
 
     if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
 
@@ -52,7 +47,7 @@ export async function GET(
     const shipmentStatus = resolveShipmentStatus(
       shipment.Status?.StatusType ?? null,
       scans,
-      shipment.Status?.Status ?? null,
+      shipment.Status?.Status ?? null
     )
 
     return NextResponse.json({

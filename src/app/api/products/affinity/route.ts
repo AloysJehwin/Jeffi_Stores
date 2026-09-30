@@ -7,7 +7,17 @@ import { getFeatureFlags } from '@/lib/site-controls'
 export const dynamic = 'force-dynamic'
 
 const idList = (max: number) =>
-  z.string().optional().transform(s => (s ? s.split(',').map(v => v.trim()).filter(Boolean) : []))
+  z
+    .string()
+    .optional()
+    .transform(s =>
+      s
+        ? s
+            .split(',')
+            .map(v => v.trim())
+            .filter(Boolean)
+        : []
+    )
     .pipe(z.array(z.guid()).max(max))
 
 const querySchema = z.object({
@@ -34,9 +44,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const skip = new Set(exclude)
-    const ranked = kind === 'bought'
-      ? await frequentlyBoughtWith(ids, limit + skip.size)
-      : await alsoViewedWith(ids[0], limit + skip.size)
+    const ranked =
+      kind === 'bought'
+        ? await frequentlyBoughtWith(ids, limit + skip.size)
+        : await alsoViewedWith(ids[0], limit + skip.size)
     const wanted = ranked.filter(id => !skip.has(id)).slice(0, limit)
     const { gstEnabled } = await getFeatureFlags()
     const products = cardPropsFor(await getProductCardsByIds(wanted, gstEnabled), gstEnabled)

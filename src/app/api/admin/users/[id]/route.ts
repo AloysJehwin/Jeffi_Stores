@@ -8,10 +8,7 @@ import { resolveRequestTenantId } from '@/lib/request-tenant'
 import { revokeAllForPrincipal } from '@/lib/auth-sessions'
 import { revokePortalCerts } from '@/lib/portal-certs'
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin || !isPlatformOwner(admin.role)) {
@@ -111,10 +108,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin || !isPlatformOwner(admin.role)) {
@@ -130,7 +124,8 @@ export async function DELETE(
     // Read the serials before the hard delete so the central registry can be revoked for them —
     // otherwise a deleted admin's cert stays downloadable from the portal.
     const certRows = await query<{ serial_number: string }>(
-      'SELECT serial_number FROM admin_certificates WHERE admin_id = $1', [id]
+      'SELECT serial_number FROM admin_certificates WHERE admin_id = $1',
+      [id]
     )
     await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
     await revokePortalCerts((certRows.rows || []).map(r => r.serial_number))

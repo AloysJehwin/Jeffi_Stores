@@ -4,10 +4,7 @@ import { queryOne } from '@/lib/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { resolveShipmentStatus } from '@/lib/shipment-status'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
@@ -22,13 +19,10 @@ export async function GET(
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
-    const res = await fetch(
-      `https://track.delhivery.com/api/v1/packages/json/?waybill=${rr.rvp_awb_number}`,
-      {
-        headers: { Authorization: `Token ${TOKEN}` },
-        next: { revalidate: 60 },
-      }
-    )
+    const res = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${rr.rvp_awb_number}`, {
+      headers: { Authorization: `Token ${TOKEN}` },
+      next: { revalidate: 60 },
+    })
 
     if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
 
@@ -48,7 +42,7 @@ export async function GET(
     const shipmentStatus = resolveShipmentStatus(
       shipment.Status?.StatusType ?? null,
       scans,
-      shipment.Status?.Status ?? null,
+      shipment.Status?.Status ?? null
     )
 
     return NextResponse.json({

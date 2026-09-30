@@ -47,10 +47,7 @@ export async function GET(request: NextRequest) {
          FROM addresses WHERE user_id = $1 AND is_default = true LIMIT 1`,
         [userId]
       ),
-      queryOne<{ count: number }>(
-        `SELECT COUNT(*)::int AS count FROM wishlist_items WHERE user_id = $1`,
-        [userId]
-      ),
+      queryOne<{ count: number }>(`SELECT COUNT(*)::int AS count FROM wishlist_items WHERE user_id = $1`, [userId]),
     ])
 
     return NextResponse.json({

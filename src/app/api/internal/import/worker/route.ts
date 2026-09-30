@@ -40,7 +40,10 @@ export async function GET(request: NextRequest) {
   }
 
   const onProgress = async (p: {
-    processed: number; created: number; updated: number; errors: number
+    processed: number
+    created: number
+    updated: number
+    errors: number
     rowResults: Awaited<ReturnType<typeof runImport>>['rowResults']
     imageProgress: Awaited<ReturnType<typeof runImport>>['imageProgress']
   }) => {
@@ -68,7 +71,7 @@ export async function GET(request: NextRequest) {
         const orphans = await computeOrphans(
           job.tenant_id,
           job.spreadsheet_id!,
-          outcome.seenProducts.map((p) => p.sku),
+          outcome.seenProducts.map(p => p.sku)
         )
         pendingDeletions = orphans
       }

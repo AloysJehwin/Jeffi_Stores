@@ -61,9 +61,11 @@ function buildFilterQuery(filters: Record<string, string>) {
   if (filters.category_id) {
     params.push(filters.category_id)
     const n = params.length
-    conditions.push(`p.category_id = ANY(SELECT id FROM categories WHERE id = $${n}::uuid UNION SELECT id FROM categories WHERE parent_category_id = $${n}::uuid)`)
+    conditions.push(
+      `p.category_id = ANY(SELECT id FROM categories WHERE id = $${n}::uuid UNION SELECT id FROM categories WHERE parent_category_id = $${n}::uuid)`
+    )
   }
-  if (filters.brand_id)       add('p.brand_id = ?::uuid', filters.brand_id)
+  if (filters.brand_id) add('p.brand_id = ?::uuid', filters.brand_id)
   const attr = buildAttributeFilterClauses(filters, params.length + 1)
   conditions.push(...attr.conditions)
   params.push(...attr.params)
@@ -74,7 +76,10 @@ function buildFilterQuery(filters: Record<string, string>) {
   }
   if (filters.product_ids) {
     const ids = filters.product_ids.split(',').filter(Boolean)
-    if (ids.length) { params.push(ids); conditions.push(`p.id = ANY($${params.length}::uuid[])`) }
+    if (ids.length) {
+      params.push(ids)
+      conditions.push(`p.id = ANY($${params.length}::uuid[])`)
+    }
   }
 
   const where = conditions.join(' AND ')
@@ -102,7 +107,8 @@ function buildFilterQuery(filters: Record<string, string>) {
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'controls:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const sp = Object.fromEntries(new URL(request.url).searchParams.entries())
   const { sql, params } = buildFilterQuery(sp)
@@ -116,7 +122,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'controls:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   // Bulk image change uploads files → multipart. Everything else is JSON.
   const contentType = request.headers.get('content-type') || ''
@@ -136,7 +143,7 @@ export async function POST(request: NextRequest) {
     let updated = 0
     let logId: string | null = null
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       // ── capture snapshot (before values) ────────────────────────────────
       const snapshot: OperationSnapshot = { products: [], variants: [], subs: [], variantUnits: [] }
 
@@ -144,18 +151,18 @@ export async function POST(request: NextRequest) {
       // Variant price rows use `price` instead of `base_price`.
       const VARIANT_PRICE_FIELDS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'price', 'discount_pct']
       const SIMPLE_FIELD_MAP: Record<string, string[]> = {
-        set_tax_class:        ['tax_class'],
-        set_condition:        ['condition'],
-        set_shipping_class:   ['shipping_class'],
-        set_handling_days:    ['handling_days'],
-        set_warranty_months:  ['warranty_months'],
-        set_target_gender:    ['target_gender'],
-        set_grade:            ['grade'],
-        set_hsn_code:         ['hsn_code'],
-        set_country_of_origin:['country_of_origin'],
-        set_featured:         ['is_featured'],
-        set_searchable:       ['is_searchable'],
-        set_active:           ['is_active'],
+        set_tax_class: ['tax_class'],
+        set_condition: ['condition'],
+        set_shipping_class: ['shipping_class'],
+        set_handling_days: ['handling_days'],
+        set_warranty_months: ['warranty_months'],
+        set_target_gender: ['target_gender'],
+        set_grade: ['grade'],
+        set_hsn_code: ['hsn_code'],
+        set_country_of_origin: ['country_of_origin'],
+        set_featured: ['is_featured'],
+        set_searchable: ['is_searchable'],
+        set_active: ['is_active'],
       }
 
       if (['inflate_price', 'set_discount', 'set_mrp_ex_gst'].includes(operation)) {
@@ -164,7 +171,11 @@ export async function POST(request: NextRequest) {
           [ids]
         )
         for (const r of rows.rows) {
-          snapshot.products.push({ id: r.id, name: r.name, before: Object.fromEntries(PRICE_FIELDS.map(f => [f, r[f]])) })
+          snapshot.products.push({
+            id: r.id,
+            name: r.name,
+            before: Object.fromEntries(PRICE_FIELDS.map(f => [f, r[f]])),
+          })
         }
         // inflate_price and set_discount also mutate variants (and inflate also
         // mutates sub-variants), so snapshot those too. set_mrp_ex_gst is
@@ -176,7 +187,11 @@ export async function POST(request: NextRequest) {
             [ids]
           )
           for (const r of vrows.rows) {
-            snapshot.variants.push({ id: r.id, name: '', before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])) })
+            snapshot.variants.push({
+              id: r.id,
+              name: '',
+              before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])),
+            })
           }
         }
         if (operation === 'inflate_price' || operation === 'set_discount') {
@@ -188,7 +203,11 @@ export async function POST(request: NextRequest) {
             [ids]
           )
           for (const r of srows.rows) {
-            snapshot.subs.push({ id: r.id, name: '', before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])) })
+            snapshot.subs.push({
+              id: r.id,
+              name: '',
+              before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])),
+            })
           }
         }
       } else if (SIMPLE_FIELD_MAP[operation]) {
@@ -210,7 +229,19 @@ export async function POST(request: NextRequest) {
           [ids]
         )
         for (const r of rows.rows) {
-          snapshot.products.push({ id: r.id, name: r.name, before: { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step } })
+          snapshot.products.push({
+            id: r.id,
+            name: r.name,
+            before: {
+              unit: r.unit,
+              factor: r.factor,
+              dimension: r.dimension,
+              display_label: r.display_label,
+              min_qty: r.min_qty,
+              max_qty: r.max_qty,
+              qty_step: r.qty_step,
+            },
+          })
         }
         // When inheriting to variants we also change each variant's base unit row
         // and product_variants.unit — snapshot both so rollback can restore them.
@@ -227,9 +258,19 @@ export async function POST(request: NextRequest) {
             snapshot.variantUnits.push({
               variant_id: r.variant_id,
               product_id: r.product_id,
-              before: r.unit == null
-                ? { variant_unit: r.variant_unit }
-                : { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step, variant_unit: r.variant_unit },
+              before:
+                r.unit == null
+                  ? { variant_unit: r.variant_unit }
+                  : {
+                      unit: r.unit,
+                      factor: r.factor,
+                      dimension: r.dimension,
+                      display_label: r.display_label,
+                      min_qty: r.min_qty,
+                      max_qty: r.max_qty,
+                      qty_step: r.qty_step,
+                      variant_unit: r.variant_unit,
+                    },
             })
           }
         }
@@ -249,7 +290,11 @@ export async function POST(request: NextRequest) {
         for (const p of products.rows) {
           const curMrpEx = parseFloat(p.mrp_ex_gst)
           if (!isNaN(curMrpEx) && curMrpEx > 0) {
-            const d = deriveFromMrpEx(applyPct(curMrpEx, pct), parseFloat(p.discount_pct) || 0, parseFloat(p.gst_percentage) || 0)
+            const d = deriveFromMrpEx(
+              applyPct(curMrpEx, pct),
+              parseFloat(p.discount_pct) || 0,
+              parseFloat(p.gst_percentage) || 0
+            )
             await client.query(
               `UPDATE products SET mrp_ex_gst=$1, mrp=$2, price_ex_gst=$3, base_price=$4, updated_at=NOW() WHERE id=$5`,
               [d.mrp_ex_gst, d.mrp, d.price_ex_gst, d.base_price, p.id]
@@ -267,7 +312,11 @@ export async function POST(request: NextRequest) {
         for (const v of variants.rows) {
           const cur = parseFloat(v.mrp_ex_gst)
           if (!isNaN(cur) && cur > 0) {
-            const d = deriveFromMrpEx(applyPct(cur, pct), parseFloat(v.discount_pct) || 0, parseFloat(v.gst_percentage) || 0)
+            const d = deriveFromMrpEx(
+              applyPct(cur, pct),
+              parseFloat(v.discount_pct) || 0,
+              parseFloat(v.gst_percentage) || 0
+            )
             await client.query(
               `UPDATE product_variants SET mrp_ex_gst=$1, mrp=$2, price_ex_gst=$3, price=$4, updated_at=NOW() WHERE id=$5`,
               [d.mrp_ex_gst, d.mrp, d.price_ex_gst, d.base_price, v.id]
@@ -286,7 +335,11 @@ export async function POST(request: NextRequest) {
         for (const sv of subs.rows) {
           const cur = parseFloat(sv.mrp_ex_gst)
           if (!isNaN(cur) && cur > 0) {
-            const d = deriveFromMrpEx(applyPct(cur, pct), parseFloat(sv.discount_pct) || 0, parseFloat(sv.gst_percentage) || 0)
+            const d = deriveFromMrpEx(
+              applyPct(cur, pct),
+              parseFloat(sv.discount_pct) || 0,
+              parseFloat(sv.gst_percentage) || 0
+            )
             await client.query(
               `UPDATE product_sub_variants SET mrp_ex_gst=$1, mrp=$2, price_ex_gst=$3, price=$4, updated_at=NOW() WHERE id=$5`,
               [d.mrp_ex_gst, d.mrp, d.price_ex_gst, d.base_price, sv.id]
@@ -301,7 +354,8 @@ export async function POST(request: NextRequest) {
         if (isNaN(disc) || disc < 0 || disc > 100) throw new Error('discount must be 0–100')
 
         const products = await client.query(
-          `SELECT id, mrp_ex_gst, gst_percentage FROM products WHERE id=ANY($1::uuid[])`, [ids]
+          `SELECT id, mrp_ex_gst, gst_percentage FROM products WHERE id=ANY($1::uuid[])`,
+          [ids]
         )
         for (const p of products.rows) {
           const mrpEx = parseFloat(p.mrp_ex_gst)
@@ -318,7 +372,8 @@ export async function POST(request: NextRequest) {
         const variants = await client.query(
           `SELECT pv.id, pv.mrp_ex_gst, p.gst_percentage
            FROM product_variants pv JOIN products p ON p.id=pv.product_id
-           WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true`, [ids]
+           WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true`,
+          [ids]
         )
         for (const v of variants.rows) {
           const cur = parseFloat(v.mrp_ex_gst)
@@ -338,7 +393,8 @@ export async function POST(request: NextRequest) {
            FROM product_sub_variants psv
            JOIN product_variants pv ON pv.id=psv.variant_id
            JOIN products p ON p.id=pv.product_id
-           WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true AND psv.is_active=true`, [ids]
+           WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true AND psv.is_active=true`,
+          [ids]
         )
         for (const sv of subs.rows) {
           const cur = parseFloat(sv.mrp_ex_gst)
@@ -358,7 +414,8 @@ export async function POST(request: NextRequest) {
         if (isNaN(mrpEx) || mrpEx <= 0) throw new Error('MRP must be > 0')
 
         const products = await client.query(
-          `SELECT id, discount_pct, gst_percentage FROM products WHERE id=ANY($1::uuid[])`, [ids]
+          `SELECT id, discount_pct, gst_percentage FROM products WHERE id=ANY($1::uuid[])`,
+          [ids]
         )
         for (const p of products.rows) {
           const d = deriveFromMrpEx(mrpEx, parseFloat(p.discount_pct) || 0, parseFloat(p.gst_percentage) || 0)
@@ -374,56 +431,71 @@ export async function POST(request: NextRequest) {
       else if (operation === 'set_tax_class') {
         await client.query(`UPDATE products SET tax_class=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
         updated = ids.length
-      }
-      else if (operation === 'set_condition') {
+      } else if (operation === 'set_condition') {
         await client.query(`UPDATE products SET condition=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
         updated = ids.length
-      }
-      else if (operation === 'set_shipping_class') {
-        await client.query(`UPDATE products SET shipping_class=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
+      } else if (operation === 'set_shipping_class') {
+        await client.query(`UPDATE products SET shipping_class=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_handling_days') {
+      } else if (operation === 'set_handling_days') {
         const days = parseInt(value)
         if (isNaN(days) || days < 0) throw new Error('handling_days must be >= 0')
-        await client.query(`UPDATE products SET handling_days=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [days, ids])
+        await client.query(`UPDATE products SET handling_days=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          days,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_warranty_months') {
+      } else if (operation === 'set_warranty_months') {
         const months = parseInt(value)
         if (isNaN(months) || months < 0) throw new Error('warranty_months must be >= 0')
-        await client.query(`UPDATE products SET warranty_months=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [months, ids])
+        await client.query(`UPDATE products SET warranty_months=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          months,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_target_gender') {
-        await client.query(`UPDATE products SET target_gender=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
+      } else if (operation === 'set_target_gender') {
+        await client.query(`UPDATE products SET target_gender=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_grade') {
-        await client.query(`UPDATE products SET grade=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value || null, ids])
+      } else if (operation === 'set_grade') {
+        await client.query(`UPDATE products SET grade=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value || null,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_hsn_code') {
+      } else if (operation === 'set_hsn_code') {
         await client.query(`UPDATE products SET hsn_code=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
         updated = ids.length
-      }
-      else if (operation === 'set_country_of_origin') {
-        await client.query(`UPDATE products SET country_of_origin=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value, ids])
+      } else if (operation === 'set_country_of_origin') {
+        await client.query(`UPDATE products SET country_of_origin=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value,
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_featured') {
-        await client.query(`UPDATE products SET is_featured=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value === 'true', ids])
+      } else if (operation === 'set_featured') {
+        await client.query(`UPDATE products SET is_featured=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value === 'true',
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_searchable') {
-        await client.query(`UPDATE products SET is_searchable=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value === 'true', ids])
+      } else if (operation === 'set_searchable') {
+        await client.query(`UPDATE products SET is_searchable=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value === 'true',
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_active') {
-        await client.query(`UPDATE products SET is_active=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [value === 'true', ids])
+      } else if (operation === 'set_active') {
+        await client.query(`UPDATE products SET is_active=$1, updated_at=NOW() WHERE id=ANY($2::uuid[])`, [
+          value === 'true',
+          ids,
+        ])
         updated = ids.length
-      }
-      else if (operation === 'set_selling_unit') {
+      } else if (operation === 'set_selling_unit') {
         if (!value || typeof value !== 'object') throw new Error('unit config required')
         const { unit, factor, dimension = 'count', display_label, min_qty, max_qty, qty_step } = value as any
         if (!unit) throw new Error('unit name required')
@@ -472,8 +544,7 @@ export async function POST(request: NextRequest) {
             [unit, ids]
           )
         }
-      }
-      else {
+      } else {
         throw new Error(`Unknown operation: ${operation}`)
       }
 
@@ -482,7 +553,15 @@ export async function POST(request: NextRequest) {
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id`,
-        [operation, ids, JSON.stringify(value ?? null), JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, ids.length]
+        [
+          operation,
+          ids,
+          JSON.stringify(value ?? null),
+          JSON.stringify(snapshot),
+          admin.email ?? null,
+          admin.adminId ?? null,
+          ids.length,
+        ]
       )
       logId = logRes.rows[0]?.id ?? null
     })
@@ -502,14 +581,24 @@ const IMG_BUCKET = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
 
 async function handleBulkImages(request: NextRequest, admin: { email?: string | null; adminId?: string | null }) {
   let form: FormData
-  try { form = await request.formData() } catch { return NextResponse.json({ error: 'Invalid form data' }, { status: 400 }) }
+  try {
+    form = await request.formData()
+  } catch {
+    return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
+  }
 
   const operation = String(form.get('operation') || '')
-  if (operation !== 'set_images') return NextResponse.json({ error: 'Unsupported multipart operation' }, { status: 400 })
+  if (operation !== 'set_images')
+    return NextResponse.json({ error: 'Unsupported multipart operation' }, { status: 400 })
 
   let ids: string[] = []
-  try { ids = JSON.parse(String(form.get('product_ids') || '[]')) } catch { ids = [] }
-  if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
+  try {
+    ids = JSON.parse(String(form.get('product_ids') || '[]'))
+  } catch {
+    ids = []
+  }
+  if (!Array.isArray(ids) || ids.length === 0)
+    return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
 
   const altText = (form.get('alt_text') as string | null)?.trim() || null
   // Slot is 1-based in the UI; convert to 0-based display_order.
@@ -521,7 +610,8 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
   const file = form.get('image_0')
   const galleryImageId = (form.get('gallery_image_id') as string | null)?.trim() || null
   const hasFile = file instanceof File && file.size > 0
-  if (!hasFile && !galleryImageId) return NextResponse.json({ error: 'An image (upload or gallery) is required' }, { status: 400 })
+  if (!hasFile && !galleryImageId)
+    return NextResponse.json({ error: 'An image (upload or gallery) is required' }, { status: 400 })
 
   // The background worker outlives this request, so buffer the uploaded bytes now
   // (the FormData stream is gone once we respond) and rebuild a File per product.
@@ -535,7 +625,17 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
   }
 
   // If using a gallery image, resolve its S3 keys + metadata up front.
-  let gallery: { s3_key: string; s3_thumbnail_key: string; image_url: string; thumbnail_url: string; file_name: string; file_size: number | null; mime_type: string | null; width: number | null; height: number | null } | null = null
+  let gallery: {
+    s3_key: string
+    s3_thumbnail_key: string
+    image_url: string
+    thumbnail_url: string
+    file_name: string
+    file_size: number | null
+    mime_type: string | null
+    width: number | null
+    height: number | null
+  } | null = null
   if (!hasFile && galleryImageId) {
     const g = await queryMany<any>(
       `SELECT s3_key, s3_thumbnail_key, image_url, thumbnail_url, file_name, file_size, mime_type, width, height
@@ -549,11 +649,21 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
   // Slot read is synchronous so we can fast-fail (bad slot, nothing to do) before
   // enqueuing a job. The actual S3 work then runs in the background.
   const existing = await queryMany<{
-    id: string; product_id: string; image_url: string; thumbnail_url: string | null
-    s3_bucket: string | null; s3_key: string | null; s3_thumbnail_key: string | null
-    file_name: string; file_size: number | null; mime_type: string | null
-    width: number | null; height: number | null; alt_text: string | null
-    display_order: number; is_primary: boolean
+    id: string
+    product_id: string
+    image_url: string
+    thumbnail_url: string | null
+    s3_bucket: string | null
+    s3_key: string | null
+    s3_thumbnail_key: string | null
+    file_name: string
+    file_size: number | null
+    mime_type: string | null
+    width: number | null
+    height: number | null
+    alt_text: string | null
+    display_order: number
+    is_primary: boolean
   }>(
     `SELECT id, product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
             file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
@@ -584,7 +694,17 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
 
   // ── background worker (fire-and-forget; not awaited) ──────────────────────────
   ;(async () => {
-    type Acquired = { url: string; thumbnailUrl: string; s3Key: string; s3ThumbnailKey: string; fileName: string; fileSize: number | null; mimeType: string | null; width: number | null; height: number | null }
+    type Acquired = {
+      url: string
+      thumbnailUrl: string
+      s3Key: string
+      s3ThumbnailKey: string
+      fileName: string
+      fileSize: number | null
+      mimeType: string | null
+      width: number | null
+      height: number | null
+    }
     const snapshot: OperationSnapshot = { products: [], variants: [], subs: [], variantUnits: [], productImages: [] }
     let done = 0
     try {
@@ -597,32 +717,65 @@ async function handleBulkImages(request: NextRequest, admin: { email?: string | 
           u = await uploadProductImage(f, pid)
         } else {
           const c = await copyGalleryImageToProduct(gallery!.s3_key, gallery!.s3_thumbnail_key, pid)
-          u = { url: c.url, thumbnailUrl: c.thumbnailUrl, s3Key: c.s3Key, s3ThumbnailKey: c.s3ThumbnailKey, fileName: gallery!.file_name, fileSize: gallery!.file_size, mimeType: gallery!.mime_type, width: gallery!.width, height: gallery!.height }
+          u = {
+            url: c.url,
+            thumbnailUrl: c.thumbnailUrl,
+            s3Key: c.s3Key,
+            s3ThumbnailKey: c.s3ThumbnailKey,
+            fileName: gallery!.file_name,
+            fileSize: gallery!.file_size,
+            mimeType: gallery!.mime_type,
+            width: gallery!.width,
+            height: gallery!.height,
+          }
         }
         // Replace the slot row in one small transaction per product, then record the
         // snapshot only after it commits (so rollback matches what actually changed).
-        await withTransaction(async (client) => {
+        await withTransaction(async client => {
           await client.query(`DELETE FROM product_images WHERE id = $1`, [old.id])
           await client.query(
             `INSERT INTO product_images (
                product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
                file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
              ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-            [pid, u.url, u.thumbnailUrl, IMG_BUCKET, u.s3Key, u.s3ThumbnailKey,
-             u.fileName, u.fileSize, u.mimeType, u.width, u.height, altText ?? old.alt_text,
-             targetOrder, targetOrder === 0 ? true : old.is_primary]
+            [
+              pid,
+              u.url,
+              u.thumbnailUrl,
+              IMG_BUCKET,
+              u.s3Key,
+              u.s3ThumbnailKey,
+              u.fileName,
+              u.fileSize,
+              u.mimeType,
+              u.width,
+              u.height,
+              altText ?? old.alt_text,
+              targetOrder,
+              targetOrder === 0 ? true : old.is_primary,
+            ]
           )
         })
         snapshot.productImages!.push({ product_id: pid, rows: [old as unknown as Record<string, unknown>] })
         done++
-        await query(`UPDATE bulk_image_jobs SET done = $2, updated_at = NOW() WHERE id = $1`, [jobId, done]).catch(() => {})
+        await query(`UPDATE bulk_image_jobs SET done = $2, updated_at = NOW() WHERE id = $1`, [jobId, done]).catch(
+          () => {}
+        )
       }
 
       // Write the rollback log once, covering exactly the products that committed.
       const logRow = await queryOne<{ id: string }>(
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [operation, snapshot.productImages!.map(s => s.product_id), JSON.stringify({ slot }), JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, done]
+        [
+          operation,
+          snapshot.productImages!.map(s => s.product_id),
+          JSON.stringify({ slot }),
+          JSON.stringify(snapshot),
+          admin.email ?? null,
+          admin.adminId ?? null,
+          done,
+        ]
       )
       await query(
         `UPDATE bulk_image_jobs SET status = 'completed', done = $2, log_id = $3, updated_at = NOW() WHERE id = $1`,

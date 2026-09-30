@@ -14,7 +14,9 @@ function isSameOriginRequest(request: NextRequest): boolean {
     try {
       const refUrl = new URL(referer)
       if (refUrl.host === host) return true
-    } catch (err) { console.error("[route]", err) }
+    } catch (err) {
+      console.error('[route]', err)
+    }
   }
   return false
 }
@@ -29,7 +31,8 @@ export async function POST(request: NextRequest) {
 
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'merchant_sync:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'merchant_sync:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
   const productId: string | undefined = body.productId
@@ -58,7 +61,8 @@ export async function GET(request: NextRequest) {
   if (!isCron) {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'merchant_sync:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'merchant_sync:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   try {

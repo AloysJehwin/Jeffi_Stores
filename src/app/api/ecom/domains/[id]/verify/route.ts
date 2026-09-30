@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Ownership check
   const tenants = await getOwnerTenants(owner.id)
-  const tenant = tenants.find((t) => t.id === domain.tenant_id)
+  const tenant = tenants.find(t => t.id === domain.tenant_id)
   if (!tenant) return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
 
   const expectedTarget = `${tenant.slug}.jeffistores.in`
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let matched = false
     try {
       const cnames = await dns.resolveCname(domain.domain)
-      matched = cnames.some((c) => c.replace(/\.$/, '').toLowerCase() === expectedTarget.toLowerCase())
+      matched = cnames.some(c => c.replace(/\.$/, '').toLowerCase() === expectedTarget.toLowerCase())
     } catch {
       // Some setups use ALIAS/A records — check if it resolves to the same place as our subdomain
       try {
@@ -39,16 +39,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           dns.resolve4(domain.domain).catch((): string[] => []),
           dns.resolve4(expectedTarget).catch((): string[] => []),
         ])
-        matched = domainAddrs.length > 0 && domainAddrs.some((a) => targetAddrs.includes(a))
-      } catch { matched = false }
+        matched = domainAddrs.length > 0 && domainAddrs.some(a => targetAddrs.includes(a))
+      } catch {
+        matched = false
+      }
     }
 
     if (!matched) {
       await setCustomDomainStatus(id, 'pending')
-      return NextResponse.json({
-        ok: false,
-        error: `CNAME not found. Add: ${domain.domain} → ${expectedTarget}, then retry (DNS can take a few minutes).`,
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `CNAME not found. Add: ${domain.domain} → ${expectedTarget}, then retry (DNS can take a few minutes).`,
+        },
+        { status: 400 }
+      )
     }
 
     // Verified. In production, trigger ACM cert issuance + CloudFront attach here.

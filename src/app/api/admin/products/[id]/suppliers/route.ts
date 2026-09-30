@@ -5,7 +5,9 @@ import { queryMany, queryOne, withTransaction } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 async function ensureProduct(productId: string) {
   const row = await queryOne<{ id: string }>(`SELECT id FROM products WHERE id = $1`, [productId])
@@ -74,7 +76,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   const subVariantId = body.sub_variant_id ? String(body.sub_variant_id) : null
   if (!supplierId) return NextResponse.json({ error: 'supplier_id is required' }, { status: 400 })
   if (variantId && subVariantId) {
-    return NextResponse.json({ error: 'A supplier attaches at one leaf: set variant_id OR sub_variant_id, not both' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'A supplier attaches at one leaf: set variant_id OR sub_variant_id, not both' },
+      { status: 400 }
+    )
   }
   if (!Number.isFinite(unitCost) || unitCost < 0) {
     return NextResponse.json({ error: 'unit_cost must be a non-negative number' }, { status: 400 })
@@ -87,11 +92,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   const currency = body.currency ? String(body.currency).slice(0, 3) : 'INR'
   const gstInclusive = !!body.gst_inclusive
   const moq = body.moq != null && Number.isFinite(Number(body.moq)) ? Number(body.moq) : null
-  const leadTime = body.lead_time_days != null && Number.isInteger(Number(body.lead_time_days)) ? Number(body.lead_time_days) : null
+  const leadTime =
+    body.lead_time_days != null && Number.isInteger(Number(body.lead_time_days)) ? Number(body.lead_time_days) : null
   const notes = body.notes ? String(body.notes).slice(0, 500) : null
 
   try {
-    const inserted = await withTransaction(async (client) => {
+    const inserted = await withTransaction(async client => {
       if (isPreferred) {
         await client.query(
           `UPDATE product_suppliers SET is_preferred = false, updated_at = NOW()

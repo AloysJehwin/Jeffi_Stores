@@ -15,7 +15,7 @@ const patchSchema = z
     sku: zNonEmpty.optional(),
     categoryId: zUuid.optional(),
   })
-  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+  .refine(d => Object.values(d).some(v => v !== undefined), {
     message: 'At least one field is required',
   })
 
@@ -23,7 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
     const product = await getProduct(id)
@@ -38,7 +39,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const raw = await req.json()
   const parsed = parseBody(patchSchema, raw)
@@ -49,7 +51,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!category_id) return NextResponse.json({ error: 'category_id required' }, { status: 400 })
 
   await query('UPDATE products SET category_id = $1, updated_at = $2 WHERE id = $3', [
-    category_id, new Date().toISOString(), id,
+    category_id,
+    new Date().toISOString(),
+    id,
   ])
   revalidatePath('/admin/products')
   revalidatePath('/admin/categories')
@@ -57,15 +61,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json({ ok: true })
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!isPlatformOwner(admin.role)) return NextResponse.json({ error: 'Only platform owners can delete products' }, { status: 403 })
+    if (!isPlatformOwner(admin.role))
+      return NextResponse.json({ error: 'Only platform owners can delete products' }, { status: 403 })
 
     const product = await query(`SELECT id FROM products WHERE id = $1`, [id])
     if (!product.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -83,13 +85,17 @@ export async function DELETE(
 
     // Atomic FORCE delete — removes the product and every referencing record,
     // including purchase history (GRN + PO line items) and all variant/unit data.
-    await withTransaction((client) => deleteProductCascadeTx(client, id))
+    await withTransaction(client => deleteProductCascadeTx(client, id))
 
     // Best-effort S3 cleanup (outside the txn — object store isn't transactional).
     const { deleteProductImage } = await import('@/lib/s3')
     for (const img of [...imgs.rows, ...variantImgs.rows]) {
       if (img.s3_key && img.s3_thumbnail_key) {
-        try { await deleteProductImage(img.s3_key, img.s3_thumbnail_key) } catch { /* orphan cleanup best-effort */ }
+        try {
+          await deleteProductImage(img.s3_key, img.s3_thumbnail_key)
+        } catch {
+          /* orphan cleanup best-effort */
+        }
       }
     }
 
@@ -98,10 +104,13 @@ export async function DELETE(
   } catch (err: any) {
     // FK violation → product is still referenced by a record we don't auto-clear.
     if (err?.code === '23503') {
-      return NextResponse.json({
-        error: `Product is still referenced by ${err?.table || 'another record'} and cannot be deleted.`,
-        detail: err?.detail,
-      }, { status: 409 })
+      return NextResponse.json(
+        {
+          error: `Product is still referenced by ${err?.table || 'another record'} and cannot be deleted.`,
+          detail: err?.detail,
+        },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
   }

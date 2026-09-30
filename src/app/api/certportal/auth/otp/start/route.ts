@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
     await storeOTP(key, otp)
     await sendAdminOTPEmail(email, otp)
     await recordSendOtp(key)
-    return NextResponse.json({ message: 'A verification code has been sent to your email.', nextCooldown: rate.nextCooldown })
+    return NextResponse.json({
+      message: 'A verification code has been sent to your email.',
+      nextCooldown: rate.nextCooldown,
+    })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

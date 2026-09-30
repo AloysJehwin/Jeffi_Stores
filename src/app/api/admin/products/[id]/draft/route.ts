@@ -6,7 +6,9 @@ import { deleteProductImage } from '@/lib/s3'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
@@ -119,11 +121,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
            ORDER BY array_position($2::uuid[], i.id)`,
           [id, orderedExistingIds, primaryId]
         )
-        imagesJson = JSON.stringify(rows.rows.map((r: any) => ({
-          ...r.img,
-          display_order: r.ord,
-          is_primary: r.is_primary,
-        })))
+        imagesJson = JSON.stringify(
+          rows.rows.map((r: any) => ({
+            ...r.img,
+            display_order: r.ord,
+            is_primary: r.is_primary,
+          }))
+        )
       } else {
         // Intent present but no existing images kept (all removed) → empty set.
         imagesJson = '[]'
@@ -161,15 +165,16 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     // (staged, never applied to live). Live-image rows (real uuid ids) are left alone —
     // their files still back the live product.
     const draft = await queryOne<{ variant_images: any[]; images: any[] }>(
-      `SELECT variant_images, images FROM product_drafts WHERE product_id = $1`, [id]
+      `SELECT variant_images, images FROM product_drafts WHERE product_id = $1`,
+      [id]
     )
 
     // Create-draft (is_draft=true, no product_drafts edit-draft): discarding means deleting the
     // product row itself, since it was never published to the live list.
     if (!draft) {
-      const createDraft = await queryOne<{ id: string }>(
-        `SELECT id FROM products WHERE id = $1 AND is_draft = true`, [id]
-      )
+      const createDraft = await queryOne<{ id: string }>(`SELECT id FROM products WHERE id = $1 AND is_draft = true`, [
+        id,
+      ])
       if (createDraft) {
         await query(`DELETE FROM products WHERE id = $1 AND is_draft = true`, [id])
         return NextResponse.json({ success: true })
@@ -179,13 +184,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
     for (const vi of stagedVI) {
       if (vi?._staged && vi?.s3_key && String(vi.id).startsWith('draft-vi-')) {
-        try { await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '') } catch {}
+        try {
+          await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '')
+        } catch {}
       }
     }
     const stagedImages = Array.isArray(draft?.images) ? draft!.images : []
     for (const img of stagedImages) {
       if (img?._staged && img?.s3_key && String(img.id).startsWith('draft-img-')) {
-        try { await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '') } catch {}
+        try {
+          await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
+        } catch {}
       }
     }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])

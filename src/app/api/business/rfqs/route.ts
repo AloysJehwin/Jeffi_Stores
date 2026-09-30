@@ -16,7 +16,8 @@ function buildRfqNumber(now: Date, seq: number): string {
 export async function GET(request: NextRequest) {
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (user.approvalStatus !== 'approved') return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
+  if (user.approvalStatus !== 'approved')
+    return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
@@ -48,7 +49,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (user.approvalStatus !== 'approved') return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
+  if (user.approvalStatus !== 'approved')
+    return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
 
   const { notes, items } = await request.json()
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -80,7 +82,18 @@ export async function POST(request: NextRequest) {
     await query(
       `INSERT INTO business_rfq_items (rfq_id, product_id, variant_id, sub_variant_id, description, quantity, unit, requested_price, notes, position)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [rfq!.id, item.productId || null, item.variantId || null, item.subVariantId || null, item.description || '', item.quantity || 1, item.unit || 'Nos', item.requested_price ?? null, item.notes || null, idx]
+      [
+        rfq!.id,
+        item.productId || null,
+        item.variantId || null,
+        item.subVariantId || null,
+        item.description || '',
+        item.quantity || 1,
+        item.unit || 'Nos',
+        item.requested_price ?? null,
+        item.notes || null,
+        idx,
+      ]
     )
   }
 

@@ -19,7 +19,9 @@ export async function POST() {
         // An explicit logout ends this admin's sessions in every browser, not just this one.
         if (typeof adminId === 'string' && adminId) await revokeAllForPrincipal('admin', adminId)
         else if (typeof sid === 'string' && sid) await revokeSession(sid)
-      } catch { /* best-effort revoke */ }
+      } catch {
+        /* best-effort revoke */
+      }
     }
 
     const baseOpts = {

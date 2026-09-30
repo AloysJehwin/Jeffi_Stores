@@ -34,7 +34,10 @@ export async function POST(request: NextRequest) {
           [asPhone]
         )
         if (!byPhone) {
-          return NextResponse.json({ error: 'No account found with this mobile number. Please sign up first.', userNotFound: true }, { status: 404 })
+          return NextResponse.json(
+            { error: 'No account found with this mobile number. Please sign up first.', userNotFound: true },
+            { status: 404 }
+          )
         }
         email = byPhone.email
         deliveryPhone = deliveryPhone || byPhone.phone
@@ -90,7 +93,10 @@ export async function POST(request: NextRequest) {
       )
 
       if (!existingUser) {
-        return NextResponse.json({ error: 'No account found with this email. Please sign up first.', userNotFound: true }, { status: 404 })
+        return NextResponse.json(
+          { error: 'No account found with this email. Please sign up first.', userNotFound: true },
+          { status: 404 }
+        )
       }
       requiresPolicyAcceptance = existingUser.policies_accepted_version !== POLICY_VERSION
     }

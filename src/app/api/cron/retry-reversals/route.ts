@@ -25,18 +25,23 @@ export async function GET(req: NextRequest) {
 
   const pool = controlPlanePool()
   // Only rows still carrying a debt, newest first, bounded so one slow run cannot stall the tick.
-  const owed = await pool.query<{
-    id: string; tenant_id: string; amount: string; note: string
-  }>(
-    `SELECT id, tenant_id, amount, note
+  const owed = await pool
+    .query<{
+      id: string
+      tenant_id: string
+      amount: string
+      note: string
+    }>(
+      `SELECT id, tenant_id, amount, note
        FROM settlement_ledger
       WHERE entry_type = 'refund'
         AND note LIKE $1
         AND occurred_at > now() - interval '90 days'
       ORDER BY occurred_at DESC
       LIMIT 50`,
-    [UNRECOVERED_NOTE]
-  ).catch(() => null)
+      [UNRECOVERED_NOTE]
+    )
+    .catch(() => null)
 
   if (!owed?.rows.length) return NextResponse.json({ retried: 0, recovered: 0 })
 
@@ -46,14 +51,16 @@ export async function GET(req: NextRequest) {
   for (const row of owed.rows) {
     // The payment id is not on the ledger row, so resolve it from the tenant transaction that
     // the refund was recorded against.
-    const txn = await pool.query<{ gateway_txn_id: string | null }>(
-      `SELECT t.gateway_txn_id
+    const txn = await pool
+      .query<{ gateway_txn_id: string | null }>(
+        `SELECT t.gateway_txn_id
          FROM tenant_transactions t
         WHERE t.tenant_id = $1
           AND $2 LIKE '%' || t.order_ref || '%'
         LIMIT 1`,
-      [row.tenant_id, row.note]
-    ).catch(() => null)
+        [row.tenant_id, row.note]
+      )
+      .catch(() => null)
 
     const paymentId = txn?.rows[0]?.gateway_txn_id
     if (!paymentId || !paymentId.startsWith('pay_')) continue
@@ -67,22 +74,26 @@ export async function GET(req: NextRequest) {
 
     recovered += outcome.reversedPaise
     // Rewrite the row to what was actually recovered so it stops matching the debt filter.
-    await pool.query(
-      `UPDATE settlement_ledger
+    await pool
+      .query(
+        `UPDATE settlement_ledger
           SET amount = $2,
               note = replace(note, 'Refund NOT reversed (owed by tenant)', 'Refund reversed (recovered on retry)')
         WHERE id = $1`,
-      [row.id, -(outcome.reversedPaise / 100)]
-    ).catch(() => {})
+        [row.id, -(outcome.reversedPaise / 100)]
+      )
+      .catch(() => {})
 
     // A partial recovery leaves the remainder owed, as its own row.
     const stillOwedPaise = owedPaise - outcome.reversedPaise
     if (stillOwedPaise > 0) {
-      await pool.query(
-        `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
+      await pool
+        .query(
+          `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
          VALUES ($1, 'refund', $2, $3, now())`,
-        [row.tenant_id, -(stillOwedPaise / 100), row.note]
-      ).catch(() => {})
+          [row.tenant_id, -(stillOwedPaise / 100), row.note]
+        )
+        .catch(() => {})
     }
   }
 

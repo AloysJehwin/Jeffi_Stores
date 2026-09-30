@@ -6,13 +6,15 @@ import { queryOne, queryMany } from '@/lib/db'
 import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/ewaybill'
 import { parseBody } from '@/lib/validate'
 
-const Schema = z.object({
-  transporterName: z.string().nullish(),
-  transporterId: z.string().nullish(),
-  transMode: z.string().nullish(),
-  transDistance: z.number().nullish(),
-  vehicleNo: z.string().nullish(),
-}).optional()
+const Schema = z
+  .object({
+    transporterName: z.string().nullish(),
+    transporterId: z.string().nullish(),
+    transMode: z.string().nullish(),
+    transDistance: z.number().nullish(),
+    vehicleNo: z.string().nullish(),
+  })
+  .optional()
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +23,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const order = await queryOne(`
+    const order = await queryOne(
+      `
       SELECT o.*,
         a.full_name, a.address_line1, a.city, a.state, a.postal_code, a.state_code,
         i.invoice_number
@@ -31,7 +35,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN addresses a ON o.shipping_address_id = a.id
       LEFT JOIN invoices i ON i.order_id = o.id
       WHERE o.id = $1
-    `, [id])
+    `,
+      [id]
+    )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.invoice_number) return NextResponse.json({ error: 'Invoice not generated yet' }, { status: 422 })
@@ -39,14 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'E-way bill already generated', ewbNo: order.eway_bill_no }, { status: 409 })
     }
 
-    const items = await queryMany(
-      'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-      [id]
-    )
+    const items = await queryMany('SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at', [id])
 
-    const settingsRows = await queryMany(
-      "SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", []
-    )
+    const settingsRows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
     const s: Record<string, string> = {}
     for (const row of settingsRows) s[row.key] = row.value || ''
 
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       cessValue: 0,
       transporterName: body.transporterName || '',
       transporterId: body.transporterId || '',
-  transMode: (body.transMode || '1') as '1' | '2' | '3' | '4',
+      transMode: (body.transMode || '1') as '1' | '2' | '3' | '4',
       transDistance: body.transDistance || 1,
       vehicleNo: body.vehicleNo || order.awb_number || '',
       vehicleType: 'R',

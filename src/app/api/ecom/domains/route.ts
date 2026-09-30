@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
 
   // Ownership check
   const tenants = await getOwnerTenants(owner.id)
-  if (!tenants.find((t) => t.id === tenantId)) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  if (!tenants.find(t => t.id === tenantId)) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const domains = await listCustomDomains(tenantId)
-  return NextResponse.json({ domains, cnameTarget: tenants.find((t) => t.id === tenantId)!.slug + '.jeffistores.in' })
+  return NextResponse.json({ domains, cnameTarget: tenants.find(t => t.id === tenantId)!.slug + '.jeffistores.in' })
 }
 
 // POST → add a custom domain (plan-quota enforced)
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const tenants = await getOwnerTenants(owner.id)
-  const tenant = tenants.find((t) => t.id === parsed.data.tenantId)
+  const tenant = tenants.find(t => t.id === parsed.data.tenantId)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const result = await addCustomDomain(parsed.data.tenantId, parsed.data.domain)

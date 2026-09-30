@@ -7,12 +7,7 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const MAX_BYTES = 5 * 1024 * 1024
-const ALLOWED_MIMES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/pdf',
-])
+const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
 
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)

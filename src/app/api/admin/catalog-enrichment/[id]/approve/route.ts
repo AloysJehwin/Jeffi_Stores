@@ -35,11 +35,16 @@ async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?:
     })
 
     const product = await queryOne<{
-      name: string; sku: string | null
-      ai_description: string | null; description: string | null
-      ai_use_cases: string[] | null; ai_keywords: string[] | null
-      ai_who_uses_it: string | null; ai_application: string | null
-      ai_product_type: string | null; ai_features: string[] | null
+      name: string
+      sku: string | null
+      ai_description: string | null
+      description: string | null
+      ai_use_cases: string[] | null
+      ai_keywords: string[] | null
+      ai_who_uses_it: string | null
+      ai_application: string | null
+      ai_product_type: string | null
+      ai_features: string[] | null
       ai_search_tags: string[] | null
     }>(
       `SELECT name, sku, ai_description, description, ai_use_cases,
@@ -62,7 +67,9 @@ async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?:
       (product.ai_keywords || []).length ? `Keywords: ${product.ai_keywords!.join(', ')}` : '',
       (product.ai_features || []).length ? `Features: ${product.ai_features!.join(', ')}` : '',
       (product.ai_search_tags || []).length ? `Tags: ${product.ai_search_tags!.join(', ')}` : '',
-    ].filter(Boolean).join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
 
     const vec = await embed(content)
     const vecLit = '[' + vec.join(',') + ']'
@@ -118,10 +125,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             ai_product_type = $6, ai_features = $7, ai_search_tags = $8,
             ai_enriched_at = NOW(), updated_at = NOW()
       WHERE id = $9::uuid`,
-    [row.ai_description, row.ai_use_cases,
-     row.ai_keywords, row.ai_who_uses_it, row.ai_application,
-     row.ai_product_type, row.ai_features, row.ai_search_tags,
-     row.product_id]
+    [
+      row.ai_description,
+      row.ai_use_cases,
+      row.ai_keywords,
+      row.ai_who_uses_it,
+      row.ai_application,
+      row.ai_product_type,
+      row.ai_features,
+      row.ai_search_tags,
+      row.product_id,
+    ]
   )
 
   const embedResult = await reEmbedProduct(row.product_id)

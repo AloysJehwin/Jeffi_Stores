@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryCount } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -24,10 +21,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -61,10 +55,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -74,10 +65,7 @@ export async function DELETE(
 
     const brandId = id
 
-    const productCount = await queryCount(
-      'SELECT COUNT(*) FROM products WHERE brand_id = $1',
-      [brandId]
-    )
+    const productCount = await queryCount('SELECT COUNT(*) FROM products WHERE brand_id = $1', [brandId])
 
     if (productCount > 0) {
       return NextResponse.json(
@@ -90,9 +78,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete brand' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Failed to delete brand' }, { status: 500 })
   }
 }

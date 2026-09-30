@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/product-label'
 import { queryMany } from '@/lib/db'
-import { buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause, buildSearchClause } from '@/lib/search'
+import {
+  buildProductSearchClause,
+  buildProductSearchRank,
+  buildVectorSearchClause,
+  buildSearchClause,
+} from '@/lib/search'
 import { authenticateAdmin } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
@@ -37,10 +42,19 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
   params.push(10)
 
   const rows = await queryMany<{
-    product_id: string; variant_id: string | null; sub_variant_id: string | null
-    name: string; variant_name: string | null; sub_variant_name: string | null
-    sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
-    inventory_quantity: number | null; discount_pct: number | null
+    product_id: string
+    variant_id: string | null
+    sub_variant_id: string | null
+    name: string
+    variant_name: string | null
+    sub_variant_name: string | null
+    sku: string
+    base_price: number | null
+    mrp: number | null
+    gst_percentage: number
+    hsn_code: string | null
+    inventory_quantity: number | null
+    discount_pct: number | null
   }>(
     `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sub_variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity, discount_pct FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, NULL::uuid AS sub_variant_id,
@@ -83,7 +97,10 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
     params
   )
   return (rows || []).map(r => {
-    const displayName = productLabel({ product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name }, ' — ')
+    const displayName = productLabel(
+      { product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name },
+      ' — '
+    )
     const encoded = [
       r.product_id,
       r.variant_id ?? '',
@@ -126,9 +143,18 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
   params.push(10)
 
   const rows = await queryMany<{
-    product_id: string; variant_id: string | null; name: string; variant_name: string | null; sub_variant_name: string | null
-    sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
-    sell_unit_label: string | null; sell_unit_dimension: string | null
+    product_id: string
+    variant_id: string | null
+    name: string
+    variant_name: string | null
+    sub_variant_name: string | null
+    sku: string
+    base_price: number | null
+    mrp: number | null
+    gst_percentage: number
+    hsn_code: string | null
+    sell_unit_label: string | null
+    sell_unit_dimension: string | null
   }>(
     `SELECT product_id, variant_id, name, variant_name, sub_variant_name, sku, base_price, mrp, gst_percentage, hsn_code, sell_unit_label, sell_unit_dimension FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, p.name, NULL AS variant_name, NULL AS sub_variant_name,
@@ -174,7 +200,10 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
     params
   )
   return (rows || []).map(r => {
-    const displayName = productLabel({ product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name }, ' — ')
+    const displayName = productLabel(
+      { product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name },
+      ' — '
+    )
     const encoded = [
       r.product_id,
       r.variant_id ?? '',
@@ -199,7 +228,12 @@ async function suggestProducts(q: string): Promise<SuggestItem[]> {
      ORDER BY ${rk.rank}, p.name ASC LIMIT 6`,
     [...sc.params, ...rk.params]
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.name, sublabel: r.sku, href: `/admin/products?search=${encodeURIComponent(q)}` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.name,
+    sublabel: r.sku,
+    href: `/admin/products?search=${encodeURIComponent(q)}`,
+  }))
 }
 
 async function suggestOrders(q: string): Promise<SuggestItem[]> {
@@ -209,12 +243,23 @@ async function suggestOrders(q: string): Promise<SuggestItem[]> {
      WHERE ${sc.clause} ORDER BY o.created_at DESC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.order_number, sublabel: r.customer_name, href: `/admin/orders?search=${encodeURIComponent(q)}` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.order_number,
+    sublabel: r.customer_name,
+    href: `/admin/orders?search=${encodeURIComponent(q)}`,
+  }))
 }
 
 async function suggestCustomers(q: string): Promise<SuggestItem[]> {
   const sc = buildSearchClause(q, ['u.first_name', 'u.last_name', 'u.email', 'u.phone'], 1)
-  const rows = await queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null }>(
+  const rows = await queryMany<{
+    id: string
+    first_name: string | null
+    last_name: string | null
+    email: string
+    phone: string | null
+  }>(
     `SELECT u.id, u.first_name, u.last_name, u.email, u.phone FROM users u
      LEFT JOIN customer_profiles cp ON cp.user_id = u.id
      WHERE u.is_guest = false AND ${sc.clause} ORDER BY u.first_name ASC, u.last_name ASC LIMIT 6`,
@@ -222,13 +267,30 @@ async function suggestCustomers(q: string): Promise<SuggestItem[]> {
   )
   return (rows || []).map(r => {
     const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email
-    return { id: r.id, label: name, sublabel: r.phone || r.email, href: `/admin/customers?search=${encodeURIComponent(q)}` }
+    return {
+      id: r.id,
+      label: name,
+      sublabel: r.phone || r.email,
+      href: `/admin/customers?search=${encodeURIComponent(q)}`,
+    }
   })
 }
 
 async function suggestInvoices(q: string): Promise<SuggestItem[]> {
-  const sc = buildVectorSearchClause(q, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], 1, 'simple')
-  const rows = await queryMany<{ id: string; invoice_number: string | null; order_number: string; customer_name: string }>(
+  const sc = buildVectorSearchClause(
+    q,
+    'o.search_vector',
+    ['o.customer_name'],
+    ['o.invoice_number', 'o.order_number'],
+    1,
+    'simple'
+  )
+  const rows = await queryMany<{
+    id: string
+    invoice_number: string | null
+    order_number: string
+    customer_name: string
+  }>(
     `SELECT o.id, o.invoice_number, o.order_number, o.customer_name FROM orders o
      WHERE o.invoice_number IS NOT NULL AND ${sc.clause}
      ORDER BY o.created_at DESC LIMIT 6`,
@@ -262,7 +324,11 @@ async function suggestCoupons(q: string): Promise<SuggestItem[]> {
     `SELECT id, code, discount_type, discount_value FROM coupons WHERE ${sc.clause} ORDER BY code ASC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.code, sublabel: `${r.discount_type === 'percentage' ? r.discount_value + '%' : '₹' + r.discount_value} off` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.code,
+    sublabel: `${r.discount_type === 'percentage' ? r.discount_value + '%' : '₹' + r.discount_value} off`,
+  }))
 }
 
 async function suggestBrands(q: string): Promise<SuggestItem[]> {
@@ -284,14 +350,25 @@ async function suggestSuppliers(q: string): Promise<SuggestItem[]> {
 }
 
 async function suggestFinancialReceivables(q: string): Promise<SuggestItem[]> {
-  const sc = buildVectorSearchClause(q, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], 1, 'simple')
+  const sc = buildVectorSearchClause(
+    q,
+    'o.search_vector',
+    ['o.customer_name'],
+    ['o.invoice_number', 'o.order_number'],
+    1,
+    'simple'
+  )
   const rows = await queryMany<{ id: string; order_number: string; customer_name: string; total_amount: string }>(
     `SELECT o.id, o.order_number, o.customer_name, o.total_amount FROM orders o
      WHERE o.payment_status IN ('unpaid','partial') AND ${sc.clause}
      ORDER BY o.created_at DESC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.customer_name, sublabel: `${r.order_number} · ₹${Number(r.total_amount).toLocaleString('en-IN')}` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.customer_name,
+    sublabel: `${r.order_number} · ₹${Number(r.total_amount).toLocaleString('en-IN')}`,
+  }))
 }
 
 async function suggestPurchaseOrders(q: string): Promise<SuggestItem[]> {
@@ -303,7 +380,11 @@ async function suggestPurchaseOrders(q: string): Promise<SuggestItem[]> {
      ORDER BY po.order_date DESC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.po_number, sublabel: `${r.supplier_name} · ₹${Number(r.total_amount).toLocaleString('en-IN')}` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.po_number,
+    sublabel: `${r.supplier_name} · ₹${Number(r.total_amount).toLocaleString('en-IN')}`,
+  }))
 }
 
 async function suggestReviewForms(q: string): Promise<SuggestItem[]> {
@@ -319,25 +400,40 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
   let idx = 1
   const params: unknown[] = []
   const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
-  params.push(...sc.params); idx = sc.nextIdx
+  params.push(...sc.params)
+  idx = sc.nextIdx
   const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
-  params.push(...sc2.params); idx = sc2.nextIdx
+  params.push(...sc2.params)
+  idx = sc2.nextIdx
   const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
-  params.push(...sc3.params); idx = sc3.nextIdx
+  params.push(...sc3.params)
+  idx = sc3.nextIdx
   const svNameIdx = idx++
   params.push(`%${q}%`)
   const svVarIdx = idx++
   params.push(`%${q}%`)
   const searchWhereSv = `(${sc3.clause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
   const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
-  params.push(...rk.params); idx = rk.nextIdx
+  params.push(...rk.params)
+  idx = rk.nextIdx
   params.push(12)
 
   const rows = await queryMany<{
-    id: string; name: string; variant_name: string | null; sub_variant_name: string | null; sku: string; slug: string
-    mrp: number | null; price_ex_gst: number | null; base_price: number | null
-    gst_percentage: number; brand_name: string | null; gtin: string | null
-    inventory_quantity: number | null; product_id: string; sell_unit_id: string | null
+    id: string
+    name: string
+    variant_name: string | null
+    sub_variant_name: string | null
+    sku: string
+    slug: string
+    mrp: number | null
+    price_ex_gst: number | null
+    base_price: number | null
+    gst_percentage: number
+    brand_name: string | null
+    gtin: string | null
+    inventory_quantity: number | null
+    product_id: string
+    sell_unit_id: string | null
     parent_variant_id: string | null
   }>(
     `SELECT id, name, variant_name, sub_variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, product_id, sell_unit_id, parent_variant_id, search_vector FROM (
@@ -378,7 +474,10 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
     params
   )
   return (rows || []).map(r => {
-    const displayName = productLabel({ product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name }, ' — ')
+    const displayName = productLabel(
+      { product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name },
+      ' — '
+    )
     const encoded = [
       r.id,
       r.name,
@@ -404,27 +503,42 @@ async function suggestScopedLabelProducts(q: string, flagCol: 'serialized' | 'pe
   let idx = 1
   const params: unknown[] = []
   const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
-  params.push(...sc.params); idx = sc.nextIdx
+  params.push(...sc.params)
+  idx = sc.nextIdx
   const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
-  params.push(...sc2.params); idx = sc2.nextIdx
+  params.push(...sc2.params)
+  idx = sc2.nextIdx
   const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
-  params.push(...sc3.params); idx = sc3.nextIdx
+  params.push(...sc3.params)
+  idx = sc3.nextIdx
   const svNameIdx = idx++
   params.push(`%${q}%`)
   const svVarIdx = idx++
   params.push(`%${q}%`)
   const searchWhereSv = `(${sc3.clause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
   const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
-  params.push(...rk.params); idx = rk.nextIdx
+  params.push(...rk.params)
+  idx = rk.nextIdx
   params.push(12)
 
   const flag = flagCol === 'serialized' ? 'p.serialized = true' : 'p.perishable = true'
 
   const rows = await queryMany<{
-    id: string; name: string; variant_name: string | null; sub_variant_name: string | null; sku: string; slug: string
-    mrp: number | null; price_ex_gst: number | null; base_price: number | null
-    gst_percentage: number; brand_name: string | null; gtin: string | null
-    inventory_quantity: number | null; product_id: string; sell_unit_id: string | null
+    id: string
+    name: string
+    variant_name: string | null
+    sub_variant_name: string | null
+    sku: string
+    slug: string
+    mrp: number | null
+    price_ex_gst: number | null
+    base_price: number | null
+    gst_percentage: number
+    brand_name: string | null
+    gtin: string | null
+    inventory_quantity: number | null
+    product_id: string
+    sell_unit_id: string | null
     parent_variant_id: string | null
   }>(
     `SELECT id, name, variant_name, sub_variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, product_id, sell_unit_id, parent_variant_id, search_vector FROM (
@@ -465,7 +579,10 @@ async function suggestScopedLabelProducts(q: string, flagCol: 'serialized' | 'pe
     params
   )
   return (rows || []).map(r => {
-    const displayName = productLabel({ product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name }, ' — ')
+    const displayName = productLabel(
+      { product_name: r.name, variant_name: r.variant_name, sub_variant_name: r.sub_variant_name },
+      ' — '
+    )
     const encoded = [
       r.id,
       r.name,
@@ -502,7 +619,11 @@ async function suggestPayables(q: string): Promise<SuggestItem[]> {
      WHERE e.status != 'paid' AND ${sc.clause} ORDER BY e.expense_date DESC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.supplier_name, sublabel: `${r.expense_number} · ₹${Number(r.total_amount).toLocaleString('en-IN')}` }))
+  return (rows || []).map(r => ({
+    id: r.id,
+    label: r.supplier_name,
+    sublabel: `${r.expense_number} · ₹${Number(r.total_amount).toLocaleString('en-IN')}`,
+  }))
 }
 
 const handlers: Record<string, (q: string) => Promise<SuggestItem[]>> = {

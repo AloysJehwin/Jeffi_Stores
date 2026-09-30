@@ -7,7 +7,11 @@ import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 export const dynamic = 'force-dynamic'
 
 function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64)
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64)
 }
 
 export async function POST(req: NextRequest) {
@@ -31,7 +35,8 @@ export async function POST(req: NextRequest) {
   if (!kind) return NextResponse.json({ error: 'kind is required' }, { status: 400 })
   if (!aiPrompt) return NextResponse.json({ error: 'ai_prompt is required' }, { status: 400 })
   if (!sql) return NextResponse.json({ error: 'generated_sql is required' }, { status: 400 })
-  if (dryRunCount === null) return NextResponse.json({ error: 'dry_run_count is required — run a dry-run first' }, { status: 400 })
+  if (dryRunCount === null)
+    return NextResponse.json({ error: 'dry_run_count is required — run a dry-run first' }, { status: 400 })
 
   const validation = validateScenarioSql(sql, 'audience')
   if (!validation.ok) {
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       await client.query(
         `INSERT INTO scenarios (kind, name, description, default_parameters)
          VALUES ($1, $2, $3, $4::jsonb)`,
@@ -66,7 +71,17 @@ export async function POST(req: NextRequest) {
       await client.query(
         `INSERT INTO custom_scenarios (kind, name, description, ai_prompt, generated_sql, product_sql, dry_run_count, dry_run_at, approved_by, approved_at, enabled, parameters)
          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, NOW(), FALSE, $9::jsonb)`,
-        [kind, name, description || null, aiPrompt, validation.normalized, productSqlNormalized, dryRunCount, admin.id, JSON.stringify(parameters)]
+        [
+          kind,
+          name,
+          description || null,
+          aiPrompt,
+          validation.normalized,
+          productSqlNormalized,
+          dryRunCount,
+          admin.id,
+          JSON.stringify(parameters),
+        ]
       )
     })
   } catch (err: any) {
@@ -75,7 +90,14 @@ export async function POST(req: NextRequest) {
 
   await query(
     `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, ai_prompt, generated_sql, validation, result) VALUES ($1, $2, 'save', $3, $4, $5::jsonb, $6::jsonb)`,
-    [admin.id, kind, aiPrompt, validation.normalized, JSON.stringify(validation), JSON.stringify({ dry_run_count: dryRunCount })]
+    [
+      admin.id,
+      kind,
+      aiPrompt,
+      validation.normalized,
+      JSON.stringify(validation),
+      JSON.stringify({ dry_run_count: dryRunCount }),
+    ]
   ).catch(() => {})
 
   return NextResponse.json({ success: true, kind })

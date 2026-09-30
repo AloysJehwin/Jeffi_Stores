@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
   const params: any[] = []
   let i = 1
 
-  if (status) { conditions.push(`r.status = $${i++}`); params.push(status) }
+  if (status) {
+    conditions.push(`r.status = $${i++}`)
+    params.push(status)
+  }
 
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
 
@@ -34,10 +37,7 @@ export async function GET(request: NextRequest) {
        LIMIT $${i} OFFSET $${i + 1}`,
       [...params, PAGE_SIZE, offset]
     ),
-    queryCount(
-      `SELECT COUNT(*) FROM business_rfqs r ${where}`,
-      params
-    ),
+    queryCount(`SELECT COUNT(*) FROM business_rfqs r ${where}`, params),
   ])
 
   return NextResponse.json({ rfqs, total, page, pageSize: PAGE_SIZE })

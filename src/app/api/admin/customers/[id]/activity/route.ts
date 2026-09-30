@@ -9,7 +9,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '50', 10)))
   const before = req.nextUrl.searchParams.get('before')
@@ -22,7 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
   vals.push(limit)
 
-  const events = await queryMany(`
+  const events = await queryMany(
+    `
     SELECT
       cal.id, cal.kind, cal.reference_id, cal.reference_type,
       cal.summary, cal.metadata, cal.created_at,
@@ -35,7 +37,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     WHERE ${wheres.join(' AND ')}
     ORDER BY cal.created_at DESC
     LIMIT $${vals.length}
-  `, vals)
+  `,
+    vals
+  )
 
   return NextResponse.json({ events })
 }

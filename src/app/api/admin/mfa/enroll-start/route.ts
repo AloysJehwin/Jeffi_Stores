@@ -23,9 +23,14 @@ export async function POST(request: Request) {
     const secret = await generateTotpSecret()
     // The store being administered, so a tenant owner sees their own name in the app.
     const { getStoreIdentity } = await import('@/lib/site-controls')
-    const storeName = await getStoreIdentity().then(i => i.name).catch(() => '')
+    const storeName = await getStoreIdentity()
+      .then(i => i.name)
+      .catch(() => '')
     const otpauthUrl = await buildOtpauthUrl(
-      admin.email || admin.id, secret, storeName ? `${storeName} Admin` : undefined)
+      admin.email || admin.id,
+      secret,
+      storeName ? `${storeName} Admin` : undefined
+    )
     const qrDataUrl = await QRCode.toDataURL(otpauthUrl, { width: 240 })
 
     return NextResponse.json({

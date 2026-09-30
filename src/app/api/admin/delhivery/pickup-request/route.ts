@@ -10,10 +10,32 @@ import { walletBlocksShipment } from '@/lib/wallet'
 
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
 
-const EXCLUDE_STATUSES = ['shipped', 'delivered', 'cancelled', 'returned', 'return_requested', 'return_approved', 'return_received', 'return_rejected']
+const EXCLUDE_STATUSES = [
+  'shipped',
+  'delivered',
+  'cancelled',
+  'returned',
+  'return_requested',
+  'return_approved',
+  'return_received',
+  'return_rejected',
+]
 
 // AWB status types that indicate the shipment has been physically picked up
-const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
+const PICKED_UP_TYPES = new Set([
+  'PU',
+  'IT',
+  'RAD',
+  'OT',
+  'OD',
+  'DL',
+  'RTO',
+  'RTRN',
+  'RTO-IT',
+  'RTO-OT',
+  'RTO-OFD',
+  'RTO-DL',
+])
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
 
 /** Resolve a Delhivery rawStatusType to a canonical code (walks scans for ambiguous types) */
@@ -40,7 +62,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'delhivery:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'delhivery:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // ?poll=<db_id> — fetch live AWB status for a specific pickup request
     const pollId = request.nextUrl.searchParams.get('poll')
@@ -56,10 +79,10 @@ export async function GET(request: NextRequest) {
 
       if (req.awbs.length === 0) return NextResponse.json({ pickup_status: req.pickup_status, updated: false })
 
-      const res = await fetch(
-        `https://track.delhivery.com/api/v1/packages/json/?waybill=${req.awbs.join(',')}`,
-        { headers: { Authorization: `Token ${token}` }, next: { revalidate: 0 } }
-      )
+      const res = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${req.awbs.join(',')}`, {
+        headers: { Authorization: `Token ${token}` },
+        next: { revalidate: 0 },
+      })
       if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
 
       const data = await res.json()
@@ -76,11 +99,19 @@ export async function GET(request: NextRequest) {
           activity: s.ScanDetail?.Scan ?? null,
         }))
         const resolved = resolveStatusCode(rawType, scans)
-        if (PICKED_UP_TYPES.has(resolved)) { anyPickedUp = true; break }
+        if (PICKED_UP_TYPES.has(resolved)) {
+          anyPickedUp = true
+          break
+        }
         // Delhivery reschedules a pickup to a later day (unpicked, will retry). Surface the new
         // expected date so a reload shows the pickup was moved rather than looking stuck on pending.
-        const rescheduleScan = [...scans].reverse().find((s: any) =>
-          (s.activity ?? '').toLowerCase().includes('reschedul') || (s.activity ?? '').toLowerCase().includes('pickup rescheduled'))
+        const rescheduleScan = [...scans]
+          .reverse()
+          .find(
+            (s: any) =>
+              (s.activity ?? '').toLowerCase().includes('reschedul') ||
+              (s.activity ?? '').toLowerCase().includes('pickup rescheduled')
+          )
         const expected = shipment.ExpectedDate ?? shipment.PickupDate ?? shipment.Status?.StatusDateTime ?? null
         if (rescheduleScan && expected) rescheduledDate = String(expected).slice(0, 10)
       }
@@ -98,7 +129,8 @@ export async function GET(request: NextRequest) {
     }
 
     const [orders, pickupHistory] = await Promise.all([
-      queryMany(`
+      queryMany(
+        `
         SELECT o.id, o.order_number, o.awb_number, o.status, o.created_at,
                o.customer_name, sa.city, sa.state, sa.postal_code
         FROM orders o
@@ -112,13 +144,18 @@ export async function GET(request: NextRequest) {
           )
         ORDER BY o.created_at DESC
         LIMIT 100
-      `, [...EXCLUDE_STATUSES]),
-      queryMany(`
+      `,
+        [...EXCLUDE_STATUSES]
+      ),
+      queryMany(
+        `
         SELECT id, pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status, created_at
         FROM delhivery_pickup_requests
         ORDER BY created_at DESC
         LIMIT 20
-      `, []),
+      `,
+        []
+      ),
     ])
 
     return NextResponse.json({ orders: orders || [], pickupHistory: pickupHistory || [] })
@@ -131,7 +168,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'delhivery:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'delhivery:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { id, pickup_status, add_awb_order_id } = body
@@ -139,7 +177,8 @@ export async function PATCH(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
     if (add_awb_order_id) {
-      const order = await queryMany(`
+      const order = await queryMany(
+        `
         SELECT id, awb_number, order_number, shipping_amount FROM orders
         WHERE id = $1
           AND awb_number IS NOT NULL
@@ -149,7 +188,9 @@ export async function PATCH(request: NextRequest) {
             SELECT UNNEST(awbs) FROM delhivery_pickup_requests
             WHERE pickup_status IN ('pending', 'picked_up')
           )
-      `, [add_awb_order_id, ...EXCLUDE_STATUSES])
+      `,
+        [add_awb_order_id, ...EXCLUDE_STATUSES]
+      )
 
       if (!order || order.length === 0) {
         return NextResponse.json({ error: 'Order not eligible to add to pickup' }, { status: 422 })
@@ -160,7 +201,7 @@ export async function PATCH(request: NextRequest) {
       // Delivery is charged at AWB creation, not here — the added order's AWB already paid. Only
       // gate on the wallet staying above its minimum before adding it to the pickup.
       const addTenantId = (await resolveTenantId()) ?? undefined
-      if (addTenantId && await walletBlocksShipment(addTenantId).catch(() => false)) {
+      if (addTenantId && (await walletBlocksShipment(addTenantId).catch(() => false))) {
         return NextResponse.json(
           { error: 'Wallet balance is below the minimum. Recharge the wallet before adding to a pickup.' },
           { status: 402 }
@@ -181,10 +222,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid pickup_status' }, { status: 400 })
     }
 
-    await query(
-      `UPDATE delhivery_pickup_requests SET pickup_status = $1 WHERE id = $2`,
-      [pickup_status, id]
-    )
+    await query(`UPDATE delhivery_pickup_requests SET pickup_status = $1 WHERE id = $2`, [pickup_status, id])
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
@@ -196,7 +234,8 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'delhivery:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'delhivery:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const tenantId = (await resolveTenantId()) ?? undefined
 
@@ -219,23 +258,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid pickup date' }, { status: 400 })
     }
 
-    const eligible = await queryMany(`
+    const eligible = await queryMany(
+      `
       SELECT id, awb_number, order_number, shipping_amount FROM orders
       WHERE id = ANY($1::uuid[])
         AND awb_number IS NOT NULL
         AND payment_status = 'paid'
         AND status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 2}`).join(', ')})
-    `, [orderIds, ...EXCLUDE_STATUSES])
+    `,
+      [orderIds, ...EXCLUDE_STATUSES]
+    )
 
     if (!eligible || eligible.length === 0) {
-      return NextResponse.json({ error: 'No eligible orders found (must have AWB, be paid, not yet shipped/cancelled)' }, { status: 422 })
+      return NextResponse.json(
+        { error: 'No eligible orders found (must have AWB, be paid, not yet shipped/cancelled)' },
+        { status: 422 }
+      )
     }
 
     const awbList = eligible.map((o: any) => o.awb_number as string)
 
     // Delivery was charged when each AWB was created (create-shipment). At pickup we only CHECK the
     // wallet is above its minimum — no second deduction. own_delhivery passes through.
-    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
+    if (tenantId && (await walletBlocksShipment(tenantId).catch(() => false))) {
       return NextResponse.json(
         { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
         { status: 402 }
@@ -263,10 +308,13 @@ export async function POST(request: NextRequest) {
       // NOTE: a rejected pickup does NOT refund. The AWB/shipment still exists and will be picked
       // up another way, so the estimate stays held (reconciled at delivery). The estimate is only
       // refunded when the AWB itself is cancelled (see cancel-shipment).
-      return NextResponse.json({
-        error: 'Delhivery rejected the pickup request',
-        details: data.error || data.prepaid || JSON.stringify(data),
-      }, { status: 422 })
+      return NextResponse.json(
+        {
+          error: 'Delhivery rejected the pickup request',
+          details: data.error || data.prepaid || JSON.stringify(data),
+        },
+        { status: 422 }
+      )
     }
 
     const pickupId = data.pickup_id ?? null

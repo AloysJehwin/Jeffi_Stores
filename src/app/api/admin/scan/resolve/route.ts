@@ -114,9 +114,7 @@ export async function POST(request: NextRequest) {
       const base = serial.variant_id
         ? await findVariantBy('pv.id = $1', serial.variant_id)
         : await findProductBy('p.id = $1', serial.product_id)
-      const item = base
-        ? { ...base, sub_variant_id: serial.sub_variant_id ?? null }
-        : undefined
+      const item = base ? { ...base, sub_variant_id: serial.sub_variant_id ?? null } : undefined
       return NextResponse.json({ kind: 'serial', code, serial, item })
     }
 

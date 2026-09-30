@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { currentBrandNameAsync } from '@/lib/brand'
 import { getStorefrontContent } from '@/lib/site-controls'
-import {
-  buildProductHighlights,
-  buildProductDetails,
-} from '@/lib/google-merchant-helpers'
+import { buildProductHighlights, buildProductDetails } from '@/lib/google-merchant-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +18,7 @@ function escapeXml(str: string): string {
 export async function GET(request: NextRequest) {
   const feedSecret = process.env.FEED_SECRET
   if (feedSecret) {
-    const provided =
-      request.headers.get('x-feed-token') ||
-      new URL(request.url).searchParams.get('token')
+    const provided = request.headers.get('x-feed-token') || new URL(request.url).searchParams.get('token')
     if (provided !== feedSecret) {
       return new NextResponse('Unauthorized', { status: 401 })
     }
@@ -80,23 +75,33 @@ export async function GET(request: NextRequest) {
     }
 
     // Shared XML fragments
-    const additionalImagesXml = additionalImages.map((url: string) =>
-      `\n      <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`).join('')
-    const highlightsXml = highlights.map(h => `\n      <g:product_highlight>${escapeXml(h)}</g:product_highlight>`).join('')
-    const detailsXml = details.map(d =>
-      `\n      <g:product_detail>\n        <g:section_name>${escapeXml(d.section)}</g:section_name>\n        <g:attribute_name>${escapeXml(d.attribute)}</g:attribute_name>\n        <g:attribute_value>${escapeXml(d.value)}</g:attribute_value>\n      </g:product_detail>`
-    ).join('')
+    const additionalImagesXml = additionalImages
+      .map((url: string) => `\n      <g:additional_image_link>${escapeXml(url)}</g:additional_image_link>`)
+      .join('')
+    const highlightsXml = highlights
+      .map(h => `\n      <g:product_highlight>${escapeXml(h)}</g:product_highlight>`)
+      .join('')
+    const detailsXml = details
+      .map(
+        d =>
+          `\n      <g:product_detail>\n        <g:section_name>${escapeXml(d.section)}</g:section_name>\n        <g:attribute_name>${escapeXml(d.attribute)}</g:attribute_name>\n        <g:attribute_value>${escapeXml(d.value)}</g:attribute_value>\n      </g:product_detail>`
+      )
+      .join('')
     const materialXml = product.material ? `\n      <g:material>${escapeXml(product.material)}</g:material>` : ''
 
     if (hasVariants) {
       for (const variant of product.product_variants) {
         const sellingPrice = variant.price
         if (sellingPrice == null) continue
-        const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
+        const variantMrp = variant.mrp ? Number(variant.mrp) : product.mrp ? Number(product.mrp) : null
         const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
         const variantMpn = variant.mpn || product.mpn || ''
         const variantGtin = variant.gtin || product.gtin || ''
-        const availability = !productActive ? 'out_of_stock' : (variant.stock_status === 'Out of Stock' ? 'out_of_stock' : 'in_stock')
+        const availability = !productActive
+          ? 'out_of_stock'
+          : variant.stock_status === 'Out of Stock'
+            ? 'out_of_stock'
+            : 'in_stock'
 
         items.push(`    <item>
       <g:id>${escapeXml(variant.sku)}</g:id>
@@ -105,14 +110,30 @@ export async function GET(request: NextRequest) {
       <description>${escapeXml(description)}</description>
       <link>${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}</link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
-      <g:price>${Number(variantMrp || sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>` : ''}
+      <g:price>${Number(variantMrp || sellingPrice).toFixed(2)} INR</g:price>${
+        hasSalePrice
+          ? `
+      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>`
+          : ''
+      }
       <g:availability>${availability}</g:availability>
       <g:condition>new</g:condition>
-      <g:identifier_exists>${(variantMpn || variantGtin || brandName) ? 'yes' : 'no'}</g:identifier_exists>${brandName ? `
-      <g:brand>${escapeXml(brandName)}</g:brand>` : ''}${variantMpn ? `
-      <g:mpn>${escapeXml(variantMpn)}</g:mpn>` : ''}${variantGtin ? `
-      <g:gtin>${escapeXml(variantGtin)}</g:gtin>` : ''}${highlightsXml}${detailsXml}${materialXml}
+      <g:identifier_exists>${variantMpn || variantGtin || brandName ? 'yes' : 'no'}</g:identifier_exists>${
+        brandName
+          ? `
+      <g:brand>${escapeXml(brandName)}</g:brand>`
+          : ''
+      }${
+        variantMpn
+          ? `
+      <g:mpn>${escapeXml(variantMpn)}</g:mpn>`
+          : ''
+      }${
+        variantGtin
+          ? `
+      <g:gtin>${escapeXml(variantGtin)}</g:gtin>`
+          : ''
+      }${highlightsXml}${detailsXml}${materialXml}
       <g:size>${escapeXml(variant.variant_name)}</g:size>${cogs(variant.cost_price ?? product.cost_price)}
     </item>`)
       }
@@ -120,7 +141,11 @@ export async function GET(request: NextRequest) {
       const sellingPrice = product.base_price
       const productMrp = product.mrp ? Number(product.mrp) : null
       const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
-      const availability = !productActive ? 'out_of_stock' : (product.stock_status === 'Out of Stock' ? 'out_of_stock' : 'in_stock')
+      const availability = !productActive
+        ? 'out_of_stock'
+        : product.stock_status === 'Out of Stock'
+          ? 'out_of_stock'
+          : 'in_stock'
 
       items.push(`    <item>
       <g:id>${escapeXml(product.sku)}</g:id>
@@ -128,15 +153,35 @@ export async function GET(request: NextRequest) {
       <description>${escapeXml(description)}</description>
       <link>${baseUrl}/products/${product.slug}</link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
-      <g:price>${Number(productMrp || sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>` : ''}
+      <g:price>${Number(productMrp || sellingPrice).toFixed(2)} INR</g:price>${
+        hasSalePrice
+          ? `
+      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>`
+          : ''
+      }
       <g:availability>${availability}</g:availability>
       <g:condition>new</g:condition>
-      <g:identifier_exists>${(product.mpn || product.gtin || brandName) ? 'yes' : 'no'}</g:identifier_exists>${brandName ? `
-      <g:brand>${escapeXml(brandName)}</g:brand>` : ''}${product.mpn ? `
-      <g:mpn>${escapeXml(product.mpn)}</g:mpn>` : ''}${product.gtin ? `
-      <g:gtin>${escapeXml(product.gtin)}</g:gtin>` : ''}${highlightsXml}${detailsXml}${materialXml}${product.size ? `
-      <g:size>${escapeXml(product.size)}</g:size>` : ''}${cogs(product.cost_price)}
+      <g:identifier_exists>${product.mpn || product.gtin || brandName ? 'yes' : 'no'}</g:identifier_exists>${
+        brandName
+          ? `
+      <g:brand>${escapeXml(brandName)}</g:brand>`
+          : ''
+      }${
+        product.mpn
+          ? `
+      <g:mpn>${escapeXml(product.mpn)}</g:mpn>`
+          : ''
+      }${
+        product.gtin
+          ? `
+      <g:gtin>${escapeXml(product.gtin)}</g:gtin>`
+          : ''
+      }${highlightsXml}${detailsXml}${materialXml}${
+        product.size
+          ? `
+      <g:size>${escapeXml(product.size)}</g:size>`
+          : ''
+      }${cogs(product.cost_price)}
     </item>`)
     }
   }

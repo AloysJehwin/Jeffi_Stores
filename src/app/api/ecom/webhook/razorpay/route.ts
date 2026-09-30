@@ -12,12 +12,17 @@ export const dynamic = 'force-dynamic'
  * 200 promptly; the real AWS provider's backup+delete can take a while.
  */
 async function autoDeprovision(tenantId: string, slug: string): Promise<void> {
-  const ownerRow = await controlPlanePool().query(
-    `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId],
-  ).catch(() => null)
+  const ownerRow = await controlPlanePool()
+    .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
+    .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
   await triggerProvisioning({
-    action: 'deprovision', tenantId, slug, plan: null, ownerId, reason: 'missed_payment',
+    action: 'deprovision',
+    tenantId,
+    slug,
+    plan: null,
+    ownerId,
+    reason: 'missed_payment',
   }).catch(() => {})
 }
 
@@ -68,15 +73,18 @@ export async function POST(request: NextRequest) {
       if (tenant.status !== 'active' && tenant.status !== 'provisioning') {
         await setSubscriptionStatus(tenant.id, 'active', 'provisioning')
         const pool = controlPlanePool()
-        const ownerRow = await pool.query(
-          `SELECT o.id, o.email, o.name, t.display_name, t.slug, t.billing_interval,
+        const ownerRow = await pool
+          .query(
+            `SELECT o.id, o.email, o.name, t.display_name, t.slug, t.billing_interval,
                   p.slug AS plan
            FROM owner_tenants ot
            JOIN owners o ON o.id = ot.owner_id
            JOIN tenants t ON t.id = ot.tenant_id
            LEFT JOIN plans p ON p.id = t.plan_id
-           WHERE ot.tenant_id=$1 LIMIT 1`, [tenant.id]
-        ).catch(() => null)
+           WHERE ot.tenant_id=$1 LIMIT 1`,
+            [tenant.id]
+          )
+          .catch(() => null)
         const row = ownerRow?.rows[0]
         if (row) {
           sendStoreLiveEmail(

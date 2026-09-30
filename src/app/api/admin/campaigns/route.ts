@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
 
   const [campaigns, countRow] = await Promise.all([
-    queryMany(`
+    queryMany(
+      `
       SELECT
         c.*,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind), 0) AS total_sent,
@@ -38,7 +39,9 @@ export async function GET(req: NextRequest) {
       FROM campaigns c
       ORDER BY c.name
       LIMIT $1 OFFSET $2
-    `, [limit, offset]),
+    `,
+      [limit, offset]
+    ),
     queryOne<{ total: string }>('SELECT COUNT(*) AS total FROM campaigns'),
   ])
 
@@ -58,7 +61,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return parsed.response
 
   const name = typeof body.name === 'string' ? body.name.trim() : ''
-  const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') : ''
+  const kind =
+    typeof body.kind === 'string'
+      ? body.kind
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9_]/g, '_')
+      : ''
   if (!name || !kind) return NextResponse.json({ error: 'name and kind are required' }, { status: 400 })
 
   const exists = await queryOne(`SELECT kind FROM campaigns WHERE kind = $1`, [kind])
@@ -67,9 +76,14 @@ export async function POST(req: NextRequest) {
   const description = typeof body.description === 'string' ? body.description.trim() || null : null
   const delay_hours = Math.max(0, Math.min(720, parseInt(body.delay_hours ?? '0', 10) || 0))
   const discount_percent = Math.max(0, Math.min(100, parseInt(body.discount_percent ?? '0', 10) || 0))
-  const subject_template = typeof body.subject_template === 'string' ? body.subject_template.slice(0, 500) : `${name} — special offer for {firstName}`
-  const body_template = typeof body.body_template === 'string' ? body.body_template.slice(0, 50000) : `<p>Hi {firstName},</p><p>${name}</p>`
-  const scenario_kind = typeof body.scenario_kind === 'string' && body.scenario_kind.trim() ? body.scenario_kind.trim() : null
+  const subject_template =
+    typeof body.subject_template === 'string'
+      ? body.subject_template.slice(0, 500)
+      : `${name} — special offer for {firstName}`
+  const body_template =
+    typeof body.body_template === 'string' ? body.body_template.slice(0, 50000) : `<p>Hi {firstName},</p><p>${name}</p>`
+  const scenario_kind =
+    typeof body.scenario_kind === 'string' && body.scenario_kind.trim() ? body.scenario_kind.trim() : null
   const parameters = body.parameters && typeof body.parameters === 'object' ? body.parameters : {}
 
   if (scenario_kind) {
@@ -85,7 +99,17 @@ export async function POST(req: NextRequest) {
   await query(
     `INSERT INTO campaigns (kind, name, description, enabled, delay_hours, discount_percent, subject_template, body_template, scenario_kind, parameters)
      VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7, $8, $9)`,
-    [kind, name, description, delay_hours, discount_percent, subject_template, body_template, scenario_kind, JSON.stringify(parameters)]
+    [
+      kind,
+      name,
+      description,
+      delay_hours,
+      discount_percent,
+      subject_template,
+      body_template,
+      scenario_kind,
+      JSON.stringify(parameters),
+    ]
   )
 
   return NextResponse.json({ success: true, kind })

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, withTransaction, query } from '@/lib/db'
-import { validateSerializedUnitStep, assertUnitChangeAllowed, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
+import {
+  validateSerializedUnitStep,
+  assertUnitChangeAllowed,
+  changedUnitFields,
+  validateUnitQuantityBounds,
+} from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,9 +77,16 @@ export async function POST(request: NextRequest, { params }: Params) {
   const allowedDimensions = ['count', 'length', 'area', 'volume', 'weight', 'custom']
   const dimension = allowedDimensions.includes(body.dimension) ? body.dimension : 'count'
   const conversionMeta = body.conversion_meta != null ? body.conversion_meta : null
-  const minQty = body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
-  const maxQty = body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty ? Number(body.max_qty) : null
-  const qtyStep = body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0 ? Number(body.qty_step) : 1
+  const minQty =
+    body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
+  const maxQty =
+    body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty
+      ? Number(body.max_qty)
+      : null
+  const qtyStep =
+    body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0
+      ? Number(body.qty_step)
+      : 1
 
   // min/max must be reachable multiples of qty_step, or the advertised bounds
   // describe quantities nobody can actually order.
@@ -87,7 +99,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const stepErr = validateSerializedUnitStep(qtyStep)
     if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
   }
-
 
   // An upsert on an existing unit overwrites factor/dimension/qty_step, so it is a
   // change like any other — refuse it when stock was recorded under the old values.
@@ -105,7 +116,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const upserted = await withTransaction(async (client) => {
+    const upserted = await withTransaction(async client => {
       if (isBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [subVariantId])
       }
@@ -131,11 +142,16 @@ export async function POST(request: NextRequest, { params }: Params) {
           id,
           variantId,
           subVariantId,
-          unit, factor, dimension,
+          unit,
+          factor,
+          dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
           isBase,
-          displayLabel, notes,
-          minQty, maxQty, qtyStep,
+          displayLabel,
+          notes,
+          minQty,
+          maxQty,
+          qtyStep,
         ]
       )
       return res.rows[0]

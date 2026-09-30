@@ -17,10 +17,7 @@ const CLOSING_PHRASES = [
   "don't hesitate to reach out",
 ]
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
   try {
     const authUser = await authenticateAnyUser(request)
@@ -45,9 +42,7 @@ export async function GET(
     const messagesWithMeta: any[] = messages.map((m: any) => ({
       ...m,
       sender_name: m.sender === 'admin' ? session.admin_name : undefined,
-      is_closing: m.sender === 'admin'
-        ? CLOSING_PHRASES.some(p => m.message.toLowerCase().includes(p))
-        : false,
+      is_closing: m.sender === 'admin' ? CLOSING_PHRASES.some(p => m.message.toLowerCase().includes(p)) : false,
     }))
 
     const BOT_DELAY_MS = parseInt(process.env.SUPPORT_BOT_DELAY_MS || '120000', 10)
@@ -56,8 +51,7 @@ export async function GET(
     // Case 1: last message is from user and unanswered
     // Case 2: no messages at all — session opened but user hasn't typed yet
     const shouldCheckBot =
-      (last && last.sender === 'user' &&
-        Date.now() - new Date(last.created_at).getTime() >= BOT_DELAY_MS) ||
+      (last && last.sender === 'user' && Date.now() - new Date(last.created_at).getTime() >= BOT_DELAY_MS) ||
       (!last && Date.now() - new Date(session.created_at).getTime() >= BOT_DELAY_MS)
 
     if (shouldCheckBot) {
@@ -89,10 +83,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params
   try {
     const authUser = await authenticateAnyUser(request)

@@ -11,10 +11,7 @@ import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
 import { getBusinessValues } from '@/lib/site-controls'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -41,14 +38,17 @@ export async function POST(
       return NextResponse.json({ error: 'Admin notes are required when rejecting a return.' }, { status: 400 })
     }
 
-    const order = await queryOne(`
+    const order = await queryOne(
+      `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.user_id, o.original_order_id,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -72,15 +72,12 @@ export async function POST(
         return NextResponse.json({ error: `Cannot approve — order status is "${order.status}"` }, { status: 400 })
       }
 
-      await withTransaction(async (client) => {
+      await withTransaction(async client => {
         await client.query(
           `UPDATE return_requests SET status = 'approved', admin_notes = $1, reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW() WHERE id = $3`,
           [adminNotes?.trim() || null, admin.adminId, returnRequest.id]
         )
-        await client.query(
-          `UPDATE orders SET status = 'return_approved', updated_at = NOW() WHERE id = $1`,
-          [orderId]
-        )
+        await client.query(`UPDATE orders SET status = 'return_approved', updated_at = NOW() WHERE id = $1`, [orderId])
       })
 
       if (userEmail && userName) {
@@ -119,15 +116,12 @@ export async function POST(
         return NextResponse.json({ error: `Cannot reject — order status is "${order.status}"` }, { status: 400 })
       }
 
-      await withTransaction(async (client) => {
+      await withTransaction(async client => {
         await client.query(
           `UPDATE return_requests SET status = 'rejected', admin_notes = $1, reviewed_by = $2, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $3`,
           [adminNotes.trim(), admin.adminId, returnRequest.id]
         )
-        await client.query(
-          `UPDATE orders SET status = 'return_rejected', updated_at = NOW() WHERE id = $1`,
-          [orderId]
-        )
+        await client.query(`UPDATE orders SET status = 'return_rejected', updated_at = NOW() WHERE id = $1`, [orderId])
       })
 
       if (userEmail && userName) {
@@ -158,15 +152,12 @@ export async function POST(
         return NextResponse.json({ error: `Cannot mark received — order status is "${order.status}"` }, { status: 400 })
       }
 
-      await withTransaction(async (client) => {
+      await withTransaction(async client => {
         await client.query(
           `UPDATE return_requests SET status = 'received', return_tracking_number = $1, reviewed_by = $2, reviewed_at = NOW(), received_at = NOW(), updated_at = NOW() WHERE id = $3`,
           [returnTrackingNumber?.trim() || null, admin.adminId, returnRequest.id]
         )
-        await client.query(
-          `UPDATE orders SET status = 'return_received', updated_at = NOW() WHERE id = $1`,
-          [orderId]
-        )
+        await client.query(`UPDATE orders SET status = 'return_received', updated_at = NOW() WHERE id = $1`, [orderId])
       })
 
       if (userEmail && userName) {
@@ -193,7 +184,11 @@ export async function POST(
           referenceId: orderId,
           referenceType: 'orders',
           summary: `Return parcel received for #${order.order_number}`,
-          metadata: { return_type: returnRequest.type, status: 'return_received', tracking: returnTrackingNumber || null },
+          metadata: {
+            return_type: returnRequest.type,
+            status: 'return_received',
+            tracking: returnTrackingNumber || null,
+          },
         }).catch(() => {})
       }
 
@@ -293,7 +288,7 @@ export async function POST(
                   if (outcome.unrecoveredPaise > 0) {
                     console.error(
                       `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
-                      `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+                        `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
                     )
                   }
                 }
@@ -310,7 +305,7 @@ export async function POST(
                 })
               }
 
-              await withTransaction(async (client) => {
+              await withTransaction(async client => {
                 await client.query(
                   `UPDATE orders SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
                   [orderId]
@@ -324,7 +319,15 @@ export async function POST(
                 for (const { record, refund } of perPayment) {
                   await client.query(
                     `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-                    [JSON.stringify({ ...(typeof record.gateway_response === 'string' ? JSON.parse(record.gateway_response) : record.gateway_response || {}), refund }), record.id]
+                    [
+                      JSON.stringify({
+                        ...(typeof record.gateway_response === 'string'
+                          ? JSON.parse(record.gateway_response)
+                          : record.gateway_response || {}),
+                        refund,
+                      }),
+                      record.id,
+                    ]
                   )
                 }
                 await client.query(
@@ -341,8 +344,12 @@ export async function POST(
 
               if (userEmail && userName) {
                 sendPaymentStatusUpdate(
-                  userEmail, userName, order.order_number, orderId,
-                  'refunded', netRefundAmount
+                  userEmail,
+                  userName,
+                  order.order_number,
+                  orderId,
+                  'refunded',
+                  netRefundAmount
                 ).catch(() => {})
               }
 
@@ -360,18 +367,21 @@ export async function POST(
                 }).catch(() => {})
               }
 
-              return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false, stockWarnings, ...chargeBreakdown })
+              return NextResponse.json({
+                success: true,
+                newStatus: 'returned',
+                refundFailed: false,
+                stockWarnings,
+                ...chargeBreakdown,
+              })
             } catch {
               refundFailed = true
             }
           }
         }
 
-        await withTransaction(async (client) => {
-          await client.query(
-            `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
-            [orderId]
-          )
+        await withTransaction(async client => {
+          await client.query(`UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`, [orderId])
           await client.query(
             `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
             [admin.adminId, returnRequest.id]
@@ -410,7 +420,13 @@ export async function POST(
           }).catch(() => {})
         }
 
-        return NextResponse.json({ success: true, newStatus: 'returned', refundFailed, stockWarnings, ...chargeBreakdown })
+        return NextResponse.json({
+          success: true,
+          newStatus: 'returned',
+          refundFailed,
+          stockWarnings,
+          ...chargeBreakdown,
+        })
       }
 
       if (returnRequest.type === 'replacement') {
@@ -434,11 +450,9 @@ export async function POST(
         // Items for replacement: only the returned items (item-level), else all order items
         const replacementItems: any[] = useItemLevel
           ? returnItems
-          : (await queryMany('SELECT * FROM order_items WHERE order_id = $1', [orderId]))
+          : await queryMany('SELECT * FROM order_items WHERE order_id = $1', [orderId])
 
-        const replacementTotal = useItemLevel
-          ? refundAmount
-          : parseFloat(order.total_amount)
+        const replacementTotal = useItemLevel ? refundAmount : parseFloat(order.total_amount)
 
         // Resolve the effective grain to ship for each replacement item. If the
         // original variant/sub-variant is gone/inactive, the admin must supply an
@@ -447,16 +461,26 @@ export async function POST(
         // for gone grains → 409 with the list, so the UI can prompt a variant picker.
         const isActiveVariant = async (vid: string | null): Promise<boolean> => {
           if (!vid) return true
-          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_variants WHERE id = $1`, [vid])
+          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_variants WHERE id = $1`, [
+            vid,
+          ])
           return !!r && r.is_active !== false
         }
         const isActiveSubVariant = async (svid: string | null): Promise<boolean> => {
           if (!svid) return true
-          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_sub_variants WHERE id = $1`, [svid])
+          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_sub_variants WHERE id = $1`, [
+            svid,
+          ])
           return !!r && r.is_active !== false
         }
 
-        const needsPick: { order_item_id: string; product_id: string; product_name: string; variant_name: string | null; options: any[] }[] = []
+        const needsPick: {
+          order_item_id: string
+          product_id: string
+          product_name: string
+          variant_name: string | null
+          options: any[]
+        }[] = []
         const resolvedItems: any[] = []
         for (const item of replacementItems) {
           const oiId = item.order_item_id || item.id // return_request_items use order_item_id; legacy order_items use id
@@ -480,13 +504,25 @@ export async function POST(
               [item.product_id, variantId, subVariantId]
             )
             if (!chosen?.ok) {
-              return NextResponse.json({ error: 'Selected replacement variant is invalid or inactive.' }, { status: 400 })
+              return NextResponse.json(
+                { error: 'Selected replacement variant is invalid or inactive.' },
+                { status: 400 }
+              )
             }
             variantName = chosen.svname || chosen.vname || variantName
-          } else if (!(await isActiveVariant(item.variant_id || null)) || !(await isActiveSubVariant(item.sub_variant_id || null))) {
+          } else if (
+            !(await isActiveVariant(item.variant_id || null)) ||
+            !(await isActiveSubVariant(item.sub_variant_id || null))
+          ) {
             // Original grain gone/inactive and no override supplied → ask the admin.
             // Attach the product's active grains so the UI can render a picker inline.
-            const opts = await queryMany<{ variant_id: string; sub_variant_id: string | null; label: string; sku: string | null; stock_status: string | null }>(
+            const opts = await queryMany<{
+              variant_id: string
+              sub_variant_id: string | null
+              label: string
+              sku: string | null
+              stock_status: string | null
+            }>(
               `SELECT pv.id AS variant_id, NULL::uuid AS sub_variant_id,
                       pv.variant_name AS label, pv.sku, pv.stock_status
                  FROM product_variants pv
@@ -501,23 +537,26 @@ export async function POST(
                ORDER BY label`,
               [item.product_id]
             )
-            needsPick.push({ order_item_id: oiId, product_id: item.product_id, product_name: item.product_name, variant_name: item.variant_name || null, options: opts })
+            needsPick.push({
+              order_item_id: oiId,
+              product_id: item.product_id,
+              product_name: item.product_name,
+              variant_name: item.variant_name || null,
+              options: opts,
+            })
             continue
           }
           resolvedItems.push({ ...item, _variantId: variantId, _subVariantId: subVariantId, _variantName: variantName })
         }
 
         if (needsPick.length > 0) {
-          return NextResponse.json(
-            { error: 'variant_pick_required', needsVariantPick: needsPick },
-            { status: 409 }
-          )
+          return NextResponse.json({ error: 'variant_pick_required', needsVariantPick: needsPick }, { status: 409 })
         }
 
         let newOrderId: string
         let newOrderNumber: string
 
-        await withTransaction(async (client) => {
+        await withTransaction(async client => {
           const newOrderResult = await client.query(
             `INSERT INTO orders (
               user_id, order_number, status, payment_status, subtotal, tax_amount,
@@ -576,10 +615,10 @@ export async function POST(
                 [qty, variantId]
               )
             } else {
-              await client.query(
-                'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
-                [qty, item.product_id]
-              )
+              await client.query('UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2', [
+                qty,
+                item.product_id,
+              ])
             }
             await logStockMovement(client, {
               productId: item.product_id,
@@ -597,10 +636,7 @@ export async function POST(
             [newOrderId, admin.adminId, returnRequest.id]
           )
 
-          await client.query(
-            `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
-            [orderId]
-          )
+          await client.query(`UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`, [orderId])
         })
 
         if (restock !== false) restoreOrderStock(orderId).catch(() => {})
@@ -621,11 +657,21 @@ export async function POST(
             referenceId: orderId,
             referenceType: 'orders',
             summary: `Replacement order #${newOrderNumber!} created for return on #${order.order_number}`,
-            metadata: { return_type: 'replacement', status: 'returned', replacement_order_id: newOrderId!, replacement_order_number: newOrderNumber! },
+            metadata: {
+              return_type: 'replacement',
+              status: 'returned',
+              replacement_order_id: newOrderId!,
+              replacement_order_number: newOrderNumber!,
+            },
           }).catch(() => {})
         }
 
-        return NextResponse.json({ success: true, newStatus: 'returned', replacementOrderId: newOrderId!, replacementOrderNumber: newOrderNumber! })
+        return NextResponse.json({
+          success: true,
+          newStatus: 'returned',
+          replacementOrderId: newOrderId!,
+          replacementOrderNumber: newOrderNumber!,
+        })
       }
     }
 

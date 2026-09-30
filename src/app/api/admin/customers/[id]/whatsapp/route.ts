@@ -11,16 +11,22 @@ import { formsHostForHost } from '@/lib/forms-host'
 export const dynamic = 'force-dynamic'
 
 function last10(phone: string | null | undefined): string {
-  return String(phone || '').replace(/\D/g, '').slice(-10)
+  return String(phone || '')
+    .replace(/\D/g, '')
+    .slice(-10)
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'crm:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'crm:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const user = await queryOne<{ phone: string | null; email: string | null }>('SELECT email, phone FROM users WHERE id = $1', [id])
+  const user = await queryOne<{ phone: string | null; email: string | null }>(
+    'SELECT email, phone FROM users WHERE id = $1',
+    [id]
+  )
   const phone = user?.phone ?? null
   const email = user?.email ?? null
   const digits = last10(phone)
@@ -152,7 +158,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'crm:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'crm:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { templateKey, variables, text } = await req.json()
 

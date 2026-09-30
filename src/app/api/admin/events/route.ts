@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if (!admin?.sessionId) return new Response('Unauthorized', { status: 401 })
   const sessionId = admin.sessionId
   const tenant = await resolveTenant().catch(() => null)
-  const inCtx = <T,>(fn: () => Promise<T>): Promise<T> => (tenant ? runWithTenantContext(tenant, fn) : fn())
+  const inCtx = <T>(fn: () => Promise<T>): Promise<T> => (tenant ? runWithTenantContext(tenant, fn) : fn())
 
   const encoder = new TextEncoder()
   let closed = false
@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
 
       const send = (data: unknown) => {
         if (closed) return
-        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)) } catch { /* closed */ }
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+        } catch {
+          /* closed */
+        }
       }
       const cleanup = () => {
         if (closed) return
@@ -49,7 +53,11 @@ export async function GET(request: NextRequest) {
         if (pollTimer) clearInterval(pollTimer)
         if (keepaliveTimer) clearInterval(keepaliveTimer)
         unsubscribe?.()
-        try { controller.close() } catch { /* already closed */ }
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
       }
       const sendLogout = (reason: string) => {
         send({ kind: 'session', type: 'logout', reason, serverNow: Date.now() })
@@ -59,24 +67,27 @@ export async function GET(request: NextRequest) {
       const armDeadline = () => {
         if (deadlineTimer) clearTimeout(deadlineTimer)
         const wait = Math.max(0, deadlineAt - Date.now()) + DEADLINE_GRACE_MS
-        deadlineTimer = setTimeout(async () => {
-          if (closed) return
-          try {
-            const d = await inCtx(() => getSessionDeadline(sessionId))
-            if (!d) {
-              await inCtx(() => revokeSessionById(sessionId, 'idle')).catch(() => {})
-              sendLogout('idle')
-              return
+        deadlineTimer = setTimeout(
+          async () => {
+            if (closed) return
+            try {
+              const d = await inCtx(() => getSessionDeadline(sessionId))
+              if (!d) {
+                await inCtx(() => revokeSessionById(sessionId, 'idle')).catch(() => {})
+                sendLogout('idle')
+                return
+              }
+              deadlineAt = new Date(d.deadlineAt).getTime()
+              expiresAt = new Date(d.expiresAt).getTime()
+              send({ kind: 'session', type: 'deadline', deadlineAt, expiresAt, serverNow: Date.now() })
+              armDeadline()
+            } catch {
+              deadlineAt = Date.now() + 30_000
+              armDeadline()
             }
-            deadlineAt = new Date(d.deadlineAt).getTime()
-            expiresAt = new Date(d.expiresAt).getTime()
-            send({ kind: 'session', type: 'deadline', deadlineAt, expiresAt, serverNow: Date.now() })
-            armDeadline()
-          } catch {
-            deadlineAt = Date.now() + 30_000
-            armDeadline()
-          }
-        }, Math.min(wait, 2_147_000_000))
+          },
+          Math.min(wait, 2_147_000_000)
+        )
       }
 
       send({ kind: 'session', type: 'hello', deadlineAt, expiresAt, serverNow: Date.now() })
@@ -84,7 +95,10 @@ export async function GET(request: NextRequest) {
 
       unsubscribe = subscribeSessionEvents(sessionId, ev => {
         if (closed) return
-        if (ev.type === 'logout') { sendLogout(ev.reason); return }
+        if (ev.type === 'logout') {
+          sendLogout(ev.reason)
+          return
+        }
         deadlineAt = new Date(ev.deadlineAt).getTime()
         expiresAt = new Date(ev.expiresAt).getTime()
         send({ kind: 'session', type: 'deadline', deadlineAt, expiresAt, serverNow: Date.now() })
@@ -101,12 +115,20 @@ export async function GET(request: NextRequest) {
             lastSignature = signature
             send({ kind: 'notifications', items, unreadCount })
           }
-        } catch { /* transient */ }
+        } catch {
+          /* transient */
+        }
       }
       await tick()
       pollTimer = setInterval(tick, NOTIF_POLL_MS)
       keepaliveTimer = setInterval(() => {
-        if (!closed) { try { controller.enqueue(encoder.encode(`: keepalive\n\n`)) } catch { /* closed */ } }
+        if (!closed) {
+          try {
+            controller.enqueue(encoder.encode(`: keepalive\n\n`))
+          } catch {
+            /* closed */
+          }
+        }
       }, KEEPALIVE_MS)
 
       request.signal.addEventListener('abort', cleanup)

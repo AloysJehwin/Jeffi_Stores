@@ -21,7 +21,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const denied = aiDenial(admin.role, admin.scopes, 'settings:write')
     if (denied) return NextResponse.json({ error: denied }, { status: 403 })
     if (!process.env.REPLICATE_API_TOKEN) {
-      return NextResponse.json({ error: 'Image generation is not configured (REPLICATE_API_TOKEN missing).' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Image generation is not configured (REPLICATE_API_TOKEN missing).' },
+        { status: 500 }
+      )
     }
 
     const { heroSlides } = await getEditableHomepage()
@@ -29,7 +32,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const body = await request.json().catch(() => ({}))
     const rawPrompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
-    if (rawPrompt.length < 3) return NextResponse.json({ error: 'Describe the scene you want (a few words at least).' }, { status: 400 })
+    if (rawPrompt.length < 3)
+      return NextResponse.json({ error: 'Describe the scene you want (a few words at least).' }, { status: 400 })
     const field = body?.field === 'image_url_mobile' ? 'image_url_mobile' : 'image_url'
 
     // Wide cinematic hero framing. Nudge the model toward a dark, product-hero look
@@ -43,8 +47,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Flux returns an array of URLs or file-like objects exposing .url()
     let genUrl = ''
     for (const item of output as any[]) {
-      if (typeof item === 'string') { genUrl = item; break }
-      if (item?.url) { genUrl = typeof item.url === 'function' ? await item.url() : item.url; break }
+      if (typeof item === 'string') {
+        genUrl = item
+        break
+      }
+      if (item?.url) {
+        genUrl = typeof item.url === 'function' ? await item.url() : item.url
+        break
+      }
     }
     if (!genUrl) return NextResponse.json({ error: 'Model returned no image' }, { status: 502 })
 

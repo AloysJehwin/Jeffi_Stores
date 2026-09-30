@@ -10,10 +10,15 @@ export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
   message: zNonEmpty.max(2000),
-  history: z.array(z.object({
-    role: z.enum(['user', 'assistant']),
-    content: z.string().max(4000),
-  })).max(20).default([]),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(4000),
+      })
+    )
+    .max(20)
+    .default([]),
 })
 
 const MAX_ITERATIONS = 10
@@ -25,10 +30,8 @@ function resolveIntent(msg: string): { tool: string; input: Record<string, unkno
     return { tool: 'get_my_recommendations', input: {} }
   if (/my orders?|recent orders?|order (status|history|list)|what.*ordered/.test(m))
     return { tool: 'get_my_orders', input: {} }
-  if (/what'?s new|new (products?|arrivals?|items?)/.test(m))
-    return { tool: 'get_recent_products', input: {} }
-  if (/popular|featured|best seller|trending/.test(m))
-    return { tool: 'get_featured_products', input: {} }
+  if (/what'?s new|new (products?|arrivals?|items?)/.test(m)) return { tool: 'get_recent_products', input: {} }
+  if (/popular|featured|best seller|trending/.test(m)) return { tool: 'get_featured_products', input: {} }
   return null
 }
 
@@ -75,7 +78,13 @@ Rules:
 - NEVER invent product names not returned by a tool.`
 }
 
-type ProductRow = { name: string; slug: string; price?: string; stock_status?: string; short_description?: string | null }
+type ProductRow = {
+  name: string
+  slug: string
+  price?: string
+  stock_status?: string
+  short_description?: string | null
+}
 
 function formatProductList(products: ProductRow[], intro: string, note?: string): string {
   if (products.length === 0) {
@@ -102,7 +111,7 @@ function formatToolResult(toolName: string, out: Record<string, unknown>): strin
   }
   if (toolName === 'get_recent_products') {
     const products = (out.products as ProductRow[]) || []
-    return formatProductList(products, "Here are our newest arrivals:", note)
+    return formatProductList(products, 'Here are our newest arrivals:', note)
   }
   if (toolName === 'recommend_for_project') {
     const products = (out.products as ProductRow[]) || []
@@ -127,8 +136,12 @@ function formatToolResult(toolName: string, out: Record<string, unknown>): strin
 // Tools whose output is formatted server-side — no second LLM turn needed.
 // Prevents the model from hallucinating product names.
 const SELF_FORMATTING_TOOLS = new Set([
-  'recommend_for_project', 'search_products', 'get_my_recommendations',
-  'get_featured_products', 'get_recent_products', 'get_my_orders',
+  'recommend_for_project',
+  'search_products',
+  'get_my_recommendations',
+  'get_featured_products',
+  'get_recent_products',
+  'get_my_orders',
 ])
 
 export async function POST(req: NextRequest) {
@@ -171,19 +184,19 @@ export async function POST(req: NextRequest) {
     const tool = getCustomerTool(resolved.tool)
     if (tool) {
       try {
-        let out = await tool.handler(resolved.input, ctx) as Record<string, unknown>
+        let out = (await tool.handler(resolved.input, ctx)) as Record<string, unknown>
         toolCallRecords.push({ tool: resolved.tool, input: resolved.input, output: out })
 
         // If recommendations returned empty, fall back to featured products
-        if (
-          resolved.tool === 'get_my_recommendations' &&
-          Array.isArray(out.products) && out.products.length === 0
-        ) {
+        if (resolved.tool === 'get_my_recommendations' && Array.isArray(out.products) && out.products.length === 0) {
           const featuredTool = getCustomerTool('get_featured_products')
           if (featuredTool) {
-            const featuredOut = await featuredTool.handler({}, ctx) as Record<string, unknown>
+            const featuredOut = (await featuredTool.handler({}, ctx)) as Record<string, unknown>
             toolCallRecords.push({ tool: 'get_featured_products', input: {}, output: featuredOut })
-            out = { products: (featuredOut as any).products, note: "You don't have any purchases yet — showing popular products instead." }
+            out = {
+              products: (featuredOut as any).products,
+              note: "You don't have any purchases yet — showing popular products instead.",
+            }
           }
         }
 
@@ -226,7 +239,11 @@ export async function POST(req: NextRequest) {
 
       // Model returned tool calls — execute them
       if (r.toolCalls && r.toolCalls.length > 0) {
-        messages.push({ role: 'assistant', content: '', tool_calls: r.toolCalls.map(tc => ({ function: { name: tc.name, arguments: tc.arguments } })) })
+        messages.push({
+          role: 'assistant',
+          content: '',
+          tool_calls: r.toolCalls.map(tc => ({ function: { name: tc.name, arguments: tc.arguments } })),
+        })
 
         for (const tc of r.toolCalls) {
           const tool = getCustomerTool(tc.name)
@@ -237,14 +254,19 @@ export async function POST(req: NextRequest) {
             continue
           }
           try {
-            const out = await tool.handler(tc.arguments, ctx) as Record<string, unknown>
+            const out = (await tool.handler(tc.arguments, ctx)) as Record<string, unknown>
             toolCallRecords.push({ tool: tc.name, input: tc.arguments, output: out })
 
             // For product/order tools, format server-side and return immediately.
             // This prevents the model from hallucinating product names.
             if (SELF_FORMATTING_TOOLS.has(tc.name)) {
               finalText = formatToolResult(tc.name, out)
-              return NextResponse.json({ message: finalText, toolCalls: toolCallRecords, provider: r.provider, model: r.model })
+              return NextResponse.json({
+                message: finalText,
+                toolCalls: toolCallRecords,
+                provider: r.provider,
+                model: r.model,
+              })
             }
 
             messages.push({ role: 'tool', content: JSON.stringify(out).slice(0, 5000) })
@@ -263,7 +285,8 @@ export async function POST(req: NextRequest) {
     }
   } catch {
     return NextResponse.json({
-      message: "I'm having trouble responding right now. Please try again in a moment, or reach out to our support team.",
+      message:
+        "I'm having trouble responding right now. Please try again in a moment, or reach out to our support team.",
       toolCalls: toolCallRecords,
       provider,
       model,
@@ -271,7 +294,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!finalText) {
-    finalText = "I had trouble answering that. Try rephrasing or asking about a specific product."
+    finalText = 'I had trouble answering that. Try rephrasing or asking about a specific product.'
   }
 
   return NextResponse.json({

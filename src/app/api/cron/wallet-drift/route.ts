@@ -21,10 +21,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const res = await controlPlanePool().query<{
-    tenant_id: string; balance: string; ledger_total: string; drift: string
-  }>(
-    `SELECT w.tenant_id,
+  const res = await controlPlanePool()
+    .query<{
+      tenant_id: string
+      balance: string
+      ledger_total: string
+      drift: string
+    }>(
+      `SELECT w.tenant_id,
             w.balance,
             COALESCE(l.total, 0) AS ledger_total,
             (w.balance - COALESCE(l.total, 0)) AS drift
@@ -35,8 +39,9 @@ export async function GET(req: NextRequest) {
           GROUP BY tenant_id
        ) l ON l.tenant_id = w.tenant_id
       WHERE ABS(w.balance - COALESCE(l.total, 0)) >= 0.01
-      ORDER BY ABS(w.balance - COALESCE(l.total, 0)) DESC`,
-  ).catch(() => null)
+      ORDER BY ABS(w.balance - COALESCE(l.total, 0)) DESC`
+    )
+    .catch(() => null)
 
   if (!res) return NextResponse.json({ error: 'drift check failed' }, { status: 500 })
 

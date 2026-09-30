@@ -20,7 +20,9 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
        VALUES ($1, $2, $3, $4, $5)`,
       [email.toLowerCase(), userId, ip, ua, reason]
     )
-  } catch { /* swallow */ }
+  } catch {
+    /* swallow */
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -34,23 +36,26 @@ export async function POST(request: NextRequest) {
 
     const otpVerification = await verifyOTP(email, otp)
     if (!otpVerification.valid) {
-      const existingUser = await queryOne("SELECT id FROM users WHERE email = $1 AND user_type != 'business'", [email.toLowerCase()])
+      const existingUser = await queryOne("SELECT id FROM users WHERE email = $1 AND user_type != 'business'", [
+        email.toLowerCase(),
+      ])
       await recordFailedLogin(request, email, 'invalid_otp', existingUser?.id ?? null)
       return NextResponse.json({ error: otpVerification.message }, { status: 400 })
     }
 
-    const user = await queryOne(
-      "SELECT * FROM users WHERE email = $1 AND user_type != 'business'",
-      [email.toLowerCase()]
-    )
+    const user = await queryOne("SELECT * FROM users WHERE email = $1 AND user_type != 'business'", [
+      email.toLowerCase(),
+    ])
 
     if (!user) {
-      const bizUser = await queryOne(
-        "SELECT id FROM users WHERE email = $1 AND user_type = 'business'",
-        [email.toLowerCase()]
-      )
+      const bizUser = await queryOne("SELECT id FROM users WHERE email = $1 AND user_type = 'business'", [
+        email.toLowerCase(),
+      ])
       if (bizUser) {
-        return NextResponse.json({ error: 'This email is registered as a business account. Please use the business portal to sign in.' }, { status: 403 })
+        return NextResponse.json(
+          { error: 'This email is registered as a business account. Please use the business portal to sign in.' },
+          { status: 403 }
+        )
       }
       return NextResponse.json({ isNewUser: true, email }, { status: 200 })
     }
@@ -61,10 +66,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (policiesAccepted === true && user.policies_accepted_version !== POLICY_VERSION) {
-      await query(
-        'UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2',
-        [POLICY_VERSION, user.id]
-      )
+      await query('UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2', [
+        POLICY_VERSION,
+        user.id,
+      ])
     }
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
@@ -83,10 +88,9 @@ export async function POST(request: NextRequest) {
     // Read guest session from request cookies directly (avoids Next.js 15 cookies() context issues)
     const guestSessionId = request.cookies.get('session_id')?.value
     if (guestSessionId && guestSessionId.startsWith('guest_')) {
-      const guestUser = await queryOne(
-        'SELECT id FROM users WHERE session_id = $1 AND is_guest = true',
-        [guestSessionId]
-      )
+      const guestUser = await queryOne('SELECT id FROM users WHERE session_id = $1 AND is_guest = true', [
+        guestSessionId,
+      ])
       if (guestUser) {
         await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, user.id]).catch(() => {})
       }

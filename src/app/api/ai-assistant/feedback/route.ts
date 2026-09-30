@@ -31,10 +31,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'aiQueryId is required' }, { status: 400 })
   }
 
-  const owns = await queryOne<{ id: string }>(
-    `SELECT id FROM ai_queries WHERE id = $1 AND user_id = $2`,
-    [aiQueryId, user.userId]
-  )
+  const owns = await queryOne<{ id: string }>(`SELECT id FROM ai_queries WHERE id = $1 AND user_id = $2`, [
+    aiQueryId,
+    user.userId,
+  ])
   if (!owns) return NextResponse.json({ error: 'AI query not found' }, { status: 404 })
 
   await query(

@@ -30,9 +30,10 @@ export async function GET(request: NextRequest) {
 
     // Category mode takes precedence when both are somehow present; the popup
     // only ever sends one axis per its page mode.
-    const products = categoryIds.length > 0
-      ? await getBrochureProductsByCategories(categoryIds)
-      : await getBrochureProductsByBrands(brandIds)
+    const products =
+      categoryIds.length > 0
+        ? await getBrochureProductsByCategories(categoryIds)
+        : await getBrochureProductsByBrands(brandIds)
 
     return NextResponse.json({ products })
   } catch (e: any) {

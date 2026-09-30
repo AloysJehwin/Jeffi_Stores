@@ -5,8 +5,12 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
-  loadActiveCart, cartSubtotal, cartTaxAmount, cartItemsForHash,
-  validateCouponForUser, commitOrder,
+  loadActiveCart,
+  cartSubtotal,
+  cartTaxAmount,
+  cartItemsForHash,
+  validateCouponForUser,
+  commitOrder,
 } from '@/lib/order-commit'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createDraftInvoice } from '@/lib/invoice'
@@ -95,7 +99,8 @@ export async function POST(request: NextRequest) {
       const user = await queryOne<any>(`SELECT * FROM users WHERE id = $1`, [authUser.userId])
       if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-      let subtotal = 0, taxAmount = 0
+      let subtotal = 0,
+        taxAmount = 0
       let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
       let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
       const { gstEnabled } = await getFeatureFlags()
@@ -103,23 +108,33 @@ export async function POST(request: NextRequest) {
       if (draft.mode === 'cart') {
         cartItems = await loadActiveCart(authUser.userId)
         if (cartItems.length === 0) {
-          return NextResponse.json({ error: 'Cart is empty — cannot create order. Contact support with payment ID: ' + capturedPayment.id }, { status: 409 })
+          return NextResponse.json(
+            { error: 'Cart is empty — cannot create order. Contact support with payment ID: ' + capturedPayment.id },
+            { status: 409 }
+          )
         }
         subtotal = cartSubtotal(cartItems, gstEnabled)
         taxAmount = cartTaxAmount(cartItems, gstEnabled)
       } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
-        const product = await queryOne<any>(`SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`, [draft.buyNowItem.productId])
+        const product = await queryOne<any>(
+          `SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`,
+          [draft.buyNowItem.productId]
+        )
         if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
         const variant = draft.buyNowItem.variantId
-          ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+          ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [
+              draft.buyNowItem.variantId,
+            ])
           : null
         const subVariant = draft.buyNowItem.subVariantId
-          ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+          ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [
+              draft.buyNowItem.subVariantId,
+            ])
           : null
         buyNowSnapshot = { product, variant, subVariant }
         subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
         const gstRate = parseFloat(String(product.gst_percentage || '0'))
-        taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
+        taxAmount = gstEnabled ? subtotal - subtotal / (1 + gstRate / 100) : 0
       } else {
         return NextResponse.json({ error: 'Invalid draft' }, { status: 400 })
       }
@@ -130,31 +145,53 @@ export async function POST(request: NextRequest) {
         if (r.ok) appliedDiscount = r.appliedDiscount
       }
 
-      const created = draft.mode === 'cart'
-        ? await commitOrder({
-            mode: 'cart', userId: authUser.userId, user, addressId: draft.addressId,
-            notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
-            codFeeAmount: draft.codFeeAmount,
-            cartItems, subtotal, taxAmount, appliedDiscount,
-            businessDiscountAmount: draft.businessDiscountAmount,
-            paymentRecord: {
-              gatewayOrderId: razorpayOrderId, paymentId: capturedPayment.id,
-              signature: '', amountPaise: capturedPayment.amount,
-            },
-          })
-        : await commitOrder({
-            mode: 'buyNow', userId: authUser.userId, user, addressId: draft.addressId,
-            notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
-            codFeeAmount: draft.codFeeAmount,
-            item: draft.buyNowItem!, product: buyNowSnapshot!.product,
-            variant: buyNowSnapshot!.variant, subVariant: buyNowSnapshot!.subVariant,
-            subtotal, taxAmount, appliedDiscount,
-            businessDiscountAmount: draft.businessDiscountAmount,
-            paymentRecord: {
-              gatewayOrderId: razorpayOrderId, paymentId: capturedPayment.id,
-              signature: '', amountPaise: capturedPayment.amount,
-            },
-          })
+      const created =
+        draft.mode === 'cart'
+          ? await commitOrder({
+              mode: 'cart',
+              userId: authUser.userId,
+              user,
+              addressId: draft.addressId,
+              notes: draft.notes,
+              couponId: draft.couponId,
+              shippingAmount: draft.shippingAmount,
+              codFeeAmount: draft.codFeeAmount,
+              cartItems,
+              subtotal,
+              taxAmount,
+              appliedDiscount,
+              businessDiscountAmount: draft.businessDiscountAmount,
+              paymentRecord: {
+                gatewayOrderId: razorpayOrderId,
+                paymentId: capturedPayment.id,
+                signature: '',
+                amountPaise: capturedPayment.amount,
+              },
+            })
+          : await commitOrder({
+              mode: 'buyNow',
+              userId: authUser.userId,
+              user,
+              addressId: draft.addressId,
+              notes: draft.notes,
+              couponId: draft.couponId,
+              shippingAmount: draft.shippingAmount,
+              codFeeAmount: draft.codFeeAmount,
+              item: draft.buyNowItem!,
+              product: buyNowSnapshot!.product,
+              variant: buyNowSnapshot!.variant,
+              subVariant: buyNowSnapshot!.subVariant,
+              subtotal,
+              taxAmount,
+              appliedDiscount,
+              businessDiscountAmount: draft.businessDiscountAmount,
+              paymentRecord: {
+                gatewayOrderId: razorpayOrderId,
+                paymentId: capturedPayment.id,
+                signature: '',
+                amountPaise: capturedPayment.amount,
+              },
+            })
 
       const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
       createDraftInvoice(created.id).catch(() => {})
@@ -162,10 +199,27 @@ export async function POST(request: NextRequest) {
       const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
       sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
       sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
-      sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
-      logActivity({ userId: authUser.userId, kind: 'order_placed', referenceId: created.id, referenceType: 'orders',
-        summary: `Placed order #${created.order_number} via payment recovery`, metadata: { orderNumber: created.order_number, total: created.total_amount } }).catch(() => {})
-      recordImplicitSignalsForProducts(authUser.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+      sendPaymentStatusUpdate(
+        user.email,
+        userName,
+        created.order_number,
+        created.id,
+        'paid',
+        parseFloat(created.total_amount)
+      ).catch(() => {})
+      logActivity({
+        userId: authUser.userId,
+        kind: 'order_placed',
+        referenceId: created.id,
+        referenceType: 'orders',
+        summary: `Placed order #${created.order_number} via payment recovery`,
+        metadata: { orderNumber: created.order_number, total: created.total_amount },
+      }).catch(() => {})
+      recordImplicitSignalsForProducts(
+        authUser.userId,
+        (orderItems || []).map((i: any) => i.product_id),
+        'purchased'
+      ).catch(() => {})
 
       return NextResponse.json({ order: { id: created.id, orderNumber: created.order_number } })
     }

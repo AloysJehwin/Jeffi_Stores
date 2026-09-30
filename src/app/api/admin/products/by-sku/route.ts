@@ -7,7 +7,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'products:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const sku = new URL(request.url).searchParams.get('q')?.trim()
     if (!sku) return NextResponse.json({ error: 'q required' }, { status: 400 })

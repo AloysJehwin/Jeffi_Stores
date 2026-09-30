@@ -5,7 +5,11 @@ import { hasScope } from '@/lib/scopes'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
 import {
-  applyDraftOrder, getEditableHomepage, nextDisplayOrder, withHomepageDraft, type DraftHeroSlide,
+  applyDraftOrder,
+  getEditableHomepage,
+  nextDisplayOrder,
+  withHomepageDraft,
+  type DraftHeroSlide,
 } from '@/lib/homepage-draft'
 
 export const dynamic = 'force-dynamic'

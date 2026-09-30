@@ -65,11 +65,24 @@ const EDITABLE_KEYS = [
   'storefront_stats_json',
   'storefront_about_copy',
   // Keyboard shortcuts
-  'shortcut_new_product', 'shortcut_cash_sale', 'shortcut_quotation', 'shortcut_new_po',
-  'shortcut_orders', 'shortcut_packing_slips', 'shortcut_returns', 'shortcut_gst',
-  'shortcut_labels', 'shortcut_inventory', 'shortcut_coupons', 'shortcut_campaign',
-  'shortcut_financial', 'shortcut_customers', 'shortcut_crm', 'shortcut_reviews',
-  'shortcut_ai_agent', 'shortcut_custom',
+  'shortcut_new_product',
+  'shortcut_cash_sale',
+  'shortcut_quotation',
+  'shortcut_new_po',
+  'shortcut_orders',
+  'shortcut_packing_slips',
+  'shortcut_returns',
+  'shortcut_gst',
+  'shortcut_labels',
+  'shortcut_inventory',
+  'shortcut_coupons',
+  'shortcut_campaign',
+  'shortcut_financial',
+  'shortcut_customers',
+  'shortcut_crm',
+  'shortcut_reviews',
+  'shortcut_ai_agent',
+  'shortcut_custom',
 ]
 
 const EDITABLE_SET = new Set(EDITABLE_KEYS)
@@ -97,7 +110,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'settings:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'settings:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 

@@ -37,8 +37,11 @@ export async function GET(request: NextRequest) {
 
     const redirectUri = `${platformOAuthBaseUrl()}/api/admin/data-source/google/callback`
     const body = new URLSearchParams({
-      code, client_id: clientId, client_secret: clientSecret,
-      redirect_uri: redirectUri, grant_type: 'authorization_code',
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
     })
     const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -48,12 +51,18 @@ export async function GET(request: NextRequest) {
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.refresh_token) {
       console.error('[data-source/google/callback] token exchange failed', {
-        ok: res.ok, status: res.status, redirectUri,
-        error: data?.error, error_description: data?.error_description,
-        has_access_token: Boolean(data?.access_token), has_refresh_token: Boolean(data?.refresh_token),
+        ok: res.ok,
+        status: res.status,
+        redirectUri,
+        error: data?.error,
+        error_description: data?.error_description,
+        has_access_token: Boolean(data?.access_token),
+        has_refresh_token: Boolean(data?.refresh_token),
       })
       const reason = data?.error_description || data?.error || 'exchange_failed'
-      return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
+      return returnToAdmin(
+        `${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`
+      )
     }
 
     // Keep a previously-stored spreadsheet id if this connect didn't carry one.
@@ -61,7 +70,9 @@ export async function GET(request: NextRequest) {
     if (!spreadsheetId) {
       const existing = await getIntegrationCredential(state.tenantId, 'google_sheets')
       if (existing) {
-        try { spreadsheetId = JSON.parse(decryptToken(existing.config_enc))?.spreadsheet_id || '' } catch {}
+        try {
+          spreadsheetId = JSON.parse(decryptToken(existing.config_enc))?.spreadsheet_id || ''
+        } catch {}
       }
     }
 
@@ -73,12 +84,17 @@ export async function GET(request: NextRequest) {
       provider: 'google_sheets',
       label: 'Google Sheet (product sync)',
       configEnc: encryptToken(JSON.stringify(normalized)),
-      meta: { connected_via: 'oauth', ...(spreadsheetId ? { spreadsheet_id: spreadsheetId } : { needs_spreadsheet_id: true }) },
+      meta: {
+        connected_via: 'oauth',
+        ...(spreadsheetId ? { spreadsheet_id: spreadsheetId } : { needs_spreadsheet_id: true }),
+      },
     })
 
     return returnToAdmin(`${backTo}?tab=google_sheet&connected=google_sheets`)
   } catch (e: any) {
     console.error('[data-source/google/callback] failed', { message: e?.message })
-    return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
+    return returnToAdmin(
+      `${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`
+    )
   }
 }

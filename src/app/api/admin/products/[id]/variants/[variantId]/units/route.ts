@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
-import { validateSerializedUnitStep, assertUnitChangeAllowed, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
+import {
+  validateSerializedUnitStep,
+  assertUnitChangeAllowed,
+  changedUnitFields,
+  validateUnitQuantityBounds,
+} from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,10 +16,10 @@ interface Params {
 }
 
 async function ensureVariant(productId: string, variantId: string) {
-  const row = await queryOne<{ id: string }>(
-    `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
-    [variantId, productId]
-  )
+  const row = await queryOne<{ id: string }>(`SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`, [
+    variantId,
+    productId,
+  ])
   return !!row
 }
 
@@ -96,9 +101,16 @@ export async function POST(request: NextRequest, { params }: Params) {
   const allowedDimensions = ['count', 'length', 'area', 'volume', 'weight', 'custom']
   const dimension = allowedDimensions.includes(body.dimension) ? body.dimension : 'count'
   const conversionMeta = body.conversion_meta != null ? body.conversion_meta : null
-  const minQty = body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
-  const maxQty = body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty ? Number(body.max_qty) : null
-  const qtyStep = body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0 ? Number(body.qty_step) : 1
+  const minQty =
+    body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
+  const maxQty =
+    body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty
+      ? Number(body.max_qty)
+      : null
+  const qtyStep =
+    body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0
+      ? Number(body.qty_step)
+      : 1
 
   // min/max must be reachable multiples of qty_step, or the advertised bounds
   // describe quantities nobody can actually order.
@@ -111,7 +123,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const stepErr = validateSerializedUnitStep(qtyStep)
     if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
   }
-
 
   // An upsert on an existing unit overwrites factor/dimension/qty_step, so it is a
   // change like any other — refuse it when stock was recorded under the old values.
@@ -129,7 +140,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   try {
-    const upserted = await withTransaction(async (client) => {
+    const upserted = await withTransaction(async client => {
       if (isBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [variantId])
       }
@@ -168,10 +179,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       )
       const row = res.rows[0]
       if (isBase) {
-        await client.query(
-          `UPDATE product_variants SET sell_unit_id = $1 WHERE id = $2`,
-          [row.id, variantId]
-        )
+        await client.query(`UPDATE product_variants SET sell_unit_id = $1 WHERE id = $2`, [row.id, variantId])
       }
       return row
     })

@@ -6,7 +6,12 @@ import { storeDescriptorForPrompt } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
-interface CartLine { name?: string; category?: string | null; brand?: string | null; qty?: number }
+interface CartLine {
+  name?: string
+  category?: string | null
+  brand?: string | null
+  qty?: number
+}
 
 // Server (Ollama) fallback for the on-device cart-insight one-liner. Mirrors
 // buildCartInsightPrompt() intent for devices where on-device is off/unsupported.
@@ -15,7 +20,11 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked
 
   let body: { cart?: CartLine[] }
-  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
   const cart = Array.isArray(body.cart) ? body.cart.slice(0, 12) : []
   if (cart.length === 0) return NextResponse.json({ error: 'cart required' }, { status: 400 })

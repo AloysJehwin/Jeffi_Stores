@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
          LIMIT 1`,
         [productId, variantId, subVariantId, supplierId]
       )
-      if (row) conversion = { purchase_unit: row.purchase_unit, purchase_unit_factor: Number(row.purchase_unit_factor) || 1 }
+      if (row)
+        conversion = { purchase_unit: row.purchase_unit, purchase_unit_factor: Number(row.purchase_unit_factor) || 1 }
     }
 
     return NextResponse.json({ conversion, baseUnit })

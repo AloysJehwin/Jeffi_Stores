@@ -10,7 +10,11 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked
 
   let body: { productName?: string; brand?: string | null; category?: string | null }
-  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
   const { productName, brand, category } = body
   if (!productName || typeof productName !== 'string' || productName.trim().length < 2) {

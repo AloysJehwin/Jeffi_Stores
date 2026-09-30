@@ -9,13 +9,15 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { product_id, variant_id, cost_price } = body
 
     if (!product_id) return NextResponse.json({ error: 'product_id is required' }, { status: 400 })
-    if (cost_price === undefined || cost_price === null) return NextResponse.json({ error: 'cost_price is required' }, { status: 400 })
+    if (cost_price === undefined || cost_price === null)
+      return NextResponse.json({ error: 'cost_price is required' }, { status: 400 })
 
     const cost = parseFloat(cost_price)
     if (isNaN(cost) || cost < 0) return NextResponse.json({ error: 'Invalid cost_price' }, { status: 400 })

@@ -10,10 +10,7 @@ export const dynamic = 'force-dynamic'
 
 const PatchSchema = z.object({ own_delhivery: z.boolean() })
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ tenantId: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })

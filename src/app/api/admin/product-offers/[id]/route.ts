@@ -22,9 +22,16 @@ const patchSchema = z.object({
 
 // Map camelCase request keys to snake_case DB columns.
 const COLUMN_MAP: Record<string, string> = {
-  title: 'title', slug: 'slug', subtitle: 'subtitle', badgeText: 'badge_text',
-  badgeColor: 'badge_color', ctaLabel: 'cta_label', startsAt: 'starts_at',
-  endsAt: 'ends_at', isActive: 'is_active', displayOrder: 'display_order',
+  title: 'title',
+  slug: 'slug',
+  subtitle: 'subtitle',
+  badgeText: 'badge_text',
+  badgeColor: 'badge_color',
+  ctaLabel: 'cta_label',
+  startsAt: 'starts_at',
+  endsAt: 'ends_at',
+  isActive: 'is_active',
+  displayOrder: 'display_order',
 }
 
 // PATCH /api/admin/product-offers/[id] — update one offer (partial).

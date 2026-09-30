@@ -14,7 +14,10 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url)
   const status = (url.searchParams.get('status') || 'proposed').toLowerCase()
-  const pageSize = Math.min(parseInt(url.searchParams.get('pageSize') || url.searchParams.get('limit') || '25', 10), 200)
+  const pageSize = Math.min(
+    parseInt(url.searchParams.get('pageSize') || url.searchParams.get('limit') || '25', 10),
+    200
+  )
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const offset = (page - 1) * pageSize
 

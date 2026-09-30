@@ -50,12 +50,12 @@ export async function GET(request: NextRequest, { params }: Params) {
   const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const rows = await queryMany(
-    `SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`,
-    [variantId]
-  )
+  const rows = await queryMany(`SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`, [
+    variantId,
+  ])
   return NextResponse.json({ sub_variants: rows })
 }
 
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const variant = await queryOne<{ id: string; sku: string }>(
     `SELECT id, sku FROM product_variants WHERE id = $1 AND product_id = $2`,
@@ -75,7 +76,22 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsed = parseBody(PostSchema, raw)
   if (!parsed.ok) return parsed.response
-  const { sub_variant_name, sku: skuInput, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, weight_grams, length_cm, breadth_cm, height_cm, package_type } = parsed.data
+  const {
+    sub_variant_name,
+    sku: skuInput,
+    price,
+    mrp,
+    price_ex_gst,
+    mrp_ex_gst,
+    discount_pct,
+    stock_status,
+    attributes,
+    weight_grams,
+    length_cm,
+    breadth_cm,
+    height_cm,
+    package_type,
+  } = parsed.data
 
   const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [id])
   const parentSku = variant.sku || productRow?.sku || 'PRD'
@@ -86,11 +102,24 @@ export async function POST(request: NextRequest, { params }: Params) {
        (variant_id, product_id, sku, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, weight_grams, length_cm, breadth_cm, height_cm, package_type)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
      RETURNING *`,
-    [variantId, id, sku, sub_variant_name, price ?? null, mrp ?? null,
-     price_ex_gst ?? null, mrp_ex_gst ?? null,
-     discount_pct ?? null,
-     stock_status ?? 'In Stock', attributes ? JSON.stringify(attributes) : null,
-     weight_grams ?? null, length_cm ?? null, breadth_cm ?? null, height_cm ?? null, package_type ?? null]
+    [
+      variantId,
+      id,
+      sku,
+      sub_variant_name,
+      price ?? null,
+      mrp ?? null,
+      price_ex_gst ?? null,
+      mrp_ex_gst ?? null,
+      discount_pct ?? null,
+      stock_status ?? 'In Stock',
+      attributes ? JSON.stringify(attributes) : null,
+      weight_grams ?? null,
+      length_cm ?? null,
+      breadth_cm ?? null,
+      height_cm ?? null,
+      package_type ?? null,
+    ]
   )
   return NextResponse.json({ sub_variant: row }, { status: 201 })
 }
@@ -99,22 +128,37 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawPut = await request.json().catch(() => null)
   if (!rawPut) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsedPut = parseBody(PutSchema, rawPut)
   if (!parsedPut.ok) return parsedPut.response
-  const { id, sub_variant_name, sku: skuOverride, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, is_active, weight_grams, length_cm, breadth_cm, height_cm, package_type } = parsedPut.data
+  const {
+    id,
+    sub_variant_name,
+    sku: skuOverride,
+    price,
+    mrp,
+    price_ex_gst,
+    mrp_ex_gst,
+    discount_pct,
+    stock_status,
+    attributes,
+    is_active,
+    weight_grams,
+    length_cm,
+    breadth_cm,
+    height_cm,
+    package_type,
+  } = parsedPut.data
 
   let newSku: string | null = null
   if (skuOverride) {
     newSku = skuOverride.toUpperCase()
   } else if (sub_variant_name) {
-    const variant = await queryOne<{ sku: string }>(
-      `SELECT sku FROM product_variants WHERE id = $1`,
-      [variantId]
-    )
+    const variant = await queryOne<{ sku: string }>(`SELECT sku FROM product_variants WHERE id = $1`, [variantId])
     if (variant?.sku) {
       newSku = generateVariantSku(variant.sku, sub_variant_name)
     }
@@ -137,11 +181,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
        updated_at = NOW()
      WHERE id = $11 AND variant_id = $12
      RETURNING *`,
-    [sub_variant_name, newSku, price ?? null, mrp ?? null, price_ex_gst ?? null,
-     mrp_ex_gst ?? null, discount_pct ?? null, stock_status ?? null,
-     attributes ? JSON.stringify(attributes) : null, is_active ?? null,
-     id, variantId,
-     weight_grams ?? null, length_cm ?? null, breadth_cm ?? null, height_cm ?? null, package_type ?? null]
+    [
+      sub_variant_name,
+      newSku,
+      price ?? null,
+      mrp ?? null,
+      price_ex_gst ?? null,
+      mrp_ex_gst ?? null,
+      discount_pct ?? null,
+      stock_status ?? null,
+      attributes ? JSON.stringify(attributes) : null,
+      is_active ?? null,
+      id,
+      variantId,
+      weight_grams ?? null,
+      length_cm ?? null,
+      breadth_cm ?? null,
+      height_cm ?? null,
+      package_type ?? null,
+    ]
   )
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ sub_variant: row })
@@ -151,7 +209,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

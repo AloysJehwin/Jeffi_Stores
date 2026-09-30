@@ -39,7 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const raw = await req.json()
   const parsed = bodySchema.safeParse(raw)
@@ -58,17 +59,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // Normalise to a list of assignments (legacy single-grain → one-element array).
-  const assignments = (body.assignments && body.assignments.length)
-    ? body.assignments
-    : [{
-        variant_id: body.variant_id ?? null,
-        sub_variant_id: body.sub_variant_id ?? null,
-        lot_number: body.lot_number ?? null,
-        manufacture_date: body.manufacture_date ?? null,
-        expiry_date: body.expiry_date ?? null,
-        location_id: body.location_id ?? null,
-        serial_numbers: body.serial_numbers ?? [],
-      }]
+  const assignments =
+    body.assignments && body.assignments.length
+      ? body.assignments
+      : [
+          {
+            variant_id: body.variant_id ?? null,
+            sub_variant_id: body.sub_variant_id ?? null,
+            lot_number: body.lot_number ?? null,
+            manufacture_date: body.manufacture_date ?? null,
+            expiry_date: body.expiry_date ?? null,
+            location_id: body.location_id ?? null,
+            serial_numbers: body.serial_numbers ?? [],
+          },
+        ]
 
   // --- Duplicate serial-number validation (mirrors the client-side check) ------
   // 1) No serial may repeat within this request (across every grain).
@@ -76,7 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const seen = new Set<string>()
     const dupsInRequest = new Set<string>()
     for (const a of assignments) {
-      for (const raw of (a.serial_numbers ?? [])) {
+      for (const raw of a.serial_numbers ?? []) {
         const sn = (raw ?? '').trim()
         if (!sn) continue
         if (seen.has(sn)) dupsInRequest.add(sn)
@@ -85,7 +89,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     if (dupsInRequest.size > 0) {
       return NextResponse.json(
-        { error: `Duplicate serial number(s) in submission: ${[...dupsInRequest].join(', ')}. Serial numbers must be unique.` },
+        {
+          error: `Duplicate serial number(s) in submission: ${[...dupsInRequest].join(', ')}. Serial numbers must be unique.`,
+        },
         { status: 400 }
       )
     }
@@ -123,16 +129,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Serialized/perishable stock must land on a shelf; require a location so the
     // batch never gets a NULL location_id (which would silently skip shelf sync).
     if (!a.location_id) {
-      return NextResponse.json(
-        { error: `A shelf location is required for grain "${grainLabel}".` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `A shelf location is required for grain "${grainLabel}".` }, { status: 400 })
     }
     if (product.perishable && !a.expiry_date) {
-      return NextResponse.json(
-        { error: `Expiry date is required for grain "${grainLabel}".` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `Expiry date is required for grain "${grainLabel}".` }, { status: 400 })
     }
     if (product.serialized) {
       const serials = (a.serial_numbers ?? []).map(s => (s ?? '').trim()).filter(Boolean)
@@ -141,16 +141,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (qty !== null) {
         // One serial per qty_step of BASE quantity — the same rule the sale and
         // receive paths use. qty is already a base quantity here.
-        const grainUnit = await resolveGrainUnit({ query }, {
-          productId,
-          variantId: a.variant_id ?? null,
-          subVariantId: a.sub_variant_id ?? null,
-        })
+        const grainUnit = await resolveGrainUnit(
+          { query },
+          {
+            productId,
+            variantId: a.variant_id ?? null,
+            subVariantId: a.sub_variant_id ?? null,
+          }
+        )
         // Only whole slots can be labelled; a remainder is written off at commit.
         const { serials: needed } = serialSlotsForBaseQuantity(qty, grainUnit)
         if (serials.length !== needed) {
           return NextResponse.json(
-            { error: `Grain "${grainLabel}" needs ${needed} serial number${needed !== 1 ? 's' : ''}, but ${serials.length} were provided.` },
+            {
+              error: `Grain "${grainLabel}" needs ${needed} serial number${needed !== 1 ? 's' : ''}, but ${serials.length} were provided.`,
+            },
             { status: 400 }
           )
         }
@@ -186,11 +191,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         continue
       } else if (subVariantId) {
         const sv = await queryOne<{ inventory_quantity: string }>(
-          `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1`, [subVariantId])
+          `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1`,
+          [subVariantId]
+        )
         inventoryQty = parseFloat(sv?.inventory_quantity ?? '0') || 0
       } else if (variantId) {
         const v = await queryOne<{ inventory_quantity: string }>(
-          `SELECT inventory_quantity FROM product_variants WHERE id = $1 AND product_id = $2`, [variantId, productId])
+          `SELECT inventory_quantity FROM product_variants WHERE id = $1 AND product_id = $2`,
+          [variantId, productId]
+        )
         inventoryQty = parseFloat(v?.inventory_quantity ?? '0') || 0
       } else {
         inventoryQty = parseFloat(product.inventory_quantity) || 0
@@ -257,15 +266,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ? await queryOne<{ is_leaf: boolean }>(
             `SELECT (sv.is_active AND v.is_active) AS is_leaf
                FROM product_sub_variants sv JOIN product_variants v ON v.id = sv.variant_id
-              WHERE sv.id = $1 AND sv.product_id = $2`, [subVariantId, productId])
+              WHERE sv.id = $1 AND sv.product_id = $2`,
+            [subVariantId, productId]
+          )
         : variantId
           ? await queryOne<{ is_leaf: boolean }>(
               `SELECT (v.is_active AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv
                         WHERE sv.variant_id = v.id AND sv.is_active = true)) AS is_leaf
-                 FROM product_variants v WHERE v.id = $1 AND v.product_id = $2`, [variantId, productId])
+                 FROM product_variants v WHERE v.id = $1 AND v.product_id = $2`,
+              [variantId, productId]
+            )
           : await queryOne<{ is_leaf: boolean }>(
               `SELECT NOT EXISTS (SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = true) AS is_leaf`,
-              [productId])
+              [productId]
+            )
       if (leaf && !leaf.is_leaf) {
         skipped.push(subVariantId || variantId || 'product')
         continue
@@ -277,7 +291,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           `INSERT INTO product_batches
              (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
            VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$7,$8) RETURNING id`,
-          [productId, variantId, subVariantId, a.lot_number || null, a.manufacture_date || null, a.expiry_date || null, inventoryQty, a.location_id || null]
+          [
+            productId,
+            variantId,
+            subVariantId,
+            a.lot_number || null,
+            a.manufacture_date || null,
+            a.expiry_date || null,
+            inventoryQty,
+            a.location_id || null,
+          ]
         )
         newBatchId = batchRes.rows[0].id
         createdBatchIds.push(newBatchId)
@@ -296,9 +319,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
 
         await logStockMovement(client, {
-          productId, variantId, subVariantId,
-          transactionType: 'adjustment', quantityChange: 0,
-          referenceType: 'manual', referenceId: productId,
+          productId,
+          variantId,
+          subVariantId,
+          transactionType: 'adjustment',
+          quantityChange: 0,
+          referenceType: 'manual',
+          referenceId: productId,
           notes: 'Bootstrap: assigned existing stock to batch/serials',
           currentStock: inventoryQty,
         })
@@ -306,9 +333,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (roundingWriteOff > 0) {
           const step = stepWriteOffs[stepWriteOffs.length - 1]?.qty_step ?? 1
           await logStockMovement(client, {
-            productId, variantId, subVariantId,
-            transactionType: 'adjustment', quantityChange: -roundingWriteOff,
-            referenceType: 'manual', referenceId: productId,
+            productId,
+            variantId,
+            subVariantId,
+            transactionType: 'adjustment',
+            quantityChange: -roundingWriteOff,
+            referenceType: 'manual',
+            referenceId: productId,
             notes: `Serialization rounding (qty_step ${step}): ${roundingWriteOff} unit(s) written off`,
             currentStock: inventoryQty,
           })
@@ -327,8 +358,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } else if (product.serialized && a.location_id) {
         if (!alreadyBootstrapped) {
           await upsertShelfStock(client, {
-            locationId: a.location_id, productId, variantId, subVariantId,
-            quantity: Math.round(inventoryQty), mode: 'add',
+            locationId: a.location_id,
+            productId,
+            variantId,
+            subVariantId,
+            quantity: Math.round(inventoryQty),
+            mode: 'add',
           })
         }
         await syncCentralInventory(client, productId, variantId, subVariantId)
@@ -336,7 +371,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     await client.query('COMMIT')
-    return NextResponse.json({ success: true, batch_ids: createdBatchIds, serial_numbers: createdSerials, skipped, step_write_offs: stepWriteOffs })
+    return NextResponse.json({
+      success: true,
+      batch_ids: createdBatchIds,
+      serial_numbers: createdSerials,
+      skipped,
+      step_write_offs: stepWriteOffs,
+    })
   } catch (err: any) {
     await client.query('ROLLBACK')
     // Unique-violation on a serial (e.g. a concurrent bootstrap that raced past the

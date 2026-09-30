@@ -77,18 +77,30 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = `+91${cleanedPhone}`
 
     if (is_default) {
-      await query(
-        'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2',
-        [userId, address_type]
-      )
+      await query('UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2', [
+        userId,
+        address_type,
+      ])
     }
 
     const address = await queryOne(
       `INSERT INTO addresses (user_id, address_type, full_name, address_line1, address_line2, landmark, city, state, postal_code, country, phone, is_default)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [userId, address_type, full_name, address_line1, address_line2 || null,
-       landmark || null, city, state, postal_code, country || 'India', normalizedPhone, is_default || false]
+      [
+        userId,
+        address_type,
+        full_name,
+        address_line1,
+        address_line2 || null,
+        landmark || null,
+        city,
+        state,
+        postal_code,
+        country || 'India',
+        normalizedPhone,
+        is_default || false,
+      ]
     )
 
     if (!address) {

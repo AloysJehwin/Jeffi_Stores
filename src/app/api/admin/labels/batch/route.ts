@@ -52,9 +52,14 @@ export async function POST(request: NextRequest) {
       )
       if (!rows.length) return NextResponse.json({ error: 'No serials found' }, { status: 404 })
       const serials: LabelSerial[] = rows.map(r => ({
-        serialNumber: r.serial_number, productName: r.product_name, sku: r.sku,
-        variantName: r.variant_name, lotNumber: r.lot_number,
-        mrp: r.mrp, priceExGst: r.price_ex_gst ?? r.base_price, gstPercentage: r.gst_percentage,
+        serialNumber: r.serial_number,
+        productName: r.product_name,
+        sku: r.sku,
+        variantName: r.variant_name,
+        lotNumber: r.lot_number,
+        mrp: r.mrp,
+        priceExGst: r.price_ex_gst ?? r.base_price,
+        gstPercentage: r.gst_percentage,
         showPrice,
         qrUrl: qrAction && r.product_id ? buildQrUrl(host, r.product_id, r.sku) : undefined,
       }))
@@ -95,12 +100,17 @@ export async function POST(request: NextRequest) {
       const batches: LabelBatch[] = []
       for (const r of rows) {
         const one: LabelBatch = {
-          batchId: r.batch_id, productName: r.product_name, sku: r.sku, variantName: r.variant_name,
+          batchId: r.batch_id,
+          productName: r.product_name,
+          sku: r.sku,
+          variantName: r.variant_name,
           lotNumber: r.lot_number,
           manufactureDate: r.manufacture_date ? String(r.manufacture_date).slice(0, 10) : null,
           expiryDate: r.expiry_date ? String(r.expiry_date).slice(0, 10) : null,
           quantity: r.quantity_remaining != null ? Number(r.quantity_remaining) : null,
-          mrp: r.mrp, priceExGst: r.price_ex_gst ?? r.base_price, gstPercentage: r.gst_percentage,
+          mrp: r.mrp,
+          priceExGst: r.price_ex_gst ?? r.base_price,
+          gstPercentage: r.gst_percentage,
           showPrice,
           qrUrl: qrAction && r.product_id ? buildQrUrl(host, r.product_id, r.sku) : undefined,
         }

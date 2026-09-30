@@ -14,7 +14,8 @@ const COL_MAP: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { log_id } = await request.json()
   if (!log_id) return NextResponse.json({ error: 'log_id required' }, { status: 400 })
@@ -26,15 +27,17 @@ export async function POST(request: NextRequest) {
   )
 
   if (!log) return NextResponse.json({ error: 'Log entry not found' }, { status: 404 })
-  if (!log.snapshot || log.snapshot.length === 0) return NextResponse.json({ error: 'No snapshot available for this entry' }, { status: 400 })
-  if (log.rolled_back_at) return NextResponse.json({ error: 'This inflation has already been rolled back' }, { status: 400 })
+  if (!log.snapshot || log.snapshot.length === 0)
+    return NextResponse.json({ error: 'No snapshot available for this entry' }, { status: 400 })
+  if (log.rolled_back_at)
+    return NextResponse.json({ error: 'This inflation has already been rolled back' }, { status: 400 })
   if (log.is_rollback) return NextResponse.json({ error: 'Cannot roll back a rollback entry' }, { status: 400 })
 
   const snapshot: any[] = log.snapshot
   const appliedCols = Object.keys(COL_MAP)
 
   try {
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       const rollbackId = crypto.randomUUID()
       await client.query(`SELECT set_config('audit.inflation_id', $1, true)`, [rollbackId])
 
@@ -53,10 +56,13 @@ export async function POST(request: NextRequest) {
 
         if (setClauses.length > 0) {
           values.push(p.id)
-          await client.query(`UPDATE products SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $${i}`, values)
+          await client.query(
+            `UPDATE products SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = $${i}`,
+            values
+          )
         }
 
-        for (const v of (p.variants || [])) {
+        for (const v of p.variants || []) {
           const vClauses: string[] = []
           const vValues: any[] = []
           let vi = 1
@@ -72,7 +78,10 @@ export async function POST(request: NextRequest) {
 
           if (vClauses.length > 0) {
             vValues.push(v.id)
-            await client.query(`UPDATE product_variants SET ${vClauses.join(', ')}, updated_at = NOW() WHERE id = $${vi}`, vValues)
+            await client.query(
+              `UPDATE product_variants SET ${vClauses.join(', ')}, updated_at = NOW() WHERE id = $${vi}`,
+              vValues
+            )
           }
         }
       }
@@ -81,16 +90,23 @@ export async function POST(request: NextRequest) {
       // from the restored product mrp_ex_gst using each sv's own mrp_ex_gst ratio.
       // For simplicity: rollback only restores product + variant rows (same as before).
 
-      await client.query(
-        `UPDATE price_inflation_log SET rolled_back_at = NOW(), rolled_back_by = $1 WHERE id = $2`,
-        [(admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin', log_id]
-      )
+      await client.query(`UPDATE price_inflation_log SET rolled_back_at = NOW(), rolled_back_by = $1 WHERE id = $2`, [
+        (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin',
+        log_id,
+      ])
 
       await client.query(
         `INSERT INTO price_inflation_log (id, category_id, category_name, percentage, applied_fields, product_count, applied_by, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [rollbackId, log.category_id, log.category_name, log.percentage, log.applied_fields, snapshot.length,
-          (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin']
+        [
+          rollbackId,
+          log.category_id,
+          log.category_name,
+          log.percentage,
+          log.applied_fields,
+          snapshot.length,
+          (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin',
+        ]
       )
     })
   } catch (e: any) {

@@ -26,8 +26,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await query(`UPDATE variant_change_requests SET status = 'rejected', updated_at = NOW() WHERE id = $1`, [vcr.id])
     if (vcr.user_id) {
-      logActivity({ userId: vcr.user_id, kind: 'variant_change', referenceId: orderId, referenceType: 'orders',
-        summary: `Customer declined the variant change on #${vcr.order_number}`, metadata: { vcrId: vcr.id, rejected: true } }).catch(() => {})
+      logActivity({
+        userId: vcr.user_id,
+        kind: 'variant_change',
+        referenceId: orderId,
+        referenceType: 'orders',
+        summary: `Customer declined the variant change on #${vcr.order_number}`,
+        metadata: { vcrId: vcr.id, rejected: true },
+      }).catch(() => {})
     }
     return NextResponse.json({ success: true })
   } catch (err: any) {

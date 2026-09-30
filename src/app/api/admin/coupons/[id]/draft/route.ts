@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // DELETE — discard draft
 export async function DELETE(req: NextRequest, { params }: Params) {

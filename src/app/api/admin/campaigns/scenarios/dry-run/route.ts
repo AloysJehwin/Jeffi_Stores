@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
   if (productSql) {
     productValidation = validateScenarioSql(productSql, 'products')
     if (!productValidation.ok) {
-      return NextResponse.json({ error: `product_sql: ${productValidation.reason}`, productValidation }, { status: 400 })
+      return NextResponse.json(
+        { error: `product_sql: ${productValidation.reason}`, productValidation },
+        { status: 400 }
+      )
     }
   }
 
@@ -51,30 +54,42 @@ export async function POST(req: NextRequest) {
   try {
     await client.query('BEGIN READ ONLY')
     await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`)
-    await client.query('SET LOCAL lock_timeout = \'1s\'')
-    await client.query('SET LOCAL idle_in_transaction_session_timeout = \'10s\'')
+    await client.query("SET LOCAL lock_timeout = '1s'")
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '10s'")
 
-    const result = await client.query<{ id: string }>(validation.normalized, [DRY_RUN_KIND, DRY_RUN_COOLDOWN_DAYS, DRY_RUN_LIMIT])
+    const result = await client.query<{ id: string }>(validation.normalized, [
+      DRY_RUN_KIND,
+      DRY_RUN_COOLDOWN_DAYS,
+      DRY_RUN_LIMIT,
+    ])
     count = result.rowCount || 0
     sample = result.rows.slice(0, 5).map(r => r.id)
 
     if (productValidation && productValidation.ok) {
-      const pr = await client.query<{ name: string; price: number | null; image_url: string | null }>(productValidation.normalized)
+      const pr = await client.query<{ name: string; price: number | null; image_url: string | null }>(
+        productValidation.normalized
+      )
       productCount = pr.rowCount || 0
       productSample = pr.rows.slice(0, 5).map(r => ({ name: r.name, price: r.price, image_url: r.image_url }))
     }
 
     await client.query('ROLLBACK')
   } catch (err: any) {
-    try { await client.query('ROLLBACK') } catch {}
+    try {
+      await client.query('ROLLBACK')
+    } catch {}
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, generated_sql, validation, result) VALUES ($1, 'dry_run_failed', $2, $3::jsonb, $4::jsonb)`,
-      [admin.id, sql, JSON.stringify(validation), JSON.stringify({ error: String(err?.message || err), code: err?.code })]
+      [
+        admin.id,
+        sql,
+        JSON.stringify(validation),
+        JSON.stringify({ error: String(err?.message || err), code: err?.code }),
+      ]
     ).catch(() => {})
     const msg = String(err?.message || err)
-    const friendly = err?.code === '57014'
-      ? `Query timed out after ${STATEMENT_TIMEOUT_MS}ms — too expensive to run`
-      : msg
+    const friendly =
+      err?.code === '57014' ? `Query timed out after ${STATEMENT_TIMEOUT_MS}ms — too expensive to run` : msg
     return NextResponse.json({ error: friendly, code: err?.code }, { status: 400 })
   } finally {
     elapsedMs = Date.now() - start
@@ -83,7 +98,12 @@ export async function POST(req: NextRequest) {
 
   await query(
     `INSERT INTO scenario_audit_log (admin_id, action, generated_sql, validation, result) VALUES ($1, 'dry_run', $2, $3::jsonb, $4::jsonb)`,
-    [admin.id, sql, JSON.stringify({ audience: validation, products: productValidation }), JSON.stringify({ count, sample, productCount, productSample, elapsedMs })]
+    [
+      admin.id,
+      sql,
+      JSON.stringify({ audience: validation, products: productValidation }),
+      JSON.stringify({ count, sample, productCount, productSample, elapsedMs }),
+    ]
   ).catch(() => {})
 
   return NextResponse.json({ count, sample, productCount, productSample, elapsedMs })

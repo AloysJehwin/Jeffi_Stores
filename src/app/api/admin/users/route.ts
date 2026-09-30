@@ -24,10 +24,7 @@ export async function POST(request: NextRequest) {
     const { email, first_name, last_name, role, scopes } = body
 
     if (!email || !first_name || !last_name) {
-      return NextResponse.json(
-        { error: 'Missing required fields: email, first_name, last_name' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Missing required fields: email, first_name, last_name' }, { status: 400 })
     }
 
     const validRoles = ['admin', 'moderator']
@@ -71,8 +68,19 @@ export async function POST(request: NextRequest) {
     const tenant = await resolveTenant().catch(() => null)
     let cert: { serialNumber: string; expiresAt: Date; downloadToken: string; p12Buffer: Buffer; p12Password: string }
     if (tenant?.tenantId) {
-      const c = await issueTenantAdminCert({ tenantId: tenant.tenantId, slug: tenant.slug, commonName: certCN, issuedTo: email })
-      cert = { serialNumber: c.serial, expiresAt: c.expiresAt, downloadToken: crypto.randomUUID(), p12Buffer: c.p12Buffer, p12Password: c.p12Password }
+      const c = await issueTenantAdminCert({
+        tenantId: tenant.tenantId,
+        slug: tenant.slug,
+        commonName: certCN,
+        issuedTo: email,
+      })
+      cert = {
+        serialNumber: c.serial,
+        expiresAt: c.expiresAt,
+        downloadToken: crypto.randomUUID(),
+        p12Buffer: c.p12Buffer,
+        p12Password: c.p12Password,
+      }
     } else {
       cert = await generateClientCertificate(certCN, result.admin!.id)
     }
@@ -80,7 +88,15 @@ export async function POST(request: NextRequest) {
     await query(
       `INSERT INTO admin_certificates (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [result.admin!.id, cert.serialNumber, certCN, cert.expiresAt, cert.downloadToken, cert.p12Buffer, cert.p12Password]
+      [
+        result.admin!.id,
+        cert.serialNumber,
+        certCN,
+        cert.expiresAt,
+        cert.downloadToken,
+        cert.p12Buffer,
+        cert.p12Password,
+      ]
     )
 
     // Also record in the central portal registry so certificate.jeffistores.in can serve it.

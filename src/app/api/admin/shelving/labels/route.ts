@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const body = await request.json()

@@ -23,9 +23,18 @@ export async function GET(req: NextRequest) {
 
   const wheres: string[] = []
   const filterVals: any[] = []
-  if (entityType) { filterVals.push(entityType); wheres.push(`l.entity_type = $${filterVals.length}`) }
-  if (action) { filterVals.push(action); wheres.push(`l.action = $${filterVals.length}`) }
-  if (adminId) { filterVals.push(adminId); wheres.push(`l.admin_id = $${filterVals.length}::uuid`) }
+  if (entityType) {
+    filterVals.push(entityType)
+    wheres.push(`l.entity_type = $${filterVals.length}`)
+  }
+  if (action) {
+    filterVals.push(action)
+    wheres.push(`l.action = $${filterVals.length}`)
+  }
+  if (adminId) {
+    filterVals.push(adminId)
+    wheres.push(`l.admin_id = $${filterVals.length}::uuid`)
+  }
   const whereSql = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
 
   const total = await queryCount(`SELECT COUNT(*) FROM admin_audit_log l ${whereSql}`, filterVals)
@@ -85,9 +94,23 @@ export async function POST(req: NextRequest) {
   }
 
   const validActions = [
-    'create','update','delete','activate','deactivate','feature','unfeature',
-    'inventory_adjust','price_change','login','logout','permission_change',
-    'export','import','send','approve','reject',
+    'create',
+    'update',
+    'delete',
+    'activate',
+    'deactivate',
+    'feature',
+    'unfeature',
+    'inventory_adjust',
+    'price_change',
+    'login',
+    'logout',
+    'permission_change',
+    'export',
+    'import',
+    'send',
+    'approve',
+    'reject',
   ]
   if (!body.action || !validActions.includes(body.action)) {
     return NextResponse.json({ error: `action must be one of: ${validActions.join(', ')}` }, { status: 400 })

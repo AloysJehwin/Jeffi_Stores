@@ -8,7 +8,7 @@ import { parseBody, zCurrency, zNonEmpty } from '@/lib/validate'
 export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
-  amount: zCurrency.refine((v) => v > 0, { message: 'amount must be greater than 0' }),
+  amount: zCurrency.refine(v => v > 0, { message: 'amount must be greater than 0' }),
   paymentMethod: zNonEmpty,
 })
 
@@ -17,7 +17,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'financial:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'financial:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { amount, payment_date, payment_method, reference, notes } = body
@@ -26,7 +27,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'amount and payment_date are required' }, { status: 400 })
     }
 
-    const parsed = parseBody(postSchema, { amount: body.amount, paymentMethod: body.paymentMethod ?? body.payment_method }, 'POST /api/admin/financial/payables/[id]/pay')
+    const parsed = parseBody(
+      postSchema,
+      { amount: body.amount, paymentMethod: body.paymentMethod ?? body.payment_method },
+      'POST /api/admin/financial/payables/[id]/pay'
+    )
     if (!parsed.ok) return parsed.response
 
     const expense = await queryOne<{ id: string; total_amount: string; status: string }>(

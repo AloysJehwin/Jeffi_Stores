@@ -4,10 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { getCustomerById } from '@/lib/queries'
 import { sendAdminContactEmail } from '@/lib/email'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)

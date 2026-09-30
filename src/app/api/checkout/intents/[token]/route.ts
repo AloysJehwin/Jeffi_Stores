@@ -86,7 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     const bizMap = await getBusinessDiscountMap(auth.userId)
     const pct = bizMap[display.category_id] ?? 0
     if (pct > 0) {
-      businessDiscount = round2(resolved.item.price * resolved.item.qty * pct / 100)
+      businessDiscount = round2((resolved.item.price * resolved.item.qty * pct) / 100)
     }
   }
 

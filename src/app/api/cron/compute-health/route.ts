@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const users = await queryMany<{ id: string }>(`
+  const users = await queryMany<{ id: string }>(
+    `
     SELECT u.id
     FROM users u
     LEFT JOIN customer_health ch ON ch.user_id = u.id
@@ -21,7 +22,9 @@ export async function GET(req: NextRequest) {
       AND (ch.last_computed_at IS NULL OR ch.last_computed_at < NOW() - INTERVAL '24 hours')
     ORDER BY ch.last_computed_at NULLS FIRST
     LIMIT $1
-  `, [BATCH_SIZE])
+  `,
+    [BATCH_SIZE]
+  )
 
   let processed = 0
   let dropTasksCreated = 0

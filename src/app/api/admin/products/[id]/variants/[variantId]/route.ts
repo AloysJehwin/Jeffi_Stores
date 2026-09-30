@@ -15,7 +15,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id, variantId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'products:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const parsed = parseBody(bodySchema, await request.json())
     if (!parsed.ok) return parsed.response

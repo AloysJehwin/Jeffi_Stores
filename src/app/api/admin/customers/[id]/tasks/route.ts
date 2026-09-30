@@ -10,7 +10,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const status = req.nextUrl.searchParams.get('status')
   const wheres = ['ct.user_id = $1']
@@ -21,7 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     wheres.push(`ct.status = 'completed'`)
   }
 
-  const tasks = await queryMany(`
+  const tasks = await queryMany(
+    `
     SELECT
       ct.id, ct.title, ct.description, ct.due_date, ct.priority, ct.status,
       ct.completed_at, ct.created_at, ct.updated_at,
@@ -43,7 +45,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ct.due_date NULLS LAST,
       ct.created_at DESC
     LIMIT 100
-  `, vals)
+  `,
+    vals
+  )
 
   return NextResponse.json({ tasks })
 }
@@ -52,10 +56,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { title, description, due_date, priority, assigned_to } = await req.json()
-  const trimmedTitle = String(title || '').trim().slice(0, 255)
+  const trimmedTitle = String(title || '')
+    .trim()
+    .slice(0, 255)
   if (!trimmedTitle) return NextResponse.json({ error: 'Title is required' }, { status: 400 })
 
   const validPriorities = ['low', 'medium', 'high', 'urgent']

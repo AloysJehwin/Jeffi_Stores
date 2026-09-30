@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
     if (e instanceof IntegrationNotConnectedError) {
       return NextResponse.json({ error: 'Connect a Google Sheet first' }, { status: 409 })
     }
-    return NextResponse.json({ error: e instanceof Error ? e.message : 'Failed to resolve Google credentials' }, { status: 502 })
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Failed to resolve Google credentials' },
+      { status: 502 }
+    )
   }
 
   if (!spreadsheetId) {

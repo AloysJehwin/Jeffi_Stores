@@ -9,10 +9,7 @@ export const dynamic = 'force-dynamic'
 // Re-applies the tenant's DNS host set to its CURRENT plan tier (DNS-only, never touches
 // RDS/S3). Used when a host was added to a tier after the tenant was provisioned — e.g.
 // forms-{slug} moving to Growth — so live tenants pick it up without re-provisioning.
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ tenantId: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!isPlatformAdmin(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -21,7 +18,10 @@ export async function POST(
   const tenant = await getTenant(tenantId)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
   if (tenant.status !== 'active') {
-    return NextResponse.json({ error: `Tenant is ${tenant.status}; DNS re-sync applies to active tenants only.` }, { status: 409 })
+    return NextResponse.json(
+      { error: `Tenant is ${tenant.status}; DNS re-sync applies to active tenants only.` },
+      { status: 409 }
+    )
   }
 
   const result = await triggerProvisioning({

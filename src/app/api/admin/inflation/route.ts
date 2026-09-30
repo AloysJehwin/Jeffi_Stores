@@ -28,14 +28,17 @@ function deriveFromMrpEx(mrpEx: number, discPct: number, gstPct: number) {
 
 const PRODUCT_COLS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price'] as const
 const VARIANT_COL_MAP: Record<string, string> = {
-  mrp_ex_gst: 'mrp_ex_gst', mrp: 'mrp', price_ex_gst: 'price_ex_gst',
+  mrp_ex_gst: 'mrp_ex_gst',
+  mrp: 'mrp',
+  price_ex_gst: 'price_ex_gst',
   base_price: 'price',
 }
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const categoryId = searchParams.get('category_id')
@@ -46,7 +49,8 @@ export async function GET(request: NextRequest) {
   if (!categoryId) return NextResponse.json({ error: 'category_id required' }, { status: 400 })
   if (!pct || pct <= 0) return NextResponse.json({ error: 'percentage must be > 0' }, { status: 400 })
 
-  const products = await queryMany(`
+  const products = await queryMany(
+    `
     SELECT
       p.id, p.name, p.has_variants,
       p.mrp_ex_gst, p.mrp, p.price_ex_gst, p.base_price,
@@ -68,7 +72,9 @@ export async function GET(request: NextRequest) {
     ) AND p.is_active = true
     AND ($2::uuid[] IS NULL OR p.id = ANY($2::uuid[]))
     ORDER BY p.name
-  `, [categoryId, productIds])
+  `,
+    [categoryId, productIds]
+  )
 
   const preview = (products || []).map((p: any) => {
     const discPct = parseFloat(p.discount_pct) || 0
@@ -109,12 +115,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { category_id, category_name, percentage, product_ids } = body
 
-  if (!category_id || !category_name) return NextResponse.json({ error: 'category_id and category_name required' }, { status: 400 })
+  if (!category_id || !category_name)
+    return NextResponse.json({ error: 'category_id and category_name required' }, { status: 400 })
 
   const parsedPost = parseBody(postSchema, { percentage: body.percentage, categoryId: body.category_id })
   if (!parsedPost.ok) return parsedPost.response
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
   const productIds = products.map((p: any) => p.id)
 
   try {
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       const inflationId = crypto.randomUUID()
       await client.query(`SELECT set_config('audit.inflation_id', $1, true)`, [inflationId])
       const snapshotProducts: any[] = []
@@ -169,9 +177,23 @@ export async function POST(request: NextRequest) {
              WHERE id = $5`,
             [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, p.id]
           )
-          snapshotProducts.push({ id: p.id, name: p.name, has_variants: p.has_variants, before, after: derived, variants: [] })
+          snapshotProducts.push({
+            id: p.id,
+            name: p.name,
+            has_variants: p.has_variants,
+            before,
+            after: derived,
+            variants: [],
+          })
         } else {
-          snapshotProducts.push({ id: p.id, name: p.name, has_variants: p.has_variants, before, after: before, variants: [] })
+          snapshotProducts.push({
+            id: p.id,
+            name: p.name,
+            has_variants: p.has_variants,
+            before,
+            after: before,
+            variants: [],
+          })
         }
       }
 
@@ -246,9 +268,16 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO price_inflation_log (id, category_id, category_name, percentage, applied_fields, product_count, applied_by, snapshot)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [inflationId, category_id, category_name, percentage, PRODUCT_COLS, products.length,
+        [
+          inflationId,
+          category_id,
+          category_name,
+          percentage,
+          PRODUCT_COLS,
+          products.length,
           (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin',
-          JSON.stringify(snapshotProducts)]
+          JSON.stringify(snapshotProducts),
+        ]
       )
     })
   } catch (e: any) {

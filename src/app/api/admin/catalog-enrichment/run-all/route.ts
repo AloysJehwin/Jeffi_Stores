@@ -66,14 +66,16 @@ function buildPrompt(p: ProductRow): string {
     p.description ? `Existing description: ${p.description}` : 'Existing description: (empty)',
     p.material ? `Material: ${p.material}` : null,
     p.size ? `Size: ${p.size}` : null,
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function cleanArr(val: unknown, maxLen = 40, maxItems = 15): string[] {
   if (!Array.isArray(val)) return []
-  return [...new Set(
-    (val as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= maxLen)
-  )].slice(0, maxItems)
+  return [
+    ...new Set((val as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= maxLen)),
+  ].slice(0, maxItems)
 }
 
 function parseEnrichment(raw: string): Enrichment {
@@ -93,9 +95,15 @@ function parseEnrichment(raw: string): Enrichment {
     ai_description: desc,
     ai_use_cases: use_cases,
     ai_keywords: cleanArr(obj.ai_keywords, 50, 15),
-    ai_who_uses_it: String(obj.ai_who_uses_it || '').trim().slice(0, 300),
-    ai_application: String(obj.ai_application || '').trim().slice(0, 500),
-    ai_product_type: String(obj.ai_product_type || '').trim().slice(0, 100),
+    ai_who_uses_it: String(obj.ai_who_uses_it || '')
+      .trim()
+      .slice(0, 300),
+    ai_application: String(obj.ai_application || '')
+      .trim()
+      .slice(0, 500),
+    ai_product_type: String(obj.ai_product_type || '')
+      .trim()
+      .slice(0, 100),
     ai_features: cleanArr(obj.ai_features, 100, 10),
     ai_search_tags: cleanArr(obj.ai_search_tags, 50, 20),
   }
@@ -164,10 +172,20 @@ export async function POST(req: NextRequest) {
               ai_application, ai_product_type, ai_features, ai_search_tags,
               model, status)
            VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'proposed')`,
-          [p.id, p.name, p.description || null,
-           e.ai_description, e.ai_use_cases, e.ai_keywords, e.ai_who_uses_it,
-           e.ai_application, e.ai_product_type, e.ai_features, e.ai_search_tags,
-           r.model]
+          [
+            p.id,
+            p.name,
+            p.description || null,
+            e.ai_description,
+            e.ai_use_cases,
+            e.ai_keywords,
+            e.ai_who_uses_it,
+            e.ai_application,
+            e.ai_product_type,
+            e.ai_features,
+            e.ai_search_tags,
+            r.model,
+          ]
         )
       } catch {
         void 0
@@ -175,5 +193,8 @@ export async function POST(req: NextRequest) {
     }
   })()
 
-  return NextResponse.json({ queued: candidates.length, message: `Enriching ${candidates.length} products at 5/min — check back in ${Math.ceil(candidates.length / 5)} minutes` })
+  return NextResponse.json({
+    queued: candidates.length,
+    message: `Enriching ${candidates.length} products at 5/min — check back in ${Math.ceil(candidates.length / 5)} minutes`,
+  })
 }

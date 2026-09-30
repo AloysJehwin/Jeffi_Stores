@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
-import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
+import {
+  generateInvoicePDF,
+  InvoiceBusinessSettings,
+  InvoiceOrder,
+  InvoiceOrderItem,
+  InvoiceBuyerAddress,
+} from '@/lib/invoice-pdf'
 import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
 import { getFinancialYear } from '@/lib/gst'
 import { generateOrderInvoice } from '@/lib/invoice'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const userAuth = await authenticateUser(request)
@@ -49,27 +52,21 @@ export async function GET(
       return NextResponse.json({ error: 'Invoice not available for this order' }, { status: 404 })
     }
 
-    const invoiceRecord = await queryOne(
-      'SELECT pdf_url FROM invoices WHERE order_id = $1',
-      [orderId]
-    )
+    const invoiceRecord = await queryOne('SELECT pdf_url FROM invoices WHERE order_id = $1', [orderId])
 
     const isVoided = order.status === 'cancelled' || order.status === 'returned'
     if (invoiceRecord?.pdf_url && !isVoided) {
       return NextResponse.redirect(invoiceRecord.pdf_url)
     }
 
-    const orderItems = await queryMany(
-      'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-      [orderId]
-    )
+    const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
 
     const settingsRows = await queryMany(
       "SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%' OR key = 'invoice_prefix'",
       []
     )
     const settings: Record<string, string> = {}
-    for (const row of (settingsRows || [])) {
+    for (const row of settingsRows || []) {
       settings[row.key] = row.value || ''
     }
 
@@ -215,19 +212,29 @@ export async function GET(
     } else {
       const voidLabel = order.status === 'returned' ? 'RETURNED' : 'CANCELLED'
       // Tax-free (Bill of Supply) when the order carries no GST at all.
-      const taxFree = (parseFloat(order.tax_amount || '0') === 0)
-        && (parseFloat(order.cgst_amount || '0') + parseFloat(order.sgst_amount || '0') + parseFloat(order.igst_amount || '0') === 0)
-      pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel, taxFree)
+      const taxFree =
+        parseFloat(order.tax_amount || '0') === 0 &&
+        parseFloat(order.cgst_amount || '0') +
+          parseFloat(order.sgst_amount || '0') +
+          parseFloat(order.igst_amount || '0') ===
+          0
+      pdfBuffer = await generateInvoicePDF(
+        invoiceOrder,
+        invoiceItems,
+        business,
+        buyerAddress,
+        billingAddress,
+        isCancelled,
+        voidLabel,
+        taxFree
+      )
     }
 
     if (!isCancelled && order.source !== 'cash_sale') {
       const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
       const s3Url = await uploadInvoicePDF(pdfBuffer, order.invoice_number, fy)
 
-      await query(
-        'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2',
-        [s3Url, orderId]
-      )
+      await query('UPDATE invoices SET pdf_url = $1 WHERE order_id = $2', [s3Url, orderId])
     }
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
@@ -242,10 +249,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -255,7 +259,9 @@ export async function POST(
 
     const orderId = id
 
-    const order = await queryOne('SELECT id, invoice_number, payment_status, status FROM orders WHERE id = $1', [orderId])
+    const order = await queryOne('SELECT id, invoice_number, payment_status, status FROM orders WHERE id = $1', [
+      orderId,
+    ])
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }

@@ -23,12 +23,15 @@ export async function GET(request: NextRequest) {
         GROUP BY oi.product_id
         ORDER BY MAX(o.created_at) DESC, oi.product_id
         LIMIT $2`,
-      [auth.userId, LIMIT],
+      [auth.userId, LIMIT]
     )
     if (rows.length === 0) return NextResponse.json({ products: [] })
 
     const { gstEnabled } = await getFeatureFlags()
-    const cards = await getProductCardsByIds(rows.map(r => r.product_id), gstEnabled)
+    const cards = await getProductCardsByIds(
+      rows.map(r => r.product_id),
+      gstEnabled
+    )
     return NextResponse.json({ products: cardPropsFor(cards, gstEnabled) })
   } catch (err) {
     console.error('[account/buy-again]', err)

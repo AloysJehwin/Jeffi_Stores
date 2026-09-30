@@ -5,7 +5,9 @@ import { embed, runWithHnswTuning, queryManyReplica } from '@/lib/rag'
 
 export const dynamic = 'force-dynamic'
 
-function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
+function vec(arr: number[]) {
+  return '[' + arr.join(',') + ']'
+}
 
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
@@ -62,10 +64,9 @@ export async function GET(req: NextRequest) {
   let products: any[] = []
   let variantProducts: any[] = []
   if (productIds.length) {
-    products = await queryManyReplica(
-      `SELECT id::text, name, slug FROM products WHERE id = ANY($1::uuid[])`,
-      [productIds]
-    ).catch(() => [])
+    products = await queryManyReplica(`SELECT id::text, name, slug FROM products WHERE id = ANY($1::uuid[])`, [
+      productIds,
+    ]).catch(() => [])
   }
   if (variantIds.length) {
     variantProducts = await queryManyReplica(

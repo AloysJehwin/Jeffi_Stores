@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
-      return NextResponse.json({ error: 'No business account found. Please sign up.', notBusinessAccount: true }, { status: 404 })
+      return NextResponse.json(
+        { error: 'No business account found. Please sign up.', notBusinessAccount: true },
+        { status: 404 }
+      )
     }
 
     if (!user.is_active) {
@@ -40,18 +43,27 @@ export async function POST(request: NextRequest) {
     if (approvalStatus !== 'approved') {
       await deleteOTP(email)
       await resetSendOtpCounter(email)
-      return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
+      return NextResponse.json({
+        approvalStatus,
+        message:
+          approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.',
+      })
     }
 
     if (policiesAccepted === true && user.policies_accepted_version !== POLICY_VERSION) {
-      await query(
-        'UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2',
-        [POLICY_VERSION, user.id]
-      )
+      await query('UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2', [
+        POLICY_VERSION,
+        user.id,
+      ])
     }
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
-    logActivity({ userId: user.id, kind: 'login', summary: 'Business login via OTP', metadata: { provider: 'otp' } }).catch(() => {})
+    logActivity({
+      userId: user.id,
+      kind: 'login',
+      summary: 'Business login via OTP',
+      metadata: { provider: 'otp' },
+    }).catch(() => {})
 
     const signals = extractSessionSignals(request)
     const { sid } = await issueUserToken({
@@ -80,7 +92,13 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({
       message: 'Login successful',
       approvalStatus: 'approved',
-      user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, companyName: user.company_name },
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        companyName: user.company_name,
+      },
     })
     res.cookies.set('business_sid', sid, cookieOpts)
     res.cookies.set('session_id', user.id, cookieOpts)

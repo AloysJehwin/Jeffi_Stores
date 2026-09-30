@@ -45,14 +45,12 @@ export async function POST(request: NextRequest) {
 
   // Optional subset: only reconcile the productIds the user selected, leaving the rest pending.
   const selectedIds = Array.isArray(productIds) ? new Set(productIds.map(String)) : null
-  const targets: SheetOrphan[] = selectedIds
-    ? pending.filter((p) => selectedIds.has(p.productId))
-    : pending
+  const targets: SheetOrphan[] = selectedIds ? pending.filter(p => selectedIds.has(p.productId)) : pending
   if (targets.length === 0) {
     return NextResponse.json({ error: 'No matching pending deletions' }, { status: 409 })
   }
-  const targetIds = new Set(targets.map((t) => t.productId))
-  const remaining = pending.filter((p) => !targetIds.has(p.productId))
+  const targetIds = new Set(targets.map(t => t.productId))
+  const remaining = pending.filter(p => !targetIds.has(p.productId))
 
   const spreadsheetId = job.spreadsheet_id
 
@@ -67,7 +65,7 @@ export async function POST(request: NextRequest) {
     const run = () => applyOrphanRemoval(tenantId, spreadsheetId, targets)
     const outcomes = ctx ? await runWithTenantContext(ctx, run) : await run()
 
-    const deletionRows: RowResult[] = outcomes.map((o) => ({
+    const deletionRows: RowResult[] = outcomes.map(o => ({
       row: 0,
       sku: o.sku,
       outcome: 'deleted',
@@ -80,12 +78,17 @@ export async function POST(request: NextRequest) {
     summary = `Removed ${outcomes.length} product(s) no longer in the Google Sheet`
     auditMeta = { jobId: job.id, spreadsheetId, decision, outcomes }
   } else {
-    const run = () => removeSheetLinks(tenantId, spreadsheetId, targets.map((t) => t.productId))
+    const run = () =>
+      removeSheetLinks(
+        tenantId,
+        spreadsheetId,
+        targets.map(t => t.productId)
+      )
     if (ctx) await runWithTenantContext(ctx, run)
     else await run()
     await updateImportJob(job.id, { pending_deletions: remaining })
     summary = `Kept ${targets.length} product(s); unlinked from the Google Sheet`
-    auditMeta = { jobId: job.id, spreadsheetId, decision, productIds: targets.map((t) => t.productId) }
+    auditMeta = { jobId: job.id, spreadsheetId, decision, productIds: targets.map(t => t.productId) }
   }
 
   await logAdminAudit({

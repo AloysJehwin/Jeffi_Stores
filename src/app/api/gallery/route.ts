@@ -27,8 +27,15 @@ export async function GET(request: NextRequest) {
   // limit/offset as the last two positional params.
   const conditions: string[] = []
   const filterParams: any[] = []
-  if (categoryId) { filterParams.push(categoryId); conditions.push(`gi.category_id = $${filterParams.length}`) }
-  if (search) { filterParams.push(`%${search}%`); const n = filterParams.length; conditions.push(`(gi.custom_name ILIKE $${n} OR gi.file_name ILIKE $${n})`) }
+  if (categoryId) {
+    filterParams.push(categoryId)
+    conditions.push(`gi.category_id = $${filterParams.length}`)
+  }
+  if (search) {
+    filterParams.push(`%${search}%`)
+    const n = filterParams.length
+    conditions.push(`(gi.custom_name ILIKE $${n} OR gi.file_name ILIKE $${n})`)
+  }
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const images = await queryMany(
@@ -44,11 +51,13 @@ export async function GET(request: NextRequest) {
     filterParams
   )
 
-  const normalized = await Promise.all((images || []).map(async (img: any) => ({
-    ...img,
-    image_url: await galleryImageUrl(img.s3_key, img.image_url),
-    thumbnail_url: await galleryImageUrl(img.s3_thumbnail_key, img.thumbnail_url),
-  })))
+  const normalized = await Promise.all(
+    (images || []).map(async (img: any) => ({
+      ...img,
+      image_url: await galleryImageUrl(img.s3_key, img.image_url),
+      thumbnail_url: await galleryImageUrl(img.s3_thumbnail_key, img.thumbnail_url),
+    }))
+  )
 
   return NextResponse.json({ images: normalized, total: parseInt(countRow?.total || '0'), page, limit })
 }

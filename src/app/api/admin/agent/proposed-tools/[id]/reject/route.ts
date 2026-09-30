@@ -13,13 +13,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const body = await req.json().catch(() => ({} as { reason?: string }))
-  const reason = String((body as any).reason || '').trim().slice(0, 500)
+  const body = await req.json().catch(() => ({}) as { reason?: string })
+  const reason = String((body as any).reason || '')
+    .trim()
+    .slice(0, 500)
 
-  const row = await queryOne<{ status: string }>(
-    `SELECT status FROM admin_agent_proposed_tools WHERE id = $1::uuid`,
-    [id]
-  )
+  const row = await queryOne<{ status: string }>(`SELECT status FROM admin_agent_proposed_tools WHERE id = $1::uuid`, [
+    id,
+  ])
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (row.status !== 'proposed') {
     return NextResponse.json({ error: `Already ${row.status}` }, { status: 400 })

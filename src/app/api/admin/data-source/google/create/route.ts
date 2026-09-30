@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
   let accessToken: string
   try {
-    ({ accessToken } = await resolveGoogleSheetsCreds(tenantId))
+    ;({ accessToken } = await resolveGoogleSheetsCreds(tenantId))
   } catch (e) {
     if (e instanceof IntegrationNotConnectedError) {
       return NextResponse.json({ error: 'Connect a Google account first' }, { status: 409 })
@@ -40,7 +40,13 @@ export async function POST(request: NextRequest) {
 
   const existing = await getIntegrationCredential(tenantId, 'google_sheets')
   const config: Record<string, any> = existing
-    ? (() => { try { return JSON.parse(decryptToken(existing.config_enc)) } catch { return {} } })()
+    ? (() => {
+        try {
+          return JSON.parse(decryptToken(existing.config_enc))
+        } catch {
+          return {}
+        }
+      })()
     : {}
   config.spreadsheet_id = spreadsheetId
 

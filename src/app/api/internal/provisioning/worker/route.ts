@@ -34,13 +34,16 @@ export async function GET(request: NextRequest) {
 }
 
 async function fireOwnerAdmin(tenantId: string): Promise<void> {
-  const row = await controlPlanePool().query(
-    `SELECT o.email, o.name, t.slug
+  const row = await controlPlanePool()
+    .query(
+      `SELECT o.email, o.name, t.slug
      FROM owner_tenants ot
      JOIN owners o ON o.id = ot.owner_id
      JOIN tenants t ON t.id = ot.tenant_id
-     WHERE ot.tenant_id = $1 LIMIT 1`, [tenantId],
-  ).catch(() => null)
+     WHERE ot.tenant_id = $1 LIMIT 1`,
+      [tenantId]
+    )
+    .catch(() => null)
   const r = row?.rows[0]
   if (!r) return
   // Never silently: this is the step that creates the owner's admin account, issues their mTLS
@@ -49,7 +52,10 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   // aloys-store. Provisioning itself stays successful (the store is live), but the failure is
   // recorded and alerted so someone knows to re-run it.
   const res = await provisionTenantOwnerAdmin({
-    tenantId, tenantSlug: r.slug, ownerEmail: r.email, ownerName: r.name,
+    tenantId,
+    tenantSlug: r.slug,
+    ownerEmail: r.email,
+    ownerName: r.name,
   }).catch((e: any) => ({ success: false, error: e?.message ?? String(e) }))
 
   if (!res.success) await reportOwnerAdminFailure(r.slug, res.error)
@@ -66,7 +72,9 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
     try {
       const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
-    } catch { /* alerting must never mask the original failure */ }
+    } catch {
+      /* alerting must never mask the original failure */
+    }
   }
 }
 
@@ -77,5 +85,7 @@ async function reportOwnerAdminFailure(slug: string, error?: string): Promise<vo
   try {
     const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
     await alertProvisioningFailure(slug, 'owner_admin_cert', error ?? 'unknown error')
-  } catch { /* alerting must never mask the original failure */ }
+  } catch {
+    /* alerting must never mask the original failure */
+  }
 }

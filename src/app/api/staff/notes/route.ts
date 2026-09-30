@@ -19,7 +19,11 @@ export async function GET(request: NextRequest) {
 function parseTags(fd: FormData): string[] {
   const raw = fd.get('tags')
   if (typeof raw === 'string' && raw.trim().startsWith('[')) {
-    try { return JSON.parse(raw) } catch { return [] }
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return []
+    }
   }
   return fd.getAll('tags').map(String)
 }
@@ -46,7 +50,8 @@ export async function POST(request: NextRequest) {
   }
 
   const files = fd.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
-  if (files.length > MAX_ATTACHMENTS) return NextResponse.json({ error: `Maximum ${MAX_ATTACHMENTS} attachments` }, { status: 400 })
+  if (files.length > MAX_ATTACHMENTS)
+    return NextResponse.json({ error: `Maximum ${MAX_ATTACHMENTS} attachments` }, { status: 400 })
   const title = String(fd.get('title') || '').trim()
   const body = String(fd.get('body') || '').trim()
   if (!title && !body && files.length === 0) {
@@ -54,12 +59,17 @@ export async function POST(request: NextRequest) {
   }
 
   let durations: Record<string, number> = {}
-  try { durations = JSON.parse(String(fd.get('durations') || '{}')) } catch { durations = {} }
+  try {
+    durations = JSON.parse(String(fd.get('durations') || '{}'))
+  } catch {
+    durations = {}
+  }
 
   const created = await createNote({
     userId: customerId.data,
     adminId: session.adminId,
-    body, title: title || null,
+    body,
+    title: title || null,
     tags: parseTags(fd),
     orderId: orderId?.success ? orderId.data : null,
     returnRequestId: returnRequestId?.success ? returnRequestId.data : null,
@@ -71,7 +81,10 @@ export async function POST(request: NextRequest) {
 
   const warnings: string[] = []
   for (let i = 0; i < files.length; i++) {
-    const r = await addAttachment(created.id, files[i], { durationSeconds: durations[String(i)] ?? null, displayOrder: i })
+    const r = await addAttachment(created.id, files[i], {
+      durationSeconds: durations[String(i)] ?? null,
+      displayOrder: i,
+    })
     if ('error' in r) warnings.push(`${files[i].name || `file ${i + 1}`}: ${r.error}`)
   }
 

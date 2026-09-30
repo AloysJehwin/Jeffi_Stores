@@ -4,19 +4,23 @@ import { query, queryMany, queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import {
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
+} from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { logActivity } from '@/lib/activity'
 import { parseBody, zUuid } from '@/lib/validate'
 
-const AddWishlistSchema = z.object({
-  productId: zUuid.nullish(),
-  product_id: zUuid.nullish(),
-  variantId: zUuid.nullish(),
-}).refine(
-  (d) => d.productId != null || d.product_id != null,
-  { message: 'productId is required' }
-)
+const AddWishlistSchema = z
+  .object({
+    productId: zUuid.nullish(),
+    product_id: zUuid.nullish(),
+    variantId: zUuid.nullish(),
+  })
+  .refine(d => d.productId != null || d.product_id != null, { message: 'productId is required' })
 
 async function resolveUserId(request: NextRequest): Promise<string> {
   const auth = await authenticateUser(request)
@@ -33,7 +37,8 @@ export async function GET(request: NextRequest) {
     const { gstEnabled } = await getFeatureFlags()
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
-    const wishlistItems = await queryMany(`
+    const wishlistItems = await queryMany(
+      `
       SELECT
         wi.id, wi.product_id, wi.created_at,
         wi.snapshot_price, wi.snapshot_in_stock,
@@ -58,7 +63,9 @@ export async function GET(request: NextRequest) {
       FROM wishlist_items wi
       INNER JOIN products p ON wi.product_id = p.id AND p.is_active = true
       WHERE wi.user_id = $1
-    `, [userId])
+    `,
+      [userId]
+    )
 
     return NextResponse.json({ items: wishlistItems || [] })
   } catch (error) {
@@ -75,18 +82,15 @@ export async function POST(request: NextRequest) {
 
     const userId = await resolveUserId(request)
 
-    const existing = await query(
-      'SELECT id FROM wishlist_items WHERE user_id = $1 AND product_id = $2',
-      [userId, productId]
-    )
+    const existing = await query('SELECT id FROM wishlist_items WHERE user_id = $1 AND product_id = $2', [
+      userId,
+      productId,
+    ])
     if ((existing as any).rows?.length > 0) {
       return NextResponse.json({ message: 'Item already in wishlist' })
     }
 
-    await query(
-      'INSERT INTO wishlist_items (user_id, product_id) VALUES ($1, $2)',
-      [userId, productId]
-    )
+    await query('INSERT INTO wishlist_items (user_id, product_id) VALUES ($1, $2)', [userId, productId])
 
     const auth = await authenticateUser(request)
     if (auth?.userId) {
@@ -113,10 +117,7 @@ export async function DELETE(request: NextRequest) {
 
     const userId = await resolveUserId(request)
 
-    await query(
-      'DELETE FROM wishlist_items WHERE product_id = $1 AND user_id = $2',
-      [productId, userId]
-    )
+    await query('DELETE FROM wishlist_items WHERE product_id = $1 AND user_id = $2', [productId, userId])
 
     const auth = await authenticateUser(request)
     if (auth?.userId && productId) {

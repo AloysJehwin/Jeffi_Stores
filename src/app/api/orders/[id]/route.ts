@@ -19,36 +19,56 @@ import { parseBody } from '@/lib/validate'
 import { isPlatformOwner } from '@/lib/scopes'
 import { logAdminAudit } from '@/lib/admin-audit'
 import {
-  notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
-  notifyOrderCancelled, notifyOutForDelivery, notifyPaymentFailed,
+  notifyOrderConfirmed,
+  notifyOrderShipped,
+  notifyOrderDelivered,
+  notifyOrderCancelled,
+  notifyOutForDelivery,
+  notifyPaymentFailed,
 } from '@/lib/notify'
 
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
   payment_status: z.string().nullish(),
-  batch_assignments: z.array(z.object({
-    order_item_id: z.string().uuid(),
-    batch_id: z.string().uuid(),
-    qty: z.number().positive(),
-  })).nullish(),
-  serial_assignments: z.array(z.object({
-    order_item_id: z.string().uuid(),
-    serial_number: z.string().min(1),
-  })).nullish(),
+  batch_assignments: z
+    .array(
+      z.object({
+        order_item_id: z.string().uuid(),
+        batch_id: z.string().uuid(),
+        qty: z.number().positive(),
+      })
+    )
+    .nullish(),
+  serial_assignments: z
+    .array(
+      z.object({
+        order_item_id: z.string().uuid(),
+        serial_number: z.string().min(1),
+      })
+    )
+    .nullish(),
   override: z.boolean().nullish(),
   override_reason: z.string().trim().min(10).max(500).nullish(),
 })
 
 const ALL_ORDER_STATUSES = [
-  'pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered',
-  'cancel_requested', 'cancel_rejected', 'cancelled',
-  'return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned',
+  'pending',
+  'confirmed',
+  'processing',
+  'shipped',
+  'out_for_delivery',
+  'delivered',
+  'cancel_requested',
+  'cancel_rejected',
+  'cancelled',
+  'return_requested',
+  'return_approved',
+  'return_received',
+  'return_rejected',
+  'returned',
 ]
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
@@ -71,7 +91,8 @@ export async function GET(
       )
       const email = bizUser?.email || ''
       const phone = bizUser?.phone || null
-      order = await queryOne(`
+      order = await queryOne(
+        `
         SELECT o.*,
           COALESCE(
             o.shipping_address_snapshot,
@@ -87,9 +108,12 @@ export async function GET(
           o.user_id = $2 OR
           (o.source = 'business' AND (o.customer_email = $3 OR ($4::text IS NOT NULL AND o.customer_phone = $4)))
         )
-      `, [orderId, authUser.userId, email, phone])
+      `,
+        [orderId, authUser.userId, email, phone]
+      )
     } else {
-      order = await queryOne(`
+      order = await queryOne(
+        `
         SELECT o.*,
           COALESCE(
             o.shipping_address_snapshot,
@@ -102,14 +126,17 @@ export async function GET(
         FROM orders o
         LEFT JOIN orders orig ON orig.id = o.original_order_id
         WHERE o.id = $1 AND o.status != 'draft' AND o.user_id = $2
-      `, [orderId, authUser.userId])
+      `,
+        [orderId, authUser.userId]
+      )
     }
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const orderItems = await queryMany(`
+    const orderItems = await queryMany(
+      `
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
         psv.sub_variant_name, psv.sku AS sub_variant_sku,
         json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days,
@@ -152,7 +179,9 @@ export async function GET(
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
       WHERE oi.order_id = $1
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     // Pending variant-change request (admin-proposed swap awaiting this customer).
     const pendingVcr = await queryOne<any>(
@@ -203,9 +232,9 @@ export async function GET(
       trackingUrl: order.tracking_url || null,
       awbNumber: order.awb_number || null,
       estimatedDeliveryDate: order.estimated_delivery_date
-        ? (order.estimated_delivery_date instanceof Date
-            ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-            : String(order.estimated_delivery_date).slice(0, 10))
+        ? order.estimated_delivery_date instanceof Date
+          ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+          : String(order.estimated_delivery_date).slice(0, 10)
         : null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
@@ -230,31 +259,39 @@ export async function GET(
         // UI never shows Return/Replace buttons regardless of product settings.
         returnAllowed: returnsEnabled ? (item.return_allowed === false ? false : !!item.return_allowed) : false,
         returnWindowDays: parseInt(item.return_window_days) || 7,
-        replacementAllowed: returnsEnabled ? (item.replacement_allowed === false ? false : !!item.replacement_allowed) : false,
+        replacementAllowed: returnsEnabled
+          ? item.replacement_allowed === false
+            ? false
+            : !!item.replacement_allowed
+          : false,
         replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
-      pendingVariantChange: pendingVcr ? {
-        id: pendingVcr.id,
-        productName: pendingVcr.product_name,
-        oldVariantName: pendingVcr.old_variant_name,
-        newVariantName: pendingVcr.new_variant_name,
-        oldUnitPrice: parseFloat(pendingVcr.old_unit_price),
-        newUnitPrice: parseFloat(pendingVcr.new_unit_price),
-        qty: parseFloat(pendingVcr.qty),
-        priceDiff: parseFloat(pendingVcr.price_diff),
-        settlementType: pendingVcr.settlement_type,
-        status: pendingVcr.status,
-      } : null,
+      pendingVariantChange: pendingVcr
+        ? {
+            id: pendingVcr.id,
+            productName: pendingVcr.product_name,
+            oldVariantName: pendingVcr.old_variant_name,
+            newVariantName: pendingVcr.new_variant_name,
+            oldUnitPrice: parseFloat(pendingVcr.old_unit_price),
+            newUnitPrice: parseFloat(pendingVcr.new_unit_price),
+            qty: parseFloat(pendingVcr.qty),
+            priceDiff: parseFloat(pendingVcr.price_diff),
+            settlementType: pendingVcr.settlement_type,
+            status: pendingVcr.status,
+          }
+        : null,
       sharedNotes: order.user_id ? await listSharedNotesForOrder(order.user_id, orderId).catch(() => []) : [],
       canChangeAddress: addressChangeAvailable && addressChangeBlockReason(order) === null,
-      addressChange: addressChange ? {
-        id: addressChange.id,
-        status: addressChange.status,
-        newAddress: addressChange.new_address_snapshot,
-        adminNotes: addressChange.admin_notes || null,
-        createdAt: addressChange.created_at,
-        reviewedAt: addressChange.reviewed_at || null,
-      } : null,
+      addressChange: addressChange
+        ? {
+            id: addressChange.id,
+            status: addressChange.status,
+            newAddress: addressChange.new_address_snapshot,
+            adminNotes: addressChange.admin_notes || null,
+            createdAt: addressChange.created_at,
+            reviewedAt: addressChange.reviewed_at || null,
+          }
+        : null,
     }
 
     return NextResponse.json({ order: orderDetails })
@@ -263,10 +300,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
@@ -287,14 +321,18 @@ export async function PATCH(
         return NextResponse.json({ error: 'Only a super admin can override the order status' }, { status: 403 })
       }
       if (!overrideReason) {
-        return NextResponse.json({ error: 'override_reason is required when overriding (10-500 characters)' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'override_reason is required when overriding (10-500 characters)' },
+          { status: 400 }
+        )
       }
       if (status && !ALL_ORDER_STATUSES.includes(status)) {
         return NextResponse.json({ error: `Unknown order status: ${status}` }, { status: 400 })
       }
     }
 
-    const currentOrder = await queryOne(`
+    const currentOrder = await queryOne(
+      `
       SELECT
         o.order_number, o.status, o.payment_status, o.total_amount,
         o.user_id, o.customer_name, o.customer_email,
@@ -302,33 +340,38 @@ export async function PATCH(
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     if (!currentOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
     const VALID_TRANSITIONS: Record<string, string[]> = {
-      pending:          ['confirmed', 'cancel_requested', 'cancelled'],
-      confirmed:        ['processing', 'cancel_requested', 'cancelled'],
-      processing:       ['shipped', 'cancel_requested'],
-      shipped:          ['out_for_delivery', 'delivered'],
+      pending: ['confirmed', 'cancel_requested', 'cancelled'],
+      confirmed: ['processing', 'cancel_requested', 'cancelled'],
+      processing: ['shipped', 'cancel_requested'],
+      shipped: ['out_for_delivery', 'delivered'],
       out_for_delivery: ['delivered'],
-      delivered:        ['return_requested'],
+      delivered: ['return_requested'],
       cancel_requested: ['cancelled', 'cancel_rejected'],
-      cancel_rejected:  [],
-      cancelled:        [],
+      cancel_rejected: [],
+      cancelled: [],
       return_requested: ['return_approved', 'return_rejected'],
-      return_approved:  ['return_received'],
-      return_received:  ['returned'],
-      return_rejected:  [],
-      returned:         [],
+      return_approved: ['return_received'],
+      return_received: ['returned'],
+      return_rejected: [],
+      returned: [],
     }
 
     const TERMINAL_STATUSES = ['cancelled', 'cancel_rejected', 'return_rejected', 'returned']
 
     if (!wantsOverride && TERMINAL_STATUSES.includes(currentOrder.status)) {
-      return NextResponse.json({ error: `Orders with status '${currentOrder.status}' cannot be modified` }, { status: 400 })
+      return NextResponse.json(
+        { error: `Orders with status '${currentOrder.status}' cannot be modified` },
+        { status: 400 }
+      )
     }
 
     const validPaymentStatuses = ['pending', 'unpaid', 'paid', 'failed', 'refunded', 'cod_pending', 'cod_collected']
@@ -348,15 +391,21 @@ export async function PATCH(
     }
 
     if (!wantsOverride && currentOrder.payment_status === 'paid' && payment_status === 'pending') {
-      return NextResponse.json({ error: 'Paid orders cannot revert to pending. Use refunded instead.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Paid orders cannot revert to pending. Use refunded instead.' },
+        { status: 400 }
+      )
     }
 
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
 
-    if (!wantsOverride && statusChanged && status === 'processing' && await hasPendingAddressChange(orderId)) {
+    if (!wantsOverride && statusChanged && status === 'processing' && (await hasPendingAddressChange(orderId))) {
       return NextResponse.json(
-        { error: 'The customer has a pending delivery address change request on this order. Approve or reject it before moving the order to processing.' },
+        {
+          error:
+            'The customer has a pending delivery address change request on this order. Approve or reject it before moving the order to processing.',
+        },
         { status: 409 }
       )
     }
@@ -388,19 +437,17 @@ export async function PATCH(
            LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
           [item.buy_unit, item.product_id, item.variant_id || null]
         )
-        const baseQty = (unitRow?.dimension === 'count' && unitRow?.factor)
-          ? rawQty * parseFloat(unitRow.factor)
-          : rawQty
+        const baseQty = unitRow?.dimension === 'count' && unitRow?.factor ? rawQty * parseFloat(unitRow.factor) : rawQty
         const stock = Number(item.inventory_quantity) || 0
         if (stock < baseQty) {
-          insufficient.push(
-            `${productLabel(item)} (available: ${stock}, required: ${baseQty})`
-          )
+          insufficient.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
         }
       }
       if (insufficient.length > 0) {
         return NextResponse.json(
-          { error: `Insufficient stock for: ${insufficient.join('; ')}. Update inventory before marking as processing.` },
+          {
+            error: `Insufficient stock for: ${insufficient.join('; ')}. Update inventory before marking as processing.`,
+          },
           { status: 400 }
         )
       }
@@ -432,10 +479,7 @@ export async function PATCH(
 
     values.push(orderId)
 
-    await query(
-      `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
-      values
-    )
+    await query(`UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`, values)
 
     // An override skips the transition rules, so it must leave a trail that says who did it
     // and why — otherwise the order history shows a jump no state machine could produce.
@@ -450,7 +494,11 @@ export async function PATCH(
         action: 'update',
         entityType: 'order',
         entityId: orderId,
-        summary: `Status override on ${currentOrder.order_number}: ${Object.entries(diff).map(([k, v]) => `${k} ${v.from} → ${v.to}`).join(', ') || 'no field change'}`,
+        summary: `Status override on ${currentOrder.order_number}: ${
+          Object.entries(diff)
+            .map(([k, v]) => `${k} ${v.from} → ${v.to}`)
+            .join(', ') || 'no field change'
+        }`,
         diff,
         metadata: { override: true, reason: overrideReason, role: admin.role },
         request,
@@ -559,7 +607,7 @@ export async function PATCH(
       // perishable items are NOT double-deducted). Admin batch/serial picker
       // selections are respected; requireSerialAssignments preserves the picker
       // contract for serialized items. Idempotent on re-transition.
-      await withTransaction(async (client) => {
+      await withTransaction(async client => {
         // Skip deduction on Basic (flag off) — no inventory module, nothing to deduct.
         if (inventoryValidationEnabled) {
           await deductOrderStock(
@@ -586,13 +634,21 @@ export async function PATCH(
       const effectivePaymentStatus = payment_status || currentOrder.payment_status
 
       if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
-        try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
+        try {
+          invoicePdfBuffer = await generateOrderInvoice(orderId)
+        } catch {}
       }
 
       const effectiveStatus = status || currentOrder.status
-      if (paymentStatusChanged && payment_status === 'paid' && (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')) {
+      if (
+        paymentStatusChanged &&
+        payment_status === 'paid' &&
+        (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')
+      ) {
         if (!invoicePdfBuffer) {
-          try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
+          try {
+            invoicePdfBuffer = await generateOrderInvoice(orderId)
+          } catch {}
         }
       }
 
@@ -601,7 +657,10 @@ export async function PATCH(
       const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
 
       if (statusChanged && status === 'cancelled') {
-        const orderWithAwb = await queryOne<{ awb_number: string | null }>('SELECT awb_number FROM orders WHERE id = $1', [orderId])
+        const orderWithAwb = await queryOne<{ awb_number: string | null }>(
+          'SELECT awb_number FROM orders WHERE id = $1',
+          [orderId]
+        )
         if (orderWithAwb?.awb_number) {
           await cancelDelhiveryShipment(orderWithAwb.awb_number).catch(() => {})
         }
@@ -610,8 +669,13 @@ export async function PATCH(
       if (userEmail && userName) {
         if (statusChanged) {
           await sendOrderStatusUpdate(
-            userEmail, userName, currentOrder.order_number, orderId, status,
-            currentOrder.status, invoicePdfBuffer
+            userEmail,
+            userName,
+            currentOrder.order_number,
+            orderId,
+            status,
+            currentOrder.status,
+            invoicePdfBuffer
           ).catch(() => {})
           // SMS / WhatsApp per customer preference — covers all status transitions
           const uid = currentOrder.user_id
@@ -619,7 +683,9 @@ export async function PATCH(
           if (status === 'confirmed' || status === 'processing') {
             notifyOrderConfirmed(uid, on, parseFloat(currentOrder.total_amount)).catch(() => {})
           } else if (status === 'shipped') {
-            const awb = await queryOne<{ awb_number: string | null }>('SELECT awb_number FROM orders WHERE id = $1', [orderId])
+            const awb = await queryOne<{ awb_number: string | null }>('SELECT awb_number FROM orders WHERE id = $1', [
+              orderId,
+            ])
             notifyOrderShipped(uid, on, 'Delhivery', awb?.awb_number || null).catch(() => {})
           } else if (status === 'out_for_delivery') {
             notifyOutForDelivery(uid, on).catch(() => {})
@@ -631,8 +697,12 @@ export async function PATCH(
         }
         if (paymentStatusChanged) {
           await sendPaymentStatusUpdate(
-            userEmail, userName, currentOrder.order_number, orderId,
-            payment_status, parseFloat(currentOrder.total_amount)
+            userEmail,
+            userName,
+            currentOrder.order_number,
+            orderId,
+            payment_status,
+            parseFloat(currentOrder.total_amount)
           ).catch(() => {})
           if (payment_status === 'failed') {
             notifyPaymentFailed(currentOrder.user_id, currentOrder.order_number).catch(() => {})
@@ -644,17 +714,11 @@ export async function PATCH(
     notify().catch(() => {})
     return response
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Failed to update order' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Failed to update order' }, { status: 500 })
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
@@ -679,15 +743,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    if (
-      order.status !== 'pending' ||
-      order.payment_status !== 'unpaid' ||
-      order.committed_payment_count > 0
-    ) {
-      return NextResponse.json(
-        { error: 'Order cannot be deleted in its current state' },
-        { status: 400 }
-      )
+    if (order.status !== 'pending' || order.payment_status !== 'unpaid' || order.committed_payment_count > 0) {
+      return NextResponse.json({ error: 'Order cannot be deleted in its current state' }, { status: 400 })
     }
 
     const orderItems = await queryMany<{
@@ -706,14 +763,33 @@ export async function DELETE(
     for (const item of orderItems) {
       const existing = await queryOne<{ id: string }>(
         `SELECT id FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4 AND buy_mode = $5`,
-        [authUser.userId, item.product_id, item.variant_id || null, item.sub_variant_id || null, item.buy_mode || 'unit']
+        [
+          authUser.userId,
+          item.product_id,
+          item.variant_id || null,
+          item.sub_variant_id || null,
+          item.buy_mode || 'unit',
+        ]
       )
       if (existing) {
-        await query(`UPDATE cart_items SET quantity = $1, price_at_addition = $2, updated_at = NOW() WHERE id = $3`, [item.quantity, item.unit_price, existing.id])
+        await query(`UPDATE cart_items SET quantity = $1, price_at_addition = $2, updated_at = NOW() WHERE id = $3`, [
+          item.quantity,
+          item.unit_price,
+          existing.id,
+        ])
       } else {
         await query(
           `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [authUser.userId, item.product_id, item.variant_id || null, item.sub_variant_id || null, item.quantity, item.unit_price, item.buy_mode || 'unit', item.buy_unit || null]
+          [
+            authUser.userId,
+            item.product_id,
+            item.variant_id || null,
+            item.sub_variant_id || null,
+            item.quantity,
+            item.unit_price,
+            item.buy_mode || 'unit',
+            item.buy_unit || null,
+          ]
         )
       }
     }
@@ -722,6 +798,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, deleted: true })
   } catch (err) {
-return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
   }
 }

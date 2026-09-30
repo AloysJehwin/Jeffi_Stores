@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'from and to date params required (YYYY-MM-DD)' }, { status: 400 })
     }
 
-    const outward = await queryOne(`
+    const outward = await queryOne(
+      `
       SELECT
         SUM(o.taxable_amount)::numeric AS total_taxable,
         SUM(o.cgst_amount)::numeric    AS total_cgst,
@@ -36,9 +37,12 @@ export async function GET(request: NextRequest) {
         AND o.invoice_date < ($2::date + interval '1 day')
         AND o.invoice_number IS NOT NULL
         AND o.payment_status = 'paid'
-    `, [from, to])
+    `,
+      [from, to]
+    )
 
-    const byRate = await queryMany(`
+    const byRate = await queryMany(
+      `
       SELECT
         oi.gst_rate,
         o.is_igst,
@@ -54,16 +58,16 @@ export async function GET(request: NextRequest) {
         AND o.payment_status = 'paid'
       GROUP BY oi.gst_rate, o.is_igst
       ORDER BY oi.gst_rate
-    `, [from, to])
+    `,
+      [from, to]
+    )
 
     const totalCgst = parseFloat(outward?.total_cgst || '0')
     const totalSgst = parseFloat(outward?.total_sgst || '0')
     const totalIgst = parseFloat(outward?.total_igst || '0')
     const totalTax = totalCgst + totalSgst + totalIgst
 
-    const settingsRows = await queryMany(
-      "SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", []
-    )
+    const settingsRows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
     const s: Record<string, string> = {}
     for (const row of settingsRows) s[row.key] = row.value || ''
 
@@ -104,9 +108,36 @@ export async function GET(request: NextRequest) {
       },
       table6: {
         label: '6. Payment of Tax',
-        igst: { tax: totalIgst, interestLate: 0, other: 0, tds: 0, itcIgst: 0, itcCgst: 0, itcSgst: 0, cashPaid: totalIgst },
-        cgst: { tax: totalCgst, interestLate: 0, other: 0, tds: 0, itcIgst: 0, itcCgst: 0, itcSgst: 0, cashPaid: totalCgst },
-        sgst: { tax: totalSgst, interestLate: 0, other: 0, tds: 0, itcIgst: 0, itcCgst: 0, itcSgst: 0, cashPaid: totalSgst },
+        igst: {
+          tax: totalIgst,
+          interestLate: 0,
+          other: 0,
+          tds: 0,
+          itcIgst: 0,
+          itcCgst: 0,
+          itcSgst: 0,
+          cashPaid: totalIgst,
+        },
+        cgst: {
+          tax: totalCgst,
+          interestLate: 0,
+          other: 0,
+          tds: 0,
+          itcIgst: 0,
+          itcCgst: 0,
+          itcSgst: 0,
+          cashPaid: totalCgst,
+        },
+        sgst: {
+          tax: totalSgst,
+          interestLate: 0,
+          other: 0,
+          tds: 0,
+          itcIgst: 0,
+          itcCgst: 0,
+          itcSgst: 0,
+          cashPaid: totalSgst,
+        },
         cess: { tax: 0, interestLate: 0, other: 0, tds: 0, itcIgst: 0, itcCgst: 0, itcSgst: 0, cashPaid: 0 },
       },
       summary: {

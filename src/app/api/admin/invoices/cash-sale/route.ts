@@ -41,12 +41,21 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 
-    const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(body?.batch_assignments) ? body.batch_assignments : []
-    const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(body?.serial_assignments) ? body.serial_assignments : []
+    const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(
+      body?.batch_assignments
+    )
+      ? body.batch_assignments
+      : []
+    const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(
+      body?.serial_assignments
+    )
+      ? body.serial_assignments
+      : []
 
     const parsed = parseBody(cashSaleSchema, body, 'POST /api/admin/invoices/cash-sale')
     if (!parsed.ok) return parsed.response
@@ -76,8 +85,11 @@ export async function POST(request: NextRequest) {
            AND (inp.variant_id IS NULL OR puv.id IS NULL)`,
         itemsWithUnits.flatMap((i: any) => [i.product_id, i.variant_id || null, i.buy_unit])
       )
-      for (const r of (unitRows || [])) {
-        unitFactorMap.set(`${r.product_id}:${r.variant_id ?? ''}:${r.buy_unit}`, { factor: parseFloat(r.factor) || 1, dimension: r.dimension })
+      for (const r of unitRows || []) {
+        unitFactorMap.set(`${r.product_id}:${r.variant_id ?? ''}:${r.buy_unit}`, {
+          factor: parseFloat(r.factor) || 1,
+          dimension: r.dimension,
+        })
       }
     }
 
@@ -97,7 +109,7 @@ export async function POST(request: NextRequest) {
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
       const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
-      const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1) ? rawQty * unitInfo.factor : rawQty
+      const effectiveQty = unitInfo?.dimension === 'count' && unitInfo.factor > 1 ? rawQty * unitInfo.factor : rawQty
 
       if (!gstEnabled) {
         // Strip GST out of the entered incl price, apply discount, no tax added.
@@ -170,7 +182,7 @@ export async function POST(request: NextRequest) {
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     const totalAmount = round2(subtotal)
 
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       const ts = Date.now()
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const saleNumber = `CS-${ts}-${rand}`
@@ -204,9 +216,14 @@ export async function POST(request: NextRequest) {
           $13
         ) RETURNING id, sale_number`,
         [
-          saleNumber, invoiceNumber, fy, seq,
+          saleNumber,
+          invoiceNumber,
+          fy,
+          seq,
           paymentMode,
-          subtotal, taxAmount, totalAmount,
+          subtotal,
+          taxAmount,
+          totalAmount,
           round2(totalTaxable),
           round2(totalCgst),
           round2(totalSgst),
@@ -231,12 +248,27 @@ export async function POST(request: NextRequest) {
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
           [
-            saleId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null,
-            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
-            item.unit_price, item.discount_amount,
-            item.tax_amount, item.total_price, item.taxable_amount,
-            item.cgst_amount, item.sgst_amount, item.igst_amount,
+            saleId,
+            item.product_id,
+            item.product_name,
+            item.product_sku,
+            item.variant_id,
+            item.sub_variant_id,
+            item.variant_name,
+            item.sub_variant_name ?? null,
+            item.hsn_code,
+            item.gst_rate,
+            item.quantity,
+            item.buy_unit || null,
+            item.buy_mode || 'unit',
+            item.unit_price,
+            item.discount_amount,
+            item.tax_amount,
+            item.total_price,
+            item.taxable_amount,
+            item.cgst_amount,
+            item.sgst_amount,
+            item.igst_amount,
           ]
         )
       }

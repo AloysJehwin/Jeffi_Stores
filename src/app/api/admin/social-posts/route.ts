@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid scheduledAt' }, { status: 400 })
   }
 
-  const imageUrls = Array.isArray(body.imageUrls) ? body.imageUrls.filter((u: unknown) => typeof u === 'string' && u) : null
+  const imageUrls = Array.isArray(body.imageUrls)
+    ? body.imageUrls.filter((u: unknown) => typeof u === 'string' && u)
+    : null
 
   const post = await enqueueSocialPost({
     tenantId: await resolveTenantId(),

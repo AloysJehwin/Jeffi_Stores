@@ -16,7 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const user = await authenticateUser(req)
     userId = user?.userId || null
-  } catch (err) { console.error("[route]", err) }
+  } catch (err) {
+    console.error('[route]', err)
+  }
 
   try {
     await query(
@@ -24,7 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
        VALUES ($1, $2, $3, $4::inet, $5)`,
       [productId, userId, sessionId, ip, userAgent]
     )
-  } catch (err) { console.error("[route]", err) }
+  } catch (err) {
+    console.error('[route]', err)
+  }
 
   if (userId) {
     try {
@@ -47,7 +51,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           }).catch(() => {})
         }
       }
-    } catch (err) { console.error("[route]", err) }
+    } catch (err) {
+      console.error('[route]', err)
+    }
   }
 
   return NextResponse.json({ ok: true })
