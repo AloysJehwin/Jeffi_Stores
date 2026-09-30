@@ -9,6 +9,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import QuickAddButton from '@/components/visitor/QuickAddButton'
 
 interface ProductCardProps {
   id: string
@@ -237,6 +238,13 @@ export default function ProductCard({
                 {name}
               </h3>
               <div className="flex-shrink-0 flex items-center gap-1.5 mt-0.5">
+                <QuickAddButton
+                  productId={id}
+                  productName={name}
+                  slug={slug}
+                  hasVariants={hasVariants}
+                  inStock={effectiveStock > 0}
+                />
                 <button
                   onClick={handleWishlist}
                   disabled={wishlistLoading}

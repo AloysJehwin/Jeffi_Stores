@@ -435,8 +435,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/ProductCard.tsx": {
-    "mtime": 1790768885.1327474,
-    "ast_hash": "3da29cf682c0fdb764e489dcb3b1600e",
+    "mtime": 1790781508.862803,
+    "ast_hash": "6423440c5baa1af13afd9a255280375d",
     "semantic_hash": ""
   },
   "src/components/visitor/ProductDetailClient.tsx": {
@@ -8390,8 +8390,8 @@
     "semantic_hash": ""
   },
   "src/app/(marketing)/page.tsx": {
-    "mtime": 1790768884.861154,
-    "ast_hash": "ce049f2ca144cf48df7b0f182e58e5e5",
+    "mtime": 1790781216.88762,
+    "ast_hash": "e0efd6e13417e5e1dcb45014861365ba",
     "semantic_hash": ""
   },
   "src/app/(marketing)/return-policy/loading.tsx": {
@@ -8555,8 +8555,8 @@
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/orders/confirmation/page.tsx": {
-    "mtime": 1790757441.4071848,
-    "ast_hash": "bcb479a195f2caf1782e867ae1c7177c",
+    "mtime": 1790780994.1976278,
+    "ast_hash": "60ffa164008085517c0853f0bac66c70",
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/orders/loading.tsx": {
@@ -12272,6 +12272,21 @@
   ".claude/plans/milestone-2-admin-storefront-ux.md": {
     "mtime": 1790776385.5520473,
     "ast_hash": "5f5477d74e125defb1004dac37b1f2ac",
+    "semantic_hash": ""
+  },
+  "src/app/(storefront)/account/orders/confirmation/OrderCelebration.tsx": {
+    "mtime": 1790780983.242004,
+    "ast_hash": "3668872f4b722bde22a1fe4b3571e662",
+    "semantic_hash": ""
+  },
+  "src/components/visitor/QuickAddButton.tsx": {
+    "mtime": 1790781498.0392883,
+    "ast_hash": "9185ea41efc579dd8baa3b103a287f27",
+    "semantic_hash": ""
+  },
+  "src/components/visitor/home/Reveal.tsx": {
+    "mtime": 1790781184.5475872,
+    "ast_hash": "1a8f4d00e5e5232c56f78b3400cf9611",
     "semantic_hash": ""
   }
 }
