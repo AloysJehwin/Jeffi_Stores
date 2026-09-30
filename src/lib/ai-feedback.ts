@@ -4,11 +4,7 @@ const ATTRIBUTION_WINDOW_HOURS = 24
 
 type ImplicitSignal = 'clicked' | 'added_to_cart' | 'purchased'
 
-export async function recordImplicitSignal(
-  userId: string,
-  productId: string,
-  signal: ImplicitSignal
-): Promise<void> {
+export async function recordImplicitSignal(userId: string, productId: string, signal: ImplicitSignal): Promise<void> {
   if (!userId || !productId) return
   try {
     const matches = await queryMany<{ id: string }>(

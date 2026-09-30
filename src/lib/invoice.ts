@@ -1,6 +1,19 @@
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST, round2 } from '@/lib/gst'
-import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
+import {
+  getFinancialYear,
+  generateInvoiceNumber,
+  getNextInvoiceSequence,
+  isInterState,
+  calculateGST,
+  round2,
+} from '@/lib/gst'
+import {
+  generateInvoicePDF,
+  InvoiceBusinessSettings,
+  InvoiceOrder,
+  InvoiceOrderItem,
+  InvoiceBuyerAddress,
+} from '@/lib/invoice-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
 import { getFeatureFlags } from '@/lib/site-controls'
 
@@ -12,10 +25,7 @@ import { getFeatureFlags } from '@/lib/site-controls'
 export async function createDraftInvoice(orderId: string): Promise<void> {
   const existing = await queryOne('SELECT id FROM invoices WHERE order_id = $1', [orderId])
   if (existing) return
-  await queryOne(
-    `INSERT INTO invoices (order_id, status) VALUES ($1, 'draft') RETURNING id`,
-    [orderId]
-  )
+  await queryOne(`INSERT INTO invoices (order_id, status) VALUES ($1, 'draft') RETURNING id`, [orderId])
 }
 
 /**
@@ -34,10 +44,7 @@ export async function assignInvoiceNumber(
   client: { query: (sql: string, params?: any[]) => Promise<any> },
   orderId: string
 ): Promise<string | null> {
-  const ord = await client.query(
-    `SELECT invoice_number, source FROM orders WHERE id = $1 FOR UPDATE`,
-    [orderId]
-  )
+  const ord = await client.query(`SELECT invoice_number, source FROM orders WHERE id = $1 FOR UPDATE`, [orderId])
   const row = ord.rows[0]
   if (!row) return null
   if (row.invoice_number) return row.invoice_number // already numbered — idempotent
@@ -51,10 +58,11 @@ export async function assignInvoiceNumber(
   const invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
   const invoiceDate = new Date().toISOString()
 
-  await client.query(
-    `UPDATE orders SET invoice_number = $1, invoice_date = $2, updated_at = NOW() WHERE id = $3`,
-    [invoiceNumber, invoiceDate, orderId]
-  )
+  await client.query(`UPDATE orders SET invoice_number = $1, invoice_date = $2, updated_at = NOW() WHERE id = $3`, [
+    invoiceNumber,
+    invoiceDate,
+    orderId,
+  ])
 
   if (isOnlineOrder) {
     // Flip the draft row (created at order placement) to finalized.
@@ -82,18 +90,20 @@ export async function assignInvoiceNumber(
 export async function generateOrderInvoice(orderId: string): Promise<Buffer | null> {
   const gstEnabled = (await getFeatureFlags()).gstEnabled
 
-  const existingInvoice = await queryOne(
-    `SELECT id FROM invoices WHERE order_id = $1 AND status = 'finalized'`,
-    [orderId]
-  )
+  const existingInvoice = await queryOne(`SELECT id FROM invoices WHERE order_id = $1 AND status = 'finalized'`, [
+    orderId,
+  ])
   if (existingInvoice) return null
 
-  const order = await queryOne(`
+  const order = await queryOne(
+    `
     SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
     FROM orders o
     LEFT JOIN addresses a ON o.shipping_address_id = a.id
     WHERE o.id = $1
-  `, [orderId])
+  `,
+    [orderId]
+  )
 
   if (!order) return null
 
@@ -103,17 +113,12 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
 
   if (order.status === 'pending' || order.status === 'cancelled') return null
 
-  const orderItems = await queryMany(
-    'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-    [orderId]
-  )
+  const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
 
-  const invoiceData = await withTransaction(async (client) => {
+  const invoiceData = await withTransaction(async client => {
     const now = new Date()
     const fy = getFinancialYear(now)
-    const settingsResult = await client.query(
-      "SELECT value FROM site_settings WHERE key = 'invoice_prefix'"
-    )
+    const settingsResult = await client.query("SELECT value FROM site_settings WHERE key = 'invoice_prefix'")
     const prefix = settingsResult.rows[0]?.value || 'JS'
     const seq = await getNextInvoiceSequence(client, fy)
     const invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
@@ -126,16 +131,17 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     let orderIsIgst = order.is_igst || false
 
     if (gstEnabled && taxableAmount === 0 && parseFloat(order.tax_amount || '0') > 0) {
-      const stateCodeResult = await client.query(
-        "SELECT value FROM site_settings WHERE key = 'business_state_code'"
-      )
+      const stateCodeResult = await client.query("SELECT value FROM site_settings WHERE key = 'business_state_code'")
       const sellerStateCode = stateCodeResult.rows[0]?.value || process.env.BUSINESS_STATE_CODE || '22'
       const buyerState = order.state || ''
       orderIsIgst = isInterState(buyerState, sellerStateCode)
 
-      let totalTaxable = 0, totalCgst = 0, totalSgst = 0, totalIgst = 0
+      let totalTaxable = 0,
+        totalCgst = 0,
+        totalSgst = 0,
+        totalIgst = 0
 
-      for (const item of (orderItems || [])) {
+      for (const item of orderItems || []) {
         const gstRate = parseFloat(item.gst_rate || item.gst_percentage || '18')
         const itemTotal = parseFloat(item.total_price)
         const gst = calculateGST(itemTotal, gstRate, orderIsIgst)
@@ -188,7 +194,13 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     )
 
     return {
-      invoiceNumber, invoiceDate, taxableAmount, cgstAmount, sgstAmount, igstAmount, isIgst: orderIsIgst
+      invoiceNumber,
+      invoiceDate,
+      taxableAmount,
+      cgstAmount,
+      sgstAmount,
+      igstAmount,
+      isIgst: orderIsIgst,
     }
   })
 
@@ -197,7 +209,7 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     []
   )
   const settings: Record<string, string> = {}
-  for (const row of (settingsRows || [])) {
+  for (const row of settingsRows || []) {
     settings[row.key] = row.value || ''
   }
 
@@ -216,10 +228,7 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     bankBranch: settings.bank_branch || '',
   }
 
-  const updatedItems = await queryMany(
-    'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-    [orderId]
-  )
+  const updatedItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
 
   const paymentRecord = await queryOne(
     `SELECT transaction_id FROM payments WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
@@ -309,20 +318,27 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
   // Tax-free (Bill of Supply) is a property of the ORDER, not the current global
   // flag: an order placed while GST was off carries zero tax and must always
   // render tax-free, even if GST is later re-enabled.
-  const invoiceIsTaxFree = invoiceData.cgstAmount === 0
-    && invoiceData.sgstAmount === 0
-    && invoiceData.igstAmount === 0
-    && parseFloat(order.tax_amount || '0') === 0
+  const invoiceIsTaxFree =
+    invoiceData.cgstAmount === 0 &&
+    invoiceData.sgstAmount === 0 &&
+    invoiceData.igstAmount === 0 &&
+    parseFloat(order.tax_amount || '0') === 0
 
-  const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, false, undefined, invoiceIsTaxFree)
+  const pdfBuffer = await generateInvoicePDF(
+    invoiceOrder,
+    invoiceItems,
+    business,
+    buyerAddress,
+    billingAddress,
+    false,
+    undefined,
+    invoiceIsTaxFree
+  )
 
   const fy = getFinancialYear(new Date(invoiceData.invoiceDate))
   const s3Url = await uploadInvoicePDF(pdfBuffer, invoiceData.invoiceNumber, fy)
 
-  await queryOne(
-    'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2 RETURNING id',
-    [s3Url, orderId]
-  )
+  await queryOne('UPDATE invoices SET pdf_url = $1 WHERE order_id = $2 RETURNING id', [s3Url, orderId])
 
   return pdfBuffer
 }

@@ -39,17 +39,31 @@ function escapeControlCharsInStrings(s: string): string {
     const ch = s[i]
     const code = s.charCodeAt(i)
     if (inStr) {
-      if (escaped) { out += ch; escaped = false; continue }
-      if (ch === '\\') { out += ch; escaped = true; continue }
-      if (ch === '"') { out += ch; inStr = false; continue }
+      if (escaped) {
+        out += ch
+        escaped = false
+        continue
+      }
+      if (ch === '\\') {
+        out += ch
+        escaped = true
+        continue
+      }
+      if (ch === '"') {
+        out += ch
+        inStr = false
+        continue
+      }
       if (code < 0x20) {
-        out += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t'
-          : '\\u' + code.toString(16).padStart(4, '0')
+        out +=
+          ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t' : '\\u' + code.toString(16).padStart(4, '0')
         continue
       }
       out += ch
     } else {
-      if (ch === '"') { inStr = true }
+      if (ch === '"') {
+        inStr = true
+      }
       out += ch
     }
   }

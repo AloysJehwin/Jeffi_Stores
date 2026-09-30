@@ -33,14 +33,19 @@ function num(v: unknown, fallback = 0): number {
  * Normalize a raw product_units row (string numerics from pg) into a SellingUnit.
  * Returns null when there is no unit row (product sold as plain integer units).
  */
-export function toSellingUnit(row: {
-  unit?: string | null
-  factor?: unknown
-  dimension?: string | null
-  qty_step?: unknown
-  min_qty?: unknown
-  max_qty?: unknown
-} | null | undefined): SellingUnit | null {
+export function toSellingUnit(
+  row:
+    | {
+        unit?: string | null
+        factor?: unknown
+        dimension?: string | null
+        qty_step?: unknown
+        min_qty?: unknown
+        max_qty?: unknown
+      }
+    | null
+    | undefined
+): SellingUnit | null {
   if (!row || !row.unit) return null
   return {
     unit: row.unit,
@@ -305,10 +310,7 @@ export async function assertUnitChangeAllowed(
   const touchesMeaning = !!(changing.factor || changing.dimension || changing.qtyStep || changing.remove)
   if (!touchesMeaning) return null
 
-  const flags = await runner.query(
-    `SELECT perishable, serialized FROM products WHERE id = $1`,
-    [scope.productId]
-  )
+  const flags = await runner.query(`SELECT perishable, serialized FROM products WHERE id = $1`, [scope.productId])
   const perishable = !!flags.rows[0]?.perishable
   const serialized = !!flags.rows[0]?.serialized
   if (!perishable && !serialized) return null
@@ -329,9 +331,11 @@ export async function assertUnitChangeAllowed(
     const n = Number(serials.rows[0]?.n ?? 0)
     if (n > 0) {
       const action = changing.remove ? 'remove the selling unit' : 'change the selling unit'
-      return `Cannot ${action} for ${what} — ${n} serial number${n === 1 ? ' is' : 's are'} in stock. ` +
+      return (
+        `Cannot ${action} for ${what} — ${n} serial number${n === 1 ? ' is' : 's are'} in stock. ` +
         `Each serial was recorded against the current unit, so the mapping cannot be recalculated. ` +
         `Sell or remove the serials first.`
+      )
     }
   }
 
@@ -346,9 +350,11 @@ export async function assertUnitChangeAllowed(
     )
     const n = Number(batches.rows[0]?.n ?? 0)
     if (n > 0) {
-      return `Cannot change the unit dimension for ${what} — ${n} batch${n === 1 ? '' : 'es'} still hold stock. ` +
+      return (
+        `Cannot change the unit dimension for ${what} — ${n} batch${n === 1 ? '' : 'es'} still hold stock. ` +
         `Dimension decides whether the factor applies, so changing it would reinterpret every existing lot. ` +
         `Consume or remove those batches first.`
+      )
     }
   }
 
@@ -372,7 +378,9 @@ export async function assertUnitChangeAllowed(
 
 /** 4-char prefix from a SKU — letters/digits only, padded so width is constant. */
 export function idPrefix(sku?: string | null): string {
-  const clean = String(sku ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const clean = String(sku ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
   if (!clean) return 'GEN0'
   return (clean.slice(0, 4) + '0000').slice(0, 4)
 }
@@ -417,7 +425,5 @@ export function generateLotNumber(sku?: string | null, at: Date = new Date()): s
 export function generateSerialRun(sku: string | null | undefined, count: number): string[] {
   const at = new Date()
   const offset = Math.floor(Math.random() * 46656)
-  return Array.from({ length: Math.max(0, count) }, (_, i) =>
-    generateSerialNumber(sku, (offset + i) % 46656, at)
-  )
+  return Array.from({ length: Math.max(0, count) }, (_, i) => generateSerialNumber(sku, (offset + i) % 46656, at))
 }

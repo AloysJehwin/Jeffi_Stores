@@ -1,5 +1,12 @@
 import type { AnalyticsRange } from './queries'
-import { CRM_SEGMENT_KEYS, CRM_RANGES, isCrmSegment, isCrmRange, type CrmSegment, type CrmSegmentKey } from './crm-insights-shared'
+import {
+  CRM_SEGMENT_KEYS,
+  CRM_RANGES,
+  isCrmSegment,
+  isCrmRange,
+  type CrmSegment,
+  type CrmSegmentKey,
+} from './crm-insights-shared'
 
 export { CRM_SEGMENT_KEYS, CRM_RANGES, isCrmSegment, isCrmRange }
 export type { CrmSegment, CrmSegmentKey }
@@ -11,7 +18,8 @@ export const SEGMENT_PREDICATES: Record<CrmSegmentKey, string> = {
   repeat: 'order_count >= 3',
   one_time: 'order_count = 1',
   new: "created_at >= NOW() - INTERVAL '30 days'",
-  at_risk: "last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '90 days' AND last_order_at >= NOW() - INTERVAL '180 days'",
+  at_risk:
+    "last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '90 days' AND last_order_at >= NOW() - INTERVAL '180 days'",
   dormant: "last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '180 days'",
   b2b: 'is_b2b',
   lead: 'order_count = 0',
@@ -36,16 +44,26 @@ export const CUSTOMER_AGG_CTE = `agg AS (
    WHERE u.is_guest = false
 )`
 
-export interface CrmWindow { startExpr: string; days: number; label: string }
+export interface CrmWindow {
+  startExpr: string
+  days: number
+  label: string
+}
 
 export function crmWindow(range: AnalyticsRange): CrmWindow {
   switch (range) {
-    case 'today': return { startExpr: "date_trunc('day', NOW())", days: 1, label: 'Today' }
-    case '7d': return { startExpr: "NOW() - INTERVAL '7 days'", days: 7, label: 'Last 7 days' }
-    case '90d': return { startExpr: "NOW() - INTERVAL '90 days'", days: 90, label: 'Last 90 days' }
-    case 'month': return { startExpr: "date_trunc('month', NOW())", days: Math.max(1, new Date().getDate()), label: 'This month' }
-    case 'year': return { startExpr: "NOW() - INTERVAL '1 year'", days: 365, label: 'Last 12 months' }
-    default: return { startExpr: "NOW() - INTERVAL '30 days'", days: 30, label: 'Last 30 days' }
+    case 'today':
+      return { startExpr: "date_trunc('day', NOW())", days: 1, label: 'Today' }
+    case '7d':
+      return { startExpr: "NOW() - INTERVAL '7 days'", days: 7, label: 'Last 7 days' }
+    case '90d':
+      return { startExpr: "NOW() - INTERVAL '90 days'", days: 90, label: 'Last 90 days' }
+    case 'month':
+      return { startExpr: "date_trunc('month', NOW())", days: Math.max(1, new Date().getDate()), label: 'This month' }
+    case 'year':
+      return { startExpr: "NOW() - INTERVAL '1 year'", days: 365, label: 'Last 12 months' }
+    default:
+      return { startExpr: "NOW() - INTERVAL '30 days'", days: 30, label: 'Last 30 days' }
   }
 }
 
@@ -299,7 +317,8 @@ SELECT to_char(g.wk, 'YYYY-MM-DD') AS week, COUNT(cn.id) AS n
  GROUP BY g.wk ORDER BY g.wk
 `
 
-export const OPEN_QUOTE = "q.converted_order_id IS NULL AND COALESCE(q.status, '') NOT IN ('rejected', 'expired', 'cancelled', 'converted')"
+export const OPEN_QUOTE =
+  "q.converted_order_id IS NULL AND COALESCE(q.status, '') NOT IN ('rejected', 'expired', 'cancelled', 'converted')"
 
 export const b2bSql = (w: CrmWindow) => `
 SELECT

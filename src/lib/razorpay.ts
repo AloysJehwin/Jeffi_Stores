@@ -17,9 +17,7 @@ export function getRazorpayInstance() {
  * the instance so callers can surface `key_id` to the browser checkout and branch on `isOwn`.
  * The env-only `getRazorpayInstance()` stays for platform-account Route-lifecycle operations
  * (linked-account create/update/settlement) that must never run on a tenant's keys. */
-export async function getRazorpayInstanceFor(
-  tenantId?: string,
-): Promise<{ instance: Razorpay; creds: RazorpayCreds }> {
+export async function getRazorpayInstanceFor(tenantId?: string): Promise<{ instance: Razorpay; creds: RazorpayCreds }> {
   const creds = await resolveRazorpayCreds(tenantId)
   if (!creds.key_id || !creds.key_secret) {
     throw new Error('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set')

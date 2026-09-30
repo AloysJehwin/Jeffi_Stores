@@ -2,27 +2,78 @@ import type { AnalyticsRange } from './queries'
 import { queryOne, queryMany } from './db'
 import {
   crmWindow,
-  growthSql, cohortSql, economicsSql, aovBySegmentSql, returnRateBySegmentSql,
-  healthAvgSql, healthTransitionsSql, healthGainsSql, serviceSql, lowReviewsSql,
-  reachSql, intentSql, topSearchesSql, workloadSql, tasksByAssigneeSql, notesPerWeekSql,
-  b2bSql, geographySql,
+  growthSql,
+  cohortSql,
+  economicsSql,
+  aovBySegmentSql,
+  returnRateBySegmentSql,
+  healthAvgSql,
+  healthTransitionsSql,
+  healthGainsSql,
+  serviceSql,
+  lowReviewsSql,
+  reachSql,
+  intentSql,
+  topSearchesSql,
+  workloadSql,
+  tasksByAssigneeSql,
+  notesPerWeekSql,
+  b2bSql,
+  geographySql,
 } from './crm-insights-sql'
 import { getCrmAttention } from './crm-insights-attention'
 import {
-  CRM_SEGMENT_KEYS, CRM_RANGES, isCrmSegment, isCrmRange,
-  type CrmSegment, type CrmSegmentKey, type CrmInsights,
-  type Growth, type CohortRow, type Economics, type SegmentRate, type SegmentReturn,
-  type Health, type HealthTransitions, type HealthGain, type Service, type LowReview,
-  type Reach, type Intent, type SearchTerm, type Workload, type Assignee, type NotesWeek,
-  type B2b, type GeoRow, type AttentionItem,
+  CRM_SEGMENT_KEYS,
+  CRM_RANGES,
+  isCrmSegment,
+  isCrmRange,
+  type CrmSegment,
+  type CrmSegmentKey,
+  type CrmInsights,
+  type Growth,
+  type CohortRow,
+  type Economics,
+  type SegmentRate,
+  type SegmentReturn,
+  type Health,
+  type HealthTransitions,
+  type HealthGain,
+  type Service,
+  type LowReview,
+  type Reach,
+  type Intent,
+  type SearchTerm,
+  type Workload,
+  type Assignee,
+  type NotesWeek,
+  type B2b,
+  type GeoRow,
+  type AttentionItem,
 } from './crm-insights-shared'
 
 export { CRM_SEGMENT_KEYS, CRM_RANGES }
 export type {
-  CrmSegment, CrmSegmentKey, CrmInsights,
-  Growth, CohortRow, Economics, SegmentRate, SegmentReturn,
-  Health, HealthTransitions, HealthGain, Service, LowReview,
-  Reach, Intent, SearchTerm, Workload, Assignee, NotesWeek, B2b, GeoRow,
+  CrmSegment,
+  CrmSegmentKey,
+  CrmInsights,
+  Growth,
+  CohortRow,
+  Economics,
+  SegmentRate,
+  SegmentReturn,
+  Health,
+  HealthTransitions,
+  HealthGain,
+  Service,
+  LowReview,
+  Reach,
+  Intent,
+  SearchTerm,
+  Workload,
+  Assignee,
+  NotesWeek,
+  B2b,
+  GeoRow,
 }
 
 const num = (v: unknown): number => {
@@ -34,8 +85,7 @@ const numOrNull = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : parseFloat(String(v))
   return Number.isFinite(n) ? n : null
 }
-const rate = (numer: number, denom: number): number | null =>
-  denom > 0 ? (numer / denom) * 100 : null
+const rate = (numer: number, denom: number): number | null => (denom > 0 ? (numer / denom) * 100 : null)
 
 type Row = Record<string, string | null>
 
@@ -108,15 +158,38 @@ function buildIntent(r: Row | null): Intent {
   }
 }
 
-export async function getCrmInsights({ range, segment }: { range: AnalyticsRange; segment: CrmSegment }): Promise<CrmInsights> {
+export async function getCrmInsights({
+  range,
+  segment,
+}: {
+  range: AnalyticsRange
+  segment: CrmSegment
+}): Promise<CrmInsights> {
   const r: AnalyticsRange = isCrmRange(range) ? range : '30d'
   const s: CrmSegment = isCrmSegment(segment) ? segment : 'all'
   const w = crmWindow(r)
 
   const [
-    growth, cohortRows, economics, aovSeg, returnSeg, health, transitions, gains,
-    service, lowReviews, reach, intent, searches, workload, assignees, notes, b2b,
-    geoStates, geoCities, attention,
+    growth,
+    cohortRows,
+    economics,
+    aovSeg,
+    returnSeg,
+    health,
+    transitions,
+    gains,
+    service,
+    lowReviews,
+    reach,
+    intent,
+    searches,
+    workload,
+    assignees,
+    notes,
+    b2b,
+    geoStates,
+    geoCities,
+    attention,
   ] = await Promise.all([
     queryOne<Row>(growthSql(w, s)),
     queryMany<Row>(cohortSql(s)),
@@ -244,8 +317,17 @@ export async function getCrmInsights({ range, segment }: { range: AnalyticsRange
       creditLimitTotal: num(b2b?.credit_limit_total),
       creditUsed: num(b2b?.credit_used),
     },
-    geographyStates: geoStates.map(g => ({ name: String(g.name ?? ''), customers: num(g.customers), revenue: num(g.revenue) })),
-    geographyCities: geoCities.map(g => ({ name: String(g.name ?? ''), state: g.state, customers: num(g.customers), revenue: num(g.revenue) })),
+    geographyStates: geoStates.map(g => ({
+      name: String(g.name ?? ''),
+      customers: num(g.customers),
+      revenue: num(g.revenue),
+    })),
+    geographyCities: geoCities.map(g => ({
+      name: String(g.name ?? ''),
+      state: g.state,
+      customers: num(g.customers),
+      revenue: num(g.revenue),
+    })),
     attention,
   }
 }

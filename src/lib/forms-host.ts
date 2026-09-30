@@ -1,14 +1,26 @@
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || process.env.NEXT_PUBLIC_PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 
-const RESERVED_LABELS = new Set(['admin', 'invoice', 'quotation', 'purchaseorder', 'forms', 'business', 'www', 'app', 'ecom'])
+const RESERVED_LABELS = new Set([
+  'admin',
+  'invoice',
+  'quotation',
+  'purchaseorder',
+  'forms',
+  'business',
+  'www',
+  'app',
+  'ecom',
+])
 
 function isLocalHost(host: string): boolean {
-  return host === 'localhost'
-    || host.endsWith('.localhost')
-    || host.endsWith('.local')
-    || host === '127.0.0.1'
-    || host === '::1'
-    || host === '[::1]'
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === '[::1]'
+  )
 }
 
 /** Tenant slug encoded in a host, or null for the platform / a custom domain. Pure string logic, safe in the client bundle. */

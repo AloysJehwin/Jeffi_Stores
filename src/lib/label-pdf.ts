@@ -81,23 +81,23 @@ function drawPrice(
   if (!rawEx || rawEx === 0) return py
 
   const exGst = Math.round(rawEx * 100) / 100
-  const incGst = gstRate > 0
-    ? Math.round(exGst * (1 + gstRate / 100) * 100) / 100
-    : exGst
+  const incGst = gstRate > 0 ? Math.round(exGst * (1 + gstRate / 100) * 100) / 100 : exGst
   const showExGst = gstRate > 0
 
   if (p.mrp) {
     const mrpRaw = Number(p.mrp)
     if (mrpRaw > 0) {
-      const mrpInc = gstRate > 0
-        ? Math.round(mrpRaw * (1 + gstRate / 100) * 100) / 100
-        : mrpRaw
+      const mrpInc = gstRate > 0 ? Math.round(mrpRaw * (1 + gstRate / 100) * 100) / 100 : mrpRaw
       if (mrpInc !== incGst) {
         doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
         const mrpText = `Rs. ${mrpInc.toFixed(2)}`
         const mrpW = doc.widthOfString(mrpText)
         doc.text(mrpText, px, py, { lineBreak: false })
-        doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
+        doc
+          .moveTo(px, py + subSize * 0.38)
+          .lineTo(px + mrpW, py + subSize * 0.38)
+          .lineWidth(0.5)
+          .stroke('#888888')
         py += subSize + 1.5
       }
     }
@@ -108,7 +108,10 @@ function drawPrice(
   py += mainSize + 1.5
 
   if (showExGst) {
-    doc.font('Helvetica').fontSize(subSize - 0.5).fillColor('#777777')
+    doc
+      .font('Helvetica')
+      .fontSize(subSize - 0.5)
+      .fillColor('#777777')
     doc.text(`ex. GST Rs. ${exGst.toFixed(2)}`, px, py, { width: availW, lineBreak: false })
     py += subSize + 1
   }
@@ -197,7 +200,11 @@ async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: n
 
   doc.font('Helvetica-Bold').fontSize(7)
   const nameAreaH = h - pad * 2 - barcodeH - 10
-  doc.text(p.name, x + pad, y + pad, { width: textW, lineBreak: true, height: p.variant_name ? nameAreaH * 0.45 : nameAreaH * 0.55 })
+  doc.text(p.name, x + pad, y + pad, {
+    width: textW,
+    lineBreak: true,
+    height: p.variant_name ? nameAreaH * 0.45 : nameAreaH * 0.55,
+  })
 
   let cursor = y + pad
   doc.font('Helvetica-Bold').fontSize(7)
@@ -408,20 +415,22 @@ type RenderFn = (doc: any, p: LabelProduct, x: number, y: number, w: number, h: 
 
 function getRenderFn(size: LabelSize): RenderFn {
   switch (size) {
-    case '30x20': return render30x20
-    case '30x50': return render30x50
-    case '40x60': return render40x60
-    case '50x50': return render50x50
-    case '80x20': return render80x20
-    case 'shelf-card': return renderProductShelfCard
+    case '30x20':
+      return render30x20
+    case '30x50':
+      return render30x50
+    case '40x60':
+      return render40x60
+    case '50x50':
+      return render50x50
+    case '80x20':
+      return render80x20
+    case 'shelf-card':
+      return renderProductShelfCard
   }
 }
 
-export async function generateLabelPDF(
-  products: LabelProduct[],
-  size: LabelSize,
-  copies: number
-): Promise<Buffer> {
+export async function generateLabelPDF(products: LabelProduct[], size: LabelSize, copies: number): Promise<Buffer> {
   const spec = LABEL_SIZES.find(s => s.size === size)!
   const renderFn = getRenderFn(size)
 
@@ -544,10 +553,7 @@ async function renderShelfCard(doc: any, item: ShelfLabelItem, x: number, y: num
   doc.fillColor('#000000')
 }
 
-export async function generateShelfLabelPDF(
-  items: ShelfLabelItem[],
-  copies: number
-): Promise<Buffer> {
+export async function generateShelfLabelPDF(items: ShelfLabelItem[], copies: number): Promise<Buffer> {
   const w = 100 * MM
   const h = 70 * MM
 
@@ -605,7 +611,14 @@ export interface LabelSerial {
 }
 
 // Compact 40×25 mm label spec used for both batch and serial labels.
-const BATCH_SPEC: LabelSpec = { size: '30x50', widthMm: 50, heightMm: 30, widthPt: 50 * MM, heightPt: 30 * MM, label: '50×30 mm' }
+const BATCH_SPEC: LabelSpec = {
+  size: '30x50',
+  widthMm: 50,
+  heightMm: 30,
+  widthPt: 50 * MM,
+  heightPt: 30 * MM,
+  label: '50×30 mm',
+}
 
 async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w: number, h: number) {
   const pad = 3.5
@@ -619,13 +632,18 @@ async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w
 
   const rightX = x + w - pad - qrSize
   const textW = rightX - x - pad - 2
-  const barTop = y + h - pad - 6 * MM      // top of the barcode strip
-  const lineH = 8                          // fixed single-line step for detail rows
-  const maxY = barTop - 2                   // don't let detail text collide with barcode
+  const barTop = y + h - pad - 6 * MM // top of the barcode strip
+  const lineH = 8 // fixed single-line step for detail rows
+  const maxY = barTop - 2 // don't let detail text collide with barcode
 
   // Product name — up to 2 lines, clipped to fit; then detail rows below it.
   doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000')
-  doc.text(clip(b.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, { width: textW, lineBreak: true, height: 16, ellipsis: true })
+  doc.text(clip(b.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, {
+    width: textW,
+    lineBreak: true,
+    height: 16,
+    ellipsis: true,
+  })
   let midY = y + pad + 16
 
   // Each detail row is CLIPPED to one line (lineBreak:false) so a long lot number
@@ -640,7 +658,15 @@ async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w
   if (b.expiryDate) row('EXP', b.expiryDate)
   if (b.quantity != null) row('QTY', String(b.quantity))
   if (b.showPrice && midY <= maxY) {
-    midY = drawPrice(doc, { mrp: b.mrp, price_ex_gst: b.priceExGst, gst_percentage: b.gstPercentage }, x + pad, midY, textW, 7, 5.5)
+    midY = drawPrice(
+      doc,
+      { mrp: b.mrp, price_ex_gst: b.priceExGst, gst_percentage: b.gstPercentage },
+      x + pad,
+      midY,
+      textW,
+      7,
+      5.5
+    )
   }
 
   if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
@@ -660,22 +686,41 @@ async function renderSerialLabel(doc: any, s: LabelSerial, x: number, y: number,
   const maxY = barTop - 2
 
   doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000')
-  doc.text(clip(s.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, { width: textW, lineBreak: true, height: 16, ellipsis: true })
+  doc.text(clip(s.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, {
+    width: textW,
+    lineBreak: true,
+    height: 16,
+    ellipsis: true,
+  })
   let midY = y + pad + 16
 
   // Detail rows — each clipped to one line so long LOT/serial values can't wrap and
   // overlap. The full serial is still in the QR + barcode text below.
   const row = (label: string, value: string, bold = false) => {
     if (midY > maxY) return
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(6).fillColor(bold ? '#000000' : '#333333')
-    doc.text(clip(`${label}: ${value}`, textW, doc, bold ? 'Helvetica-Bold' : 'Helvetica', 6), x + pad, midY, { width: textW, lineBreak: false })
+    doc
+      .font(bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(6)
+      .fillColor(bold ? '#000000' : '#333333')
+    doc.text(clip(`${label}: ${value}`, textW, doc, bold ? 'Helvetica-Bold' : 'Helvetica', 6), x + pad, midY, {
+      width: textW,
+      lineBreak: false,
+    })
     midY += lineH
   }
   row('SKU', s.sku)
   if (s.lotNumber) row('LOT', s.lotNumber)
   row('S/N', s.serialNumber, true)
   if (s.showPrice && midY <= maxY) {
-    midY = drawPrice(doc, { mrp: s.mrp, price_ex_gst: s.priceExGst, gst_percentage: s.gstPercentage }, x + pad, midY, textW, 7, 5.5)
+    midY = drawPrice(
+      doc,
+      { mrp: s.mrp, price_ex_gst: s.priceExGst, gst_percentage: s.gstPercentage },
+      x + pad,
+      midY,
+      textW,
+      7,
+      5.5
+    )
   }
 
   if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
@@ -704,7 +749,10 @@ function makeGenerator<T>(renderOne: (doc: any, item: T, x: number, y: number, w
   }
   // A4 grid with cut lines (sheet).
   const sheet = (items: T[], copies: number, spec: LabelSpec = BATCH_SPEC): Promise<Buffer> => {
-    const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 18, GAP = 5
+    const PAGE_W = 595.28,
+      PAGE_H = 841.89,
+      MARGIN = 18,
+      GAP = 5
     const cols = Math.max(1, Math.floor((PAGE_W - MARGIN * 2 + GAP) / (spec.widthPt + GAP)))
     const rows = Math.max(1, Math.floor((PAGE_H - MARGIN * 2 + GAP) / (spec.heightPt + GAP)))
     const all: T[] = []
@@ -746,12 +794,22 @@ function batchSpecFor(size?: string | null): LabelSpec {
   return findLabelSpec(size) ?? BATCH_SPEC
 }
 
-export function generateBatchLabelPDF(batches: LabelBatch[], copies: number, sheet: boolean, size?: string | null): Promise<Buffer> {
+export function generateBatchLabelPDF(
+  batches: LabelBatch[],
+  copies: number,
+  sheet: boolean,
+  size?: string | null
+): Promise<Buffer> {
   const spec = batchSpecFor(size)
   return sheet ? batchGen.sheet(batches, copies, spec) : batchGen.thermal(batches, copies, spec)
 }
 
-export function generateSerialLabelPDF(serials: LabelSerial[], copies: number, sheet: boolean, size?: string | null): Promise<Buffer> {
+export function generateSerialLabelPDF(
+  serials: LabelSerial[],
+  copies: number,
+  sheet: boolean,
+  size?: string | null
+): Promise<Buffer> {
   const spec = batchSpecFor(size)
   return sheet ? serialGen.sheet(serials, copies, spec) : serialGen.thermal(serials, copies, spec)
 }

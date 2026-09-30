@@ -3,8 +3,10 @@ import { getFeatureFlags } from '@/lib/site-controls'
 import { buildProductCardSql } from '@/lib/homepage-data'
 export { cardPropsFor, type CardProps } from '@/lib/product-card-props'
 import {
-  VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL,
-  VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL,
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
 
 export const TOTAL_SOLD_SQL = `COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.product_id = p.id), 0)`
@@ -26,7 +28,7 @@ export async function getProductCards(opts: {
       variantStockTotalSql: VARIANT_STOCK_TOTAL_SQL,
       variantMinMrpSql: VARIANT_MIN_MRP_SQL,
       totalSoldSql: TOTAL_SOLD_SQL,
-    },
+    }
   )
   return queryMany(sql, [...params, opts.limit])
 }

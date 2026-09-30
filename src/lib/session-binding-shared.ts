@@ -18,13 +18,14 @@ export const BIND_COOKIE: Record<PrincipalType, string> = {
 // Script-made API calls that cannot carry a header: EventSource and sendBeacon have no way to set
 // one. They still need the short-lived cookie. Matched by exact path, never by a request header,
 // because a header is the caller's to fake and would switch the proof off for any endpoint.
-export const PROOF_EXEMPT_PATHS: ReadonlySet<string> = new Set([
-  '/api/admin/events',
-  '/api/track',
-])
+export const PROOF_EXEMPT_PATHS: ReadonlySet<string> = new Set(['/api/admin/events', '/api/track'])
 
 export function normHost(host: string | null | undefined): string {
-  return String(host ?? '').toLowerCase().split(',')[0].trim().replace(/:\d+$/, '')
+  return String(host ?? '')
+    .toLowerCase()
+    .split(',')[0]
+    .trim()
+    .replace(/:\d+$/, '')
 }
 
 export interface BindingContext {

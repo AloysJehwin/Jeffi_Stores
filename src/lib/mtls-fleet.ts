@@ -44,9 +44,9 @@ export async function rebuildAndPublishClientCaBundle(): Promise<{ count: number
   const platformCa = fs.readFileSync(caPath, 'utf8').trim()
 
   const { rows } = await controlPlanePool().query<{ ca_cert_pem: string }>(
-    'SELECT ca_cert_pem FROM tenant_ca WHERE ca_cert_pem IS NOT NULL',
+    'SELECT ca_cert_pem FROM tenant_ca WHERE ca_cert_pem IS NOT NULL'
   )
-  const parts = [platformCa, ...rows.map((r) => r.ca_cert_pem.trim()).filter(Boolean)]
+  const parts = [platformCa, ...rows.map(r => r.ca_cert_pem.trim()).filter(Boolean)]
   const bundle = parts.join('\n') + '\n'
 
   const tmp = path.join(os.tmpdir(), `client-ca-bundle-${Date.now()}.pem`)
@@ -62,12 +62,14 @@ export async function rebuildAndPublishClientCaBundle(): Promise<{ count: number
   }
 
   const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
-  await s3.send(new PutObjectCommand({
-    Bucket: truststoreBucket(),
-    Key: FLEET_KEY,
-    Body: bundle,
-    ContentType: 'application/x-pem-file',
-  }))
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: truststoreBucket(),
+      Key: FLEET_KEY,
+      Body: bundle,
+      ContentType: 'application/x-pem-file',
+    })
+  )
 
   const count = (bundle.match(/BEGIN CERTIFICATE/g) ?? []).length
   return { count }
@@ -87,7 +89,7 @@ function fleetReloadCommands(): string[] {
  * Fire-and-forget on the SSM side: returns once the command is sent, without waiting for the
  * per-box invocation to finish. */
 export async function refreshTenantMtlsFleet(
-  slug?: string,
+  slug?: string
 ): Promise<{ count: number; commandId: string | null; targets: number }> {
   const { count } = await rebuildAndPublishClientCaBundle()
 
@@ -95,7 +97,9 @@ export async function refreshTenantMtlsFleet(
   if (ids.length === 0) return { count, commandId: null, targets: 0 }
 
   const { commandId } = await sendShellCommand(
-    ids, fleetReloadCommands(), `mtls-bundle refresh${slug ? ` ${slug}` : ''}`,
+    ids,
+    fleetReloadCommands(),
+    `mtls-bundle refresh${slug ? ` ${slug}` : ''}`
   )
   return { count, commandId, targets: ids.length }
 }

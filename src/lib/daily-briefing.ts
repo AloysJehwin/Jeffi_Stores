@@ -56,19 +56,17 @@ export interface BriefingData {
 const STUCK_DAYS = 3
 
 export async function collectBriefingData(): Promise<BriefingData> {
-  const [
-    yesterday,
-    sevenDayAvg,
-    topProducts,
-    lowStock,
-    stuckShipments,
-    abandonedCheckouts,
-    campaignPerf,
-  ] = await Promise.all([
-    queryOne<{
-      count: string; paid_count: string; cancelled_count: string; pending_count: string
-      revenue: string; avg_order_value: string
-    }>(`
+  const [yesterday, sevenDayAvg, topProducts, lowStock, stuckShipments, abandonedCheckouts, campaignPerf] =
+    await Promise.all([
+      queryOne<{
+        count: string
+        paid_count: string
+        cancelled_count: string
+        pending_count: string
+        revenue: string
+        avg_order_value: string
+      }>(
+        `
       WITH bounds AS (
         SELECT
           (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata' AS lo,
@@ -83,8 +81,11 @@ export async function collectBriefingData(): Promise<BriefingData> {
         COALESCE(AVG(total_amount) FILTER (WHERE payment_status = 'paid'), 0)::text AS avg_order_value
       FROM orders, bounds
       WHERE created_at >= bounds.lo AND created_at < bounds.hi
-    `, []),
-    queryOne<{ avg_revenue: string; avg_orders: string }>(`
+    `,
+        []
+      ),
+      queryOne<{ avg_revenue: string; avg_orders: string }>(
+        `
       WITH bounds AS (
         SELECT
           (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '8 days') AT TIME ZONE 'Asia/Kolkata' AS lo,
@@ -103,8 +104,11 @@ export async function collectBriefingData(): Promise<BriefingData> {
         COALESCE(AVG(revenue), 0)::text AS avg_revenue,
         COALESCE(AVG(orders),  0)::text AS avg_orders
       FROM daily
-    `, []),
-    queryMany<{ product_id: string; product_name: string; qty: string; revenue: string }>(`
+    `,
+        []
+      ),
+      queryMany<{ product_id: string; product_name: string; qty: string; revenue: string }>(
+        `
       WITH bounds AS (
         SELECT
           (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata' AS lo,
@@ -122,18 +126,28 @@ export async function collectBriefingData(): Promise<BriefingData> {
       GROUP BY oi.product_id, oi.product_name
       ORDER BY SUM(oi.total_price) DESC
       LIMIT 5
-    `, []),
-    queryMany<LowStockProduct>(`
+    `,
+        []
+      ),
+      queryMany<LowStockProduct>(
+        `
       SELECT id::text, name, sku, inventory_quantity
       FROM products
       WHERE is_active = TRUE AND inventory_quantity <= 10
       ORDER BY inventory_quantity ASC, name ASC
       LIMIT 15
-    `, []),
-    queryMany<{
-      order_number: string; awb_number: string | null; shipped_at: string
-      customer_name: string | null; total_amount: string; days_since_shipped: string
-    }>(`
+    `,
+        []
+      ),
+      queryMany<{
+        order_number: string
+        awb_number: string | null
+        shipped_at: string
+        customer_name: string | null
+        total_amount: string
+        days_since_shipped: string
+      }>(
+        `
       SELECT
         order_number,
         awb_number,
@@ -149,14 +163,20 @@ export async function collectBriefingData(): Promise<BriefingData> {
         AND status != 'cancelled'
       ORDER BY shipped_at ASC
       LIMIT 20
-    `, []),
-    queryOne<{ count: string }>(`
+    `,
+        []
+      ),
+      queryOne<{ count: string }>(
+        `
       SELECT COUNT(*)::text AS count
       FROM orders
       WHERE status = 'cancelled' AND payment_status = 'cancelled'
         AND updated_at >= NOW() - INTERVAL '24 hours'
-    `, []),
-    queryMany<{ campaign_kind: string; sent: string; opened: string; clicked: string; converted: string }>(`
+    `,
+        []
+      ),
+      queryMany<{ campaign_kind: string; sent: string; opened: string; clicked: string; converted: string }>(
+        `
       SELECT
         campaign_kind,
         COUNT(*)::text AS sent,
@@ -167,10 +187,19 @@ export async function collectBriefingData(): Promise<BriefingData> {
       WHERE sent_at >= NOW() - INTERVAL '24 hours'
       GROUP BY campaign_kind
       ORDER BY COUNT(*) DESC
-    `, []),
-  ])
+    `,
+        []
+      ),
+    ])
 
-  const y = yesterday || { count: '0', paid_count: '0', cancelled_count: '0', pending_count: '0', revenue: '0', avg_order_value: '0' }
+  const y = yesterday || {
+    count: '0',
+    paid_count: '0',
+    cancelled_count: '0',
+    pending_count: '0',
+    revenue: '0',
+    avg_order_value: '0',
+  }
   const avg = sevenDayAvg || { avg_revenue: '0', avg_orders: '0' }
 
   const yesterdayRevenue = parseFloat(y.revenue) || 0
@@ -287,33 +316,46 @@ function deltaBadge(pct: number): string {
 export function renderBriefingEmail(data: BriefingData, narration: string): { subject: string; html: string } {
   const subject = `Ops briefing — ${data.briefing_date} — ${data.yesterday.count} orders, ${fmtINR(data.yesterday.revenue)}`
 
-  const stuckRows = data.stuck_shipments.map(s => `
+  const stuckRows = data.stuck_shipments
+    .map(
+      s => `
     <tr>
       <td class="mono">${s.order_number}</td>
       <td>${s.customer_name || '—'}</td>
       <td class="red">${s.days_since_shipped}d</td>
       <td class="num">${fmtINR(s.total_amount)}</td>
-    </tr>`).join('')
+    </tr>`
+    )
+    .join('')
 
-  const topProductRows = data.top_products.map((p, i) => `
+  const topProductRows = data.top_products
+    .map(
+      (p, i) => `
     <tr>
       <td class="grey" style="width:24px;">${i + 1}</td>
       <td>${p.product_name}</td>
       <td class="num grey">${p.qty}</td>
       <td class="num" style="font-weight:600;">${fmtINR(p.revenue)}</td>
-    </tr>`).join('')
+    </tr>`
+    )
+    .join('')
 
-  const lowStockRows = data.low_stock.map(p => `
+  const lowStockRows = data.low_stock
+    .map(
+      p => `
     <tr>
       <td>${p.name}</td>
       <td class="mono grey" style="font-size:12px;">${p.sku || '—'}</td>
       <td class="num" style="color:${p.inventory_quantity === 0 ? '#dc2626' : '#ea580c'};font-weight:600;">${p.inventory_quantity}</td>
-    </tr>`).join('')
+    </tr>`
+    )
+    .join('')
 
-  const campaignRows = data.campaign_perf_24h.map(c => {
-    const openRate = c.sent > 0 ? Math.round((c.opened / c.sent) * 100) : 0
-    const clickRate = c.sent > 0 ? Math.round((c.clicked / c.sent) * 100) : 0
-    return `
+  const campaignRows = data.campaign_perf_24h
+    .map(c => {
+      const openRate = c.sent > 0 ? Math.round((c.opened / c.sent) * 100) : 0
+      const clickRate = c.sent > 0 ? Math.round((c.clicked / c.sent) * 100) : 0
+      return `
     <tr>
       <td>${c.campaign_kind}</td>
       <td class="num">${c.sent}</td>
@@ -321,7 +363,8 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
       <td class="num grey">${clickRate}%</td>
       <td class="num green">${c.converted}</td>
     </tr>`
-  }).join('')
+    })
+    .join('')
 
   const html = mailShell({
     brand: BRIEFING_BRAND,
@@ -358,33 +401,49 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
         </table>
       </div>
 
-      ${data.stuck_shipments.length > 0 ? `
+      ${
+        data.stuck_shipments.length > 0
+          ? `
       <h3 class="section" style="color:#dc2626;">Stuck shipments (${data.stuck_shipments.length})</h3>
       <table class="rows">
         <tr><th>Order</th><th>Customer</th><th>Stuck</th><th class="num">Total</th></tr>
         ${stuckRows}
-      </table>` : ''}
+      </table>`
+          : ''
+      }
 
-      ${data.top_products.length > 0 ? `
+      ${
+        data.top_products.length > 0
+          ? `
       <h3 class="section">Top products yesterday</h3>
       <table class="rows">
         <tr><th style="width:24px;"></th><th>Product</th><th class="num">Qty</th><th class="num">Revenue</th></tr>
         ${topProductRows}
-      </table>` : ''}
+      </table>`
+          : ''
+      }
 
-      ${data.low_stock.length > 0 ? `
+      ${
+        data.low_stock.length > 0
+          ? `
       <h3 class="section" style="color:#ea580c;">Low stock (${data.low_stock.length})</h3>
       <table class="rows">
         <tr><th>Product</th><th>SKU</th><th class="num">Stock</th></tr>
         ${lowStockRows}
-      </table>` : ''}
+      </table>`
+          : ''
+      }
 
-      ${data.campaign_perf_24h.length > 0 ? `
+      ${
+        data.campaign_perf_24h.length > 0
+          ? `
       <h3 class="section">Campaigns (last 24h)</h3>
       <table class="rows">
         <tr><th>Campaign</th><th class="num">Sent</th><th class="num">Open%</th><th class="num">Click%</th><th class="num">Conv</th></tr>
         ${campaignRows}
-      </table>` : ''}
+      </table>`
+          : ''
+      }
 
       <p class="muted" style="text-align:center;margin-top:24px;">
         Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>

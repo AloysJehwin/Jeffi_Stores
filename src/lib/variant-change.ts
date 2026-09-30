@@ -35,11 +35,11 @@ export interface VariantChangeRow {
 /** A variant or sub-variant candidate for the swap, with the fields we price on. */
 export interface VariantPriceRow {
   id: string
-  name: string | null                 // variant_name / sub_variant_name
-  sku: string | null                  // variant/sub-variant SKU (falls back to product SKU)
-  product_name: string | null         // parent product name (for rebuilding order_items.product_name)
-  parent_variant_name: string | null  // for a sub-variant: its parent variant_name (else null)
-  price: number | null                // GST-inclusive
+  name: string | null // variant_name / sub_variant_name
+  sku: string | null // variant/sub-variant SKU (falls back to product SKU)
+  product_name: string | null // parent product name (for rebuilding order_items.product_name)
+  parent_variant_name: string | null // for a sub-variant: its parent variant_name (else null)
+  price: number | null // GST-inclusive
   price_ex_gst: number | null
   mrp: number | null
   gst_percentage: string | number | null
@@ -70,19 +70,33 @@ export function computeVariantChangePreview(params: {
   qty: number
   newV: VariantPriceRow
   gstEnabled: boolean
-}): { oldUnitPrice: number; newUnitPrice: number; priceDiff: number; settlementType: 'refund' | 'collect' | 'none'; codSettlement: 'cod_adjust' } {
-  const newUnitPrice = round2(pickUnitPrice({ inclusive: params.newV.price, exGst: params.newV.price_ex_gst }, params.gstEnabled))
+}): {
+  oldUnitPrice: number
+  newUnitPrice: number
+  priceDiff: number
+  settlementType: 'refund' | 'collect' | 'none'
+  codSettlement: 'cod_adjust'
+} {
+  const newUnitPrice = round2(
+    pickUnitPrice({ inclusive: params.newV.price, exGst: params.newV.price_ex_gst }, params.gstEnabled)
+  )
   // Signed difference on the whole line (new − old) × qty.
   const priceDiff = round2((newUnitPrice - params.oldUnitPrice) * params.qty)
   const settlementType = priceDiff < 0 ? 'refund' : priceDiff > 0 ? 'collect' : 'none'
-  return { oldUnitPrice: round2(params.oldUnitPrice), newUnitPrice, priceDiff, settlementType, codSettlement: 'cod_adjust' }
+  return {
+    oldUnitPrice: round2(params.oldUnitPrice),
+    newUnitPrice,
+    priceDiff,
+    settlementType,
+    codSettlement: 'cod_adjust',
+  }
 }
 
 /** Load a variant or sub-variant priceable row (sub-variant preferred when given). */
 export async function loadVariantPriceRow(
   variantId: string | null,
   subVariantId: string | null,
-  productId: string,
+  productId: string
 ): Promise<VariantPriceRow | null> {
   if (subVariantId) {
     return queryOne<VariantPriceRow>(
@@ -138,15 +152,12 @@ interface OrderRow {
  */
 export async function applyVariantChange(
   vcrId: string,
-  actorAdminId?: string | null,
+  actorAdminId?: string | null
 ): Promise<{ applied: boolean; reason?: string }> {
   const { gstEnabled } = await getFeatureFlags()
 
   return withTransaction(async (client: PoolClient) => {
-    const vcrRes = await client.query(
-      `SELECT * FROM variant_change_requests WHERE id = $1 FOR UPDATE`,
-      [vcrId]
-    )
+    const vcrRes = await client.query(`SELECT * FROM variant_change_requests WHERE id = $1 FOR UPDATE`, [vcrId])
     const vcr = vcrRes.rows[0] as VariantChangeRow | undefined
     if (!vcr) return { applied: false, reason: 'not_found' }
     if (vcr.status === 'applied') return { applied: false, reason: 'already_applied' } // idempotent
@@ -171,7 +182,8 @@ export async function applyVariantChange(
       `SELECT id, product_id, quantity, gst_rate FROM order_items WHERE id = $1 AND order_id = $2`,
       [vcr.order_item_id, vcr.order_id]
     )
-    const item = itemRes.rows[0] as { id: string; product_id: string; quantity: string; gst_rate: string | null } | undefined
+    const item = itemRes.rows[0] as
+      { id: string; product_id: string; quantity: string; gst_rate: string | null } | undefined
     if (!item) return { applied: false, reason: 'item_not_found' }
 
     const newV = await loadVariantPriceRow(vcr.new_variant_id, vcr.new_sub_variant_id, item.product_id)
@@ -180,9 +192,10 @@ export async function applyVariantChange(
     const qty = Number(item.quantity) || 1
     // A 'none' settlement moves no money, so the line keeps the price quoted on the request
     // (the current price when the admin waived the difference) instead of the catalogue price.
-    const unitPrice = vcr.settlement_type === 'none'
-      ? round2(Number(vcr.new_unit_price))
-      : round2(pickUnitPrice({ inclusive: newV.price, exGst: newV.price_ex_gst }, gstEnabled))
+    const unitPrice =
+      vcr.settlement_type === 'none'
+        ? round2(Number(vcr.new_unit_price))
+        : round2(pickUnitPrice({ inclusive: newV.price, exGst: newV.price_ex_gst }, gstEnabled))
     const itemTotal = round2(unitPrice * qty)
     const gstRate = parseFloat(String(newV.gst_percentage ?? item.gst_rate ?? '0'))
 
@@ -199,8 +212,14 @@ export async function applyVariantChange(
          gst_rate = $9, taxable_amount = $10, cgst_amount = $11, sgst_amount = $12, igst_amount = $13, tax_amount = $14
        WHERE id = $15`,
       [
-        vcr.new_variant_id, vcr.new_sub_variant_id, newV.name, newV.sku ?? null, newProductName,
-        unitPrice, itemTotal, newV.mrp,
+        vcr.new_variant_id,
+        vcr.new_sub_variant_id,
+        newV.name,
+        newV.sku ?? null,
+        newProductName,
+        unitPrice,
+        itemTotal,
+        newV.mrp,
         gstEnabled ? gstRate : null,
         gst ? gst.taxableAmount : 0,
         gst ? gst.cgst : 0,
@@ -283,10 +302,9 @@ export async function settleVariantChangePayment(params: {
   razorpayPaymentId: string
   amountPaise: number
 }): Promise<{ applied: boolean; reason?: string }> {
-  const vcr = await queryOne<VariantChangeRow>(
-    `SELECT * FROM variant_change_requests WHERE razorpay_order_id = $1`,
-    [params.razorpayOrderId]
-  )
+  const vcr = await queryOne<VariantChangeRow>(`SELECT * FROM variant_change_requests WHERE razorpay_order_id = $1`, [
+    params.razorpayOrderId,
+  ])
   if (!vcr) return { applied: false, reason: 'no_request' }
   if (vcr.status === 'applied') return { applied: false, reason: 'already_applied' }
 
@@ -300,7 +318,12 @@ export async function settleVariantChangePayment(params: {
       vcr.order_id,
       params.razorpayPaymentId,
       (params.amountPaise / 100).toFixed(2),
-      JSON.stringify({ purpose: 'variant_change', vcrId: vcr.id, razorpay_order_id: params.razorpayOrderId, razorpay_payment_id: params.razorpayPaymentId }),
+      JSON.stringify({
+        purpose: 'variant_change',
+        vcrId: vcr.id,
+        razorpay_order_id: params.razorpayOrderId,
+        razorpay_payment_id: params.razorpayPaymentId,
+      }),
     ]
   )
   await queryOne(

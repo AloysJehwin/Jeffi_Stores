@@ -3,9 +3,15 @@
 // into the browser bundle.
 
 export const CAMPAIGN_WA_KINDS = [
-  'abandoned_cart', 'abandoned_checkout', 'restock',
-  'winback_90', 'winback_180', 'price_drop',
-  'review_request', 'review_reminder', 'post_purchase',
+  'abandoned_cart',
+  'abandoned_checkout',
+  'restock',
+  'winback_90',
+  'winback_180',
+  'price_drop',
+  'review_request',
+  'review_reminder',
+  'post_purchase',
 ] as const
 
 export function campaignSupportsWhatsApp(kind: string): boolean {

@@ -28,26 +28,42 @@ const HOSTED_ZONE_ID = process.env.PLATFORM_HOSTED_ZONE_ID || 'Z08094881XKVZ9XSG
 function targetIp(): string {
   const ip = process.env.TENANT_APP_TARGET_IP
   if (!ip || !ip.trim()) {
-    throw new Error('TENANT_APP_TARGET_IP is not set — required (a stable/attached IP) for tenant DNS. Refusing to write records to a placeholder.')
+    throw new Error(
+      'TENANT_APP_TARGET_IP is not set — required (a stable/attached IP) for tenant DNS. Refusing to write records to a placeholder.'
+    )
   }
   return ip.trim()
 }
 
 function xmlEscape(s: string): string {
-  return s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]!))
+  return s.replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]!)
 }
 
-async function route53(method: string, path: string, body?: string): Promise<{ ok: boolean; status: number; text: string }> {
+async function route53(
+  method: string,
+  path: string,
+  body?: string
+): Promise<{ ok: boolean; status: number; text: string }> {
   const request = new HttpRequest({
-    method, protocol: 'https:', hostname: ROUTE53_HOST, path,
+    method,
+    protocol: 'https:',
+    hostname: ROUTE53_HOST,
+    path,
     headers: { host: ROUTE53_HOST, ...(body ? { 'content-type': 'application/xml' } : {}) },
     ...(body ? { body } : {}),
   })
   const signer = new SignatureV4({
-    service: 'route53', region: 'us-east-1', credentials: defaultProvider(), sha256: Sha256,
+    service: 'route53',
+    region: 'us-east-1',
+    credentials: defaultProvider(),
+    sha256: Sha256,
   })
   const signed = await signer.sign(request)
-  const res = await fetch(`https://${ROUTE53_HOST}${path}`, { method, headers: signed.headers as any, ...(body ? { body } : {}) })
+  const res = await fetch(`https://${ROUTE53_HOST}${path}`, {
+    method,
+    headers: signed.headers as any,
+    ...(body ? { body } : {}),
+  })
   const text = await res.text().catch(() => '')
   return { ok: res.ok, status: res.status, text }
 }
@@ -55,7 +71,9 @@ async function route53(method: string, path: string, body?: string): Promise<{ o
 async function upsert(hostnames: string[], overrideIp?: string): Promise<void> {
   if (hostnames.length === 0) return
   const ip = overrideIp && overrideIp.trim() ? overrideIp.trim() : targetIp()
-  const changes = hostnames.map((h) => `
+  const changes = hostnames
+    .map(
+      h => `
     <Change>
       <Action>UPSERT</Action>
       <ResourceRecordSet>
@@ -64,7 +82,9 @@ async function upsert(hostnames: string[], overrideIp?: string): Promise<void> {
         <TTL>300</TTL>
         <ResourceRecords><ResourceRecord><Value>${xmlEscape(ip)}</Value></ResourceRecord></ResourceRecords>
       </ResourceRecordSet>
-    </Change>`).join('')
+    </Change>`
+    )
+    .join('')
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
   <ChangeBatch><Changes>${changes}</Changes></ChangeBatch>
@@ -84,16 +104,19 @@ async function upsert(hostnames: string[], overrideIp?: string): Promise<void> {
 async function deleteRecords(hostnames: string[]): Promise<void> {
   for (const h of hostnames) {
     const name = h.endsWith('.') ? h : `${h}.`
-    const list = await route53('GET', `/2013-04-01/hostedzone/${HOSTED_ZONE_ID}/rrset?name=${encodeURIComponent(name)}&type=A&maxitems=1`)
+    const list = await route53(
+      'GET',
+      `/2013-04-01/hostedzone/${HOSTED_ZONE_ID}/rrset?name=${encodeURIComponent(name)}&type=A&maxitems=1`
+    )
     if (!list.ok) throw new Error(`Route53 list failed for ${h} (${list.status}): ${list.text.slice(0, 200)}`)
     // Parse the returned record set; only delete if the Name matches exactly (Route53
     // returns the next record alphabetically if ours doesn't exist).
     const nameMatch = new RegExp(`<Name>${name.replace(/[.]/g, '\\.')}</Name>`, 'i').test(list.text)
     if (!nameMatch) continue // record doesn't exist → nothing to delete
     const ttl = (list.text.match(/<TTL>(\d+)<\/TTL>/) || [])[1] || '300'
-    const values = [...list.text.matchAll(/<Value>([^<]+)<\/Value>/g)].map((m) => m[1])
+    const values = [...list.text.matchAll(/<Value>([^<]+)<\/Value>/g)].map(m => m[1])
     if (values.length === 0) continue
-    const recs = values.map((v) => `<ResourceRecord><Value>${xmlEscape(v)}</Value></ResourceRecord>`).join('')
+    const recs = values.map(v => `<ResourceRecord><Value>${xmlEscape(v)}</Value></ResourceRecord>`).join('')
     const body = `<?xml version="1.0" encoding="UTF-8"?>
 <ChangeResourceRecordSetsRequest xmlns="https://route53.amazonaws.com/doc/2013-04-01/">
   <ChangeBatch><Changes><Change>

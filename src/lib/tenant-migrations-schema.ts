@@ -7,10 +7,26 @@ import path from 'path'
 
 const APPLY_ORDER = [
   'extensions.sql',
-  'auth.sql', 'users.sql', 'catalog.sql', 'inventory.sql', 'orders.sql',
-  'payments.sql', 'invoices.sql', 'quotations.sql', 'crm.sql', 'marketing.sql',
-  'reviews.sql', 'support.sql', 'logs.sql', 'settings.sql', 'ai.sql', 'amazon.sql',
-  'constraints.sql', 'indexes.sql', 'functions.sql', 'triggers.sql',
+  'auth.sql',
+  'users.sql',
+  'catalog.sql',
+  'inventory.sql',
+  'orders.sql',
+  'payments.sql',
+  'invoices.sql',
+  'quotations.sql',
+  'crm.sql',
+  'marketing.sql',
+  'reviews.sql',
+  'support.sql',
+  'logs.sql',
+  'settings.sql',
+  'ai.sql',
+  'amazon.sql',
+  'constraints.sql',
+  'indexes.sql',
+  'functions.sql',
+  'triggers.sql',
 ]
 
 export function buildTenantSchemaSql(): string {
@@ -26,8 +42,14 @@ export function buildTenantSchemaSql(): string {
   return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
 }
 
-export interface DesiredColumn { name: string; type: string }
-export interface DesiredTable { table: string; columns: DesiredColumn[] }
+export interface DesiredColumn {
+  name: string
+  type: string
+}
+export interface DesiredTable {
+  table: string
+  columns: DesiredColumn[]
+}
 
 const CREATE_TABLE_RE = /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?((?:[A-Za-z0-9_]+\.)?[A-Za-z0-9_]+)\s*\(([\s\S]*?)\n\);/gi
 const CONSTRAINT_LEADERS = /^(CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE|LIKE)\b/i
@@ -51,7 +73,10 @@ export function parseCreateTables(sql: string): DesiredTable[] {
       if (!line || CONSTRAINT_LEADERS.test(line)) continue
       const nameMatch = line.match(/^("?[A-Za-z0-9_]+"?)\s+(.*)$/s)
       if (!nameMatch) continue
-      const type = nameMatch[2].replace(/\bNOT\s+NULL\b/gi, '').replace(/\s+/g, ' ').trim()
+      const type = nameMatch[2]
+        .replace(/\bNOT\s+NULL\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
       if (!type) continue
       columns.push({ name: nameMatch[1], type })
     }
@@ -69,7 +94,10 @@ export function desiredTableColumns(): Map<string, string[]> {
     if (!fs.existsSync(p)) continue
     for (const t of parseCreateTables(fs.readFileSync(p, 'utf8'))) {
       const bare = t.table.split('.').pop()!.replace(/"/g, '')
-      map.set(bare, t.columns.map(c => c.name.replace(/"/g, '')))
+      map.set(
+        bare,
+        t.columns.map(c => c.name.replace(/"/g, ''))
+      )
     }
   }
   return map
@@ -92,7 +120,7 @@ export function desiredTableColumns(): Map<string, string[]> {
  * fresh and existing tables alike.
  */
 function syncTableColumns(sql: string): string {
-  return sql.replace(CREATE_TABLE_RE, (stmt) => {
+  return sql.replace(CREATE_TABLE_RE, stmt => {
     const [parsed] = parseCreateTables(stmt)
     if (!parsed || parsed.columns.length === 0) return stmt
     const alters = parsed.columns.map(c => `ALTER TABLE ${parsed.table} ADD COLUMN IF NOT EXISTS ${c.name} ${c.type};`)
@@ -146,7 +174,7 @@ function stripExtensionComments(sql: string): string {
 function stripPsqlMetaCommands(sql: string): string {
   return sql
     .split('\n')
-    .filter((line) => !/^\s*\\/.test(line))
+    .filter(line => !/^\s*\\/.test(line))
     .join('\n')
 }
 
@@ -168,12 +196,14 @@ function hoistForeignKeys(sql: string): string {
   const fkAddRe = /ALTER TABLE[^;]*?ADD CONSTRAINT\s+([A-Za-z0-9_]+)[^;]*?FOREIGN KEY[^;]*?;/gis
   // Collect FK adds, keyed by constraint name (last one wins → matches file's final intent).
   const byName = new Map<string, string>()
-  let body = sql.replace(fkAddRe, (m, name) => { byName.set(name, m.trim()); return '' })
+  let body = sql.replace(fkAddRe, (m, name) => {
+    byName.set(name, m.trim())
+    return ''
+  })
   if (byName.size === 0) return sql
   // Remove now-orphaned `DROP CONSTRAINT IF EXISTS <hoisted-fk>` lines from the body.
-  body = body.replace(
-    /ALTER TABLE[^;]*?DROP CONSTRAINT IF EXISTS\s+([A-Za-z0-9_]+)\s*;/gis,
-    (m, name) => (byName.has(name) ? '' : m),
+  body = body.replace(/ALTER TABLE[^;]*?DROP CONSTRAINT IF EXISTS\s+([A-Za-z0-9_]+)\s*;/gis, (m, name) =>
+    byName.has(name) ? '' : m
   )
   // Emit each FK once, self-guarded with a DROP IF EXISTS so re-runs are safe.
   const emitted = [...byName.entries()].map(([name, add]) => {
@@ -209,7 +239,7 @@ function hoistForeignKeys(sql: string): string {
 function guardNonFkConstraints(sql: string): string {
   const addRe = /ALTER TABLE\s+(?:ONLY\s+)?([A-Za-z0-9_.]+)\s+ADD CONSTRAINT\s+([A-Za-z0-9_]+)\b([^;]*);/gis
   return sql.replace(addRe, (stmt, table, name, rest) => {
-    if (/FOREIGN KEY/i.test(rest)) return stmt   // hoisted, already self-guarded
+    if (/FOREIGN KEY/i.test(rest)) return stmt // hoisted, already self-guarded
     if (/\bCHECK\b/i.test(rest)) {
       return [
         'DO $$ BEGIN',
@@ -252,13 +282,15 @@ function guardNonFkConstraints(sql: string): string {
 function makeCreatesIdempotent(sql: string): string {
   let out = sql
   out = out.replace(/CREATE TABLE\s+(?!IF NOT EXISTS)/gi, 'CREATE TABLE IF NOT EXISTS ')
-  out = out.replace(/CREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF NOT EXISTS)/gi,
-    (_m, uniq) => `CREATE ${uniq ? 'UNIQUE ' : ''}INDEX IF NOT EXISTS `)
+  out = out.replace(
+    /CREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF NOT EXISTS)/gi,
+    (_m, uniq) => `CREATE ${uniq ? 'UNIQUE ' : ''}INDEX IF NOT EXISTS `
+  )
   out = out.replace(/CREATE SEQUENCE\s+(?!IF NOT EXISTS)/gi, 'CREATE SEQUENCE IF NOT EXISTS ')
   out = out.replace(/CREATE FUNCTION\s+/gi, 'CREATE OR REPLACE FUNCTION ')
   out = out.replace(
     /CREATE TRIGGER\s+([A-Za-z0-9_]+)([^;]*?\sON\s+([A-Za-z0-9_.]+)[^;]*);/gis,
-    (stmt, name, _rest, table) => `DROP TRIGGER IF EXISTS ${name} ON ${table};\n${stmt.trim()}`,
+    (stmt, name, _rest, table) => `DROP TRIGGER IF EXISTS ${name} ON ${table};\n${stmt.trim()}`
   )
   return out
 }

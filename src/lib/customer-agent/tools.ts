@@ -3,15 +3,28 @@ import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { findSimilarProductIds } from '@/lib/rag'
 import { buildProductSearchClause } from '@/lib/search'
 
-function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
-function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+function vec(arr: number[]) {
+  return '[' + arr.join(',') + ']'
+}
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
 
 // Reject if a promise doesn't settle within ms — fast-fails the vector search
 // when the RAG store is unreachable so we fall back promptly.
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('rag-timeout')), ms)
-    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
+    p.then(
+      v => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      e => {
+        clearTimeout(timer)
+        reject(e)
+      }
+    )
   })
 }
 
@@ -30,7 +43,8 @@ async function resolveProductIds(query: string, limit: number): Promise<string[]
     }
     if (variantIds.length) {
       const vp = await queryMany<{ product_id: string }>(
-        `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`, [variantIds]
+        `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`,
+        [variantIds]
       )
       for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
     }
@@ -56,7 +70,10 @@ async function resolveProductIds(query: string, limit: number): Promise<string[]
 
 export interface CustomerToolInputSchema {
   type: 'object'
-  properties: Record<string, { type: string; description?: string; default?: unknown; minimum?: number; maximum?: number; enum?: string[] }>
+  properties: Record<
+    string,
+    { type: string; description?: string; default?: unknown; minimum?: number; maximum?: number; enum?: string[] }
+  >
   required?: string[]
 }
 
@@ -74,7 +91,8 @@ export interface CustomerToolDef {
 export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   {
     name: 'recommend_for_project',
-    description: 'Find products for a described need, occasion or use-case using semantic vector search. Use when the user describes what they need or what it is for — e.g. "I need a gift for a friend who loves cooking". Returns ranked products with price and stock. Always prefer this over search_products for need-style queries.',
+    description:
+      'Find products for a described need, occasion or use-case using semantic vector search. Use when the user describes what they need or what it is for — e.g. "I need a gift for a friend who loves cooking". Returns ranked products with price and stock. Always prefer this over search_products for need-style queries.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -87,11 +105,17 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const queryStr = String(q).slice(0, 500)
       const lim = clamp(typeof limit === 'number' ? limit : 8, 1, 12)
       const productIds = await resolveProductIds(queryStr, lim)
-      if (productIds.length === 0) return { products: [], note: "Sorry, we don't carry products matching that description." }
+      if (productIds.length === 0)
+        return { products: [], note: "Sorry, we don't carry products matching that description." }
 
       const rows = await queryMany<{
-        id: string; name: string; slug: string; sku: string;
-        price: string; short_description: string | null; stock_status: string
+        id: string
+        name: string
+        slug: string
+        sku: string
+        price: string
+        short_description: string | null
+        stock_status: string
       }>(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
@@ -106,7 +130,8 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
   {
     name: 'search_products',
-    description: 'Semantic search over the active catalog. Use for "find me X" / "I need a Y" queries. Returns ranked candidates with current price + stock.',
+    description:
+      'Semantic search over the active catalog. Use for "find me X" / "I need a Y" queries. Returns ranked candidates with current price + stock.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -230,7 +255,8 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
   {
     name: 'get_my_orders',
-    description: 'Return the authenticated user\'s OWN orders. Use when they ask "where is my order" / "my recent orders" / "my last purchase". Only returns orders that belong to them — never other customers.',
+    description:
+      'Return the authenticated user\'s OWN orders. Use when they ask "where is my order" / "my recent orders" / "my last purchase". Only returns orders that belong to them — never other customers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -242,7 +268,10 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
       const params: unknown[] = [ctx.authenticatedUserId]
       const where = ['o.user_id = $1::uuid']
-      if (status) { params.push(status); where.push(`o.status = $${params.length}`) }
+      if (status) {
+        params.push(status)
+        where.push(`o.status = $${params.length}`)
+      }
       params.push(lim)
       const rows = await queryMany(
         `SELECT o.id::text, o.order_number, o.status, o.payment_status,
@@ -259,7 +288,8 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
   {
     name: 'get_my_order',
-    description: 'Fetch one of the authenticated user\'s OWN orders by order number, including line items. Refuses to return any order that does not belong to them.',
+    description:
+      "Fetch one of the authenticated user's OWN orders by order number, including line items. Refuses to return any order that does not belong to them.",
     inputSchema: {
       type: 'object',
       properties: { orderNumber: { type: 'string' } },
@@ -267,8 +297,14 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
     },
     handler: async ({ orderNumber }, ctx) => {
       const order = await queryOne<{
-        id: string; order_number: string; status: string; payment_status: string;
-        subtotal: string; total_amount: string; created_at: string; delivered_at: string | null
+        id: string
+        order_number: string
+        status: string
+        payment_status: string
+        subtotal: string
+        total_amount: string
+        created_at: string
+        delivered_at: string | null
       }>(
         `SELECT o.id::text, o.order_number, o.status, o.payment_status,
                 o.subtotal::text, o.total_amount::text, o.created_at, o.delivered_at
@@ -288,7 +324,8 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
   },
   {
     name: 'get_my_recommendations',
-    description: 'Personalised product recommendations based on the authenticated user\'s OWN purchase history. Use when they ask "recommend something for me" / "based on what I\'ve bought".',
+    description:
+      'Personalised product recommendations based on the authenticated user\'s OWN purchase history. Use when they ask "recommend something for me" / "based on what I\'ve bought".',
     inputSchema: {
       type: 'object',
       properties: { limit: { type: 'integer', default: 5, minimum: 1, maximum: 10 } },
@@ -312,7 +349,12 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const ownedIds = new Set(recentItems.map(i => i.product_id))
       const productIds: string[] = []
       for (const r of ids) {
-        if (r.matchedVia === 'products' && r.productId && !ownedIds.has(r.productId) && !productIds.includes(r.productId)) {
+        if (
+          r.matchedVia === 'products' &&
+          r.productId &&
+          !ownedIds.has(r.productId) &&
+          !productIds.includes(r.productId)
+        ) {
           productIds.push(r.productId)
         }
       }

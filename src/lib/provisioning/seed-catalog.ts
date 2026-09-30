@@ -1,4 +1,8 @@
-export interface SeedItem { name: string; price: number; blurb: string }
+export interface SeedItem {
+  name: string
+  price: number
+  blurb: string
+}
 export interface SeedCatalog {
   category: string
   categorySlug: string
@@ -12,7 +16,8 @@ const mk = (name: string, price: number, blurb: string): SeedItem => ({ name, pr
 // a new store looks furnished on first login, and every row is safe to edit or delete.
 export const SEED_CATALOGS: Record<string, SeedCatalog> = {
   'Electronics & Gadgets': {
-    category: 'Electronics', categorySlug: 'electronics',
+    category: 'Electronics',
+    categorySlug: 'electronics',
     items: [
       mk('Wireless Earbuds', 2499, 'True wireless earbuds with charging case and noise isolation.'),
       mk('Bluetooth Speaker', 1899, 'Portable speaker with deep bass and all-day battery.'),
@@ -26,12 +31,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Webcam 1080p', 2799, 'Full-HD webcam with autofocus and built-in microphone.'),
     ],
     hero: [
-      { title: 'New arrivals in electronics', subtitle: 'Audio, charging and desk essentials', badge: 'New', cta: 'Shop now' },
-      { title: 'Everyday tech, honest prices', subtitle: 'Curated gadgets for work and home', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'New arrivals in electronics',
+        subtitle: 'Audio, charging and desk essentials',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Everyday tech, honest prices',
+        subtitle: 'Curated gadgets for work and home',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Fashion & Apparel': {
-    category: 'Apparel', categorySlug: 'apparel',
+    category: 'Apparel',
+    categorySlug: 'apparel',
     items: [
       mk('Cotton Crew T-Shirt', 699, 'Pre-shrunk combed cotton with a regular fit.'),
       mk('Oxford Shirt', 1499, 'Button-down oxford weave for work or weekend.'),
@@ -45,12 +61,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Baseball Cap', 599, 'Six-panel cotton cap with adjustable strap.'),
     ],
     hero: [
-      { title: 'The new season is here', subtitle: 'Everyday staples, considered fabrics', badge: 'New season', cta: 'Shop the range' },
-      { title: 'Built to be worn often', subtitle: 'Simple pieces that hold their shape', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'The new season is here',
+        subtitle: 'Everyday staples, considered fabrics',
+        badge: 'New season',
+        cta: 'Shop the range',
+      },
+      {
+        title: 'Built to be worn often',
+        subtitle: 'Simple pieces that hold their shape',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Home & Kitchen': {
-    category: 'Home & Kitchen', categorySlug: 'home-kitchen',
+    category: 'Home & Kitchen',
+    categorySlug: 'home-kitchen',
     items: [
       mk('Stainless Steel Cookware Set', 4999, 'Five-piece induction-ready set with glass lids.'),
       mk('Ceramic Dinner Set', 2999, 'Sixteen-piece stoneware set, dishwasher safe.'),
@@ -65,11 +92,17 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
     ],
     hero: [
       { title: 'Make the everyday better', subtitle: 'Kitchen and home essentials', badge: 'New', cta: 'Shop now' },
-      { title: 'Built for daily use', subtitle: 'Durable pieces at fair prices', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Built for daily use',
+        subtitle: 'Durable pieces at fair prices',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Health & Beauty': {
-    category: 'Health & Beauty', categorySlug: 'health-beauty',
+    category: 'Health & Beauty',
+    categorySlug: 'health-beauty',
     items: [
       mk('Vitamin C Serum', 1299, 'Brightening serum with stabilised vitamin C.'),
       mk('Daily Moisturiser', 899, 'Lightweight hydration for all skin types.'),
@@ -83,12 +116,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Electric Face Brush', 1999, 'Silicone sonic cleansing brush, waterproof.'),
     ],
     hero: [
-      { title: 'Care that fits your routine', subtitle: 'Skin, hair and daily essentials', badge: 'New', cta: 'Shop now' },
-      { title: 'Simple ingredients, real results', subtitle: 'Dermatologist-friendly formulations', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Care that fits your routine',
+        subtitle: 'Skin, hair and daily essentials',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Simple ingredients, real results',
+        subtitle: 'Dermatologist-friendly formulations',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Books & Stationery': {
-    category: 'Books & Stationery', categorySlug: 'books-stationery',
+    category: 'Books & Stationery',
+    categorySlug: 'books-stationery',
     items: [
       mk('Hardbound Notebook A5', 499, 'Two hundred pages of ninety GSM paper.'),
       mk('Gel Pen Set', 349, 'Pack of ten quick-dry pens in assorted colours.'),
@@ -102,12 +146,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Book Stand', 799, 'Adjustable bamboo reading stand.'),
     ],
     hero: [
-      { title: 'For the desk you actually use', subtitle: 'Notebooks, pens and organisers', badge: 'New', cta: 'Shop now' },
-      { title: 'Stationery worth keeping', subtitle: 'Considered tools for daily work', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'For the desk you actually use',
+        subtitle: 'Notebooks, pens and organisers',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Stationery worth keeping',
+        subtitle: 'Considered tools for daily work',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Sports & Fitness': {
-    category: 'Sports & Fitness', categorySlug: 'sports-fitness',
+    category: 'Sports & Fitness',
+    categorySlug: 'sports-fitness',
     items: [
       mk('Yoga Mat 6mm', 1299, 'Non-slip TPE mat with carrying strap.'),
       mk('Adjustable Dumbbell', 3499, 'Two-point-five to twenty-four kilogram range.'),
@@ -121,12 +176,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Ankle Weights Pair', 1399, 'One kilogram each with adjustable straps.'),
     ],
     hero: [
-      { title: 'Train at home, properly', subtitle: 'Equipment that lasts past January', badge: 'New', cta: 'Shop now' },
-      { title: 'Kit for every session', subtitle: 'Strength, mobility and recovery', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Train at home, properly',
+        subtitle: 'Equipment that lasts past January',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Kit for every session',
+        subtitle: 'Strength, mobility and recovery',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Toys & Games': {
-    category: 'Toys & Games', categorySlug: 'toys-games',
+    category: 'Toys & Games',
+    categorySlug: 'toys-games',
     items: [
       mk('Wooden Building Blocks', 1299, 'Fifty-piece set in untreated hardwood.'),
       mk('Strategy Board Game', 1999, 'Two to four players, forty-five minute play.'),
@@ -141,11 +207,17 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
     ],
     hero: [
       { title: 'Play that lasts', subtitle: 'Toys and games for every age', badge: 'New', cta: 'Shop now' },
-      { title: 'Screen-free favourites', subtitle: 'Build, solve and imagine', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Screen-free favourites',
+        subtitle: 'Build, solve and imagine',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Industrial & B2B': {
-    category: 'Industrial Supplies', categorySlug: 'industrial-supplies',
+    category: 'Industrial Supplies',
+    categorySlug: 'industrial-supplies',
     items: [
       mk('Hex Bolt Assortment', 1499, 'Grade eight-point-eight zinc-plated, assorted sizes.'),
       mk('Torque Wrench', 3999, 'Twenty to two hundred newton metre, calibrated.'),
@@ -159,12 +231,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Safety Goggles', 449, 'Anti-fog polycarbonate with side shields.'),
     ],
     hero: [
-      { title: 'Supplies for the working day', subtitle: 'Fasteners, tools and safety gear', badge: 'New', cta: 'Shop now' },
-      { title: 'Bulk pricing available', subtitle: 'Request a quotation on any line', badge: 'B2B', cta: 'Browse catalogue' },
+      {
+        title: 'Supplies for the working day',
+        subtitle: 'Fasteners, tools and safety gear',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Bulk pricing available',
+        subtitle: 'Request a quotation on any line',
+        badge: 'B2B',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   'Food & Groceries': {
-    category: 'Food & Groceries', categorySlug: 'food-groceries',
+    category: 'Food & Groceries',
+    categorySlug: 'food-groceries',
     items: [
       mk('Cold Pressed Oil 1L', 649, 'Single-origin, unrefined and filtered.'),
       mk('Organic Honey 500g', 549, 'Raw multifloral honey, unpasteurised.'),
@@ -178,12 +261,23 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Millet Mix 1kg', 399, 'Five-millet blend for daily cooking.'),
     ],
     hero: [
-      { title: 'Pantry staples, sourced well', subtitle: 'Everyday groceries you can trust', badge: 'New', cta: 'Shop now' },
-      { title: 'Fresh stock every week', subtitle: 'Grains, oils, spices and more', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Pantry staples, sourced well',
+        subtitle: 'Everyday groceries you can trust',
+        badge: 'New',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Fresh stock every week',
+        subtitle: 'Grains, oils, spices and more',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
   Other: {
-    category: 'General', categorySlug: 'general',
+    category: 'General',
+    categorySlug: 'general',
     items: [
       mk('Sample Product One', 999, 'Replace this with your own product details.'),
       mk('Sample Product Two', 1499, 'Replace this with your own product details.'),
@@ -197,8 +291,18 @@ export const SEED_CATALOGS: Record<string, SeedCatalog> = {
       mk('Sample Product Ten', 2199, 'Replace this with your own product details.'),
     ],
     hero: [
-      { title: 'Welcome to your new store', subtitle: 'Edit this banner from Admin, Hero Slides', badge: 'Getting started', cta: 'Shop now' },
-      { title: 'Your products, your way', subtitle: 'Replace these samples with your catalogue', badge: 'Featured', cta: 'Browse catalogue' },
+      {
+        title: 'Welcome to your new store',
+        subtitle: 'Edit this banner from Admin, Hero Slides',
+        badge: 'Getting started',
+        cta: 'Shop now',
+      },
+      {
+        title: 'Your products, your way',
+        subtitle: 'Replace these samples with your catalogue',
+        badge: 'Featured',
+        cta: 'Browse catalogue',
+      },
     ],
   },
 }

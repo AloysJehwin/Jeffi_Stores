@@ -64,10 +64,7 @@ function toVectorLiteral(vec: number[]): string {
   return `[${vec.join(',')}]`
 }
 
-export async function queryManyReplica<T = Record<string, unknown>>(
-  sql: string,
-  params: unknown[] = []
-): Promise<T[]> {
+export async function queryManyReplica<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
   const client = await getPool().connect()
   try {
     const result = await client.query(sql, params)
@@ -88,10 +85,7 @@ export async function embed(text: string): Promise<number[]> {
   return vector
 }
 
-export async function findSimilar(
-  query: string,
-  opts: FindSimilarOptions = {}
-): Promise<RagResult[]> {
+export async function findSimilar(query: string, opts: FindSimilarOptions = {}): Promise<RagResult[]> {
   const limit = opts.limit ?? 10
   const minSimilarity = opts.minSimilarity
   const tables = opts.sourceTables ?? (opts.sourceTable ? [opts.sourceTable] : undefined)
@@ -129,7 +123,7 @@ export async function findSimilar(
   `
 
   const result = await runWithHnswTuning(sql, params)
-  return result.rows.map((row) => ({
+  return result.rows.map(row => ({
     source_table: row.source_table,
     source_id: row.source_id,
     content: row.content,
@@ -232,8 +226,37 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
  */
 async function keywordProductIds(query: string, limit: number): Promise<string[]> {
   // Salient tokens: drop stopwords / connectors, keep words >= 3 chars.
-  const STOP = new Set(['for', 'the', 'and', 'need', 'want', 'what', 'which', 'with', 'from', 'that', 'this', 'building', 'build', 'make', 'making', 'some', 'any', 'are', 'you', 'your', 'have', 'get', 'looking', 'about', 'help'])
-  const tokens = query.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+  const STOP = new Set([
+    'for',
+    'the',
+    'and',
+    'need',
+    'want',
+    'what',
+    'which',
+    'with',
+    'from',
+    'that',
+    'this',
+    'building',
+    'build',
+    'make',
+    'making',
+    'some',
+    'any',
+    'are',
+    'you',
+    'your',
+    'have',
+    'get',
+    'looking',
+    'about',
+    'help',
+  ])
+  const tokens = query
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
     .filter(t => t.length >= 3 && !STOP.has(t))
   if (tokens.length === 0) return []
   const tsquery = tokens.join(' | ')

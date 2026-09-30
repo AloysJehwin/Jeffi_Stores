@@ -1,7 +1,6 @@
 import { queryOne, queryMany } from './db'
 
-const fmtName = (fn: string | null, ln: string | null, email: string) =>
-  [fn, ln].filter(Boolean).join(' ') || email
+const fmtName = (fn: string | null, ln: string | null, email: string) => [fn, ln].filter(Boolean).join(' ') || email
 
 export async function getCrmDashboardData(adminId: string) {
   const [
@@ -19,9 +18,18 @@ export async function getCrmDashboardData(adminId: string) {
     biggestDrops,
   ] = await Promise.all([
     queryOne<{
-      total: string; vip: string; loyal: string; repeat: string; one_time: string;
-      new: string; at_risk: string; dormant: string; b2b: string; lead: string;
-    }>(`
+      total: string
+      vip: string
+      loyal: string
+      repeat: string
+      one_time: string
+      new: string
+      at_risk: string
+      dormant: string
+      b2b: string
+      lead: string
+    }>(
+      `
       WITH agg AS (
         SELECT
           u.id,
@@ -55,9 +63,19 @@ export async function getCrmDashboardData(adminId: string) {
         COUNT(*) FILTER (WHERE is_b2b) AS b2b,
         COUNT(*) FILTER (WHERE order_count = 0) AS lead
       FROM agg
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; last_order_at: string; ltv: string }>(`
+    queryMany<{
+      id: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+      last_order_at: string
+      ltv: string
+    }>(
+      `
       SELECT u.id, u.first_name, u.last_name, u.email,
              o.last_order_at, COALESCE(o.lifetime_value, 0) AS ltv
       FROM users u
@@ -70,9 +88,19 @@ export async function getCrmDashboardData(adminId: string) {
         AND o.last_order_at >= NOW() - INTERVAL '97 days'
       ORDER BY o.lifetime_value DESC
       LIMIT 10
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; last_order_at: string; ltv: string }>(`
+    queryMany<{
+      id: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+      last_order_at: string
+      ltv: string
+    }>(
+      `
       SELECT u.id, u.first_name, u.last_name, u.email,
              o.last_order_at, COALESCE(o.lifetime_value, 0) AS ltv
       FROM users u
@@ -84,17 +112,39 @@ export async function getCrmDashboardData(adminId: string) {
         AND o.last_order_at < NOW() - INTERVAL '180 days'
       ORDER BY o.lifetime_value DESC
       LIMIT 10
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ user_id: string; tag: string; created_at: string; first_name: string | null; last_name: string | null; email: string }>(`
+    queryMany<{
+      user_id: string
+      tag: string
+      created_at: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+    }>(
+      `
       SELECT ct.user_id, ct.tag, ct.created_at, u.first_name, u.last_name, u.email
       FROM customer_tags ct
       JOIN users u ON u.id = ct.user_id
       ORDER BY ct.created_at DESC
       LIMIT 12
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ user_id: string; body: string; created_at: string; first_name: string | null; last_name: string | null; email: string; admin_first_name: string | null; admin_last_name: string | null }>(`
+    queryMany<{
+      user_id: string
+      body: string
+      created_at: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+      admin_first_name: string | null
+      admin_last_name: string | null
+    }>(
+      `
       SELECT cn.user_id, cn.body, cn.created_at,
              u.first_name, u.last_name, u.email,
              au.first_name AS admin_first_name, au.last_name AS admin_last_name
@@ -104,42 +154,57 @@ export async function getCrmDashboardData(adminId: string) {
       LEFT JOIN users au ON au.id = a.user_id
       ORDER BY cn.created_at DESC
       LIMIT 8
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ tag: string; count: string }>(`
+    queryMany<{ tag: string; count: string }>(
+      `
       SELECT tag, COUNT(*)::int AS count
       FROM customer_tags
       GROUP BY tag
       ORDER BY COUNT(*) DESC
       LIMIT 12
-    `, []),
+    `,
+      []
+    ),
 
-    queryOne<{ count: string }>(`
+    queryOne<{ count: string }>(
+      `
       SELECT COUNT(*) AS count
       FROM users u
       LEFT JOIN orders o ON o.user_id = u.id
       WHERE u.is_guest = false
         AND u.created_at >= NOW() - INTERVAL '7 days'
         AND o.id IS NULL
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; created_at: string }>(`
+    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; created_at: string }>(
+      `
       SELECT u.id, u.first_name, u.last_name, u.email, u.created_at
       FROM users u
       WHERE u.is_guest = false
       ORDER BY u.created_at DESC
       LIMIT 8
-    `, []),
+    `,
+      []
+    ),
 
-    queryOne<{ open_count: string; overdue_count: string; mine_count: string }>(`
+    queryOne<{ open_count: string; overdue_count: string; mine_count: string }>(
+      `
       SELECT
         COUNT(*) FILTER (WHERE ct.status IN ('pending', 'in_progress')) AS open_count,
         COUNT(*) FILTER (WHERE ct.status IN ('pending', 'in_progress') AND ct.due_date < CURRENT_DATE) AS overdue_count,
         COUNT(*) FILTER (WHERE ct.status IN ('pending', 'in_progress') AND ct.assigned_to = $1) AS mine_count
       FROM customer_tasks ct
-    `, [adminId]),
+    `,
+      [adminId]
+    ),
 
-    queryOne<{ b0_20: string; b20_40: string; b40_60: string; b60_80: string; b80_100: string; unscored: string }>(`
+    queryOne<{ b0_20: string; b20_40: string; b40_60: string; b60_80: string; b80_100: string; unscored: string }>(
+      `
       SELECT
         COUNT(*) FILTER (WHERE ch.score >= 0 AND ch.score < 20)   AS b0_20,
         COUNT(*) FILTER (WHERE ch.score >= 20 AND ch.score < 40)  AS b20_40,
@@ -152,9 +217,20 @@ export async function getCrmDashboardData(adminId: string) {
       FROM customer_health ch
       JOIN users u ON u.id = ch.user_id
       WHERE u.is_active = true AND u.is_guest = false
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; score: number; ltv: string; days_since_last_order: string | null }>(`
+    queryMany<{
+      id: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+      score: number
+      ltv: string
+      days_since_last_order: string | null
+    }>(
+      `
       SELECT u.id, u.first_name, u.last_name, u.email, ch.score,
              COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS ltv,
              EXTRACT(DAY FROM NOW() - (SELECT MAX(o.created_at) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'))::int::text AS days_since_last_order
@@ -164,9 +240,19 @@ export async function getCrmDashboardData(adminId: string) {
         AND ch.score < 40
       ORDER BY (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid') DESC
       LIMIT 10
-    `, []),
+    `,
+      []
+    ),
 
-    queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; score: number; trend_delta_7d: number }>(`
+    queryMany<{
+      id: string
+      first_name: string | null
+      last_name: string | null
+      email: string
+      score: number
+      trend_delta_7d: number
+    }>(
+      `
       SELECT u.id, u.first_name, u.last_name, u.email, ch.score, ch.trend_delta_7d
       FROM users u
       JOIN customer_health ch ON ch.user_id = u.id
@@ -174,21 +260,23 @@ export async function getCrmDashboardData(adminId: string) {
         AND ch.trend_delta_7d <= -15
       ORDER BY ch.trend_delta_7d ASC
       LIMIT 5
-    `, []),
+    `,
+      []
+    ),
   ])
 
   return {
     segments: {
-      total:    parseInt(segmentCounts?.total ?? '0'),
-      vip:      parseInt(segmentCounts?.vip ?? '0'),
-      loyal:    parseInt(segmentCounts?.loyal ?? '0'),
-      repeat:   parseInt(segmentCounts?.repeat ?? '0'),
+      total: parseInt(segmentCounts?.total ?? '0'),
+      vip: parseInt(segmentCounts?.vip ?? '0'),
+      loyal: parseInt(segmentCounts?.loyal ?? '0'),
+      repeat: parseInt(segmentCounts?.repeat ?? '0'),
       one_time: parseInt(segmentCounts?.one_time ?? '0'),
-      new:      parseInt(segmentCounts?.new ?? '0'),
-      at_risk:  parseInt(segmentCounts?.at_risk ?? '0'),
-      dormant:  parseInt(segmentCounts?.dormant ?? '0'),
-      b2b:      parseInt(segmentCounts?.b2b ?? '0'),
-      lead:     parseInt(segmentCounts?.lead ?? '0'),
+      new: parseInt(segmentCounts?.new ?? '0'),
+      at_risk: parseInt(segmentCounts?.at_risk ?? '0'),
+      dormant: parseInt(segmentCounts?.dormant ?? '0'),
+      b2b: parseInt(segmentCounts?.b2b ?? '0'),
+      lead: parseInt(segmentCounts?.lead ?? '0'),
     },
     crossingAtRisk: crossingAtRisk.map(c => ({
       id: c.id,
@@ -226,16 +314,16 @@ export async function getCrmDashboardData(adminId: string) {
       createdAt: s.created_at,
     })),
     tasks: {
-      open:    parseInt(taskCounts?.open_count ?? '0'),
+      open: parseInt(taskCounts?.open_count ?? '0'),
       overdue: parseInt(taskCounts?.overdue_count ?? '0'),
-      mine:    parseInt(taskCounts?.mine_count ?? '0'),
+      mine: parseInt(taskCounts?.mine_count ?? '0'),
     },
     health: {
       distribution: {
-        b0_20:   parseInt(healthDistribution?.b0_20 ?? '0'),
-        b20_40:  parseInt(healthDistribution?.b20_40 ?? '0'),
-        b40_60:  parseInt(healthDistribution?.b40_60 ?? '0'),
-        b60_80:  parseInt(healthDistribution?.b60_80 ?? '0'),
+        b0_20: parseInt(healthDistribution?.b0_20 ?? '0'),
+        b20_40: parseInt(healthDistribution?.b20_40 ?? '0'),
+        b40_60: parseInt(healthDistribution?.b40_60 ?? '0'),
+        b60_80: parseInt(healthDistribution?.b60_80 ?? '0'),
         b80_100: parseInt(healthDistribution?.b80_100 ?? '0'),
         unscored: parseInt(healthDistribution?.unscored ?? '0'),
       },

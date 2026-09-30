@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { queryMany } from '@/lib/db'
 import type { AdvancedFilterField } from '@/lib/product-attribute-filters-shared'
+import { ALIASED_SPEC_KEYS, COLUMN_SPEC_ALIASES, SPEC_JUNK_SQL, specKeySql, specLabel } from '@/lib/product-specs'
 import {
-  ALIASED_SPEC_KEYS, COLUMN_SPEC_ALIASES, SPEC_JUNK_SQL, specKeySql, specLabel,
-} from '@/lib/product-specs'
-import {
-  SPEC_PARAM_PREFIX, SPEC_SECTION, specKeyFromParam, specParam, splitFilterValues,
+  SPEC_PARAM_PREFIX,
+  SPEC_SECTION,
+  specKeyFromParam,
+  specParam,
+  splitFilterValues,
 } from '@/lib/product-attribute-filters-shared'
 
 export type FilterParams = Record<string, unknown>
@@ -25,7 +27,11 @@ const VALUE_SOURCES: Record<string, ValueSource> = {
   finish: { expr: 'p.finish', specKeys: COLUMN_SPEC_ALIASES.finish },
   color: { expr: 'p.color', specKeys: COLUMN_SPEC_ALIASES.color },
   size: { expr: 'p.size', specKeys: COLUMN_SPEC_ALIASES.size },
-  compliance_standard: { expr: 'p.compliance_standard', specKeys: COLUMN_SPEC_ALIASES.compliance_standard, splitList: true },
+  compliance_standard: {
+    expr: 'p.compliance_standard',
+    specKeys: COLUMN_SPEC_ALIASES.compliance_standard,
+    splitList: true,
+  },
   safety_rating: { expr: 'p.safety_rating', specKeys: COLUMN_SPEC_ALIASES.safety_rating },
   certifications: { arrayExpr: 'p.certifications' },
   brand_part_number: { expr: 'p.brand_part_number', specKeys: COLUMN_SPEC_ALIASES.brand_part_number },
@@ -47,9 +53,15 @@ const VALUE_SOURCES: Record<string, ValueSource> = {
 }
 
 const TOGGLES: Record<string, string> = {
-  is_featured: 'p.is_featured', has_variants: 'p.has_variants', is_digital: 'p.is_digital',
-  is_bundle: 'p.is_bundle', is_subscription: 'p.is_subscription', is_cod_allowed: 'p.is_cod_allowed',
-  inclusive_tax: 'p.inclusive_tax', inventory_sync: 'p.inventory_sync', is_oversized: 'p.is_oversized',
+  is_featured: 'p.is_featured',
+  has_variants: 'p.has_variants',
+  is_digital: 'p.is_digital',
+  is_bundle: 'p.is_bundle',
+  is_subscription: 'p.is_subscription',
+  is_cod_allowed: 'p.is_cod_allowed',
+  inclusive_tax: 'p.inclusive_tax',
+  inventory_sync: 'p.inventory_sync',
+  is_oversized: 'p.is_oversized',
   is_searchable: 'p.is_searchable',
 }
 
@@ -62,7 +74,8 @@ const MULTI: Record<string, { expr: string; numeric?: boolean }> = {
 }
 
 const RANGES: Record<string, string> = {
-  price: '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
+  price:
+    '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
   mrp: 'p.mrp',
   discount: 'p.discount_pct',
   stock: `(CASE WHEN p.has_variants THEN COALESCE((SELECT SUM(
@@ -94,9 +107,11 @@ function specRowsSql(keys: readonly string[], bind: Bind, split: boolean): strin
 function sourceRowsSql(source: ValueSource, bind: Bind): string {
   const parts: string[] = []
   if (source.expr) {
-    parts.push(source.splitList
-      ? `SELECT btrim(y) AS val FROM regexp_split_to_table(${source.expr}, ',') y`
-      : `SELECT btrim(${source.expr}) AS val`)
+    parts.push(
+      source.splitList
+        ? `SELECT btrim(y) AS val FROM regexp_split_to_table(${source.expr}, ',') y`
+        : `SELECT btrim(${source.expr}) AS val`
+    )
   }
   if (source.arrayExpr) parts.push(`SELECT btrim(y) AS val FROM unnest(${source.arrayExpr}) y`)
   if (source.specKeys?.length) parts.push(specRowsSql(source.specKeys, bind, !!source.splitList))
@@ -118,8 +133,12 @@ function matchSql(source: ValueSource, values: string[], bind: Bind): string {
   return `EXISTS (SELECT 1 FROM (${sourceRowsSql(source, bind)}) s WHERE ${fold}(s.val) IN (${wanted}))`
 }
 
-const first = (v: unknown) => (typeof v === 'string' ? v : Array.isArray(v) && typeof v[0] === 'string' ? v[0] : '').trim()
-const list = (v: unknown) => splitFilterValues(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? v : '')
+const first = (v: unknown) =>
+  (typeof v === 'string' ? v : Array.isArray(v) && typeof v[0] === 'string' ? v[0] : '').trim()
+const list = (v: unknown) =>
+  splitFilterValues(
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : typeof v === 'string' ? v : ''
+  )
 const isNumber = (v: string) => v !== '' && Number.isFinite(Number(v))
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
 
@@ -127,7 +146,10 @@ const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v)
  * WHERE conditions for every attribute filter in the query string (the product list and the Controls
  * page share them). Values are bound raw and compared case-insensitively in SQL.
  */
-export function buildAttributeFilterClauses(sp: FilterParams, startIdx: number): { conditions: string[]; params: unknown[]; nextIdx: number } {
+export function buildAttributeFilterClauses(
+  sp: FilterParams,
+  startIdx: number
+): { conditions: string[]; params: unknown[]; nextIdx: number } {
   const conditions: string[] = []
   const params: unknown[] = []
   const bind: Bind = value => {
@@ -144,11 +166,17 @@ export function buildAttributeFilterClauses(sp: FilterParams, startIdx: number):
     if (v === 'true' || v === 'false') conditions.push(`p.${flag} = ${v}`)
   }
   for (const [param, { expr, numeric }] of Object.entries(MULTI)) {
-    const values = first(sp[param]).split(',').map(v => v.trim()).filter(v => v && (!numeric || isNumber(v))).slice(0, MAX_VALUES)
+    const values = first(sp[param])
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v && (!numeric || isNumber(v)))
+      .slice(0, MAX_VALUES)
     if (values.length === 0) continue
-    conditions.push(numeric
-      ? `${expr} IN (${values.map(v => `${bind(v)}::numeric`).join(', ')})`
-      : `lower(btrim(${expr})) IN (${values.map(v => `lower(${bind(v)})`).join(', ')})`)
+    conditions.push(
+      numeric
+        ? `${expr} IN (${values.map(v => `${bind(v)}::numeric`).join(', ')})`
+        : `lower(btrim(${expr})) IN (${values.map(v => `lower(${bind(v)})`).join(', ')})`
+    )
   }
   for (const [base, expr] of Object.entries(RANGES)) {
     const min = first(sp[`${base}_min`])
@@ -161,7 +189,10 @@ export function buildAttributeFilterClauses(sp: FilterParams, startIdx: number):
   if (isDate(from)) conditions.push(`p.created_at >= ${bind(from)}::date`)
   if (isDate(to)) conditions.push(`p.created_at < ${bind(to)}::date + 1`)
 
-  const specParams = Object.keys(sp).filter(k => k.startsWith(SPEC_PARAM_PREFIX)).sort().slice(0, MAX_SPEC_FILTERS)
+  const specParams = Object.keys(sp)
+    .filter(k => k.startsWith(SPEC_PARAM_PREFIX))
+    .sort()
+    .slice(0, MAX_SPEC_FILTERS)
   for (const param of [...Object.keys(VALUE_SOURCES), ...specParams]) {
     const values = list(sp[param]).slice(0, MAX_VALUES)
     const source = values.length > 0 ? sourceFor(param) : null
@@ -177,7 +208,11 @@ export interface AttributeValue {
 }
 
 /** The distinct values of one attribute with their product counts, most common first; null for an unknown attribute. */
-export async function getAttributeValues(param: string, search: string, page: number): Promise<AttributeValue[] | null> {
+export async function getAttributeValues(
+  param: string,
+  search: string,
+  page: number
+): Promise<AttributeValue[] | null> {
   const source = sourceFor(param)
   if (!source) return null
   const params: unknown[] = []
@@ -186,7 +221,10 @@ export async function getAttributeValues(param: string, search: string, page: nu
     return `$${params.length}`
   }
   const rows = sourceRowsSql(source, bind)
-  const needle = search.trim().slice(0, 100).replace(/[\\%_]/g, m => `\\${m}`)
+  const needle = search
+    .trim()
+    .slice(0, 100)
+    .replace(/[\\%_]/g, m => `\\${m}`)
   const searchSql = needle ? `AND v.val ILIKE ${bind(`%${needle}%`)}` : ''
   const offset = bind((Math.max(1, page) - 1) * PAGE_SIZE)
   return queryMany<AttributeValue>(
@@ -196,7 +234,7 @@ export async function getAttributeValues(param: string, search: string, page: nu
      GROUP BY ${source.upper ? 'upper' : 'lower'}(v.val)
      ORDER BY count DESC, value
      LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
-    params,
+    params
   )
 }
 
@@ -223,7 +261,7 @@ export async function getSpecFilterFields(minProducts = 2): Promise<AdvancedFilt
      HAVING count(DISTINCT p.id) >= $1
      ORDER BY count(DISTINCT p.id) DESC, 1
      LIMIT 200`,
-    [minProducts],
+    [minProducts]
   ).catch(err => {
     console.error('[product-attribute-filters] spec fields', err)
     return [] as { key: string; label: string | null; raw: string }[]

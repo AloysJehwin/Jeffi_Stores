@@ -109,17 +109,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ] = await Promise.all([
       queryCount('SELECT COUNT(*) FROM products'),
       queryCount('SELECT COUNT(*) FROM orders'),
-      queryOne<{ total: string; online: string; offline: string }>(`
+      queryOne<{ total: string; online: string; offline: string }>(
+        `
         SELECT
           COALESCE(SUM(total_amount), 0) AS total,
           COALESCE(SUM(CASE WHEN source = 'online' THEN total_amount ELSE 0 END), 0) AS online,
           COALESCE(SUM(CASE WHEN source = 'offline' THEN total_amount ELSE 0 END), 0) AS offline
         FROM orders WHERE payment_status = $1
-      `, ['paid']),
+      `,
+        ['paid']
+      ),
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
       queryCount("SELECT COUNT(*) FROM products WHERE stock_status = 'Low Stock'"),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
-      queryCount("SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"),
+      queryCount(
+        "SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"
+      ),
     ])
 
     const [onlineOrders, offlineOrders] = await Promise.all([
@@ -212,7 +217,8 @@ export async function getAllProducts() {
 }
 
 export async function getProduct(id: string) {
-  const product = await queryOne(`
+  const product = await queryOne(
+    `
     SELECT
       p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -315,7 +321,9 @@ export async function getProduct(id: string) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.id = $1
-  `, [id])
+  `,
+    [id]
+  )
 
   if (!product) throw new Error('Product not found')
   return product
@@ -444,7 +452,14 @@ export async function getFilteredOrders(filters: {
     conditions.push(`o.payment_mode = 'cod' AND o.payment_status = 'cod_collected' AND o.cod_remitted_at IS NULL`)
   }
   if (filters.search) {
-    const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.order_number'], i, 'simple')
+    const sc = buildVectorSearchClause(
+      filters.search,
+      'o.search_vector',
+      ['o.customer_name'],
+      ['o.order_number'],
+      i,
+      'simple'
+    )
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
@@ -457,7 +472,8 @@ export async function getFilteredOrders(filters: {
   const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [orders, countResult] = await Promise.all([
-    queryMany(`
+    queryMany(
+      `
       SELECT
         o.*,
         json_build_object(
@@ -469,7 +485,9 @@ export async function getFilteredOrders(filters: {
       ${where}
       ORDER BY ${sortCol} ${sortDir}
       LIMIT $${i} OFFSET $${i + 1}
-    `, [...params, limit, offset]),
+    `,
+      [...params, limit, offset]
+    ),
     queryCount(`SELECT COUNT(*) FROM orders o ${where}`, params),
   ])
 
@@ -481,7 +499,8 @@ const PRODUCT_SORT_COLS: Record<string, string> = {
   sku: 'p.sku',
   // products has no `price` column — use the effective display price (min active variant
   // price, else base_price). Sorting by 'p.price' errored the whole page.
-  price: '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
+  price:
+    '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
   stock: 'p.stock_status',
   created_at: 'p.created_at',
   category: 'c.name',
@@ -588,7 +607,8 @@ export async function getFilteredProducts(filters: {
     : `${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
   const [products, total] = await Promise.all([
-    queryMany(`
+    queryMany(
+      `
       SELECT
         p.*,
         json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -668,7 +688,9 @@ export async function getFilteredProducts(filters: {
       ${where}
       ORDER BY ${orderBy}
       LIMIT $${i} OFFSET $${i + 1}
-    `, [...params, limit, offset]),
+    `,
+      [...params, limit, offset]
+    ),
     queryCount(`SELECT COUNT(*) FROM products p ${where}`, countParams),
   ])
 
@@ -737,9 +759,7 @@ const BROCHURE_SELECT = `
  * sub-categories via the recursive cat_tree) — regardless of brand. Backs the
  * categories-page brochure. Active products only.
  */
-export async function getBrochureProductsByCategories(
-  categoryIds: string[]
-): Promise<BrochureProduct[]> {
+export async function getBrochureProductsByCategories(categoryIds: string[]): Promise<BrochureProduct[]> {
   if (categoryIds.length === 0) return []
   return queryMany<BrochureProduct>(
     `
@@ -761,9 +781,7 @@ export async function getBrochureProductsByCategories(
  * Products for the selected brands — regardless of category. Backs the
  * brands-page brochure. Active products only.
  */
-export async function getBrochureProductsByBrands(
-  brandIds: string[]
-): Promise<BrochureProduct[]> {
+export async function getBrochureProductsByBrands(brandIds: string[]): Promise<BrochureProduct[]> {
   if (brandIds.length === 0) return []
   return queryMany<BrochureProduct>(
     `
@@ -780,9 +798,7 @@ export async function getBrochureProductsByBrands(
  * Products by explicit id list — the final admin selection (after deselecting in
  * the popup). Returned in the given id order so the PDF matches the preview.
  */
-export async function getBrochureProductsByIds(
-  productIds: string[]
-): Promise<BrochureProduct[]> {
+export async function getBrochureProductsByIds(productIds: string[]): Promise<BrochureProduct[]> {
   if (productIds.length === 0) return []
   const rows = await queryMany<BrochureProduct>(
     `
@@ -796,11 +812,7 @@ export async function getBrochureProductsByIds(
   return productIds.map(id => byId.get(id)).filter(Boolean) as BrochureProduct[]
 }
 
-export async function getFilteredCategories(filters: {
-  is_active?: string
-  type?: string
-  search?: string
-}) {
+export async function getFilteredCategories(filters: { is_active?: string; type?: string; search?: string }) {
   const conditions: string[] = []
   const params: any[] = []
   let i = 1
@@ -900,7 +912,9 @@ export async function getCustomers(filters: {
     } else if (seg === 'new') {
       conditions.push(`u.created_at >= NOW() - INTERVAL '30 days'`)
     } else if (seg === 'at_risk') {
-      conditions.push(`o.last_order_at IS NOT NULL AND o.last_order_at < NOW() - INTERVAL '90 days' AND o.last_order_at >= NOW() - INTERVAL '180 days'`)
+      conditions.push(
+        `o.last_order_at IS NOT NULL AND o.last_order_at < NOW() - INTERVAL '90 days' AND o.last_order_at >= NOW() - INTERVAL '180 days'`
+      )
     } else if (seg === 'dormant') {
       conditions.push(`o.last_order_at IS NOT NULL AND o.last_order_at < NOW() - INTERVAL '180 days'`)
     } else if (seg === 'lead') {
@@ -924,11 +938,12 @@ export async function getCustomers(filters: {
   const sortCol = CUSTOMER_SORT_COLS[filters.sort || ''] || 'u.created_at'
   const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
-  const safeCol = (filters.sort && CUSTOMER_SORT_COLS[filters.sort]) ? CUSTOMER_SORT_COLS[filters.sort] : 'u.created_at'
+  const safeCol = filters.sort && CUSTOMER_SORT_COLS[filters.sort] ? CUSTOMER_SORT_COLS[filters.sort] : 'u.created_at'
   const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [customers, total] = await Promise.all([
-    queryMany(`
+    queryMany(
+      `
       SELECT
         u.id, u.email, u.phone, u.first_name, u.last_name,
         u.is_active, u.is_flagged, u.flag_reason, u.created_at,
@@ -963,8 +978,11 @@ export async function getCustomers(filters: {
       ${where}
       ORDER BY ${safeCol} ${safeDir}
       LIMIT $${i} OFFSET $${i + 1}
-    `, [...params, limit, offset]),
-    queryCount(`
+    `,
+      [...params, limit, offset]
+    ),
+    queryCount(
+      `
       SELECT COUNT(*) FROM users u
       LEFT JOIN customer_profiles cp ON u.id = cp.user_id
       LEFT JOIN customer_health ch ON ch.user_id = u.id
@@ -977,14 +995,17 @@ export async function getCustomers(filters: {
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${where}
-    `, params),
+    `,
+      params
+    ),
   ])
 
   return { customers, total }
 }
 
 export async function getCustomerById(id: string) {
-  const customer = await queryOne(`
+  const customer = await queryOne(
+    `
     SELECT
       u.id, u.email, u.phone, u.first_name, u.last_name,
       u.is_active, u.is_flagged, u.flag_reason, u.created_at,
@@ -1002,24 +1023,30 @@ export async function getCustomerById(id: string) {
     LEFT JOIN customer_profiles cp ON u.id = cp.user_id
     LEFT JOIN business_profiles bp ON bp.user_id = u.id
     WHERE u.id = $1 AND u.is_guest = false
-  `, [id])
+  `,
+    [id]
+  )
 
   if (!customer) throw new Error('Customer not found')
 
-  const recentOrders = await queryMany(`
+  const recentOrders = await queryMany(
+    `
     SELECT id, order_number, total_amount, status, payment_status, created_at
     FROM orders
     WHERE user_id = $1
     ORDER BY created_at DESC
     LIMIT 10
-  `, [id])
+  `,
+    [id]
+  )
 
   const stats = await queryOne<{
     total_orders: string
     lifetime_value: string
     last_order_at: string | null
     paid_orders: string
-  }>(`
+  }>(
+    `
     SELECT
       COUNT(*) AS total_orders,
       COALESCE(SUM(total_amount), 0) AS lifetime_value,
@@ -1027,16 +1054,26 @@ export async function getCustomerById(id: string) {
       COUNT(*) FILTER (WHERE payment_status = 'paid') AS paid_orders
     FROM orders
     WHERE user_id = $1
-  `, [id])
+  `,
+    [id]
+  )
 
-  const tags = await queryMany<{ id: string; tag: string; created_at: string }>(`
+  const tags = await queryMany<{ id: string; tag: string; created_at: string }>(
+    `
     SELECT id, tag, created_at FROM customer_tags WHERE user_id = $1 ORDER BY created_at DESC
-  `, [id])
+  `,
+    [id]
+  )
 
   const notes = await queryMany<{
-    id: string; body: string; created_at: string;
-    admin_username: string | null; admin_first_name: string | null; admin_last_name: string | null
-  }>(`
+    id: string
+    body: string
+    created_at: string
+    admin_username: string | null
+    admin_first_name: string | null
+    admin_last_name: string | null
+  }>(
+    `
     SELECT n.id, n.body, n.created_at,
            COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username, u.first_name AS admin_first_name, u.last_name AS admin_last_name
     FROM customer_notes n
@@ -1045,7 +1082,9 @@ export async function getCustomerById(id: string) {
     WHERE n.user_id = $1
     ORDER BY n.created_at DESC
     LIMIT 50
-  `, [id])
+  `,
+    [id]
+  )
 
   const totalOrders = parseInt(stats?.total_orders ?? '0')
   const lifetimeValue = parseFloat(stats?.lifetime_value ?? '0')
@@ -1068,20 +1107,35 @@ export async function getCustomerById(id: string) {
   if (paidOrders >= 5 && lifetimeValue >= 25000) segments.push('loyal')
 
   const health = await queryOne<{
-    score: number; recency_score: number; frequency_score: number;
-    monetary_score: number; engagement_score: number; satisfaction_score: number;
-    churn_risk: string; trend_delta_7d: number; trend_delta_30d: number;
-    last_computed_at: string;
-  }>(`
+    score: number
+    recency_score: number
+    frequency_score: number
+    monetary_score: number
+    engagement_score: number
+    satisfaction_score: number
+    churn_risk: string
+    trend_delta_7d: number
+    trend_delta_30d: number
+    last_computed_at: string
+  }>(
+    `
     SELECT score, recency_score, frequency_score, monetary_score, engagement_score, satisfaction_score,
            churn_risk, trend_delta_7d, trend_delta_30d, last_computed_at::text AS last_computed_at
     FROM customer_health WHERE user_id = $1
-  `, [id])
+  `,
+    [id]
+  )
 
   const assignedCoupons = await queryMany<{
-    id: string; code: string; discount_type: string; discount_value: number;
-    valid_until: string | null; times_used: number; description: string | null;
-  }>(`
+    id: string
+    code: string
+    discount_type: string
+    discount_value: number
+    valid_until: string | null
+    times_used: number
+    description: string | null
+  }>(
+    `
     SELECT DISTINCT ON (c.id) c.id, c.code, c.discount_type, c.discount_value, c.valid_until, c.times_used, c.description
     FROM coupons c
     WHERE c.is_active = true
@@ -1091,7 +1145,9 @@ export async function getCustomerById(id: string) {
         OR EXISTS (SELECT 1 FROM coupon_eligible_users ceu WHERE ceu.coupon_id = c.id AND ceu.user_id = $1)
       )
     ORDER BY c.id, c.created_at DESC
-  `, [id])
+  `,
+    [id]
+  )
 
   return {
     ...customer,
@@ -1114,18 +1170,18 @@ export async function getRecentOrders(limit: number = 10) {
 }
 
 export async function getDashboardMetrics() {
-  const [
-    periodRevenue,
-    orderFunnel,
-    topProducts,
-    recentOrders,
-  ] = await Promise.all([
+  const [periodRevenue, orderFunnel, topProducts, recentOrders] = await Promise.all([
     queryOne<{
-      this_month_revenue: string; last_month_revenue: string
-      this_month_orders: string; last_month_orders: string
-      this_month_customers: string; last_month_customers: string
-      today_revenue: string; yesterday_revenue: string
-      online_revenue: string; offline_revenue: string
+      this_month_revenue: string
+      last_month_revenue: string
+      this_month_orders: string
+      last_month_orders: string
+      this_month_customers: string
+      last_month_customers: string
+      today_revenue: string
+      yesterday_revenue: string
+      online_revenue: string
+      offline_revenue: string
     }>(`
       SELECT
         COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS this_month_revenue,
@@ -1139,8 +1195,12 @@ export async function getDashboardMetrics() {
       FROM orders
     `),
     queryOne<{
-      pending: string; processing: string; shipped: string
-      out_for_delivery: string; delivered: string; cancelled: string
+      pending: string
+      processing: string
+      shipped: string
+      out_for_delivery: string
+      delivered: string
+      cancelled: string
     }>(`
       SELECT
         COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
@@ -1180,7 +1240,7 @@ export async function getDashboardMetrics() {
     `),
   ])
 
-  const pct = (a: number, b: number) => b === 0 ? null : Math.round(((a - b) / b) * 100)
+  const pct = (a: number, b: number) => (b === 0 ? null : Math.round(((a - b) / b) * 100))
 
   const thisRevenue = parseFloat(periodRevenue?.this_month_revenue || '0')
   const lastRevenue = parseFloat(periodRevenue?.last_month_revenue || '0')
@@ -1227,7 +1287,8 @@ export async function getDashboardMetrics() {
 }
 
 export async function getOrder(id: string) {
-  const order = await queryOne(`
+  const order = await queryOne(
+    `
     SELECT
       o.*,
       json_build_object(
@@ -1297,14 +1358,17 @@ export async function getOrder(id: string) {
     LEFT JOIN users u ON o.user_id = u.id
     LEFT JOIN orders orig ON orig.id = o.original_order_id
     WHERE o.id = $1
-  `, [id])
+  `,
+    [id]
+  )
 
   if (!order) throw new Error('Order not found')
   return order
 }
 
 export async function getReturnRequest(orderId: string) {
-  const returnRequest = await queryOne(`
+  const returnRequest = await queryOne(
+    `
     SELECT rr.*, o2.order_number AS replacement_order_number,
       COALESCE(
         (SELECT json_agg(json_build_object(
@@ -1326,7 +1390,9 @@ export async function getReturnRequest(orderId: string) {
     WHERE rr.order_id = $1
     ORDER BY rr.created_at DESC
     LIMIT 1
-  `, [orderId])
+  `,
+    [orderId]
+  )
   return returnRequest || null
 }
 
@@ -1335,15 +1401,26 @@ export async function getReturnRequest(orderId: string) {
 export type AnalyticsRange = 'today' | '7d' | '30d' | '90d' | 'month' | 'year'
 
 /** Map a range key → an interval string + the trend bucket granularity. */
-function rangeConfig(range: AnalyticsRange): { interval: string; bucket: 'hour' | 'day' | 'week' | 'month'; label: string } {
+function rangeConfig(range: AnalyticsRange): {
+  interval: string
+  bucket: 'hour' | 'day' | 'week' | 'month'
+  label: string
+} {
   switch (range) {
-    case 'today': return { interval: '1 day', bucket: 'hour', label: 'Today' }
-    case '7d':    return { interval: '7 days', bucket: 'day', label: 'Last 7 days' }
-    case '30d':   return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
-    case '90d':   return { interval: '90 days', bucket: 'week', label: 'Last 90 days' }
-    case 'month': return { interval: '1 month', bucket: 'day', label: 'This month' }
-    case 'year':  return { interval: '1 year', bucket: 'month', label: 'Last 12 months' }
-    default:      return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
+    case 'today':
+      return { interval: '1 day', bucket: 'hour', label: 'Today' }
+    case '7d':
+      return { interval: '7 days', bucket: 'day', label: 'Last 7 days' }
+    case '30d':
+      return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
+    case '90d':
+      return { interval: '90 days', bucket: 'week', label: 'Last 90 days' }
+    case 'month':
+      return { interval: '1 month', bucket: 'day', label: 'This month' }
+    case 'year':
+      return { interval: '1 year', bucket: 'month', label: 'Last 12 months' }
+    default:
+      return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
   }
 }
 
@@ -1355,12 +1432,29 @@ export interface DashboardAnalytics {
   range: AnalyticsRange
   rangeLabel: string
   kpis: {
-    revenue: number; revenuePrev: number; revenuePct: number | null
-    orders: number; ordersPrev: number; ordersPct: number | null
-    aov: number; aovPrev: number; aovPct: number | null
-    customers: number; customersPrev: number; customersPct: number | null
+    revenue: number
+    revenuePrev: number
+    revenuePct: number | null
+    orders: number
+    ordersPrev: number
+    ordersPct: number | null
+    aov: number
+    aovPrev: number
+    aovPct: number | null
+    customers: number
+    customersPrev: number
+    customersPct: number | null
   }
-  trend: { bucket: string; label: string; revenue: number; orders: number; paidOrders: number; customers: number; units: number; aov: number }[]
+  trend: {
+    bucket: string
+    label: string
+    revenue: number
+    orders: number
+    paidOrders: number
+    customers: number
+    units: number
+    aov: number
+  }[]
   trendBucket: 'hour' | 'day' | 'week' | 'month'
   payment: { online: number; cod: number; other: number; codOutstanding: number; codOutstandingCount: number }
   topCategories: { name: string; units: number; revenue: number }[]
@@ -1380,16 +1474,18 @@ export interface DashboardAnalytics {
 export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Promise<DashboardAnalytics> {
   const { interval, bucket, label } = rangeConfig(range)
   // For 'month'/'year' anchor to calendar boundaries; else rolling window.
-  const startExpr = range === 'month'
-    ? `date_trunc('month', NOW())`
-    : range === 'year'
-      ? `date_trunc('month', NOW()) - INTERVAL '11 months'`
-      : `NOW() - INTERVAL '${interval}'`
-  const prevStartExpr = range === 'month'
-    ? `date_trunc('month', NOW() - INTERVAL '1 month')`
-    : range === 'year'
-      ? `date_trunc('month', NOW()) - INTERVAL '23 months'`
-      : `NOW() - INTERVAL '${interval}' - INTERVAL '${interval}'`
+  const startExpr =
+    range === 'month'
+      ? `date_trunc('month', NOW())`
+      : range === 'year'
+        ? `date_trunc('month', NOW()) - INTERVAL '11 months'`
+        : `NOW() - INTERVAL '${interval}'`
+  const prevStartExpr =
+    range === 'month'
+      ? `date_trunc('month', NOW() - INTERVAL '1 month')`
+      : range === 'year'
+        ? `date_trunc('month', NOW()) - INTERVAL '23 months'`
+        : `NOW() - INTERVAL '${interval}' - INTERVAL '${interval}'`
   const prevEndExpr = range === 'month' ? `date_trunc('month', NOW())` : `NOW() - INTERVAL '${interval}'`
 
   const kpiPromise = queryOne<Record<string, string>>(`
@@ -1404,11 +1500,12 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     `)
   const paidRevenue = kpiPromise.then(r => ({ revenue: num(r?.rev), revenuePrev: num(r?.rev_prev) }))
 
-  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights] = await Promise.all([
-    kpiPromise,
-    // Trend series over the range. Two aggregations joined by bucket so the
-    // order_items fan-out doesn't inflate order-level sums (revenue/counts).
-    queryMany<Record<string, string>>(`
+  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow, insights] =
+    await Promise.all([
+      kpiPromise,
+      // Trend series over the range. Two aggregations joined by bucket so the
+      // order_items fan-out doesn't inflate order-level sums (revenue/counts).
+      queryMany<Record<string, string>>(`
       WITH ord AS (
         SELECT date_trunc('${bucket}', created_at) AS bucket,
                COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue,
@@ -1429,8 +1526,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       FROM ord LEFT JOIN itm ON itm.bucket = ord.bucket
       ORDER BY ord.bucket ASC
     `),
-    // Payment split + COD outstanding
-    queryOne<Record<string, string>>(`
+      // Payment split + COD outstanding
+      queryOne<Record<string, string>>(`
       SELECT
         COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND payment_mode NOT ILIKE '%cod%'), 0) AS online,
         COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND payment_mode ILIKE '%cod%'), 0) AS cod,
@@ -1440,8 +1537,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       FROM orders
       WHERE created_at >= ${startExpr}
     `),
-    // Top categories
-    queryMany<Record<string, string>>(`
+      // Top categories
+      queryMany<Record<string, string>>(`
       SELECT c.name AS name, SUM(oi.quantity) AS units, SUM(oi.total_price) AS revenue
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
@@ -1450,8 +1547,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       WHERE o.created_at >= ${startExpr}
       GROUP BY c.name ORDER BY revenue DESC LIMIT 6
     `),
-    // Top brands
-    queryMany<Record<string, string>>(`
+      // Top brands
+      queryMany<Record<string, string>>(`
       SELECT b.name AS name, SUM(oi.quantity) AS units, SUM(oi.total_price) AS revenue
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
@@ -1460,8 +1557,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       WHERE o.created_at >= ${startExpr}
       GROUP BY b.name ORDER BY revenue DESC LIMIT 6
     `),
-    // New vs returning customers in range (based on first-ever order date)
-    queryOne<Record<string, string>>(`
+      // New vs returning customers in range (based on first-ever order date)
+      queryOne<Record<string, string>>(`
       WITH firsts AS (
         SELECT user_id, MIN(created_at) AS first_order FROM orders WHERE user_id IS NOT NULL GROUP BY user_id
       ), in_range AS (
@@ -1472,8 +1569,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(*) FILTER (WHERE f.first_order < ${startExpr}) AS returning_cust
       FROM in_range ir JOIN firsts f ON f.user_id = ir.user_id
     `),
-    // Business vs consumer (by orders in range; B2B = GSTIN present or business discount)
-    queryOne<Record<string, string>>(`
+      // Business vs consumer (by orders in range; B2B = GSTIN present or business discount)
+      queryOne<Record<string, string>>(`
       SELECT
         COUNT(*) FILTER (WHERE buyer_gstin IS NOT NULL AND buyer_gstin <> '' OR business_discount_amount > 0) AS business,
         COUNT(*) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0) AS consumer,
@@ -1481,8 +1578,8 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COALESCE(SUM(total_amount) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0), 0) AS consumer_rev
       FROM orders WHERE created_at >= ${startExpr} AND payment_status = 'paid'
     `),
-    // Inventory health (active products) + real stock value from variants/sub-variants
-    queryOne<Record<string, string>>(`
+      // Inventory health (active products) + real stock value from variants/sub-variants
+      queryOne<Record<string, string>>(`
       SELECT
         COUNT(*) FILTER (WHERE stock_status = 'In Stock') AS in_stock,
         COUNT(*) FILTER (WHERE stock_status = 'Low Stock') AS low_stock,
@@ -1517,20 +1614,23 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         ), 0) AS stock_value
       FROM products WHERE is_active = true
     `),
-    // Returns / RTO
-    queryOne<Record<string, string>>(`
+      // Returns / RTO
+      queryOne<Record<string, string>>(`
       SELECT
         (SELECT COUNT(*) FROM return_requests WHERE created_at >= ${startExpr}) AS total_returns,
         COUNT(*) FILTER (WHERE shipment_status IN ('rto_initiated','rto_in_transit','rto_out_for_return')) AS rto_in_transit,
         COUNT(*) FILTER (WHERE shipment_status = 'rto_delivered') AS rto_delivered
       FROM orders WHERE created_at >= ${startExpr}
     `),
-    getDashboardInsights({ startExpr, prevStartExpr, prevEndExpr, days: rangeDays(range) }, paidRevenue),
-  ])
+      getDashboardInsights({ startExpr, prevStartExpr, prevEndExpr, days: rangeDays(range) }, paidRevenue),
+    ])
 
-  const rev = num(kpiRow?.rev), revPrev = num(kpiRow?.rev_prev)
-  const ord = int(kpiRow?.ord), ordPrev = int(kpiRow?.ord_prev)
-  const cust = int(kpiRow?.cust), custPrev = int(kpiRow?.cust_prev)
+  const rev = num(kpiRow?.rev),
+    revPrev = num(kpiRow?.rev_prev)
+  const ord = int(kpiRow?.ord),
+    ordPrev = int(kpiRow?.ord_prev)
+  const cust = int(kpiRow?.cust),
+    custPrev = int(kpiRow?.cust_prev)
   const aov = ord > 0 ? rev / ord : 0
   const aovPrev = ordPrev > 0 ? revPrev / ordPrev : 0
 
@@ -1539,10 +1639,18 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     rangeLabel: label,
     trendBucket: bucket,
     kpis: {
-      revenue: rev, revenuePrev: revPrev, revenuePct: pctDelta(rev, revPrev),
-      orders: ord, ordersPrev: ordPrev, ordersPct: pctDelta(ord, ordPrev),
-      aov: Math.round(aov), aovPrev: Math.round(aovPrev), aovPct: pctDelta(aov, aovPrev),
-      customers: cust, customersPrev: custPrev, customersPct: pctDelta(cust, custPrev),
+      revenue: rev,
+      revenuePrev: revPrev,
+      revenuePct: pctDelta(rev, revPrev),
+      orders: ord,
+      ordersPrev: ordPrev,
+      ordersPct: pctDelta(ord, ordPrev),
+      aov: Math.round(aov),
+      aovPrev: Math.round(aovPrev),
+      aovPct: pctDelta(aov, aovPrev),
+      customers: cust,
+      customersPrev: custPrev,
+      customersPct: pctDelta(cust, custPrev),
     },
     trend: trendRows.map(r => {
       const revenue = num(r.revenue)
@@ -1565,19 +1673,29 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       codOutstanding: num(payRow?.cod_outstanding),
       codOutstandingCount: int(payRow?.cod_outstanding_count),
     },
-    topCategories: topCats.map(c => ({ name: c.name || 'Uncategorized', units: num(c.units), revenue: num(c.revenue) })),
+    topCategories: topCats.map(c => ({
+      name: c.name || 'Uncategorized',
+      units: num(c.units),
+      revenue: num(c.revenue),
+    })),
     topBrands: topBrandsRows.map(b => ({ name: b.name || 'No brand', units: num(b.units), revenue: num(b.revenue) })),
     customerSplit: { newCustomers: int(custSplit?.new_cust), returningCustomers: int(custSplit?.returning_cust) },
     buyerSplit: {
-      business: int(buyerRow?.business), consumer: int(buyerRow?.consumer),
-      businessRevenue: num(buyerRow?.business_rev), consumerRevenue: num(buyerRow?.consumer_rev),
+      business: int(buyerRow?.business),
+      consumer: int(buyerRow?.consumer),
+      businessRevenue: num(buyerRow?.business_rev),
+      consumerRevenue: num(buyerRow?.consumer_rev),
     },
     inventory: {
-      inStock: int(invRow?.in_stock), lowStock: int(invRow?.low_stock),
-      outOfStock: int(invRow?.out_of_stock), stockValue: num(invRow?.stock_value),
+      inStock: int(invRow?.in_stock),
+      lowStock: int(invRow?.low_stock),
+      outOfStock: int(invRow?.out_of_stock),
+      stockValue: num(invRow?.stock_value),
     },
     returns: {
-      total: int(retRow?.total_returns), rtoInTransit: int(retRow?.rto_in_transit), rtoDelivered: int(retRow?.rto_delivered),
+      total: int(retRow?.total_returns),
+      rtoInTransit: int(retRow?.rto_in_transit),
+      rtoDelivered: int(retRow?.rto_delivered),
     },
     insights,
   }
@@ -1591,10 +1709,10 @@ export interface RevenueTrend {
 }
 
 const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> = [
-  { source: 'online', label: 'Online', color: '#3b82f6' },      // blue
-  { source: 'business', label: 'Business', color: '#22c55e' },  // green
-  { source: 'offline', label: 'Offline', color: '#a855f7' },    // purple
-  { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' },// amber
+  { source: 'online', label: 'Online', color: '#3b82f6' }, // blue
+  { source: 'business', label: 'Business', color: '#22c55e' }, // green
+  { source: 'offline', label: 'Offline', color: '#a855f7' }, // purple
+  { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' }, // amber
 ]
 
 export type RevenuePeriod = '3m' | '6m' | '12m' | 'ytd' | 'all'
@@ -1610,7 +1728,8 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
   if (period === '3m') start = startOfMonth(now.getFullYear(), now.getMonth() - 2)
   else if (period === '6m') start = startOfMonth(now.getFullYear(), now.getMonth() - 5)
   else if (period === 'ytd') start = startOfMonth(now.getFullYear(), 0)
-  else if (period === 'all') start = new Date(0) // resolved to first-order month below
+  else if (period === 'all')
+    start = new Date(0) // resolved to first-order month below
   else start = startOfMonth(now.getFullYear(), now.getMonth() - 11) // 12m default
 
   // For 'all', anchor the axis to the earliest paid order.
@@ -1628,7 +1747,8 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
   }
 
   const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`
-  const rows = await queryMany<{ month: string; source: string; revenue: number }>(`
+  const rows = await queryMany<{ month: string; source: string; revenue: number }>(
+    `
     SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
            source,
            SUM(total_amount)::float AS revenue
@@ -1637,7 +1757,9 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
        AND created_at >= $1::date
      GROUP BY 1, 2
      ORDER BY 1
-  `, [startStr]).catch(() => [])
+  `,
+    [startStr]
+  ).catch(() => [])
 
   // Continuous month axis from `start` through the current month.
   const months: string[] = []
@@ -1661,24 +1783,36 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
   return { months, series }
 }
 
-export interface BreakdownSlice { label: string; value: number; color: string }
+export interface BreakdownSlice {
+  label: string
+  value: number
+  color: string
+}
 
 export interface ProductStats {
   totalProducts: number
   activeProducts: number
   featured: number
   categories: number
-  inventoryValue: number       // Σ (price × inventory_quantity): variants for has_variants, base for simple
+  inventoryValue: number // Σ (price × inventory_quantity): variants for has_variants, base for simple
   byCategory: BreakdownSlice[]
   byBrand: BreakdownSlice[]
   byStock: BreakdownSlice[]
-  byInventoryValue: BreakdownSlice[]   // Σ base_price split by stock status (₹)
+  byInventoryValue: BreakdownSlice[] // Σ base_price split by stock status (₹)
 }
 
 // Categorical palette for the product breakdown bars (brand-neutral, light/dark safe).
 const BREAKDOWN_PALETTE = [
-  '#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ef4444',
-  '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316',
+  '#3b82f6',
+  '#22c55e',
+  '#a855f7',
+  '#f59e0b',
+  '#ef4444',
+  '#06b6d4',
+  '#ec4899',
+  '#84cc16',
+  '#6366f1',
+  '#f97316',
 ]
 
 // Cap a grouped result to top-N slices + an aggregated "Other" bucket, and colorize.
@@ -1704,7 +1838,9 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
     `),
     // True inventory stock value — reuse the canonical valuation (ex-GST, covers products +
     // variants + sub-variants) so this matches the Stock Ledger → Valuation page exactly.
-    getStockValuation().then(v => ({ inv_value: v.totalValue })).catch(() => ({ inv_value: 0 })),
+    getStockValuation()
+      .then(v => ({ inv_value: v.totalValue }))
+      .catch(() => ({ inv_value: 0 })),
     queryMany<{ label: string | null; count: number }>(`
       SELECT COALESCE(top.name, 'Uncategorized') AS label, COUNT(*)::int AS count
         FROM products p
@@ -1777,8 +1913,14 @@ export async function getCustomerStats(): Promise<CustomerStats> {
 // derived from order history — mirrors the CRM segment SQL.
 export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
   const row = await queryOne<{
-    vip: number; loyal: number; repeat: number; one_time: number;
-    new: number; at_risk: number; dormant: number; lead: number;
+    vip: number
+    loyal: number
+    repeat: number
+    one_time: number
+    new: number
+    at_risk: number
+    dormant: number
+    lead: number
   }>(`
     WITH agg AS (
       SELECT
@@ -1836,7 +1978,7 @@ export async function getCustomerChannelMix(): Promise<BreakdownSlice[]> {
     .map(r => {
       const key = (r.channel || 'email').toLowerCase()
       return {
-        label: labels[key] || (r.channel || 'Email'),
+        label: labels[key] || r.channel || 'Email',
         value: Number(r.count) || 0,
         color: colors[key] || '#94a3b8',
       }

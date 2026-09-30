@@ -37,7 +37,14 @@ export async function verifyGoogleAccessToken(accessToken: string): Promise<Goog
     if (!res.ok) return null
     const data = await res.json()
     if (!data.sub || !data.email || data.email_verified === false) return null
-    return { sub: data.sub, email: data.email, given_name: data.given_name, family_name: data.family_name, name: data.name, picture: data.picture }
+    return {
+      sub: data.sub,
+      email: data.email,
+      given_name: data.given_name,
+      family_name: data.family_name,
+      name: data.name,
+      picture: data.picture,
+    }
   } catch {
     return null
   }

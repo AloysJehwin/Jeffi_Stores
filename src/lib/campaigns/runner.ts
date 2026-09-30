@@ -18,7 +18,8 @@ export async function runScenario<P extends Record<string, unknown>, Row>(
 
   for (const row of rows) {
     const r = await scenario.send(row, { campaign, params })
-    if (r.ok) result.sent++; else result.skipped++
+    if (r.ok) result.sent++
+    else result.skipped++
   }
 
   if (result.attempted > 0) {
@@ -28,9 +29,7 @@ export async function runScenario<P extends Record<string, unknown>, Row>(
   return result
 }
 
-export async function runScenarioForAllCampaigns(
-  scenario: AnyScenarioModule
-): Promise<SweepResult[]> {
+export async function runScenarioForAllCampaigns(scenario: AnyScenarioModule): Promise<SweepResult[]> {
   const { rows } = await query<{ kind: string }>(
     `SELECT kind FROM campaigns WHERE scenario_kind = $1 AND enabled = TRUE`,
     [scenario.kind]

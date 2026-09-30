@@ -26,15 +26,69 @@ export interface TemplateVar {
 }
 
 export const TEMPLATE_VARS: TemplateVar[] = [
-  { key: 'customer_first_name', label: 'First name', description: "Recipient's first name (falls back to 'there')", group: 'customer', sample: 'Aloys' },
-  { key: 'customer_last_name', label: 'Last name', description: "Recipient's last name (empty if not on file)", group: 'customer', sample: 'Jehwin' },
-  { key: 'customer_name', label: 'Full name', description: "Recipient's full name (first + last)", group: 'customer', sample: 'Aloys Jehwin' },
-  { key: 'customer_email', label: 'Email', description: "Recipient's email address", group: 'customer', sample: 'customer@example.com' },
-  { key: 'store_name', label: 'Store name', description: 'Configured store / business name', group: 'store', sample: 'Your Store' },
-  { key: 'store_email', label: 'Store email', description: 'Configured store contact email', group: 'store', sample: 'hello@yourstore.in' },
-  { key: 'store_phone', label: 'Store phone', description: 'Configured store contact phone', group: 'store', sample: '+91 90000 00000' },
-  { key: 'store_web', label: 'Store URL', description: 'Customer-facing site URL', group: 'store', sample: 'yourstore.in' },
-  { key: 'current_year', label: 'Year', description: 'Current 4-digit year', group: 'date', sample: String(new Date().getFullYear()) },
+  {
+    key: 'customer_first_name',
+    label: 'First name',
+    description: "Recipient's first name (falls back to 'there')",
+    group: 'customer',
+    sample: 'Aloys',
+  },
+  {
+    key: 'customer_last_name',
+    label: 'Last name',
+    description: "Recipient's last name (empty if not on file)",
+    group: 'customer',
+    sample: 'Jehwin',
+  },
+  {
+    key: 'customer_name',
+    label: 'Full name',
+    description: "Recipient's full name (first + last)",
+    group: 'customer',
+    sample: 'Aloys Jehwin',
+  },
+  {
+    key: 'customer_email',
+    label: 'Email',
+    description: "Recipient's email address",
+    group: 'customer',
+    sample: 'customer@example.com',
+  },
+  {
+    key: 'store_name',
+    label: 'Store name',
+    description: 'Configured store / business name',
+    group: 'store',
+    sample: 'Your Store',
+  },
+  {
+    key: 'store_email',
+    label: 'Store email',
+    description: 'Configured store contact email',
+    group: 'store',
+    sample: 'hello@yourstore.in',
+  },
+  {
+    key: 'store_phone',
+    label: 'Store phone',
+    description: 'Configured store contact phone',
+    group: 'store',
+    sample: '+91 90000 00000',
+  },
+  {
+    key: 'store_web',
+    label: 'Store URL',
+    description: 'Customer-facing site URL',
+    group: 'store',
+    sample: 'yourstore.in',
+  },
+  {
+    key: 'current_year',
+    label: 'Year',
+    description: 'Current 4-digit year',
+    group: 'date',
+    sample: String(new Date().getFullYear()),
+  },
   { key: 'date', label: 'Today', description: 'Today in DD Mon YYYY format', group: 'date', sample: '15 Jun 2026' },
 ]
 

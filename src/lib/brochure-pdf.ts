@@ -39,12 +39,9 @@ export interface BrochureOptions {
 
 /** Load store branding from site_settings (mirrors packing-slip-pdf.ts). */
 export async function loadBrochureStore(): Promise<BrochureStore> {
-  const rows = await queryMany(
-    "SELECT key, value FROM site_settings WHERE key LIKE 'business_%'",
-    []
-  )
+  const rows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
   const s: Record<string, string> = {}
-  for (const row of (rows || [])) s[row.key] = row.value || ''
+  for (const row of rows || []) s[row.key] = row.value || ''
 
   return {
     name: s.business_trade_name || s.business_legal_name || 'JEFFI STORES',
@@ -72,20 +69,20 @@ const CW = PAGE_W - ML - MR
 
 const GREEN_DARK = '#3d6b00'
 const GREEN_MAIN = '#7cb900'
-const LIGHT_BG   = '#f4f9ea'
+const LIGHT_BG = '#f4f9ea'
 const RULE_COLOR = '#dddddd'
-const TEXT_DARK  = '#111111'
-const TEXT_MID   = '#444444'
+const TEXT_DARK = '#111111'
+const TEXT_MID = '#444444'
 const TEXT_MUTED = '#777777'
 const TEXT_LIGHT = '#d4edaa'
 
 const HEADER_H = 84
 const FOOTER_H = 30
 const ROW_H = 60
-const ROW_PAD = 8              // inner top/bottom padding within a row
+const ROW_PAD = 8 // inner top/bottom padding within a row
 const IMG_SIZE = 44
 const QR_SIZE = 40
-const GUTTER = 12              // horizontal gap between columns
+const GUTTER = 12 // horizontal gap between columns
 const IMG_CONCURRENCY = 8
 
 // Column geometry (left → right): [image] [name block] [price] [qr]
@@ -125,7 +122,8 @@ function clip1(doc: any, text: string, maxW: number): string {
   if (!s) return ''
   if (doc.widthOfString(s) <= maxW) return s
   const ell = '…'
-  let lo = 0, hi = s.length
+  let lo = 0,
+    hi = s.length
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2)
     if (doc.widthOfString(s.slice(0, mid) + ell) <= maxW) lo = mid
@@ -158,25 +156,27 @@ async function prefetchImages(urls: (string | null | undefined)[]): Promise<(Buf
   const out: (Buffer | null)[] = new Array(urls.length).fill(null)
   for (let i = 0; i < urls.length; i += IMG_CONCURRENCY) {
     const slice = urls.slice(i, i + IMG_CONCURRENCY)
-    const bufs = await Promise.all(
-      slice.map(u => (u ? fetchImageBuffer(u) : Promise.resolve(null)))
-    )
-    bufs.forEach((b, j) => { out[i + j] = b })
+    const bufs = await Promise.all(slice.map(u => (u ? fetchImageBuffer(u) : Promise.resolve(null))))
+    bufs.forEach((b, j) => {
+      out[i + j] = b
+    })
   }
   return out
 }
 
 /** Render each product's QR (product URL) up front. null when no slug. */
 async function buildQRCodes(products: BrochureProductInput[], web: string): Promise<(Buffer | null)[]> {
-  return Promise.all(products.map(async p => {
-    const url = productUrl(web, p.slug)
-    if (!url) return null
-    try {
-      return await QRCode.toBuffer(url, { type: 'png', width: 120, margin: 0 })
-    } catch {
-      return null
-    }
-  }))
+  return Promise.all(
+    products.map(async p => {
+      const url = productUrl(web, p.slug)
+      if (!url) return null
+      try {
+        return await QRCode.toBuffer(url, { type: 'png', width: 120, margin: 0 })
+      } catch {
+        return null
+      }
+    })
+  )
 }
 
 function drawHeader(doc: any, store: BrochureStore, title: string, heading?: string) {
@@ -186,7 +186,9 @@ function drawHeader(doc: any, store: BrochureStore, title: string, heading?: str
   const LOGO_PATH = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
   try {
     doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
-  } catch { /* logo missing — skip */ }
+  } catch {
+    /* logo missing — skip */
+  }
 
   const textX = ML + LOGO_SIZE + 12
   const textW = CW - LOGO_SIZE - 12
@@ -203,7 +205,11 @@ function drawHeader(doc: any, store: BrochureStore, title: string, heading?: str
   doc.text(clip1(doc, title, textW - 130), textX, 54, { width: textW - 130, lineBreak: false })
   if (heading) {
     doc.font('Helvetica').fontSize(8.5).fillColor(TEXT_LIGHT)
-    doc.text(clip1(doc, heading.toUpperCase(), 130), textX + textW - 130, 55, { width: 130, align: 'right', lineBreak: false })
+    doc.text(clip1(doc, heading.toUpperCase(), 130), textX + textW - 130, 55, {
+      width: 130,
+      align: 'right',
+      lineBreak: false,
+    })
   }
 }
 
@@ -236,10 +242,10 @@ export function familyKey(name: string): string {
   // e.g. `BSW 1/2" SS 202 Allen Cap Screw`). Leaves grade/material numbers
   // like 202 / 304 / 12.9 intact — only sized tokens are stripped.
   const sizeTokens = [
-    /\bM\d+(?:\.\d+)?\b/gi,                        // M6, M12
-    /\b\d+\/\d+\s*["'”]?/g,                   // 1/2", 3/16
-    /\b\d+(?:\.\d+)?\s*(?:mm|cm|inch|in)\b/gi,     // 25mm, 3 in
-    /\b\d+(?:\.\d+)?\s*["'”]/g,               // 2"
+    /\bM\d+(?:\.\d+)?\b/gi, // M6, M12
+    /\b\d+\/\d+\s*["'”]?/g, // 1/2", 3/16
+    /\b\d+(?:\.\d+)?\s*(?:mm|cm|inch|in)\b/gi, // 25mm, 3 in
+    /\b\d+(?:\.\d+)?\s*["'”]/g, // 2"
     /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\b/gi, // 5x40
   ]
   for (const re of sizeTokens) s = s.replace(re, ' ')
@@ -249,7 +255,8 @@ export function familyKey(name: string): string {
 
 /** Levenshtein distance (iterative, two-row). */
 function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length
+  const m = a.length,
+    n = b.length
   if (m === 0) return n
   if (n === 0) return m
   let prev = Array.from({ length: n + 1 }, (_, j) => j)
@@ -260,7 +267,7 @@ function levenshtein(a: string, b: string): number {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
       cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
     }
-    [prev, cur] = [cur, prev]
+    ;[prev, cur] = [cur, prev]
   }
   return prev[n]
 }
@@ -283,7 +290,7 @@ const FAMILY_SIMILARITY_THRESHOLD = 0.82
  * while collapsing M5/M8/… or 1/2"/3/8" sizes of the same product.
  */
 export function sameFamily(a: string, b: string): boolean {
-  if (familyKey(a) !== familyKey(b)) return false          // size-only-diff gate
+  if (familyKey(a) !== familyKey(b)) return false // size-only-diff gate
   return nameSimilarity(a, b) >= FAMILY_SIMILARITY_THRESHOLD // similarity confirm
 }
 
@@ -309,7 +316,8 @@ export function splitFamilies(products: BrochureProductInput[]): {
       rest.push(p)
     } else {
       representatives.push(p)
-      if (bucket) bucket.push(p); else repByKey.set(key, [p])
+      if (bucket) bucket.push(p)
+      else repByKey.set(key, [p])
     }
   }
   return { representatives, rest }
@@ -322,10 +330,7 @@ export function splitFamilies(products: BrochureProductInput[]): {
  *   • Then: every remaining product (other sizes/SKUs) in compact list rows.
  * Shared branded header/footer + page numbers; QR per product → product page.
  */
-export async function generateBrochurePDF(
-  products: BrochureProductInput[],
-  opts: BrochureOptions
-): Promise<Buffer> {
+export async function generateBrochurePDF(products: BrochureProductInput[], opts: BrochureOptions): Promise<Buffer> {
   const { store, showPrices } = opts
   const title = (opts.title && opts.title.trim()) || 'Product Brochure'
   const promo = (opts.promo && opts.promo.trim()) || ''
@@ -337,7 +342,10 @@ export async function generateBrochurePDF(
   const hasQR = qrBufs.some(Boolean)
   const imgById = new Map<string, Buffer | null>()
   const qrById = new Map<string, Buffer | null>()
-  products.forEach((p, i) => { imgById.set(p.id, imageBufs[i]); qrById.set(p.id, qrBufs[i]) })
+  products.forEach((p, i) => {
+    imgById.set(p.id, imageBufs[i])
+    qrById.set(p.id, qrBufs[i])
+  })
 
   const { representatives, rest } = splitFamilies(products)
   const coverImg = loadCoverImage()
@@ -345,7 +353,7 @@ export async function generateBrochurePDF(
   const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true })
   const chunks: Buffer[] = []
   doc.on('data', (c: Buffer) => chunks.push(c))
-  const done = new Promise<Buffer>((resolve) => {
+  const done = new Promise<Buffer>(resolve => {
     doc.on('end', () => resolve(Buffer.concat(chunks)))
   })
 
@@ -418,7 +426,11 @@ export async function generateBrochurePDF(
     doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MUTED)
     const foot = [store.name, store.gstin && `GSTIN: ${store.gstin}`].filter(Boolean).join('  |  ')
     doc.text(clip1(doc, foot, CW - 90), ML, PAGE_H - FOOTER_H + 8, { width: CW - 90, lineBreak: false })
-    doc.text(`Page ${i + 1} of ${range.count}`, ML + CW - 90, PAGE_H - FOOTER_H + 8, { width: 90, align: 'right', lineBreak: false })
+    doc.text(`Page ${i + 1} of ${range.count}`, ML + CW - 90, PAGE_H - FOOTER_H + 8, {
+      width: 90,
+      align: 'right',
+      lineBreak: false,
+    })
   }
 
   doc.end()
@@ -430,7 +442,11 @@ function loadCoverImage(): string | null {
   const candidates = ['brochure-cover.png', 'brochure-cover.jpg', 'brochure-cover.jpeg']
   for (const f of candidates) {
     const p = path.join(process.cwd(), 'public', 'images', f)
-    try { if (fs.existsSync(p)) return p } catch { /* ignore */ }
+    try {
+      if (fs.existsSync(p)) return p
+    } catch {
+      /* ignore */
+    }
   }
   return null
 }
@@ -443,28 +459,44 @@ function loadCoverImage(): string | null {
 function drawCover(doc: any, store: BrochureStore, title: string, promo: string, coverImg: string | null) {
   // Background
   if (coverImg) {
-    try { doc.image(coverImg, 0, 0, { width: PAGE_W, height: PAGE_H, align: 'center', valign: 'center' }) }
-    catch { paintGradient(doc) }
+    try {
+      doc.image(coverImg, 0, 0, { width: PAGE_W, height: PAGE_H, align: 'center', valign: 'center' })
+    } catch {
+      paintGradient(doc)
+    }
   } else {
     paintGradient(doc)
   }
   // Dark scrim so overlay text is legible on any image
   doc.save()
-  doc.rect(0, 0, PAGE_W, PAGE_H).fillColor('#000000').opacity(coverImg ? 0.38 : 0.12).fill()
+  doc
+    .rect(0, 0, PAGE_W, PAGE_H)
+    .fillColor('#000000')
+    .opacity(coverImg ? 0.38 : 0.12)
+    .fill()
   doc.restore()
 
   const cx = PAGE_W / 2
   // Logo (centered, upper third)
   const LOGO = 96
   const logoPath = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
-  try { doc.image(logoPath, cx - LOGO / 2, 150, { width: LOGO, height: LOGO }) } catch { /* skip */ }
+  try {
+    doc.image(logoPath, cx - LOGO / 2, 150, { width: LOGO, height: LOGO })
+  } catch {
+    /* skip */
+  }
 
   doc.fillColor('#ffffff')
   doc.font('Helvetica-Bold').fontSize(30)
   doc.text(store.name.toUpperCase(), ML, 270, { width: CW, align: 'center' })
 
   // Accent rule
-  doc.moveTo(cx - 60, 312).lineTo(cx + 60, 312).lineWidth(2).strokeColor(GREEN_MAIN).stroke()
+  doc
+    .moveTo(cx - 60, 312)
+    .lineTo(cx + 60, 312)
+    .lineWidth(2)
+    .strokeColor(GREEN_MAIN)
+    .stroke()
 
   doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff')
   doc.text(title, ML, 330, { width: CW, align: 'center' })
@@ -496,7 +528,10 @@ function paintGradient(doc: any) {
   for (let i = 0; i < bands; i++) {
     const t = i / (bands - 1)
     const c = mixHex('#2c5200', '#7cb900', t)
-    doc.rect(0, (PAGE_H / bands) * i, PAGE_W, PAGE_H / bands + 1).fillColor(c).fill()
+    doc
+      .rect(0, (PAGE_H / bands) * i, PAGE_W, PAGE_H / bands + 1)
+      .fillColor(c)
+      .fill()
   }
 }
 
@@ -509,8 +544,11 @@ function mixHex(a: string, b: string, t: number): string {
 
 /** Page 2 — index: each family representative → its page number. */
 function drawIndex(
-  doc: any, store: BrochureStore, title: string,
-  familyPages: { name: string; page: number }[], hasList: boolean
+  doc: any,
+  store: BrochureStore,
+  title: string,
+  familyPages: { name: string; page: number }[],
+  hasList: boolean
 ) {
   drawHeader(doc, store, title, 'Index')
   let y = HEADER_H + 24
@@ -546,7 +584,10 @@ function drawIndex(
       let dx = dotsX1
       const dots: string[] = []
       const dotW = doc.widthOfString('.')
-      while (dx < dotsX2) { dots.push('.'); dx += dotW }
+      while (dx < dotsX2) {
+        dots.push('.')
+        dx += dotW
+      }
       doc.text(dots.join(''), dotsX1, y + 1, { lineBreak: false })
     }
     doc.font('Helvetica-Bold').fontSize(9.5).fillColor(GREEN_DARK)
@@ -563,15 +604,24 @@ function drawIndex(
 
 /** One compact list row (used for the non-representative products). */
 function drawListRow(
-  doc: any, p: BrochureProductInput, y: number, idx: number,
-  buf: Buffer | null, qr: Buffer | null, showPrices: boolean, hasQR: boolean
+  doc: any,
+  p: BrochureProductInput,
+  y: number,
+  idx: number,
+  buf: Buffer | null,
+  qr: Buffer | null,
+  showPrices: boolean,
+  hasQR: boolean
 ) {
   if (idx % 2 === 1) box(doc, ML, y, CW, ROW_H, '#fafcf5')
 
   const imgY = y + Math.round((ROW_H - IMG_SIZE) / 2)
   if (buf) {
-    try { doc.image(buf, IMG_X, imgY, { fit: [IMG_SIZE, IMG_SIZE], align: 'center', valign: 'center' }) }
-    catch { doc.rect(IMG_X, imgY, IMG_SIZE, IMG_SIZE).lineWidth(0.5).strokeColor(RULE_COLOR).stroke() }
+    try {
+      doc.image(buf, IMG_X, imgY, { fit: [IMG_SIZE, IMG_SIZE], align: 'center', valign: 'center' })
+    } catch {
+      doc.rect(IMG_X, imgY, IMG_SIZE, IMG_SIZE).lineWidth(0.5).strokeColor(RULE_COLOR).stroke()
+    }
   } else {
     doc.rect(IMG_X, imgY, IMG_SIZE, IMG_SIZE).fillColor('#f0f0f0').fill()
     doc.font('Helvetica').fontSize(6).fillColor('#aaaaaa')
@@ -579,7 +629,7 @@ function drawListRow(
   }
 
   const priceColX = hasQR ? PRICE_X_WITH_QR : PRICE_X_NO_QR
-  const nameRightEdge = showPrices ? priceColX : (hasQR ? QR_X : (ML + CW - 6))
+  const nameRightEdge = showPrices ? priceColX : hasQR ? QR_X : ML + CW - 6
   const nameW = nameRightEdge - GUTTER - NAME_X
 
   const nameGap = 13
@@ -590,10 +640,12 @@ function drawListRow(
   let ty = y + Math.round((ROW_H - blockH) / 2)
 
   doc.font('Helvetica-Bold').fontSize(9.5).fillColor(TEXT_DARK)
-  doc.text(clip1(doc, p.name, nameW), NAME_X, ty, { width: nameW, lineBreak: false }); ty += nameGap
+  doc.text(clip1(doc, p.name, nameW), NAME_X, ty, { width: nameW, lineBreak: false })
+  ty += nameGap
   if (hasMeta) {
     doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MUTED)
-    doc.text(clip1(doc, metaText, nameW), NAME_X, ty, { width: nameW, lineBreak: false }); ty += 11
+    doc.text(clip1(doc, metaText, nameW), NAME_X, ty, { width: nameW, lineBreak: false })
+    ty += 11
   }
   if (hasDesc) {
     doc.font('Helvetica').fontSize(8).fillColor(TEXT_MID)
@@ -609,10 +661,15 @@ function drawListRow(
     let py = y + Math.round((ROW_H - stackH) / 2)
     if (showMrpStrike) {
       doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MUTED)
-      doc.text(rs(mrp!), priceColX, py, { width: PRICE_W, align: 'right', lineBreak: false }); py += 11
+      doc.text(rs(mrp!), priceColX, py, { width: PRICE_W, align: 'right', lineBreak: false })
+      py += 11
     }
     doc.font('Helvetica-Bold').fontSize(10).fillColor(GREEN_DARK)
-    doc.text(price != null ? rs(price) : (mrp != null ? rs(mrp) : '—'), priceColX, py, { width: PRICE_W, align: 'right', lineBreak: false })
+    doc.text(price != null ? rs(price) : mrp != null ? rs(mrp) : '—', priceColX, py, {
+      width: PRICE_W,
+      align: 'right',
+      lineBreak: false,
+    })
     if (off > 0) {
       // small "N% OFF" badge to the left of the price column
       doc.font('Helvetica-Bold').fontSize(7).fillColor('#c0392b')
@@ -622,7 +679,11 @@ function drawListRow(
 
   if (hasQR && qr) {
     const qy = y + Math.round((ROW_H - QR_SIZE) / 2)
-    try { doc.image(qr, QR_X, qy, { width: QR_SIZE, height: QR_SIZE }) } catch { /* skip */ }
+    try {
+      doc.image(qr, QR_X, qy, { width: QR_SIZE, height: QR_SIZE })
+    } catch {
+      /* skip */
+    }
   }
 
   hRule(doc, ML, y + ROW_H, ML + CW, RULE_COLOR, 0.4)
@@ -630,23 +691,39 @@ function drawListRow(
 
 /** One featured matrix tile: bordered card with big image, name, price, QR. */
 function drawTile(
-  doc: any, p: BrochureProductInput, x: number, y: number,
-  buf: Buffer | null, qr: Buffer | null, showPrices: boolean, hasQR: boolean
+  doc: any,
+  p: BrochureProductInput,
+  x: number,
+  y: number,
+  buf: Buffer | null,
+  qr: Buffer | null,
+  showPrices: boolean,
+  hasQR: boolean
 ) {
   // Card
   doc.roundedRect(x, y, TILE_W, TILE_H, 6).lineWidth(0.6).strokeColor(RULE_COLOR).stroke()
 
   const pad = 8
   const innerW = TILE_W - pad * 2
-  const imgBox = TILE_W - pad * 2           // square image area spanning inner width
+  const imgBox = TILE_W - pad * 2 // square image area spanning inner width
   const imgH = Math.min(imgBox, 96)
   const imgY = y + pad
 
   if (buf) {
-    try { doc.image(buf, x + pad, imgY, { fit: [innerW, imgH], align: 'center', valign: 'center' }) }
-    catch { doc.rect(x + pad, imgY, innerW, imgH).lineWidth(0.4).strokeColor(RULE_COLOR).stroke() }
+    try {
+      doc.image(buf, x + pad, imgY, { fit: [innerW, imgH], align: 'center', valign: 'center' })
+    } catch {
+      doc
+        .rect(x + pad, imgY, innerW, imgH)
+        .lineWidth(0.4)
+        .strokeColor(RULE_COLOR)
+        .stroke()
+    }
   } else {
-    doc.rect(x + pad, imgY, innerW, imgH).fillColor('#f4f4f4').fill()
+    doc
+      .rect(x + pad, imgY, innerW, imgH)
+      .fillColor('#f4f4f4')
+      .fill()
     doc.font('Helvetica').fontSize(7).fillColor('#aaaaaa')
     doc.text('No image', x + pad, imgY + imgH / 2 - 4, { width: innerW, align: 'center', lineBreak: false })
   }
@@ -668,7 +745,11 @@ function drawTile(
   // Bottom strip: price (left) + QR (right)
   const stripY = y + TILE_H - pad - QR_SIZE
   if (hasQR && qr) {
-    try { doc.image(qr, x + TILE_W - pad - QR_SIZE, stripY, { width: QR_SIZE, height: QR_SIZE }) } catch { /* skip */ }
+    try {
+      doc.image(qr, x + TILE_W - pad - QR_SIZE, stripY, { width: QR_SIZE, height: QR_SIZE })
+    } catch {
+      /* skip */
+    }
   }
   if (showPrices) {
     const price = p.base_price != null ? Number(p.base_price) : null
@@ -687,6 +768,9 @@ function drawTile(
       py += 11
     }
     doc.font('Helvetica-Bold').fontSize(11).fillColor(GREEN_DARK)
-    doc.text(price != null ? rs(price) : (mrp != null ? rs(mrp) : '—'), x + pad, py, { width: priceMaxW, lineBreak: false })
+    doc.text(price != null ? rs(price) : mrp != null ? rs(mrp) : '—', x + pad, py, {
+      width: priceMaxW,
+      lineBreak: false,
+    })
   }
 }

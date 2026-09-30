@@ -13,7 +13,6 @@ export async function register() {
 
   if (!CRON_SECRET || !APP_URL) return
 
-
   const recordRun = async (jobId: string, ok: boolean, errorMsg?: string, detail?: unknown) => {
     try {
       await fetch(`${APP_URL}/api/internal/cron-record`, {
@@ -21,8 +20,7 @@ export async function register() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CRON_SECRET}` },
         body: JSON.stringify({ jobId, ok, errorMsg, detail }),
       })
-    } catch {
-    }
+    } catch {}
   }
 
   // Acquire a distributed Redis lock for the given job.
@@ -43,7 +41,7 @@ export async function register() {
 
   const callCron = async (jobId: string, path: string, method: 'GET' | 'POST', lockTtlMs: number) => {
     const won = await acquireLock(jobId, lockTtlMs)
-    if (!won) return  // Another instance is already running this job
+    if (!won) return // Another instance is already running this job
 
     try {
       const res = await fetch(`${APP_URL}${path}`, {
@@ -51,7 +49,11 @@ export async function register() {
         headers: { Authorization: `Bearer ${CRON_SECRET}` },
       })
       let body: unknown
-      try { body = await res.json() } catch { body = undefined }
+      try {
+        body = await res.json()
+      } catch {
+        body = undefined
+      }
       await recordRun(jobId, res.ok, res.ok ? undefined : `HTTP ${res.status}`, body)
     } catch (err: any) {
       await recordRun(jobId, false, err?.message || 'fetch failed')

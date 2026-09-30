@@ -1,5 +1,11 @@
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFromAsync, currentBrandNameAsync, platformAdminEmail, storeContactLine, resolveCurrentTenant } from './brand'
+import {
+  customerMailFromAsync,
+  currentBrandNameAsync,
+  platformAdminEmail,
+  storeContactLine,
+  resolveCurrentTenant,
+} from './brand'
 import { mailShell } from './mail-template'
 
 const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
@@ -24,7 +30,7 @@ async function send(
   to: string,
   subject: string,
   html: string,
-  audit: { templateName: string; entityType?: string | null; entityId?: string | null; userId?: string | null },
+  audit: { templateName: string; entityType?: string | null; entityId?: string | null; userId?: string | null }
 ) {
   try {
     const info = await sendAuditedMail({
@@ -45,12 +51,10 @@ async function send(
 }
 
 // RFQ submitted — notify business user + admin
-export async function sendRfqSubmittedEmail(
-  toEmail: string,
-  name: string,
-  rfqNumber: string,
-) {
-  const userHtml = await baseLayout(`RFQ ${rfqNumber} submitted`, `
+export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNumber: string) {
+  const userHtml = await baseLayout(
+    `RFQ ${rfqNumber} submitted`,
+    `
     <p>Dear ${name},</p>
     <p>Your Request for Quotation has been submitted successfully. Our team will review it and send you a quotation shortly.</p>
     <div class="info">
@@ -58,16 +62,20 @@ export async function sendRfqSubmittedEmail(
     </div>
     <p>You can track the status of your RFQ by logging into your account.</p>
     <div class="cta"><a href="${await businessUrl()}/rfqs" class="button" style="color:#ffffff;">View My RFQs</a></div>
-  `)
+  `
+  )
 
-  const adminHtml = await baseLayout(`New RFQ ${rfqNumber}`, `
+  const adminHtml = await baseLayout(
+    `New RFQ ${rfqNumber}`,
+    `
     <p>A new RFQ has been submitted.</p>
     <div class="info">
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
       <p style="margin:0"><strong>Submitted By:</strong> ${name} (${toEmail})</p>
     </div>
     <div class="cta"><a href="https://admin.jeffistores.in/admin/business/rfqs" class="button" style="color:#ffffff;">View RFQs</a></div>
-  `)
+  `
+  )
 
   const brand = await currentBrandNameAsync()
   await Promise.allSettled([
@@ -87,10 +95,12 @@ export async function sendRfqConvertedToQuotationEmail(
   rfqNumber: string,
   quoteNumber: string,
   totalAmount: number,
-  viewUrl: string,
+  viewUrl: string
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = await baseLayout(`Quotation ${quoteNumber} ready`, `
+  const html = await baseLayout(
+    `Quotation ${quoteNumber} ready`,
+    `
     <p>Dear ${name},</p>
     <p>Your RFQ <strong>${rfqNumber}</strong> has been reviewed and a quotation has been prepared for you.</p>
     <div class="info">
@@ -99,7 +109,8 @@ export async function sendRfqConvertedToQuotationEmail(
     </div>
     <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
     <p>Please review the quotation. If you have any questions, contact us at +91 96853 54099.</p>
-  `)
+  `
+  )
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Quotation ${quoteNumber} ready — ${brand}`, html, {
     templateName: 'rfq_converted_to_quotation',
@@ -107,17 +118,16 @@ export async function sendRfqConvertedToQuotationEmail(
 }
 
 // Business account approved
-export async function sendBusinessAccountApprovedEmail(
-  toEmail: string,
-  name: string,
-  companyName: string,
-) {
-  const html = await baseLayout('Business account approved', `
+export async function sendBusinessAccountApprovedEmail(toEmail: string, name: string, companyName: string) {
+  const html = await baseLayout(
+    'Business account approved',
+    `
     <p>Dear ${name},</p>
     <p>We are pleased to inform you that your business account for <strong>${companyName}</strong> has been <strong>approved</strong>.</p>
     <p>You can now log in and start placing RFQs and orders.</p>
     <div class="cta"><a href="${await businessUrl()}/signin" class="button" style="color:#ffffff;">Log In to Business Portal</a></div>
-  `)
+  `
+  )
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Business account approved — ${brand}`, html, {
     templateName: 'business_account_approved',
@@ -129,15 +139,18 @@ export async function sendBusinessAccountRejectedEmail(
   toEmail: string,
   name: string,
   companyName: string,
-  rejectionNote?: string | null,
+  rejectionNote?: string | null
 ) {
   const contact = await storeContactLine()
-  const html = await baseLayout('Business account application update', `
+  const html = await baseLayout(
+    'Business account application update',
+    `
     <p>Dear ${name},</p>
     <p>We regret to inform you that your business account application for <strong>${companyName}</strong> could not be approved at this time.</p>
     ${rejectionNote ? `<div class="info"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
     <p>If you believe this is an error or would like to reapply, please contact us${contact ? ` at ${contact}` : ''}.</p>
-  `)
+  `
+  )
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Business account application update — ${brand}`, html, {
     templateName: 'business_account_rejected',
@@ -151,11 +164,13 @@ export async function sendBusinessInvoiceGeneratedEmail(
   invoiceNumber: string,
   orderNumber: string,
   totalAmount: number,
-  invoiceViewUrl: string,
+  invoiceViewUrl: string
 ) {
   const contact = await storeContactLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = await baseLayout(`Invoice ${invoiceNumber}`, `
+  const html = await baseLayout(
+    `Invoice ${invoiceNumber}`,
+    `
     <p>Dear ${name},</p>
     <p>Your invoice has been generated. Please find the details below.</p>
     <div class="info">
@@ -165,7 +180,8 @@ export async function sendBusinessInvoiceGeneratedEmail(
     </div>
     <div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>
     <p>For payment enquiries, contact us${contact ? ` at ${contact}` : ''}.</p>
-  `)
+  `
+  )
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, {
     templateName: 'business_invoice_generated',
@@ -178,7 +194,7 @@ export async function sendBusinessOrderStatusEmail(
   name: string,
   orderNumber: string,
   status: string,
-  invoiceViewUrl?: string,
+  invoiceViewUrl?: string
 ) {
   const contact = await storeContactLine()
   const statusLabel: Record<string, string> = {
@@ -188,12 +204,15 @@ export async function sendBusinessOrderStatusEmail(
     cancelled: 'Cancelled',
   }
   const label = statusLabel[status] || status
-  const html = await baseLayout(`Order ${orderNumber} — ${label}`, `
+  const html = await baseLayout(
+    `Order ${orderNumber} — ${label}`,
+    `
     <p>Dear ${name},</p>
     <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
     ${invoiceViewUrl ? `<div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
     <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
-  `)
+  `
+  )
   const brand = await currentBrandNameAsync()
   return send(toEmail, `Order ${orderNumber} — ${label} | ${brand}`, html, {
     templateName: 'business_order_status',

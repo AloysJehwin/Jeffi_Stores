@@ -1,7 +1,16 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
-import { putListingsItem, patchListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, amazonConfigured, getMarketplaceId } from './client'
+import {
+  putListingsItem,
+  patchListingsItem,
+  validateListingsItem,
+  deleteListingsItem,
+  matchAsin,
+  AMAZON_PUSH_DISABLED,
+  amazonConfigured,
+  getMarketplaceId,
+} from './client'
 import { getBusinessValues } from '@/lib/site-controls'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
@@ -20,7 +29,9 @@ interface SyncResult {
   finishedAt: string
 }
 
-async function saveSyncStatus(result: Partial<SyncResult> & { status: 'running' | 'success' | 'error'; error?: string }) {
+async function saveSyncStatus(
+  result: Partial<SyncResult> & { status: 'running' | 'success' | 'error'; error?: string }
+) {
   try {
     await query(
       `INSERT INTO amazon_sync_log (status, synced, deleted, errors, started_at, finished_at)
@@ -63,7 +74,9 @@ async function putWithBackoff(sku: string, listing: any): Promise<void> {
       await patchListingsItem(sku, listing.productType, [
         { op: 'replace', path: '/attributes/purchasable_offer', value: offer },
       ])
-    } catch { /* offer patch failure is surfaced by the later status refresh */ }
+    } catch {
+      /* offer patch failure is surfaced by the later status refresh */
+    }
   }
 
   // Store-on-push: persist the ASIN this SKU is now listed against (highest confidence).
@@ -73,9 +86,7 @@ async function putWithBackoff(sku: string, listing: any): Promise<void> {
 
 // Write the confirmed ASIN back onto the variant (or simple product) matched by SKU.
 async function persistListedAsin(sku: string, asin: string): Promise<void> {
-  const upd = await query(
-    `UPDATE product_variants SET asin = $1, asin_match = 'listed' WHERE sku = $2`, [asin, sku]
-  )
+  const upd = await query(`UPDATE product_variants SET asin = $1, asin_match = 'listed' WHERE sku = $2`, [asin, sku])
   // If no variant matched this SKU, try the product-level (simple product) SKU.
   if (!(upd as any)?.rowCount) {
     await query(`UPDATE products SET asin = $1, asin_match = 'listed' WHERE sku = $2`, [asin, sku])
@@ -98,23 +109,24 @@ export async function syncAllProductsToAmazon(): Promise<SyncResult> {
   if (AMAZON_PUSH_DISABLED) {
     const now = new Date().toISOString()
     return {
-      synced: 0, deleted: 0,
+      synced: 0,
+      deleted: 0,
       errors: [{ sku: '__disabled__', error: 'Amazon push is disabled in this environment' }],
-      startedAt: now, finishedAt: now,
+      startedAt: now,
+      finishedAt: now,
     }
   }
   if (!(await amazonConfigured())) {
     const now = new Date().toISOString()
     return {
-      synced: 0, deleted: 0,
+      synced: 0,
+      deleted: 0,
       errors: [{ sku: '__config__', error: 'Amazon is not connected' }],
-      startedAt: now, finishedAt: now,
+      startedAt: now,
+      finishedAt: now,
     }
   }
-  const lockRes = await queryOne<{ acquired: boolean }>(
-    `SELECT pg_try_advisory_lock($1) AS acquired`,
-    [SYNC_LOCK_KEY]
-  )
+  const lockRes = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [SYNC_LOCK_KEY])
   if (!lockRes?.acquired) {
     const startedAt = new Date().toISOString()
     return {
@@ -166,10 +178,16 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
     for (const v of product.product_variants) {
       if (v.price == null) continue
       const stored = trustedAsin(v)
-      const asin = stored || (await safeMatchAsin({
-        gtin: v.gtin || product.gtin, brand, mpn: v.mpn || product.mpn,
-        name: `${brand} ${product.name} ${v.variant_name || ''}`.trim(),
-      }))?.asin
+      const asin =
+        stored ||
+        (
+          await safeMatchAsin({
+            gtin: v.gtin || product.gtin,
+            brand,
+            mpn: v.mpn || product.mpn,
+            name: `${brand} ${product.name} ${v.variant_name || ''}`.trim(),
+          })
+        )?.asin
       if (asin) out.push(productToAmazonOfferListing(product, asin, marketplaceId, v))
     }
     if (out.length) return out
@@ -177,10 +195,16 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
   }
 
   const stored = trustedAsin(product)
-  const asin = stored || (await safeMatchAsin({
-    gtin: product.gtin, brand, mpn: product.mpn,
-    name: `${brand} ${product.name}`.trim(),
-  }))?.asin
+  const asin =
+    stored ||
+    (
+      await safeMatchAsin({
+        gtin: product.gtin,
+        brand,
+        mpn: product.mpn,
+        name: `${brand} ${product.name}`.trim(),
+      })
+    )?.asin
   if (asin) return [productToAmazonOfferListing(product, asin, marketplaceId)]
   return productToAmazonListings(product, marketplaceId, contactText)
 }
@@ -240,16 +264,32 @@ export async function deleteProductFromAmazon(sku: string): Promise<void> {
 // NOT write anything, so it works even with AMAZON_PUSH_DISABLED=true.
 export async function validateProductForAmazon(
   productId: string
-): Promise<Array<{ sku: string; productType: string; requirements?: string; status?: string; issues: any[]; error?: string }>> {
-  if (!(await amazonConfigured())) return [{ sku: '__config__', productType: '', issues: [], error: 'Amazon is not connected' }]
+): Promise<
+  Array<{ sku: string; productType: string; requirements?: string; status?: string; issues: any[]; error?: string }>
+> {
+  if (!(await amazonConfigured()))
+    return [{ sku: '__config__', productType: '', issues: [], error: 'Amazon is not connected' }]
   const product = await fetchProduct(productId)
   if (!product) return [{ sku: '__notfound__', productType: '', issues: [], error: 'Product not found' }]
 
-  const out: Array<{ sku: string; productType: string; requirements: string; status?: string; issues: any[]; error?: string }> = []
+  const out: Array<{
+    sku: string
+    productType: string
+    requirements: string
+    status?: string
+    issues: any[]
+    error?: string
+  }> = []
   for (const l of await resolveListingsForProduct(product)) {
     try {
       const res = await validateListingsItem(l.sku, l)
-      out.push({ sku: l.sku, productType: l.productType, requirements: l.requirements, status: res?.status, issues: res?.issues || [] })
+      out.push({
+        sku: l.sku,
+        productType: l.productType,
+        requirements: l.requirements,
+        status: res?.status,
+        issues: res?.issues || [],
+      })
     } catch (err: any) {
       out.push({ sku: l.sku, productType: l.productType, requirements: l.requirements, issues: [], error: err.message })
     }
@@ -265,8 +305,8 @@ export interface AmazonDryRunRow {
   strategy: 'offer-only' | 'create'
   asin: string | null
   listable: boolean | null
-  postable: boolean | null       // VALIDATION_PREVIEW passed (would actually post)
-  blockReason?: string           // top issue code/message if not postable
+  postable: boolean | null // VALIDATION_PREVIEW passed (would actually post)
+  blockReason?: string // top issue code/message if not postable
 }
 
 export interface AmazonDryRunReport {
@@ -292,7 +332,7 @@ export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport>
       const listings = await resolveListingsForProduct(product)
       const l = listings[0]
       const isOffer = l?.requirements === 'LISTING_OFFER_ONLY'
-      const asin = isOffer ? (l.attributes as any)?.merchant_suggested_asin?.[0]?.value ?? null : null
+      const asin = isOffer ? ((l.attributes as any)?.merchant_suggested_asin?.[0]?.value ?? null) : null
 
       let postable: boolean | null = null
       let blockReason: string | undefined
@@ -304,20 +344,34 @@ export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport>
             const iss = (res?.issues || [])[0]
             blockReason = iss ? `${iss.code || ''}: ${String(iss.message || '').slice(0, 80)}` : 'invalid'
           }
-        } catch (err: any) { postable = null; blockReason = err.message?.slice(0, 80) }
+        } catch (err: any) {
+          postable = null
+          blockReason = err.message?.slice(0, 80)
+        }
       }
 
       rows.push({
-        productId: product.id, sku: product.sku, name: product.name,
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
         brand: product.brands?.name || '',
         strategy: isOffer ? 'offer-only' : 'create',
-        asin, listable: isOffer ? true : null, postable, blockReason,
+        asin,
+        listable: isOffer ? true : null,
+        postable,
+        blockReason,
       })
     } catch (err: any) {
       rows.push({
-        productId: product.id, sku: product.sku, name: product.name,
-        brand: product.brands?.name || '', strategy: 'create', asin: null,
-        listable: null, postable: null, blockReason: err.message?.slice(0, 80),
+        productId: product.id,
+        sku: product.sku,
+        name: product.name,
+        brand: product.brands?.name || '',
+        strategy: 'create',
+        asin: null,
+        listable: null,
+        postable: null,
+        blockReason: err.message?.slice(0, 80),
       })
     }
   }
@@ -336,10 +390,7 @@ export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport>
 
 export async function getLastAmazonSyncStatus(): Promise<any> {
   try {
-    return await queryOne(
-      `SELECT * FROM amazon_sync_log ORDER BY started_at DESC LIMIT 1`,
-      []
-    )
+    return await queryOne(`SELECT * FROM amazon_sync_log ORDER BY started_at DESC LIMIT 1`, [])
   } catch (err) {
     return null
   }

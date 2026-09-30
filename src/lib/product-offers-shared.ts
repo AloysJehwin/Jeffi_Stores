@@ -28,9 +28,11 @@ export function offerHref(slug: string): string {
 
 /** Slugify a title for a new offer: lower-case, hyphenated, ascii-safe. */
 export function slugifyOffer(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 200) || 'offer'
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 200) || 'offer'
+  )
 }

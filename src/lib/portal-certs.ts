@@ -57,10 +57,10 @@ export async function revokePortalCerts(serials: string[]): Promise<number> {
 }
 
 export interface RecordPortalCertInput {
-  tenantId: string | null            // null = platform admin cert
+  tenantId: string | null // null = platform admin cert
   serial: string
   commonName: string
-  issuedTo: string                   // the email the portal matches on
+  issuedTo: string // the email the portal matches on
   role: string
   storeName: string | null
   p12Buffer: Buffer
@@ -87,8 +87,16 @@ export async function recordPortalCert(input: RecordPortalCertInput): Promise<st
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (serial) DO NOTHING`,
       [
-        input.tenantId, input.serial, input.commonName, input.issuedTo, input.role,
-        input.storeName, p12Enc, pwdEnc, downloadToken, input.expiresAt,
+        input.tenantId,
+        input.serial,
+        input.commonName,
+        input.issuedTo,
+        input.role,
+        input.storeName,
+        p12Enc,
+        pwdEnc,
+        downloadToken,
+        input.expiresAt,
       ]
     )
     return downloadToken

@@ -23,10 +23,16 @@ export const LABEL_SIZES: LabelSpec[] = [
   { size: '40x60', widthMm: 60, heightMm: 40, widthPt: 60 * MM, heightPt: 40 * MM, label: '40×60 mm' },
   { size: '50x50', widthMm: 50, heightMm: 50, widthPt: 50 * MM, heightPt: 50 * MM, label: '50×50 mm' },
   { size: '80x20', widthMm: 80, heightMm: 20, widthPt: 80 * MM, heightPt: 20 * MM, label: '80×20 mm (Cable)' },
-  { size: 'shelf-card', widthMm: 100, heightMm: 70, widthPt: 100 * MM, heightPt: 70 * MM, label: '100×70 mm (Shelf Card)' },
+  {
+    size: 'shelf-card',
+    widthMm: 100,
+    heightMm: 70,
+    widthPt: 100 * MM,
+    heightPt: 70 * MM,
+    label: '100×70 mm (Shelf Card)',
+  },
 ]
 
 export function findLabelSpec(size: string | null | undefined): LabelSpec | undefined {
   return LABEL_SIZES.find(s => s.size === size)
 }
-

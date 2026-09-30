@@ -1,24 +1,30 @@
 import * as XLSX from 'xlsx'
 import {
-  HEADER_ROW, columnByHeader, columnsForSheet, keyColumnsFor, ALL_COLUMNS, ATTRIBUTE_SHEETS,
-  type RowType, type SheetName,
+  HEADER_ROW,
+  columnByHeader,
+  columnsForSheet,
+  keyColumnsFor,
+  ALL_COLUMNS,
+  ATTRIBUTE_SHEETS,
+  type RowType,
+  type SheetName,
 } from './columns'
 import { coerceCell, parseImageUrls } from './coerce'
 
 export interface ParsedRow {
-  rowNumber: number            // 1-based spreadsheet row (for error reporting)
-  sheet?: string               // worksheet the row came from (multi-sheet template only)
+  rowNumber: number // 1-based spreadsheet row (for error reporting)
+  sheet?: string // worksheet the row came from (multi-sheet template only)
   rowType: RowType
   parentSku: string | null
   variantSku: string | null
   imageUrls: string[]
-  values: Record<string, unknown>   // coerced, section-agnostic: keyed by column.key
-  errors: string[]                  // per-cell coercion errors
+  values: Record<string, unknown> // coerced, section-agnostic: keyed by column.key
+  errors: string[] // per-cell coercion errors
 }
 
 export interface ParseResult {
   rows: ParsedRow[]
-  fatal?: string   // whole-file problem (bad headers, empty, unreadable)
+  fatal?: string // whole-file problem (bad headers, empty, unreadable)
 }
 
 const MAX_ROWS = 5000
@@ -58,10 +64,12 @@ function readSheet(ws: XLSX.WorkSheet): { headers: string[]; aoa: unknown[][] } 
   return { headers, aoa }
 }
 
-const cellReader = (headers: string[], raw: unknown[]): Cell => (header) => {
-  const idx = headers.indexOf(header)
-  return idx === -1 ? null : raw[idx]
-}
+const cellReader =
+  (headers: string[], raw: unknown[]): Cell =>
+  header => {
+    const idx = headers.indexOf(header)
+    return idx === -1 ? null : raw[idx]
+  }
 
 function isBlank(raw: unknown[]): boolean {
   return raw.every(v => v === null || v === undefined || String(v).trim() === '')
@@ -70,7 +78,8 @@ function isBlank(raw: unknown[]): boolean {
 // The template ships a help row under every header. Recognise it by content, not position, so a
 // sheet whose help row was deleted (or duplicated) still parses.
 function isHelpRow(headers: string[], raw: unknown[], helpOf: Map<string, string>): boolean {
-  let filled = 0, matched = 0
+  let filled = 0,
+    matched = 0
   headers.forEach((h, i) => {
     const v = String(raw[i] ?? '').trim()
     if (!v) return
@@ -88,7 +97,11 @@ function helpLookup(sheet: SheetName): Map<string, string> {
   return m
 }
 
-function coerceRow(sheet: SheetName, rowType: RowType, cell: Cell): { values: Record<string, unknown>; errors: string[] } {
+function coerceRow(
+  sheet: SheetName,
+  rowType: RowType,
+  cell: Cell
+): { values: Record<string, unknown>; errors: string[] } {
   const values: Record<string, unknown> = {}
   const errors: string[] = []
   for (const col of columnsForSheet(sheet)) {
@@ -120,8 +133,14 @@ function parseTemplate(wb: XLSX.WorkBook): ParseResult {
   eachRow('Products', (rowNumber, cell) => {
     const { values, errors } = coerceRow('Products', 'product', cell)
     const row: ParsedRow = {
-      rowNumber, sheet: 'Products', rowType: 'product', parentSku: null, variantSku: null,
-      imageUrls: parseImageUrls(cell('image_urls')), values, errors,
+      rowNumber,
+      sheet: 'Products',
+      rowType: 'product',
+      parentSku: null,
+      variantSku: null,
+      imageUrls: parseImageUrls(cell('image_urls')),
+      values,
+      errors,
     }
     rows.push(row)
     const sku = str(cell('sku'))
@@ -133,12 +152,30 @@ function parseTemplate(wb: XLSX.WorkBook): ParseResult {
       const sku = str(cell('sku'))
       const { values, errors } = coerceRow(sheet, 'product', cell)
       if (!sku) {
-        rows.push({ rowNumber, sheet, rowType: 'product', parentSku: null, variantSku: null, imageUrls: [], values: {}, errors: [`${sheet}: row has values but no sku`] })
+        rows.push({
+          rowNumber,
+          sheet,
+          rowType: 'product',
+          parentSku: null,
+          variantSku: null,
+          imageUrls: [],
+          values: {},
+          errors: [`${sheet}: row has values but no sku`],
+        })
         return
       }
       const target = productBySku.get(sku)
       if (!target) {
-        rows.push({ rowNumber, sheet, rowType: 'product', parentSku: null, variantSku: null, imageUrls: [], values: { sku }, errors: [`${sheet}: sku "${sku}" is not on the Products sheet`] })
+        rows.push({
+          rowNumber,
+          sheet,
+          rowType: 'product',
+          parentSku: null,
+          variantSku: null,
+          imageUrls: [],
+          values: { sku },
+          errors: [`${sheet}: sku "${sku}" is not on the Products sheet`],
+        })
         return
       }
       Object.assign(target.values, values)
@@ -148,16 +185,36 @@ function parseTemplate(wb: XLSX.WorkBook): ParseResult {
 
   eachRow('Variants', (rowNumber, cell) => {
     const { values, errors } = coerceRow('Variants', 'variant', cell)
-    rows.push({ rowNumber, sheet: 'Variants', rowType: 'variant', parentSku: str(cell('parent_sku')), variantSku: null, imageUrls: [], values, errors })
+    rows.push({
+      rowNumber,
+      sheet: 'Variants',
+      rowType: 'variant',
+      parentSku: str(cell('parent_sku')),
+      variantSku: null,
+      imageUrls: [],
+      values,
+      errors,
+    })
   })
 
   eachRow('Sub-variants', (rowNumber, cell) => {
     const { values, errors } = coerceRow('Sub-variants', 'sub_variant', cell)
-    rows.push({ rowNumber, sheet: 'Sub-variants', rowType: 'sub_variant', parentSku: str(cell('parent_sku')), variantSku: str(cell('variant_sku')), imageUrls: [], values, errors })
+    rows.push({
+      rowNumber,
+      sheet: 'Sub-variants',
+      rowType: 'sub_variant',
+      parentSku: str(cell('parent_sku')),
+      variantSku: str(cell('variant_sku')),
+      imageUrls: [],
+      values,
+      errors,
+    })
   })
 
-  if (rows.length === 0) return { rows: [], fatal: 'No data rows found under the headers. Fill the Products sheet first.' }
-  if (rows.length > MAX_ROWS) return { rows: rows.slice(0, MAX_ROWS), fatal: `Too many rows (max ${MAX_ROWS}). Split the file.` }
+  if (rows.length === 0)
+    return { rows: [], fatal: 'No data rows found under the headers. Fill the Products sheet first.' }
+  if (rows.length > MAX_ROWS)
+    return { rows: rows.slice(0, MAX_ROWS), fatal: `Too many rows (max ${MAX_ROWS}). Split the file.` }
   return { rows }
 }
 
@@ -176,13 +233,19 @@ function parseFlat(ws: XLSX.WorkSheet): ParseResult {
     const raw = aoa[i] as unknown[]
     const cell = cellReader(headers, raw)
 
-    const rowTypeRaw = String(cell('row_type') ?? '').trim().toLowerCase()
+    const rowTypeRaw = String(cell('row_type') ?? '')
+      .trim()
+      .toLowerCase()
     // Skip the template's help row (its row_type cell carries the help text).
     if (!rowTypeRaw || rowTypeRaw.includes('|')) continue
     if (rowTypeRaw !== 'product' && rowTypeRaw !== 'variant' && rowTypeRaw !== 'sub_variant') {
       rows.push({
-        rowNumber: i + 1, rowType: 'product', parentSku: null, variantSku: null,
-        imageUrls: [], values: {},
+        rowNumber: i + 1,
+        rowType: 'product',
+        parentSku: null,
+        variantSku: null,
+        imageUrls: [],
+        values: {},
         errors: [`invalid row_type "${rowTypeRaw}" (expected product | variant | sub_variant)`],
       })
       continue

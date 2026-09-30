@@ -10,10 +10,10 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   private stopped = new Set<string>()
   private buckets = new Set<string>()
   private paramGroups = new Set<string>()
-  private backups = new Map<string, Buffer>()   // endpoint -> last dumped archive
-  private restored = new Map<string, Buffer>()   // endpoint -> last restored archive
-  private dns = new Set<string>()                 // tenant hostnames pointed at the app
-  private instances = new Map<string, string>()   // instanceId -> public IP (EC2 app instances)
+  private backups = new Map<string, Buffer>() // endpoint -> last dumped archive
+  private restored = new Map<string, Buffer>() // endpoint -> last restored archive
+  private dns = new Set<string>() // tenant hostnames pointed at the app
+  private instances = new Map<string, string>() // instanceId -> public IP (EC2 app instances)
   private instanceSeq = 0
   // How many getDbEndpoint polls before "available" (small so tests are fast).
   constructor(private availableAfterPolls = 2) {}
@@ -43,7 +43,9 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     return null // still provisioning
   }
 
-  async loadSchema(_endpoint: string, _dbName: string): Promise<void> { /* no-op in stub */ }
+  async loadSchema(_endpoint: string, _dbName: string): Promise<void> {
+    /* no-op in stub */
+  }
 
   async backupDb(endpoint: string, _dbName: string): Promise<Buffer> {
     // Deterministic fake archive so callers get real bytes to round-trip through S3.
@@ -56,27 +58,43 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     this.restored.set(endpoint, archive)
   }
 
-  async ensureBucket(bucket: string): Promise<void> { this.buckets.add(bucket) }
+  async ensureBucket(bucket: string): Promise<void> {
+    this.buckets.add(bucket)
+  }
 
-  async ensureDns(hostnames: string[], _targetIp?: string): Promise<void> { hostnames.forEach((h) => this.dns.add(h)) }
-  async removeDns(hostnames: string[]): Promise<void> { hostnames.forEach((h) => this.dns.delete(h)) }
+  async ensureDns(hostnames: string[], _targetIp?: string): Promise<void> {
+    hostnames.forEach(h => this.dns.add(h))
+  }
+  async removeDns(hostnames: string[]): Promise<void> {
+    hostnames.forEach(h => this.dns.delete(h))
+  }
 
-  async stopDbInstance(dbInstanceId: string): Promise<void> { this.stopped.add(dbInstanceId) }
-  async startDbInstance(dbInstanceId: string): Promise<void> { this.stopped.delete(dbInstanceId) }
+  async stopDbInstance(dbInstanceId: string): Promise<void> {
+    this.stopped.add(dbInstanceId)
+  }
+  async startDbInstance(dbInstanceId: string): Promise<void> {
+    this.stopped.delete(dbInstanceId)
+  }
 
   async deleteDbInstance(dbInstanceId: string): Promise<void> {
-    this.endpoints.delete(dbInstanceId); this.pending.delete(dbInstanceId); this.stopped.delete(dbInstanceId)
+    this.endpoints.delete(dbInstanceId)
+    this.pending.delete(dbInstanceId)
+    this.stopped.delete(dbInstanceId)
   }
-  async deleteBucket(bucket: string): Promise<void> { this.buckets.delete(bucket) }
+  async deleteBucket(bucket: string): Promise<void> {
+    this.buckets.delete(bucket)
+  }
 
   async isDbInstanceGone(dbInstanceId: string): Promise<boolean> {
     return !this.endpoints.has(dbInstanceId) && !this.pending.has(dbInstanceId)
   }
-  async deleteParamGroup(paramGroup: string): Promise<void> { this.paramGroups.delete(paramGroup) }
+  async deleteParamGroup(paramGroup: string): Promise<void> {
+    this.paramGroups.delete(paramGroup)
+  }
 
   async ensureAppInstance(
     args: { name: string; instanceType: string; userData?: string },
-    onLaunched?: (instanceId: string) => Promise<void>,
+    onLaunched?: (instanceId: string) => Promise<void>
   ): Promise<{ instanceId: string; ip: string }> {
     const instanceId = `i-stub${String(++this.instanceSeq).padStart(6, '0')}`
     const ip = `52.0.0.${this.instanceSeq}`
@@ -84,16 +102,36 @@ export class StubProvisioningProvider implements ProvisioningProvider {
     if (onLaunched) await onLaunched(instanceId)
     return { instanceId, ip }
   }
-  async deleteAppInstance(instanceId: string): Promise<void> { this.instances.delete(instanceId) }
-  async isInstanceGone(instanceId: string): Promise<boolean> { return !this.instances.has(instanceId) }
+  async deleteAppInstance(instanceId: string): Promise<void> {
+    this.instances.delete(instanceId)
+  }
+  async isInstanceGone(instanceId: string): Promise<boolean> {
+    return !this.instances.has(instanceId)
+  }
 
   // test helpers
-  isStopped(id: string) { return this.stopped.has(id) }
-  hasBucket(b: string) { return this.buckets.has(b) }
-  hasParamGroup(pg: string) { return this.paramGroups.has(pg) }
-  wasBackedUp(endpoint: string) { return this.backups.has(endpoint) }
-  wasRestored(endpoint: string) { return this.restored.has(endpoint) }
-  hasDns(host: string) { return this.dns.has(host) }
-  hasInstance(id: string) { return this.instances.has(id) }
-  instanceCount() { return this.instances.size }
+  isStopped(id: string) {
+    return this.stopped.has(id)
+  }
+  hasBucket(b: string) {
+    return this.buckets.has(b)
+  }
+  hasParamGroup(pg: string) {
+    return this.paramGroups.has(pg)
+  }
+  wasBackedUp(endpoint: string) {
+    return this.backups.has(endpoint)
+  }
+  wasRestored(endpoint: string) {
+    return this.restored.has(endpoint)
+  }
+  hasDns(host: string) {
+    return this.dns.has(host)
+  }
+  hasInstance(id: string) {
+    return this.instances.has(id)
+  }
+  instanceCount() {
+    return this.instances.size
+  }
 }

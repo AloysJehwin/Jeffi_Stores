@@ -35,10 +35,9 @@ export async function listFilterOffers(): Promise<Pick<ProductOffer, 'slug' | 't
 /** Active-window offers for the given ids, returned in the order of `ids`. */
 export async function listOffersByIds(ids: string[]): Promise<ProductOffer[]> {
   if (ids.length === 0) return []
-  const rows = await queryMany<ProductOffer>(
-    `SELECT * FROM product_offers WHERE ${LIVE_WINDOW} AND id = ANY($1)`,
-    [ids]
-  )
+  const rows = await queryMany<ProductOffer>(`SELECT * FROM product_offers WHERE ${LIVE_WINDOW} AND id = ANY($1)`, [
+    ids,
+  ])
   const byId = new Map(rows.map(o => [o.id, o]))
   return ids.map(id => byId.get(id)).filter((o): o is ProductOffer => o != null)
 }

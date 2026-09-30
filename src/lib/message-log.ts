@@ -15,8 +15,10 @@ export function redactOtpBody(body: string | null): string | null {
   const MASK = '••••••'
   const isCodeLike = (s: string) => /^[0-9][0-9A-Za-z]{2,7}$/.test(s) && /\d/.test(s)
   return body
-    .replace(/\b(otp|code|password|pin)\b(\s*(?:is|:|=)?\s*)([A-Za-z0-9]{3,12})/gi,
-      (m, kw: string, sep: string, val: string) => (isCodeLike(val) ? `${kw}${sep}${MASK}` : m))
+    .replace(
+      /\b(otp|code|password|pin)\b(\s*(?:is|:|=)?\s*)([A-Za-z0-9]{3,12})/gi,
+      (m, kw: string, sep: string, val: string) => (isCodeLike(val) ? `${kw}${sep}${MASK}` : m)
+    )
     .replace(/\b\d{4,8}\b/g, MASK)
 }
 
@@ -40,8 +42,19 @@ export function logMessage(params: {
   query(
     `INSERT INTO message_logs (channel, direction, to_number, from_number, body, kind, status, error, provider_sid, user_id, entity_type, entity_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [params.channel, params.direction ?? 'outbound', params.to, params.from, body, params.kind,
-     params.status, params.error ?? null, params.providerSid ?? null, params.userId ?? null,
-     params.entityType ?? null, params.entityId ?? null]
+    [
+      params.channel,
+      params.direction ?? 'outbound',
+      params.to,
+      params.from,
+      body,
+      params.kind,
+      params.status,
+      params.error ?? null,
+      params.providerSid ?? null,
+      params.userId ?? null,
+      params.entityType ?? null,
+      params.entityId ?? null,
+    ]
   ).catch(() => {})
 }

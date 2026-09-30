@@ -26,10 +26,7 @@ export async function getInventorySync(
   const run = client
     ? (sql: string, params: any[]) => client.query(sql, params)
     : (sql: string, params: any[]) => query(sql, params)
-  const res = await run(
-    `SELECT inventory_sync, low_stock_threshold FROM products WHERE id = $1`,
-    [productId]
-  )
+  const res = await run(`SELECT inventory_sync, low_stock_threshold FROM products WHERE id = $1`, [productId])
   const row = res.rows[0]
   return {
     enabled: !!row?.inventory_sync,
@@ -88,7 +85,6 @@ export async function recomputeStockStatusForProduct(
   )
 }
 
-
 export async function logStockMovement(
   client: PoolClient | null,
   params: {
@@ -111,22 +107,29 @@ export async function logStockMovement(
     serialNumber?: string | null
   }
 ) {
-  const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
+  const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } =
+    params
 
   let currentStockRaw: number
   if (params.currentStock !== undefined) {
     currentStockRaw = params.currentStock
   } else if (subVariantId) {
     const row = await queryOne<{ inventory_quantity: number }>(
-      'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1', [subVariantId])
+      'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1',
+      [subVariantId]
+    )
     currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
   } else if (variantId) {
     const row = await queryOne<{ inventory_quantity: number }>(
-      'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variantId])
+      'SELECT inventory_quantity FROM product_variants WHERE id = $1',
+      [variantId]
+    )
     currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
   } else {
     const row = await queryOne<{ inventory_quantity: number }>(
-      'SELECT inventory_quantity FROM products WHERE id = $1', [productId])
+      'SELECT inventory_quantity FROM products WHERE id = $1',
+      [productId]
+    )
     currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
   }
 
@@ -139,13 +142,23 @@ export async function logStockMovement(
      lot_number, expiry_date, serial_number)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`
   const values = [
-    productId, variantId, subVariantId || null,
-    transactionType, qtyChange, quantityAfter,
-    referenceType, referenceId, notes || null,
-    params.unitId || null, params.unitLabel || null,
-    params.unitFactor || null, params.quantityInUnit || null,
+    productId,
+    variantId,
+    subVariantId || null,
+    transactionType,
+    qtyChange,
+    quantityAfter,
+    referenceType,
+    referenceId,
+    notes || null,
+    params.unitId || null,
+    params.unitLabel || null,
+    params.unitFactor || null,
+    params.quantityInUnit || null,
     params.batchId || null,
-    params.lotNumber || null, params.expiryDate || null, params.serialNumber || null,
+    params.lotNumber || null,
+    params.expiryDate || null,
+    params.serialNumber || null,
   ]
 
   if (client) {
@@ -174,30 +187,26 @@ export async function updateWeightedAvgCost(
     return
   } else if (variantId) {
     const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
-      'SELECT inventory_quantity, cost_price FROM product_variants WHERE id = $1 FOR UPDATE', [variantId])
+      'SELECT inventory_quantity, cost_price FROM product_variants WHERE id = $1 FOR UPDATE',
+      [variantId]
+    )
     const cur = row.rows[0]
     const curStock = parseFloat(cur?.inventory_quantity as any) || 0
     const curCost = parseFloat(cur?.cost_price as any) || 0
-    const newCost = curStock + qtyReceived > 0
-      ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived)
-      : unitCost
-    await client.query(
-      'UPDATE product_variants SET cost_price = $1 WHERE id = $2',
-      [round2(newCost), variantId]
-    )
+    const newCost =
+      curStock + qtyReceived > 0 ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived) : unitCost
+    await client.query('UPDATE product_variants SET cost_price = $1 WHERE id = $2', [round2(newCost), variantId])
   } else {
     const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
-      'SELECT inventory_quantity, cost_price FROM products WHERE id = $1 FOR UPDATE', [productId])
+      'SELECT inventory_quantity, cost_price FROM products WHERE id = $1 FOR UPDATE',
+      [productId]
+    )
     const cur = row.rows[0]
     const curStock = parseFloat(cur?.inventory_quantity as any) || 0
     const curCost = parseFloat(cur?.cost_price as any) || 0
-    const newCost = curStock + qtyReceived > 0
-      ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived)
-      : unitCost
-    await client.query(
-      'UPDATE products SET cost_price = $1 WHERE id = $2',
-      [round2(newCost), productId]
-    )
+    const newCost =
+      curStock + qtyReceived > 0 ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived) : unitCost
+    await client.query('UPDATE products SET cost_price = $1 WHERE id = $2', [round2(newCost), productId])
   }
 }
 
@@ -213,9 +222,18 @@ export async function getStockLedger(filters: {
   const params: any[] = []
   let i = 1
 
-  if (filters.productId) { conditions.push(`it.product_id = $${i++}`); params.push(filters.productId) }
-  if (filters.from) { conditions.push(`it.created_at >= $${i++}`); params.push(filters.from) }
-  if (filters.to) { conditions.push(`it.created_at <= $${i++}`); params.push(filters.to + ' 23:59:59') }
+  if (filters.productId) {
+    conditions.push(`it.product_id = $${i++}`)
+    params.push(filters.productId)
+  }
+  if (filters.from) {
+    conditions.push(`it.created_at >= $${i++}`)
+    params.push(filters.from)
+  }
+  if (filters.to) {
+    conditions.push(`it.created_at <= $${i++}`)
+    params.push(filters.to + ' 23:59:59')
+  }
   if (filters.search) {
     const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
     conditions.push(sc.clause)
@@ -265,7 +283,8 @@ export async function getStockLedger(filters: {
   // same group order (by the group's newest timestamp) so the UI groups cleanly.
   const keys = groupRows.map(g => g.group_key)
   const rowParams = [...params, keys]
-  const rows = await queryMany<any>(`
+  const rows = await queryMany<any>(
+    `
     SELECT
       it.id,
       it.created_at,
@@ -308,21 +327,25 @@ export async function getStockLedger(filters: {
     LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
     WHERE ${where} AND ${GROUP_KEY} = ANY($${i}::text[])
     ORDER BY MAX(it.created_at) OVER (PARTITION BY ${GROUP_KEY}) DESC, ${GROUP_KEY}, it.created_at DESC
-  `, rowParams)
+  `,
+    rowParams
+  )
 
   return { rows: rows || [], total }
 }
 
-export async function getStockValuation(filters: {
-  limit?: number
-  offset?: number
-  search?: string
-  categoryName?: string
-  brandName?: string
-  stockStatus?: string
-  sort?: string
-  dir?: string
-} = {}) {
+export async function getStockValuation(
+  filters: {
+    limit?: number
+    offset?: number
+    search?: string
+    categoryName?: string
+    brandName?: string
+    stockStatus?: string
+    sort?: string
+    dir?: string
+  } = {}
+) {
   const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir } = filters
 
   // Build WHERE conditions applied to each UNION leg via a wrapping CTE
@@ -491,15 +514,29 @@ export async function getStockValuation(filters: {
   if (search) {
     const sc = buildProductSearchClause(search, 'rows.name', 'rows.row_sku', 'rows.search_vector', i)
     const nameIdx = sc.nextIdx
-    havingClauses.push(`(${sc.clause} OR rows.variant_name ILIKE $${nameIdx} OR rows.sub_variant_name ILIKE $${nameIdx})`)
+    havingClauses.push(
+      `(${sc.clause} OR rows.variant_name ILIKE $${nameIdx} OR rows.sub_variant_name ILIKE $${nameIdx})`
+    )
     params.push(...sc.params, `%${search.trim()}%`)
     i = nameIdx + 1
   }
-  if (categoryName) { havingClauses.push(`rows.category_name = $${i++}`); params.push(categoryName) }
-  if (brandName)    { havingClauses.push(`rows.brand_name = $${i++}`);    params.push(brandName) }
-  if (stockStatus === 'in_stock')     { havingClauses.push(`rows.inventory_quantity > 0`) }
-  if (stockStatus === 'out_of_stock') { havingClauses.push(`rows.inventory_quantity <= 0`) }
-  if (stockStatus === 'low_stock')    { havingClauses.push(`rows.inventory_quantity > 0 AND rows.inventory_quantity <= 5`) }
+  if (categoryName) {
+    havingClauses.push(`rows.category_name = $${i++}`)
+    params.push(categoryName)
+  }
+  if (brandName) {
+    havingClauses.push(`rows.brand_name = $${i++}`)
+    params.push(brandName)
+  }
+  if (stockStatus === 'in_stock') {
+    havingClauses.push(`rows.inventory_quantity > 0`)
+  }
+  if (stockStatus === 'out_of_stock') {
+    havingClauses.push(`rows.inventory_quantity <= 0`)
+  }
+  if (stockStatus === 'low_stock') {
+    havingClauses.push(`rows.inventory_quantity > 0 AND rows.inventory_quantity <= 5`)
+  }
 
   const whereClause = havingClauses.length > 0 ? `WHERE ${havingClauses.join(' AND ')}` : ''
 
@@ -525,12 +562,18 @@ export async function getStockValuation(filters: {
   const inStockCount = await queryOne<{ n: number }>(
     `${baseQuery} SELECT COUNT(DISTINCT rows.id)::int AS n FROM rows ${whereClause}${whereClause ? ' AND' : ' WHERE'} rows.inventory_quantity > 0`,
     params
-  ).then(r => r?.n || 0).catch(() => 0)
+  )
+    .then(r => r?.n || 0)
+    .catch(() => 0)
 
   // Server-side sort (across ALL matching SKUs, not just the page). Whitelist columns.
   const VAL_SORT_COLS: Record<string, string> = {
-    product: 'rows.name', variant: 'rows.variant_name', sku: 'rows.row_sku',
-    stock: 'rows.inventory_quantity', price: 'rows.cost_price', value: 'rows.stock_value',
+    product: 'rows.name',
+    variant: 'rows.variant_name',
+    sku: 'rows.row_sku',
+    stock: 'rows.inventory_quantity',
+    price: 'rows.cost_price',
+    value: 'rows.stock_value',
   }
   const sortCol = (sort && VAL_SORT_COLS[sort]) || null
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC'
@@ -559,12 +602,13 @@ export async function getStockValuation(filters: {
     pageParams
   )
   const idList = (pagedProductIds || []).map(r => r.id)
-  const products = idList.length > 0
-    ? await queryMany<any>(
-        `${baseQuery} SELECT rows.* FROM rows WHERE rows.id = ANY($1) ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`,
-        [idList]
-      )
-    : []
+  const products =
+    idList.length > 0
+      ? await queryMany<any>(
+          `${baseQuery} SELECT rows.* FROM rows WHERE rows.id = ANY($1) ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`,
+          [idList]
+        )
+      : []
 
   return {
     products: products || [],

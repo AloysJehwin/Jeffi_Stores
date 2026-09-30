@@ -22,13 +22,16 @@ export const POOL_SIZE_TIERS = [
 const FLAGSHIP_INSTANCE_ID = process.env.FLAGSHIP_INSTANCE_ID || 'i-0b2466b2a540d6f23'
 
 export function targetType(count: number): string {
-  const tier = POOL_SIZE_TIERS.find((t) => count <= t.maxTenants)
-  if (!tier) throw new Error(`Pool capacity exceeded: ${count} active tenants > ${POOL_SIZE_TIERS[POOL_SIZE_TIERS.length - 1].maxTenants} (needs a bigger architecture — paging a human)`)
+  const tier = POOL_SIZE_TIERS.find(t => count <= t.maxTenants)
+  if (!tier)
+    throw new Error(
+      `Pool capacity exceeded: ${count} active tenants > ${POOL_SIZE_TIERS[POOL_SIZE_TIERS.length - 1].maxTenants} (needs a bigger architecture — paging a human)`
+    )
   return tier.type
 }
 
 function tierIndex(type: string): number {
-  return POOL_SIZE_TIERS.findIndex((t) => t.type === type)
+  return POOL_SIZE_TIERS.findIndex(t => t.type === type)
 }
 
 export interface AutoscaleResult {
@@ -45,7 +48,8 @@ export interface AutoscaleResult {
  */
 export async function runPoolAutoscale(): Promise<AutoscaleResult> {
   const poolId = process.env.POOL_INSTANCE_ID
-  if (!poolId) return { tenantCount: 0, currentType: '', targetType: '', action: 'disabled', detail: 'POOL_INSTANCE_ID not set' }
+  if (!poolId)
+    return { tenantCount: 0, currentType: '', targetType: '', action: 'disabled', detail: 'POOL_INSTANCE_ID not set' }
 
   // Flagship interlock — three ways this can never touch the dedicated box.
   if (poolId === FLAGSHIP_INSTANCE_ID) {
@@ -101,7 +105,7 @@ export async function ensurePoolInstance(): Promise<{ instanceId: string; ip: st
     { name: 'jeffi-pool', instanceType: POOL_SIZE_TIERS[0].type, userData: appBootUserData() },
     // Persist before the readiness wait: if that throws, the next run finds this instance
     // instead of launching a second one.
-    (id) => setPlatformInfra(POOL_ID_KEY, id),
+    id => setPlatformInfra(POOL_ID_KEY, id)
   )
   await setPlatformInfra(POOL_ID_KEY, instanceId)
   await setPlatformInfra(POOL_IP_KEY, ip)

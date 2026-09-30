@@ -41,14 +41,40 @@ interface DraftRow {
 }
 
 const SECTION_COLUMNS = [
-  'type', 'title', 'subtitle', 'eyebrow', 'cta_label', 'cta_url', 'config',
-  'display_order', 'is_active', 'starts_at', 'ends_at',
+  'type',
+  'title',
+  'subtitle',
+  'eyebrow',
+  'cta_label',
+  'cta_url',
+  'config',
+  'display_order',
+  'is_active',
+  'starts_at',
+  'ends_at',
 ] as const
 
 const SLIDE_COLUMNS = [
-  'title', 'subtitle', 'badge_text', 'badge_color', 'image_url', 'image_url_mobile', 'blurhash', 'blurhash_mobile',
-  'cta_label', 'cta_url', 'filter_category', 'filter_brand', 'filter_grade', 'filter_material',
-  'filter_min_price', 'filter_max_price', 'filter_in_stock', 'filter_on_sale', 'display_order', 'is_active',
+  'title',
+  'subtitle',
+  'badge_text',
+  'badge_color',
+  'image_url',
+  'image_url_mobile',
+  'blurhash',
+  'blurhash_mobile',
+  'cta_label',
+  'cta_url',
+  'filter_category',
+  'filter_brand',
+  'filter_grade',
+  'filter_material',
+  'filter_min_price',
+  'filter_max_price',
+  'filter_in_stock',
+  'filter_on_sale',
+  'display_order',
+  'is_active',
 ] as const
 
 const NOT_NULL_DEFAULTS: Record<string, string> = {
@@ -130,8 +156,12 @@ function toIso(value: unknown): string | null {
 function canonical(value: unknown): string {
   return JSON.stringify(value ?? null, (_key, v) =>
     v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]]))
-      : v,
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .map(k => [k, v[k]])
+        )
+      : v
   )
 }
 
@@ -185,7 +215,12 @@ export function endsBeforeStart(startsAt: unknown, endsAt: unknown): boolean {
 
 async function readDraft() {
   try {
-    return await queryOne<{ sections: unknown; hero_slides: unknown; updated_at: unknown; updated_by_name: string | null }>(READ_DRAFT_SQL)
+    return await queryOne<{
+      sections: unknown
+      hero_slides: unknown
+      updated_at: unknown
+      updated_by_name: string | null
+    }>(READ_DRAFT_SQL)
   } catch (err) {
     if (isUndefinedTable(err)) return null
     throw err
@@ -223,7 +258,7 @@ async function lockDraft(client: PoolClient, updatedBy: string | null): Promise<
  */
 export async function withHomepageDraft<T>(
   adminId: string | null,
-  mutate: (draft: HomepageDraftState) => T | Promise<T>,
+  mutate: (draft: HomepageDraftState) => T | Promise<T>
 ): Promise<T> {
   const updatedBy = asUuid(adminId)
   try {
@@ -243,7 +278,9 @@ export async function withHomepageDraft<T>(
 
 async function publishRows(client: PoolClient, spec: TableSpec, rows: DraftRow[]): Promise<PublishCounts> {
   const upserted = await client.query<{ inserted: boolean }>(spec.upsert, [JSON.stringify(rows)])
-  const deleted = await client.query(`DELETE FROM ${spec.table} WHERE NOT (id = ANY($1::uuid[]))`, [rows.map(r => r.id)])
+  const deleted = await client.query(`DELETE FROM ${spec.table} WHERE NOT (id = ANY($1::uuid[]))`, [
+    rows.map(r => r.id),
+  ])
   const inserted = upserted.rows.filter(r => r.inserted).length
   return { inserted, updated: upserted.rows.length - inserted, deleted: deleted.rowCount ?? 0 }
 }
@@ -276,8 +313,12 @@ function diffRows(draft: DraftRow[], live: DraftRow[], fields: readonly string[]
     if (!prev) added++
     else if (fields.some(f => comparable(f, value(row, f)) !== comparable(f, value(prev, f)))) edited++
   }
-  const draftOrder = sortByDisplayOrder(draft).map(r => r.id).filter(id => liveById.has(id))
-  const liveOrder = sortByDisplayOrder(live).map(r => r.id).filter(id => draftIds.has(id))
+  const draftOrder = sortByDisplayOrder(draft)
+    .map(r => r.id)
+    .filter(id => liveById.has(id))
+  const liveOrder = sortByDisplayOrder(live)
+    .map(r => r.id)
+    .filter(id => draftIds.has(id))
   return {
     added,
     removed: live.filter(r => !draftIds.has(r.id)).length,

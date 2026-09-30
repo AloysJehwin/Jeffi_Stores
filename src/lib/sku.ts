@@ -6,15 +6,18 @@ export async function generateProductSku(categoryId: string | null): Promise<str
     let prefix = 'PRD'
 
     if (categoryId) {
-      const catResult = await client.query(
-        'SELECT name, sku_prefix FROM categories WHERE id = $1 FOR UPDATE',
-        [categoryId]
-      )
+      const catResult = await client.query('SELECT name, sku_prefix FROM categories WHERE id = $1 FOR UPDATE', [
+        categoryId,
+      ])
       const cat = catResult.rows[0]
       if (cat) {
-        prefix = cat.sku_prefix
-          || cat.name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, '')
-          || 'PRD'
+        prefix =
+          cat.sku_prefix ||
+          cat.name
+            .slice(0, 3)
+            .toUpperCase()
+            .replace(/[^A-Z]/g, '') ||
+          'PRD'
       }
     }
 
@@ -26,10 +29,7 @@ export async function generateProductSku(categoryId: string | null): Promise<str
       ) AS max_seq
       FROM products
       WHERE sku ~ $2`,
-      [
-        prefix,
-        `^${prefix}-\\d+$`,
-      ]
+      [prefix, `^${prefix}-\\d+$`]
     )
 
     const nextSeq = (maxResult.rows[0]?.max_seq || 0) + 1

@@ -50,7 +50,9 @@ export interface IRNResult {
 
 let cachedToken: { token: string; expiresAt: number } | null = null
 
-export function __resetTokenCacheForTests(): void { cachedToken = null }
+export function __resetTokenCacheForTests(): void {
+  cachedToken = null
+}
 
 function isConfigured(): boolean {
   return !!(
@@ -135,8 +137,12 @@ function buildIRPPayload(p: EInvoicePayload): object {
       IgstAmt: item.igstAmt,
       CgstAmt: item.cgstAmt,
       SgstAmt: item.sgstAmt,
-      CesRt: 0, CesAmt: 0, CesNonAdvlAmt: 0,
-      StateCesRt: 0, StateCesAmt: 0, StateCesNonAdvlAmt: 0,
+      CesRt: 0,
+      CesAmt: 0,
+      CesNonAdvlAmt: 0,
+      StateCesRt: 0,
+      StateCesAmt: 0,
+      StateCesNonAdvlAmt: 0,
       OthChrg: 0,
       TotItemVal: item.totalItemVal,
     })),
@@ -145,7 +151,11 @@ function buildIRPPayload(p: EInvoicePayload): object {
       CgstVal: p.cgstVal,
       SgstVal: p.sgstVal,
       IgstVal: p.igstVal,
-      CesVal: 0, StCesVal: 0, Discount: 0, OthChrg: 0, RndOffAmt: 0,
+      CesVal: 0,
+      StCesVal: 0,
+      Discount: 0,
+      OthChrg: 0,
+      RndOffAmt: 0,
       TotInvVal: p.totalInvVal,
     },
   }

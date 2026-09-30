@@ -35,12 +35,12 @@ function outOfStockMessage(label: string): string {
  * .batch_id are ON DELETE SET NULL). Call after any decrement. Returns true if
  * the batch was deleted.
  */
-export async function deleteBatchIfEmpty(client: { query: (sql: string, params?: any[]) => Promise<any> }, batchId: string | null | undefined): Promise<boolean> {
+export async function deleteBatchIfEmpty(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  batchId: string | null | undefined
+): Promise<boolean> {
   if (!batchId) return false
-  const res = await client.query(
-    `DELETE FROM product_batches WHERE id = $1 AND quantity_remaining <= 0`,
-    [batchId]
-  )
+  const res = await client.query(`DELETE FROM product_batches WHERE id = $1 AND quantity_remaining <= 0`, [batchId])
   return (res?.rowCount ?? 0) > 0
 }
 
@@ -221,14 +221,22 @@ async function deductItems(
         const step = unit && unit.qty_step > 0 ? unit.qty_step : 1
         throw new Error(
           `Serial numbers for "${label}" — expected ${needed} serial number(s) ` +
-          `(${baseQty} base units / ${step} qty_step), got ${manualSerials.length}`
+            `(${baseQty} base units / ${step} qty_step), got ${manualSerials.length}`
         )
       }
       await deductSerialized(client, referenceId, item, baseQty, needed, manualSerials, label)
-      touchedPerishable.push({ productId: item.product_id, variantId: item.variant_id, subVariantId: item.sub_variant_id })
+      touchedPerishable.push({
+        productId: item.product_id,
+        variantId: item.variant_id,
+        subVariantId: item.sub_variant_id,
+      })
     } else if (isPerishable) {
       await deductPerishable(client, referenceId, item, baseQty, manualBatches, label)
-      touchedPerishable.push({ productId: item.product_id, variantId: item.variant_id, subVariantId: item.sub_variant_id })
+      touchedPerishable.push({
+        productId: item.product_id,
+        variantId: item.variant_id,
+        subVariantId: item.sub_variant_id,
+      })
     } else {
       await deductPlain(client, referenceId, item, baseQty, label)
     }
@@ -277,7 +285,10 @@ async function deductPerishable(
     for (const b of avail.rows) {
       if (remaining <= 1e-6) break
       const take = Math.min(remaining, parseFloat(b.quantity_remaining) || 0)
-      if (take > 0) { plan.push({ batch_id: b.id, qty: take }); remaining -= take }
+      if (take > 0) {
+        plan.push({ batch_id: b.id, qty: take })
+        remaining -= take
+      }
     }
     if (remaining > 1e-6) {
       throw new InsufficientStockError(
@@ -289,7 +300,8 @@ async function deductPerishable(
 
   for (const p of plan) {
     const br = await client.query<{ quantity_remaining: string }>(
-      `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [p.batch_id]
+      `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`,
+      [p.batch_id]
     )
     const before = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
     if (before + 1e-6 < p.qty) {
@@ -342,10 +354,11 @@ async function deductSerialized(
           WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
         [item.product_id, a.serial_number]
       )
-      if (!r.rows.length) throw new InsufficientStockError(
-        `Serial "${a.serial_number}" for "${label}" is not available`,
-        outOfStockMessage(label)
-      )
+      if (!r.rows.length)
+        throw new InsufficientStockError(
+          `Serial "${a.serial_number}" for "${label}" is not available`,
+          outOfStockMessage(label)
+        )
       serials.push({ id: r.rows[0].id, serial_number: a.serial_number, batch_id: r.rows[0].batch_id })
     }
   } else {
@@ -429,7 +442,8 @@ async function deductPlain(
   const table = item.sub_variant_id ? 'product_sub_variants' : item.variant_id ? 'product_variants' : 'products'
   const targetId = item.sub_variant_id || item.variant_id || item.product_id
   const inv = await client.query<{ inventory_quantity: string }>(
-    `SELECT inventory_quantity FROM ${table} WHERE id = $1 FOR UPDATE`, [targetId]
+    `SELECT inventory_quantity FROM ${table} WHERE id = $1 FOR UPDATE`,
+    [targetId]
   )
   const before = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
   if (before + 1e-6 < baseQty) {
@@ -438,9 +452,10 @@ async function deductPlain(
       outOfStockMessage(label)
     )
   }
-  await client.query(
-    `UPDATE ${table} SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`, [baseQty, targetId]
-  )
+  await client.query(`UPDATE ${table} SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`, [
+    baseQty,
+    targetId,
+  ])
   await logStockMovement(client, {
     productId: item.product_id,
     variantId: item.variant_id,

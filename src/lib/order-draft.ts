@@ -1,7 +1,10 @@
 import { SignJWT, jwtVerify } from 'jose'
 
 const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET not set') })()
+  process.env.JWT_SECRET ??
+    (() => {
+      throw new Error('JWT_SECRET not set')
+    })()
 )
 
 const DRAFT_TTL_SECONDS = 1800
@@ -84,9 +87,11 @@ export function hashCartItems(items: DraftCartItem[]): string {
     const kb = `${b.productId}|${b.variantId || ''}|${b.subVariantId || ''}|${b.buyMode}`
     return ka.localeCompare(kb)
   })
-  const fp = sorted.map(i =>
-    `${i.productId}:${i.variantId || ''}:${i.subVariantId || ''}:${i.buyMode}:${i.quantity}:${i.priceAtAddition}`
-  ).join('|')
+  const fp = sorted
+    .map(
+      i => `${i.productId}:${i.variantId || ''}:${i.subVariantId || ''}:${i.buyMode}:${i.quantity}:${i.priceAtAddition}`
+    )
+    .join('|')
   let h = 5381
   for (let i = 0; i < fp.length; i++) {
     h = ((h << 5) + h) ^ fp.charCodeAt(i)

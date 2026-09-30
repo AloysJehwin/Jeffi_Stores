@@ -58,7 +58,7 @@ function getCached(tenantId: string) {
 export interface PlanGateResult {
   allowed: boolean
   plan: string
-  upgradeRequired: string | null  // minimum plan slug needed, or null if allowed
+  upgradeRequired: string | null // minimum plan slug needed, or null if allowed
 }
 
 /**

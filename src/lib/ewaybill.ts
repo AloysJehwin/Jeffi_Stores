@@ -50,7 +50,9 @@ export interface EWayBillResult {
 
 let cachedToken: { token: string; expiresAt: number } | null = null
 
-export function __resetTokenCacheForTests(): void { cachedToken = null }
+export function __resetTokenCacheForTests(): void {
+  cachedToken = null
+}
 
 function isConfigured(): boolean {
   return !!(

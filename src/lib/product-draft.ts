@@ -31,7 +31,7 @@ export class OpenOrdersBlockError extends Error {
   constructor(orderNumbers: string[]) {
     super(
       `Cannot publish: this product has ${orderNumbers.length} open order(s) (${orderNumbers.join(', ')}) in pending/confirmed status. ` +
-      `Publishing could change variants/SKUs and break those orders' stock. Move them past 'confirmed' (or cancel) first.`
+        `Publishing could change variants/SKUs and break those orders' stock. Move them past 'confirmed' (or cancel) first.`
     )
     this.name = 'OpenOrdersBlockError'
     this.orderNumbers = orderNumbers
@@ -54,15 +54,15 @@ export class UnitChangeBlockedError extends Error {
  * name) reads as a factor/dimension/qty_step change vs the old base and is caught;
  * a re-save with identical numerics is not a change and passes.
  */
-async function assertStagedUnitChangesAllowed(
-  productId: string,
-  units: any[]
-): Promise<void> {
+async function assertStagedUnitChangesAllowed(productId: string, units: any[]): Promise<void> {
   const baseOf = (rows: any[]) => rows.find(u => u.is_base) ?? null
 
-  const productBase = baseOf(units.filter(u =>
-    !u._cleared && (!u.variant_id || u.variant_id === 'null') && (!u.sub_variant_id || u.sub_variant_id === 'null')
-  ))
+  const productBase = baseOf(
+    units.filter(
+      u =>
+        !u._cleared && (!u.variant_id || u.variant_id === 'null') && (!u.sub_variant_id || u.sub_variant_id === 'null')
+    )
+  )
   const variantBases = new Map<string, any>()
   const subVariantBases = new Map<string, any>()
   for (const u of units) {
@@ -74,15 +74,18 @@ async function assertStagedUnitChangesAllowed(
     }
   }
 
-  const guard = async (
-    scope: { variantId: string | null; subVariantId: string | null },
-    staged: any
-  ) => {
+  const guard = async (scope: { variantId: string | null; subVariantId: string | null }, staged: any) => {
     if (!staged) return
     // An admin-confirmed override wipes this grain's stock on publish, so the change
     // is allowed — the wipe (which runs first, inside the tx) leaves nothing to block.
     if (staged._reset_stock_on_publish) return
-    const live = await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; display_label: string | null }>(
+    const live = await queryOne<{
+      unit: string
+      factor: string
+      dimension: string
+      qty_step: string
+      display_label: string | null
+    }>(
       `SELECT unit, factor::text, dimension, qty_step::text, display_label
          FROM product_units
         WHERE product_id = $1 AND is_base = true
@@ -94,11 +97,13 @@ async function assertStagedUnitChangesAllowed(
     if (!live) return
     const reason = await assertUnitChangeAllowed(
       { query },
-      { productId, variantId: scope.variantId, subVariantId: scope.subVariantId, label: live.display_label || live.unit },
-      changedUnitFields(
-        { factor: staged.factor, dimension: staged.dimension, qty_step: staged.qty_step },
-        live
-      )
+      {
+        productId,
+        variantId: scope.variantId,
+        subVariantId: scope.subVariantId,
+        label: live.display_label || live.unit,
+      },
+      changedUnitFields({ factor: staged.factor, dimension: staged.dimension, qty_step: staged.qty_step }, live)
     )
     if (reason) throw new UnitChangeBlockedError(reason)
   }
@@ -142,10 +147,22 @@ async function wipeStockForScope(
 
   if (subVariantId) {
     // Leaf grain — just this sub-variant.
-    await client.query(`DELETE FROM product_serials WHERE product_id = $1 AND sub_variant_id = $2 AND status = 'in_stock'`, [productId, subVariantId])
-    await client.query(`DELETE FROM product_batches WHERE product_id = $1 AND sub_variant_id = $2`, [productId, subVariantId])
-    await client.query(`DELETE FROM shelf_stock WHERE product_id = $1 AND sub_variant_id = $2`, [productId, subVariantId])
-    await client.query(`UPDATE product_sub_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [subVariantId])
+    await client.query(
+      `DELETE FROM product_serials WHERE product_id = $1 AND sub_variant_id = $2 AND status = 'in_stock'`,
+      [productId, subVariantId]
+    )
+    await client.query(`DELETE FROM product_batches WHERE product_id = $1 AND sub_variant_id = $2`, [
+      productId,
+      subVariantId,
+    ])
+    await client.query(`DELETE FROM shelf_stock WHERE product_id = $1 AND sub_variant_id = $2`, [
+      productId,
+      subVariantId,
+    ])
+    await client.query(
+      `UPDATE product_sub_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`,
+      [subVariantId]
+    )
     return
   }
 
@@ -175,7 +192,10 @@ async function wipeStockForScope(
           AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.sub_variant_id = sv.id AND pu.is_base = true)`,
       [variantId]
     )
-    await client.query(`UPDATE product_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [variantId])
+    await client.query(
+      `UPDATE product_variants SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`,
+      [variantId]
+    )
     return
   }
 
@@ -214,7 +234,10 @@ async function wipeStockForScope(
         AND NOT EXISTS (SELECT 1 FROM product_units pu WHERE pu.is_base = true AND pu.variant_id = v.id)`,
     [productId]
   )
-  await client.query(`UPDATE products SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`, [productId])
+  await client.query(
+    `UPDATE products SET inventory_quantity = 0, stock_status = 'Out of Stock', updated_at = NOW() WHERE id = $1`,
+    [productId]
+  )
 }
 
 interface ProductDraft {
@@ -234,10 +257,7 @@ interface ProductDraft {
  * server action so the publish logic is never duplicated or bypassed.
  */
 export async function publishProductDraft(productId: string): Promise<void> {
-  const draft = await queryOne<ProductDraft>(
-    `SELECT * FROM product_drafts WHERE product_id = $1`,
-    [productId]
-  )
+  const draft = await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1`, [productId])
   if (!draft) throw new Error('Draft not found')
 
   // Hard gate: never publish while the product has open (pending/confirmed) orders.
@@ -252,18 +272,20 @@ export async function publishProductDraft(productId: string): Promise<void> {
     [productId]
   )
   // Leaf structure BEFORE publish; compared with the post-upsert state below.
-  const liveActiveVariants = (await queryMany<{ id: string; has_subs: boolean }>(
-    `SELECT v.id, EXISTS (SELECT 1 FROM product_sub_variants sv
+  const liveActiveVariants =
+    (await queryMany<{ id: string; has_subs: boolean }>(
+      `SELECT v.id, EXISTS (SELECT 1 FROM product_sub_variants sv
                           WHERE sv.variant_id = v.id AND sv.is_active = true) AS has_subs
        FROM product_variants v WHERE v.product_id = $1 AND v.is_active = true`,
-    [productId]
-  )) || []
-  const liveActiveSubVariants = (await queryMany<{ id: string; variant_id: string }>(
-    `SELECT sv.id, sv.variant_id FROM product_sub_variants sv
+      [productId]
+    )) || []
+  const liveActiveSubVariants =
+    (await queryMany<{ id: string; variant_id: string }>(
+      `SELECT sv.id, sv.variant_id FROM product_sub_variants sv
        JOIN product_variants v ON v.id = sv.variant_id
       WHERE v.product_id = $1 AND v.is_active = true AND sv.is_active = true`,
-    [productId]
-  )) || []
+      [productId]
+    )) || []
   const fields: any = draft.fields || {}
   const newPerishable = fields.perishable === true || fields.perishable === 'true'
   const newSerialized = fields.serialized === true || fields.serialized === 'true'
@@ -281,22 +303,24 @@ export async function publishProductDraft(productId: string): Promise<void> {
   const variants = turnedOffVariants
     ? []
     : Array.isArray(draft.variants) && draft.variants.length > 0
-    ? draft.variants
-    : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
+      ? draft.variants
+      : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
 
-  const subVariants = Array.isArray(draft.sub_variants) && draft.sub_variants.length > 0
-    ? draft.sub_variants
-    : await queryMany(`SELECT * FROM product_sub_variants WHERE product_id = $1`, [productId])
+  const subVariants =
+    Array.isArray(draft.sub_variants) && draft.sub_variants.length > 0
+      ? draft.sub_variants
+      : await queryMany(`SELECT * FROM product_sub_variants WHERE product_id = $1`, [productId])
 
-  const units = Array.isArray(draft.units) && draft.units.length > 0
-    ? draft.units
-    : await queryMany(`SELECT * FROM product_units WHERE product_id = $1`, [productId])
+  const units =
+    Array.isArray(draft.units) && draft.units.length > 0
+      ? draft.units
+      : await queryMany(`SELECT * FROM product_units WHERE product_id = $1`, [productId])
 
   // Block a base selling-unit change (or switch) at any grain when stock recorded
   // under the current unit would be reinterpreted. Runs before the write tx.
   await assertStagedUnitChangesAllowed(productId, units as any[])
 
-  await withTransaction(async (client) => {
+  await withTransaction(async client => {
     await client.query(
       `UPDATE products SET
          category_id              = NULLIF(($2::jsonb)->>'category_id', '')::uuid,
@@ -422,8 +446,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
          WHERE product_id = $1 AND sku != ALL($2::text[])`,
         [productId, draftSkus]
       )
-    await client.query(
-      `INSERT INTO product_variants (
+      await client.query(
+        `INSERT INTO product_variants (
          product_id, sku, variant_name, price, attributes, is_active, mrp,
          price_ex_gst, mpn, gtin, asin, asin_match, isbn, pricing_type, unit, numeric_value,
          weight_grams, length_cm, breadth_cm, height_cm,
@@ -472,36 +496,36 @@ export async function publishProductDraft(productId: string): Promise<void> {
          stock_decimal_precision = EXCLUDED.stock_decimal_precision,
          sell_unit_id = EXCLUDED.sell_unit_id, stock_status = EXCLUDED.stock_status,
          updated_at = NOW()`,
-      [productId, JSON.stringify(validVariants)]
-    )
-    // "Has sub-variants" explicitly turned OFF retires that variant's sub-variants.
-    // Only a literal false counts: a snapshot missing the key must not retire anything.
-    const subsOffSkus = validVariants
-      .filter((v: any) => v.sub_variant_type_on === false || v.sub_variant_type_on === 'false')
-      .map((v: any) => v.sku as string)
-    for (const sku of subsOffSkus) {
-      await client.query(
-        `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
+        [productId, JSON.stringify(validVariants)]
+      )
+      // "Has sub-variants" explicitly turned OFF retires that variant's sub-variants.
+      // Only a literal false counts: a snapshot missing the key must not retire anything.
+      const subsOffSkus = validVariants
+        .filter((v: any) => v.sub_variant_type_on === false || v.sub_variant_type_on === 'false')
+        .map((v: any) => v.sku as string)
+      for (const sku of subsOffSkus) {
+        await client.query(
+          `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
          WHERE variant_id = (SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2)`,
-        [productId, sku]
-      )
-    }
-    if (subsOffSkus.length > 0) {
-      const offRows = await client.query<{ id: string }>(
-        `SELECT id FROM product_variants WHERE product_id = $1 AND sku = ANY($2::text[])`,
-        [productId, subsOffSkus]
-      )
-      for (const r of offRows.rows) subsOffVariantIds.add(r.id)
-    }
-    // Delete variant images for variants where use_own_images was turned off
-    const variantsWithOwnImagesOff = validVariants.filter((v: any) => !v.use_own_images && v.sku)
-    for (const v of variantsWithOwnImagesOff) {
-      await client.query(
-        `DELETE FROM variant_images
+          [productId, sku]
+        )
+      }
+      if (subsOffSkus.length > 0) {
+        const offRows = await client.query<{ id: string }>(
+          `SELECT id FROM product_variants WHERE product_id = $1 AND sku = ANY($2::text[])`,
+          [productId, subsOffSkus]
+        )
+        for (const r of offRows.rows) subsOffVariantIds.add(r.id)
+      }
+      // Delete variant images for variants where use_own_images was turned off
+      const variantsWithOwnImagesOff = validVariants.filter((v: any) => !v.use_own_images && v.sku)
+      for (const v of variantsWithOwnImagesOff) {
+        await client.query(
+          `DELETE FROM variant_images
          WHERE variant_id = (SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2)`,
-        [productId, v.sku]
-      )
-    }
+          [productId, v.sku]
+        )
+      }
     }
 
     // ── Reconcile staged variant images → live variant_images ─────────────────
@@ -525,17 +549,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
       // Reconcile each variant that (a) has staged rows, or (b) is an active variant in
       // this publish (so a cleared-to-zero variant also gets its live images removed).
       const activeVariantIds = await client.query<{ id: string }>(
-        `SELECT id FROM product_variants WHERE product_id = $1 AND is_active = true`, [productId]
+        `SELECT id FROM product_variants WHERE product_id = $1 AND is_active = true`,
+        [productId]
       )
       const variantIds = new Set<string>([...byVariant.keys(), ...activeVariantIds.rows.map(r => r.id)])
       for (const vid of variantIds) {
         const rows = (byVariant.get(vid) || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
         const keepIds = rows.map(r => r.id).filter((id: any) => id && !String(id).startsWith('draft-vi-'))
         // Remove live rows no longer kept.
-        await client.query(
-          `DELETE FROM variant_images WHERE variant_id = $1 AND id <> ALL($2::uuid[])`,
-          [vid, keepIds]
-        )
+        await client.query(`DELETE FROM variant_images WHERE variant_id = $1 AND id <> ALL($2::uuid[])`, [vid, keepIds])
         // Insert freshly-staged uploads (draft-vi- ids).
         for (const r of rows) {
           if (r.id && !String(r.id).startsWith('draft-vi-')) continue // existing live row
@@ -545,11 +567,19 @@ export async function publishProductDraft(productId: string): Promise<void> {
                 file_name, file_size, mime_type, width, height, display_order, is_primary)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
             [
-              vid, r.image_url, r.thumbnail_url,
-              r.s3_bucket || (process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'),
-              r.s3_key || null, r.s3_thumbnail_key || null,
-              r.file_name || null, r.file_size ?? null, r.mime_type || null,
-              r.width ?? null, r.height ?? null, r.display_order ?? 0, !!r.is_primary,
+              vid,
+              r.image_url,
+              r.thumbnail_url,
+              r.s3_bucket || process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              r.s3_key || null,
+              r.s3_thumbnail_key || null,
+              r.file_name || null,
+              r.file_size ?? null,
+              r.mime_type || null,
+              r.width ?? null,
+              r.height ?? null,
+              r.display_order ?? 0,
+              !!r.is_primary,
             ]
           )
         }
@@ -603,7 +633,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
         let vid: string | null = sv.variant_id || null
         if (!vid && UUID_RE.test(String(sv.original_id || ''))) {
           const r = await client.query<{ variant_id: string }>(
-            `SELECT variant_id FROM product_sub_variants WHERE id = $1`, [sv.original_id]
+            `SELECT variant_id FROM product_sub_variants WHERE id = $1`,
+            [sv.original_id]
           )
           vid = r.rows[0]?.variant_id ?? null
         }
@@ -647,7 +678,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
             // A re-added name regenerates the SKU of its retired row: revive that row
             // (order history stays linked to its id) instead of hitting the unique index.
             const bySku = await client.query<{ id: string; variant_id: string; product_id: string }>(
-              `SELECT id, variant_id, product_id FROM product_sub_variants WHERE sku = $1`, [sv.sku]
+              `SELECT id, variant_id, product_id FROM product_sub_variants WHERE sku = $1`,
+              [sv.sku]
             )
             const hit = bySku.rows[0]
             if (hit) {
@@ -665,13 +697,23 @@ export async function publishProductDraft(productId: string): Promise<void> {
                  created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())`,
               [
-                vid, productId, sv.sku || null, sv.sub_variant_name,
-                num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
-                sv.attributes || null, sv.is_active != null ? sv.is_active : true,
-                num(sv.inventory_quantity) ?? 0, num(sv.discount_pct) ?? 0,
+                vid,
+                productId,
+                sv.sku || null,
+                sv.sub_variant_name,
+                num(sv.price),
+                num(sv.mrp),
+                num(sv.price_ex_gst),
+                num(sv.mrp_ex_gst),
+                sv.attributes || null,
+                sv.is_active != null ? sv.is_active : true,
+                num(sv.inventory_quantity) ?? 0,
+                num(sv.discount_pct) ?? 0,
                 sv.stock_status || 'In Stock',
-                num(sv.weight_grams) ?? null, num(sv.length_cm) ?? null,
-                num(sv.breadth_cm) ?? null, num(sv.height_cm) ?? null,
+                num(sv.weight_grams) ?? null,
+                num(sv.length_cm) ?? null,
+                num(sv.breadth_cm) ?? null,
+                num(sv.height_cm) ?? null,
                 sv.package_type || null,
               ]
             )
@@ -688,12 +730,22 @@ export async function publishProductDraft(productId: string): Promise<void> {
                  updated_at = NOW()
                WHERE id = $1 AND product_id = $2`,
               [
-                targetId, productId, sv.sku || null, sv.sub_variant_name,
-                num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
-                sv.attributes || null, sv.is_active != null ? sv.is_active : true,
-                num(sv.discount_pct) ?? 0, sv.stock_status || 'In Stock',
-                num(sv.weight_grams) ?? null, num(sv.length_cm) ?? null,
-                num(sv.breadth_cm) ?? null, num(sv.height_cm) ?? null,
+                targetId,
+                productId,
+                sv.sku || null,
+                sv.sub_variant_name,
+                num(sv.price),
+                num(sv.mrp),
+                num(sv.price_ex_gst),
+                num(sv.mrp_ex_gst),
+                sv.attributes || null,
+                sv.is_active != null ? sv.is_active : true,
+                num(sv.discount_pct) ?? 0,
+                sv.stock_status || 'In Stock',
+                num(sv.weight_grams) ?? null,
+                num(sv.length_cm) ?? null,
+                num(sv.breadth_cm) ?? null,
+                num(sv.height_cm) ?? null,
                 sv.package_type || null,
               ]
             )
@@ -729,18 +781,24 @@ export async function publishProductDraft(productId: string): Promise<void> {
     //    retired children's quantity. Stock is received afresh at the new leaf.
     //  • Retired rows always end at inventory_quantity 0 so a later revival cannot
     //    resurrect stale stock. Sold serials keep their historical grain.
-    const nowVariants = (await client.query<{ id: string; has_subs: boolean }>(
-      `SELECT v.id, EXISTS (SELECT 1 FROM product_sub_variants sv
+    const nowVariants = (
+      await client.query<{ id: string; has_subs: boolean }>(
+        `SELECT v.id, EXISTS (SELECT 1 FROM product_sub_variants sv
                             WHERE sv.variant_id = v.id AND sv.is_active = true) AS has_subs
          FROM product_variants v WHERE v.product_id = $1 AND v.is_active = true`,
-      [productId]
-    )).rows
-    const nowSubIds = new Set((await client.query<{ id: string }>(
-      `SELECT sv.id FROM product_sub_variants sv
+        [productId]
+      )
+    ).rows
+    const nowSubIds = new Set(
+      (
+        await client.query<{ id: string }>(
+          `SELECT sv.id FROM product_sub_variants sv
          JOIN product_variants v ON v.id = sv.variant_id
         WHERE v.product_id = $1 AND v.is_active = true AND sv.is_active = true`,
-      [productId]
-    )).rows.map(r => r.id))
+          [productId]
+        )
+      ).rows.map(r => r.id)
+    )
     const nowVariantIds = new Set(nowVariants.map(v => v.id))
     const nowParentIds = new Set(nowVariants.filter(v => v.has_subs).map(v => v.id))
     const liveParentIds = new Set(liveActiveVariants.filter(v => v.has_subs).map(v => v.id))
@@ -853,10 +911,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
       const skuSubVariantCache = new Map<string, string | null>()
       async function resolveVariantId(sku: string): Promise<string | null> {
         if (skuVariantCache.has(sku)) return skuVariantCache.get(sku) ?? null
-        const r = await client.query(
-          `SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2 LIMIT 1`,
-          [productId, sku]
-        )
+        const r = await client.query(`SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2 LIMIT 1`, [
+          productId,
+          sku,
+        ])
         const id = r.rows[0]?.id ?? null
         skuVariantCache.set(sku, id)
         return id
@@ -898,14 +956,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
         }
         const key = `${variantId || NIL}:${subVariantId || NIL}`
         let leaf = leaves.get(key)
-        if (!leaf) { leaf = { variantId, subVariantId, rows: [] }; leaves.set(key, leaf) }
+        if (!leaf) {
+          leaf = { variantId, subVariantId, rows: [] }
+          leaves.set(key, leaf)
+        }
         leaf.rows.push(s)
       }
 
       for (const { variantId, subVariantId, rows } of leaves.values()) {
-        const keepSupplierIds = rows
-          .map((s: any) => String(s.supplier_id || '').trim())
-          .filter(Boolean)
+        const keepSupplierIds = rows.map((s: any) => String(s.supplier_id || '').trim()).filter(Boolean)
         // Deactivate rows for this leaf whose supplier is no longer in the draft set.
         await client.query(
           `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW()
@@ -925,7 +984,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
           const currency = s.currency ? String(s.currency).slice(0, 3) : 'INR'
           const gstInclusive = !!s.gst_inclusive
           const moq = s.moq != null && Number.isFinite(Number(s.moq)) ? Number(s.moq) : null
-          const leadTime = s.lead_time_days != null && Number.isInteger(Number(s.lead_time_days)) ? Number(s.lead_time_days) : null
+          const leadTime =
+            s.lead_time_days != null && Number.isInteger(Number(s.lead_time_days)) ? Number(s.lead_time_days) : null
           const notes = s.notes ? String(s.notes).slice(0, 500) : null
 
           // Current active row for this leaf + supplier (latest), if any.
@@ -1004,10 +1064,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
             [subVariantId, cachedSupplierId]
           )
         } else if (variantId) {
-          await client.query(
-            `UPDATE product_variants SET supplier_id = $2::uuid, updated_at = NOW() WHERE id = $1`,
-            [variantId, cachedSupplierId]
-          )
+          await client.query(`UPDATE product_variants SET supplier_id = $2::uuid, updated_at = NOW() WHERE id = $1`, [
+            variantId,
+            cachedSupplierId,
+          ])
         }
       }
 
@@ -1046,10 +1106,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
     // SET NULL) and by product_unit_rules (ON DELETE CASCADE). Recreating them silently
     // unlinked the base unit — which the GRN receive route reads qty_step through — and
     // dropped every unit rule on each publish.
-    const productUnits = (units as any[]).filter((u: any) =>
-      !u._cleared &&
-      (!u.variant_id || u.variant_id === 'null') &&
-      (!u.sub_variant_id || u.sub_variant_id === 'null')
+    const productUnits = (units as any[]).filter(
+      (u: any) =>
+        !u._cleared && (!u.variant_id || u.variant_id === 'null') && (!u.sub_variant_id || u.sub_variant_id === 'null')
     )
     if (productUnits.length > 0) {
       // Clear the scope's single-flag rows FIRST so an incoming base/purchase-default
@@ -1115,15 +1174,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
       .filter((u: any) => u._cleared && u.variant_id && u.variant_id !== 'null')
       .map((u: any) => u.variant_id)
     for (const vid of clearedVariantUnitIds) {
-      await client.query(
-        `DELETE FROM product_units WHERE product_id = $1 AND variant_id = $2`,
-        [productId, vid]
-      )
+      await client.query(`DELETE FROM product_units WHERE product_id = $1 AND variant_id = $2`, [productId, vid])
       // Clear sell_unit_id on the variant so it inherits from product
-      await client.query(
-        `UPDATE product_variants SET sell_unit_id = NULL, updated_at = NOW() WHERE id = $1`,
-        [vid]
-      )
+      await client.query(`UPDATE product_variants SET sell_unit_id = NULL, updated_at = NOW() WHERE id = $1`, [vid])
     }
     const variantUnits = (units as any[]).filter((u: any) => !u._cleared && u.variant_id && u.variant_id !== 'null')
     // Clear each variant scope's flags once before its upserts, so a base/purchase-default
@@ -1150,12 +1203,21 @@ export async function publishProductDraft(productId: string): Promise<void> {
            conversion_meta = EXCLUDED.conversion_meta, min_qty = EXCLUDED.min_qty,
            max_qty = EXCLUDED.max_qty, qty_step = EXCLUDED.qty_step, updated_at = NOW()`,
         [
-          productId, u.variant_id, u.unit, u.factor ?? 1,
-          u.is_base ?? false, u.is_purchase_default ?? false,
-          u.price_override ?? null, u.display_label ?? null,
-          u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
+          productId,
+          u.variant_id,
+          u.unit,
+          u.factor ?? 1,
+          u.is_base ?? false,
+          u.is_purchase_default ?? false,
+          u.price_override ?? null,
+          u.display_label ?? null,
+          u.notes ?? null,
+          u.dimension ?? 'count',
+          u.conversion_meta ?? null,
           u.sub_variant_id ?? null,
-          u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1
+          u.min_qty ?? 1,
+          u.max_qty ?? null,
+          u.qty_step ?? 1,
         ]
       )
     }
@@ -1167,12 +1229,11 @@ export async function publishProductDraft(productId: string): Promise<void> {
       .filter((u: any) => u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null')
       .map((u: any) => u.sub_variant_id)
     for (const svid of clearedSubVariantUnitIds) {
-      await client.query(
-        `DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2`,
-        [productId, svid]
-      )
+      await client.query(`DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2`, [productId, svid])
     }
-    const subVariantUnits = (units as any[]).filter((u: any) => !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null')
+    const subVariantUnits = (units as any[]).filter(
+      (u: any) => !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null'
+    )
     // Clear each sub-variant scope's flags once before its upserts, so a base/purchase-default
     // switch to a different unit name doesn't collide on the one_base/one_purchase_sub_variant indexes.
     for (const svid of new Set(subVariantUnits.map((u: any) => u.sub_variant_id))) {
@@ -1203,13 +1264,21 @@ export async function publishProductDraft(productId: string): Promise<void> {
              conversion_meta = EXCLUDED.conversion_meta, min_qty = EXCLUDED.min_qty,
              max_qty = EXCLUDED.max_qty, qty_step = EXCLUDED.qty_step, updated_at = NOW()`,
           [
-            productId, u.unit, u.factor ?? 1,
-            u.is_base ?? false, u.is_purchase_default ?? false,
-            u.price_override ?? null, u.display_label ?? null,
-            u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
+            productId,
+            u.unit,
+            u.factor ?? 1,
+            u.is_base ?? false,
+            u.is_purchase_default ?? false,
+            u.price_override ?? null,
+            u.display_label ?? null,
+            u.notes ?? null,
+            u.dimension ?? 'count',
+            u.conversion_meta ?? null,
             u.sub_variant_id,
-            u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1,
-            u.variant_id && u.variant_id !== 'null' ? u.variant_id : null
+            u.min_qty ?? 1,
+            u.max_qty ?? null,
+            u.qty_step ?? 1,
+            u.variant_id && u.variant_id !== 'null' ? u.variant_id : null,
           ]
         )
         await client.query('RELEASE SAVEPOINT sv_unit')
@@ -1226,10 +1295,20 @@ export async function publishProductDraft(productId: string): Promise<void> {
              min_qty = $11, max_qty = $12, qty_step = $13, updated_at = NOW()
            WHERE product_id = $1 AND sub_variant_id = $2 AND unit = $14`,
           [
-            productId, u.sub_variant_id, u.factor ?? 1, u.is_base ?? false,
-            u.is_purchase_default ?? false, u.price_override ?? null, u.display_label ?? null,
-            u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
-            u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1, u.unit,
+            productId,
+            u.sub_variant_id,
+            u.factor ?? 1,
+            u.is_base ?? false,
+            u.is_purchase_default ?? false,
+            u.price_override ?? null,
+            u.display_label ?? null,
+            u.notes ?? null,
+            u.dimension ?? 'count',
+            u.conversion_meta ?? null,
+            u.min_qty ?? 1,
+            u.max_qty ?? null,
+            u.qty_step ?? 1,
+            u.unit,
           ]
         )
       }
@@ -1274,14 +1353,27 @@ export async function publishProductDraft(productId: string): Promise<void> {
       }
       // Each source contributes its own per-grain SUM; take the max across sources so
       // a batch(N)+serials(N) grain reads N (not 2N), and a single-source grain reads N.
-      const unioned = sources.map((s, i) => `SELECT variant_id, sub_variant_id, SUM(q) AS total FROM (${s}) src${i} GROUP BY variant_id, sub_variant_id`).join(' UNION ALL ')
+      const unioned = sources
+        .map(
+          (s, i) =>
+            `SELECT variant_id, sub_variant_id, SUM(q) AS total FROM (${s}) src${i} GROUP BY variant_id, sub_variant_id`
+        )
+        .join(' UNION ALL ')
       const perGrain = await client.query<{ variant_id: string | null; sub_variant_id: string | null; total: string }>(
         `SELECT variant_id, sub_variant_id, MAX(total)::text AS total
          FROM (${unioned}) u GROUP BY variant_id, sub_variant_id`,
         [productId]
       )
-      const subCounts = { rows: perGrain.rows.filter(r => r.sub_variant_id).map(r => ({ sub_variant_id: r.sub_variant_id as string, total: r.total })) }
-      const varCounts = { rows: perGrain.rows.filter(r => r.variant_id && !r.sub_variant_id).map(r => ({ variant_id: r.variant_id as string, total: r.total })) }
+      const subCounts = {
+        rows: perGrain.rows
+          .filter(r => r.sub_variant_id)
+          .map(r => ({ sub_variant_id: r.sub_variant_id as string, total: r.total })),
+      }
+      const varCounts = {
+        rows: perGrain.rows
+          .filter(r => r.variant_id && !r.sub_variant_id)
+          .map(r => ({ variant_id: r.variant_id as string, total: r.total })),
+      }
       const prodTotal = perGrain.rows.find(r => !r.variant_id && !r.sub_variant_id)?.total ?? '0'
       const prodCount = { rows: [{ total: prodTotal }] }
 
@@ -1297,7 +1389,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
         await client.query(`DELETE FROM product_batches WHERE product_id = $1`, [productId])
         await client.query(`DELETE FROM shelf_stock WHERE product_id = $1`, [productId])
       } else if (!newPerishable) {
-        await client.query(`UPDATE product_batches SET expiry_date = NULL, updated_at = NOW() WHERE product_id = $1`, [productId])
+        await client.query(`UPDATE product_batches SET expiry_date = NULL, updated_at = NOW() WHERE product_id = $1`, [
+          productId,
+        ])
       }
 
       // Roll counts back into plain inventory at the correct grain.
@@ -1347,10 +1441,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
           [productId]
         )
       } else {
-        await client.query(
-          `UPDATE products SET inventory_quantity = $1, updated_at = NOW() WHERE id = $2`,
-          [parseFloat(prodCount.rows[0]?.total ?? '0') || 0, productId]
-        )
+        await client.query(`UPDATE products SET inventory_quantity = $1, updated_at = NOW() WHERE id = $2`, [
+          parseFloat(prodCount.rows[0]?.total ?? '0') || 0,
+          productId,
+        ])
       }
     }
 

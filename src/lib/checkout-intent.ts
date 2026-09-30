@@ -2,8 +2,10 @@ import { SignJWT, jwtVerify } from 'jose'
 
 const SECRET = new TextEncoder().encode(
   process.env.CHECKOUT_INTENT_SECRET ||
-  process.env.JWT_SECRET ||
-  (() => { throw new Error('CHECKOUT_INTENT_SECRET / JWT_SECRET not set') })()
+    process.env.JWT_SECRET ||
+    (() => {
+      throw new Error('CHECKOUT_INTENT_SECRET / JWT_SECRET not set')
+    })()
 )
 const TTL_SECONDS = 60 * 60
 

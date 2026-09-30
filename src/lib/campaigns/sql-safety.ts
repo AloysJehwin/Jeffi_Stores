@@ -31,24 +31,66 @@ const ALLOWED_TABLES = new Set([
 ])
 
 const BANNED_KEYWORDS = [
-  'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'UPSERT',
-  'DROP', 'ALTER', 'CREATE', 'TRUNCATE', 'COMMENT',
-  'GRANT', 'REVOKE', 'REASSIGN', 'REINDEX', 'VACUUM', 'CLUSTER',
-  'COPY', 'EXECUTE', 'CALL', 'PREPARE', 'DEALLOCATE',
-  'LISTEN', 'NOTIFY', 'UNLISTEN',
-  'SET', 'RESET', 'SHOW',
-  'BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT',
-  'LOCK', 'DO', 'DECLARE', 'FETCH', 'MOVE', 'CLOSE',
-  'INTO', 'RETURNING', 'FOR UPDATE', 'FOR SHARE',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'MERGE',
+  'UPSERT',
+  'DROP',
+  'ALTER',
+  'CREATE',
+  'TRUNCATE',
+  'COMMENT',
+  'GRANT',
+  'REVOKE',
+  'REASSIGN',
+  'REINDEX',
+  'VACUUM',
+  'CLUSTER',
+  'COPY',
+  'EXECUTE',
+  'CALL',
+  'PREPARE',
+  'DEALLOCATE',
+  'LISTEN',
+  'NOTIFY',
+  'UNLISTEN',
+  'SET',
+  'RESET',
+  'SHOW',
+  'BEGIN',
+  'COMMIT',
+  'ROLLBACK',
+  'SAVEPOINT',
+  'LOCK',
+  'DO',
+  'DECLARE',
+  'FETCH',
+  'MOVE',
+  'CLOSE',
+  'INTO',
+  'RETURNING',
+  'FOR UPDATE',
+  'FOR SHARE',
 ]
 
 const BANNED_FUNCTIONS = [
-  'pg_read_file', 'pg_read_binary_file', 'pg_ls_dir', 'pg_stat_file',
-  'pg_sleep', 'pg_terminate_backend', 'pg_cancel_backend',
-  'current_setting', 'set_config',
-  'lo_import', 'lo_export', 'lo_create',
-  'dblink', 'dblink_exec',
-  'pg_advisory_lock', 'pg_advisory_xact_lock',
+  'pg_read_file',
+  'pg_read_binary_file',
+  'pg_ls_dir',
+  'pg_stat_file',
+  'pg_sleep',
+  'pg_terminate_backend',
+  'pg_cancel_backend',
+  'current_setting',
+  'set_config',
+  'lo_import',
+  'lo_export',
+  'lo_create',
+  'dblink',
+  'dblink_exec',
+  'pg_advisory_lock',
+  'pg_advisory_xact_lock',
 ]
 
 const COMMENT_PATTERNS = [/--/g, /\/\*[\s\S]*?\*\//g]
@@ -152,11 +194,12 @@ export function validateScenarioSql(rawSql: string, intent: 'audience' | 'produc
   const cols = selectClause.split(',').map(c => c.trim().toLowerCase())
 
   if (intent === 'audience') {
-    const looksLikeUserId = cols.every(c =>
-      /^(distinct\s+)?(u\.|users\.|orders\.|o\.|wi\.|ci\.|pr\.)?(user_)?id(\s+as\s+[a-z_]+)?$/i.test(c) ||
-      /^(distinct\s+)?u\.id$/i.test(c) ||
-      /^id$/i.test(c) ||
-      /^user_id$/i.test(c)
+    const looksLikeUserId = cols.every(
+      c =>
+        /^(distinct\s+)?(u\.|users\.|orders\.|o\.|wi\.|ci\.|pr\.)?(user_)?id(\s+as\s+[a-z_]+)?$/i.test(c) ||
+        /^(distinct\s+)?u\.id$/i.test(c) ||
+        /^id$/i.test(c) ||
+        /^user_id$/i.test(c)
     )
     if (!looksLikeUserId) {
       return {
@@ -192,16 +235,29 @@ export function validateScenarioSql(rawSql: string, intent: 'audience' | 'produc
         reason: 'Audience SQL must end with `LIMIT $3` so the runner can cap recipients per sweep.',
       }
     }
-    if (!/email_campaigns_sent/i.test(stripped) || !/sent_at\s*>\s*now\(\)\s*-\s*\(\$2\s*\|\|\s*'\s*days'\s*\)\s*::\s*interval/i.test(stripped)) {
+    if (
+      !/email_campaigns_sent/i.test(stripped) ||
+      !/sent_at\s*>\s*now\(\)\s*-\s*\(\$2\s*\|\|\s*'\s*days'\s*\)\s*::\s*interval/i.test(stripped)
+    ) {
       return {
         ok: false,
-        reason: 'Audience SQL must include the frequency-cap clause: NOT EXISTS (SELECT 1 FROM email_campaigns_sent WHERE campaign_kind = $1 AND user_id = u.id AND sent_at > NOW() - ($2 || \' days\')::interval).',
+        reason:
+          "Audience SQL must include the frequency-cap clause: NOT EXISTS (SELECT 1 FROM email_campaigns_sent WHERE campaign_kind = $1 AND user_id = u.id AND sent_at > NOW() - ($2 || ' days')::interval).",
       }
     }
   } else {
     const ALLOWED_PRODUCT_COLS = new Set([
-      'product_id', 'id', 'name', 'product_name', 'slug', 'product_slug',
-      'image_url', 'price', 'base_price', 'old_price', 'new_price',
+      'product_id',
+      'id',
+      'name',
+      'product_name',
+      'slug',
+      'product_slug',
+      'image_url',
+      'price',
+      'base_price',
+      'old_price',
+      'new_price',
     ])
     const looksLikeProduct = cols.every(c => {
       const cleaned = c
@@ -217,7 +273,8 @@ export function validateScenarioSql(rawSql: string, intent: 'audience' | 'produc
     if (!looksLikeProduct) {
       return {
         ok: false,
-        reason: 'Product SELECT must return columns from: product_id, name, slug, image_url, price. Got: ' + selectClause,
+        reason:
+          'Product SELECT must return columns from: product_id, name, slug, image_url, price. Got: ' + selectClause,
       }
     }
     if (/\$[0-9]+/.test(stripped)) {

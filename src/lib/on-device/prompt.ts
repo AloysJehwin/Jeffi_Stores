@@ -102,7 +102,8 @@ export function serializeSignals(sig: SessionSignals): string {
     const bits: string[] = []
     if (profile.topCategories.length) bits.push(`Frequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
     if (profile.topBrands.length) bits.push(`Brands: ${profile.topBrands.slice(0, 3).join(', ')}`)
-    if (profile.priceRange) bits.push(`Budget: Rs.${Math.round(profile.priceRange.min)}–Rs.${Math.round(profile.priceRange.max)}`)
+    if (profile.priceRange)
+      bits.push(`Budget: Rs.${Math.round(profile.priceRange.min)}–Rs.${Math.round(profile.priceRange.max)}`)
     if (profile.purchaseCount > 0) bits.push(`Orders: ${profile.purchaseCount}`)
     if (bits.length) {
       lines.push('### Profile')
@@ -148,7 +149,7 @@ export function buildProductPitchPrompt(
 ): string {
   const instruction =
     'You are a friendly shopping assistant for an online store. ' +
-    'Write exactly one sentence (max 20 words) explaining why this product fits the customer\'s needs based on their history. ' +
+    "Write exactly one sentence (max 20 words) explaining why this product fits the customer's needs based on their history. " +
     'Be specific. Do not mention prices or make things up.'
   const lines = [`### Product\n${productName}${brand ? ` (${brand})` : ''}${category ? ` — ${category}` : ''}`]
   if (profile && (profile.topCategories.length || profile.topBrands.length)) {
@@ -169,9 +170,14 @@ export function buildAffirmationPrompt(
 ): string {
   const instruction =
     'You are a friendly shopping assistant for an online store. ' +
-    'Write one warm sentence (max 20 words) affirming the customer\'s purchase decision. ' +
+    "Write one warm sentence (max 20 words) affirming the customer's purchase decision. " +
     'Reference what they bought. Do not mention prices.'
-  const lines = [`### Purchased\n${itemNames.slice(0, 5).map(n => `- ${n}`).join('\n')}`]
+  const lines = [
+    `### Purchased\n${itemNames
+      .slice(0, 5)
+      .map(n => `- ${n}`)
+      .join('\n')}`,
+  ]
   if (profile?.topCategories.length) {
     lines.push(`### Profile\nFrequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
   }

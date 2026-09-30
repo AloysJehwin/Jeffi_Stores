@@ -11,10 +11,10 @@ import { query, queryOne, queryMany } from './db'
 export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
 
 export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session (non-admin cap)
-export const DEFAULT_ADMIN_IDLE_MINUTES = 8 * 60    // admins with no per-account timeout set
+export const DEFAULT_ADMIN_IDLE_MINUTES = 8 * 60 // admins with no per-account timeout set
 // Allowed per-admin idle timeouts (minutes). Shared with the team-section toggle + the PATCH guard.
 export const ADMIN_IDLE_TIMEOUT_CHOICES = [60, 120, 240, 480, 1440] as const
-const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at every 5 min
+const TOUCH_WINDOW_MS = 5 * 60 * 1000 // only bump last_seen_at every 5 min
 
 // Matches a v4-style uuid. LEGACY: pre-token cookies were the uuid PK itself; resolveSession
 // still accepts these during the transition (looked up by id) so existing sessions don't get
@@ -95,9 +95,9 @@ export interface SessionSignals {
   binding?: import('./session-binding-shared').BindingContext
   userAgent?: string | null
   acceptLanguage?: string | null // raw Accept-Language header
-  uaPlatform?: string | null     // raw Sec-CH-UA-Platform client hint (e.g. '"macOS"')
-  ip?: string | null             // raw IP / X-Forwarded-For; derived to a network, never stored raw for binding
-  fpHash?: string | null         // client canvas/webgl fingerprint hash
+  uaPlatform?: string | null // raw Sec-CH-UA-Platform client hint (e.g. '"macOS"')
+  ip?: string | null // raw IP / X-Forwarded-For; derived to a network, never stored raw for binding
+  fpHash?: string | null // client canvas/webgl fingerprint hash
 }
 
 // Accept-Language → primary language subtag only. 'en-US,en;q=0.9' → 'en'. Region + q-values
@@ -114,7 +114,10 @@ export function langPrimary(al: string | null | undefined): string | null {
 // lowercases. Absent on non-secure origins / unsupported browsers → null (dropped).
 export function normPlatform(p: string | null | undefined): string | null {
   if (!p) return null
-  const v = p.replace(/^"+|"+$/g, '').trim().toLowerCase()
+  const v = p
+    .replace(/^"+|"+$/g, '')
+    .trim()
+    .toLowerCase()
   return v || null
 }
 
@@ -137,7 +140,7 @@ export function ipNetwork(ip: string | null | undefined): string | null {
   // IPv4 (drop a possible :port that survived above only for v4 dotted form).
   const v4 = bare.replace(/:\d+$/, '')
   const octets = v4.split('.')
-  if (octets.length !== 4 || octets.some((o) => o === '' || !/^\d{1,3}$/.test(o) || Number(o) > 255)) {
+  if (octets.length !== 4 || octets.some(o => o === '' || !/^\d{1,3}$/.test(o) || Number(o) > 255)) {
     return null
   }
   return `${octets[0]}.${octets[1]}`
@@ -238,7 +241,10 @@ export interface ResolvedSession {
   idleWindowMs: number
 }
 
-export interface SessionDeadline { deadlineAt: string; expiresAt: string }
+export interface SessionDeadline {
+  deadlineAt: string
+  expiresAt: string
+}
 
 export function idleWindowMsFor(principalType: PrincipalType, idleTimeoutMinutes: number | null | undefined): number {
   return principalType === 'admin' ? (idleTimeoutMinutes ?? DEFAULT_ADMIN_IDLE_MINUTES) * 60_000 : IDLE_TIMEOUT_MS
@@ -256,7 +262,9 @@ async function emitSessionEvent(sessionId: string, event: import('./session-even
     sessionEventsModule ??= import('./session-events')
     const { publishSessionEvent } = await sessionEventsModule
     await publishSessionEvent(sessionId, event)
-  } catch { /* events are best-effort; the DB row is the gate */ }
+  } catch {
+    /* events are best-effort; the DB row is the gate */
+  }
 }
 
 // Create a session row at login/signup. Generates a random opaque token (the cookie value) and
@@ -288,13 +296,21 @@ export async function createSession(args: {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
-      args.principalType, args.principalId, expiresAt,
-      args.userAgent || null, args.ip || null,
-      args.role || null, JSON.stringify(args.scopes || []),
-      args.certCN || null, args.approvalStatus || null,
+      args.principalType,
+      args.principalId,
+      expiresAt,
+      args.userAgent || null,
+      args.ip || null,
+      args.role || null,
+      JSON.stringify(args.scopes || []),
+      args.certCN || null,
+      args.approvalStatus || null,
       args.tenantId || null,
-      langPrimary(args.acceptLanguage), normPlatform(args.uaPlatform), ipNetwork(args.ip),
-      args.fpHash || null, hashToken(token),
+      langPrimary(args.acceptLanguage),
+      normPlatform(args.uaPlatform),
+      ipNetwork(args.ip),
+      args.fpHash || null,
+      hashToken(token),
     ]
   )
   if (!row) throw new Error('Failed to create session')
@@ -340,7 +356,11 @@ async function effectiveScopes(tenantId: string | null, granted: string[], role:
   }
 }
 
-export async function resolveSession(sid: string, current?: string | null | SessionSignals, opts?: { touch?: boolean }): Promise<ResolvedSession | null> {
+export async function resolveSession(
+  sid: string,
+  current?: string | null | SessionSignals,
+  opts?: { touch?: boolean }
+): Promise<ResolvedSession | null> {
   if (!sid) return null
   // Route the lookup by cookie shape (cheap, pre-DB): token → token_hash; legacy uuid → id.
   let whereCol: 'token_hash' | 'id'
@@ -356,14 +376,26 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   }
   const row = await queryOne<{
     id: string
-    principal_type: PrincipalType; principal_id: string
-    revoked_at: string | null; expires_at: string; last_seen_at: string; created_at: string | null
+    principal_type: PrincipalType
+    principal_id: string
+    revoked_at: string | null
+    expires_at: string
+    last_seen_at: string
+    created_at: string | null
     idle_timeout_minutes: number | null
-    role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
+    role: string | null
+    scopes: any
+    cert_cn: string | null
+    approval_status: string | null
     tenant_id: string | null
-    user_agent: string | null; accept_lang: string | null; ua_platform: string | null
-    ip_net: string | null; fp_hash: string | null
-    email: string | null; first_name: string | null; last_name: string | null
+    user_agent: string | null
+    accept_lang: string | null
+    ua_platform: string | null
+    ip_net: string | null
+    fp_hash: string | null
+    email: string | null
+    first_name: string | null
+    last_name: string | null
   }>(
     `SELECT s.id, s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at, s.created_at,
             s.role, s.scopes, s.cert_cn, s.approval_status, s.tenant_id, s.user_agent,
@@ -404,7 +436,9 @@ export async function resolveSession(sid: string, current?: string | null | Sess
       sig
     )
     if (decision.revoke) {
-      query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [row.id]).catch(() => {})
+      query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [row.id]).catch(
+        () => {}
+      )
       void emitSessionEvent(row.id, { type: 'logout', reason: 'binding' })
       return null
     }
@@ -422,7 +456,9 @@ export async function resolveSession(sid: string, current?: string | null | Sess
           sessionCreatedAt: row.created_at ? new Date(row.created_at).getTime() : null,
         })
         if (verdict.reject) return null
-      } catch { /* fail open */ }
+      } catch {
+        /* fail open */
+      }
     }
   }
 
@@ -452,11 +488,21 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   }
 }
 
-type DeadlineRow = { id: string; principal_type: PrincipalType; expires_at: string; last_seen_at: string; idle_timeout_minutes: number | null }
+type DeadlineRow = {
+  id: string
+  principal_type: PrincipalType
+  expires_at: string
+  last_seen_at: string
+  idle_timeout_minutes: number | null
+}
 
 function deadlineOf(r: DeadlineRow): SessionDeadline {
   return {
-    deadlineAt: computeDeadline(r.expires_at, new Date(r.last_seen_at).getTime(), idleWindowMsFor(r.principal_type, r.idle_timeout_minutes)),
+    deadlineAt: computeDeadline(
+      r.expires_at,
+      new Date(r.last_seen_at).getTime(),
+      idleWindowMsFor(r.principal_type, r.idle_timeout_minutes)
+    ),
     expiresAt: new Date(r.expires_at).toISOString(),
   }
 }
@@ -500,8 +546,14 @@ export async function getSessionDeadline(sessionId: string): Promise<SessionDead
 }
 
 /** Revoke one session by row id (idle sweep, event-stream deadline) and notify its tabs. */
-export async function revokeSessionById(sessionId: string, reason: import('./session-events').SessionLogoutReason): Promise<boolean> {
-  const res = await query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING id`, [sessionId])
+export async function revokeSessionById(
+  sessionId: string,
+  reason: import('./session-events').SessionLogoutReason
+): Promise<boolean> {
+  const res = await query(
+    `UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL RETURNING id`,
+    [sessionId]
+  )
   const hit = (res?.rowCount || 0) > 0
   if (hit) await emitSessionEvent(sessionId, { type: 'logout', reason })
   return hit
@@ -528,7 +580,11 @@ export async function sweepExpiredAdminSessions(): Promise<string[]> {
 }
 
 // Thin wrapper over resolveSession — one liveness implementation, no drift.
-export async function validateSession(sid: string, principalType: PrincipalType, current?: string | null | SessionSignals): Promise<boolean> {
+export async function validateSession(
+  sid: string,
+  principalType: PrincipalType,
+  current?: string | null | SessionSignals
+): Promise<boolean> {
   const s = await resolveSession(sid, current)
   return !!s && s.principalType === principalType
 }

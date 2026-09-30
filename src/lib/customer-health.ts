@@ -105,7 +105,8 @@ async function loadSignals(userId: string): Promise<RawSignals | null> {
     return_count: string
     low_review_count: string
     avg_rating: string | null
-  }>(`
+  }>(
+    `
     WITH paid AS (
       SELECT created_at, total_amount FROM orders
       WHERE user_id = $1 AND payment_status = 'paid'
@@ -140,7 +141,9 @@ async function loadSignals(userId: string): Promise<RawSignals | null> {
       (SELECT cnt FROM rets)::text                                                                            AS return_count,
       (SELECT low_count FROM revs)::text                                                                      AS low_review_count,
       (SELECT avg_rating FROM revs)::text                                                                     AS avg_rating
-  `, [userId])
+  `,
+    [userId]
+  )
 
   if (!row) return null
   return {
@@ -181,13 +184,13 @@ export async function computeHealthForUser(userId: string): Promise<ComputedHeal
   const engagement = engagementScore(s.email_opens_90d, s.email_clicks_90d, s.email_sends_90d)
   const satisfaction = satisfactionScore(s.return_count, s.low_review_count, s.paid_orders, s.avg_rating)
 
-  const blended = (
-    recency      * HEALTH_WEIGHTS.recency      +
-    frequency    * HEALTH_WEIGHTS.frequency    +
-    monetary     * HEALTH_WEIGHTS.monetary     +
-    engagement   * HEALTH_WEIGHTS.engagement   +
-    satisfaction * HEALTH_WEIGHTS.satisfaction
-  ) / 100
+  const blended =
+    (recency * HEALTH_WEIGHTS.recency +
+      frequency * HEALTH_WEIGHTS.frequency +
+      monetary * HEALTH_WEIGHTS.monetary +
+      engagement * HEALTH_WEIGHTS.engagement +
+      satisfaction * HEALTH_WEIGHTS.satisfaction) /
+    100
 
   const score = Math.round(Math.max(0, Math.min(100, blended)))
 
@@ -196,11 +199,7 @@ export async function computeHealthForUser(userId: string): Promise<ComputedHeal
     [userId]
   )
 
-  const churn_risk = determineChurnRisk(
-    score,
-    s.days_since_last_order,
-    previous?.trend_delta_30d ?? 0
-  )
+  const churn_risk = determineChurnRisk(score, s.days_since_last_order, previous?.trend_delta_30d ?? 0)
 
   return {
     score,
@@ -218,10 +217,7 @@ export async function recomputeHealth(userId: string): Promise<HealthBreakdown |
   const computed = await computeHealthForUser(userId)
   if (!computed) return null
 
-  const oldHealth = await queryOne<{ score: number }>(
-    `SELECT score FROM customer_health WHERE user_id = $1`,
-    [userId]
-  )
+  const oldHealth = await queryOne<{ score: number }>(`SELECT score FROM customer_health WHERE user_id = $1`, [userId])
 
   const snap7 = await queryOne<{ score: number }>(
     `SELECT score FROM customer_health_history
@@ -236,14 +232,10 @@ export async function recomputeHealth(userId: string): Promise<HealthBreakdown |
     [userId]
   )
 
-  const trend7 = snap7 ? computed.score - snap7.score : (oldHealth ? computed.score - oldHealth.score : 0)
+  const trend7 = snap7 ? computed.score - snap7.score : oldHealth ? computed.score - oldHealth.score : 0
   const trend30 = snap30 ? computed.score - snap30.score : 0
 
-  const finalChurnRisk = determineChurnRisk(
-    computed.score,
-    computed.signals.days_since_last_order,
-    trend30
-  )
+  const finalChurnRisk = determineChurnRisk(computed.score, computed.signals.days_since_last_order, trend30)
 
   await query(
     `INSERT INTO customer_health
@@ -281,12 +273,13 @@ export async function recomputeHealth(userId: string): Promise<HealthBreakdown |
      WHERE user_id = $1 ORDER BY snapshot_at DESC LIMIT 1`,
     [userId]
   )
-  const shouldSnapshot = !lastSnap || (Date.now() - new Date(lastSnap.snapshot_at).getTime()) >= 7 * 86400000
+  const shouldSnapshot = !lastSnap || Date.now() - new Date(lastSnap.snapshot_at).getTime() >= 7 * 86400000
   if (shouldSnapshot) {
-    await query(
-      `INSERT INTO customer_health_history (user_id, score, churn_risk) VALUES ($1, $2, $3)`,
-      [userId, computed.score, finalChurnRisk]
-    ).catch(() => {})
+    await query(`INSERT INTO customer_health_history (user_id, score, churn_risk) VALUES ($1, $2, $3)`, [
+      userId,
+      computed.score,
+      finalChurnRisk,
+    ]).catch(() => {})
   }
 
   return getHealth(userId)

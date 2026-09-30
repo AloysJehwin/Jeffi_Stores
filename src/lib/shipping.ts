@@ -10,15 +10,15 @@ export type PackageType =
   | 'long_tube'
 
 export const PACKAGE_TYPE_LABELS: Record<PackageType, string> = {
-  flat_poly_auto:    'Flat Poly (auto by weight)',
-  flat_poly_s:       'Flat Poly S (≤100g)',
-  flat_poly_m:       'Flat Poly M (≤500g)',
-  flat_poly_l:       'Flat Poly L (≤1500g)',
-  flat_poly_xl:      'Flat Poly XL (>1500g)',
-  drill_bit_tube:    'Drill Bit Tube',
-  drill_bit_set_case:'Drill Bit Set Case',
-  corrugated_box:    'Corrugated Box',
-  long_tube:         'Long Tube / Rod / Pipe',
+  flat_poly_auto: 'Flat Poly (auto by weight)',
+  flat_poly_s: 'Flat Poly S (≤100g)',
+  flat_poly_m: 'Flat Poly M (≤500g)',
+  flat_poly_l: 'Flat Poly L (≤1500g)',
+  flat_poly_xl: 'Flat Poly XL (>1500g)',
+  drill_bit_tube: 'Drill Bit Tube',
+  drill_bit_set_case: 'Drill Bit Set Case',
+  corrugated_box: 'Corrugated Box',
+  long_tube: 'Long Tube / Rod / Pipe',
 }
 
 export const STORED_DIMS_REQUIRED: PackageType[] = [
@@ -115,16 +115,20 @@ export function resolvePackedDims(item: ShipmentItem): PackedDims {
   const s = item.storedDims
 
   switch (pt) {
-    case 'flat_poly_s':  return { length_cm: 15, breadth_cm: 10, height_cm: 3 }
-    case 'flat_poly_m':  return { length_cm: 20, breadth_cm: 15, height_cm: 4 }
-    case 'flat_poly_l':  return { length_cm: 25, breadth_cm: 20, height_cm: 5 }
-    case 'flat_poly_xl': return { length_cm: 30, breadth_cm: 25, height_cm: 5 }
+    case 'flat_poly_s':
+      return { length_cm: 15, breadth_cm: 10, height_cm: 3 }
+    case 'flat_poly_m':
+      return { length_cm: 20, breadth_cm: 15, height_cm: 4 }
+    case 'flat_poly_l':
+      return { length_cm: 25, breadth_cm: 20, height_cm: 5 }
+    case 'flat_poly_xl':
+      return { length_cm: 30, breadth_cm: 25, height_cm: 5 }
 
     case 'flat_poly_auto':
-      if (w <= 100)  return { length_cm: 15, breadth_cm: 10, height_cm: 3 }
-      if (w <= 500)  return { length_cm: 20, breadth_cm: 15, height_cm: 4 }
+      if (w <= 100) return { length_cm: 15, breadth_cm: 10, height_cm: 3 }
+      if (w <= 500) return { length_cm: 20, breadth_cm: 15, height_cm: 4 }
       if (w <= 1500) return { length_cm: 25, breadth_cm: 20, height_cm: 5 }
-      return               { length_cm: 30, breadth_cm: 25, height_cm: 5 }
+      return { length_cm: 30, breadth_cm: 25, height_cm: 5 }
 
     case 'drill_bit_tube':
       return { length_cm: s.length_cm ?? 30, breadth_cm: 8, height_cm: 8 }
@@ -139,9 +143,9 @@ export function resolvePackedDims(item: ShipmentItem): PackedDims {
     case 'corrugated_box':
     default:
       return {
-        length_cm:  s.length_cm  ?? 20,
+        length_cm: s.length_cm ?? 20,
         breadth_cm: s.breadth_cm ?? 15,
-        height_cm:  s.height_cm  ?? 10,
+        height_cm: s.height_cm ?? 10,
       }
   }
 }
@@ -157,23 +161,19 @@ function finalizeCarton(c: CartonAccumulator): Carton {
   const volumetricGrams = (c.maxL * c.maxB * c.totalH) / VOLUMETRIC_DIVISOR_CM3_PER_GRAM
   const charged = Math.max(c.weightGrams, volumetricGrams)
   return {
-    length_cm:             Math.ceil(c.maxL),
-    breadth_cm:            Math.ceil(c.maxB),
-    height_cm:             Math.ceil(c.totalH),
-    actualWeightGrams:     Math.round(c.weightGrams),
+    length_cm: Math.ceil(c.maxL),
+    breadth_cm: Math.ceil(c.maxB),
+    height_cm: Math.ceil(c.totalH),
+    actualWeightGrams: Math.round(c.weightGrams),
     volumetricWeightGrams: Math.round(volumetricGrams),
-    chargedWeightGrams:    Math.round(charged),
+    chargedWeightGrams: Math.round(charged),
   }
 }
 
 const PACKING_VOID_FACTOR = 1.35
 const MAX_CARTON_DIM_CM = 60
 
-function deriveBulkCartonDims(
-  unitDims: PackedDims,
-  unitCount: number,
-  isLongShape: boolean,
-): PackedDims {
+function deriveBulkCartonDims(unitDims: PackedDims, unitCount: number, isLongShape: boolean): PackedDims {
   if (unitCount <= 1) return unitDims
   const unitVolume = unitDims.length_cm * unitDims.breadth_cm * unitDims.height_cm
   const totalVolume = unitVolume * unitCount * PACKING_VOID_FACTOR
@@ -190,10 +190,7 @@ function deriveBulkCartonDims(
   return { length_cm: dim, breadth_cm: dim, height_cm: dim }
 }
 
-export function packIntoCartons(
-  items: ShipmentItem[],
-  maxCartonWeightGrams = CARTON_MAX_WEIGHT_GRAMS,
-): Carton[] {
+export function packIntoCartons(items: ShipmentItem[], maxCartonWeightGrams = CARTON_MAX_WEIGHT_GRAMS): Carton[] {
   const cartons: Carton[] = []
 
   // Consolidate all flat-poly items into a single weight pool before packing.
@@ -224,15 +221,16 @@ export function packIntoCartons(
     let remaining = totalWeight
     while (remaining > 0) {
       const take = Math.min(remaining, maxCartonWeightGrams)
-      const volumetricGrams = (repDims.length_cm * repDims.breadth_cm * repDims.height_cm) / VOLUMETRIC_DIVISOR_CM3_PER_GRAM
+      const volumetricGrams =
+        (repDims.length_cm * repDims.breadth_cm * repDims.height_cm) / VOLUMETRIC_DIVISOR_CM3_PER_GRAM
       const charged = Math.max(take, volumetricGrams)
       cartons.push({
-        length_cm:             Math.ceil(repDims.length_cm),
-        breadth_cm:            Math.ceil(repDims.breadth_cm),
-        height_cm:             Math.ceil(repDims.height_cm),
-        actualWeightGrams:     Math.round(take),
+        length_cm: Math.ceil(repDims.length_cm),
+        breadth_cm: Math.ceil(repDims.breadth_cm),
+        height_cm: Math.ceil(repDims.height_cm),
+        actualWeightGrams: Math.round(take),
         volumetricWeightGrams: Math.round(volumetricGrams),
-        chargedWeightGrams:    Math.round(charged),
+        chargedWeightGrams: Math.round(charged),
       })
       remaining -= take
     }
@@ -264,9 +262,21 @@ export function packIntoCartons(
 export function computeShipmentDims(items: ShipmentItem[]): ShipmentResult {
   const cartons = packIntoCartons(items)
   if (cartons.length === 0) {
-    return { length_cm: 0, breadth_cm: 0, height_cm: 0, actualWeightGrams: 0, volumetricWeightGrams: 0, chargedWeightGrams: 0 }
+    return {
+      length_cm: 0,
+      breadth_cm: 0,
+      height_cm: 0,
+      actualWeightGrams: 0,
+      volumetricWeightGrams: 0,
+      chargedWeightGrams: 0,
+    }
   }
-  let maxL = 0, maxB = 0, totalH = 0, actual = 0, vol = 0, charged = 0
+  let maxL = 0,
+    maxB = 0,
+    totalH = 0,
+    actual = 0,
+    vol = 0,
+    charged = 0
   for (const c of cartons) {
     if (c.length_cm > maxL) maxL = c.length_cm
     if (c.breadth_cm > maxB) maxB = c.breadth_cm

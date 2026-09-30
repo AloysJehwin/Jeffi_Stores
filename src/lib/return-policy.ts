@@ -62,15 +62,31 @@ export async function getOrderItemsPolicy(orderId: string): Promise<OrderItemPol
   )
 
   return rows.map(r => {
-    const returnFlags = [r.brand_return_allowed, r.category_return_allowed, r.parent_return_allowed].filter(v => v !== null) as boolean[]
-    const replaceFlags = [r.brand_replacement_allowed, r.category_replacement_allowed, r.parent_replacement_allowed].filter(v => v !== null) as boolean[]
-    const returnWindows = [r.brand_return_window_days, r.category_return_window_days, r.parent_return_window_days].filter(v => v !== null) as number[]
-    const replaceWindows = [r.brand_replacement_window_days, r.category_replacement_window_days, r.parent_replacement_window_days].filter(v => v !== null) as number[]
+    const returnFlags = [r.brand_return_allowed, r.category_return_allowed, r.parent_return_allowed].filter(
+      v => v !== null
+    ) as boolean[]
+    const replaceFlags = [
+      r.brand_replacement_allowed,
+      r.category_replacement_allowed,
+      r.parent_replacement_allowed,
+    ].filter(v => v !== null) as boolean[]
+    const returnWindows = [
+      r.brand_return_window_days,
+      r.category_return_window_days,
+      r.parent_return_window_days,
+    ].filter(v => v !== null) as number[]
+    const replaceWindows = [
+      r.brand_replacement_window_days,
+      r.category_replacement_window_days,
+      r.parent_replacement_window_days,
+    ].filter(v => v !== null) as number[]
 
     const return_allowed = returnFlags.length > 0 ? returnFlags.every(Boolean) : DEFAULT_POLICY.return_allowed
-    const replacement_allowed = replaceFlags.length > 0 ? replaceFlags.every(Boolean) : DEFAULT_POLICY.replacement_allowed
+    const replacement_allowed =
+      replaceFlags.length > 0 ? replaceFlags.every(Boolean) : DEFAULT_POLICY.replacement_allowed
     const return_window_days = returnWindows.length > 0 ? Math.min(...returnWindows) : DEFAULT_POLICY.return_window_days
-    const replacement_window_days = replaceWindows.length > 0 ? Math.min(...replaceWindows) : DEFAULT_POLICY.replacement_window_days
+    const replacement_window_days =
+      replaceWindows.length > 0 ? Math.min(...replaceWindows) : DEFAULT_POLICY.replacement_window_days
 
     let source: OrderItemPolicy['source'] = 'default'
     if (returnFlags.length === 0 && replaceFlags.length === 0) source = 'default'
@@ -103,30 +119,25 @@ export async function checkReturnEligibility(
   }
 
   // Scope to submitted items when provided; validates only what the user selected
-  const policies = itemIds && itemIds.length > 0
-    ? allPolicies.filter(p => itemIds.includes(p.product_id))
-    : allPolicies
+  const policies = itemIds && itemIds.length > 0 ? allPolicies.filter(p => itemIds.includes(p.product_id)) : allPolicies
 
   if (policies.length === 0) {
     return { ok: false, reason: 'None of the selected items were found on this order' }
   }
 
-  const blocked = policies.find(p =>
-    type === 'refund' ? !p.return_allowed : !p.replacement_allowed
-  )
+  const blocked = policies.find(p => (type === 'refund' ? !p.return_allowed : !p.replacement_allowed))
   if (blocked) {
     return {
       ok: false,
-      reason: type === 'refund'
-        ? `Returns are not allowed for "${blocked.product_name}".`
-        : `Replacements are not allowed for "${blocked.product_name}".`,
+      reason:
+        type === 'refund'
+          ? `Returns are not allowed for "${blocked.product_name}".`
+          : `Replacements are not allowed for "${blocked.product_name}".`,
     }
   }
 
   const effectiveWindow = Math.min(
-    ...policies.map(p =>
-      type === 'refund' ? p.return_window_days : p.replacement_window_days
-    )
+    ...policies.map(p => (type === 'refund' ? p.return_window_days : p.replacement_window_days))
   )
 
   const cutoff = new Date(deliveredAt.getTime() + effectiveWindow * 24 * 60 * 60 * 1000)

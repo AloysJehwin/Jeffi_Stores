@@ -1,10 +1,6 @@
 import { queryMany } from '@/lib/db'
 import { generateReviewToken } from '@/lib/jwt'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmailRendered,
-} from '@/lib/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/automation-emails'
 import { renderCampaignEmail } from '@/lib/email-campaigns'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
@@ -32,13 +28,30 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
     whatsappEnabled: false,
   },
   paramSchema: {
-    lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',        description: 'Only consider orders delivered in the last N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run', description: 'Hard limit per sweep' },
-    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
+    lookbackDays: {
+      type: 'integer',
+      min: 1,
+      max: 90,
+      label: 'Lookback (days)',
+      description: 'Only consider orders delivered in the last N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
   async findEligible({ campaign, params }) {
-    return queryMany<Row>(`
+    return queryMany<Row>(
+      `
       SELECT o.id, o.user_id, o.order_number
       FROM orders o
       JOIN users u ON u.id = o.user_id
@@ -59,14 +72,17 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
             AND ecs.reference_id = o.id::text
         )
       LIMIT $4
-    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep])
+    `,
+      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep]
+    )
   },
 
   async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const items = await queryMany<{ name: string; product_id: string; image_url: string | null; slug: string | null }>(`
+    const items = await queryMany<{ name: string; product_id: string; image_url: string | null; slug: string | null }>(
+      `
       SELECT oi.product_name AS name,
              oi.product_id::text AS product_id,
              (SELECT image_url FROM product_images WHERE product_id = oi.product_id ORDER BY display_order ASC LIMIT 1) AS image_url,
@@ -75,17 +91,21 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1::uuid
       LIMIT 8
-    `, [row.id])
+    `,
+      [row.id]
+    )
 
-    const itemsWithLinks = await Promise.all(items.map(async item => {
-      const token = await generateReviewToken({ orderId: row.id, productId: item.product_id, userId: row.user_id })
-      const starLinks: string[] = []
-      for (let rating = 1; rating <= 5; rating++) {
-        starLinks.push(`${user.baseUrl}/review?token=${token}&rating=${rating}`)
-      }
-      const productUrl = item.slug ? `${user.baseUrl}/products/${item.slug}` : null
-      return { name: item.name, imageUrl: item.image_url, starLinks, productUrl, token }
-    }))
+    const itemsWithLinks = await Promise.all(
+      items.map(async item => {
+        const token = await generateReviewToken({ orderId: row.id, productId: item.product_id, userId: row.user_id })
+        const starLinks: string[] = []
+        for (let rating = 1; rating <= 5; rating++) {
+          starLinks.push(`${user.baseUrl}/review?token=${token}&rating=${rating}`)
+        }
+        const productUrl = item.slug ? `${user.baseUrl}/products/${item.slug}` : null
+        return { name: item.name, imageUrl: item.image_url, starLinks, productUrl, token }
+      })
+    )
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 

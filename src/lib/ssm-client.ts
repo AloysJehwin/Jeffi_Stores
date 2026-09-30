@@ -14,7 +14,10 @@ const SSM_HOST = 'ssm.us-east-1.amazonaws.com'
 async function ssm(target: string, payload: Record<string, unknown>): Promise<any> {
   const body = JSON.stringify(payload)
   const request = new HttpRequest({
-    method: 'POST', protocol: 'https:', hostname: SSM_HOST, path: '/',
+    method: 'POST',
+    protocol: 'https:',
+    hostname: SSM_HOST,
+    path: '/',
     headers: {
       host: SSM_HOST,
       'content-type': 'application/x-amz-json-1.1',
@@ -22,7 +25,12 @@ async function ssm(target: string, payload: Record<string, unknown>): Promise<an
     },
     body,
   })
-  const signer = new SignatureV4({ service: 'ssm', region: 'us-east-1', credentials: defaultProvider(), sha256: Sha256 })
+  const signer = new SignatureV4({
+    service: 'ssm',
+    region: 'us-east-1',
+    credentials: defaultProvider(),
+    sha256: Sha256,
+  })
   const signed = await signer.sign(request)
   const res = await fetch(`https://${SSM_HOST}/`, { method: 'POST', headers: signed.headers as any, body })
   const text = await res.text()
@@ -33,7 +41,9 @@ async function ssm(target: string, payload: Record<string, unknown>): Promise<an
 /** Run a shell command on the given instances via AWS-RunShellScript. Returns the command id
  * (null if SSM answered without one) so callers can log it; does not wait for completion. */
 export async function sendShellCommand(
-  instanceIds: string[], commands: string[], comment?: string,
+  instanceIds: string[],
+  commands: string[],
+  comment?: string
 ): Promise<{ commandId: string | null }> {
   if (instanceIds.length === 0) return { commandId: null }
   const out = await ssm('SendCommand', {

@@ -24,7 +24,9 @@ function write(key: string, list: string[]) {
   try {
     if (typeof sessionStorage === 'undefined') return
     sessionStorage.setItem(key, JSON.stringify(list.slice(0, MAX)))
-  } catch { /* quota / private mode — ignore */ }
+  } catch {
+    /* quota / private mode — ignore */
+  }
 }
 
 /** Push to the front, dedupe (case-insensitive), cap length. */
@@ -57,5 +59,7 @@ export function clearSessionSignals() {
   try {
     sessionStorage.removeItem(VIEWED_KEY)
     sessionStorage.removeItem(SEARCH_KEY)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

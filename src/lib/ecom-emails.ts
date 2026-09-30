@@ -45,11 +45,18 @@ export function tenantCampaignEmail(slug: string, displayName?: string | null): 
   return `"${senderName(slug, displayName)}" <${tenantCampaignAddress(slug)}>`
 }
 
-interface Row { label: string; value: string }
+interface Row {
+  label: string
+  value: string
+}
 
 function detailTable(rows: Row[]): string {
-  const cells = rows.map(({ label, value }) => `
-    <tr><th>${label}</th><td>${value}</td></tr>`).join('')
+  const cells = rows
+    .map(
+      ({ label, value }) => `
+    <tr><th>${label}</th><td>${value}</td></tr>`
+    )
+    .join('')
   return `<table class="rows" cellpadding="0" cellspacing="0" width="100%">${cells}</table>`
 }
 
@@ -85,10 +92,15 @@ function toText(html: string): string {
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|tr|h1|h2|div|table)>/gi, '\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&middot;/g, '·').replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&middot;/g, '·')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .replace(/\n{3,}/g, '\n\n')
-    .split('\n').map((l) => l.trim()).join('\n')
+    .split('\n')
+    .map(l => l.trim())
+    .join('\n')
     .trim()
 }
 
@@ -103,29 +115,37 @@ async function send(to: string, subject: string, html: string) {
     subject,
     html,
     text: toText(html),
-  }).catch((e) => {
+  }).catch(e => {
     process.stderr.write(`[ecom-email] failed to send to ${to}: ${e?.message}\n`)
   })
 }
 
 export async function sendKycSubmittedEmail(owner: { email: string; name: string | null }) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('We have received your application and started the review.', 'Your application is under review', `
+  const html = baseHtml(
+    'We have received your application and started the review.',
+    'Your application is under review',
+    `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Thank you for applying to Jeffi Commerce. We have received your business details and GST certificate, and our team has started the verification.</p>
     ${notice('Verification usually completes within <strong>1 to 2 business days</strong>. Once approved, you will complete your subscription payment and your store will be provisioned automatically.')}
     <p style="margin:0;">We will email you as soon as there is an update. No action is needed from you in the meantime.</p>
-  `)
+  `
+  )
   await send(owner.email, 'Your Jeffi Commerce application is under review', html)
 
-  const adminHtml = baseHtml('A new merchant application needs review.', 'New merchant application', `
+  const adminHtml = baseHtml(
+    'A new merchant application needs review.',
+    'New merchant application',
+    `
     ${detailTable([
       { label: 'Applicant', value: owner.name ?? '—' },
       { label: 'Email', value: owner.email },
       { label: 'Received', value: new Date().toLocaleString('en-IN') },
     ])}
     <p style="margin:0;">Review it in the Ecom Store section of the admin panel.</p>
-  `)
+  `
+  )
   await send(PLATFORM_ADMIN, `New merchant application: ${owner.email}`, adminHtml)
 }
 
@@ -135,7 +155,10 @@ export async function sendKycApprovedEmail(
   checkoutUrl: string
 ) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('Your application is approved. Complete payment to launch your store.', 'Your application has been approved', `
+  const html = baseHtml(
+    'Your application is approved. Complete payment to launch your store.',
+    'Your application has been approved',
+    `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Your GST certificate has been verified and your application for <strong>${tenant.display_name}</strong> is approved.</p>
     ${detailTable([
@@ -145,22 +168,24 @@ export async function sendKycApprovedEmail(
     <p style="margin:0 0 14px;">Complete your subscription payment to launch. You will be taken to Razorpay's secure checkout.</p>
     ${button(checkoutUrl, 'Complete payment')}
     <p class="muted" style="margin:0;">Your store is provisioned automatically once payment is confirmed, and is usually ready within a few minutes.</p>
-  `)
+  `
+  )
   await send(owner.email, 'Approved: complete your payment to launch your store', html)
 }
 
-export async function sendKycRejectedEmail(
-  owner: { email: string; name: string | null },
-  reason: string
-) {
+export async function sendKycRejectedEmail(owner: { email: string; name: string | null }, reason: string) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('We could not verify your application. Action is required.', 'We could not verify your application', `
+  const html = baseHtml(
+    'We could not verify your application. Action is required.',
+    'We could not verify your application',
+    `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">We were unable to verify the details submitted with your application.</p>
     ${notice(`<strong>Reason:</strong> ${reason}`, 'warn')}
     <p style="margin:0 0 14px;">This is usually straightforward to resolve. Reply to this email with corrected details and we will re-review your application.</p>
     <p style="margin:0;">No payment has been taken.</p>
-  `)
+  `
+  )
   await send(owner.email, 'Action required: we could not verify your application', html)
 }
 
@@ -169,7 +194,10 @@ export async function sendPaymentConfirmedEmail(
   tenant: { display_name: string; slug: string; plan: string | null; billing_interval: string }
 ) {
   const name = owner.name ?? 'there'
-  const html = baseHtml('Payment confirmed. Your store is being provisioned.', 'Payment confirmed', `
+  const html = baseHtml(
+    'Payment confirmed. Your store is being provisioned.',
+    'Payment confirmed',
+    `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">We have received your subscription payment for <strong>${tenant.display_name}</strong>. Your store is being provisioned now.</p>
     ${detailTable([
@@ -179,7 +207,8 @@ export async function sendPaymentConfirmedEmail(
       { label: 'Status', value: 'Provisioning' },
     ])}
     <p style="margin:0;">Provisioning sets up your database, storage and store addresses. We will email you the moment it is live, usually within a few minutes.</p>
-  `)
+  `
+  )
   await send(owner.email, `Payment confirmed for ${tenant.display_name}`, html)
 }
 
@@ -190,7 +219,10 @@ export async function sendStoreLiveEmail(
   const name = owner.name ?? 'there'
   const adminUrl = `https://admin-${tenant.slug}.jeffistores.in`
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
-  const html = baseHtml(`${tenant.display_name} is live. Here are your store links.`, `${tenant.display_name} is now live`, `
+  const html = baseHtml(
+    `${tenant.display_name} is live. Here are your store links.`,
+    `${tenant.display_name} is now live`,
+    `
     <p style="margin:0 0 14px;">Hi ${name},</p>
     <p style="margin:0 0 14px;">Your store has been provisioned and is ready to use.</p>
     ${detailTable([
@@ -202,6 +234,7 @@ export async function sendStoreLiveEmail(
     ${button(adminUrl, 'Open your admin panel')}
     <p style="margin:0 0 14px;">Sign in with <strong>${owner.email}</strong> using the same one-time code or Google sign-in you used during onboarding.</p>
     ${notice('Your admin panel is protected by a client certificate, sent separately. Install it on each device you use to manage the store.')}
-  `)
+  `
+  )
   await send(owner.email, `${tenant.display_name} is live`, html)
 }

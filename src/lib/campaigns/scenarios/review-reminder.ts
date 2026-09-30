@@ -1,10 +1,5 @@
 import { queryMany } from '@/lib/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
@@ -24,20 +19,38 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
   kind: 'review_reminder',
   name: 'Review Reminder',
   description: 'Sent N hours after delivery if no review left',
-  trigger: 'Fires after delivery + the campaign\'s delay, but only if the customer hasn\'t already reviewed any product from that order. One send per order. Stops if a review is left after the email goes out.',
+  trigger:
+    "Fires after delivery + the campaign's delay, but only if the customer hasn't already reviewed any product from that order. One send per order. Stops if a review is left after the email goes out.",
   defaultParams: {
     lookbackDays: 30,
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
   paramSchema: {
-    lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',        description: 'Only consider orders delivered in the last N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run', description: 'Hard limit per sweep' },
-    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
+    lookbackDays: {
+      type: 'integer',
+      min: 1,
+      max: 90,
+      label: 'Lookback (days)',
+      description: 'Only consider orders delivered in the last N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
   async findEligible({ campaign, params }) {
-    return queryMany<Row>(`
+    return queryMany<Row>(
+      `
       SELECT o.id, o.user_id, o.order_number
       FROM orders o
       JOIN users u ON u.id = o.user_id
@@ -58,14 +71,22 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
             AND ecs.reference_id = o.id::text
         )
       LIMIT $4
-    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep])
+    `,
+      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep]
+    )
   },
 
   async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const items = await queryMany<{ name: string; product_id: string; product_slug: string | null; image_url: string | null }>(`
+    const items = await queryMany<{
+      name: string
+      product_id: string
+      product_slug: string | null
+      image_url: string | null
+    }>(
+      `
       SELECT oi.product_name AS name,
              oi.product_id::text AS product_id,
              p.slug AS product_slug,
@@ -74,7 +95,9 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
       LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1::uuid
       LIMIT 8
-    `, [row.id])
+    `,
+      [row.id]
+    )
 
     const itemsHtml = renderItemRows(
       items.map(i => ({

@@ -19,7 +19,9 @@ function readStoredTheme(storageKey: string): Theme {
   try {
     const stored = (sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)) as Theme | null
     if (stored && ['light', 'dark', 'system'].includes(stored)) return stored
-  } catch { /* storage unavailable */ }
+  } catch {
+    /* storage unavailable */
+  }
   return 'light'
 }
 

@@ -28,10 +28,10 @@ export interface Campaign {
 const FREQUENCY_CAP_HOURS = 72
 
 function resolveAppUrl(): string {
-  const isLocalhost = (v: string | undefined) => !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
+  const isLocalhost = (v: string | undefined) =>
+    !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
   const isProd = process.env.NODE_ENV === 'production'
-  const pickFirst = (vals: Array<string | undefined>) =>
-    vals.find(v => v && (!isProd || !isLocalhost(v))) || ''
+  const pickFirst = (vals: Array<string | undefined>) => vals.find(v => v && (!isProd || !isLocalhost(v))) || ''
   const candidate =
     pickFirst([
       process.env.NEXT_PUBLIC_APP_URL,
@@ -55,7 +55,10 @@ export async function getAllCampaigns(): Promise<Campaign[]> {
   return result.rows
 }
 
-export async function canSendMarketing(userId: string, campaignKind: CampaignKind): Promise<{ ok: boolean; reason?: string }> {
+export async function canSendMarketing(
+  userId: string,
+  campaignKind: CampaignKind
+): Promise<{ ok: boolean; reason?: string }> {
   const user = await queryOne<{ marketing_opt_out: boolean; email: string | null; is_active: boolean }>(
     `SELECT marketing_opt_out, email, is_active FROM users WHERE id = $1`,
     [userId]
@@ -86,9 +89,7 @@ export async function alreadySentForReference(
   userId: string,
   referenceId: string | null
 ): Promise<boolean> {
-  const timeFilter = referenceId === null
-    ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`
-    : ''
+  const timeFilter = referenceId === null ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'` : ''
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM email_campaigns_sent
      WHERE campaign_kind = $1 AND user_id = $2
@@ -159,7 +160,10 @@ export async function generateCouponForCampaign(params: {
   )
   if (existing) {
     // Ensure campaigns.coupon_id is set even if it was cleared
-    await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2 AND (coupon_id IS NULL OR coupon_id != $1)`, [existing.id, params.campaignKind])
+    await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2 AND (coupon_id IS NULL OR coupon_id != $1)`, [
+      existing.id,
+      params.campaignKind,
+    ])
     return existing.code
   }
 
@@ -196,7 +200,9 @@ export async function generateCouponForCampaign(params: {
   }
 }
 
-export async function getAssignedCouponCode(couponId: string): Promise<{ code: string; discountValue: number; discountType: string } | null> {
+export async function getAssignedCouponCode(
+  couponId: string
+): Promise<{ code: string; discountValue: number; discountType: string } | null> {
   return queryOne<{ code: string; discountValue: number; discountType: string }>(
     `SELECT code, discount_value::float AS "discountValue", discount_type AS "discountType"
      FROM coupons WHERE id = $1 AND is_active = TRUE`,
@@ -229,7 +235,13 @@ export function renderTemplate(template: string, vars: Record<string, string | n
   })
 }
 
-export function wrapWithTracking(html: string, sentId: string, unsubscribeUrl: string, baseUrl: string = APP_URL, storeName?: string): string {
+export function wrapWithTracking(
+  html: string,
+  sentId: string,
+  unsubscribeUrl: string,
+  baseUrl: string = APP_URL,
+  storeName?: string
+): string {
   const rewritten = rewriteLinksForTracking(html, sentId, baseUrl)
   const pixel = `<img src="${buildTrackingPixelUrl(sentId, baseUrl)}" width="1" height="1" alt="" style="display:none;"/>`
   const footer = `

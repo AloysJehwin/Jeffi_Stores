@@ -72,7 +72,10 @@ const cache = new Map<string, { result: RecResult; expires: number }>()
 function cacheGet(userId: string): RecResult | null {
   const hit = cache.get(userId)
   if (!hit) return null
-  if (hit.expires < nowMs()) { cache.delete(userId); return null }
+  if (hit.expires < nowMs()) {
+    cache.delete(userId)
+    return null
+  }
   return hit.result
 }
 
@@ -87,7 +90,11 @@ function cacheSet(userId: string, result: RecResult) {
 
 // Date.now() is unavailable in some sandboxed runtimes; guard it.
 function nowMs(): number {
-  try { return Date.now() } catch { return 0 }
+  try {
+    return Date.now()
+  } catch {
+    return 0
+  }
 }
 
 // Reject if a promise doesn't settle within ms — used to fast-fail the vector
@@ -96,8 +103,14 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('rec-timeout')), ms)
     p.then(
-      v => { clearTimeout(timer); resolve(v) },
-      e => { clearTimeout(timer); reject(e) }
+      v => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      e => {
+        clearTimeout(timer)
+        reject(e)
+      }
     )
   })
 }
@@ -142,7 +155,11 @@ export async function aggregateUserSignals(userId: string): Promise<UserSignals>
   // Weighted, 30-day recency-decayed score per product across all behaviour
   // sources. Weights: purchased 5 > carted 4 > wishlist/review 3 > viewed 1.
   const rows = await queryMany<{
-    product_id: string; name: string; category_id: string | null; brand_id: string | null; score: number
+    product_id: string
+    name: string
+    category_id: string | null
+    brand_id: string | null
+    score: number
   }>(
     `
     WITH signals AS (
@@ -191,7 +208,10 @@ export async function aggregateUserSignals(userId: string): Promise<UserSignals>
   )
 
   return {
-    seedNames: rows.slice(0, 8).map(r => r.name).filter(Boolean),
+    seedNames: rows
+      .slice(0, 8)
+      .map(r => r.name)
+      .filter(Boolean),
     excludeIds: owned.map(r => r.product_id),
     topCategoryIds: [...new Set(rows.map(r => r.category_id).filter(Boolean) as string[])].slice(0, 6),
     topBrandIds: [...new Set(rows.map(r => r.brand_id).filter(Boolean) as string[])].slice(0, 6),
@@ -223,7 +243,7 @@ export async function getCandidates(
   // Ollama box or vector store is unreachable. Raced against a hard deadline so
   // an unreachable RAG store degrades fast (~6s) instead of hanging on pg
   // connect timeouts and blocking the homepage.
-  if (seedQuery && await storefrontAiAllowed().catch(() => false)) {
+  if (seedQuery && (await storefrontAiAllowed().catch(() => false))) {
     try {
       const similar = await withTimeout(findSimilarProductIds(seedQuery, limit), 6000)
       const excl = new Set(excludeIds)
@@ -280,7 +300,13 @@ Given a shopper's recent interests and a numbered list of candidate products, pi
 Return ONLY valid JSON using the candidate NUMBERS: {"picks":[<number>, <number>, ...]}
 Rules: use only the numbers shown; order best-first; prefer variety across categories; return the requested count.`
 
-interface CandidateMeta { id: string; name: string; category: string | null; brand: string | null; price: number }
+interface CandidateMeta {
+  id: string
+  name: string
+  category: string | null
+  brand: string | null
+  price: number
+}
 
 // Collapse a product name to its "family" — strips trailing size/variant tokens
 // so "... Screw Metric 12.9 M4", "... M6", "... M10" all map to one family. This
@@ -289,12 +315,14 @@ function familyKey(m: CandidateMeta): string {
   const base = (m.name || '')
     .toLowerCase()
     // drop common size/spec tokens: M6, 12.9, 250mm, 1/2", 1m, sizes, grades
-    .replace(/\b[mM]\d+(\.\d+)?\b/g, ' ')       // M6, M10, 12.9-style M-codes
+    .replace(/\b[mM]\d+(\.\d+)?\b/g, ' ') // M6, M10, 12.9-style M-codes
     .replace(/\b\d+(\.\d+)?\s?(mm|cm|m|inch|in|")\b/g, ' ') // 250mm, 1m, 1/2"
-    .replace(/\b\d+(\.\d+)?\b/g, ' ')            // bare numbers/grades (12.9)
+    .replace(/\b\d+(\.\d+)?\b/g, ' ') // bare numbers/grades (12.9)
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
-    .split(/\s+/).slice(0, 6).join(' ')          // first few descriptive words
+    .split(/\s+/)
+    .slice(0, 6)
+    .join(' ') // first few descriptive words
   return `${m.brand ?? ''}|${m.category ?? ''}|${base}`
 }
 
@@ -342,19 +370,31 @@ async function curate(
   candidates: CandidateMeta[],
   signals: UserSignals,
   want: number
-): Promise<{ ids: string[]; curated: boolean; model?: string; responseMs?: number; promptTokens?: number; completionTokens?: number }> {
+): Promise<{
+  ids: string[]
+  curated: boolean
+  model?: string
+  responseMs?: number
+  promptTokens?: number
+  completionTokens?: number
+}> {
   const fallback = candidates.slice(0, want).map(c => c.id)
   if (candidates.length <= want) return { ids: fallback, curated: false }
   if (!(await storefrontAiAllowed().catch(() => false))) return { ids: fallback, curated: false }
 
   const interest = [
     signals.seedNames.length ? `Recently interested in: ${signals.seedNames.slice(0, 6).join(', ')}.` : '',
-  ].filter(Boolean).join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   // Reference candidates by short 1-based INDEX, not UUID — small models (gemma3:4b)
   // reliably echo small integers but mangle/drop 36-char UUIDs.
   const list = candidates
-    .map((c, i) => `${i + 1}. ${c.name}${c.brand ? ` | ${c.brand}` : ''}${c.category ? ` | ${c.category}` : ''} | ₹${c.price}`)
+    .map(
+      (c, i) =>
+        `${i + 1}. ${c.name}${c.brand ? ` | ${c.brand}` : ''}${c.category ? ` | ${c.category}` : ''} | ₹${c.price}`
+    )
     .join('\n')
 
   const userPrompt = `${interest}\n\nCandidates (numbered):\n${list}\n\nReturn the best ${want} as their numbers.`
@@ -375,7 +415,10 @@ async function curate(
     try {
       parsed = JSON.parse(r.content)
     } catch {
-      const m = r.content.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').match(/\{[\s\S]*\}/)
+      const m = r.content
+        .replace(/^```[\w]*\n?/, '')
+        .replace(/\n?```$/, '')
+        .match(/\{[\s\S]*\}/)
       parsed = m ? JSON.parse(m[0]) : {}
     }
     // Map returned 1-based indexes → candidate ids; keep model order, dedup, drop out-of-range.
@@ -404,7 +447,9 @@ async function curate(
       responseMs: r.latencyMs,
     }
   } catch (err) {
-    if (!(err instanceof AiClientError)) { /* unexpected — still degrade */ }
+    if (!(err instanceof AiClientError)) {
+      /* unexpected — still degrade */
+    }
     return { ids: fallback, curated: false }
   }
 }
@@ -466,7 +511,7 @@ export async function getFeaturedForUser(userId: string, want = 8): Promise<RecR
     seedQuery,
     candidateCount: candidateCards.length,
     model,
-    responseMs: responseMs ?? (nowMs() - started),
+    responseMs: responseMs ?? nowMs() - started,
     promptTokens,
     completionTokens,
   }
@@ -480,15 +525,22 @@ export async function getBestSellerCards(want = 8): Promise<RecCard[]> {
   const ids = await bestSellerIds([], Math.max(24, want * 3))
   const cards = await hydrate(ids)
   const meta = new Map<string, CandidateMeta>(
-    cards.map(c => [c.id, {
-      id: c.id,
-      name: c.name,
-      category: c.categories?.name ?? null,
-      brand: c.brands?.name ?? null,
-      price: 0,
-    }])
+    cards.map(c => [
+      c.id,
+      {
+        id: c.id,
+        name: c.name,
+        category: c.categories?.name ?? null,
+        brand: c.brands?.name ?? null,
+        price: 0,
+      },
+    ])
   )
-  const diverseIds = diversify(cards.map(c => c.id), meta, want)
+  const diverseIds = diversify(
+    cards.map(c => c.id),
+    meta,
+    want
+  )
   const byId = new Map(cards.map(c => [c.id, c]))
   return diverseIds.map(id => byId.get(id)).filter(Boolean) as RecCard[]
 }

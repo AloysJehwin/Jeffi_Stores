@@ -1,10 +1,5 @@
 import { getClient, queryOne } from '@/lib/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/automation-emails'
 import { storeBaseUrlAsync } from '@/lib/brand'
 import type { Campaign, CampaignKind } from '@/lib/marketing'
 import type { SweepResult } from './types'
@@ -20,10 +15,9 @@ interface CustomScenarioRow {
 }
 
 export async function isCustomScenario(scenarioKind: string): Promise<boolean> {
-  const row = await queryOne<{ enabled: boolean }>(
-    `SELECT enabled FROM custom_scenarios WHERE kind = $1`,
-    [scenarioKind]
-  )
+  const row = await queryOne<{ enabled: boolean }>(`SELECT enabled FROM custom_scenarios WHERE kind = $1`, [
+    scenarioKind,
+  ])
   return row !== null && row.enabled === true
 }
 
@@ -50,7 +44,13 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
   const maxRecipients = typeof params.maxRecipientsPerSweep === 'number' ? params.maxRecipientsPerSweep : 50
 
   let userIds: string[] = []
-  let products: Array<{ product_id: string; name: string; slug: string | null; image_url: string | null; price: number | null }> = []
+  let products: Array<{
+    product_id: string
+    name: string
+    slug: string | null
+    image_url: string | null
+    price: number | null
+  }> = []
 
   const client = await getClient()
   try {
@@ -62,7 +62,13 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
 
     if (productValidation && productValidation.ok) {
       try {
-        const pr = await client.query<{ product_id: string; name: string; slug: string | null; image_url: string | null; price: number | null }>(productValidation.normalized)
+        const pr = await client.query<{
+          product_id: string
+          name: string
+          slug: string | null
+          image_url: string | null
+          price: number | null
+        }>(productValidation.normalized)
         products = pr.rows
       } catch (err) {
         console.error('[route]', err)
@@ -73,7 +79,9 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
     await client.query('ROLLBACK')
   } catch (err) {
     console.error('[route]', err)
-    try { await client.query('ROLLBACK') } catch {}
+    try {
+      await client.query('ROLLBACK')
+    } catch {}
     return result
   } finally {
     client.release()
@@ -83,18 +91,24 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
 
   const baseUrl = await storeBaseUrlAsync()
 
-  const itemsHtml = products.length > 0
-    ? renderItemRows(products.map(p => ({
-        name: p.name,
-        price: p.price ?? undefined,
-        imageUrl: p.image_url,
-        productUrl: p.slug ? `${baseUrl}/products/${p.slug}` : null,
-      })))
-    : ''
+  const itemsHtml =
+    products.length > 0
+      ? renderItemRows(
+          products.map(p => ({
+            name: p.name,
+            price: p.price ?? undefined,
+            imageUrl: p.image_url,
+            productUrl: p.slug ? `${baseUrl}/products/${p.slug}` : null,
+          }))
+        )
+      : ''
 
   for (const userId of userIds) {
     const user = await fetchUserContext(userId)
-    if (!user) { result.skipped++; continue }
+    if (!user) {
+      result.skipped++
+      continue
+    }
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
 
@@ -110,7 +124,8 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
         ctaUrl: `${user.baseUrl}/products`,
       },
     })
-    if (r.ok) result.sent++; else result.skipped++
+    if (r.ok) result.sent++
+    else result.skipped++
   }
 
   return result

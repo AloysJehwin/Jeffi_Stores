@@ -37,10 +37,9 @@ function deriveStatus(ps: any): string {
 // Pull ALL GMC product statuses (paginated) and upsert into merchant_gmc_status,
 // then recompute the aggregate meta row. Returns the fresh summary.
 export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked: true }> {
-  const lock = await queryOne<{ acquired: boolean }>(
-    `SELECT pg_try_advisory_lock($1) AS acquired`,
-    [GMC_STATUS_LOCK_KEY]
-  )
+  const lock = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [
+    GMC_STATUS_LOCK_KEY,
+  ])
   if (!lock?.acquired) return { locked: true }
 
   try {
@@ -51,12 +50,21 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
       const rows = res.resources || []
       for (const ps of rows) {
         // productId format: "online:en:IN:<offerId>"
-        const offerId = String(ps.productId || '').split(':').slice(3).join(':') || ps.productId || ''
+        const offerId =
+          String(ps.productId || '')
+            .split(':')
+            .slice(3)
+            .join(':') ||
+          ps.productId ||
+          ''
         if (!offerId) continue
         const status = deriveStatus(ps)
         const issues = (ps.itemLevelIssues || []).map((i: any) => ({
-          code: i.code, servability: i.servability, description: i.description,
-          detail: i.detail, attribute: i.attributeName,
+          code: i.code,
+          servability: i.servability,
+          description: i.description,
+          detail: i.detail,
+          attribute: i.attributeName,
         }))
         await query(
           `INSERT INTO merchant_gmc_status
@@ -66,8 +74,7 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
              title = EXCLUDED.title, status = EXCLUDED.status,
              destination_statuses = EXCLUDED.destination_statuses,
              item_issues = EXCLUDED.item_issues, synced_at = now()`,
-          [offerId, ps.title || null, status,
-           JSON.stringify(ps.destinationStatuses || []), JSON.stringify(issues)]
+          [offerId, ps.title || null, status, JSON.stringify(ps.destinationStatuses || []), JSON.stringify(issues)]
         )
         seen.push(offerId)
       }
@@ -76,10 +83,7 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
 
     // Drop rows no longer present in GMC (offers that were removed).
     if (seen.length > 0) {
-      await query(
-        `DELETE FROM merchant_gmc_status WHERE offer_id <> ALL($1::text[])`,
-        [seen]
-      )
+      await query(`DELETE FROM merchant_gmc_status WHERE offer_id <> ALL($1::text[])`, [seen])
     }
 
     // Recompute meta counts from the table.
@@ -118,9 +122,7 @@ export interface GmcPageParams {
   status?: string
 }
 
-export async function getGmcStatusPage(
-  params: GmcPageParams
-): Promise<{ rows: GmcStatusRow[]; total: number }> {
+export async function getGmcStatusPage(params: GmcPageParams): Promise<{ rows: GmcStatusRow[]; total: number }> {
   const page = Math.max(1, params.page || 1)
   const pageSize = Math.min(200, Math.max(1, params.pageSize || 50))
   const where: string[] = []
@@ -135,9 +137,7 @@ export async function getGmcStatusPage(
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
-  const totalRow = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM merchant_gmc_status ${whereSql}`, args
-  )
+  const totalRow = await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM merchant_gmc_status ${whereSql}`, args)
   const total = totalRow?.n ?? 0
 
   const limitArg = args.length + 1

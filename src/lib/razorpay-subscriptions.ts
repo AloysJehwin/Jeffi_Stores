@@ -4,10 +4,10 @@ export type BillingInterval = 'monthly' | 'yearly'
 
 // Monthly prices in paise (INR × 100) — must match plans.monthly_price_inr in the DB.
 const MONTHLY_PAISE: Record<string, number> = {
-  basic:        499900,  // ₹4999
-  growth:       999900,  // ₹9999
-  pro:         1999900,  // ₹19999
-  enterprise:  4999900,  // ₹49999
+  basic: 499900, // ₹4999
+  growth: 999900, // ₹9999
+  pro: 1999900, // ₹19999
+  enterprise: 4999900, // ₹49999
 }
 
 // Yearly = monthly × 12 (full price — 20% discount applied via Razorpay offer at checkout).
@@ -86,11 +86,11 @@ export async function createRazorpaySubscription(opts: {
 
   const sub = await (rz.subscriptions as any).create({
     plan_id: planId,
-    total_count: 120,    // max cycles (10 yrs monthly / ~8 yrs yearly); Razorpay requires ≥1
+    total_count: 120, // max cycles (10 yrs monthly / ~8 yrs yearly); Razorpay requires ≥1
     quantity: 1,
     customer_notify: 1,
     // For yearly plans, apply the 20% discount offer if configured.
-    offer_id: opts.interval === 'yearly' ? (process.env.RAZORPAY_YEARLY_OFFER_ID || null) : null,
+    offer_id: opts.interval === 'yearly' ? process.env.RAZORPAY_YEARLY_OFFER_ID || null : null,
     notes: {
       tenant_id: opts.tenantId,
       tenant_slug: opts.tenantSlug,
@@ -143,16 +143,17 @@ export async function upgradeSubscription(opts: {
 
   // Create new subscription (with prorated addon credit if meaningful).
   const planId = await ensureRazorpayPlan(opts.newPlanSlug, opts.newPlanName, opts.newInterval)
-  const addons = proratedCreditPaise > 0
-    ? [{ item: { name: 'Prorated credit from previous plan', amount: -proratedCreditPaise, currency: 'INR' } }]
-    : []
+  const addons =
+    proratedCreditPaise > 0
+      ? [{ item: { name: 'Prorated credit from previous plan', amount: -proratedCreditPaise, currency: 'INR' } }]
+      : []
 
   const sub = await (rz.subscriptions as any).create({
     plan_id: planId,
     total_count: 0,
     quantity: 1,
     customer_notify: 1,
-    offer_id: opts.newInterval === 'yearly' ? (process.env.RAZORPAY_YEARLY_OFFER_ID || null) : null,
+    offer_id: opts.newInterval === 'yearly' ? process.env.RAZORPAY_YEARLY_OFFER_ID || null : null,
     addons,
     notes: {
       tenant_id: opts.tenantId,
@@ -203,7 +204,7 @@ export async function downgradeSubscription(opts: {
  */
 export async function cancelSubscription(
   subscriptionId: string,
-  opts?: { cancelAtCycleEnd?: boolean },
+  opts?: { cancelAtCycleEnd?: boolean }
 ): Promise<{ status: string; endsAt: number | null }> {
   const rz = getRazorpayInstance()
   const cancelAtCycleEnd = opts?.cancelAtCycleEnd !== false

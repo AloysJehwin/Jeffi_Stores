@@ -50,15 +50,19 @@ async function resolveOriginPin(defaultOriginPin: string, pickupLocationName: st
 }
 
 async function callDelhiveryForCarton(
-  carton: { chargedWeightGrams: number; actualWeightGrams?: number; length_cm?: number; breadth_cm?: number; height_cm?: number },
+  carton: {
+    chargedWeightGrams: number
+    actualWeightGrams?: number
+    length_cm?: number
+    breadth_cm?: number
+    height_cm?: number
+  },
   destinationPin: string,
   isCod: boolean,
   originPin: string,
-  token: string,
+  token: string
 ) {
-  const cgmGrams = Number(carton.actualWeightGrams) > 0
-    ? Number(carton.actualWeightGrams)
-    : carton.chargedWeightGrams
+  const cgmGrams = Number(carton.actualWeightGrams) > 0 ? Number(carton.actualWeightGrams) : carton.chargedWeightGrams
   const params = new URLSearchParams({
     md: 'S',
     ss: 'Delivered',
@@ -71,7 +75,9 @@ async function callDelhiveryForCarton(
   // Dimensions are optional per the invoice-charges spec. Send them when known so Delhivery
   // applies its own volumetric divisor rather than relying on our pre-collapsed weight.
   const dims: Array<[string, number | undefined]> = [
-    ['l', carton.length_cm], ['b', carton.breadth_cm], ['h', carton.height_cm],
+    ['l', carton.length_cm],
+    ['b', carton.breadth_cm],
+    ['h', carton.height_cm],
   ]
   for (const [key, val] of dims) {
     if (Number(val) > 0) params.set(key, String(Math.round(Number(val))))
@@ -110,8 +116,12 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
   const originPin = await resolveOriginPin(bv.delhiveryOriginPincode, bv.pickupLocation)
 
   const subVariantIds: string[] = (cartItems || []).filter(i => i.subVariantId).map(i => i.subVariantId as string)
-  const variantIds: string[] = (cartItems || []).filter(i => i.variantId && !i.subVariantId).map(i => i.variantId as string)
-  const productIds: string[] = (cartItems || []).filter(i => !i.variantId && !i.subVariantId).map(i => i.productId as string)
+  const variantIds: string[] = (cartItems || [])
+    .filter(i => i.variantId && !i.subVariantId)
+    .map(i => i.variantId as string)
+  const productIds: string[] = (cartItems || [])
+    .filter(i => !i.variantId && !i.subVariantId)
+    .map(i => i.productId as string)
 
   const shipmentItems: ShipmentItem[] = []
 
@@ -137,9 +147,9 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
           weightGrams: resolveShipWeight(sv.weight_grams, bv),
           quantity: item.quantity || 1,
           storedDims: {
-            length_cm:  sv.length_cm  ? parseFloat(sv.length_cm)  : null,
+            length_cm: sv.length_cm ? parseFloat(sv.length_cm) : null,
             breadth_cm: sv.breadth_cm ? parseFloat(sv.breadth_cm) : null,
-            height_cm:  sv.height_cm  ? parseFloat(sv.height_cm)  : null,
+            height_cm: sv.height_cm ? parseFloat(sv.height_cm) : null,
           },
           variantName: sv.sub_variant_name,
         })
@@ -168,9 +178,9 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
           weightGrams: resolveShipWeight(v.weight_grams, bv),
           quantity: item.quantity || 1,
           storedDims: {
-            length_cm:  v.length_cm  ? parseFloat(v.length_cm)  : null,
+            length_cm: v.length_cm ? parseFloat(v.length_cm) : null,
             breadth_cm: v.breadth_cm ? parseFloat(v.breadth_cm) : null,
-            height_cm:  v.height_cm  ? parseFloat(v.height_cm)  : null,
+            height_cm: v.height_cm ? parseFloat(v.height_cm) : null,
           },
           variantName: v.variant_name,
         })
@@ -192,9 +202,9 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
           weightGrams: resolveShipWeight(p.weight_grams, bv),
           quantity: item.quantity || 1,
           storedDims: {
-            length_cm:  p.length_cm  ? parseFloat(p.length_cm)  : null,
+            length_cm: p.length_cm ? parseFloat(p.length_cm) : null,
             breadth_cm: p.breadth_cm ? parseFloat(p.breadth_cm) : null,
-            height_cm:  p.height_cm  ? parseFloat(p.height_cm)  : null,
+            height_cm: p.height_cm ? parseFloat(p.height_cm) : null,
           },
           variantName: p.name,
         })
@@ -213,9 +223,13 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
   const service = await checkPincodeServiceability(destinationPin, getCurrentTenantId() ?? undefined)
   if (!service.serviceable) {
     return {
-      charge: 0, codFee: 0, totalCharge: 0,
-      zone: '', source: 'unserviceable',
-      chargedWeightGrams: 0, cartonCount: 0,
+      charge: 0,
+      codFee: 0,
+      totalCharge: 0,
+      zone: '',
+      source: 'unserviceable',
+      chargedWeightGrams: 0,
+      cartonCount: 0,
       serviceable: false,
       serviceCod: false,
       servicePrepaid: false,
@@ -229,10 +243,16 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
 
   if (!deliverySettings.enabled) {
     return {
-      charge: 0, codFee: 0, totalCharge: 0,
-      zone: 'Free', source: 'admin_disabled',
-      chargedWeightGrams: totalWeightGrams, cartonCount: 0,
-      serviceable: true, serviceCod: service.cod, servicePrepaid: service.prepaid,
+      charge: 0,
+      codFee: 0,
+      totalCharge: 0,
+      zone: 'Free',
+      source: 'admin_disabled',
+      chargedWeightGrams: totalWeightGrams,
+      cartonCount: 0,
+      serviceable: true,
+      serviceCod: service.cod,
+      servicePrepaid: service.prepaid,
     }
   }
 
@@ -243,11 +263,17 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
     totalWeightGrams / 1000 < freeCeilingKg
   ) {
     return {
-      charge: 0, codFee: 0, totalCharge: 0,
-      zone: 'Free', source: 'free_threshold',
-      chargedWeightGrams: totalWeightGrams, cartonCount: 0,
+      charge: 0,
+      codFee: 0,
+      totalCharge: 0,
+      zone: 'Free',
+      source: 'free_threshold',
+      chargedWeightGrams: totalWeightGrams,
+      cartonCount: 0,
       freeShippingThreshold: deliverySettings.freeThreshold,
-      serviceable: true, serviceCod: service.cod, servicePrepaid: service.prepaid,
+      serviceable: true,
+      serviceCod: service.cod,
+      servicePrepaid: service.prepaid,
     }
   }
 
@@ -312,7 +338,9 @@ export async function computeShippingRate(input: RateInput): Promise<RateBreakdo
 
   // COD fee is computed separately — NOT folded into totalCharge so callers can show it as its own line.
   const codFee = isCod
-    ? Math.round(Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * (typeof subtotal === 'number' ? subtotal : 0)) * 100) / 100
+    ? Math.round(
+        Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * (typeof subtotal === 'number' ? subtotal : 0)) * 100
+      ) / 100
     : 0
 
   // Carton-derived, so a per-kg rate prices identically whether the carrier quote succeeded,

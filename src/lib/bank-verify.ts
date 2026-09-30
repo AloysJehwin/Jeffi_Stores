@@ -51,7 +51,11 @@ export async function verifyBankAccountFAV(ownerId: string, details: BankDetails
     if (fmt.status === 'failed') return fmt
     try {
       await saveBankVerification({
-        ownerId, ...details, status: 'unverified', ref: 'route_pending', verifiedName: details.holderName,
+        ownerId,
+        ...details,
+        status: 'unverified',
+        ref: 'route_pending',
+        verifiedName: details.holderName,
       })
     } catch {
       // This row is the only record that the account was given — unlike the FAV path there is no
@@ -94,15 +98,21 @@ export async function verifyBankAccountFAV(ownerId: string, details: BankDetails
     const registeredName = fav.results?.registered_name ?? fav.fund_account?.bank_account?.name ?? details.holderName
 
     if (accountStatus === 'invalid') {
-      await pool.query(
-        `UPDATE tenant_bank_accounts SET verification_status='failed', verification_ref=$1, updated_at=now() WHERE owner_id=$2`,
-        [fav.id, ownerId]
-      ).catch(() => {})
+      await pool
+        .query(
+          `UPDATE tenant_bank_accounts SET verification_status='failed', verification_ref=$1, updated_at=now() WHERE owner_id=$2`,
+          [fav.id, ownerId]
+        )
+        .catch(() => {})
       return { status: 'failed', reason: 'Bank account not found or invalid' }
     }
 
     await saveBankVerification({
-      ownerId, ...details, status: 'verified', ref: fav.id, verifiedName: registeredName,
+      ownerId,
+      ...details,
+      status: 'verified',
+      ref: fav.id,
+      verifiedName: registeredName,
     }).catch(() => {})
 
     return { status: 'verified', verifiedName: registeredName ?? details.holderName, ref: fav.id }

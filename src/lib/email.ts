@@ -2,7 +2,17 @@ import 'server-only'
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFromAsync, adminMailFrom, currentBrandName, currentBrandNameAsync, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeAddressLine, storeBaseUrlAsync } from './brand'
+import {
+  customerMailFromAsync,
+  adminMailFrom,
+  currentBrandName,
+  currentBrandNameAsync,
+  currentAdminBaseUrl,
+  platformAdminEmail,
+  storeContactLine,
+  storeAddressLine,
+  storeBaseUrlAsync,
+} from './brand'
 import { createAdminNotification } from './admin-notify'
 import { mailShell } from './mail-template'
 
@@ -39,7 +49,9 @@ async function getAdminNotificationEmails(): Promise<string> {
       []
     )
     if (rows.length > 0) return rows.map(r => r.email).join(', ')
-  } catch { /* fall back to ADMIN_EMAIL below */ }
+  } catch {
+    /* fall back to ADMIN_EMAIL below */
+  }
   // Default is the administrative mailbox on the platform domain, not a personal address.
   return process.env.ADMIN_EMAIL || 'admin@jeffistores.in'
 }
@@ -183,7 +195,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
 }
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
@@ -207,12 +219,16 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
         <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
           day: '2-digit',
           month: 'short',
-          year: 'numeric'
+          year: 'numeric',
         })}</p>
         <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">CONFIRMED</span></p>
-        ${order.taxable_amount > 0 ? `
+        ${
+          order.taxable_amount > 0
+            ? `
         <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
-        ` : ''}
+        `
+            : ''
+        }
       </div>
 
       <h3>Order Items</h3>
@@ -225,26 +241,35 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           </tr>
         </thead>
         <tbody>
-          ${orderItems.map(item => `
+          ${orderItems
+            .map(
+              item => `
             <tr>
               <td>${item.product_name}</td>
               <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
               <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
             </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
         </tbody>
       </table>
 
       <div class="total">
-        ${order.taxable_amount > 0 ? `
+        ${
+          order.taxable_amount > 0
+            ? `
         <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-        ${order.is_igst
-          ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
-          : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+        ${
+          order.is_igst
+            ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+            : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
              <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
         }
         <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
-        ` : ''}
+        `
+            : ''
+        }
         <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
       </div>
 
@@ -330,7 +355,9 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
           </tr>
         </thead>
         <tbody>
-          ${orderItems.map(item => `
+          ${orderItems
+            .map(
+              item => `
             <tr>
               <td>${item.product_name}</td>
               <td>${item.product_sku}</td>
@@ -338,7 +365,9 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
               <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
               <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
             </tr>
-          `).join('')}
+          `
+            )
+            .join('')}
           <tr style="background-color: #fff3cd; font-weight: bold;">
             <td colspan="4" style="text-align: right;">Total:</td>
             <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -385,7 +414,7 @@ export async function sendOrderStatusUpdate(
   newStatus: string,
   previousStatus?: string,
   invoicePdfBuffer?: Buffer | null,
-  cancellationNote?: string,
+  cancellationNote?: string
 ) {
   const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine()
@@ -424,12 +453,14 @@ export async function sendOrderStatusUpdate(
     },
     cancelled: {
       title: 'Order Cancelled',
-      message: 'Your order has been cancelled. If you did not request this cancellation, please contact us immediately.',
+      message:
+        'Your order has been cancelled. If you did not request this cancellation, please contact us immediately.',
       color: '#ef4444',
     },
     cancel_requested: {
       title: 'Cancellation Request Received',
-      message: 'We have received your cancellation request. Our team will review it and notify you once it is approved or rejected.',
+      message:
+        'We have received your cancellation request. Our team will review it and notify you once it is approved or rejected.',
       color: '#f97316',
     },
     cancel_rejected: {
@@ -459,12 +490,16 @@ export async function sendOrderStatusUpdate(
       <p>Hello ${customerName},</p>
       <p>${statusInfo.message}</p>
 
-      ${cancellationNote ? `
+      ${
+        cancellationNote
+          ? `
       <div class="danger">
         <h4 style="margin-top: 0; color: #b91c1c;">Reason</h4>
         <p style="margin: 0;">${cancellationNote}</p>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="status-badge">${newStatus}</div>
 
@@ -475,11 +510,13 @@ export async function sendOrderStatusUpdate(
         ${previousStatus ? `<p><strong>Previous Status:</strong> ${previousStatus}</p>` : ''}
         <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', {
           dateStyle: 'long',
-          timeStyle: 'short'
+          timeStyle: 'short',
         })}</p>
       </div>
 
-      ${newStatus === 'shipped' ? `
+      ${
+        newStatus === 'shipped'
+          ? `
         <div class="info">
           <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
           <p>Track your shipment live by visiting your order page:</p>
@@ -489,14 +526,20 @@ export async function sendOrderStatusUpdate(
             </a>
           </p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
-      ${newStatus === 'delivered' ? `
+      ${
+        newStatus === 'delivered'
+          ? `
         <div class="info">
           <h4 style="margin-top: 0;">Thank You!</h4>
           <p>We hope you're satisfied with your purchase. If you have any questions or concerns, please don't hesitate to contact us.</p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="cta">
         <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
@@ -508,11 +551,15 @@ export async function sendOrderStatusUpdate(
     `,
     footerLines: [address, contactLine],
   })
-  const attachments = invoicePdfBuffer ? [{
-    filename: `Invoice-${orderNumber}.pdf`,
-    content: invoicePdfBuffer,
-    contentType: 'application/pdf',
-  }] : []
+  const attachments = invoicePdfBuffer
+    ? [
+        {
+          filename: `Invoice-${orderNumber}.pdf`,
+          content: invoicePdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ]
+    : []
 
   try {
     const info = await sendAuditedMail({
@@ -557,7 +604,8 @@ export async function sendPaymentStatusUpdate(
     },
     failed: {
       title: 'Payment Failed',
-      message: 'Unfortunately, your payment could not be processed. You have 10 minutes from when the order was placed to retry payment before the order is automatically cancelled.',
+      message:
+        'Unfortunately, your payment could not be processed. You have 10 minutes from when the order was placed to retry payment before the order is automatically cancelled.',
       color: '#ef4444',
     },
     refunded: {
@@ -603,38 +651,54 @@ export async function sendPaymentStatusUpdate(
         <p><strong>Payment Status:</strong> ${newPaymentStatus}</p>
         <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', {
           dateStyle: 'long',
-          timeStyle: 'short'
+          timeStyle: 'short',
         })}</p>
       </div>
 
-      ${newPaymentStatus === 'paid' ? `
+      ${
+        newPaymentStatus === 'paid'
+          ? `
         <div class="info">
           <h4 style="margin-top: 0;">Payment Confirmed</h4>
           <p>Your order will now be processed and shipped as per the delivery schedule.</p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
-      ${newPaymentStatus === 'pending' ? `
+      ${
+        newPaymentStatus === 'pending'
+          ? `
         <div class="info">
           <h4 style="margin-top: 0;">Action Required</h4>
           <p>Please complete your payment to avoid order cancellation. Contact us if you need assistance.</p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
-      ${newPaymentStatus === 'refunded' ? `
+      ${
+        newPaymentStatus === 'refunded'
+          ? `
         <div class="info">
           <h4 style="margin-top: 0;">Refund Processed</h4>
           <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
-      ${newPaymentStatus === 'failed' ? `
+      ${
+        newPaymentStatus === 'failed'
+          ? `
         <div class="danger">
           <h4 style="margin-top: 0; color: #ef4444;">Action Required &mdash; 10 Minute Window</h4>
           <p>You have <strong>10 minutes</strong> from when the order was placed to complete payment. After that, the order will be automatically cancelled and items returned to your cart.</p>
           <p>Click the button below to retry payment now.</p>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="cta">
         <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
@@ -680,8 +744,9 @@ export async function sendAdminCertificateEmail(
   if (mode === 'portal') {
     return sendCertInviteEmail(email, displayName, role, tenant)
   }
-  const portalNote = mode === 'both'
-    ? `
+  const portalNote =
+    mode === 'both'
+      ? `
             <div class="info">
               <strong>Prefer to download it later?</strong>
               <p style="margin: 8px 0 0 0;">This certificate is also available once from the certificate portal at
@@ -689,15 +754,13 @@ export async function sendAdminCertificateEmail(
                 Sign in there with <strong>${email}</strong> (Google, or a one-time code sent to this address).</p>
             </div>
 `
-    : ''
+      : ''
   // Tenant owners are an ecom communication, so they come from ecommerce@; the platform's
   // own admin certs keep the existing admin sender.
   const from = tenant
     ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`
     : adminMailFrom()
-  const subject = tenant
-    ? `Your admin certificate for ${tenant.storeName}`
-    : 'Your Admin Certificate - Jeffi Stores'
+  const subject = tenant ? `Your admin certificate for ${tenant.storeName}` : 'Your Admin Certificate - Jeffi Stores'
   const certFileSlug = (displayName || email).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-|-$/g, '') || 'admin'
   // A tenant owner administers their own store on their own host. Sending them to the
   // platform's admin panel gave them a certificate their browser was never asked for, and a
@@ -757,10 +820,12 @@ export async function sendAdminCertificateEmail(
 ${portalNote}
       <p>If you have any questions, contact the super admin.</p>
     `,
-    footerLines: tenant ? [] : [
-      'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
-      `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
-    ],
+    footerLines: tenant
+      ? []
+      : [
+          'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
+          `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
+        ],
   })
   const attachments = [
     {
@@ -802,7 +867,7 @@ export async function sendCertInviteEmail(
   const platformDomain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
   const headerName = tenant ? tenant.storeName : storeName()
   const subject = `Access your admin certificate for ${headerName}`
-  const esc = (s: string) => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string))
+  const esc = (s: string) => String(s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] as string)
   const html = mailShell({
     brand: headerName,
     kicker: 'Admin Panel Access',
@@ -826,10 +891,12 @@ export async function sendCertInviteEmail(
 
       <p class="muted">If the button doesn't work, go to <a href="${portalUrl}" style="color:#2563eb;">${portalUrl}</a></p>
     `,
-    footerLines: tenant ? [] : [
-      'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
-      `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
-    ],
+    footerLines: tenant
+      ? []
+      : [
+          'SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092',
+          `Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}`,
+        ],
   })
   try {
     const info = await sendAuditedMail({
@@ -886,12 +953,16 @@ export async function sendNewReviewNotification(review: any, user: any, product:
             <span class="stars">${review.rating}/5</span>
           </div>
 
-          ${review.is_verified_purchase ? `
+          ${
+            review.is_verified_purchase
+              ? `
           <div class="info-row">
             <span class="info-label">Status:</span>
             <span style="color: #28a745; font-weight: bold;">Verified Purchase</span>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <div class="info-row">
             <span class="info-label">Submitted:</span>
@@ -900,16 +971,20 @@ export async function sendNewReviewNotification(review: any, user: any, product:
               month: 'long',
               day: 'numeric',
               hour: '2-digit',
-              minute: '2-digit'
+              minute: '2-digit',
             })}</span>
           </div>
 
-          ${review.title ? `
+          ${
+            review.title
+              ? `
           <div style="margin-top: 20px;">
             <strong>Review Title:</strong>
             <p style="margin: 5px 0; font-size: 16px;">${review.title}</p>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <div class="warning">
             <strong>Review Comment:</strong>
@@ -946,7 +1021,14 @@ export async function sendNewReviewNotification(review: any, user: any, product:
 }
 
 export async function sendPaymentFailedAdminNotification(
-  order: { order_number: string; id: string; customer_name: string; customer_email: string; total_amount: string | number; customer_phone?: string },
+  order: {
+    order_number: string
+    id: string
+    customer_name: string
+    customer_email: string
+    total_amount: string | number
+    customer_phone?: string
+  },
   errorDescription?: string
 ) {
   const adminEmail = await getAdminNotificationEmails()
@@ -1030,9 +1112,7 @@ export async function sendAdminContactEmail(
   const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const messageHtml = opts.isHtml
-    ? message
-    : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const messageHtml = opts.isHtml ? message : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: email,
@@ -1164,18 +1244,24 @@ export async function sendReturnStatusEmail(
   orderNumber: string,
   orderId: string,
   event: ReturnEmailEvent,
-  extra?: { adminNotes?: string; replacementOrderNumber?: string; returnType?: string; reason?: string; appUrl?: string }
+  extra?: {
+    adminNotes?: string
+    replacementOrderNumber?: string
+    returnType?: string
+    reason?: string
+    appUrl?: string
+  }
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = extra?.appUrl || await storeBaseUrlAsync()
+  const appUrl = extra?.appUrl || (await storeBaseUrlAsync())
   const orderLink = `${appUrl}/account/orders/${orderId}`
   const to = Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail
 
   const subjects: Record<ReturnEmailEvent, string> = {
-    requested_admin:    `Return/Replacement Request — Order #${orderNumber}`,
-    approved:           `Your Return Request Has Been Approved — Order #${orderNumber}`,
-    rejected:           `Your Return Request Was Not Approved — Order #${orderNumber}`,
-    received:           `We've Received Your Return — Order #${orderNumber}`,
-    replacement_created:`Your Replacement Order Has Been Created — Order #${orderNumber}`,
+    requested_admin: `Return/Replacement Request — Order #${orderNumber}`,
+    approved: `Your Return Request Has Been Approved — Order #${orderNumber}`,
+    rejected: `Your Return Request Was Not Approved — Order #${orderNumber}`,
+    received: `We've Received Your Return — Order #${orderNumber}`,
+    replacement_created: `Your Replacement Order Has Been Created — Order #${orderNumber}`,
   }
 
   const bodies: Record<ReturnEmailEvent, string> = {
@@ -1251,7 +1337,7 @@ export async function sendPaymentRetryEmail(
   customerEmail: string,
   customerName: string,
   orderNumber: string,
-  orderTotal: number,
+  orderTotal: number
 ) {
   const BASE_URL = await storeBaseUrlAsync()
   const shopUrl = `${BASE_URL}/products`
@@ -1298,7 +1384,7 @@ export async function sendInvoiceFinalizedEmail(
   orderNumber?: string,
   viewUrl?: string
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
@@ -1349,17 +1435,20 @@ export async function sendPurchaseOrderEmail(
   items: Array<{ product_name: string; variant_name?: string | null; quantity: number; unit_cost: number }>,
   viewUrl?: string
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const itemRows = items.map(it =>
-    `<tr>
+  const itemRows = items
+    .map(
+      it =>
+        `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
     </tr>`
-  ).join('')
+    )
+    .join('')
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
@@ -1412,17 +1501,20 @@ export async function sendPOReceiveNotificationEmail(
   newStatus: string,
   items: Array<{ product_name: string; variant_name?: string | null; quantity_received: number; unit_cost: number }>
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const statusLabel = newStatus === 'received' ? 'Fully Received' : 'Partially Received'
-  const itemRows = items.map(it =>
-    `<tr>
+  const itemRows = items
+    .map(
+      it =>
+        `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity_received}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
     </tr>`
-  ).join('')
+    )
+    .join('')
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
@@ -1473,7 +1565,7 @@ export async function sendQuotationFinalizedEmail(
   totalAmount: number,
   viewUrl: string
 ) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
@@ -1667,7 +1759,9 @@ export async function sendOrderDelayNotification(args: {
       <p>If you have any questions, just reply to this email and we'll get back to you.</p>
       <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The ${brand} team</p>
     `,
-    footerLines: [`This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.`],
+    footerLines: [
+      `This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.`,
+    ],
   })
   const text = `Hi ${customerName},
 
@@ -1730,7 +1824,9 @@ export async function sendProductAnnouncementEmail(args: {
     .replace(/<\/?[a-z][^>]*>/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
-  const cards = products.map(p => `
+  const cards = products
+    .map(
+      p => `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#ffffff;">
       <tr>
         ${p.primary_image_url ? `<td width="120" style="vertical-align:top;padding:12px;"><img src="${escapeHtml(p.primary_image_url)}" alt="" width="100" height="100" style="display:block;border-radius:6px;object-fit:cover;"></td>` : ''}
@@ -1740,7 +1836,9 @@ export async function sendProductAnnouncementEmail(args: {
           <p style="margin:6px 0 0;font-weight:600;color:#0f172a;font-size:14px;">₹${escapeHtml(p.price)}</p>
         </td>
       </tr>
-    </table>`).join('')
+    </table>`
+    )
+    .join('')
 
   const html = mailShell({
     brand,
@@ -1752,7 +1850,9 @@ export async function sendProductAnnouncementEmail(args: {
       ${cards}
       <p class="muted">Visit <a href="${siteUrl}" style="color:#2563eb;">${escapeHtml(brand)}</a> for the full catalogue.</p>
     `,
-    footerLines: [`You are receiving this because you opted in to product updates from ${escapeHtml(brand)}. To stop receiving these, reply to this email with "unsubscribe".`],
+    footerLines: [
+      `You are receiving this because you opted in to product updates from ${escapeHtml(brand)}. To stop receiving these, reply to this email with "unsubscribe".`,
+    ],
   })
 
   const textProducts = products.map(p => `• ${p.name} — ₹${p.price}\n  ${siteUrl}/products/${p.slug}`).join('\n\n')
@@ -1793,13 +1893,14 @@ export async function sendVariantChangeRequestedEmail(params: {
   const brand = await currentBrandNameAsync()
   const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
-  const diffLine = params.settlementType === 'refund'
-    ? `We'll <strong>refund &#8377;${absDiff.toFixed(2)}</strong> to your original payment once you confirm.`
-    : params.settlementType === 'collect'
-      ? `An additional <strong>&#8377;${absDiff.toFixed(2)}</strong> is payable — you'll be asked to pay it securely when you confirm.`
-      : params.settlementType === 'cod_adjust'
-        ? `Your order total will be updated to <strong>&#8377;${params.newTotal.toFixed(2)}</strong> (payable on delivery).`
-        : `There is no change to your total.`
+  const diffLine =
+    params.settlementType === 'refund'
+      ? `We'll <strong>refund &#8377;${absDiff.toFixed(2)}</strong> to your original payment once you confirm.`
+      : params.settlementType === 'collect'
+        ? `An additional <strong>&#8377;${absDiff.toFixed(2)}</strong> is payable — you'll be asked to pay it securely when you confirm.`
+        : params.settlementType === 'cod_adjust'
+          ? `Your order total will be updated to <strong>&#8377;${params.newTotal.toFixed(2)}</strong> (payable on delivery).`
+          : `There is no change to your total.`
 
   const subject = `Action needed: variant change on order ${params.orderNumber}`
   const html = mailShell({
@@ -1855,14 +1956,19 @@ export async function sendOperationalReport(opts: {
   kind?: string
 }): Promise<void> {
   const { sendAuditedMail } = await import('./mail-audit')
-  const esc = (t: unknown) => String(t ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const esc = (t: unknown) =>
+    String(t ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
 
   const errs = opts.errors ?? []
   const shown = errs.slice(0, 20)
   const rows = Object.entries(opts.stats ?? {})
-    .map(([k, v]) => `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">${esc(k)}</td>
-        <td style="padding:4px 0;font-weight:bold;color:#111827">${esc(v)}</td></tr>`)
+    .map(
+      ([k, v]) => `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">${esc(k)}</td>
+        <td style="padding:4px 0;font-weight:bold;color:#111827">${esc(v)}</td></tr>`
+    )
     .join('')
 
   const errorBlock = shown.length

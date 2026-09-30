@@ -44,7 +44,10 @@ function createInMemoryRedis(): any {
     async get(key: string): Promise<string | null> {
       const entry = store.get(key)
       if (!entry) return null
-      if (entry.expiry && Date.now() > entry.expiry) { store.delete(key); return null }
+      if (entry.expiry && Date.now() > entry.expiry) {
+        store.delete(key)
+        return null
+      }
       return entry.value
     },
     async del(key: string): Promise<number> {

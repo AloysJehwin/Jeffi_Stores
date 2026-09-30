@@ -82,8 +82,28 @@ export interface InvoiceBuyerAddress {
 
 function numberToWords(num: number): string {
   if (num === 0) return 'Zero'
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
-    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
+  const ones = [
+    '',
+    'One',
+    'Two',
+    'Three',
+    'Four',
+    'Five',
+    'Six',
+    'Seven',
+    'Eight',
+    'Nine',
+    'Ten',
+    'Eleven',
+    'Twelve',
+    'Thirteen',
+    'Fourteen',
+    'Fifteen',
+    'Sixteen',
+    'Seventeen',
+    'Eighteen',
+    'Nineteen',
+  ]
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
 
   function convertGroup(n: number): string {
@@ -125,15 +145,44 @@ function formatDate(dateStr: string): string {
 
 function getStateCode(stateName: string): string {
   const map: Record<string, string> = {
-    'jammu and kashmir': '01', 'himachal pradesh': '02', 'punjab': '03', 'chandigarh': '04',
-    'uttarakhand': '05', 'haryana': '06', 'delhi': '07', 'rajasthan': '08', 'uttar pradesh': '09',
-    'bihar': '10', 'sikkim': '11', 'arunachal pradesh': '12', 'nagaland': '13', 'manipur': '14',
-    'mizoram': '15', 'tripura': '16', 'meghalaya': '17', 'assam': '18', 'west bengal': '19',
-    'jharkhand': '20', 'odisha': '21', 'chhattisgarh': '22', 'madhya pradesh': '23',
-    'gujarat': '24', 'daman and diu': '25', 'dadra and nagar haveli': '26', 'maharashtra': '27',
-    'andhra pradesh': '28', 'karnataka': '29', 'goa': '30', 'lakshadweep': '31', 'kerala': '32',
-    'tamil nadu': '33', 'puducherry': '34', 'andaman and nicobar': '35', 'telangana': '36',
-    'andhra pradesh (new)': '37', 'ladakh': '38',
+    'jammu and kashmir': '01',
+    'himachal pradesh': '02',
+    punjab: '03',
+    chandigarh: '04',
+    uttarakhand: '05',
+    haryana: '06',
+    delhi: '07',
+    rajasthan: '08',
+    'uttar pradesh': '09',
+    bihar: '10',
+    sikkim: '11',
+    'arunachal pradesh': '12',
+    nagaland: '13',
+    manipur: '14',
+    mizoram: '15',
+    tripura: '16',
+    meghalaya: '17',
+    assam: '18',
+    'west bengal': '19',
+    jharkhand: '20',
+    odisha: '21',
+    chhattisgarh: '22',
+    'madhya pradesh': '23',
+    gujarat: '24',
+    'daman and diu': '25',
+    'dadra and nagar haveli': '26',
+    maharashtra: '27',
+    'andhra pradesh': '28',
+    karnataka: '29',
+    goa: '30',
+    lakshadweep: '31',
+    kerala: '32',
+    'tamil nadu': '33',
+    puducherry: '34',
+    'andaman and nicobar': '35',
+    telangana: '36',
+    'andhra pradesh (new)': '37',
+    ladakh: '38',
   }
   return map[stateName.toLowerCase().trim()] || ''
 }
@@ -151,11 +200,19 @@ function drawVLine(doc: any, x: number, y1: number, y2: number) {
 }
 
 function renderAddressBlock(
-  doc: any, label: string, addr: InvoiceBuyerAddress, buyerGstin: string | null,
-  LM: number, pw: number, startY: number
+  doc: any,
+  label: string,
+  addr: InvoiceBuyerAddress,
+  buyerGstin: string | null,
+  LM: number,
+  pw: number,
+  startY: number
 ): number {
   let y = startY
-  doc.font('Helvetica').fontSize(6).text(label, LM + 3, y + 2, { width: pw - 6 })
+  doc
+    .font('Helvetica')
+    .fontSize(6)
+    .text(label, LM + 3, y + 2, { width: pw - 6 })
   y += 10
   doc.font('Helvetica-Bold').fontSize(7)
   const fullAddr = [
@@ -164,20 +221,27 @@ function renderAddressBlock(
     addr.address_line2,
     addr.city,
     `${addr.state} - ${addr.postal_code}, India`,
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
   doc.text(fullAddr, LM + 3, y, { width: pw * 0.55 - 6 })
   y += doc.heightOfString(fullAddr, { width: pw * 0.55 - 6 }) + 2
 
   const stateCode = getStateCode(addr.state)
   if (buyerGstin) {
-    doc.font('Helvetica').fontSize(7).text(`GSTIN/UIN      : ${buyerGstin}`, LM + 3, y, { width: pw * 0.55 - 6 })
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .text(`GSTIN/UIN      : ${buyerGstin}`, LM + 3, y, { width: pw * 0.55 - 6 })
     y += 9
     const pan = buyerGstin.substring(2, 12)
     doc.text(`PAN/IT No       : ${pan}`, LM + 3, y, { width: pw * 0.55 - 6 })
     y += 9
   }
   doc.font('Helvetica').fontSize(7)
-  doc.text(`State Name      : ${addr.state}${stateCode ? ', Code : ' + stateCode : ''}`, LM + 3, y, { width: pw * 0.55 - 6 })
+  doc.text(`State Name      : ${addr.state}${stateCode ? ', Code : ' + stateCode : ''}`, LM + 3, y, {
+    width: pw * 0.55 - 6,
+  })
   y += 9
   if (addr.phone) {
     doc.text(`Phone            : ${addr.phone}`, LM + 3, y, { width: pw * 0.55 - 6 })
@@ -205,7 +269,7 @@ export async function generateInvoicePDF(
   billingAddress?: InvoiceBuyerAddress,
   isCancelled?: boolean,
   voidLabel?: string,
-  taxFree?: boolean,
+  taxFree?: boolean
 ): Promise<Buffer> {
   const nicQRBuf = order.signed_qr_code ? await buildQRBuffer(order.signed_qr_code, 80) : null
   const payQRBuf = order.payment_link_url ? await buildQRBuffer(order.payment_link_url, 80) : null
@@ -228,7 +292,10 @@ export async function generateInvoicePDF(
 
     let y = 28
 
-    doc.font(FB).fontSize(12).text(taxFree ? 'Bill of Supply' : 'Tax Invoice', LM, y, { width: pw, align: 'center' })
+    doc
+      .font(FB)
+      .fontSize(12)
+      .text(taxFree ? 'Bill of Supply' : 'Tax Invoice', LM, y, { width: pw, align: 'center' })
     y += 16
 
     const topY = y
@@ -239,7 +306,10 @@ export async function generateInvoicePDF(
 
     const sellerX = LM + 3
     let sy = topY + 3
-    doc.font(FB).fontSize(9).text(business.tradeName.toUpperCase(), sellerX, sy, { width: sellerW - 6 })
+    doc
+      .font(FB)
+      .fontSize(9)
+      .text(business.tradeName.toUpperCase(), sellerX, sy, { width: sellerW - 6 })
     sy += 11
     doc.font(F).fontSize(7)
     const addressLines = business.address.split(',').map(s => s.trim())
@@ -264,11 +334,31 @@ export async function generateInvoicePDF(
     const metaRowH = 18
     const metaRows = [
       { left: 'Invoice No.', leftVal: order.invoice_number, right: 'Dated', rightVal: formatDate(order.invoice_date) },
-      { left: 'Delivery Note', leftVal: order.payment_transaction_id || order.tracking_number || '', right: 'Mode/Terms of Payment', rightVal: order.payment_mode || 'Online Payment' },
+      {
+        left: 'Delivery Note',
+        leftVal: order.payment_transaction_id || order.tracking_number || '',
+        right: 'Mode/Terms of Payment',
+        rightVal: order.payment_mode || 'Online Payment',
+      },
       { left: 'Reference No. & Date.', leftVal: '', right: 'Other References', rightVal: '' },
-      { left: "Buyer's Order No.", leftVal: order.order_number, right: 'Dated', rightVal: order.order_date ? formatDate(order.order_date) : '' },
-      { left: 'Dispatch Doc No.', leftVal: order.tracking_number || '', right: 'Delivery Note Date', rightVal: order.shipped_at ? formatDate(order.shipped_at) : '' },
-      { left: 'Dispatched through', leftVal: order.shipping_method || '', right: 'Destination', rightVal: order.destination || '' },
+      {
+        left: "Buyer's Order No.",
+        leftVal: order.order_number,
+        right: 'Dated',
+        rightVal: order.order_date ? formatDate(order.order_date) : '',
+      },
+      {
+        left: 'Dispatch Doc No.',
+        leftVal: order.tracking_number || '',
+        right: 'Delivery Note Date',
+        rightVal: order.shipped_at ? formatDate(order.shipped_at) : '',
+      },
+      {
+        left: 'Dispatched through',
+        leftVal: order.shipping_method || '',
+        right: 'Destination',
+        rightVal: order.destination || '',
+      },
     ]
 
     let my = topY
@@ -285,9 +375,17 @@ export async function generateInvoicePDF(
     }
 
     drawRect(doc, metaX, my, metaW, metaRowH)
-    doc.font(F).fontSize(6).text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
+    doc
+      .font(F)
+      .fontSize(6)
+      .text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
     if (order.estimated_delivery_date) {
-      doc.font(FB).fontSize(7).text(`Expected Delivery: ${formatDate(order.estimated_delivery_date)}`, metaX + 2, my + 9, { width: metaW - 4 })
+      doc
+        .font(FB)
+        .fontSize(7)
+        .text(`Expected Delivery: ${formatDate(order.estimated_delivery_date)}`, metaX + 2, my + 9, {
+          width: metaW - 4,
+        })
     }
     my += metaRowH
 
@@ -298,13 +396,22 @@ export async function generateInvoicePDF(
     if (order.irn) {
       const irnRowH = 13
       drawRect(doc, LM, y, pw, irnRowH)
-      doc.font(F).fontSize(6).text('IRN :', LM + 3, y + 3, { continued: true })
+      doc
+        .font(F)
+        .fontSize(6)
+        .text('IRN :', LM + 3, y + 3, { continued: true })
       doc.font(FB).fontSize(6).text(` ${order.irn}`, { continued: false })
       if (order.irn_ack_no) {
-        doc.font(F).fontSize(6).text(`Ack No: ${order.irn_ack_no}`, LM + pw * 0.55, y + 3, { width: pw * 0.28 })
+        doc
+          .font(F)
+          .fontSize(6)
+          .text(`Ack No: ${order.irn_ack_no}`, LM + pw * 0.55, y + 3, { width: pw * 0.28 })
       }
       if (order.irn_ack_dt) {
-        doc.font(F).fontSize(6).text(`Ack Date: ${formatDate(order.irn_ack_dt)}`, LM + pw * 0.83, y + 3, { width: pw * 0.17 })
+        doc
+          .font(F)
+          .fontSize(6)
+          .text(`Ack Date: ${formatDate(order.irn_ack_dt)}`, LM + pw * 0.83, y + 3, { width: pw * 0.17 })
       }
       y += irnRowH
     }
@@ -312,7 +419,10 @@ export async function generateInvoicePDF(
     if (order.eway_bill_no) {
       const ewbRowH = 12
       drawRect(doc, LM, y, pw, ewbRowH)
-      doc.font(F).fontSize(6).text('E-Way Bill No :', LM + 3, y + 3, { continued: true })
+      doc
+        .font(F)
+        .fontSize(6)
+        .text('E-Way Bill No :', LM + 3, y + 3, { continued: true })
       doc.font(FB).fontSize(6).text(` ${order.eway_bill_no}`)
       y += ewbRowH
     }
@@ -340,7 +450,9 @@ export async function generateInvoicePDF(
 
     const rawTotal = itemCols.reduce((s, c) => s + c.w, 0)
     const colScale = pw / rawTotal
-    itemCols.forEach(c => { c.w = Math.round(c.w * colScale) })
+    itemCols.forEach(c => {
+      c.w = Math.round(c.w * colScale)
+    })
     const drift = pw - itemCols.reduce((s, c) => s + c.w, 0)
     itemCols[itemCols.length - 1].w += drift
 
@@ -377,7 +489,10 @@ export async function generateInvoicePDF(
     function checkPageBreak(neededHeight: number) {
       if (y + neededHeight > pageBottom) {
         closeTableSegment()
-        doc.font(FI).fontSize(6).text('Continued on next page...', LM, y + 2, { width: pw, align: 'center' })
+        doc
+          .font(FI)
+          .fontSize(6)
+          .text('Continued on next page...', LM, y + 2, { width: pw, align: 'center' })
         doc.addPage()
         y = LM
         tableTop = y
@@ -461,59 +576,112 @@ export async function generateInvoicePDF(
     doc.font(F).fontSize(7)
     // Tax-free (Bill of Supply): the summary "taxable value" is the net line
     // total (there is no GST split), not the persisted taxable_amount (which is 0).
-    const summaryTaxable = taxFree ? (itemsSubtotal - bizDiscount) : order.taxable_amount
+    const summaryTaxable = taxFree ? itemsSubtotal - bizDiscount : order.taxable_amount
     doc.text(fmt(summaryTaxable), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
     y += rowH
 
     if (!taxFree && order.is_igst) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('IGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(fmt(order.igst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('IGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(fmt(order.igst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     } else if (!taxFree) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('CGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(fmt(order.cgst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('CGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(fmt(order.cgst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
 
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('SGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(fmt(order.sgst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('SGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(fmt(order.sgst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 
-    const roundOff = order.total_amount - (summaryTaxable + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0) - (order.business_discount_amount || 0))
+    const roundOff =
+      order.total_amount -
+      (summaryTaxable +
+        order.cgst_amount +
+        order.sgst_amount +
+        order.igst_amount +
+        (order.shipping_amount || 0) -
+        (order.discount_amount || 0) -
+        (order.business_discount_amount || 0))
     if (order.discount_amount > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(`-${fmt(order.discount_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(`-${fmt(order.discount_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
     if ((order.business_discount_amount || 0) > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('BUSINESS DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(`-${fmt(order.business_discount_amount!)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('BUSINESS DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(`-${fmt(order.business_discount_amount!)}`, amountColX + 2, y + 2, {
+          width: amountColW - 4,
+          align: 'right',
+        })
       y += rowH
     }
 
     if (order.shipping_amount > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('DELIVERY CHARGES', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(fmt(order.shipping_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('DELIVERY CHARGES', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(fmt(order.shipping_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 
     if (Math.abs(roundOff) >= 0.01) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('ROUND OFF', descLabelX, y + 2, { width: itemCols[1].w - 12 })
-      doc.font(F).fontSize(7).text(fmt(roundOff), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc
+        .font(FBI)
+        .fontSize(8)
+        .text('ROUND OFF', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc
+        .font(F)
+        .fontSize(7)
+        .text(fmt(roundOff), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 
@@ -521,7 +689,10 @@ export async function generateInvoicePDF(
     const totalRowY = y
     drawHLine(doc, LM, R, y)
     y += 3
-    doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
+    doc
+      .font(FB)
+      .fontSize(7)
+      .text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
     const totalStr = fmt(order.total_amount)
     // Check if "Rs. X" fits on one line; if not, draw Rs. + amount stacked
     doc.font(FB).fontSize(9)
@@ -553,168 +724,211 @@ export async function generateInvoicePDF(
 
     ensureSpace(26)
     const wordsY = y
-    doc.font(F).fontSize(7).text('Amount Chargeable (in words)', LM + 3, y + 2)
-    doc.font(F).fontSize(7).text('E. & O.E', R - 50, y + 2, { width: 48, align: 'right' })
+    doc
+      .font(F)
+      .fontSize(7)
+      .text('Amount Chargeable (in words)', LM + 3, y + 2)
+    doc
+      .font(F)
+      .fontSize(7)
+      .text('E. & O.E', R - 50, y + 2, { width: 48, align: 'right' })
     y += 11
-    doc.font(FB).fontSize(8).text(`INR ${numberToWords(order.total_amount)} Only`, LM + 3, y)
+    doc
+      .font(FB)
+      .fontSize(8)
+      .text(`INR ${numberToWords(order.total_amount)} Only`, LM + 3, y)
     y += 13
     drawRect(doc, LM, wordsY, pw, y - wordsY)
 
     // HSN / tax-summary table — omitted entirely for a tax-free Bill of Supply.
     if (!taxFree) {
-    ensureSpace(60)
-    let cx = LM
-    const hsnY = y
+      ensureSpace(60)
+      let cx = LM
+      const hsnY = y
 
-    const hsnMap = new Map<string, { taxable: number; rate: number; cgst: number; sgst: number; igst: number; totalTax: number }>()
-    for (const item of items) {
-      const key = item.hsn_code || 'N/A'
-      const ex = hsnMap.get(key) || { taxable: 0, rate: item.gst_rate, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }
-      ex.taxable += item.taxable_amount
-      ex.cgst += item.cgst_amount
-      ex.sgst += item.sgst_amount
-      ex.igst += item.igst_amount
-      ex.totalTax += item.cgst_amount + item.sgst_amount + item.igst_amount
-      hsnMap.set(key, ex)
-    }
-
-    const hsnCols = order.is_igst
-      ? [
-          { label: 'HSN/SAC', w: 160, align: 'left' as const },
-          { label: 'Taxable\nValue', w: 90, align: 'right' as const },
-          { label: 'IGST', w: 0, align: 'center' as const, sub: true, subCols: [
-            { label: 'Rate', w: 50, align: 'center' as const },
-            { label: 'Amount', w: 80, align: 'right' as const },
-          ]},
-          { label: 'Total\nTax Amount', w: 80, align: 'right' as const },
-        ]
-      : [
-          { label: 'HSN/SAC', w: 130, align: 'left' as const },
-          { label: 'Taxable\nValue', w: 80, align: 'right' as const },
-          { label: 'CGST', w: 0, align: 'center' as const, sub: true, subCols: [
-            { label: 'Rate', w: 40, align: 'center' as const },
-            { label: 'Amount', w: 60, align: 'right' as const },
-          ]},
-          { label: 'SGST', w: 0, align: 'center' as const, sub: true, subCols: [
-            { label: 'Rate', w: 40, align: 'center' as const },
-            { label: 'Amount', w: 60, align: 'right' as const },
-          ]},
-          { label: 'Total\nTax Amount', w: 70, align: 'right' as const },
-        ]
-
-    type FlatCol = { label: string; w: number; align: 'left' | 'right' | 'center' }
-    const flatCols: FlatCol[] = []
-    for (const col of hsnCols) {
-      if ((col as any).sub && (col as any).subCols) {
-        for (const sc of (col as any).subCols) flatCols.push(sc)
-      } else {
-        flatCols.push({ label: col.label, w: col.w, align: col.align })
+      const hsnMap = new Map<
+        string,
+        { taxable: number; rate: number; cgst: number; sgst: number; igst: number; totalTax: number }
+      >()
+      for (const item of items) {
+        const key = item.hsn_code || 'N/A'
+        const ex = hsnMap.get(key) || { taxable: 0, rate: item.gst_rate, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }
+        ex.taxable += item.taxable_amount
+        ex.cgst += item.cgst_amount
+        ex.sgst += item.sgst_amount
+        ex.igst += item.igst_amount
+        ex.totalTax += item.cgst_amount + item.sgst_amount + item.igst_amount
+        hsnMap.set(key, ex)
       }
-    }
-    const hsnRawTotal = flatCols.reduce((s, c) => s + c.w, 0)
-    const hsnSc = pw / hsnRawTotal
-    flatCols.forEach(c => { c.w = Math.round(c.w * hsnSc) })
-    flatCols[flatCols.length - 1].w += pw - flatCols.reduce((s, c) => s + c.w, 0)
 
-    const hsnHeaderH1 = 12
-    const hsnHeaderH2 = 12
-    cx = LM
-    doc.font(FB).fontSize(6.5)
+      const hsnCols = order.is_igst
+        ? [
+            { label: 'HSN/SAC', w: 160, align: 'left' as const },
+            { label: 'Taxable\nValue', w: 90, align: 'right' as const },
+            {
+              label: 'IGST',
+              w: 0,
+              align: 'center' as const,
+              sub: true,
+              subCols: [
+                { label: 'Rate', w: 50, align: 'center' as const },
+                { label: 'Amount', w: 80, align: 'right' as const },
+              ],
+            },
+            { label: 'Total\nTax Amount', w: 80, align: 'right' as const },
+          ]
+        : [
+            { label: 'HSN/SAC', w: 130, align: 'left' as const },
+            { label: 'Taxable\nValue', w: 80, align: 'right' as const },
+            {
+              label: 'CGST',
+              w: 0,
+              align: 'center' as const,
+              sub: true,
+              subCols: [
+                { label: 'Rate', w: 40, align: 'center' as const },
+                { label: 'Amount', w: 60, align: 'right' as const },
+              ],
+            },
+            {
+              label: 'SGST',
+              w: 0,
+              align: 'center' as const,
+              sub: true,
+              subCols: [
+                { label: 'Rate', w: 40, align: 'center' as const },
+                { label: 'Amount', w: 60, align: 'right' as const },
+              ],
+            },
+            { label: 'Total\nTax Amount', w: 70, align: 'right' as const },
+          ]
 
-    let flatIdx = 0
-    for (const col of hsnCols) {
-      if ((col as any).sub && (col as any).subCols) {
-        let actualSubW = 0
-        for (const _sc of (col as any).subCols) {
-          actualSubW += flatCols[flatIdx].w
-          flatIdx++
+      type FlatCol = { label: string; w: number; align: 'left' | 'right' | 'center' }
+      const flatCols: FlatCol[] = []
+      for (const col of hsnCols) {
+        if ((col as any).sub && (col as any).subCols) {
+          for (const sc of (col as any).subCols) flatCols.push(sc)
+        } else {
+          flatCols.push({ label: col.label, w: col.w, align: col.align })
         }
-        drawRect(doc, cx, y, actualSubW, hsnHeaderH1)
-        doc.text(col.label, cx + 2, y + 3, { width: actualSubW - 4, align: 'center' })
-        cx += actualSubW
-      } else {
-        drawRect(doc, cx, y, flatCols[flatIdx].w, hsnHeaderH1 + hsnHeaderH2)
-        doc.text(col.label, cx + 2, y + 3, { width: flatCols[flatIdx].w - 4, align: col.align })
-        cx += flatCols[flatIdx].w
-        flatIdx++
       }
-    }
-    y += hsnHeaderH1
+      const hsnRawTotal = flatCols.reduce((s, c) => s + c.w, 0)
+      const hsnSc = pw / hsnRawTotal
+      flatCols.forEach(c => {
+        c.w = Math.round(c.w * hsnSc)
+      })
+      flatCols[flatCols.length - 1].w += pw - flatCols.reduce((s, c) => s + c.w, 0)
 
-    cx = LM
-    flatIdx = 0
-    for (const col of hsnCols) {
-      if ((col as any).sub && (col as any).subCols) {
-        for (const sc of (col as any).subCols) {
-          drawRect(doc, cx, y, flatCols[flatIdx].w, hsnHeaderH2)
-          doc.font(FB).fontSize(6.5).text(sc.label, cx + 2, y + 3, { width: flatCols[flatIdx].w - 4, align: sc.align })
+      const hsnHeaderH1 = 12
+      const hsnHeaderH2 = 12
+      cx = LM
+      doc.font(FB).fontSize(6.5)
+
+      let flatIdx = 0
+      for (const col of hsnCols) {
+        if ((col as any).sub && (col as any).subCols) {
+          let actualSubW = 0
+          for (const _sc of (col as any).subCols) {
+            actualSubW += flatCols[flatIdx].w
+            flatIdx++
+          }
+          drawRect(doc, cx, y, actualSubW, hsnHeaderH1)
+          doc.text(col.label, cx + 2, y + 3, { width: actualSubW - 4, align: 'center' })
+          cx += actualSubW
+        } else {
+          drawRect(doc, cx, y, flatCols[flatIdx].w, hsnHeaderH1 + hsnHeaderH2)
+          doc.text(col.label, cx + 2, y + 3, { width: flatCols[flatIdx].w - 4, align: col.align })
           cx += flatCols[flatIdx].w
           flatIdx++
         }
-      } else {
-        cx += flatCols[flatIdx].w
-        flatIdx++
       }
-    }
-    y += hsnHeaderH2
+      y += hsnHeaderH1
 
-    let hsnTotalTaxable = 0
-    let hsnTotalTax = 0
-    doc.font(F).fontSize(7)
-    for (const [hsn, vals] of hsnMap) {
       cx = LM
-      hsnTotalTaxable += vals.taxable
-      hsnTotalTax += vals.totalTax
+      flatIdx = 0
+      for (const col of hsnCols) {
+        if ((col as any).sub && (col as any).subCols) {
+          for (const sc of (col as any).subCols) {
+            drawRect(doc, cx, y, flatCols[flatIdx].w, hsnHeaderH2)
+            doc
+              .font(FB)
+              .fontSize(6.5)
+              .text(sc.label, cx + 2, y + 3, { width: flatCols[flatIdx].w - 4, align: sc.align })
+            cx += flatCols[flatIdx].w
+            flatIdx++
+          }
+        } else {
+          cx += flatCols[flatIdx].w
+          flatIdx++
+        }
+      }
+      y += hsnHeaderH2
 
-      let rowData: string[]
+      let hsnTotalTaxable = 0
+      let hsnTotalTax = 0
+      doc.font(F).fontSize(7)
+      for (const [hsn, vals] of hsnMap) {
+        cx = LM
+        hsnTotalTaxable += vals.taxable
+        hsnTotalTax += vals.totalTax
+
+        let rowData: string[]
+        if (order.is_igst) {
+          rowData = [hsn, fmt(vals.taxable), `${vals.rate}%`, fmt(vals.igst), fmt(vals.totalTax)]
+        } else {
+          rowData = [
+            hsn,
+            fmt(vals.taxable),
+            `${vals.rate / 2}%`,
+            fmt(vals.cgst),
+            `${vals.rate / 2}%`,
+            fmt(vals.sgst),
+            fmt(vals.totalTax),
+          ]
+        }
+
+        for (let j = 0; j < flatCols.length; j++) {
+          doc.text(rowData[j] || '', cx + 2, y + 2, { width: flatCols[j].w - 4, align: flatCols[j].align })
+          cx += flatCols[j].w
+        }
+        y += 12
+      }
+
+      drawHLine(doc, LM, R, y)
+      y += 1
+      cx = LM
+      doc.font(FB).fontSize(7)
+
+      doc.text('Total', cx + 2, y + 2, { width: flatCols[0].w - 4, align: 'right' })
+      cx += flatCols[0].w
+      doc.text(fmt(hsnTotalTaxable), cx + 2, y + 2, { width: flatCols[1].w - 4, align: 'right' })
+      cx += flatCols[1].w
+
       if (order.is_igst) {
-        rowData = [hsn, fmt(vals.taxable), `${vals.rate}%`, fmt(vals.igst), fmt(vals.totalTax)]
+        cx += flatCols[2].w
+        doc.text(fmt(order.igst_amount), cx + 2 - flatCols[3].w, y + 2, { width: flatCols[3].w - 4, align: 'right' })
+        cx = LM + flatCols.reduce((s, c) => s + c.w, 0) - flatCols[flatCols.length - 1].w
       } else {
-        rowData = [hsn, fmt(vals.taxable), `${vals.rate / 2}%`, fmt(vals.cgst), `${vals.rate / 2}%`, fmt(vals.sgst), fmt(vals.totalTax)]
+        cx += flatCols[2].w
+        doc.text(fmt(order.cgst_amount), cx + 2, y + 2, { width: flatCols[3].w - 4, align: 'right' })
+        cx += flatCols[3].w + flatCols[4].w
+        doc.text(fmt(order.sgst_amount), cx + 2, y + 2, { width: flatCols[5].w - 4, align: 'right' })
+        cx += flatCols[5].w
       }
+      const lastColX = R - flatCols[flatCols.length - 1].w
+      doc.text(fmt(hsnTotalTax), lastColX + 2, y + 2, { width: flatCols[flatCols.length - 1].w - 4, align: 'right' })
+      y += 14
 
-      for (let j = 0; j < flatCols.length; j++) {
-        doc.text(rowData[j] || '', cx + 2, y + 2, { width: flatCols[j].w - 4, align: flatCols[j].align })
-        cx += flatCols[j].w
-      }
-      y += 12
-    }
+      drawRect(doc, LM, hsnY, pw, y - hsnY)
 
-    drawHLine(doc, LM, R, y)
-    y += 1
-    cx = LM
-    doc.font(FB).fontSize(7)
-
-    doc.text('Total', cx + 2, y + 2, { width: flatCols[0].w - 4, align: 'right' })
-    cx += flatCols[0].w
-    doc.text(fmt(hsnTotalTaxable), cx + 2, y + 2, { width: flatCols[1].w - 4, align: 'right' })
-    cx += flatCols[1].w
-
-    if (order.is_igst) {
-      cx += flatCols[2].w
-      doc.text(fmt(order.igst_amount), cx + 2 - flatCols[3].w, y + 2, { width: flatCols[3].w - 4, align: 'right' })
-      cx = LM + flatCols.reduce((s, c) => s + c.w, 0) - flatCols[flatCols.length - 1].w
-    } else {
-      cx += flatCols[2].w
-      doc.text(fmt(order.cgst_amount), cx + 2, y + 2, { width: flatCols[3].w - 4, align: 'right' })
-      cx += flatCols[3].w + flatCols[4].w
-      doc.text(fmt(order.sgst_amount), cx + 2, y + 2, { width: flatCols[5].w - 4, align: 'right' })
-      cx += flatCols[5].w
-    }
-    const lastColX = R - flatCols[flatCols.length - 1].w
-    doc.text(fmt(hsnTotalTax), lastColX + 2, y + 2, { width: flatCols[flatCols.length - 1].w - 4, align: 'right' })
-    y += 14
-
-    drawRect(doc, LM, hsnY, pw, y - hsnY)
-
-    const taxWordsY = y
-    const totalTaxAmount = order.is_igst ? order.igst_amount : (order.cgst_amount + order.sgst_amount)
-    doc.font(F).fontSize(7)
-    doc.text('Tax Amount (in words) :', LM + 3, y + 3, { continued: true })
-    doc.font(FB).fontSize(7)
-    doc.text(`  INR ${numberToWords(totalTaxAmount)} Only`)
-    y += 14
-    drawRect(doc, LM, taxWordsY, pw, y - taxWordsY)
+      const taxWordsY = y
+      const totalTaxAmount = order.is_igst ? order.igst_amount : order.cgst_amount + order.sgst_amount
+      doc.font(F).fontSize(7)
+      doc.text('Tax Amount (in words) :', LM + 3, y + 3, { continued: true })
+      doc.font(FB).fontSize(7)
+      doc.text(`  INR ${numberToWords(totalTaxAmount)} Only`)
+      y += 14
+      drawRect(doc, LM, taxWordsY, pw, y - taxWordsY)
     } // end if (!taxFree) — HSN/tax-summary table
 
     ensureSpace(110)
@@ -723,10 +937,18 @@ export async function generateInvoicePDF(
     const declW = pw * 0.48
     const bankW = pw - declW
 
-    doc.font(FB).fontSize(7).text('Declaration', LM + 3, y + 3, { width: declW - 6 })
+    doc
+      .font(FB)
+      .fontSize(7)
+      .text('Declaration', LM + 3, y + 3, { width: declW - 6 })
     y += 10
     doc.font(F).fontSize(6.5)
-    doc.text('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.', LM + 3, y, { width: declW - 6 })
+    doc.text(
+      'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
+      LM + 3,
+      y,
+      { width: declW - 6 }
+    )
 
     const bankX = LM + declW
     let by = bottomY + 3
@@ -743,7 +965,10 @@ export async function generateInvoicePDF(
       { label: 'Branch & IFS Code', value: `${business.bankBranch} & ${business.bankIfsc}` },
     ]
     for (const bd of bankDetails) {
-      doc.font(F).fontSize(6.5).text(`${bd.label}  :`, bankX + 2, by, { width: bankLabelW })
+      doc
+        .font(F)
+        .fontSize(6.5)
+        .text(`${bd.label}  :`, bankX + 2, by, { width: bankLabelW })
       doc.font(FB).fontSize(6.5).text(bd.value, bankValX, by, { width: bankValW })
       by += 9
     }
@@ -758,9 +983,18 @@ export async function generateInvoicePDF(
     drawRect(doc, LM, sigY, declW, sigH)
     drawRect(doc, LM + declW, sigY, bankW, sigH)
 
-    doc.font(F).fontSize(7).text("Customer's Seal and Signature", LM + 3, sigY + 3)
-    doc.font(FB).fontSize(7).text(`for ${business.tradeName.toUpperCase()}`, LM + declW + 2, sigY + 3, { width: bankW - 4, align: 'right' })
-    doc.font(F).fontSize(7).text('Authorised Signatory', LM + declW + 2, sigY + sigH - 12, { width: bankW - 4, align: 'right' })
+    doc
+      .font(F)
+      .fontSize(7)
+      .text("Customer's Seal and Signature", LM + 3, sigY + 3)
+    doc
+      .font(FB)
+      .fontSize(7)
+      .text(`for ${business.tradeName.toUpperCase()}`, LM + declW + 2, sigY + 3, { width: bankW - 4, align: 'right' })
+    doc
+      .font(F)
+      .fontSize(7)
+      .text('Authorised Signatory', LM + declW + 2, sigY + sigH - 12, { width: bankW - 4, align: 'right' })
 
     y = sigY + sigH + 8
 
@@ -779,12 +1013,18 @@ export async function generateInvoicePDF(
 
       let qrX = LM + 6
       if (nicQRBuf) {
-        doc.font(F).fontSize(6).text('Scan & Verify (NIC)', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
+        doc
+          .font(F)
+          .fontSize(6)
+          .text('Scan & Verify (NIC)', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
         doc.image(nicQRBuf, qrX, qrSectionY + labelH, { width: qrSize, height: qrSize })
         qrX += qrSize + 10
       }
       if (payQRBuf) {
-        doc.font(F).fontSize(6).text('Pay Now', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
+        doc
+          .font(F)
+          .fontSize(6)
+          .text('Pay Now', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
         doc.image(payQRBuf, qrX, qrSectionY + labelH, { width: qrSize, height: qrSize })
       }
 

@@ -49,7 +49,10 @@ export function escapeHtml(value: unknown): string {
 
 export function mailShell(o: MailShellOptions): string {
   const brand = escapeHtml(o.brand)
-  const footer = [`<p><strong>${brand}</strong></p>`, ...(o.footerLines ?? []).filter(Boolean).map(l => `<p>${l}</p>`)].join('\n              ')
+  const footer = [
+    `<p><strong>${brand}</strong></p>`,
+    ...(o.footerLines ?? []).filter(Boolean).map(l => `<p>${l}</p>`),
+  ].join('\n              ')
   return `<!DOCTYPE html>
 <html>
   <head>

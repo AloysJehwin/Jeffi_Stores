@@ -17,11 +17,16 @@ RULES:
 - Do not invent specs, prices, or claims not given to you.`
 
 /** Generate a short caption from a product's name/description. Returns '' on any failure. */
-export async function generateSocialCaption(opts: { productName: string; productDescription?: string | null }): Promise<string> {
+export async function generateSocialCaption(opts: {
+  productName: string
+  productDescription?: string | null
+}): Promise<string> {
   const userPrompt = [
     `Product: ${opts.productName}`,
     opts.productDescription ? `Description: ${opts.productDescription}` : null,
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   try {
     const { currentTenantPlanGate } = await import('@/lib/plan-gate')
@@ -59,7 +64,10 @@ function extractCaption(raw: string): string {
   let caption = tryParse(raw)
   if (caption) return caption
 
-  const stripped = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+  const stripped = raw
+    .replace(/^```[\w]*\n?/, '')
+    .replace(/\n?```$/, '')
+    .trim()
   caption = tryParse(stripped)
   if (caption) return caption
 

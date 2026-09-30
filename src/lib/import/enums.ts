@@ -5,8 +5,15 @@ import type { PackageType } from '@/lib/shipping'
 // sheet offers exactly what the editor does. Advisory, not hard-validated on import.
 
 const PACKAGE_TYPES: PackageType[] = [
-  'flat_poly_auto', 'flat_poly_s', 'flat_poly_m', 'flat_poly_l', 'flat_poly_xl',
-  'drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube',
+  'flat_poly_auto',
+  'flat_poly_s',
+  'flat_poly_m',
+  'flat_poly_l',
+  'flat_poly_xl',
+  'drill_bit_tube',
+  'drill_bit_set_case',
+  'corrugated_box',
+  'long_tube',
 ]
 
 export const ENUMS: Record<string, string[]> = {

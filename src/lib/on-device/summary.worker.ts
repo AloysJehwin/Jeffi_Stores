@@ -11,12 +11,7 @@
  *   { type: 'ready' } | { type: 'load-error', error }
  *   { type: 'result', id, text } | { type: 'error', id, error }
  */
-import {
-  AutoTokenizer,
-  AutoModelForCausalLM,
-  TextStreamer,
-  env,
-} from '@huggingface/transformers'
+import { AutoTokenizer, AutoModelForCausalLM, TextStreamer, env } from '@huggingface/transformers'
 
 // The model + ORT runtime are served either from our own origin (local dev) or
 // a CDN (prod), selected by NEXT_PUBLIC_ONDEVICE_MODEL_BASE. We present the host
@@ -44,17 +39,19 @@ env.allowLocalModels = false
 // Put the whole base path in the template with {model} standing in for the dir
 // name, so files resolve at <base>/<file>.
 const baseUrl = new URL(MODEL_BASE)
-const basePath = baseUrl.pathname.replace(/\/+$/, '')                 // e.g. /models/onboarding/v1
+const basePath = baseUrl.pathname.replace(/\/+$/, '') // e.g. /models/onboarding/v1
 const templatePath = basePath.includes(`/${MODEL_ID}`)
-  ? basePath.replace(`/${MODEL_ID}`, `/{model}`)                      // /models/{model}/v1
-  : `${basePath}/{model}`                                            // fallback
+  ? basePath.replace(`/${MODEL_ID}`, `/{model}`) // /models/{model}/v1
+  : `${basePath}/{model}` // fallback
 ;(env as any).remoteHost = baseUrl.origin
 ;(env as any).remotePathTemplate = templatePath
 
 // onnxruntime-web WASM/backends under <base>/ort/ (not jsdelivr, which CSP blocks).
 try {
   ;(env as any).backends.onnx.wasm.wasmPaths = `${MODEL_BASE}/ort/`
-} catch { /* backends not ready — harmless */ }
+} catch {
+  /* backends not ready — harmless */
+}
 
 let tokenizer: any = null
 let model: any = null

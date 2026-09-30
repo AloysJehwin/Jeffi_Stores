@@ -67,12 +67,9 @@ export interface StoreSettings {
 }
 
 export async function loadStoreSettings(): Promise<StoreSettings> {
-  const rows = await queryMany(
-    "SELECT key, value FROM site_settings WHERE key LIKE 'business_%'",
-    []
-  )
+  const rows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
   const s: Record<string, string> = {}
-  for (const row of (rows || [])) s[row.key] = row.value || ''
+  for (const row of rows || []) s[row.key] = row.value || ''
 
   return {
     name: s.business_trade_name || s.business_legal_name || 'JEFFI STORES',
@@ -92,18 +89,20 @@ const MR = 36
 const CW = PAGE_W - ML - MR
 
 const GREEN_DARK = '#3d6b00'
-const GREEN_MID  = '#5a8a00'
+const GREEN_MID = '#5a8a00'
 const GREEN_MAIN = '#7cb900'
-const LIGHT_BG   = '#f4f9ea'
+const LIGHT_BG = '#f4f9ea'
 const RULE_COLOR = '#cccccc'
-const TEXT_DARK  = '#111111'
-const TEXT_MID   = '#444444'
+const TEXT_DARK = '#111111'
+const TEXT_MID = '#444444'
 const TEXT_MUTED = '#666666'
 const TEXT_LIGHT = '#d4edaa'
 
 async function generateQRBuffer(orderNumber: string): Promise<Buffer> {
   return QRCode.toBuffer(orderNumber, {
-    type: 'png', width: 100, margin: 1,
+    type: 'png',
+    width: 100,
+    margin: 1,
   })
 }
 
@@ -148,8 +147,16 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
 async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSettings): Promise<void> {
   let qrBuf: Buffer | null = null
   let barBuf: Buffer | null = null
-  try { qrBuf = await generateQRBuffer(order.order_number) } catch { /* non-fatal */ }
-  try { barBuf = await generateBarcodeBuffer(order.order_number) } catch { /* non-fatal */ }
+  try {
+    qrBuf = await generateQRBuffer(order.order_number)
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    barBuf = await generateBarcodeBuffer(order.order_number)
+  } catch {
+    /* non-fatal */
+  }
 
   const QR_SIZE = 66
   const HEADER_H = 90
@@ -161,7 +168,11 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   const textZoneW = CW - LOGO_SIZE - QR_SIZE - 24
 
-  try { doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE }) } catch { /* logo missing */ }
+  try {
+    doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
+  } catch {
+    /* logo missing */
+  }
 
   const textX = ML + LOGO_SIZE + 12
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
@@ -183,7 +194,11 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.text('PACKING SLIP', textX, hy, { width: textZoneW, lineBreak: false })
 
   if (qrBuf) {
-    try { doc.image(qrBuf, PAGE_W - MR - QR_SIZE, Math.floor((HEADER_H - QR_SIZE) / 2), { width: QR_SIZE, height: QR_SIZE }) } catch { /* qr render failed */ }
+    try {
+      doc.image(qrBuf, PAGE_W - MR - QR_SIZE, Math.floor((HEADER_H - QR_SIZE) / 2), { width: QR_SIZE, height: QR_SIZE })
+    } catch {
+      /* qr render failed */
+    }
   }
 
   let y = HEADER_H + 8
@@ -207,12 +222,12 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   const addr = order.shipping_address
   let addrContentH = 0
   if (addr) {
-    addrContentH += 14  // name
-    addrContentH += 12  // line1
+    addrContentH += 14 // name
+    addrContentH += 12 // line1
     if (addr.address_line2) addrContentH += 12
     if (addr.landmark) addrContentH += 12
-    addrContentH += 12  // city, state
-    addrContentH += 12  // PIN
+    addrContentH += 12 // city, state
+    addrContentH += 12 // PIN
     if (addr.phone || order.customer_phone) addrContentH += 13
   } else {
     addrContentH = 12
@@ -264,13 +279,13 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   // ── ORDER ITEMS section (full width) ────────────────────────────────────────
   const IMG_SIZE = 30
-  const COL_IMG  = IMG_SIZE + 6   // 36
-  const COL_HSN  = 52
-  const COL_GST  = 34
-  const COL_QTY  = 52
+  const COL_IMG = IMG_SIZE + 6 // 36
+  const COL_HSN = 52
+  const COL_GST = 34
+  const COL_QTY = 52
   const COL_RATE = 54
   const COL_DISC = 38
-  const COL_AMT  = 62
+  const COL_AMT = 62
   const COL_PROD = CW - 16 - COL_IMG - COL_HSN - COL_GST - COL_QTY - COL_RATE - COL_DISC - COL_AMT
 
   const tblX = ML + 8
@@ -278,11 +293,11 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   // Pre-fetch all product images
   const imageBufs: (Buffer | null)[] = await Promise.all(
-    order.items.map(item => item.image_url ? fetchImageBuffer(item.image_url) : Promise.resolve(null))
+    order.items.map(item => (item.image_url ? fetchImageBuffer(item.image_url) : Promise.resolve(null)))
   )
 
   // Pre-measure row heights
-  const COL_HDR_H = 22   // two-line header
+  const COL_HDR_H = 22 // two-line header
   const varLineH = 10
   const ROW_V_PAD = 8
   const rowHeights = order.items.map(item => {
@@ -301,7 +316,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   const hasBizDiscount = (order.business_discount_amount || 0) > 0
   const hasShipping = (order.shipping_amount || 0) > 0
   const summaryRowH = 14
-  let summaryRowCount = hasTax ? (isIgst ? 2 : 3) : 1  // taxable + igst OR cgst+sgst
+  let summaryRowCount = hasTax ? (isIgst ? 2 : 3) : 1 // taxable + igst OR cgst+sgst
   if (hasOrderDiscount) summaryRowCount++
   if (hasBizDiscount) summaryRowCount++
   if (hasShipping) summaryRowCount++
@@ -310,7 +325,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   // Bottom limit for flowing content: leave room for the seller/footer/barcode zones.
   const FOOTER_H = 28
   const BAR_ZONE_H = 52
-  const SELLER_BLOCK_H = 90   // seller details + handling instructions + rule/padding
+  const SELLER_BLOCK_H = 90 // seller details + handling instructions + rule/padding
   const CONTENT_BOTTOM = PAGE_H - FOOTER_H - BAR_ZONE_H - SELLER_BLOCK_H
 
   // Two-line column header — repeated at the top of the items table on every page.
@@ -323,16 +338,44 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.text('PRODUCT', tblX + COL_IMG, hdrY1, { width: COL_PROD, lineBreak: false })
     doc.text('HSN/', tblX + COL_IMG + COL_PROD, hdrY1, { width: COL_HSN, align: 'center', lineBreak: false })
     doc.text('GST', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY1, { width: COL_GST, align: 'center', lineBreak: false })
-    doc.text('QTY', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, hdrY1, { width: COL_QTY, align: 'center', lineBreak: false })
-    doc.text('RATE', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY1, { width: COL_RATE, align: 'right', lineBreak: false })
-    doc.text('DISC', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY1, { width: COL_DISC, align: 'center', lineBreak: false })
-    doc.text('AMOUNT', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY1, { width: COL_AMT, align: 'right', lineBreak: false })
-    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY2, { width: COL_AMT, align: 'right', lineBreak: false })
+    doc.text('QTY', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, hdrY1, {
+      width: COL_QTY,
+      align: 'center',
+      lineBreak: false,
+    })
+    doc.text('RATE', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY1, {
+      width: COL_RATE,
+      align: 'right',
+      lineBreak: false,
+    })
+    doc.text('DISC', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY1, {
+      width: COL_DISC,
+      align: 'center',
+      lineBreak: false,
+    })
+    doc.text('AMOUNT', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY1, {
+      width: COL_AMT,
+      align: 'right',
+      lineBreak: false,
+    })
+    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY2, {
+      width: COL_AMT,
+      align: 'right',
+      lineBreak: false,
+    })
     // row 2
     doc.text('SAC', tblX + COL_IMG + COL_PROD, hdrY2, { width: COL_HSN, align: 'center', lineBreak: false })
     doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY2, { width: COL_GST, align: 'center', lineBreak: false })
-    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY2, { width: COL_RATE, align: 'right', lineBreak: false })
-    doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY2, { width: COL_DISC, align: 'center', lineBreak: false })
+    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY2, {
+      width: COL_RATE,
+      align: 'right',
+      lineBreak: false,
+    })
+    doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY2, {
+      width: COL_DISC,
+      align: 'center',
+      lineBreak: false,
+    })
     return atY + COL_HDR_H
   }
 
@@ -343,12 +386,16 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.text('ORDER ITEMS', ML + 8, y + 6, { lineBreak: false })
 
   let iy = y + HDR_ROW_H
-  let segTop = iy            // top of the current page's row segment (for the border box)
+  let segTop = iy // top of the current page's row segment (for the border box)
   iy = drawItemsHeader(iy)
 
   // Close the current page's table border around [segTop .. iy].
   function closeItemsSegment() {
-    doc.rect(ML, segTop, CW, iy - segTop).lineWidth(0.5).strokeColor(RULE_COLOR).stroke()
+    doc
+      .rect(ML, segTop, CW, iy - segTop)
+      .lineWidth(0.5)
+      .strokeColor(RULE_COLOR)
+      .stroke()
   }
 
   for (let i = 0; i < order.items.length; i++) {
@@ -389,9 +436,17 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
     // Thumbnail
     if (imgBuf) {
-      try { doc.image(imgBuf, tblX, iy + 4, { width: IMG_SIZE, height: IMG_SIZE }) } catch { /* image render failed */ }
+      try {
+        doc.image(imgBuf, tblX, iy + 4, { width: IMG_SIZE, height: IMG_SIZE })
+      } catch {
+        /* image render failed */
+      }
     } else {
-      doc.rect(tblX, iy + 4, IMG_SIZE, IMG_SIZE).lineWidth(0.3).strokeColor('#dddddd').stroke()
+      doc
+        .rect(tblX, iy + 4, IMG_SIZE, IMG_SIZE)
+        .lineWidth(0.3)
+        .strokeColor('#dddddd')
+        .stroke()
     }
 
     // Product name (wrapping)
@@ -407,13 +462,34 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     // Right-side columns — vertically centred
     const midY = iy + Math.floor(rowH / 2) - 5
     doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_DARK)
-    doc.text(item.hsn_code || '', tblX + COL_IMG + COL_PROD, midY, { width: COL_HSN, align: 'center', lineBreak: false })
+    doc.text(item.hsn_code || '', tblX + COL_IMG + COL_PROD, midY, {
+      width: COL_HSN,
+      align: 'center',
+      lineBreak: false,
+    })
     doc.text(gstStr, tblX + COL_IMG + COL_PROD + COL_HSN, midY, { width: COL_GST, align: 'center', lineBreak: false })
-    doc.text(qtyStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, midY, { width: COL_QTY, align: 'center', lineBreak: false })
-    doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, { width: COL_RATE, align: 'right', lineBreak: false })
-    doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, { width: COL_DISC, align: 'center', lineBreak: false })
+    doc.text(qtyStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, midY, {
+      width: COL_QTY,
+      align: 'center',
+      lineBreak: false,
+    })
+    doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, {
+      width: COL_RATE,
+      align: 'right',
+      lineBreak: false,
+    })
+    doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, {
+      width: COL_DISC,
+      align: 'center',
+      lineBreak: false,
+    })
     doc.font('Helvetica-Bold').fontSize(7.5)
-    doc.text(rs(item.total_price), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, midY, { width: COL_AMT, align: 'right', lineBreak: false })
+    doc.text(
+      rs(item.total_price),
+      tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC,
+      midY,
+      { width: COL_AMT, align: 'right', lineBreak: false }
+    )
 
     iy += rowH
     hRule(doc, tblX, iy, tblX + CW - 16, '#eeeeee', 0.3)
@@ -432,12 +508,15 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   // ── Summary rows ──────────────────────────────────────────────────────────────
   const summaryLabelX = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY
   const summaryLabelW = COL_RATE + COL_DISC - 4
-  const summaryAmtX   = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC
-  const summaryAmtW   = COL_AMT
+  const summaryAmtX = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC
+  const summaryAmtW = COL_AMT
 
   function summaryRow(label: string, value: string, bold = false, color = TEXT_MID) {
     hRule(doc, ML + 1, iy, ML + CW - 1, '#eeeeee', 0.3)
-    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(color)
+    doc
+      .font(bold ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(7.5)
+      .fillColor(color)
     doc.text(label, summaryLabelX, iy + 3, { width: summaryLabelW, align: 'right', lineBreak: false })
     doc.text(value, summaryAmtX, iy + 3, { width: summaryAmtW, align: 'right', lineBreak: false })
     iy += summaryRowH
@@ -506,7 +585,9 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text('HANDLING INSTRUCTIONS', INFO_COL2_X, infoStartY, { width: CW - INFO_COL_W - 16, lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor(TEXT_MID)
-  doc.text('Handle with care. Keep dry.\nDo not bend or compress.', INFO_COL2_X, infoStartY + 11, { width: CW - INFO_COL_W - 16 })
+  doc.text('Handle with care. Keep dry.\nDo not bend or compress.', INFO_COL2_X, infoStartY + 11, {
+    width: CW - INFO_COL_W - 16,
+  })
 
   // ── Footer + barcode ─────────────────────────────────────────────────────────
   const footerY = PAGE_H - FOOTER_H
@@ -520,7 +601,9 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     const barH = 38
     try {
       doc.image(barBuf, Math.floor((PAGE_W - barW) / 2), barZoneY + 7, { width: barW, height: barH })
-    } catch { /* barcode render failed */ }
+    } catch {
+      /* barcode render failed */
+    }
   }
 
   box(doc, 0, footerY, PAGE_W, FOOTER_H, GREEN_DARK)
@@ -528,7 +611,9 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     `Thank you for shopping with ${store.name}`,
     store.web,
     store.email ? `Questions? ${store.email}` : null,
-  ].filter(Boolean).join('   —   ')
+  ]
+    .filter(Boolean)
+    .join('   —   ')
   doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_LIGHT)
   doc.text(footerParts, ML, footerY + 9, { width: CW, align: 'center', lineBreak: false })
 }
@@ -540,7 +625,9 @@ export async function generatePackingSlipPDF(order: PackingSlipOrder, store: Sto
     doc.on('data', (c: Buffer) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
-    renderPage(doc, order, store).then(() => doc.end()).catch(reject)
+    renderPage(doc, order, store)
+      .then(() => doc.end())
+      .catch(reject)
   })
 }
 

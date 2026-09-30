@@ -3,8 +3,12 @@ import { customerMailFromAsync, currentBrandNameAsync, storeBaseUrlAsync } from 
 import { mailShell } from '@/lib/mail-template'
 import type { AddressSnapshot } from '@/lib/address-change'
 
-const esc = (v: unknown) => String(v ?? '')
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+const esc = (v: unknown) =>
+  String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 
 function addressBlock(a: AddressSnapshot): string {
   const lines = [

@@ -57,7 +57,7 @@ export function mrpDiscountPct(mrp: number | null | undefined, price: number): n
  */
 export function pickUnitPrice(
   fields: { inclusive: number | null | undefined; exGst: number | null | undefined },
-  gstEnabled: boolean,
+  gstEnabled: boolean
 ): number {
   const incl = Number(fields.inclusive ?? 0)
   if (gstEnabled) return incl
@@ -77,7 +77,7 @@ export function resolveLineUnitPrice(
     variant?: { inclusive: number | null | undefined; exGst: number | null | undefined } | null
     product: { inclusive: number | null | undefined; exGst: number | null | undefined }
   },
-  gstEnabled: boolean,
+  gstEnabled: boolean
 ): number {
   const hasVal = (v: number | null | undefined) => v != null && Number(v) > 0
   if (levels.subVariant && hasVal(levels.subVariant.inclusive)) {

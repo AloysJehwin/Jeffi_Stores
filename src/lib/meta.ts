@@ -56,11 +56,19 @@ async function graphPost(path: string, body: Record<string, string>): Promise<an
 export function buildOAuthUrl(redirectUri: string, state: string): string {
   const { appId } = getMetaConfig()
   const scopes = [
-    'pages_show_list', 'pages_manage_posts', 'pages_read_engagement',
-    'instagram_basic', 'instagram_content_publish', 'business_management',
+    'pages_show_list',
+    'pages_manage_posts',
+    'pages_read_engagement',
+    'instagram_basic',
+    'instagram_content_publish',
+    'business_management',
   ].join(',')
   const qs = new URLSearchParams({
-    client_id: appId, redirect_uri: redirectUri, state, scope: scopes, response_type: 'code',
+    client_id: appId,
+    redirect_uri: redirectUri,
+    state,
+    scope: scopes,
+    response_type: 'code',
   }).toString()
   return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${qs}`
 }
@@ -69,7 +77,10 @@ export function buildOAuthUrl(redirectUri: string, state: string): string {
 export async function exchangeCodeForToken(code: string, redirectUri: string): Promise<string> {
   const { appId, appSecret } = getMetaConfig()
   const json = await graphGet('oauth/access_token', {
-    client_id: appId, client_secret: appSecret, redirect_uri: redirectUri, code,
+    client_id: appId,
+    client_secret: appSecret,
+    redirect_uri: redirectUri,
+    code,
   })
   return json.access_token as string
 }
@@ -78,7 +89,10 @@ export async function exchangeCodeForToken(code: string, redirectUri: string): P
 export async function getLongLivedToken(shortToken: string): Promise<{ token: string; expiresInSec: number }> {
   const { appId, appSecret } = getMetaConfig()
   const json = await graphGet('oauth/access_token', {
-    grant_type: 'fb_exchange_token', client_id: appId, client_secret: appSecret, fb_exchange_token: shortToken,
+    grant_type: 'fb_exchange_token',
+    client_id: appId,
+    client_secret: appSecret,
+    fb_exchange_token: shortToken,
   })
   return { token: json.access_token as string, expiresInSec: Number(json.expires_in ?? 60 * 24 * 60 * 60) }
 }
@@ -97,7 +111,8 @@ export interface MetaAccounts {
  */
 export async function getPageAndIgAccounts(userToken: string): Promise<MetaAccounts> {
   const pages = await graphGet('me/accounts', {
-    access_token: userToken, fields: 'id,name,access_token,instagram_business_account',
+    access_token: userToken,
+    fields: 'id,name,access_token,instagram_business_account',
   })
   const page = pages.data?.[0]
   if (!page) throw new Error('No Facebook Page found on this account (a Page is required to post)')
@@ -113,11 +128,17 @@ export async function getPageAndIgAccounts(userToken: string): Promise<MetaAccou
 
 /** Post to a Facebook Page — a photo post when imageUrl is given, else a text/link post. */
 export async function publishFacebookPost(opts: {
-  pageId: string; message: string; imageUrl?: string; accessToken: string; link?: string | null
+  pageId: string
+  message: string
+  imageUrl?: string
+  accessToken: string
+  link?: string | null
 }): Promise<{ id: string }> {
   if (opts.imageUrl) {
     const r = await graphPost(`${opts.pageId}/photos`, {
-      url: opts.imageUrl, caption: opts.message, access_token: opts.accessToken,
+      url: opts.imageUrl,
+      caption: opts.message,
+      access_token: opts.accessToken,
     })
     return { id: r.post_id || r.id }
   }
@@ -133,7 +154,10 @@ export async function publishFacebookPost(opts: {
 
 /** Multi-photo Facebook Page post (2+ images attached to one feed post). */
 export async function publishFacebookCarousel(opts: {
-  pageId: string; message: string; imageUrls: string[]; accessToken: string
+  pageId: string
+  message: string
+  imageUrls: string[]
+  accessToken: string
 }): Promise<{ id: string }> {
   if (opts.imageUrls.length < 2) {
     throw new Error('FB multi-photo post needs at least 2 images')
@@ -141,7 +165,9 @@ export async function publishFacebookCarousel(opts: {
   const mediaIds: string[] = []
   for (const url of opts.imageUrls) {
     const p = await graphPost(`${opts.pageId}/photos`, {
-      url, published: 'false', access_token: opts.accessToken,
+      url,
+      published: 'false',
+      access_token: opts.accessToken,
     })
     mediaIds.push(p.id)
   }
@@ -162,17 +188,25 @@ async function publishIgContainer(igUserId: string, creationId: string, accessTo
 
 /** Single-image IG feed post. imageUrl MUST be publicly reachable by Meta. */
 export async function publishInstagramImage(opts: {
-  igUserId: string; imageUrl: string; caption: string; accessToken: string
+  igUserId: string
+  imageUrl: string
+  caption: string
+  accessToken: string
 }): Promise<{ id: string }> {
   const container = await graphPost(`${opts.igUserId}/media`, {
-    image_url: opts.imageUrl, caption: opts.caption, access_token: opts.accessToken,
+    image_url: opts.imageUrl,
+    caption: opts.caption,
+    access_token: opts.accessToken,
   })
   return publishIgContainer(opts.igUserId, container.id, opts.accessToken)
 }
 
 /** Multi-image IG carousel (2–10 images). */
 export async function publishInstagramCarousel(opts: {
-  igUserId: string; imageUrls: string[]; caption: string; accessToken: string
+  igUserId: string
+  imageUrls: string[]
+  caption: string
+  accessToken: string
 }): Promise<{ id: string }> {
   if (opts.imageUrls.length < 2 || opts.imageUrls.length > 10) {
     throw new Error('IG carousel needs 2–10 images')
@@ -180,12 +214,17 @@ export async function publishInstagramCarousel(opts: {
   const children: string[] = []
   for (const url of opts.imageUrls) {
     const c = await graphPost(`${opts.igUserId}/media`, {
-      image_url: url, is_carousel_item: 'true', access_token: opts.accessToken,
+      image_url: url,
+      is_carousel_item: 'true',
+      access_token: opts.accessToken,
     })
     children.push(c.id)
   }
   const parent = await graphPost(`${opts.igUserId}/media`, {
-    media_type: 'CAROUSEL', children: children.join(','), caption: opts.caption, access_token: opts.accessToken,
+    media_type: 'CAROUSEL',
+    children: children.join(','),
+    caption: opts.caption,
+    access_token: opts.accessToken,
   })
   return publishIgContainer(opts.igUserId, parent.id, opts.accessToken)
 }
@@ -196,10 +235,16 @@ export async function publishInstagramCarousel(opts: {
  * the Reel is published with whatever audio is baked into the video (or silent).
  */
 export async function publishInstagramReel(opts: {
-  igUserId: string; videoUrl: string; caption: string; accessToken: string; coverUrl?: string
+  igUserId: string
+  videoUrl: string
+  caption: string
+  accessToken: string
+  coverUrl?: string
 }): Promise<{ id: string }> {
   const container = await graphPost(`${opts.igUserId}/media`, {
-    media_type: 'REELS', video_url: opts.videoUrl, caption: opts.caption,
+    media_type: 'REELS',
+    video_url: opts.videoUrl,
+    caption: opts.caption,
     ...(opts.coverUrl ? { cover_url: opts.coverUrl } : {}),
     access_token: opts.accessToken,
   })
@@ -215,7 +260,7 @@ async function waitForContainerReady(containerId: string, accessToken: string): 
     const s = await graphGet(containerId, { fields: 'status_code', access_token: accessToken })
     if (s.status_code === 'FINISHED') return
     if (s.status_code === 'ERROR') throw new Error('IG media container processing failed (ERROR)')
-    await new Promise((r) => setTimeout(r, CONTAINER_POLL_MS))
+    await new Promise(r => setTimeout(r, CONTAINER_POLL_MS))
   }
   throw new Error('IG media container did not reach FINISHED within the poll budget')
 }
@@ -230,7 +275,9 @@ async function waitForContainerReady(containerId: string, accessToken: string): 
 export async function searchHashtagReach(igUserId: string, tag: string, accessToken: string): Promise<number> {
   try {
     const search = await graphGet('ig_hashtag_search', {
-      user_id: igUserId, q: tag.replace(/^#/, ''), access_token: accessToken,
+      user_id: igUserId,
+      q: tag.replace(/^#/, ''),
+      access_token: accessToken,
     })
     const hashtagId = search.data?.[0]?.id
     if (!hashtagId) return 0

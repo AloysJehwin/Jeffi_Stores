@@ -32,8 +32,15 @@ let cache: { at: number; offers: PublicOffer[] } | null = null
 
 /** Bank codes Razorpay returns on card rules; unmapped codes fall through unchanged. */
 const ISSUER_NAMES: Record<string, string> = {
-  HSBC: 'HSBC', INDB: 'IndusInd', UTIB: 'Axis Bank', BARB: 'Bank of Baroda',
-  IDFB: 'IDFC First', HDFC: 'HDFC Bank', ICIC: 'ICICI Bank', SBIN: 'SBI', KKBK: 'Kotak',
+  HSBC: 'HSBC',
+  INDB: 'IndusInd',
+  UTIB: 'Axis Bank',
+  BARB: 'Bank of Baroda',
+  IDFB: 'IDFC First',
+  HDFC: 'HDFC Bank',
+  ICIC: 'ICICI Bank',
+  SBIN: 'SBI',
+  KKBK: 'Kotak',
 }
 
 /**
@@ -46,11 +53,7 @@ const ISSUER_NAMES: Record<string, string> = {
  * page shows every offer and its explicit setting always wins, so a wrong guess here is
  * visible and one click to correct.
  */
-const INTERNAL_TITLE_PATTERNS = [
-  /logo visibility/i,
-  /spend stimulation/i,
-  /visibility offer/i,
-]
+const INTERNAL_TITLE_PATTERNS = [/logo visibility/i, /spend stimulation/i, /visibility offer/i]
 
 function normalise(o: RawOffer): PublicOffer | null {
   if (o.status !== 'ACTIVE') return null
@@ -98,15 +101,16 @@ export async function getOffersWithSettings(): Promise<{ offers: AdminOffer[]; f
   const { queryMany } = await import('./db')
   const [result, rows] = await Promise.all([
     fetchAccountOffers(),
-    queryMany<OfferSetting>('SELECT offer_id, is_visible, title_override, display_order, updated_at FROM offer_display_settings')
-      .catch(() => [] as OfferSetting[]),
+    queryMany<OfferSetting>(
+      'SELECT offer_id, is_visible, title_override, display_order, updated_at FROM offer_display_settings'
+    ).catch(() => [] as OfferSetting[]),
   ])
-  const byId = new Map(rows.map((r) => [r.offer_id, r]))
+  const byId = new Map(rows.map(r => [r.offer_id, r]))
 
   const offers = result.offers
-    .map((o) => {
+    .map(o => {
       const s = byId.get(o.id)
-      const looksInternal = INTERNAL_TITLE_PATTERNS.some((re) => re.test(o.title))
+      const looksInternal = INTERNAL_TITLE_PATTERNS.some(re => re.test(o.title))
       return {
         ...o,
         isVisible: s ? s.is_visible : !looksInternal,
@@ -128,9 +132,14 @@ export async function getOffersWithSettings(): Promise<{ offers: AdminOffer[]; f
 export async function getPublicOffers(): Promise<PublicOffer[]> {
   const { offers } = await getOffersWithSettings().catch(() => ({ offers: [] as AdminOffer[] }))
   return offers
-    .filter((o) => o.isVisible)
+    .filter(o => o.isVisible)
     .map(({ id, title, titleOverride, methods, issuers, endsAt, terms }) => ({
-      id, title: titleOverride || title, methods, issuers, endsAt, terms,
+      id,
+      title: titleOverride || title,
+      methods,
+      issuers,
+      endsAt,
+      terms,
     }))
 }
 
@@ -168,22 +177,28 @@ export async function fetchAccountOffers(): Promise<OffersFetch> {
     if (!res.ok) {
       return testMode
         ? {
-            ok: false, offers: cache?.offers ?? [], reason: 'test_mode',
+            ok: false,
+            offers: cache?.offers ?? [],
+            reason: 'test_mode',
             detail: `Razorpay's offers API is not available on test keys (HTTP ${res.status}). Offers created in test mode cannot be listed here; this page works against live keys.`,
           }
         : {
-            ok: false, offers: cache?.offers ?? [], reason: 'unreachable',
+            ok: false,
+            offers: cache?.offers ?? [],
+            reason: 'unreachable',
             detail: `Razorpay returned HTTP ${res.status} for GET /v1/offers.`,
           }
     }
 
-    const body = await res.json() as { items?: RawOffer[] }
+    const body = (await res.json()) as { items?: RawOffer[] }
     const offers = (body.items ?? []).map(normalise).filter((o): o is PublicOffer => !!o)
     cache = { at: Date.now(), offers }
     return { ok: true, offers }
   } catch (e) {
     return {
-      ok: false, offers: cache?.offers ?? [], reason: 'unreachable',
+      ok: false,
+      offers: cache?.offers ?? [],
+      reason: 'unreachable',
       detail: e instanceof Error ? e.message : 'Could not reach Razorpay.',
     }
   }

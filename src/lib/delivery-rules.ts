@@ -8,10 +8,7 @@ export interface DeliverySettings {
   freeWeightCeilingKg: number
 }
 
-export type ApplyDeliverySource =
-  | 'admin_disabled'
-  | 'free_threshold'
-  | 'as_is'
+export type ApplyDeliverySource = 'admin_disabled' | 'free_threshold' | 'as_is'
 
 export interface ApplyDeliveryResult {
   charge: number
@@ -41,9 +38,7 @@ export function applyDeliveryRules(params: {
   // volumetric-vs-actual max the carrier itself bills on — so bulky-but-light parcels are not
   // priced under cost. Falls back to actual weight when no charged weight was supplied.
   const rateWeightKg = Math.max(0, (params.chargedWeightGrams ?? params.weightGrams ?? 0) / 1000)
-  const base = settings.ratePerKg > 0
-    ? settings.ratePerKg * rateWeightKg
-    : Math.max(0, params.baseCharge)
+  const base = settings.ratePerKg > 0 ? settings.ratePerKg * rateWeightKg : Math.max(0, params.baseCharge)
   const original = Math.max(0, round2(base))
 
   // Free shipping now also requires the parcel to be under the weight ceiling.

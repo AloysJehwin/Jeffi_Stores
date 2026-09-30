@@ -2,7 +2,16 @@ import { queryOne, queryMany } from './db'
 import { round2 } from './gst'
 
 export async function getProductAnalyticsData(productId: string, days: number) {
-  const product = await queryOne<{ id: string; name: string; sku: string; slug: string; brand_name: string | null; stock_status: string; inventory_quantity: number; base_price: string }>(
+  const product = await queryOne<{
+    id: string
+    name: string
+    sku: string
+    slug: string
+    brand_name: string | null
+    stock_status: string
+    inventory_quantity: number
+    base_price: string
+  }>(
     `SELECT p.id, p.name, p.sku, p.slug, b.name AS brand_name, p.stock_status, p.inventory_quantity, p.base_price
      FROM products p LEFT JOIN brands b ON b.id = p.brand_id
      WHERE p.id = $1`,
@@ -12,8 +21,14 @@ export async function getProductAnalyticsData(productId: string, days: number) {
 
   const [totals, daily, referrers, recentBuyers, variantStats, currentCarts] = await Promise.all([
     queryOne<{
-      views: string; unique_viewers: string; cart_adds: string; orders: string; revenue: string; quantity_sold: string
-    }>(`
+      views: string
+      unique_viewers: string
+      cart_adds: string
+      orders: string
+      revenue: string
+      quantity_sold: string
+    }>(
+      `
       SELECT
         (SELECT COUNT(*) FROM product_views WHERE product_id = $1 AND created_at >= NOW() - INTERVAL '1 day' * $2) AS views,
         (SELECT COUNT(DISTINCT COALESCE(user_id::text, session_id)) FROM product_views WHERE product_id = $1 AND created_at >= NOW() - INTERVAL '1 day' * $2) AS unique_viewers,
@@ -21,9 +36,12 @@ export async function getProductAnalyticsData(productId: string, days: number) {
         (SELECT COUNT(DISTINCT oi.order_id) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = $1 AND o.created_at >= NOW() - INTERVAL '1 day' * $2 AND o.payment_status = 'paid') AS orders,
         (SELECT COALESCE(SUM(oi.total_price), 0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = $1 AND o.created_at >= NOW() - INTERVAL '1 day' * $2 AND o.payment_status = 'paid') AS revenue,
         (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE oi.product_id = $1 AND o.created_at >= NOW() - INTERVAL '1 day' * $2 AND o.payment_status = 'paid') AS quantity_sold
-    `, [productId, days]),
+    `,
+      [productId, days]
+    ),
 
-    queryMany<{ date: string; views: string; carts: string; orders: string }>(`
+    queryMany<{ date: string; views: string; carts: string; orders: string }>(
+      `
       SELECT day::date AS date,
         COALESCE(v.views, 0) AS views,
         COALESCE(c.carts, 0) AS carts,
@@ -50,9 +68,12 @@ export async function getProductAnalyticsData(productId: string, days: number) {
         GROUP BY d
       ) o ON o.d = day::date
       ORDER BY day::date ASC
-    `, [productId, days]),
+    `,
+      [productId, days]
+    ),
 
-    queryMany<{ referrer: string; sessions: string }>(`
+    queryMany<{ referrer: string; sessions: string }>(
+      `
       SELECT COALESCE(NULLIF(pe.referrer, ''), 'Direct') AS referrer,
              COUNT(DISTINCT pe.session_id) AS sessions
       FROM page_events pe
@@ -61,18 +82,36 @@ export async function getProductAnalyticsData(productId: string, days: number) {
       GROUP BY referrer
       ORDER BY sessions DESC
       LIMIT 8
-    `, [`/products/${product.slug}%`, days]).catch(() => [] as { referrer: string; sessions: string }[]),
+    `,
+      [`/products/${product.slug}%`, days]
+    ).catch(() => [] as { referrer: string; sessions: string }[]),
 
-    queryMany<{ order_number: string; created_at: string; quantity: string; total_price: string; customer_name: string }>(`
+    queryMany<{
+      order_number: string
+      created_at: string
+      quantity: string
+      total_price: string
+      customer_name: string
+    }>(
+      `
       SELECT o.order_number, o.created_at, oi.quantity, oi.total_price, o.customer_name
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
       WHERE oi.product_id = $1 AND o.payment_status = 'paid'
       ORDER BY o.created_at DESC
       LIMIT 10
-    `, [productId]),
+    `,
+      [productId]
+    ),
 
-    queryMany<{ variant_name: string | null; sub_variant_name: string | null; orders: string; quantity: string; revenue: string }>(`
+    queryMany<{
+      variant_name: string | null
+      sub_variant_name: string | null
+      orders: string
+      quantity: string
+      revenue: string
+    }>(
+      `
       SELECT pv.variant_name,
              NULL AS sub_variant_name,
              COUNT(DISTINCT oi.order_id) AS orders,
@@ -86,12 +125,17 @@ export async function getProductAnalyticsData(productId: string, days: number) {
       GROUP BY pv.variant_name
       ORDER BY revenue DESC
       LIMIT 10
-    `, [productId, days]),
+    `,
+      [productId, days]
+    ),
 
-    queryOne<{ active: string }>(`
+    queryOne<{ active: string }>(
+      `
       SELECT COUNT(*) AS active FROM cart_items
       WHERE product_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE
-    `, [productId]),
+    `,
+      [productId]
+    ),
   ])
 
   const views = parseInt(totals?.views ?? '0')

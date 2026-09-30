@@ -66,17 +66,18 @@ export async function findStuckJobs(): Promise<StuckJob[]> {
      WHERE j.status = 'failed'
         OR (j.status IN ('pending','running') AND j.updated_at < now() - ($1 || ' minutes')::interval)
      ORDER BY j.updated_at`,
-    [String(STUCK_AFTER_MIN)],
+    [String(STUCK_AFTER_MIN)]
   )
   return res.rows.map((r: any) => ({ ...r, stuck_minutes: Math.round(Number(r.stuck_minutes)) }))
 }
 
 export async function alertProvisioningFailure(
-  tenantSlug: string, step: string, error: string, tenantId?: string,
+  tenantSlug: string,
+  step: string,
+  error: string,
+  tenantId?: string
 ): Promise<void> {
-  const where = tenantId
-    ? `/admin/ecom/customers/${tenantId}?tab=provisioning`
-    : '/admin/ecom/customers'
+  const where = tenantId ? `/admin/ecom/customers/${tenantId}?tab=provisioning` : '/admin/ecom/customers'
   // owner_admin_cert and mtls_fleet_refresh run AFTER the job is already `done` — the store is
   // live and nothing is rolled back. Only a failure in the job's own step machine is terminal,
   // so only that case may claim a rollback; the post-done hooks get a re-run instruction.
@@ -86,7 +87,7 @@ export async function alertProvisioningFailure(
     : `The job is terminal and rollback has run. Inspect at ${where}`
   await send(
     `[Jeffi] Provisioning ${nonFatal ? 'step failed (store live)' : 'FAILED'}: ${tenantSlug}`,
-    `Tenant : ${tenantSlug}\nStep   : ${step}\nError  : ${error}\n\n${tail}`,
+    `Tenant : ${tenantSlug}\nStep   : ${step}\nError  : ${error}\n\n${tail}`
   )
 }
 
@@ -100,13 +101,14 @@ export async function alertStuckJobs(): Promise<number> {
     return 0
   }
   if (jobs.length === 0) return 0
-  const lines = jobs.map((j) =>
-    `- ${j.slug}: ${j.status} at ${j.step} (${j.attempts} ticks, idle ${j.stuck_minutes}m)` +
-    (j.last_error ? `\n    ${j.last_error.slice(0, 200)}` : ''),
+  const lines = jobs.map(
+    j =>
+      `- ${j.slug}: ${j.status} at ${j.step} (${j.attempts} ticks, idle ${j.stuck_minutes}m)` +
+      (j.last_error ? `\n    ${j.last_error.slice(0, 200)}` : '')
   )
   await send(
     `[Jeffi] ${jobs.length} provisioning job(s) need attention`,
-    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n/admin/ecom/customers`,
+    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n/admin/ecom/customers`
   )
   return jobs.length
 }

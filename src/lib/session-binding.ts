@@ -3,7 +3,14 @@ import { query, queryOne } from './db'
 import type { PrincipalType } from './auth-sessions'
 import { BIND_ENDPOINT, BIND_TTL_S, PROOF_EXEMPT_PATHS, normHost, type BindingContext } from './session-binding-shared'
 
-export { BIND_ENDPOINT, PROOF_HEADER, BIND_TTL_S, BIND_COOKIE, normHost, type BindingContext } from './session-binding-shared'
+export {
+  BIND_ENDPOINT,
+  PROOF_HEADER,
+  BIND_TTL_S,
+  BIND_COOKIE,
+  normHost,
+  type BindingContext,
+} from './session-binding-shared'
 
 // Key-bound sessions. A session cookie is a bearer token: copied into another browser it still
 // works, and no passive signal can tell two windows of the same browser apart. So the session is
@@ -49,7 +56,10 @@ export function canRegisterKey(sessionCreatedAtMs: number | null | undefined): b
 }
 
 function macKey(): Buffer {
-  return crypto.createHash('sha256').update('session-binding:' + secretBase()).digest()
+  return crypto
+    .createHash('sha256')
+    .update('session-binding:' + secretBase())
+    .digest()
 }
 
 function mac(sidHash: string, exp: number, host: string): string {
@@ -74,7 +84,12 @@ export function verifyBindCookie(value: string | null | undefined, sidHash: stri
   return expected.length === given.length && crypto.timingSafeEqual(expected, given)
 }
 
-export interface PublicJwk { kty: 'EC'; crv: 'P-256'; x: string; y: string }
+export interface PublicJwk {
+  kty: 'EC'
+  crv: 'P-256'
+  x: string
+  y: string
+}
 
 export function parsePublicJwk(input: unknown): PublicJwk | null {
   const j = input as Record<string, unknown> | null
@@ -86,7 +101,12 @@ export function parsePublicJwk(input: unknown): PublicJwk | null {
 
 // Proof = "<ts base36>.<nonce>.<sig>", an ECDSA P-256 signature (WebCrypto's raw r||s form) over
 // METHOD, path, ts and nonce.
-export function verifyProof(jwk: PublicJwk, proof: string | null | undefined, method: string, path: string): { ok: boolean; ts: number } {
+export function verifyProof(
+  jwk: PublicJwk,
+  proof: string | null | undefined,
+  method: string,
+  path: string
+): { ok: boolean; ts: number } {
   const parts = String(proof ?? '').split('.')
   if (parts.length !== 3) return { ok: false, ts: 0 }
   const ts = parseInt(parts[0], 36)
@@ -102,7 +122,11 @@ export function verifyProof(jwk: PublicJwk, proof: string | null | undefined, me
   }
 }
 
-interface StoredKey { jwk: PublicJwk; host: string; createdAt: number }
+interface StoredKey {
+  jwk: PublicJwk
+  host: string
+  createdAt: number
+}
 const keyCache = new Map<string, { key: StoredKey; at: number }>()
 
 // 'unavailable' = the table could not be read (a database the schema has not reached yet).
@@ -203,16 +227,31 @@ export async function evaluateKeyBinding(args: {
     // No key yet: a login that has not bound since, or a session older than this feature. Past
     // the registration window it can never be bound, so under enforcement it has to sign in again.
     const expired = mode === 'enforce' && !canRegisterKey(args.sessionCreatedAt)
-    logBinding({ sessionId, principalType, reason: expired ? 'unbound_expired' : 'unbound', path: ctx.path, host: ctx.host })
+    logBinding({
+      sessionId,
+      principalType,
+      reason: expired ? 'unbound_expired' : 'unbound',
+      path: ctx.path,
+      host: ctx.host,
+    })
     return { status: 'unbound', reject: expired }
   }
   if (key.host !== ctx.host) reason = 'host_mismatch'
 
   // abs(): a key timestamp in the future (clock skew) must not read as a grace that never ends.
-  const inGrace = (reason === 'cookie_missing' || reason === 'cookie_invalid')
-    && Math.abs(Date.now() - key.createdAt) < POST_REGISTRATION_GRACE_MS
+  const inGrace =
+    (reason === 'cookie_missing' || reason === 'cookie_invalid') &&
+    Math.abs(Date.now() - key.createdAt) < POST_REGISTRATION_GRACE_MS
   if (inGrace) return { status: 'ok', reject: false }
 
-  logBinding({ sessionId, principalType, reason, path: ctx.path, host: ctx.host, boundHost: key.host, fetchDest: ctx.fetchDest })
+  logBinding({
+    sessionId,
+    principalType,
+    reason,
+    path: ctx.path,
+    host: ctx.host,
+    boundHost: key.host,
+    fetchDest: ctx.fetchDest,
+  })
   return { status: 'violation', reason, reject: mode === 'enforce' }
 }

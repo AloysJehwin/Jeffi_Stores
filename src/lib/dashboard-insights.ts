@@ -10,49 +10,117 @@ export interface RangeWindow {
 
 export interface DashboardInsights {
   money: {
-    cogs: number; gross: number; grossPrev: number; grossPct: number | null
-    marginPct: number | null; marginPctPrev: number | null; costCoveragePct: number | null
-    units: number; unitsPrev: number; unitsPct: number | null
+    cogs: number
+    gross: number
+    grossPrev: number
+    grossPct: number | null
+    marginPct: number | null
+    marginPctPrev: number | null
+    costCoveragePct: number | null
+    units: number
+    unitsPrev: number
+    unitsPct: number | null
   }
   conversion: {
-    sessions: number; sessionsPrev: number; productViews: number; productViewsPrev: number
-    paidOrders: number; paidOrdersPrev: number; rate: number | null; ratePrev: number | null; ratePct: number | null
+    sessions: number
+    sessionsPrev: number
+    productViews: number
+    productViewsPrev: number
+    paidOrders: number
+    paidOrdersPrev: number
+    rate: number | null
+    ratePrev: number | null
+    ratePct: number | null
   }
   fulfilment: {
-    avgHoursToShip: number | null; avgHoursToShipPrev: number | null; avgDaysToDeliver: number | null
-    onTimePct: number | null; etaSample: number
-    cancelRate: number | null; cancelRatePrev: number | null; returnRate: number | null; returnsInRange: number
+    avgHoursToShip: number | null
+    avgHoursToShipPrev: number | null
+    avgDaysToDeliver: number | null
+    onTimePct: number | null
+    etaSample: number
+    cancelRate: number | null
+    cancelRatePrev: number | null
+    returnRate: number | null
+    returnsInRange: number
     guestShare: number | null
   }
   attention: {
-    pendingOver24h: number; unshippedOver48h: number; deliveryAttempted: number; cancelRequested: number
-    unpaidOnline: number; unpaidOnlineAmount: number; openReturns: number
-    pendingReviews: number; backInStockWaitlist: number; supportOpen: number
-    overdueTasks: number; openTasks: number; pendingRfqs: number; churnHigh: number
-    expiringBatches: number; expiredBatches: number; sellingButOut: number; restockSoon: number; overdueBills: number
+    pendingOver24h: number
+    unshippedOver48h: number
+    deliveryAttempted: number
+    cancelRequested: number
+    unpaidOnline: number
+    unpaidOnlineAmount: number
+    openReturns: number
+    pendingReviews: number
+    backInStockWaitlist: number
+    supportOpen: number
+    overdueTasks: number
+    openTasks: number
+    pendingRfqs: number
+    churnHigh: number
+    expiringBatches: number
+    expiredBatches: number
+    sellingButOut: number
+    restockSoon: number
+    overdueBills: number
   }
   promotions: {
-    discountTotal: number; discountPctOfRevenue: number | null; discountedOrders: number
-    couponUses: number; couponDiscount: number; topCoupons: { code: string; uses: number; discount: number }[]
+    discountTotal: number
+    discountPctOfRevenue: number | null
+    discountedOrders: number
+    couponUses: number
+    couponDiscount: number
+    topCoupons: { code: string; uses: number; discount: number }[]
   }
-  carts: { activeCarts: number; cartValue: number; abandonedCarts: number; abandonedValue: number; savedForLater: number }
+  carts: {
+    activeCarts: number
+    cartValue: number
+    abandonedCarts: number
+    abandonedValue: number
+    savedForLater: number
+  }
   engagement: {
-    wishlistAdds: number; newReviews: number; avgRating: number | null; avgRatingAll: number | null; lowRatingReviews: number
-    searches: number; zeroResultSearches: number; topZeroSearches: { query: string; count: number }[]
-    supportInRange: number; supportResolutionHours: number | null
-    signups: number; signupsPrev: number; signupsPct: number | null
+    wishlistAdds: number
+    newReviews: number
+    avgRating: number | null
+    avgRatingAll: number | null
+    lowRatingReviews: number
+    searches: number
+    zeroResultSearches: number
+    topZeroSearches: { query: string; count: number }[]
+    supportInRange: number
+    supportResolutionHours: number | null
+    signups: number
+    signupsPrev: number
+    signupsPct: number | null
   }
   health: { healthy: number; rising: number; high: number; avgScore: number | null }
   catalog: {
-    activeProducts: number; draftProducts: number; newProducts: number; productsSold: number
-    slowMovers: number; slowMoverValue: number; expiringQty: number
+    activeProducts: number
+    draftProducts: number
+    newProducts: number
+    productsSold: number
+    slowMovers: number
+    slowMoverValue: number
+    expiringQty: number
   }
   topViewed: { id: string; name: string; views: number; units: number; revenue: number; conversion: number | null }[]
   marginByProduct: { id: string; name: string; revenue: number; units: number; marginPct: number | null }[]
   cash: {
-    gstCollected: number; shippingCharged: number; shippingCost: number; shippedViaDelhivery: number; codFees: number
-    cashSales: number; cashSalesValue: number; expenses: number; overdueBillsAmount: number
-    openQuotes: number; openQuotesValue: number; openPos: number; openPosValue: number
+    gstCollected: number
+    shippingCharged: number
+    shippingCost: number
+    shippedViaDelhivery: number
+    codFees: number
+    cashSales: number
+    cashSalesValue: number
+    expenses: number
+    overdueBillsAmount: number
+    openQuotes: number
+    openQuotesValue: number
+    openPos: number
+    openPosValue: number
   }
   byHour: number[]
   trafficByHour: number[]
@@ -64,29 +132,58 @@ const num = (v: unknown) => (v == null ? 0 : parseFloat(String(v)) || 0)
 const int = (v: unknown) => (v == null ? 0 : parseInt(String(v), 10) || 0)
 const nullable = (v: unknown) => (v == null ? null : parseFloat(String(v)))
 const pctDelta = (a: number, b: number): number | null => (b === 0 ? null : Math.round(((a - b) / b) * 100))
-const ratio = (a: number, b: number, digits = 1): number | null => (b > 0 ? Number(((a / b) * 100).toFixed(digits)) : null)
+const ratio = (a: number, b: number, digits = 1): number | null =>
+  b > 0 ? Number(((a / b) * 100).toFixed(digits)) : null
 const round1 = (v: number | null) => (v == null ? null : Math.round(v * 10) / 10)
 const round2 = (v: number | null) => (v == null ? null : Math.round(v * 100) / 100)
 
 export function rangeDays(range: AnalyticsRange): number {
   switch (range) {
-    case 'today': return 1
-    case '7d': return 7
-    case '90d': return 90
-    case 'month': return Math.max(1, new Date().getDate())
-    case 'year': return 365
-    default: return 30
+    case 'today':
+      return 1
+    case '7d':
+      return 7
+    case '90d':
+      return 90
+    case 'month':
+      return Math.max(1, new Date().getDate())
+    case 'year':
+      return 365
+    default:
+      return 30
   }
 }
 
 type PaidRevenue = { revenue: number; revenuePrev: number }
 
-export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | Promise<PaidRevenue>): Promise<DashboardInsights> {
+export async function getDashboardInsights(
+  w: RangeWindow,
+  paid: PaidRevenue | Promise<PaidRevenue>
+): Promise<DashboardInsights> {
   const { startExpr, prevStartExpr, prevEndExpr } = w
   const days = Math.max(1, Math.floor(w.days))
   const prevWindow = `created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}`
 
-  const [money, conv, ful, ret, promo, coupons, cart, eng, zero, health, cat, viewed, margins, hours, traffic, sources, states, cash] = await Promise.all([
+  const [
+    money,
+    conv,
+    ful,
+    ret,
+    promo,
+    coupons,
+    cart,
+    eng,
+    zero,
+    health,
+    cat,
+    viewed,
+    margins,
+    hours,
+    traffic,
+    sources,
+    states,
+    cash,
+  ] = await Promise.all([
     queryOne<Record<string, string>>(`
       WITH items AS (
         SELECT o.created_at, o.payment_status, oi.quantity,
@@ -303,88 +400,180 @@ export async function getDashboardInsights(w: RangeWindow, paid: PaidRevenue | P
   ])
 
   const { revenue, revenuePrev } = await paid
-  const cogs = num(money?.cogs), cogsPrev = num(money?.cogs_prev)
-  const gross = revenue - cogs, grossPrev = revenuePrev - cogsPrev
-  const paidUnits = num(money?.paid_units), costedUnits = num(money?.costed_units)
-  const units = num(money?.units), unitsPrev = num(money?.units_prev)
+  const cogs = num(money?.cogs),
+    cogsPrev = num(money?.cogs_prev)
+  const gross = revenue - cogs,
+    grossPrev = revenuePrev - cogsPrev
+  const paidUnits = num(money?.paid_units),
+    costedUnits = num(money?.costed_units)
+  const units = num(money?.units),
+    unitsPrev = num(money?.units_prev)
 
-  const sessions = int(conv?.sessions), sessionsPrev = int(conv?.sessions_prev)
-  const paidOrders = int(conv?.paid_orders), paidOrdersPrev = int(conv?.paid_orders_prev)
-  const rate = ratio(int(conv?.online_paid), sessions, 2), ratePrev = ratio(int(conv?.online_paid_prev), sessionsPrev, 2)
+  const sessions = int(conv?.sessions),
+    sessionsPrev = int(conv?.sessions_prev)
+  const paidOrders = int(conv?.paid_orders),
+    paidOrdersPrev = int(conv?.paid_orders_prev)
+  const rate = ratio(int(conv?.online_paid), sessions, 2),
+    ratePrev = ratio(int(conv?.online_paid_prev), sessionsPrev, 2)
 
-  const ordersCur = int(ful?.orders_cur), ordersPrev = int(ful?.orders_prev), deliveredCur = int(ful?.delivered_cur)
+  const ordersCur = int(ful?.orders_cur),
+    ordersPrev = int(ful?.orders_prev),
+    deliveredCur = int(ful?.delivered_cur)
   const returnsInRange = int(ret?.in_range)
   const discountTotal = num(promo?.discount_total)
 
   const byHour = Array.from({ length: 24 }, () => 0)
-  for (const r of hours) { const h = int(r.h); if (h >= 0 && h < 24) byHour[h] = int(r.n) }
+  for (const r of hours) {
+    const h = int(r.h)
+    if (h >= 0 && h < 24) byHour[h] = int(r.n)
+  }
   const trafficByHour = Array.from({ length: 24 }, () => 0)
-  for (const r of traffic) { const h = int(r.h); if (h >= 0 && h < 24) trafficByHour[h] = int(r.n) }
+  for (const r of traffic) {
+    const h = int(r.h)
+    if (h >= 0 && h < 24) trafficByHour[h] = int(r.n)
+  }
 
   return {
     money: {
-      cogs, gross, grossPrev, grossPct: pctDelta(gross, grossPrev),
+      cogs,
+      gross,
+      grossPrev,
+      grossPct: pctDelta(gross, grossPrev),
       marginPct: revenue > 0 ? round1((gross / revenue) * 100) : null,
       marginPctPrev: revenuePrev > 0 ? round1((grossPrev / revenuePrev) * 100) : null,
       costCoveragePct: ratio(costedUnits, paidUnits, 0),
-      units, unitsPrev, unitsPct: pctDelta(units, unitsPrev),
+      units,
+      unitsPrev,
+      unitsPct: pctDelta(units, unitsPrev),
     },
     conversion: {
-      sessions, sessionsPrev, productViews: int(conv?.product_views), productViewsPrev: int(conv?.product_views_prev),
-      paidOrders, paidOrdersPrev, rate, ratePrev, ratePct: rate != null && ratePrev != null ? pctDelta(rate, ratePrev) : null,
+      sessions,
+      sessionsPrev,
+      productViews: int(conv?.product_views),
+      productViewsPrev: int(conv?.product_views_prev),
+      paidOrders,
+      paidOrdersPrev,
+      rate,
+      ratePrev,
+      ratePct: rate != null && ratePrev != null ? pctDelta(rate, ratePrev) : null,
     },
     fulfilment: {
-      avgHoursToShip: round2(nullable(ful?.ship_hours)), avgHoursToShipPrev: round2(nullable(ful?.ship_hours_prev)),
+      avgHoursToShip: round2(nullable(ful?.ship_hours)),
+      avgHoursToShipPrev: round2(nullable(ful?.ship_hours_prev)),
       avgDaysToDeliver: round2(nullable(ful?.deliver_days)),
-      onTimePct: ratio(int(ful?.eta_on_time), int(ful?.eta_total), 0), etaSample: int(ful?.eta_total),
-      cancelRate: ratio(int(ful?.cancelled_cur), ordersCur), cancelRatePrev: ratio(int(ful?.cancelled_prev), ordersPrev),
-      returnRate: ratio(returnsInRange, deliveredCur > 0 ? deliveredCur : ordersCur), returnsInRange,
+      onTimePct: ratio(int(ful?.eta_on_time), int(ful?.eta_total), 0),
+      etaSample: int(ful?.eta_total),
+      cancelRate: ratio(int(ful?.cancelled_cur), ordersCur),
+      cancelRatePrev: ratio(int(ful?.cancelled_prev), ordersPrev),
+      returnRate: ratio(returnsInRange, deliveredCur > 0 ? deliveredCur : ordersCur),
+      returnsInRange,
       guestShare: ratio(int(ful?.guest_cur), ordersCur, 0),
     },
     attention: {
-      pendingOver24h: int(ful?.pending_over_24h), unshippedOver48h: int(ful?.unshipped_over_48h),
-      deliveryAttempted: int(ful?.delivery_attempted), cancelRequested: int(ful?.cancel_requested),
-      unpaidOnline: int(ful?.unpaid_online), unpaidOnlineAmount: num(ful?.unpaid_online_amt), openReturns: int(ret?.open_all),
-      pendingReviews: int(eng?.pending_reviews), backInStockWaitlist: int(eng?.back_in_stock), supportOpen: int(eng?.support_open),
-      overdueTasks: int(eng?.overdue_tasks), openTasks: int(eng?.open_tasks), pendingRfqs: int(eng?.pending_rfqs), churnHigh: int(health?.high),
-      expiringBatches: int(cat?.expiring_batches), expiredBatches: int(cat?.expired_batches), sellingButOut: int(cat?.selling_but_out),
-      restockSoon: int(cat?.restock_soon), overdueBills: int(cash?.overdue_bills),
+      pendingOver24h: int(ful?.pending_over_24h),
+      unshippedOver48h: int(ful?.unshipped_over_48h),
+      deliveryAttempted: int(ful?.delivery_attempted),
+      cancelRequested: int(ful?.cancel_requested),
+      unpaidOnline: int(ful?.unpaid_online),
+      unpaidOnlineAmount: num(ful?.unpaid_online_amt),
+      openReturns: int(ret?.open_all),
+      pendingReviews: int(eng?.pending_reviews),
+      backInStockWaitlist: int(eng?.back_in_stock),
+      supportOpen: int(eng?.support_open),
+      overdueTasks: int(eng?.overdue_tasks),
+      openTasks: int(eng?.open_tasks),
+      pendingRfqs: int(eng?.pending_rfqs),
+      churnHigh: int(health?.high),
+      expiringBatches: int(cat?.expiring_batches),
+      expiredBatches: int(cat?.expired_batches),
+      sellingButOut: int(cat?.selling_but_out),
+      restockSoon: int(cat?.restock_soon),
+      overdueBills: int(cash?.overdue_bills),
     },
     promotions: {
-      discountTotal, discountPctOfRevenue: ratio(discountTotal, revenue + discountTotal), discountedOrders: int(promo?.discounted_orders),
-      couponUses: int(promo?.coupon_uses), couponDiscount: num(promo?.coupon_discount),
+      discountTotal,
+      discountPctOfRevenue: ratio(discountTotal, revenue + discountTotal),
+      discountedOrders: int(promo?.discounted_orders),
+      couponUses: int(promo?.coupon_uses),
+      couponDiscount: num(promo?.coupon_discount),
       topCoupons: coupons.map(c => ({ code: c.code, uses: int(c.uses), discount: num(c.discount) })),
     },
     carts: {
-      activeCarts: int(cart?.active_carts), cartValue: num(cart?.cart_value),
-      abandonedCarts: int(cart?.abandoned_carts), abandonedValue: num(cart?.abandoned_value), savedForLater: int(cart?.saved_for_later),
+      activeCarts: int(cart?.active_carts),
+      cartValue: num(cart?.cart_value),
+      abandonedCarts: int(cart?.abandoned_carts),
+      abandonedValue: num(cart?.abandoned_value),
+      savedForLater: int(cart?.saved_for_later),
     },
     engagement: {
-      wishlistAdds: int(eng?.wishlist_adds), newReviews: int(eng?.new_reviews),
-      avgRating: round1(nullable(eng?.avg_rating)), avgRatingAll: round1(nullable(eng?.avg_rating_all)), lowRatingReviews: int(eng?.low_rating),
-      searches: int(eng?.searches), zeroResultSearches: int(eng?.zero_searches),
+      wishlistAdds: int(eng?.wishlist_adds),
+      newReviews: int(eng?.new_reviews),
+      avgRating: round1(nullable(eng?.avg_rating)),
+      avgRatingAll: round1(nullable(eng?.avg_rating_all)),
+      lowRatingReviews: int(eng?.low_rating),
+      searches: int(eng?.searches),
+      zeroResultSearches: int(eng?.zero_searches),
       topZeroSearches: zero.map(z => ({ query: z.q, count: int(z.n) })),
-      supportInRange: int(eng?.support_in_range), supportResolutionHours: round2(nullable(eng?.support_hours)),
-      signups: int(eng?.signups), signupsPrev: int(eng?.signups_prev), signupsPct: pctDelta(int(eng?.signups), int(eng?.signups_prev)),
+      supportInRange: int(eng?.support_in_range),
+      supportResolutionHours: round2(nullable(eng?.support_hours)),
+      signups: int(eng?.signups),
+      signupsPrev: int(eng?.signups_prev),
+      signupsPct: pctDelta(int(eng?.signups), int(eng?.signups_prev)),
     },
-    health: { healthy: int(health?.healthy), rising: int(health?.rising), high: int(health?.high), avgScore: round1(nullable(health?.avg_score)) },
+    health: {
+      healthy: int(health?.healthy),
+      rising: int(health?.rising),
+      high: int(health?.high),
+      avgScore: round1(nullable(health?.avg_score)),
+    },
     catalog: {
-      activeProducts: int(cat?.active_products), draftProducts: int(cat?.draft_products), newProducts: int(cat?.new_products),
-      productsSold: int(cat?.products_sold), slowMovers: int(cat?.slow_movers), slowMoverValue: num(cat?.slow_mover_value), expiringQty: num(cat?.expiring_qty),
+      activeProducts: int(cat?.active_products),
+      draftProducts: int(cat?.draft_products),
+      newProducts: int(cat?.new_products),
+      productsSold: int(cat?.products_sold),
+      slowMovers: int(cat?.slow_movers),
+      slowMoverValue: num(cat?.slow_mover_value),
+      expiringQty: num(cat?.expiring_qty),
     },
     topViewed: viewed.map(v => {
-      const views = int(v.views), unitsSold = num(v.units)
-      return { id: v.id, name: v.name, views, units: unitsSold, revenue: num(v.revenue), conversion: ratio(unitsSold, views) }
+      const views = int(v.views),
+        unitsSold = num(v.units)
+      return {
+        id: v.id,
+        name: v.name,
+        views,
+        units: unitsSold,
+        revenue: num(v.revenue),
+        conversion: ratio(unitsSold, views),
+      }
     }),
     marginByProduct: margins.map(m => {
-      const rev = num(m.revenue), c = num(m.cogs), u = num(m.units), costed = num(m.costed_units)
-      return { id: m.id, name: m.name, revenue: rev, units: u, marginPct: rev > 0 && costed > 0 && costed >= u * 0.5 ? round1(((rev - c) / rev) * 100) : null }
+      const rev = num(m.revenue),
+        c = num(m.cogs),
+        u = num(m.units),
+        costed = num(m.costed_units)
+      return {
+        id: m.id,
+        name: m.name,
+        revenue: rev,
+        units: u,
+        marginPct: rev > 0 && costed > 0 && costed >= u * 0.5 ? round1(((rev - c) / rev) * 100) : null,
+      }
     }),
     cash: {
-      gstCollected: num(promo?.gst_collected), shippingCharged: num(promo?.shipping_charged), shippingCost: num(promo?.shipping_cost),
-      shippedViaDelhivery: int(promo?.shipped_via_delhivery), codFees: num(promo?.cod_fees),
-      cashSales: int(cash?.cash_sales), cashSalesValue: num(cash?.cash_sales_value), expenses: num(cash?.expenses), overdueBillsAmount: num(cash?.overdue_bills_amt),
-      openQuotes: int(cash?.open_quotes), openQuotesValue: num(cash?.open_quotes_value), openPos: int(cash?.open_pos), openPosValue: num(cash?.open_pos_value),
+      gstCollected: num(promo?.gst_collected),
+      shippingCharged: num(promo?.shipping_charged),
+      shippingCost: num(promo?.shipping_cost),
+      shippedViaDelhivery: int(promo?.shipped_via_delhivery),
+      codFees: num(promo?.cod_fees),
+      cashSales: int(cash?.cash_sales),
+      cashSalesValue: num(cash?.cash_sales_value),
+      expenses: num(cash?.expenses),
+      overdueBillsAmount: num(cash?.overdue_bills_amt),
+      openQuotes: int(cash?.open_quotes),
+      openQuotesValue: num(cash?.open_quotes_value),
+      openPos: int(cash?.open_pos),
+      openPosValue: num(cash?.open_pos_value),
     },
     byHour,
     trafficByHour,

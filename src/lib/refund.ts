@@ -12,7 +12,7 @@ interface ReturnRequestLike {
 
 export async function computeRefundableAmount(
   order: RefundOrderLike,
-  returnRequest: ReturnRequestLike | null,
+  returnRequest: ReturnRequestLike | null
 ): Promise<number> {
   const total = parseFloat(String(order.total_amount)) || 0
   const isReturn = order.status === 'returned'
@@ -23,9 +23,8 @@ export async function computeRefundableAmount(
 
   const charge = (await getBusinessValues()).returnStandardCharge
   const items = Array.isArray(returnRequest?.items) ? returnRequest!.items! : []
-  const returnedValue = items.length > 0
-    ? items.reduce((sum, i) => sum + (parseFloat(String(i.refund_amount)) || 0), 0)
-    : total
+  const returnedValue =
+    items.length > 0 ? items.reduce((sum, i) => sum + (parseFloat(String(i.refund_amount)) || 0), 0) : total
 
   return Math.max(0, Math.round((returnedValue - charge) * 100) / 100)
 }
