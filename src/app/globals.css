@@ -29,12 +29,12 @@
     --color-foreground-secondary: #d1d5db;
     --color-foreground-muted: #aeb4c0;
     --color-border: #3f4150;
-    --color-border-secondary: #4a4c5e;
+    --color-border-secondary: #6a6c82; /* WCAG AA 3:1 on --color-surface for input/UI outlines */
 
     /* Brand colors — dark mode (deeper for WCAG contrast on dark surfaces) */
     --primary-500: #d97706;
     --primary-600: #b45309;
-    --accent-500: #5a8a00;
+    --accent-500: #74a800; /* WCAG AA 4.5:1 as text on dark surface */
     --accent-600: #4a7200;
   }
 
