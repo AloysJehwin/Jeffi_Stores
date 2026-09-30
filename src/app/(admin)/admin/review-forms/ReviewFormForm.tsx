@@ -12,6 +12,7 @@ import AIFillForm from '@/components/admin/AIFillForm'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Coupon {
   id: string
@@ -102,7 +103,7 @@ export default function ReviewFormForm({
   const [isActive, setIsActive] = useState(d.is_active !== false)
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const { showToast } = useToast()
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
   useEffect(() => {
@@ -178,7 +179,6 @@ export default function ReviewFormForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
-    setError('')
     try {
       const v = valuesRef.current
       const payload = {
@@ -207,7 +207,7 @@ export default function ReviewFormForm({
         })
         if (!res.ok) {
           const dd = await res.json()
-          setError(dd.error || 'Failed to save')
+          showToast(dd.error || 'Failed to save', 'error')
           return
         }
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
@@ -228,7 +228,7 @@ export default function ReviewFormForm({
           const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'POST' })
           if (!res.ok) {
             const d = await res.json()
-            setError(d.error || 'Failed to publish')
+            showToast(d.error || 'Failed to publish', 'error')
             return
           }
           router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
@@ -243,7 +243,7 @@ export default function ReviewFormForm({
         })
         if (!res.ok) {
           const d = await res.json()
-          setError(d.error || 'Failed to save draft')
+          showToast(d.error || 'Failed to save draft', 'error')
           return
         }
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
@@ -262,7 +262,7 @@ export default function ReviewFormForm({
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.error || 'Failed to save form')
+        showToast(data.error || 'Failed to save form', 'error')
         return
       }
 
@@ -479,8 +479,6 @@ export default function ReviewFormForm({
             ))}
           </div>
         </div>
-
-        {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex items-center gap-3 pt-2">
           <Link

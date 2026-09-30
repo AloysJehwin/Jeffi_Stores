@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface UserResult {
   id: string
@@ -61,7 +62,7 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [bulkLoading, setBulkLoading] = useState(false)
-  const [bulkStatus, setBulkStatus] = useState<string | null>(null)
+  const { showToast } = useToast()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const search = useCallback((val: string) => {
@@ -98,26 +99,24 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
 
   async function bulkFetch(params: string, label: string) {
     setBulkLoading(true)
-    setBulkStatus(null)
     try {
       const res = await fetch(`/api/admin/coupons/user-pool?${params}`)
       const data = await res.json()
       if (!res.ok) {
-        setBulkStatus(`Error: ${data.error}`)
+        showToast(`Error: ${data.error}`, 'error')
         return
       }
       const users: UserResult[] = (data.users || []).filter((u: UserResult) => !existingIds.has(u.id))
       if (users.length === 0) {
-        setBulkStatus(`No new users to add from ${label}`)
+        showToast(`No new users to add from ${label}`, 'info')
       } else {
         for (const u of users) {
           await onAdd(u)
         }
-        setBulkStatus(`Added ${users.length} user${users.length === 1 ? '' : 's'} from ${label}`)
+        showToast(`Added ${users.length} user${users.length === 1 ? '' : 's'} from ${label}`, 'success')
       }
     } finally {
       setBulkLoading(false)
-      setTimeout(() => setBulkStatus(null), 4000)
     }
   }
 
@@ -240,8 +239,6 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
           </div>
         </div>
       )}
-
-      {bulkStatus && <p className="text-xs text-foreground-secondary">{bulkStatus}</p>}
     </div>
   )
 }

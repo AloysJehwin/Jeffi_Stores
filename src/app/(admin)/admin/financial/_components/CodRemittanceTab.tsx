@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 import { Skeleton, SummaryCard, formatDate, formatINR } from './shared'
 
 export function CodRemittanceTab() {
@@ -12,8 +13,8 @@ export function CodRemittanceTab() {
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
   const canWrite = useCanWrite('financial:write')
+  const { showToast } = useToast()
 
   const load = useCallback(() => {
     setLoading(true)
@@ -32,7 +33,6 @@ export function CodRemittanceTab() {
 
   async function markRemitted(ids: string[]) {
     setMarking(true)
-    setMsg(null)
     const res = await fetch('/api/admin/financial/cod-remittance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -41,7 +41,7 @@ export function CodRemittanceTab() {
     const j = await res.json()
     setMarking(false)
     if (j.success) {
-      setMsg(`Marked ${j.marked} order(s) as remitted.`)
+      showToast(`Marked ${j.marked} order(s) as remitted.`, 'success')
       load()
     }
   }
@@ -100,7 +100,6 @@ export function CodRemittanceTab() {
             {marking ? 'Marking…' : `Mark ${selected.size} selected as Remitted`}
           </button>
         )}
-        {msg && <span className="text-sm text-green-600 dark:text-green-400 font-medium">{msg}</span>}
       </div>
 
       {loading && <Skeleton rows={6} />}
