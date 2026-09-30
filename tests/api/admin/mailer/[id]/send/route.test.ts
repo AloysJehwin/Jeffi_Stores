@@ -105,14 +105,13 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockQueryOne.mockResolvedValue(futureCampaign)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await POST(makeRequest('campaign-1', { dispatchNow: false }), { params: Promise.resolve({ id: 'campaign-1' }) })
+    const res = await POST(makeRequest('campaign-1', { dispatchNow: false }), {
+      params: Promise.resolve({ id: 'campaign-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.scheduled).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("status = 'scheduled'"),
-      ['campaign-1'],
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'scheduled'"), ['campaign-1'])
   })
 
   it('queues immediate dispatch when dispatchNow is true even with future scheduled_at', async () => {
@@ -122,17 +121,16 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendCampaign.mockResolvedValue({ sent: 50, failed: 2 })
 
-    const res = await POST(makeRequest('campaign-1', { dispatchNow: true }), { params: Promise.resolve({ id: 'campaign-1' }) })
+    const res = await POST(makeRequest('campaign-1', { dispatchNow: true }), {
+      params: Promise.resolve({ id: 'campaign-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     // The send is now fire-and-forget: the route returns immediately after
     // marking the campaign 'sending' and kicking off a background dispatch.
     expect(body.queued).toBe(true)
     expect(body.batch_size).toBe(50)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("status = 'sending'"),
-      ['campaign-1'],
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'sending'"), ['campaign-1'])
   })
 
   it('queues dispatch of a draft campaign without scheduled_at', async () => {
@@ -148,7 +146,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     expect(body.queued).toBe(true)
     expect(body.batch_size).toBe(50)
     // Background dispatch fires after the response; allow the microtask to run.
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(mockSendCampaign).toHaveBeenCalledWith('campaign-1', expect.objectContaining({ batchSize: 50 }))
   })
 })

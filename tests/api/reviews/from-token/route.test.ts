@@ -106,8 +106,8 @@ describe('POST /api/reviews/from-token', () => {
 
   it('returns 400 when order not delivered', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)   // no existing review
-      .mockResolvedValueOnce(null as any)   // order check fails
+      .mockResolvedValueOnce(null as any) // no existing review
+      .mockResolvedValueOnce(null as any) // order check fails
     const res = await POST(makePostReq({ token: 't', rating: 5, comment: 'great' }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/not delivered/)
@@ -116,9 +116,9 @@ describe('POST /api/reviews/from-token', () => {
   it('submits review on happy path', async () => {
     const review = { id: 'rev-1', rating: 5 }
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)           // no existing review
+      .mockResolvedValueOnce(null as any) // no existing review
       .mockResolvedValueOnce({ id: 'ord-1' } as any) // order check passes
-      .mockResolvedValueOnce(review as any)          // INSERT review
+      .mockResolvedValueOnce(review as any) // INSERT review
     const res = await POST(makePostReq({ token: 't', rating: 5, comment: 'great', title: 'Nice' }))
     expect(res.status).toBe(200)
     expect((await res.json()).message).toMatch(/submitted/)

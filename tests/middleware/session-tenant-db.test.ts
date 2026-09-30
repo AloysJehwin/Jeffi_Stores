@@ -10,7 +10,9 @@ const { mockResolveTenant, mockVerifyToken, mockResolveSession, seenTenantIds } 
 }))
 
 vi.mock('@/lib/jwt', () => ({
-  verifyToken: mockVerifyToken, verifyBusinessToken: vi.fn(), authenticateAdmin: vi.fn(),
+  verifyToken: mockVerifyToken,
+  verifyBusinessToken: vi.fn(),
+  authenticateAdmin: vi.fn(),
 }))
 vi.mock('@/lib/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/scopes', () => ({
@@ -32,8 +34,19 @@ import { middleware } from '@/middleware'
 import { adminCookieNameForHost } from '@/lib/admin-cookie'
 
 const ACTIVE = {
-  tenantId: 't-1', slug: 'acme', displayName: 'Acme', plan: 'basic',
-  infra: { rdsEndpoint: 'ep', rdsDb: 'jeffi_stores', rdsPort: 5432, dbSecretRef: null, iamAuth: true, s3Bucket: 'b', region: 'us-east-1' },
+  tenantId: 't-1',
+  slug: 'acme',
+  displayName: 'Acme',
+  plan: 'basic',
+  infra: {
+    rdsEndpoint: 'ep',
+    rdsDb: 'jeffi_stores',
+    rdsPort: 5432,
+    dbSecretRef: null,
+    iamAuth: true,
+    s3Bucket: 'b',
+    region: 'us-east-1',
+  },
 }
 
 function req(url: string, host: string, opts: { admin?: boolean } = {}) {
@@ -59,7 +72,9 @@ describe('middleware resolves sessions against the tenant database', () => {
   })
 
   it('carries tenant context into the admin API session lookup', async () => {
-    await middleware(req('https://admin-acme.jeffistores.in/api/admin/products', 'admin-acme.jeffistores.in', { admin: true }))
+    await middleware(
+      req('https://admin-acme.jeffistores.in/api/admin/products', 'admin-acme.jeffistores.in', { admin: true })
+    )
     expect(seenTenantIds).toEqual(['t-1'])
   })
 
@@ -85,26 +100,58 @@ describe('a session minted for another tenant is refused', () => {
   })
 
   it('refuses a platform session (tenantId null) on a tenant host', async () => {
-    mockResolveSession.mockResolvedValue({ sid: 's', principalType: 'admin', principalId: 'a-1', tenantId: null, scopes: [] })
-    const res = await middleware(req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true }))
+    mockResolveSession.mockResolvedValue({
+      sid: 's',
+      principalType: 'admin',
+      principalId: 'a-1',
+      tenantId: null,
+      scopes: [],
+    })
+    const res = await middleware(
+      req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true })
+    )
     expect(res.status).toBe(307)
   })
 
   it('refuses another tenant session on this tenant host', async () => {
-    mockResolveSession.mockResolvedValue({ sid: 's', principalType: 'admin', principalId: 'a-1', tenantId: 't-2', scopes: [] })
-    const res = await middleware(req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true }))
+    mockResolveSession.mockResolvedValue({
+      sid: 's',
+      principalType: 'admin',
+      principalId: 'a-1',
+      tenantId: 't-2',
+      scopes: [],
+    })
+    const res = await middleware(
+      req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true })
+    )
     expect(res.status).toBe(307)
   })
 
   it('does not clear the shared admin cookie when refusing', async () => {
-    mockResolveSession.mockResolvedValue({ sid: 's', principalType: 'admin', principalId: 'a-1', tenantId: null, scopes: [] })
-    const res = await middleware(req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true }))
+    mockResolveSession.mockResolvedValue({
+      sid: 's',
+      principalType: 'admin',
+      principalId: 'a-1',
+      tenantId: null,
+      scopes: [],
+    })
+    const res = await middleware(
+      req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true })
+    )
     expect(res.headers.get('set-cookie') ?? '').not.toContain('admin_sid=')
   })
 
   it('admits the tenant own session', async () => {
-    mockResolveSession.mockResolvedValue({ sid: 's', principalType: 'admin', principalId: 'a-1', tenantId: 't-1', scopes: [] })
-    const res = await middleware(req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true }))
+    mockResolveSession.mockResolvedValue({
+      sid: 's',
+      principalType: 'admin',
+      principalId: 'a-1',
+      tenantId: 't-1',
+      scopes: [],
+    })
+    const res = await middleware(
+      req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true })
+    )
     expect(res.status).not.toBe(307)
   })
 })

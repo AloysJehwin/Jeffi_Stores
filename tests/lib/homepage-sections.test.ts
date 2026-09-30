@@ -1,24 +1,55 @@
 import { describe, it, expect } from 'vitest'
 import {
-  DEFAULT_SECTIONS, SECTION_META, SECTION_TYPES,
-  isWithinWindow, productRowKey, productSource, sectionLayout, sectionLimit,
-  visibleSections, withDefaults,
+  DEFAULT_SECTIONS,
+  SECTION_META,
+  SECTION_TYPES,
+  isWithinWindow,
+  productRowKey,
+  productSource,
+  sectionLayout,
+  sectionLimit,
+  visibleSections,
+  withDefaults,
   type HomepageSection,
 } from '@/lib/homepage-sections'
 
 const make = (over: Partial<HomepageSection> = {}): HomepageSection => ({
-  id: 'x', type: 'product_row', title: null, subtitle: null, eyebrow: null,
-  cta_label: null, cta_url: null, config: {}, display_order: 0, is_active: true,
-  starts_at: null, ends_at: null, ...over,
+  id: 'x',
+  type: 'product_row',
+  title: null,
+  subtitle: null,
+  eyebrow: null,
+  cta_label: null,
+  cta_url: null,
+  config: {},
+  display_order: 0,
+  is_active: true,
+  starts_at: null,
+  ends_at: null,
+  ...over,
 })
 
 describe('defaults', () => {
   it('starts a store on the classic layout plus the engagement sections that need no setup', () => {
     expect(DEFAULT_SECTIONS.map(s => s.type)).toEqual([
-      'hero', 'trust_strip', 'category_grid', 'product_row', 'brand_carousel',
-      'product_row', 'category_showcase', 'featured_for_you', 'recently_viewed', 'product_row',
-      'category_tabs', 'back_in_stock', 'testimonials', 'benefits', 'why_us', 'value_stats',
-      'about', 'business_cta',
+      'hero',
+      'trust_strip',
+      'category_grid',
+      'product_row',
+      'brand_carousel',
+      'product_row',
+      'category_showcase',
+      'featured_for_you',
+      'recently_viewed',
+      'product_row',
+      'category_tabs',
+      'back_in_stock',
+      'testimonials',
+      'benefits',
+      'why_us',
+      'value_stats',
+      'about',
+      'business_cta',
     ])
   })
 
@@ -128,6 +159,8 @@ describe('config accessors', () => {
     const base = make({ config: { source: 'featured' } })
     expect(productRowKey(base, 8)).not.toBe(productRowKey(base, 4))
     expect(productRowKey(base, 8)).not.toBe(productRowKey(make({ config: { source: 'on_sale' } }), 8))
-    expect(productRowKey(base, 8)).not.toBe(productRowKey(make({ config: { source: 'featured', categorySlug: 'tools' } }), 8))
+    expect(productRowKey(base, 8)).not.toBe(
+      productRowKey(make({ config: { source: 'featured', categorySlug: 'tools' } }), 8)
+    )
   })
 })

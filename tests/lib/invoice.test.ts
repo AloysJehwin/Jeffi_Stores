@@ -122,7 +122,7 @@ describe('createDraftInvoice', () => {
 
   it('inserts draft invoice when none exists', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(null)           // SELECT — no existing
+      .mockResolvedValueOnce(null) // SELECT — no existing
       .mockResolvedValueOnce({ id: 'new-inv' }) // INSERT RETURNING
     await createDraftInvoice('order-1')
     expect(mockQueryOne).toHaveBeenCalledTimes(2)
@@ -131,9 +131,7 @@ describe('createDraftInvoice', () => {
   })
 
   it('inserts with the correct order_id', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'inv-2' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'inv-2' })
     await createDraftInvoice('order-xyz')
     const [, params] = mockQueryOne.mock.calls[1]
     expect(params).toContain('order-xyz')
@@ -157,12 +155,11 @@ describe('generateOrderInvoice already finalized', () => {
 // ---------------------------------------------------------------------------
 describe('generateOrderInvoice guard conditions', () => {
   beforeEach(() => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing finalized invoice
+    mockQueryOne.mockResolvedValueOnce(null) // no existing finalized invoice
   })
 
   it('returns null when order not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)  // order query
+    mockQueryOne.mockResolvedValueOnce(null) // order query
     const result = await generateOrderInvoice('order-1')
     expect(result).toBeNull()
   })
@@ -207,15 +204,16 @@ describe('generateOrderInvoice success path', () => {
     // 7) update pdf_url
 
     mockQueryOne
-      .mockResolvedValueOnce(null)           // no finalized invoice
-      .mockResolvedValueOnce(mockOrder)      // fetch order
-      .mockResolvedValueOnce(null)           // paymentRecord (no razorpay txn)
-      .mockResolvedValueOnce(null)           // billing address not fetched (billing_address_id null)
-      .mockResolvedValueOnce({ id: 'inv-updated' })  // UPDATE pdf_url
+      .mockResolvedValueOnce(null) // no finalized invoice
+      .mockResolvedValueOnce(mockOrder) // fetch order
+      .mockResolvedValueOnce(null) // paymentRecord (no razorpay txn)
+      .mockResolvedValueOnce(null) // billing address not fetched (billing_address_id null)
+      .mockResolvedValueOnce({ id: 'inv-updated' }) // UPDATE pdf_url
 
     mockQueryMany
       .mockResolvedValueOnce([mockOrderItem]) // order items in generateOrderInvoice
-      .mockResolvedValueOnce([               // settings rows
+      .mockResolvedValueOnce([
+        // settings rows
         { key: 'business_gstin', value: '22AAAAA0000A1Z5' },
         { key: 'business_legal_name', value: 'Jeffi Stores' },
         { key: 'business_trade_name', value: 'Jeffi Stores' },
@@ -227,7 +225,7 @@ describe('generateOrderInvoice success path', () => {
       ])
       .mockResolvedValueOnce([mockOrderItem]) // updated items
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({
           rows: [{ value: 'JS' }],
@@ -326,10 +324,11 @@ describe('generateOrderInvoice with separate billing address', () => {
     }
 
     mockQueryOne
-      .mockResolvedValueOnce(null)              // no finalized invoice
-      .mockResolvedValueOnce(orderWithBilling)  // order
-      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
-      .mockResolvedValueOnce({                  // billing address
+      .mockResolvedValueOnce(null) // no finalized invoice
+      .mockResolvedValueOnce(orderWithBilling) // order
+      .mockResolvedValueOnce(null) // paymentRecord (no razorpay txn)
+      .mockResolvedValueOnce({
+        // billing address
         full_name: 'Jane Doe',
         address_line1: '456 Business Rd',
         address_line2: null,
@@ -338,14 +337,14 @@ describe('generateOrderInvoice with separate billing address', () => {
         postal_code: '400001',
         phone: '9123456789',
       })
-      .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
+      .mockResolvedValueOnce({ id: 'inv-up' }) // UPDATE pdf_url
 
     mockQueryMany
-      .mockResolvedValueOnce([mockOrderItem])   // order items
+      .mockResolvedValueOnce([mockOrderItem]) // order items
       .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
-      .mockResolvedValueOnce([mockOrderItem])   // updated items
+      .mockResolvedValueOnce([mockOrderItem]) // updated items
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -377,18 +376,18 @@ describe('generateOrderInvoice with separate billing address', () => {
     }
 
     mockQueryOne
-      .mockResolvedValueOnce(null)              // no finalized invoice
-      .mockResolvedValueOnce(orderWithBilling)  // order
-      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
-      .mockResolvedValueOnce(null)              // billing address row not found
-      .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
+      .mockResolvedValueOnce(null) // no finalized invoice
+      .mockResolvedValueOnce(orderWithBilling) // order
+      .mockResolvedValueOnce(null) // paymentRecord (no razorpay txn)
+      .mockResolvedValueOnce(null) // billing address row not found
+      .mockResolvedValueOnce({ id: 'inv-up' }) // UPDATE pdf_url
 
     mockQueryMany
-      .mockResolvedValueOnce([mockOrderItem])   // order items
+      .mockResolvedValueOnce([mockOrderItem]) // order items
       .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
-      .mockResolvedValueOnce([mockOrderItem])   // updated items
+      .mockResolvedValueOnce([mockOrderItem]) // updated items
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -420,10 +419,11 @@ describe('generateOrderInvoice with separate billing address', () => {
     }
 
     mockQueryOne
-      .mockResolvedValueOnce(null)              // no finalized invoice
-      .mockResolvedValueOnce(orderWithBilling)  // order
-      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
-      .mockResolvedValueOnce({                  // billing address with all-null fields
+      .mockResolvedValueOnce(null) // no finalized invoice
+      .mockResolvedValueOnce(orderWithBilling) // order
+      .mockResolvedValueOnce(null) // paymentRecord (no razorpay txn)
+      .mockResolvedValueOnce({
+        // billing address with all-null fields
         full_name: null,
         address_line1: null,
         address_line2: null,
@@ -432,14 +432,14 @@ describe('generateOrderInvoice with separate billing address', () => {
         postal_code: null,
         phone: null,
       })
-      .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
+      .mockResolvedValueOnce({ id: 'inv-up' }) // UPDATE pdf_url
 
     mockQueryMany
-      .mockResolvedValueOnce([mockOrderItem])   // order items
+      .mockResolvedValueOnce([mockOrderItem]) // order items
       .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
-      .mockResolvedValueOnce([mockOrderItem])   // updated items
+      .mockResolvedValueOnce([mockOrderItem]) // updated items
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -497,9 +497,9 @@ describe('generateOrderInvoice item field null fallbacks', () => {
     }
 
     mockQueryOne
-      .mockResolvedValueOnce(null)           // no finalized invoice
-      .mockResolvedValueOnce(mockOrder)      // order
-      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce(null) // no finalized invoice
+      .mockResolvedValueOnce(mockOrder) // order
+      .mockResolvedValueOnce(null) // paymentRecord
       .mockResolvedValueOnce({ id: 'inv-up' }) // UPDATE pdf_url
 
     mockQueryMany
@@ -507,7 +507,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
       .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
       .mockResolvedValueOnce([itemWithNulls]) // updated items
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -546,7 +546,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(orderNeedingRecalc)
-      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce(null) // paymentRecord
       .mockResolvedValueOnce({ id: 'inv-up' })
 
     mockQueryMany
@@ -554,7 +554,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
       .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }])
       .mockResolvedValueOnce([itemNoGstRate])
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -584,7 +584,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(orderWithTaxable)
-      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce(null) // paymentRecord
       .mockResolvedValueOnce({ id: 'inv-up' })
 
     mockQueryMany
@@ -592,7 +592,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
       .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
       .mockResolvedValueOnce([mockOrderItem])
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -626,7 +626,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
       .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
       .mockResolvedValueOnce([mockOrderItem])
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
@@ -658,7 +658,7 @@ describe('generateOrderInvoice item field null fallbacks', () => {
       .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
       .mockResolvedValueOnce([mockOrderItem])
 
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }

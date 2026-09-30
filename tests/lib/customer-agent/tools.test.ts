@@ -82,7 +82,9 @@ describe('customer-agent/tools', () => {
       mockQueryMany
         .mockResolvedValueOnce([{ product_id: 'p3' }])
         // product details
-        .mockResolvedValueOnce([{ id: 'p3', name: 'Gizmo', slug: 'gizmo', sku: 'G1', price: '150', short_description: null, stock: 2 }])
+        .mockResolvedValueOnce([
+          { id: 'p3', name: 'Gizmo', slug: 'gizmo', sku: 'G1', price: '150', short_description: null, stock: 2 },
+        ])
       const result = await tool().handler({ query: 'gizmo variant' }, ctx)
       expect((result as any).products).toHaveLength(1)
     })
@@ -202,7 +204,14 @@ describe('customer-agent/tools', () => {
 
     it('returns recently added products', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'New Product', slug: 'new-product', sku: 'NP1', price: '299', short_description: 'A new one' },
+        {
+          id: 'p1',
+          name: 'New Product',
+          slug: 'new-product',
+          sku: 'NP1',
+          price: '299',
+          short_description: 'A new one',
+        },
         { id: 'p2', name: 'Another New', slug: 'another-new', sku: 'AN1', price: '199', short_description: null },
       ])
       const result = await tool().handler({}, ctx)
@@ -234,7 +243,14 @@ describe('customer-agent/tools', () => {
 
     it('returns featured products', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Featured Widget', slug: 'featured-widget', sku: 'FW1', price: '499', short_description: 'Great pick' },
+        {
+          id: 'p1',
+          name: 'Featured Widget',
+          slug: 'featured-widget',
+          sku: 'FW1',
+          price: '499',
+          short_description: 'Great pick',
+        },
       ])
       const result = await tool().handler({}, ctx)
       expect((result as any).products).toHaveLength(1)
@@ -259,16 +275,31 @@ describe('customer-agent/tools', () => {
 
     it('returns orders for authenticated user', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-001', status: 'delivered', payment_status: 'paid', total_amount: '1500', created_at: '2024-01-01', delivered_at: null, awb_number: null },
-        { id: 'o2', order_number: 'ORD-002', status: 'processing', payment_status: 'paid', total_amount: '800', created_at: '2024-02-01', delivered_at: null, awb_number: null },
+        {
+          id: 'o1',
+          order_number: 'ORD-001',
+          status: 'delivered',
+          payment_status: 'paid',
+          total_amount: '1500',
+          created_at: '2024-01-01',
+          delivered_at: null,
+          awb_number: null,
+        },
+        {
+          id: 'o2',
+          order_number: 'ORD-002',
+          status: 'processing',
+          payment_status: 'paid',
+          total_amount: '800',
+          created_at: '2024-02-01',
+          delivered_at: null,
+          awb_number: null,
+        },
       ])
 
       const result = await tool().handler({}, ctx)
       expect((result as any).orders).toBeDefined()
-      expect(mockQueryMany).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.arrayContaining(['user-123'])
-      )
+      expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['user-123']))
     })
 
     it('returns empty list when user has no orders', async () => {
@@ -315,7 +346,14 @@ describe('customer-agent/tools', () => {
         delivered_at: '2024-01-05',
       })
       mockQueryMany.mockResolvedValueOnce([
-        { product_name: 'Widget A', product_sku: 'WA1', variant_name: null, quantity: '2', unit_price: '700', total_price: '1400' },
+        {
+          product_name: 'Widget A',
+          product_sku: 'WA1',
+          variant_name: null,
+          quantity: '2',
+          unit_price: '700',
+          total_price: '1400',
+        },
       ])
 
       const result = await tool().handler({ orderNumber: 'ORD-001' }, ctx)
@@ -338,9 +376,14 @@ describe('customer-agent/tools', () => {
 
     it('returns order with empty items array when no line items', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'o2', order_number: 'ORD-002', status: 'processing',
-        payment_status: 'paid', subtotal: '500', total_amount: '520',
-        created_at: '2024-03-01', delivered_at: null,
+        id: 'o2',
+        order_number: 'ORD-002',
+        status: 'processing',
+        payment_status: 'paid',
+        subtotal: '500',
+        total_amount: '520',
+        created_at: '2024-03-01',
+        delivered_at: null,
       })
       mockQueryMany.mockResolvedValueOnce([])
       const result = await tool().handler({ orderNumber: 'ORD-002' }, ctx)
@@ -359,11 +402,10 @@ describe('customer-agent/tools', () => {
     })
 
     it('uses purchase history to find similar products', async () => {
-      mockQueryMany
-        .mockResolvedValueOnce([
-          { product_id: 'p1', product_name: 'Widget A' },
-          { product_id: 'p2', product_name: 'Widget B' },
-        ])
+      mockQueryMany.mockResolvedValueOnce([
+        { product_id: 'p1', product_name: 'Widget A' },
+        { product_id: 'p2', product_name: 'Widget B' },
+      ])
       mockFindSimilar.mockResolvedValueOnce([
         { matchedVia: 'products', productId: 'p3', variantId: null, similarity: 0.9 },
         { matchedVia: 'products', productId: 'p4', variantId: null, similarity: 0.8 },
@@ -377,10 +419,7 @@ describe('customer-agent/tools', () => {
     })
 
     it('excludes already-owned products from recommendations', async () => {
-      mockQueryMany
-        .mockResolvedValueOnce([
-          { product_id: 'p1', product_name: 'Widget A' },
-        ])
+      mockQueryMany.mockResolvedValueOnce([{ product_id: 'p1', product_name: 'Widget A' }])
       mockFindSimilar.mockResolvedValueOnce([
         { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 }, // already owned — excluded
         { matchedVia: 'products', productId: 'p2', variantId: null, similarity: 0.8 },
@@ -394,8 +433,7 @@ describe('customer-agent/tools', () => {
     })
 
     it('returns empty products when all similar ids are already owned', async () => {
-      mockQueryMany
-        .mockResolvedValueOnce([{ product_id: 'p1', product_name: 'Widget A' }])
+      mockQueryMany.mockResolvedValueOnce([{ product_id: 'p1', product_name: 'Widget A' }])
       mockFindSimilar.mockResolvedValueOnce([
         { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 }, // only result, already owned
       ])

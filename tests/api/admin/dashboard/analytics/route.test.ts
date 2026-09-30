@@ -22,7 +22,9 @@ function makeReq(range?: string) {
   return new NextRequest(url.toString())
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/dashboard/analytics', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -66,10 +68,10 @@ describe('GET /api/admin/dashboard/analytics', () => {
   })
 })
 
-  it('returns 500 when getDashboardAnalytics throws', async () => {
-    mockAuth.mockResolvedValue(admin as any)
-    mockHasScope.mockReturnValue(true)
-    mockGet.mockRejectedValue(new Error('db fail'))
-    const res = await GET(makeReq())
-    expect(res.status).toBe(500)
-  })
+it('returns 500 when getDashboardAnalytics throws', async () => {
+  mockAuth.mockResolvedValue(admin as any)
+  mockHasScope.mockReturnValue(true)
+  mockGet.mockRejectedValue(new Error('db fail'))
+  const res = await GET(makeReq())
+  expect(res.status).toBe(500)
+})

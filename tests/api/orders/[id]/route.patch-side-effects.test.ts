@@ -44,7 +44,7 @@ vi.mock('@/lib/marketing', () => ({
 vi.mock('@/lib/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -211,9 +211,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     expect(res.status).toBe(200)
     await flush()
 
-    expect(vi.mocked(autoTasks.createAutoTask).mock.calls.some(
-      c => (c[0] as any)?.sourceKind === 'process_refund'
-    )).toBe(false)
+    expect(
+      vi.mocked(autoTasks.createAutoTask).mock.calls.some(c => (c[0] as any)?.sourceKind === 'process_refund')
+    ).toBe(false)
   })
 
   it('restores stock on cancellation when a sale ledger row exists', async () => {
@@ -250,8 +250,16 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
       }) // currentOrder
       .mockResolvedValueOnce(null) // preflight unitRow
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1',
-        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '1',
+        buy_unit: null,
+        product_name: 'P',
+        variant_name: null,
+        inventory_quantity: 100,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
@@ -280,8 +288,16 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
       })
       .mockResolvedValueOnce(null) // preflight unitRow
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1',
-        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '1',
+        buy_unit: null,
+        product_name: 'P',
+        variant_name: null,
+        inventory_quantity: 100,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
@@ -351,9 +367,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     await flush()
     expect(vi.mocked(autoTasks.completeAutoTask).mock.calls.some(c => c[0] === 'stuck_shipment')).toBe(true)
     expect(vi.mocked(autoTasks.completeAutoTask).mock.calls.some(c => c[0] === 'ndr_check')).toBe(true)
-    expect(vi.mocked(autoTasks.createAutoTask).mock.calls.some(
-      c => (c[0] as any)?.sourceKind === 'confirm_cod_payment'
-    )).toBe(true)
+    expect(
+      vi.mocked(autoTasks.createAutoTask).mock.calls.some(c => (c[0] as any)?.sourceKind === 'confirm_cod_payment')
+    ).toBe(true)
   })
 
   it('does not email when the order has no user and no customer contact', async () => {
@@ -409,9 +425,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     const res = await PATCH(makeReq('PATCH', { payment_status: 'failed' }) as any, PARAMS)
     expect(res.status).toBe(200)
     await flush()
-    expect(vi.mocked(autoTasks.createAutoTask).mock.calls.some(
-      c => (c[0] as any)?.sourceKind === 'contact_failed_payment'
-    )).toBe(true)
+    expect(
+      vi.mocked(autoTasks.createAutoTask).mock.calls.some(c => (c[0] as any)?.sourceKind === 'contact_failed_payment')
+    ).toBe(true)
   })
 
   it('swallows rejecting completeAutoTask + attributeConversion on refunded/paid', async () => {

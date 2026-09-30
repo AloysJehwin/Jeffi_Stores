@@ -81,28 +81,35 @@ function makeReq(opts: { auth?: string } = {}) {
 }
 
 const ORDER = {
-  id: 'ord-1', awb_number: 'AWB001', status: 'shipped',
-  order_number: 'ORD-001', customer_name: 'John Doe',
-  customer_email: 'john@example.com', user_id: 'user-1',
-  delhivery_quoted_weight_kg: 1, delhivery_charged_weight_kg: null,
+  id: 'ord-1',
+  awb_number: 'AWB001',
+  status: 'shipped',
+  order_number: 'ORD-001',
+  customer_name: 'John Doe',
+  customer_email: 'john@example.com',
+  user_id: 'user-1',
+  delhivery_quoted_weight_kg: 1,
+  delhivery_charged_weight_kg: null,
 }
 
 function makeShipmentData(awb: string, statusType: string, extra: Record<string, any> = {}) {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: extra.status ?? '',
-          StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: extra.status ?? '',
+            StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+          },
+          Scans: extra.scans ?? [],
+          DestRecieveDate: extra.destReceiveDate ?? null,
+          ReturnedDate: extra.returnedDate ?? null,
+          ...extra.shipmentExtra,
         },
-        Scans: extra.scans ?? [],
-        DestRecieveDate: extra.destReceiveDate ?? null,
-        ReturnedDate: extra.returnedDate ?? null,
-        ...extra.shipmentExtra,
       },
-    }],
+    ],
   }
 }
 
@@ -130,18 +137,15 @@ afterEach(() => {
 
 describe('POST — exception type scan fallback', () => {
   it('resolves UD via scan ScanType fallback to known type', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'PU', Scan: 'picked up' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'PU', Scan: 'picked up' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -150,18 +154,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "out for delivery"', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'out for delivery attempt' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'out for delivery attempt' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -170,18 +171,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves HOLD via scan activity "rto delivered" to RTO-DL', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'HOLD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'HOLD', Scan: 'rto delivered to origin' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'HOLD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'HOLD', Scan: 'rto delivered to origin' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -190,18 +188,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves LOST via scan activity "out for return" to RTO-OT', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'LOST', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'LOST', Scan: 'out for return to sender' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'LOST', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'LOST', Scan: 'out for return to sender' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -210,18 +205,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves MIS via scan activity "return in transit" to RTO-IT', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'MIS', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'MIS', Scan: 'return in transit to hub' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'MIS', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'MIS', Scan: 'return in transit to hub' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -230,18 +222,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "rto initiated" to RTO', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'rto initiated at facility' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'rto initiated at facility' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -250,18 +239,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "in transit" to IT', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'in transit to destination' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'in transit to destination' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -270,18 +256,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "picked up" to PU', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'picked up from sender' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'picked up from sender' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -290,18 +273,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "manifested" to MF (no syncRule → skip)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'manifested at origin' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'manifested at origin' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -310,18 +290,15 @@ describe('POST — exception type scan fallback', () => {
   })
 
   it('resolves UD via scan activity "delivered" to DL', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'UD', {
-        status: '',
-        scans: [
-          { ScanDetail: { ScanType: 'UD', Scan: 'delivered to consignee' } },
-        ],
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'UD', {
+          status: '',
+          scans: [{ ScanDetail: { ScanType: 'UD', Scan: 'delivered to consignee' } }],
+        }),
     } as any)
 
     const res = await POST(makeReq())
@@ -351,9 +328,7 @@ describe('POST — no email when customer info absent', () => {
 
 describe('POST — malformed ShipmentData entries', () => {
   it('skips entry with no Shipment property', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -365,9 +340,7 @@ describe('POST — malformed ShipmentData entries', () => {
   })
 
   it('skips entry when AWB does not match any order in batch', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -379,9 +352,7 @@ describe('POST — malformed ShipmentData entries', () => {
   })
 
   it('handles empty ShipmentData array', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -397,31 +368,29 @@ describe('POST — malformed ShipmentData entries', () => {
 
 describe('POST — statusDateTime absent', () => {
   it('handles DL with no statusDateTime by using NOW()', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        ShipmentData: [{
-          Shipment: {
-            AWB: 'AWB001',
-            Status: { StatusType: 'DL', Status: '', StatusDateTime: null },
-            Scans: [],
-            DestRecieveDate: null,
-            ReturnedDate: null,
+        ShipmentData: [
+          {
+            Shipment: {
+              AWB: 'AWB001',
+              Status: { StatusType: 'DL', Status: '', StatusDateTime: null },
+              Scans: [],
+              DestRecieveDate: null,
+              ReturnedDate: null,
+            },
           },
-        }],
+        ],
       }),
     } as any)
 
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.synced).toBe(1)
-    const updateSql = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delivered_at')
-    )
-    expect((updateSql![0] as string)).toContain('delivered_at = NOW()')
+    const updateSql = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delivered_at'))
+    expect(updateSql![0] as string).toContain('delivered_at = NOW()')
   })
 })

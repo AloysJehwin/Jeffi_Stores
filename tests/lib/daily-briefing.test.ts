@@ -4,7 +4,13 @@ vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
 vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(msg: string, public provider: string) { super(msg); this.name = 'AiClientError' }
+    constructor(
+      msg: string,
+      public provider: string
+    ) {
+      super(msg)
+      this.name = 'AiClientError'
+    }
   },
 }))
 
@@ -81,10 +87,7 @@ describe('collectBriefingData', () => {
   })
 
   it('handles null yesterday and sevenDayAvg gracefully', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
 
     mockQueryMany.mockResolvedValue([])
 
@@ -189,14 +192,26 @@ describe('narrate', () => {
   }
 
   it('returns trimmed content from aiChat', async () => {
-    mockAiChat.mockResolvedValueOnce({ content: '  Revenue was up 10%.  ', provider: 'openai', model: 'gpt-4o-mini', latencyMs: 100, fallbackUsed: false })
+    mockAiChat.mockResolvedValueOnce({
+      content: '  Revenue was up 10%.  ',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      latencyMs: 100,
+      fallbackUsed: false,
+    })
     const result = await narrate(sampleData)
     expect(result).toBe('Revenue was up 10%.')
   })
 
   it('truncates content to 600 chars', async () => {
     const longText = 'x'.repeat(700)
-    mockAiChat.mockResolvedValueOnce({ content: longText, provider: 'openai', model: 'gpt-4o-mini', latencyMs: 100, fallbackUsed: false })
+    mockAiChat.mockResolvedValueOnce({
+      content: longText,
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      latencyMs: 100,
+      fallbackUsed: false,
+    })
     const result = await narrate(sampleData)
     expect(result).toHaveLength(600)
   })
@@ -218,21 +233,29 @@ describe('narrate', () => {
 describe('renderBriefingEmail', () => {
   const sampleData: BriefingData = {
     briefing_date: '2024-06-17',
-    yesterday: { count: 10, paid_count: 8, cancelled_count: 1, pending_count: 1, revenue: 15000, avg_order_value: 1875 },
+    yesterday: {
+      count: 10,
+      paid_count: 8,
+      cancelled_count: 1,
+      pending_count: 1,
+      revenue: 15000,
+      avg_order_value: 1875,
+    },
     delta_vs_avg: { revenue_pct: 20, orders_pct: -10 },
-    top_products: [
-      { product_id: 'p1', product_name: 'Bolt M8', qty: 20, revenue: 5000 },
-    ],
-    low_stock: [
-      { id: 'p2', name: 'Nut M6', sku: 'NUT-M6', inventory_quantity: 3 },
-    ],
+    top_products: [{ product_id: 'p1', product_name: 'Bolt M8', qty: 20, revenue: 5000 }],
+    low_stock: [{ id: 'p2', name: 'Nut M6', sku: 'NUT-M6', inventory_quantity: 3 }],
     stuck_shipments: [
-      { order_number: 'ORD-001', awb_number: 'AWB-123', shipped_at: '2024-06-10T00:00:00Z', customer_name: 'Alice', total_amount: 2000, days_since_shipped: 7 },
+      {
+        order_number: 'ORD-001',
+        awb_number: 'AWB-123',
+        shipped_at: '2024-06-10T00:00:00Z',
+        customer_name: 'Alice',
+        total_amount: 2000,
+        days_since_shipped: 7,
+      },
     ],
     abandoned_checkouts_24h: 5,
-    campaign_perf_24h: [
-      { campaign_kind: 'winback_90', sent: 100, opened: 30, clicked: 10, converted: 2 },
-    ],
+    campaign_perf_24h: [{ campaign_kind: 'winback_90', sent: 100, opened: 30, clicked: 10, converted: 2 }],
   }
 
   it('returns object with subject and html', () => {

@@ -68,7 +68,9 @@ describe('POST /api/admin/data-source/google/disconnect', () => {
     expect(vi.mocked(releaseSheetProducts).mock.invocationCallOrder[0]).toBeLessThan(deletedAt)
     expect(lookupTenantContextById).not.toHaveBeenCalled()
     expect(runWithTenantContext).not.toHaveBeenCalled()
-    expect(vi.mocked(logAdminAudit).mock.calls[0][0]).toMatchObject({ metadata: { released: 7, unlinked: 3, cancelled: 1 } })
+    expect(vi.mocked(logAdminAudit).mock.calls[0][0]).toMatchObject({
+      metadata: { released: 7, unlinked: 3, cancelled: 1 },
+    })
   })
 
   it('re-tags a tenant store inside that tenant context', async () => {

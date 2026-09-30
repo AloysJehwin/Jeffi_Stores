@@ -68,8 +68,13 @@ const params = { params: Promise.resolve({ id: ACTION_ID }) }
 
 function action(kind: string, payload: any, over: any = {}) {
   return {
-    id: ACTION_ID, admin_id: 'admin-1', conversation_id: 'conv-1',
-    kind, payload, status: 'proposed', ...over,
+    id: ACTION_ID,
+    admin_id: 'admin-1',
+    conversation_id: 'conv-1',
+    kind,
+    payload,
+    status: 'proposed',
+    ...over,
   }
 }
 
@@ -100,8 +105,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('toggle_marketing_opt_out opt out success', async () => {
-    primeAction(action('toggle_marketing_opt_out', { customerId: 'u1', optOut: true }),
-      { id: 'u1', email: 'a@b.com', marketing_opt_out: true })
+    primeAction(action('toggle_marketing_opt_out', { customerId: 'u1', optOut: true }), {
+      id: 'u1',
+      email: 'a@b.com',
+      marketing_opt_out: true,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -121,19 +129,18 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_tag_definition success', async () => {
-    primeAction(action('create_tag_definition', { slug: 'vip', color: 'gold' }),
-      { sort_order: 20 })
+    primeAction(action('create_tag_definition', { slug: 'vip', color: 'gold' }), { sort_order: 20 })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_tag_definition duplicate', async () => {
-    primeAction(action('create_tag_definition', { slug: 'vip', color: '' }),
-      { sort_order: 10 })
+    primeAction(action('create_tag_definition', { slug: 'vip', color: '' }), { sort_order: 10 })
     mockQuery.mockImplementation(async (sql: any) =>
       String(sql).includes('customer_tag_definitions')
         ? Promise.reject({ code: '23505' })
-        : ({ rows: [], rowCount: 1 } as any))
+        : ({ rows: [], rowCount: 1 } as any)
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already exists/i)
@@ -144,7 +151,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQuery.mockImplementation(async (sql: any) =>
       String(sql).includes('customer_tag_definitions')
         ? Promise.reject(new Error('db fail'))
-        : ({ rows: [], rowCount: 1 } as any))
+        : ({ rows: [], rowCount: 1 } as any)
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/db fail/i)
@@ -153,27 +161,39 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── create_pickup_request ─────────────────────────────────────────────────
 
   it('create_pickup_request orderIds missing', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_pickup_request', { orderIds: [], pickupDate: '2026-01-01', orderCount: 0 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_pickup_request', { orderIds: [], pickupDate: '2026-01-01', orderCount: 0 })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('create_pickup_request invalid date', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_pickup_request', { orderIds: ['o1'], pickupDate: 'bad', orderCount: 1 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_pickup_request', { orderIds: ['o1'], pickupDate: 'bad', orderCount: 1 })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/invalid pickupdate/i)
   })
 
   it('create_pickup_request success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 }))
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ pickupId: 'pk1', pickupDate: '2026-01-01', orderCount: 1, awbs: ['A1'] }) } as any)
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 })
+    )
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ pickupId: 'pk1', pickupDate: '2026-01-01', orderCount: 1, awbs: ['A1'] }),
+    } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_pickup_request upstream failure', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 })
+    )
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: 'nope' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -195,7 +215,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('sync_delhivery_statuses success', async () => {
     process.env.CRON_SECRET = 'secret'
     mockQueryOne.mockResolvedValueOnce(action('sync_delhivery_statuses', {}))
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ total: 5, synced: 4, errors: [], rvp: { received: 1 } }) } as any)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ total: 5, synced: 4, errors: [], rvp: { received: 1 } }),
+    } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
     delete process.env.CRON_SECRET
@@ -204,7 +227,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('sync_delhivery_statuses upstream failure with json parse throw', async () => {
     process.env.CRON_SECRET = 'secret'
     mockQueryOne.mockResolvedValueOnce(action('sync_delhivery_statuses', {}))
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error('x') } } as any)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new Error('x')
+      },
+    } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/sync failed/i)
@@ -221,16 +250,36 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('pay_payable success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('pay_payable',
-      { payableId: 'py1', expenseNumber: 'E1', supplierName: 'S', amount: 100, paymentMode: 'cash', paidAt: '2026-01-01', transactionRef: 'ref1' }))
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ new_status: 'paid', total_paid: 100 }) } as any)
+    mockQueryOne.mockResolvedValueOnce(
+      action('pay_payable', {
+        payableId: 'py1',
+        expenseNumber: 'E1',
+        supplierName: 'S',
+        amount: 100,
+        paymentMode: 'cash',
+        paidAt: '2026-01-01',
+        transactionRef: 'ref1',
+      })
+    )
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, json: async () => ({ new_status: 'paid', total_paid: 100 }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('pay_payable upstream failure', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('pay_payable',
-      { payableId: 'py1', expenseNumber: 'E1', supplierName: 'S', amount: 100, paymentMode: 'cash', paidAt: '2026-01-01', transactionRef: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('pay_payable', {
+        payableId: 'py1',
+        expenseNumber: 'E1',
+        supplierName: 'S',
+        amount: 100,
+        paymentMode: 'cash',
+        paidAt: '2026-01-01',
+        transactionRef: null,
+      })
+    )
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'bad' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -240,20 +289,28 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── export_gstr1 ──────────────────────────────────────────────────────────
 
   it('export_gstr1 missing from/to', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('export_gstr1', { month: 'Jan', from: '', to: '', format: 'json', rowCount: 0 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('export_gstr1', { month: 'Jan', from: '', to: '', format: 'json', rowCount: 0 })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('export_gstr1 json success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'json', rowCount: 3 }))
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ summary: {}, b2b: [1], b2c: [], hsnSummary: [] }) } as any)
+    mockQueryOne.mockResolvedValueOnce(
+      action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'json', rowCount: 3 })
+    )
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ summary: {}, b2b: [1], b2c: [], hsnSummary: [] }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('export_gstr1 csv success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'csv', rowCount: 3 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'csv', rowCount: 3 })
+    )
     global.fetch = vi.fn().mockResolvedValue({ ok: true, text: async () => 'a,b\n1,2' } as any)
     const res = await POST(makeReq(), params)
     const body = await res.json()
@@ -263,16 +320,28 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('export_gstr1 upstream failure with json error', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'json', rowCount: 3 }))
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: 'gst boom' }) } as any)
+    mockQueryOne.mockResolvedValueOnce(
+      action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'json', rowCount: 3 })
+    )
+    global.fetch = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: 'gst boom' }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('gst boom')
   })
 
   it('export_gstr1 upstream failure json parse throws', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'csv', rowCount: 3 }))
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => { throw new Error('x') } } as any)
+    mockQueryOne.mockResolvedValueOnce(
+      action('export_gstr1', { month: 'Jan', from: '2026-01-01', to: '2026-01-31', format: 'csv', rowCount: 3 })
+    )
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => {
+        throw new Error('x')
+      },
+    } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/gstr-1 export failed/i)
@@ -287,7 +356,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne.mockResolvedValueOnce(action('add_customer_note', { customerId: 'u1', body: 'note' }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('customer actions swallow logActivity rejection (add_customer_tag)', async () => {
@@ -295,7 +364,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne.mockResolvedValueOnce(action('add_customer_tag', { customerId: 'u1', tagSlug: 'vip' }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('customer actions swallow logActivity rejection (remove_customer_tag)', async () => {
@@ -303,53 +372,83 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne.mockResolvedValueOnce(action('remove_customer_tag', { customerId: 'u1', tagSlug: 'vip' }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('customer actions swallow logActivity rejection (create_customer_task)', async () => {
     vi.mocked(activity.logActivity).mockRejectedValue(new Error('log down'))
-    primeAction(action('create_customer_task', { customerId: 'u1', title: 'T', dueAt: null, assignedToAdminId: null, priority: 'high' }),
-      { id: 'task-1' })
+    primeAction(
+      action('create_customer_task', {
+        customerId: 'u1',
+        title: 'T',
+        dueAt: null,
+        assignedToAdminId: null,
+        priority: 'high',
+      }),
+      { id: 'task-1' }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('customer actions swallow logActivity rejection (close_customer_task)', async () => {
     vi.mocked(activity.logActivity).mockRejectedValue(new Error('log down'))
-    primeAction(action('close_customer_task', { taskId: 't1', resolution: 'done' }),
-      { id: 't1', user_id: 'u1', title: 'T', status: 'open', description: null })
+    primeAction(action('close_customer_task', { taskId: 't1', resolution: 'done' }), {
+      id: 't1',
+      user_id: 'u1',
+      title: 'T',
+      status: 'open',
+      description: null,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('customer actions swallow logActivity rejection (toggle_marketing_opt_out)', async () => {
     vi.mocked(activity.logActivity).mockRejectedValue(new Error('log down'))
-    primeAction(action('toggle_marketing_opt_out', { customerId: 'u1', optOut: true }),
-      { id: 'u1', email: 'a@b.com', marketing_opt_out: true })
+    primeAction(action('toggle_marketing_opt_out', { customerId: 'u1', optOut: true }), {
+      id: 'u1',
+      email: 'a@b.com',
+      marketing_opt_out: true,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
   })
 
   it('call_admin_api json+text both throw → data null (text catch closure)', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'POST', path: '/api/admin/products', body: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'POST', path: '/api/admin/products', body: null })
+    )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200,
-      json: async () => { throw new Error('no json') },
-      text: async () => { throw new Error('no text') },
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error('no json')
+      },
+      text: async () => {
+        throw new Error('no text')
+      },
     } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_pickup_request internal api text fallback (callInternalApi json throws)', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_pickup_request', { orderIds: ['o1'], pickupDate: '2026-01-01', orderCount: 1 })
+    )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false, status: 500,
-      json: async () => { throw new Error('no json') },
-      text: async () => { throw new Error('no text') },
+      ok: false,
+      status: 500,
+      json: async () => {
+        throw new Error('no json')
+      },
+      text: async () => {
+        throw new Error('no text')
+      },
     } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)

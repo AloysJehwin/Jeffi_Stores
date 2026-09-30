@@ -105,10 +105,7 @@ describe('POST /api/upload', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.url).toBe('https://cdn.example.com/img.jpg')
-    expect(mockUploadProductImage).toHaveBeenCalledWith(
-      expect.any(File),
-      'prod-abc'
-    )
+    expect(mockUploadProductImage).toHaveBeenCalledWith(expect.any(File), 'prod-abc')
   })
 
   it('returns 500 when S3 upload throws', async () => {

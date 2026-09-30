@@ -38,7 +38,7 @@ describe('recordImplicitSignal', () => {
     expect(mockQuery).toHaveBeenCalledOnce()
     const [sql, params] = mockQuery.mock.calls[0]
     expect(sql).toContain('INSERT INTO ai_feedback')
-    expect(params[0]).toBe('q1')  // ai_query_id
+    expect(params[0]).toBe('q1') // ai_query_id
     expect(params[1]).toBe('user-1')
     expect(params[2]).toBe('p1')
     expect(params[3]).toBe('purchased')
@@ -86,9 +86,7 @@ describe('recordImplicitSignalsForProducts', () => {
 
   it('calls recordImplicitSignal for each product', async () => {
     // 2 products, each with a match
-    mockQueryMany
-      .mockResolvedValueOnce([{ id: 'q1' }])
-      .mockResolvedValueOnce([{ id: 'q2' }])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'q1' }]).mockResolvedValueOnce([{ id: 'q2' }])
     mockQuery.mockResolvedValue({ rows: [] })
 
     await recordImplicitSignalsForProducts('user-1', ['p1', 'p2'], 'clicked')
@@ -103,9 +101,7 @@ describe('recordImplicitSignalsForProducts', () => {
   })
 
   it('processes products sequentially (still completes all)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ id: 'q1' }])
-      .mockResolvedValueOnce([]) // no match for p2
+    mockQueryMany.mockResolvedValueOnce([{ id: 'q1' }]).mockResolvedValueOnce([]) // no match for p2
 
     mockQuery.mockResolvedValue({ rows: [] })
 

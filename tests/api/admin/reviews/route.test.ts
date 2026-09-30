@@ -38,9 +38,7 @@ function makePatch(body: unknown) {
   })
 }
 
-const sampleReviews = [
-  { id: 'rev-1', rating: 5, comment: 'Great', is_approved: false, users: {}, products: {} },
-]
+const sampleReviews = [{ id: 'rev-1', rating: 5, comment: 'Great', is_approved: false, users: {}, products: {} }]
 
 // ── Tests: GET ────────────────────────────────────────────────────────────────
 
@@ -196,10 +194,7 @@ describe('PATCH /api/admin/reviews', () => {
     const res = await PATCH(makePatch({ reviewId: 'r1', action: 'approve' }))
     expect(res.status).toBe(200)
     expect((await res.json()).message).toMatch(/approved/i)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('is_approved = true'),
-      ['r1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('is_approved = true'), ['r1'])
   })
 
   it('rejects (deletes) a review', async () => {
@@ -210,10 +205,7 @@ describe('PATCH /api/admin/reviews', () => {
     const res = await PATCH(makePatch({ reviewId: 'r2', action: 'reject' }))
     expect(res.status).toBe(200)
     expect((await res.json()).message).toMatch(/deleted/i)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM product_reviews'),
-      ['r2']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM product_reviews'), ['r2'])
   })
 
   it('returns 400 for invalid action', async () => {

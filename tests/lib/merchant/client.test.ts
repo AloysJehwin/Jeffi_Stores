@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('crypto', async (importOriginal) => {
+vi.mock('crypto', async importOriginal => {
   const actual = await importOriginal<typeof import('crypto')>()
   return {
     ...actual,
@@ -141,9 +141,7 @@ describe('merchant/client', () => {
 
   describe('customBatchUpsert', () => {
     it('sends batch request to GMC API', async () => {
-      const entries = [
-        { batchId: 0, merchantId: '12345', method: 'insert', product: { offerId: 'SKU-001' } },
-      ]
+      const entries = [{ batchId: 0, merchantId: '12345', method: 'insert', product: { offerId: 'SKU-001' } }]
 
       mockFetch
         .mockResolvedValueOnce({

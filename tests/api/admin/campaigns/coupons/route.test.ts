@@ -31,7 +31,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/campaigns/coupons')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/campaigns/coupons', () => {
   it('returns 401 when unauthenticated', async () => {

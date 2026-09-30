@@ -1,13 +1,26 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
 import { decodeJwt } from 'jose'
-import { issueStaffToken, verifyStaffToken, staffSessionFromRequest, setStaffCookie, STAFF_COOKIE } from '@/lib/staff-session'
+import {
+  issueStaffToken,
+  verifyStaffToken,
+  staffSessionFromRequest,
+  setStaffCookie,
+  STAFF_COOKIE,
+} from '@/lib/staff-session'
 import { NextResponse } from 'next/server'
 
-const claims = { adminId: '1e99c629-fa38-41bb-a693-6686b3f45b88', tenantId: null, email: 'Owner@Example.com', name: 'Store Owner' }
+const claims = {
+  adminId: '1e99c629-fa38-41bb-a693-6686b3f45b88',
+  tenantId: null,
+  email: 'Owner@Example.com',
+  name: 'Store Owner',
+}
 
 describe('staff-session', () => {
-  beforeAll(() => { process.env.JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256-signing' })
+  beforeAll(() => {
+    process.env.JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256-signing'
+  })
 
   it('round-trips identity claims with a lower-cased email', async () => {
     const token = await issueStaffToken(claims)
@@ -34,7 +47,10 @@ describe('staff-session', () => {
     const token = await issueStaffToken({ ...claims, tenantId: 'tenant-a' })
     const req = new NextRequest('https://a.example.com/api/staff/me')
     req.cookies.set(STAFF_COOKIE, token)
-    expect(await staffSessionFromRequest(req, 'tenant-a')).toMatchObject({ adminId: claims.adminId, tenantId: 'tenant-a' })
+    expect(await staffSessionFromRequest(req, 'tenant-a')).toMatchObject({
+      adminId: claims.adminId,
+      tenantId: 'tenant-a',
+    })
     expect(await staffSessionFromRequest(req, 'tenant-b')).toBeNull()
     expect(await staffSessionFromRequest(req, null)).toBeNull()
   })

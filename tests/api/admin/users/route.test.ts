@@ -29,7 +29,16 @@ vi.mock('@/lib/scopes', () => ({
   hasScope: vi.fn(),
   isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
   // A tenant may only hand out what its plan sells; off-tenant this is the full set.
-  assignableScopeKeys: vi.fn(async () => ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent']),
+  assignableScopeKeys: vi.fn(async () => [
+    'products',
+    'orders',
+    'inventory',
+    'financial',
+    'customers',
+    'mailer',
+    'audit',
+    'agent',
+  ]),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
@@ -189,9 +198,7 @@ describe('POST /api/admin/users', () => {
 
     const res = await POST(makeRequest(bodyWithoutRole))
     expect(res.status).toBe(200)
-    expect(mockCreateAdminUser).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'admin' })
-    )
+    expect(mockCreateAdminUser).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin' }))
   })
 
   it('returns 500 on unexpected error', async () => {

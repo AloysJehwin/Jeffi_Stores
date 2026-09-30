@@ -51,7 +51,9 @@ function makePostReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/invoices/drafts', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -116,16 +118,19 @@ describe('POST /api/admin/invoices/drafts', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'addr-1' }] })
         .mockResolvedValueOnce({ rows: [{ id: 'ord-1', order_number: 'DFT-123' }] }),
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
-    const res = await POST(makePostReq({
-      customerName: 'John Doe',
-      customerPhone: '9999999999',
-      items: [],
-    }))
+    const res = await POST(
+      makePostReq({
+        customerName: 'John Doe',
+        customerPhone: '9999999999',
+        items: [],
+      })
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -136,23 +141,41 @@ describe('POST /api/admin/invoices/drafts', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'addr-1' }] })
         .mockResolvedValueOnce({ rows: [{ id: 'ord-1', order_number: 'DFT-456' }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] }),
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
-    const res = await POST(makePostReq({
-      customerName: 'Jane',
-      items: [
-        { product_id: 'p1', product_name: 'Bolt', product_sku: 'B1', quantity: '2', unit_price: '100', gst_rate: '18' },
-        { product_id: 'p2', product_name: 'Nut', product_sku: 'N1', quantity: '5', unit_price: '50', discount_pct: '10', gst_rate: '5' },
-      ],
-    }))
+    const res = await POST(
+      makePostReq({
+        customerName: 'Jane',
+        items: [
+          {
+            product_id: 'p1',
+            product_name: 'Bolt',
+            product_sku: 'B1',
+            quantity: '2',
+            unit_price: '100',
+            gst_rate: '18',
+          },
+          {
+            product_id: 'p2',
+            product_name: 'Nut',
+            product_sku: 'N1',
+            quantity: '5',
+            unit_price: '50',
+            discount_pct: '10',
+            gst_rate: '5',
+          },
+        ],
+      })
+    )
     expect(res.status).toBe(200)
-    const itemInserts = mockClient.query.mock.calls.filter((args: any[]) =>
-      typeof args[0] === 'string' && args[0].includes('INSERT INTO order_items')
+    const itemInserts = mockClient.query.mock.calls.filter(
+      (args: any[]) => typeof args[0] === 'string' && args[0].includes('INSERT INTO order_items')
     )
     expect(itemInserts).toHaveLength(2)
   })
@@ -162,19 +185,20 @@ describe('POST /api/admin/invoices/drafts', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'addr-1' }] })
         .mockResolvedValueOnce({ rows: [{ id: 'ord-2', order_number: 'DFT-789' }] }),
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
-    const res = await POST(makePostReq({
-      customerName: 'Corp Ltd',
-      buyerGstin: '27AABCS1429B1Z5',
-      state: 'Maharashtra',
-      items: [
-        { product_name: 'Item A', quantity: '1', unit_price: '200', gst_rate: '18' },
-      ],
-    }))
+    const res = await POST(
+      makePostReq({
+        customerName: 'Corp Ltd',
+        buyerGstin: '27AABCS1429B1Z5',
+        state: 'Maharashtra',
+        items: [{ product_name: 'Item A', quantity: '1', unit_price: '200', gst_rate: '18' }],
+      })
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -183,19 +207,22 @@ describe('POST /api/admin/invoices/drafts', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'addr-1' }] })
         .mockResolvedValueOnce({ rows: [{ id: 'ord-3', order_number: 'DFT-CR1' }] }),
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
-    const res = await POST(makePostReq({
-      customerName: 'Credit Customer',
-      paymentMode: 'credit',
-      items: [],
-    }))
+    const res = await POST(
+      makePostReq({
+        customerName: 'Credit Customer',
+        paymentMode: 'credit',
+        items: [],
+      })
+    )
     expect(res.status).toBe(200)
-    const orderInsertCall = mockClient.query.mock.calls.find((args: any[]) =>
-      typeof args[0] === 'string' && args[0].includes('INSERT INTO orders')
+    const orderInsertCall = mockClient.query.mock.calls.find(
+      (args: any[]) => typeof args[0] === 'string' && args[0].includes('INSERT INTO orders')
     )
     expect(orderInsertCall).toBeDefined()
     expect(orderInsertCall![1]).toContain('unpaid')

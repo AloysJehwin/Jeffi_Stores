@@ -88,9 +88,7 @@ describe('PATCH /api/products/[id]', () => {
 
   it('features a product when fewer than 6 are already featured', async () => {
     // First queryOne = featured count check, second = UPDATE RETURNING
-    queryOneMock
-      .mockResolvedValueOnce({ count: '3' })
-      .mockResolvedValueOnce({ id: 'prod-1' })
+    queryOneMock.mockResolvedValueOnce({ count: '3' }).mockResolvedValueOnce({ id: 'prod-1' })
 
     const res = await PATCH(makeReq('PATCH', { is_featured: true }) as any, {
       params: Promise.resolve({ id: 'prod-1' }),
@@ -116,7 +114,9 @@ describe('PATCH /api/products/[id]', () => {
 
 describe('DELETE /api/products/[id]', () => {
   it('always returns 405 with informative message', async () => {
-    const res = await DELETE(new NextRequest('http://localhost/api/products/test'), { params: Promise.resolve({ id: 'test' }) })
+    const res = await DELETE(new NextRequest('http://localhost/api/products/test'), {
+      params: Promise.resolve({ id: 'test' }),
+    })
     expect(res.status).toBe(405)
 
     const body = await res.json()

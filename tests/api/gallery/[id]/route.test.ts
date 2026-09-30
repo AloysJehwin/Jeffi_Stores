@@ -34,7 +34,9 @@ function makeRequest() {
 }
 
 describe('DELETE /api/gallery/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not admin', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -66,10 +68,7 @@ describe('DELETE /api/gallery/[id]', () => {
     const json = await res.json()
     expect(json.success).toBe(true)
     expect(mockDelete).toHaveBeenCalledWith('gallery/img1.jpg', 'gallery/thumb_img1.jpg')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM gallery_images'),
-      ['img1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM gallery_images'), ['img1'])
   })
 
   it('passes null s3 keys to deleteGalleryImage when missing', async () => {

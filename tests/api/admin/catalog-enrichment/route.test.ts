@@ -29,7 +29,9 @@ const sampleRows = [
 ]
 
 describe('GET /api/admin/catalog-enrichment', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

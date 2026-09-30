@@ -31,7 +31,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/support/sessions')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/support/sessions', () => {
   it('returns 401 when unauthenticated', async () => {

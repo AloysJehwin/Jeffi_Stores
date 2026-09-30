@@ -11,9 +11,15 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import {
-  parseChannels, clampConversationLimit, derivePage, mapConversationRow, summarizeRow,
-  buildConversationsSql, CONVERSATION_CHANNELS,
-  type ConversationRow, type SummaryRow,
+  parseChannels,
+  clampConversationLimit,
+  derivePage,
+  mapConversationRow,
+  summarizeRow,
+  buildConversationsSql,
+  CONVERSATION_CHANNELS,
+  type ConversationRow,
+  type SummaryRow,
 } from '@/lib/customer-conversations'
 
 describe('buildConversationsSql', () => {
@@ -22,7 +28,21 @@ describe('buildConversationsSql', () => {
   it('aliases the outer columns for every single channel', () => {
     for (const c of CONVERSATION_CHANNELS) {
       const sql = buildConversationsSql([c])
-      for (const col of ['id', 'channel', 'direction', 'at', 'thread_id', 'thread_label', 'actor', 'subject', 'body', 'status', 'entity_type', 'entity_id', 'attachments']) {
+      for (const col of [
+        'id',
+        'channel',
+        'direction',
+        'at',
+        'thread_id',
+        'thread_label',
+        'actor',
+        'subject',
+        'body',
+        'status',
+        'entity_type',
+        'entity_id',
+        'attachments',
+      ]) {
         expect(sql, `${c} must alias ${col}`).toMatch(new RegExp(`AS ${col}\\b`))
       }
       expect(sql).not.toContain('UNION ALL')
@@ -79,9 +99,19 @@ describe('derivePage', () => {
 
 function baseRow(overrides: Partial<ConversationRow> = {}): ConversationRow {
   return {
-    id: 'e1', channel: 'email', direction: 'outbound', at: '2024-01-15T10:00:00Z',
-    thread_id: null, thread_label: null, actor: 'Store', subject: 'Hello', body: '<b>Hi</b>',
-    status: 'sent', entity_type: 'order', entity_id: 'ord-1', attachments: null,
+    id: 'e1',
+    channel: 'email',
+    direction: 'outbound',
+    at: '2024-01-15T10:00:00Z',
+    thread_id: null,
+    thread_label: null,
+    actor: 'Store',
+    subject: 'Hello',
+    body: '<b>Hi</b>',
+    status: 'sent',
+    entity_type: 'order',
+    entity_id: 'ord-1',
+    attachments: null,
     ...overrides,
   }
 }
@@ -95,17 +125,30 @@ describe('mapConversationRow', () => {
   })
 
   it('maps an internal note and its thread href stays null', async () => {
-    const item = await mapConversationRow(baseRow({
-      channel: 'note', direction: 'internal', entity_type: null, entity_id: null,
-    }), 'user-1')
+    const item = await mapConversationRow(
+      baseRow({
+        channel: 'note',
+        direction: 'internal',
+        entity_type: null,
+        entity_id: null,
+      }),
+      'user-1'
+    )
     expect(item.direction).toBe('internal')
     expect(item.href).toBeNull()
   })
 
   it('links a chat row to the support session view', async () => {
-    const item = await mapConversationRow(baseRow({
-      channel: 'chat', direction: 'inbound', thread_id: 'sess-9', entity_type: 'support_session', entity_id: 'sess-9',
-    }), 'user-7')
+    const item = await mapConversationRow(
+      baseRow({
+        channel: 'chat',
+        direction: 'inbound',
+        thread_id: 'sess-9',
+        entity_type: 'support_session',
+        entity_id: 'sess-9',
+      }),
+      'user-7'
+    )
     expect(item.direction).toBe('inbound')
     expect(item.href).toBe('/admin/customers/user-7?chat=true')
   })
@@ -125,13 +168,17 @@ function summaryRow(overrides: Partial<SummaryRow> = {}): SummaryRow {
 
 describe('summarizeRow', () => {
   it('flags awaitingReply when inbound is newer than outbound', () => {
-    const s = summarizeRow(summaryRow({ last_inbound_at: '2024-02-01T00:00:00Z', last_outbound_at: '2024-01-01T00:00:00Z' }))
+    const s = summarizeRow(
+      summaryRow({ last_inbound_at: '2024-02-01T00:00:00Z', last_outbound_at: '2024-01-01T00:00:00Z' })
+    )
     expect(s.awaitingReply).toBe(true)
     expect(s.awaitingReplySince).toBe('2024-02-01T00:00:00.000Z')
   })
 
   it('is not awaiting when outbound is newer', () => {
-    const s = summarizeRow(summaryRow({ last_inbound_at: '2024-01-01T00:00:00Z', last_outbound_at: '2024-02-01T00:00:00Z' }))
+    const s = summarizeRow(
+      summaryRow({ last_inbound_at: '2024-01-01T00:00:00Z', last_outbound_at: '2024-02-01T00:00:00Z' })
+    )
     expect(s.awaitingReply).toBe(false)
     expect(s.awaitingReplySince).toBeNull()
   })

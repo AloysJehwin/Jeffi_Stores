@@ -17,14 +17,20 @@ function cmd(name: string) {
   })
 }
 vi.mock('@aws-sdk/client-s3', () => ({
-  S3Client: vi.fn().mockImplementation(function (this: any) { this.send = s3Send }),
+  S3Client: vi.fn().mockImplementation(function (this: any) {
+    this.send = s3Send
+  }),
   PutObjectCommand: cmd('PutObject'),
   GetObjectCommand: cmd('GetObject'),
   ListObjectsV2Command: cmd('ListObjectsV2'),
 }))
 
-function inputs() { return s3Send.mock.calls.map((c: any[]) => c[0]?.input) }
-function types() { return s3Send.mock.calls.map((c: any[]) => c[0]?.__type) }
+function inputs() {
+  return s3Send.mock.calls.map((c: any[]) => c[0]?.input)
+}
+function types() {
+  return s3Send.mock.calls.map((c: any[]) => c[0]?.__type)
+}
 
 async function importStore() {
   vi.resetModules()
@@ -50,19 +56,29 @@ describe('tenant-backup-store', () => {
     it('writes the SAME bytes under both the owner and slug prefixes', async () => {
       const { putTenantBackup } = await importStore()
       const buf = Buffer.from('dump-bytes')
-      const out = await putTenantBackup({ buffer: buf, ownerId: 'o-1', slug: 'acme', capturedAt: '2026-08-18T10:20:30.123Z' })
+      const out = await putTenantBackup({
+        buffer: buf,
+        ownerId: 'o-1',
+        slug: 'acme',
+        capturedAt: '2026-08-18T10:20:30.123Z',
+      })
 
       expect(types()).toEqual(['PutObject', 'PutObject'])
       expect(out.ownerKey).toBe('tenant-backups/by-owner/o-1/2026-08-18T10-20-30-123Z.sql.gz')
       expect(out.slugKey).toBe('tenant-backups/by-slug/acme/2026-08-18T10-20-30-123Z.sql.gz')
-      const bodies = inputs().map((i) => i.Body)
+      const bodies = inputs().map(i => i.Body)
       expect(bodies[0]).toBe(buf)
       expect(bodies[1]).toBe(buf)
     })
 
     it('stores gzip content type and searchable metadata', async () => {
       const { putTenantBackup } = await importStore()
-      await putTenantBackup({ buffer: Buffer.from('x'), ownerId: 'o-1', slug: 'acme', capturedAt: '2026-08-18T10:20:30.123Z' })
+      await putTenantBackup({
+        buffer: Buffer.from('x'),
+        ownerId: 'o-1',
+        slug: 'acme',
+        capturedAt: '2026-08-18T10:20:30.123Z',
+      })
       expect(inputs()[0]).toMatchObject({
         ContentType: 'application/gzip',
         Metadata: { owner_id: 'o-1', slug: 'acme', captured_at: '2026-08-18T10:20:30.123Z' },
@@ -105,8 +121,9 @@ describe('tenant-backup-store', () => {
     it('propagates an S3 failure rather than reporting a phantom backup', async () => {
       const { putTenantBackup } = await importStore()
       s3Send.mockRejectedValueOnce(new Error('AccessDenied'))
-      await expect(putTenantBackup({ buffer: Buffer.from('x'), ownerId: 'o', slug: 's' }))
-        .rejects.toThrow('AccessDenied')
+      await expect(putTenantBackup({ buffer: Buffer.from('x'), ownerId: 'o', slug: 's' })).rejects.toThrow(
+        'AccessDenied'
+      )
     })
   })
 
@@ -214,4 +231,3 @@ describe('tenant-backup-store', () => {
     })
   })
 })
-

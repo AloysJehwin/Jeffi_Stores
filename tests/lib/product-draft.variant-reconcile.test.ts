@@ -22,11 +22,26 @@ vi.mock('@/lib/inventory', () => ({
 
 function baseFields(over: Record<string, unknown> = {}) {
   return {
-    name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false,
-    has_variants: true, fragile: false, hazardous: false, flammable: false,
-    perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false,
-    is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false,
-    serialized: false, stock_status: 'In Stock', inventory_quantity: '0',
+    name: 'P',
+    sku: 'S',
+    slug: 's',
+    base_price: '0',
+    is_featured: false,
+    has_variants: true,
+    fragile: false,
+    hazardous: false,
+    flammable: false,
+    perishable: false,
+    is_cod_allowed: true,
+    is_oversized: false,
+    is_digital: false,
+    is_subscription: false,
+    is_bundle: false,
+    is_searchable: true,
+    inclusive_tax: false,
+    serialized: false,
+    stock_status: 'In Stock',
+    inventory_quantity: '0',
     ...over,
   }
 }
@@ -37,7 +52,9 @@ const V_ID = 'aaaaaaaa-0000-4000-8000-000000000001'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockWithTransaction.mockImplementation(async (fn: any) => { await fn({ query: mockClientQuery }) })
+  mockWithTransaction.mockImplementation(async (fn: any) => {
+    await fn({ query: mockClientQuery })
+  })
   mockQueryMany.mockResolvedValue([])
   // Live flags query (perishable/serialized/has_variants) — keep everything on so
   // no toggle-off cleanup fires; has_variants stays on.
@@ -62,14 +79,27 @@ describe('publishProductDraft — variant_images reconcile', () => {
         // kept live row (real uuid), not primary
         { id: '00000000-0000-4000-8000-0000000000aa', variant_id: V_ID, display_order: 1, is_primary: false },
         // fresh upload (draft-vi- id) → INSERT, marked primary
-        { id: 'draft-vi-123', variant_id: V_ID, image_url: 'https://cdn/new.jpg', display_order: 0, is_primary: true, s3_key: 'k', width: 5, height: 6 },
+        {
+          id: 'draft-vi-123',
+          variant_id: V_ID,
+          image_url: 'https://cdn/new.jpg',
+          display_order: 0,
+          is_primary: true,
+          s3_key: 'k',
+          width: 5,
+          height: 6,
+        },
       ],
     }
     // First queryOne = SELECT * FROM product_drafts
     mockQueryOne.mockResolvedValueOnce(draft as any)
 
     mockClientQuery.mockImplementation((sql: string) => {
-      if (typeof sql === 'string' && sql.includes('is_active = true') && sql.includes('SELECT id FROM product_variants')) {
+      if (
+        typeof sql === 'string' &&
+        sql.includes('is_active = true') &&
+        sql.includes('SELECT id FROM product_variants')
+      ) {
         return Promise.resolve({ rows: [{ id: V_ID }] })
       }
       return Promise.resolve({ rows: [], rowCount: 0 })
@@ -101,7 +131,11 @@ describe('publishProductDraft — variant_images reconcile', () => {
     }
     mockQueryOne.mockResolvedValueOnce(draft as any)
     mockClientQuery.mockImplementation((sql: string) => {
-      if (typeof sql === 'string' && sql.includes('is_active = true') && sql.includes('SELECT id FROM product_variants')) {
+      if (
+        typeof sql === 'string' &&
+        sql.includes('is_active = true') &&
+        sql.includes('SELECT id FROM product_variants')
+      ) {
         return Promise.resolve({ rows: [{ id: V_ID }] })
       }
       return Promise.resolve({ rows: [], rowCount: 0 })
@@ -126,7 +160,11 @@ describe('publishProductDraft — variant_images reconcile', () => {
     }
     mockQueryOne.mockResolvedValueOnce(draft as any)
     mockClientQuery.mockImplementation((sql: string) => {
-      if (typeof sql === 'string' && sql.includes('is_active = true') && sql.includes('SELECT id FROM product_variants')) {
+      if (
+        typeof sql === 'string' &&
+        sql.includes('is_active = true') &&
+        sql.includes('SELECT id FROM product_variants')
+      ) {
         return Promise.resolve({ rows: [{ id: V_ID }] })
       }
       return Promise.resolve({ rows: [], rowCount: 0 })
@@ -156,7 +194,11 @@ describe('publishProductDraft — sub-variant UPDATE-by-id', () => {
     }
     mockQueryOne.mockResolvedValueOnce(draft as any)
     mockClientQuery.mockImplementation((sql: string) => {
-      if (typeof sql === 'string' && sql.includes('is_active = true') && sql.includes('SELECT id FROM product_variants')) {
+      if (
+        typeof sql === 'string' &&
+        sql.includes('is_active = true') &&
+        sql.includes('SELECT id FROM product_variants')
+      ) {
         return Promise.resolve({ rows: [{ id: V_ID }] })
       }
       return Promise.resolve({ rows: [], rowCount: 0 })

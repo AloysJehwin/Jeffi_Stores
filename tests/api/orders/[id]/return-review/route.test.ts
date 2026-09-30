@@ -129,9 +129,7 @@ describe('POST /api/orders/[id]/return-review', () => {
 
   it('returns 404 when no active return request found', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(404)
     const body = await res.json()
@@ -151,9 +149,7 @@ describe('POST /api/orders/[id]/return-review', () => {
 
   it('approves a return request successfully', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'approve', adminNotes: 'OK' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -163,9 +159,7 @@ describe('POST /api/orders/[id]/return-review', () => {
 
   it('rejects a return request with notes', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'reject', adminNotes: 'Not eligible' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -262,7 +256,12 @@ describe('POST /api/orders/[id]/return-review', () => {
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
 
     vi.mocked(db.queryMany)
@@ -315,9 +314,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('approves return for guest order (no user_id)', async () => {
     const guestOrder = { ...MOCK_ORDER, user_id: null, users: null }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(guestOrder)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(guestOrder).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -329,9 +326,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('approves return and uses customer_email fallback when users is null', async () => {
     const guestOrder = { ...MOCK_ORDER, users: null, customer_name: 'Guest User', customer_email: 'guest@example.com' }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(guestOrder)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(guestOrder).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -343,9 +338,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('rejects return for guest order (no user_id)', async () => {
     const guestOrder = { ...MOCK_ORDER, user_id: null, users: null }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(guestOrder)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(guestOrder).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'reject', adminNotes: 'Not eligible' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -357,9 +350,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('marks return received for guest order (no user_id)', async () => {
     const guestOrder = { ...MOCK_ORDER, status: 'return_approved', user_id: null, users: null }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(guestOrder)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(guestOrder).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'mark_received' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -410,14 +401,20 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(db.resolveRequestTenant).mockResolvedValue({ tenantId: 'tnt-1', slug: 't' } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce({ id: 'rr-1', type: 'refund', status: 'received', order_id: 'order-123' })
 
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ id: 'pmt-1', transaction_id: 'pay_abc', amount: '500', gateway_response: '{}' }])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
-      fn({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
+      fn({ query: vi.fn().mockResolvedValue({ rows: [] }) })
+    )
 
     await POST(makeRequest({ action: 'process' }) as any, PARAMS)
     expect(razorpayRoute.reverseTransfersForRefund).toHaveBeenCalled()
@@ -435,7 +432,13 @@ describe('POST /api/orders/[id]/return-review', () => {
     // 100 → netRefundAmount 400. The first payment captured only 300, so the remaining 100 must
     // spill into the second payment — which the old single-payment LIMIT 1 lookup would miss.
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, total_amount: '500', status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        total_amount: '500',
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce({ id: 'rr-1', type: 'refund', status: 'received', order_id: 'order-123' })
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([]) // no item-level records → full order_total
@@ -444,7 +447,8 @@ describe('POST /api/orders/[id]/return-review', () => {
         { id: 'pmt-2', transaction_id: 'pay_topup', amount: '200', gateway_response: '{}' },
       ])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
-      fn({ query: vi.fn().mockResolvedValue({ rows: [] }) }))
+      fn({ query: vi.fn().mockResolvedValue({ rows: [] }) })
+    )
 
     const res = await POST(makeRequest({ action: 'process' }) as any, PARAMS)
     expect(res.status).toBe(200)
@@ -460,7 +464,12 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: 'parent-order-1' })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: 'parent-order-1',
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
       .mockResolvedValueOnce({ payment_status: 'paid' }) // parent order payment_status
     const res = await POST(makeRequest({ action: 'process' }) as any, PARAMS)
@@ -515,7 +524,12 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: 'parent-order-1' })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: 'parent-order-1',
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
       .mockResolvedValueOnce({ payment_status: 'paid' }) // parent payment_status lookup
 
@@ -625,8 +639,22 @@ describe('POST /api/orders/[id]/return-review', () => {
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     // item-level return records → useItemLevel = true, reduce runs
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { refund_amount: '100.50', quantity: '1', unit_price: '100.50', product_id: 'p1', variant_id: null, product_name: 'Widget' },
-      { refund_amount: '49.50', quantity: '1', unit_price: '49.50', product_id: 'p2', variant_id: null, product_name: 'Gadget' },
+      {
+        refund_amount: '100.50',
+        quantity: '1',
+        unit_price: '100.50',
+        product_id: 'p1',
+        variant_id: null,
+        product_name: 'Widget',
+      },
+      {
+        refund_amount: '49.50',
+        quantity: '1',
+        unit_price: '49.50',
+        product_id: 'p2',
+        variant_id: null,
+        product_name: 'Gadget',
+      },
     ])
     const res = await POST(makeRequest({ action: 'process' }) as any, PARAMS)
     expect(res.status).toBe(200)
@@ -645,7 +673,12 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
 
     vi.mocked(db.queryMany)
@@ -670,12 +703,19 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
 
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: 'pmt-1', transaction_id: 'pay_abc', amount: '500', gateway_response: { existing: true } }])
+      .mockResolvedValueOnce([
+        { id: 'pmt-1', transaction_id: 'pay_abc', amount: '500', gateway_response: { existing: true } },
+      ])
     const res = await POST(makeRequest({ action: 'process' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -692,7 +732,12 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: razorpayMock } as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: null })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'return_received',
+        payment_status: 'paid',
+        original_order_id: null,
+      })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
 
     vi.mocked(db.queryMany)
@@ -712,13 +757,36 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(replacementReturnRequest)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, shipping_address_snapshot: { full_name: 'Snap User', address_line1: 'L1' } })
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        shipping_address_snapshot: { full_name: 'Snap User', address_line1: 'L1' },
+      })
       // v1 is still an active variant → no variant pick needed
       .mockResolvedValueOnce({ is_active: true })
     // item-level records → replacementItems = returnItems, loop executes both branches
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { refund_amount: '200', quantity: '2', unit_price: '100', product_id: 'p1', variant_id: 'v1', product_name: 'Variant Item', variant_name: 'Red', buy_mode: 'unit', buy_unit: null },
-      { refund_amount: '50', quantity: '1', unit_price: '50', product_id: 'p2', variant_id: null, product_name: 'Plain Item', variant_name: null, buy_mode: null, buy_unit: null },
+      {
+        refund_amount: '200',
+        quantity: '2',
+        unit_price: '100',
+        product_id: 'p1',
+        variant_id: 'v1',
+        product_name: 'Variant Item',
+        variant_name: 'Red',
+        buy_mode: 'unit',
+        buy_unit: null,
+      },
+      {
+        refund_amount: '50',
+        quantity: '1',
+        unit_price: '50',
+        product_id: 'p2',
+        variant_id: null,
+        product_name: 'Plain Item',
+        variant_name: null,
+        buy_mode: null,
+        buy_unit: null,
+      },
     ])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
@@ -750,7 +818,16 @@ describe('POST /api/orders/[id]/return-review', () => {
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { quantity: '3', unit_price: '10', product_id: 'p9', variant_id: null, product_name: 'Legacy', variant_name: null, buy_mode: 'unit', buy_unit: null },
+        {
+          quantity: '3',
+          unit_price: '10',
+          product_id: 'p9',
+          variant_id: null,
+          product_name: 'Legacy',
+          variant_name: null,
+          buy_mode: 'unit',
+          buy_unit: null,
+        },
       ])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
@@ -770,9 +847,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('approves when userName resolves empty (email skipped)', async () => {
     const orderNoName = { ...MOCK_ORDER, users: { email: 'e@x.com', first_name: '', last_name: '' }, customer_name: '' }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(orderNoName)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(orderNoName).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     // userName is '' (falsy) so sendReturnStatusEmail must NOT be called
@@ -784,9 +859,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   it('approves a replacement-type return (activity summary uses Replacement)', async () => {
     const replacementReq = { ...MOCK_RETURN_REQUEST, type: 'replacement' }
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(replacementReq)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(replacementReq)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     expect(vi.mocked(activity.logActivity)).toHaveBeenCalledWith(
@@ -810,7 +883,9 @@ describe('POST /api/orders/[id]/return-review — rejected side-effects hit .cat
     vi.mocked(db.queryOne).mockReset()
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
-      const client = { query: vi.fn().mockResolvedValue({ rows: [{ id: 'new-order-id', order_number: 'RPL-ORD-001' }] }) }
+      const client = {
+        query: vi.fn().mockResolvedValue({ rows: [{ id: 'new-order-id', order_number: 'RPL-ORD-001' }] }),
+      }
       return fn(client)
     })
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
@@ -824,18 +899,14 @@ describe('POST /api/orders/[id]/return-review — rejected side-effects hit .cat
   })
 
   it('approve path: swallows all rejected side effects', async () => {
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     expect((await res.json()).newStatus).toBe('return_approved')
   })
 
   it('reject path: swallows all rejected side effects', async () => {
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(MOCK_RETURN_REQUEST)
     const res = await POST(makeRequest({ action: 'reject', adminNotes: 'no' }) as any, PARAMS)
     expect(res.status).toBe(200)
     expect((await res.json()).newStatus).toBe('return_rejected')

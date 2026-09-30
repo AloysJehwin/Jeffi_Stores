@@ -30,7 +30,14 @@ describe('toSellingUnit', () => {
   })
 
   it('coerces string numerics from pg and defaults factor/step', () => {
-    const u = toSellingUnit({ unit: 'box', factor: '12', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null })
+    const u = toSellingUnit({
+      unit: 'box',
+      factor: '12',
+      dimension: 'count',
+      qty_step: '1',
+      min_qty: '1',
+      max_qty: null,
+    })
     expect(u).toEqual({ unit: 'box', factor: 12, dimension: 'count', qty_step: 1, min_qty: 1, max_qty: null })
   })
 
@@ -158,8 +165,10 @@ const SCOPE = { productId: 'p1', label: 'box' }
 
 describe('changedUnitFields', () => {
   it('reports nothing when the body re-sends identical values', () => {
-    const c = changedUnitFields({ factor: 12, dimension: 'count', qty_step: 1 },
-                                { factor: '12', dimension: 'count', qty_step: '1' })
+    const c = changedUnitFields(
+      { factor: 12, dimension: 'count', qty_step: 1 },
+      { factor: '12', dimension: 'count', qty_step: '1' }
+    )
     expect(c).toEqual({ factor: false, qtyStep: false, dimension: false })
   })
   it('ignores fields the body omits', () => {
@@ -317,23 +326,27 @@ describe('validateUnitQuantityBounds', () => {
 
   it('rejects a minimum below the step', () => {
     // min 1 with step 10 advertises a minimum nobody can order.
-    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 1, max_qty: 100 }))
-      .toMatch(/cannot be below the quantity step/i)
+    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 1, max_qty: 100 })).toMatch(
+      /cannot be below the quantity step/i
+    )
   })
 
   it('rejects a minimum that is not a multiple of the step', () => {
-    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 13, max_qty: 100 }))
-      .toMatch(/must be a multiple of the quantity step/i)
+    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 13, max_qty: 100 })).toMatch(
+      /must be a multiple of the quantity step/i
+    )
   })
 
   it('rejects a maximum that is not a multiple of the step', () => {
-    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 10, max_qty: 95 }))
-      .toMatch(/Maximum quantity .* must be a multiple/i)
+    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 10, max_qty: 95 })).toMatch(
+      /Maximum quantity .* must be a multiple/i
+    )
   })
 
   it('rejects a maximum below the minimum', () => {
-    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 50, max_qty: 20 }))
-      .toMatch(/cannot be below the minimum/i)
+    expect(validateUnitQuantityBounds({ qty_step: 10, min_qty: 50, max_qty: 20 })).toMatch(
+      /cannot be below the minimum/i
+    )
   })
 
   it('allows a null maximum', () => {
@@ -346,7 +359,8 @@ describe('validateUnitQuantityBounds', () => {
 
   it('handles a fractional step on the grid', () => {
     expect(validateUnitQuantityBounds({ qty_step: 0.5, min_qty: 1.5, max_qty: 10 })).toBeNull()
-    expect(validateUnitQuantityBounds({ qty_step: 0.5, min_qty: 1.3, max_qty: 10 }))
-      .toMatch(/multiple of the quantity step/i)
+    expect(validateUnitQuantityBounds({ qty_step: 0.5, min_qty: 1.3, max_qty: 10 })).toMatch(
+      /multiple of the quantity step/i
+    )
   })
 })

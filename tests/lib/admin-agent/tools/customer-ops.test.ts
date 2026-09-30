@@ -142,7 +142,9 @@ describe('admin-agent/tools/customer-ops', () => {
 
   describe('get_customer_tags', () => {
     it('returns tags for a customer', async () => {
-      mockQueryMany.mockResolvedValueOnce([{ id: 'tg1', tag: 'vip', created_at: '2024-01-01', color: 'gold', sort_order: 1 }])
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'tg1', tag: 'vip', created_at: '2024-01-01', color: 'gold', sort_order: 1 },
+      ])
       const result = await getTool('get_customer_tags').handler({ customerId: 'u1' })
       expect((result as any).tags).toHaveLength(1)
       expect((result as any).count).toBe(1)
@@ -159,9 +161,17 @@ describe('admin-agent/tools/customer-ops', () => {
   describe('get_customer_health', () => {
     it('returns health row when it exists', async () => {
       const healthRow = {
-        user_id: 'u1', score: 82, recency_score: 90, frequency_score: 70,
-        monetary_score: 85, engagement_score: 80, satisfaction_score: 75,
-        churn_risk: 'low', trend_delta_7d: 2, trend_delta_30d: -1, last_computed_at: '2024-06-01',
+        user_id: 'u1',
+        score: 82,
+        recency_score: 90,
+        frequency_score: 70,
+        monetary_score: 85,
+        engagement_score: 80,
+        satisfaction_score: 75,
+        churn_risk: 'low',
+        trend_delta_7d: 2,
+        trend_delta_30d: -1,
+        last_computed_at: '2024-06-01',
       }
       mockQueryOne.mockResolvedValueOnce(healthRow)
       const result = await getTool('get_customer_health').handler({ customerId: 'u1' })
@@ -198,7 +208,9 @@ describe('admin-agent/tools/customer-ops', () => {
 
   describe('list_customers_by_tag', () => {
     it('returns customers for a given tag', async () => {
-      const rows = [{ id: 'u1', email: 'alice@test.com', name: 'Alice', phone: null, tagged_at: '2024-01-01', paid_orders: 3 }]
+      const rows = [
+        { id: 'u1', email: 'alice@test.com', name: 'Alice', phone: null, tagged_at: '2024-01-01', paid_orders: 3 },
+      ]
       mockQueryMany.mockResolvedValueOnce(rows)
       const result = await getTool('list_customers_by_tag').handler({ tagSlug: 'vip' })
       expect((result as any).data.customers).toHaveLength(1)
@@ -236,15 +248,11 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when tagSlug is empty', async () => {
-      await expect(
-        getTool('list_customers_by_tag').handler({ tagSlug: '' })
-      ).rejects.toThrow('tagSlug is required')
+      await expect(getTool('list_customers_by_tag').handler({ tagSlug: '' })).rejects.toThrow('tagSlug is required')
     })
 
     it('throws when tagSlug is whitespace only', async () => {
-      await expect(
-        getTool('list_customers_by_tag').handler({ tagSlug: '   ' })
-      ).rejects.toThrow('tagSlug is required')
+      await expect(getTool('list_customers_by_tag').handler({ tagSlug: '   ' })).rejects.toThrow('tagSlug is required')
     })
 
     it('uses default limit when limit is not a number', async () => {
@@ -312,9 +320,9 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when body is empty', async () => {
-      await expect(
-        getTool('propose_add_customer_note').handler({ customerId: 'u1', body: '' })
-      ).rejects.toThrow('body is required')
+      await expect(getTool('propose_add_customer_note').handler({ customerId: 'u1', body: '' })).rejects.toThrow(
+        'body is required'
+      )
     })
 
     it('throws when body exceeds 2000 chars', async () => {
@@ -395,15 +403,15 @@ describe('admin-agent/tools/customer-ops', () => {
 
     it('throws when customer not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      await expect(
-        getTool('propose_add_customer_tag').handler({ customerId: 'bad', tagSlug: 'vip' })
-      ).rejects.toThrow('Customer not found')
+      await expect(getTool('propose_add_customer_tag').handler({ customerId: 'bad', tagSlug: 'vip' })).rejects.toThrow(
+        'Customer not found'
+      )
     })
 
     it('throws when tagSlug is empty', async () => {
-      await expect(
-        getTool('propose_add_customer_tag').handler({ customerId: 'u1', tagSlug: '' })
-      ).rejects.toThrow('tagSlug is required')
+      await expect(getTool('propose_add_customer_tag').handler({ customerId: 'u1', tagSlug: '' })).rejects.toThrow(
+        'tagSlug is required'
+      )
     })
 
     it('includes expiresAt in payload when provided', async () => {
@@ -475,9 +483,9 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when tagSlug is empty', async () => {
-      await expect(
-        getTool('propose_remove_customer_tag').handler({ customerId: 'u1', tagSlug: '' })
-      ).rejects.toThrow('tagSlug is required')
+      await expect(getTool('propose_remove_customer_tag').handler({ customerId: 'u1', tagSlug: '' })).rejects.toThrow(
+        'tagSlug is required'
+      )
     })
 
     it('lower-cases and trims tagSlug before checking', async () => {
@@ -513,9 +521,9 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when title is empty', async () => {
-      await expect(
-        getTool('propose_create_customer_task').handler({ customerId: 'u1', title: '' })
-      ).rejects.toThrow('title is required')
+      await expect(getTool('propose_create_customer_task').handler({ customerId: 'u1', title: '' })).rejects.toThrow(
+        'title is required'
+      )
     })
 
     it('defaults priority to medium for invalid priority value', async () => {
@@ -659,15 +667,17 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when taskId is empty', async () => {
-      await expect(
-        getTool('propose_close_customer_task').handler({ taskId: '' })
-      ).rejects.toThrow('taskId is required')
+      await expect(getTool('propose_close_customer_task').handler({ taskId: '' })).rejects.toThrow('taskId is required')
     })
 
     it('sets resolution to null in payload when resolution is empty', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'task1', title: 'Task', status: 'pending',
-        user_id: 'u1', customer_email: 'alice@test.com', customer_name: 'Alice',
+        id: 'task1',
+        title: 'Task',
+        status: 'pending',
+        user_id: 'u1',
+        customer_email: 'alice@test.com',
+        customer_name: 'Alice',
       })
       const result = await getTool('propose_close_customer_task').handler({
         taskId: 'task1',
@@ -678,8 +688,12 @@ describe('admin-agent/tools/customer-ops', () => {
 
     it('includes resolution in kv_pairs when resolution is non-empty', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'task1', title: 'Task', status: 'pending',
-        user_id: 'u1', customer_email: 'alice@test.com', customer_name: 'Alice',
+        id: 'task1',
+        title: 'Task',
+        status: 'pending',
+        user_id: 'u1',
+        customer_email: 'alice@test.com',
+        customer_name: 'Alice',
       })
       const result = await getTool('propose_close_customer_task').handler({
         taskId: 'task1',
@@ -810,9 +824,9 @@ describe('admin-agent/tools/customer-ops', () => {
     })
 
     it('throws when slug is missing', async () => {
-      await expect(
-        getTool('propose_create_tag_definition').handler({ slug: '', label: 'Enterprise' })
-      ).rejects.toThrow('slug is required')
+      await expect(getTool('propose_create_tag_definition').handler({ slug: '', label: 'Enterprise' })).rejects.toThrow(
+        'slug is required'
+      )
     })
 
     it('throws when slug has invalid characters after cleaning', async () => {

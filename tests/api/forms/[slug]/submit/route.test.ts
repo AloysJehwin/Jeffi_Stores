@@ -42,7 +42,9 @@ const activeForm = {
 }
 
 describe('POST /api/forms/[slug]/submit', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 404 when form not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
@@ -96,9 +98,7 @@ describe('POST /api/forms/[slug]/submit', () => {
   })
 
   it('returns 409 when email already submitted', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(activeForm)
-      .mockResolvedValueOnce({ id: 'existing-sub' })
+    mockQueryOne.mockResolvedValueOnce(activeForm).mockResolvedValueOnce({ id: 'existing-sub' })
     const file = new File(['img'], 'shot.png', { type: 'image/png' })
     const fd = makeFormData({ email: 'exists@example.com', screenshot: file })
     const res = await POST(makeRequest(fd) as any, params as any)
@@ -106,9 +106,7 @@ describe('POST /api/forms/[slug]/submit', () => {
   })
 
   it('returns 500 on upload failure', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(activeForm)
-      .mockResolvedValueOnce(null)  // no existing submission
+    mockQueryOne.mockResolvedValueOnce(activeForm).mockResolvedValueOnce(null) // no existing submission
     mockUpload.mockRejectedValueOnce(new Error('s3 fail'))
 
     const file = new File(['img'], 'shot.png', { type: 'image/png' })
@@ -118,9 +116,7 @@ describe('POST /api/forms/[slug]/submit', () => {
   })
 
   it('returns 200 on successful submission without coupon', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(activeForm)
-      .mockResolvedValueOnce(null)  // no existing submission
+    mockQueryOne.mockResolvedValueOnce(activeForm).mockResolvedValueOnce(null) // no existing submission
     mockUpload.mockResolvedValueOnce({ url: 'https://cdn/screen.jpg' } as any)
     mockWithTransaction.mockResolvedValueOnce(undefined)
 
@@ -135,11 +131,15 @@ describe('POST /api/forms/[slug]/submit', () => {
 
   it('returns coupon data on successful submission with coupon', async () => {
     const formWithCoupon = { ...activeForm, coupon_id: 'coup1' }
-    const coupon = { id: 'coup1', code: 'SAVE10', description: '10% off', valid_until: null, discount_type: 'percentage', discount_value: 10 }
-    mockQueryOne
-      .mockResolvedValueOnce(formWithCoupon)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(coupon)
+    const coupon = {
+      id: 'coup1',
+      code: 'SAVE10',
+      description: '10% off',
+      valid_until: null,
+      discount_type: 'percentage',
+      discount_value: 10,
+    }
+    mockQueryOne.mockResolvedValueOnce(formWithCoupon).mockResolvedValueOnce(null).mockResolvedValueOnce(coupon)
     mockUpload.mockResolvedValueOnce({ url: 'https://cdn/screen.jpg' } as any)
     mockWithTransaction.mockResolvedValueOnce(undefined)
 
@@ -170,12 +170,10 @@ describe('POST /api/forms/[slug]/submit', () => {
       ...activeForm,
       custom_fields: [{ id: 'img1', label: 'Receipt', type: 'image', required: false }],
     }
-    mockQueryOne
-      .mockResolvedValueOnce(formWithImageField)
-      .mockResolvedValueOnce(null) // no existing submission
+    mockQueryOne.mockResolvedValueOnce(formWithImageField).mockResolvedValueOnce(null) // no existing submission
     mockUpload
       .mockResolvedValueOnce({ url: 'https://cdn/screenshot.jpg' } as any) // screenshot upload
-      .mockResolvedValueOnce({ url: 'https://cdn/receipt.jpg' } as any)    // custom field image upload
+      .mockResolvedValueOnce({ url: 'https://cdn/receipt.jpg' } as any) // custom field image upload
     mockWithTransaction.mockResolvedValueOnce(undefined)
 
     const screenshot = new File(['img'], 'shot.png', { type: 'image/png' })

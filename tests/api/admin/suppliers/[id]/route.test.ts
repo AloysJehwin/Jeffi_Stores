@@ -39,7 +39,9 @@ const sampleStats = {
 }
 
 describe('GET /api/admin/suppliers/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -69,9 +71,7 @@ describe('GET /api/admin/suppliers/[id]', () => {
   it('returns supplier with stats, pos, and expenses on success', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce(sampleSupplier)
-      .mockResolvedValueOnce(sampleStats)
+    mockQueryOne.mockResolvedValueOnce(sampleSupplier).mockResolvedValueOnce(sampleStats)
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'po-1', po_number: 'PO-001' }])
       .mockResolvedValueOnce([{ id: 'exp-1', expense_number: 'EXP-001' }])
@@ -88,12 +88,8 @@ describe('GET /api/admin/suppliers/[id]', () => {
   it('returns empty arrays when queryMany returns null', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce(sampleSupplier)
-      .mockResolvedValueOnce(sampleStats)
-    mockQueryMany
-      .mockResolvedValueOnce(null as any)
-      .mockResolvedValueOnce(null as any)
+    mockQueryOne.mockResolvedValueOnce(sampleSupplier).mockResolvedValueOnce(sampleStats)
+    mockQueryMany.mockResolvedValueOnce(null as any).mockResolvedValueOnce(null as any)
 
     const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'sup-123' }) as any })
     expect(res.status).toBe(200)

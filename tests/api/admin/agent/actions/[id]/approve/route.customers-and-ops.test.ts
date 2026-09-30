@@ -88,7 +88,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     vi.mocked(logActivity).mockResolvedValue(undefined as any)
     // default fetch: return a 200 empty response so any un-mocked call doesn't hit real network
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({}), text: async () => '',
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => '',
     }) as any
   })
 
@@ -99,36 +102,28 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── customer tag/task/note ────────────────────────────────────────────
 
   it('returns 500 when add_customer_note missing customerId', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('add_customer_note', { customerId: '', body: 'hi' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('add_customer_note', { customerId: '', body: 'hi' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/customerId and body required/)
   })
 
   it('executes add_customer_tag successfully', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('add_customer_tag', { customerId: 'c1', tagSlug: 'VIP' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('add_customer_tag', { customerId: 'c1', tagSlug: 'VIP' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
     expect((await res.json()).result.tag).toBe('vip')
   })
 
   it('returns 500 when add_customer_tag missing tag', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('add_customer_tag', { customerId: 'c1', tagSlug: '' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('add_customer_tag', { customerId: 'c1', tagSlug: '' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/tagSlug required/)
   })
 
   it('executes remove_customer_tag successfully', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('remove_customer_tag', { customerId: 'c1', tagSlug: 'vip' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('remove_customer_tag', { customerId: 'c1', tagSlug: 'vip' }) as any)
     mockQuery.mockResolvedValueOnce({ rowCount: 1 } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -138,7 +133,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when create_customer_task missing title', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_customer_task', {
-        customerId: 'c1', title: '', dueAt: null, assignedToAdminId: null, priority: 'high',
+        customerId: 'c1',
+        title: '',
+        dueAt: null,
+        assignedToAdminId: null,
+        priority: 'high',
       }) as any
     )
     const res = await POST(makeReq(), params())
@@ -150,7 +149,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne
       .mockResolvedValueOnce(
         proposed('create_customer_task', {
-          customerId: 'c1', title: 'call', dueAt: null, assignedToAdminId: null, priority: 'weird',
+          customerId: 'c1',
+          title: 'call',
+          dueAt: null,
+          assignedToAdminId: null,
+          priority: 'weird',
         }) as any
       )
       .mockResolvedValueOnce({ id: 'task-1' } as any)
@@ -187,9 +190,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('returns 500 when close_customer_task missing taskId', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('close_customer_task', { taskId: '', resolution: null }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('close_customer_task', { taskId: '', resolution: null }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/taskId required/)
@@ -205,9 +206,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('returns 500 when toggle_marketing_opt_out missing customerId', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('toggle_marketing_opt_out', { customerId: '', optOut: true }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('toggle_marketing_opt_out', { customerId: '', optOut: true }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/customerId required/)
@@ -216,9 +215,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── create_tag_definition ─────────────────────────────────────────────
 
   it('returns 500 when create_tag_definition missing slug', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('create_tag_definition', { slug: '', color: 'red' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('create_tag_definition', { slug: '', color: 'red' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/slug required/)
@@ -276,7 +273,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       proposed('create_pickup_request', { orderIds: ['o1'], pickupDate: '2099-01-01', orderCount: 1 }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ pickupId: 'PU-1', pickupDate: '2099-01-01', orderCount: 1, awbs: ['AWB1'] }),
+      ok: true,
+      status: 200,
+      json: async () => ({ pickupId: 'PU-1', pickupDate: '2099-01-01', orderCount: 1, awbs: ['AWB1'] }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -288,7 +287,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes sync_delhivery_statuses successfully', async () => {
     mockQueryOne.mockResolvedValueOnce(proposed('sync_delhivery_statuses', {}) as any)
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ total: 10, synced: 8, errors: [], rvp: { received: 2 } }),
+      ok: true,
+      status: 200,
+      json: async () => ({ total: 10, synced: 8, errors: [], rvp: { received: 2 } }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -300,7 +301,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when sync_delhivery_statuses upstream fails', async () => {
     mockQueryOne.mockResolvedValueOnce(proposed('sync_delhivery_statuses', {}) as any)
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false, status: 502, json: async () => ({ error: 'Delhivery down' }),
+      ok: false,
+      status: 502,
+      json: async () => ({ error: 'Delhivery down' }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
@@ -312,8 +315,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when pay_payable amount invalid', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('pay_payable', {
-        payableId: 'pay-1', expenseNumber: 'E1', supplierName: 'S',
-        amount: 0, paymentMode: 'cash', paidAt: '2099-01-01', transactionRef: null,
+        payableId: 'pay-1',
+        expenseNumber: 'E1',
+        supplierName: 'S',
+        amount: 0,
+        paymentMode: 'cash',
+        paidAt: '2099-01-01',
+        transactionRef: null,
       }) as any
     )
     const res = await POST(makeReq(), params())
@@ -324,12 +332,19 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when pay_payable upstream not ok', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('pay_payable', {
-        payableId: 'pay-1', expenseNumber: 'E1', supplierName: 'S',
-        amount: 500, paymentMode: 'cash', paidAt: '2099-01-01', transactionRef: null,
+        payableId: 'pay-1',
+        expenseNumber: 'E1',
+        supplierName: 'S',
+        amount: 500,
+        paymentMode: 'cash',
+        paidAt: '2099-01-01',
+        transactionRef: null,
       }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false, status: 400, json: async () => ({ error: 'already paid' }),
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'already paid' }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
@@ -339,12 +354,19 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes pay_payable successfully', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('pay_payable', {
-        payableId: 'pay-1', expenseNumber: 'E1', supplierName: 'S',
-        amount: 500, paymentMode: 'cash', paidAt: '2099-01-01', transactionRef: 'TX1',
+        payableId: 'pay-1',
+        expenseNumber: 'E1',
+        supplierName: 'S',
+        amount: 500,
+        paymentMode: 'cash',
+        paidAt: '2099-01-01',
+        transactionRef: 'TX1',
       }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ new_status: 'paid', total_paid: 500 }),
+      ok: true,
+      status: 200,
+      json: async () => ({ new_status: 'paid', total_paid: 500 }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)

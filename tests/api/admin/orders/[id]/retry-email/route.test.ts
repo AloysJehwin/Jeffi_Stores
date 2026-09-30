@@ -118,12 +118,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(mockSendEmail).toHaveBeenCalledWith(
-      'customer@example.com',
-      'Jane Doe',
-      'ORD-001',
-      1500,
-    )
+    expect(mockSendEmail).toHaveBeenCalledWith('customer@example.com', 'Jane Doe', 'ORD-001', 1500)
   })
 
   it('sends retry email for unpaid status', async () => {

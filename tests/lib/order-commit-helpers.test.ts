@@ -17,13 +17,7 @@ vi.mock('@/lib/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
-import {
-  cartLineUnitPrice,
-  cartItemsForHash,
-  cartSubtotal,
-  cartTaxAmount,
-  type CartLine,
-} from '@/lib/order-commit'
+import { cartLineUnitPrice, cartItemsForHash, cartSubtotal, cartTaxAmount, type CartLine } from '@/lib/order-commit'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -146,8 +140,24 @@ describe('cartLineUnitPrice', () => {
 describe('cartItemsForHash', () => {
   it('maps CartLine array to DraftCartItem shape', () => {
     const lines: CartLine[] = [
-      makeCartLine({ product_id: 'p1', variant_id: 'v1', sub_variant_id: null, quantity: 2, price_at_addition: 500, buy_mode: 'unit', buy_unit: null }),
-      makeCartLine({ product_id: 'p2', variant_id: null, sub_variant_id: 'sv2', quantity: 3, price_at_addition: 750, buy_mode: 'box', buy_unit: 'box' }),
+      makeCartLine({
+        product_id: 'p1',
+        variant_id: 'v1',
+        sub_variant_id: null,
+        quantity: 2,
+        price_at_addition: 500,
+        buy_mode: 'unit',
+        buy_unit: null,
+      }),
+      makeCartLine({
+        product_id: 'p2',
+        variant_id: null,
+        sub_variant_id: 'sv2',
+        quantity: 3,
+        price_at_addition: 750,
+        buy_mode: 'box',
+        buy_unit: 'box',
+      }),
     ]
     const result = cartItemsForHash(lines)
     expect(result).toHaveLength(2)

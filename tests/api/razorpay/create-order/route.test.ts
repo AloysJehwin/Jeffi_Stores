@@ -23,7 +23,7 @@ vi.mock('@/lib/order-commit', () => ({
   cartItemsForHash: vi.fn(),
   validateCouponForUser: vi.fn(),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -105,7 +105,8 @@ describe('POST /api/razorpay/create-order', () => {
     vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({               // order lookup
+      .mockResolvedValueOnce({
+        // order lookup
         id: 'order-uuid',
         order_number: 'ORD-999',
         user_id: 'user-123',
@@ -121,7 +122,7 @@ describe('POST /api/razorpay/create-order', () => {
 
     expect(res.status).toBe(200)
     expect(body.razorpayOrderId).toBe('rzp_order_abc123')
-    expect(body.amount).toBe(50000)   // 500 * 100 paise
+    expect(body.amount).toBe(50000) // 500 * 100 paise
     expect(body.currency).toBe('INR')
     expect(body.orderId).toBe('order-uuid')
     expect(rzpInstance.orders.create).toHaveBeenCalledOnce()
@@ -323,7 +324,8 @@ describe('POST /api/razorpay/create-order', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: false } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: AUTH_USER.email, phone: null }) // bizUser lookup
-      .mockResolvedValueOnce({                                          // order lookup
+      .mockResolvedValueOnce({
+        // order lookup
         id: 'order-uuid',
         order_number: 'ORD-BIZ',
         user_id: 'user-123',
@@ -334,10 +336,7 @@ describe('POST /api/razorpay/create-order', () => {
 
     mockRazorpayInstance()
 
-    const res = await POST(makeRequest(
-      { orderId: 'order-uuid' },
-      { 'x-auth-portal': 'business' }
-    ) as any)
+    const res = await POST(makeRequest({ orderId: 'order-uuid' }, { 'x-auth-portal': 'business' }) as any)
     const body = await res.json()
 
     expect(res.status).toBe(200)

@@ -200,11 +200,13 @@ describe('getFilterFacets', () => {
       // aggregates is queryOne — handled separately
       .mockResolvedValueOnce([{ value: 'size', count: '4' }]) // variantTypes
       .mockResolvedValueOnce([{ value: 'L', count: '2' }]) // variantValues
-      .mockResolvedValueOnce(opts.specRows ?? [
-        { key: 'voltage', val: '12V', cnt: '2' },
-        { key: 'voltage', val: '24V', cnt: '1' },
-        { key: 'weight', val: '1kg', cnt: '5' },
-      ]) // specRows
+      .mockResolvedValueOnce(
+        opts.specRows ?? [
+          { key: 'voltage', val: '12V', cnt: '2' },
+          { key: 'voltage', val: '24V', cnt: '1' },
+          { key: 'weight', val: '1kg', cnt: '5' },
+        ]
+      ) // specRows
     mockQueryOne.mockResolvedValueOnce(
       opts.aggregates ?? { in_stock_count: '7', on_sale_count: '2', price_min: '5', price_max: '99' }
     )
@@ -229,7 +231,13 @@ describe('getFilterFacets', () => {
     expect(facets.variantValues).toEqual([{ value: 'L', count: 2 }])
     // spec facets grouped by key
     expect(facets.specFacets).toEqual([
-      { key: 'voltage', values: [{ value: '12V', count: 2 }, { value: '24V', count: 1 }] },
+      {
+        key: 'voltage',
+        values: [
+          { value: '12V', count: 2 },
+          { value: '24V', count: 1 },
+        ],
+      },
       { key: 'weight', values: [{ value: '1kg', count: 5 }] },
     ])
   })

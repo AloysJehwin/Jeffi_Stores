@@ -35,7 +35,9 @@ function makeRequest(opts: { sessionId?: string } = {}) {
 const params = { params: Promise.resolve({ id: 'prod1' }) }
 
 describe('POST /api/products/[id]/view', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns ok when unauthenticated', async () => {
     mockAuth.mockRejectedValueOnce(new Error('no auth'))
@@ -63,8 +65,8 @@ describe('POST /api/products/[id]/view', () => {
     mockAuth.mockResolvedValueOnce({ userId: 'user1' } as any)
     mockQuery.mockResolvedValueOnce(undefined as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)                        // no recent activity
-      .mockResolvedValueOnce({ name: 'Test Product' })    // product name
+      .mockResolvedValueOnce(null) // no recent activity
+      .mockResolvedValueOnce({ name: 'Test Product' }) // product name
 
     const res = await POST(makeRequest(), params as any)
     expect(res.status).toBe(200)
@@ -73,7 +75,7 @@ describe('POST /api/products/[id]/view', () => {
   it('skips logActivity when recent view exists', async () => {
     mockAuth.mockResolvedValueOnce({ userId: 'user1' } as any)
     mockQuery.mockResolvedValueOnce(undefined as any)
-    mockQueryOne.mockResolvedValueOnce({ id: 'recent-log' })  // recent activity found
+    mockQueryOne.mockResolvedValueOnce({ id: 'recent-log' }) // recent activity found
 
     const res = await POST(makeRequest(), params as any)
     expect(res.status).toBe(200)

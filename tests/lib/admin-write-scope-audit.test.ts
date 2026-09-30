@@ -15,20 +15,33 @@ import { AI_ACTION_SCOPES } from '@/lib/ai-scope'
  */
 const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Pre-auth or self-service: the caller is proving who they are, or acting on themselves.
-  'auth/email-otp/start', 'auth/email-otp/verify', 'logout', 'refresh',
+  'auth/email-otp/start',
+  'auth/email-otp/verify',
+  'logout',
+  'refresh',
   // Activity heartbeat on the caller's own session: extends its idle window, mutates nothing else.
   'session/heartbeat',
-  'mfa/enroll-start', 'mfa/enroll-confirm', 'mfa/verify', 'mfa/recovery-codes',
-  'sessions/[id]/revoke', 'sessions/revoke-all', 'access-request',
+  'mfa/enroll-start',
+  'mfa/enroll-confirm',
+  'mfa/verify',
+  'mfa/recovery-codes',
+  'sessions/[id]/revoke',
+  'sessions/revoke-all',
+  'access-request',
   // Self-service: a member marking their own notification bell read, not a scoped action.
   'notifications/read',
   // Owner-only team management, gated on isPlatformOwner rather than a scope.
-  'users', 'users/[id]', 'users/[id]/revoke-sessions', 'users/[id]/resend-certificate',
+  'users',
+  'users/[id]',
+  'users/[id]/revoke-sessions',
+  'users/[id]/resend-certificate',
   // Platform control plane: gated by host and isPlatformAdmin in middleware.
-  'ecom/kyc/[tenantId]/approve', 'ecom/kyc/[tenantId]/reject',
+  'ecom/kyc/[tenantId]/approve',
+  'ecom/kyc/[tenantId]/reject',
   // Platform-admin tenant billing controls (admin.jeffistores.in): gated on isPlatformAdmin,
   // which is strictly stronger than any :write scope, so a read-only member can never reach them.
-  'ecom/[tenantId]/account-mode', 'ecom/[tenantId]/delivery-mode',
+  'ecom/[tenantId]/account-mode',
+  'ecom/[tenantId]/delivery-mode',
   'ecom/[tenantId]/shipments/[orderId]/correct',
   // Revoke a tenant admin certificate — platform-owner only (isPlatformAdmin), same as the other
   // ecom/[tenantId] controls above.

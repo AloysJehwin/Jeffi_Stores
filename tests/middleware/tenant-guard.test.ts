@@ -4,7 +4,9 @@ import { NextRequest } from 'next/server'
 const { mockResolveTenant } = vi.hoisted(() => ({ mockResolveTenant: vi.fn() }))
 
 vi.mock('@/lib/jwt', () => ({
-  verifyToken: vi.fn(), verifyBusinessToken: vi.fn(), authenticateAdmin: vi.fn(),
+  verifyToken: vi.fn(),
+  verifyBusinessToken: vi.fn(),
+  authenticateAdmin: vi.fn(),
 }))
 vi.mock('@/lib/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/scopes', () => ({
@@ -23,10 +25,25 @@ function req(url: string, headers: Record<string, string> = {}) {
   return new NextRequest(url, { headers: new Headers(headers) })
 }
 
-const ACTIVE = { tenantId: 't-1', slug: 'acme', plan: 'basic', infra: { rdsEndpoint: 'ep', rdsDb: 'jeffi_stores', rdsPort: 5432, dbSecretRef: null, iamAuth: true, s3Bucket: 'b', region: 'us-east-1' } }
+const ACTIVE = {
+  tenantId: 't-1',
+  slug: 'acme',
+  plan: 'basic',
+  infra: {
+    rdsEndpoint: 'ep',
+    rdsDb: 'jeffi_stores',
+    rdsPort: 5432,
+    dbSecretRef: null,
+    iamAuth: true,
+    s3Bucket: 'b',
+    region: 'us-east-1',
+  },
+}
 
 describe('unknown tenant host must 404, never fall through to the platform store', () => {
-  beforeEach(() => { mockResolveTenant.mockReset() })
+  beforeEach(() => {
+    mockResolveTenant.mockReset()
+  })
 
   it('404s an unresolved tenant slug instead of serving the flagship', async () => {
     mockResolveTenant.mockResolvedValue(null)
@@ -36,7 +53,9 @@ describe('unknown tenant host must 404, never fall through to the platform store
 
   it('404s an unresolved tenant admin host rather than offering a login page', async () => {
     mockResolveTenant.mockResolvedValue(null)
-    const res = await middleware(req('https://admin-nope.jeffistores.in/', { 'x-forwarded-host': 'admin-nope.jeffistores.in' }))
+    const res = await middleware(
+      req('https://admin-nope.jeffistores.in/', { 'x-forwarded-host': 'admin-nope.jeffistores.in' })
+    )
     expect(res.status).toBe(404)
   })
 
@@ -68,24 +87,31 @@ describe('unknown tenant host must 404, never fall through to the platform store
 })
 
 describe('x-forwarded-host spoofing guard', () => {
-  beforeEach(() => { mockResolveTenant.mockReset(); mockResolveTenant.mockResolvedValue(null) })
+  beforeEach(() => {
+    mockResolveTenant.mockReset()
+    mockResolveTenant.mockResolvedValue(null)
+  })
 
   it('ignores a forwarded host that disagrees with Host on the tenant slug', async () => {
     // Host says platform apex; forged forwarded header claims a tenant.
-    await middleware(req('https://jeffistores.in/', {
-      host: 'jeffistores.in',
-      'x-forwarded-host': 'victim.jeffistores.in',
-    }))
+    await middleware(
+      req('https://jeffistores.in/', {
+        host: 'jeffistores.in',
+        'x-forwarded-host': 'victim.jeffistores.in',
+      })
+    )
     // The guard must have resolved the platform host, never the forged tenant.
-    const seen = mockResolveTenant.mock.calls.map((c) => c[0])
+    const seen = mockResolveTenant.mock.calls.map(c => c[0])
     expect(seen).not.toContain('victim.jeffistores.in')
   })
 
   it('accepts a forwarded host that agrees with Host', async () => {
-    await middleware(req('https://acme.jeffistores.in/', {
-      host: 'acme.jeffistores.in',
-      'x-forwarded-host': 'acme.jeffistores.in',
-    }))
+    await middleware(
+      req('https://acme.jeffistores.in/', {
+        host: 'acme.jeffistores.in',
+        'x-forwarded-host': 'acme.jeffistores.in',
+      })
+    )
     expect(mockResolveTenant.mock.calls[0]?.[0]).toBe('acme.jeffistores.in')
   })
 })

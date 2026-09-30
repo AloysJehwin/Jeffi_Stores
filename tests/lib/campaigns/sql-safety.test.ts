@@ -83,9 +83,7 @@ describe('validateScenarioSql — comment handling', () => {
 // ---------------------------------------------------------------------------
 describe('validateScenarioSql — multi-statement prevention', () => {
   it('rejects two statements separated by semicolons', () => {
-    const result = validateScenarioSql(
-      `${VALID_AUDIENCE_SQL}; SELECT 1 FROM users LIMIT $3`
-    )
+    const result = validateScenarioSql(`${VALID_AUDIENCE_SQL}; SELECT 1 FROM users LIMIT $3`)
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toMatch(/Multiple statements/)
   })
@@ -109,9 +107,7 @@ describe('validateScenarioSql — multi-statement prevention', () => {
 // ---------------------------------------------------------------------------
 describe('validateScenarioSql — must start with SELECT', () => {
   it('rejects query not starting with SELECT', () => {
-    const result = validateScenarioSql(
-      `FROM users u WHERE u.id = '1' LIMIT $3`
-    )
+    const result = validateScenarioSql(`FROM users u WHERE u.id = '1' LIMIT $3`)
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toMatch(/SELECT/)
   })
@@ -436,7 +432,7 @@ describe('validateScenarioSql — products intent', () => {
 // 13. SQL injection — classic patterns
 // ---------------------------------------------------------------------------
 describe('validateScenarioSql — SQL injection patterns', () => {
-  it("rejects UNION-based injection attempt via banned table", () => {
+  it('rejects UNION-based injection attempt via banned table', () => {
     const sql = `
       SELECT DISTINCT u.id
       FROM users u
@@ -447,9 +443,7 @@ describe('validateScenarioSql — SQL injection patterns', () => {
   })
 
   it('rejects stacked query injection via semicolon', () => {
-    const result = validateScenarioSql(
-      `SELECT id FROM users LIMIT $3; DROP TABLE users`
-    )
+    const result = validateScenarioSql(`SELECT id FROM users LIMIT $3; DROP TABLE users`)
     expect(result.ok).toBe(false)
   })
 

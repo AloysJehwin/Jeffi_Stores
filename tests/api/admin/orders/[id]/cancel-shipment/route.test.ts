@@ -37,12 +37,15 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQuery = vi.mocked(query)
 
 function mockFetch(body: object, ok = true, status = 200) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-    catch: vi.fn().mockResolvedValue(body),
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+      catch: vi.fn().mockResolvedValue(body),
+    })
+  )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -110,10 +113,7 @@ describe('POST /api/admin/orders/[id]/cancel-shipment', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.waybill).toBe('AWB12345')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE orders SET awb_number = NULL/),
-      [ORDER_ID]
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE orders SET awb_number = NULL/), [ORDER_ID])
   })
 
   // ── Error handling ────────────────────────────────────────────────────────

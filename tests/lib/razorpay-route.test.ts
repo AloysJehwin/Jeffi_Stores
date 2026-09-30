@@ -143,22 +143,22 @@ describe('createLinkedAccount', () => {
 describe('isValidCompanyPan', () => {
   const cases: Array<[string, string, boolean, string]> = [
     // partnerships and LLPs hold a firm PAN ('F')
-    ['ABCFD1234E', 'partnership',        true,  'firm PAN for a partnership'],
-    ['ABCPD1234E', 'partnership',        false, 'individual PAN for a partnership (live failure)'],
-    ['ABCCD1234E', 'partnership',        false, 'company PAN for a partnership'],
-    ['ABCFD1234E', 'llp',                true,  'firm PAN for an LLP'],
+    ['ABCFD1234E', 'partnership', true, 'firm PAN for a partnership'],
+    ['ABCPD1234E', 'partnership', false, 'individual PAN for a partnership (live failure)'],
+    ['ABCCD1234E', 'partnership', false, 'company PAN for a partnership'],
+    ['ABCFD1234E', 'llp', true, 'firm PAN for an LLP'],
     // companies hold 'C'
-    ['ABCCD1234E', 'private_limited',    true,  'company PAN for a pvt ltd'],
-    ['ABCCD1234E', 'public_limited',     true,  'company PAN for a public ltd'],
-    ['ABCFD1234E', 'private_limited',    false, 'firm PAN for a pvt ltd'],
+    ['ABCCD1234E', 'private_limited', true, 'company PAN for a pvt ltd'],
+    ['ABCCD1234E', 'public_limited', true, 'company PAN for a public ltd'],
+    ['ABCFD1234E', 'private_limited', false, 'firm PAN for a pvt ltd'],
     // no entity PAN exists for these
-    ['ABCPD1234E', 'proprietorship',     false, 'individual PAN for a proprietorship (live failure)'],
-    ['ABCCD1234E', 'proprietorship',     false, 'even a company PAN for a proprietorship'],
+    ['ABCPD1234E', 'proprietorship', false, 'individual PAN for a proprietorship (live failure)'],
+    ['ABCCD1234E', 'proprietorship', false, 'even a company PAN for a proprietorship'],
     ['ABCFD1234E', 'not_yet_registered', false, 'unregistered business has none'],
     // NGOs may be a trust, association or body of individuals
-    ['ABCTD1234E', 'ngo',                true,  'trust PAN for an NGO'],
-    ['ABCAD1234E', 'ngo',                true,  'association PAN for an NGO'],
-    ['ABCPD1234E', 'ngo',                false, 'individual PAN for an NGO'],
+    ['ABCTD1234E', 'ngo', true, 'trust PAN for an NGO'],
+    ['ABCAD1234E', 'ngo', true, 'association PAN for an NGO'],
+    ['ABCPD1234E', 'ngo', false, 'individual PAN for an NGO'],
   ]
   it.each(cases)('%s + %s -> %s (%s)', async (pan, type, expected) => {
     const { isValidCompanyPan } = await import('@/lib/razorpay-route')
@@ -167,10 +167,14 @@ describe('isValidCompanyPan', () => {
 
   // A malformed PAN must never be forwarded — it fails the create just as a mismatch does.
   it.each([
-    ['', 'empty'], ['   ', 'blank'], ['ABCF1234E', 'too short'], ['ABCFD1234EX', 'too long'],
-    ['12CFD1234E', 'digits in the letter block'], ['ABCFD12X4E', 'letter in the digit block'],
+    ['', 'empty'],
+    ['   ', 'blank'],
+    ['ABCF1234E', 'too short'],
+    ['ABCFD1234EX', 'too long'],
+    ['12CFD1234E', 'digits in the letter block'],
+    ['ABCFD12X4E', 'letter in the digit block'],
     ['ABCFD1234', 'missing check letter'],
-  ])('rejects a malformed PAN (%s — %s)', async (pan) => {
+  ])('rejects a malformed PAN (%s — %s)', async pan => {
     const { isValidCompanyPan } = await import('@/lib/razorpay-route')
     expect(isValidCompanyPan(pan, 'partnership')).toBe(false)
   })
@@ -214,7 +218,11 @@ describe('createRouteStakeholder', () => {
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
     const id = await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test', pan: 'ABCPD1234E' })
     expect(id).toBe('sth_1')
-    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', email: 'owner@acme.test', kyc: { pan: 'ABCPD1234E' } })
+    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', {
+      name: 'Owner',
+      email: 'owner@acme.test',
+      kyc: { pan: 'ABCPD1234E' },
+    })
   })
 
   it('omits kyc when no PAN is given', async () => {
@@ -236,20 +244,26 @@ describe('createRouteStakeholder', () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockResolvedValue({ items: [] })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({
+      message: 'already exists',
+    })
   })
 
   it('re-throws the "already exists" error when the list lookup itself fails', async () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockRejectedValue(new Error('list boom'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({
+      message: 'already exists',
+    })
   })
 
   it('re-throws a non-idempotent error unchanged', async () => {
     rz.stakeholders.create.mockRejectedValue(new Error('validation failed'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toThrow('validation failed')
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toThrow(
+      'validation failed'
+    )
     expect(rz.stakeholders.all).not.toHaveBeenCalled()
   })
 })
@@ -260,7 +274,11 @@ describe('configureRouteSettlement', () => {
     rz.products.requestProductConfiguration.mockResolvedValue({ id: 'cfg_1' })
     rz.products.edit.mockResolvedValue({})
     const { configureRouteSettlement } = await import('@/lib/razorpay-route')
-    const out = await configureRouteSettlement('acc_1', { accountNumber: '111', ifsc: 'HDFC0000001', beneficiaryName: 'Owner' })
+    const out = await configureRouteSettlement('acc_1', {
+      accountNumber: '111',
+      ifsc: 'HDFC0000001',
+      beneficiaryName: 'Owner',
+    })
     expect(out).toEqual({ ok: true })
     expect(rz.products.edit).toHaveBeenCalledWith('acc_1', 'cfg_1', {
       settlements: { account_number: '111', ifsc_code: 'HDFC0000001', beneficiary_name: 'Owner' },
@@ -306,14 +324,23 @@ describe('transferToLinkedAccount', () => {
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_1', status: 'processed' }] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
-      paymentId: 'pay_1', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
-      delhiveryChargePaise: 2000, orderId: 'o-1', tenantSlug: 'acme',
+      paymentId: 'pay_1',
+      grossAmountPaise: 100000,
+      linkedAccountId: 'acc_1',
+      delhiveryChargePaise: 2000,
+      orderId: 'o-1',
+      tenantSlug: 'acme',
     })
     // 100000 - 5000 commission - 2360 gateway = 92640 (delhivery NOT deducted)
     // transfer fee = round(92640 * 0.0025 * 1.18) = 273 → 92367
     expect(out).toEqual({
-      transferId: 'trf_1', amount: 92367, linkedAccountId: 'acc_1', status: 'processed',
-      gatewayFeePaise: 2360, transferFeePaise: 273, platformCommissionPaise: 5000,
+      transferId: 'trf_1',
+      amount: 92367,
+      linkedAccountId: 'acc_1',
+      status: 'processed',
+      gatewayFeePaise: 2360,
+      transferFeePaise: 273,
+      platformCommissionPaise: 5000,
     })
     expect(rz.payments.fetch).toHaveBeenCalledWith('pay_1')
     const body = rz.api.post.mock.calls[0][0]
@@ -321,20 +348,25 @@ describe('transferToLinkedAccount', () => {
     expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 92367, currency: 'INR' })
     // The caller may still pass delhiveryChargePaise; it must not reduce the tenant's share.
     expect(body.data.transfers[0].notes).toMatchObject({
-      platform_commission: 5000, gateway_fee: 2360, transfer_fee: 273, delhivery_charge: 0,
+      platform_commission: 5000,
+      gateway_fee: 2360,
+      transfer_fee: 273,
+      delhivery_charge: 0,
     })
   })
 
   // A UPI payment costs far less than a card, so estimating would over-deduct from the tenant.
-  it('uses the payment\'s actual fee rather than a flat rate', async () => {
+  it("uses the payment's actual fee rather than a flat rate", async () => {
     rz.payments.fetch.mockResolvedValue({ fee: 140, tax: 21 })
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_u', status: 'processed' }] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
-      paymentId: 'pay_upi', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
+      paymentId: 'pay_upi',
+      grossAmountPaise: 100000,
+      linkedAccountId: 'acc_1',
     })
     expect(out.gatewayFeePaise).toBe(140)
-    expect(out.amount).toBe(94580)  // 100000-5000-140 = 94860, less 280 transfer fee
+    expect(out.amount).toBe(94580) // 100000-5000-140 = 94860, less 280 transfer fee
   })
 
   // The payment already succeeded; abandoning the transfer would strand the tenant's money.
@@ -343,9 +375,11 @@ describe('transferToLinkedAccount', () => {
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_f', status: 'processed' }] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
-      paymentId: 'pay_3', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
+      paymentId: 'pay_3',
+      grossAmountPaise: 100000,
+      linkedAccountId: 'acc_1',
     })
-    expect(out.gatewayFeePaise).toBe(2360)  // 2% + 18% GST
+    expect(out.gatewayFeePaise).toBe(2360) // 2% + 18% GST
     expect(out.transferId).toBe('trf_f')
   })
 
@@ -353,7 +387,10 @@ describe('transferToLinkedAccount', () => {
     rz.api.post.mockResolvedValue({ items: [] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
-      paymentId: 'pay_2', grossAmountPaise: 1000, linkedAccountId: 'acc_2', delhiveryChargePaise: 5000,
+      paymentId: 'pay_2',
+      grossAmountPaise: 1000,
+      linkedAccountId: 'acc_2',
+      delhiveryChargePaise: 5000,
     })
     expect(out).toMatchObject({ transferId: '', amount: 0, linkedAccountId: 'acc_2', status: 'created' })
     // orderId / tenantSlug default to '' in notes
@@ -400,8 +437,11 @@ describe('recordCodSettlement', () => {
   it('writes a tenant_transactions row and the settlement_ledger entries', async () => {
     const { recordCodSettlement } = await import('@/lib/razorpay-route')
     await recordCodSettlement({
-      tenantId: 't-1', tenantSlug: 'acme', orderRef: 'ORD-1',
-      grossAmountInr: 1000, actualDelhiveryChargeInr: 50,
+      tenantId: 't-1',
+      tenantSlug: 'acme',
+      orderRef: 'ORD-1',
+      grossAmountInr: 1000,
+      actualDelhiveryChargeInr: 50,
     })
     // txn + base ledger + the delhivery row (no wallet debit on this order)
     expect(pool.query).toHaveBeenCalledTimes(3)
@@ -418,8 +458,11 @@ describe('recordCodSettlement', () => {
   it('does NOT deduct shipping again when the wallet already billed it', async () => {
     const { recordCodSettlement } = await import('@/lib/razorpay-route')
     await recordCodSettlement({
-      tenantId: 't-1', tenantSlug: 'acme', orderRef: 'ORD-9',
-      grossAmountInr: 1000, actualDelhiveryChargeInr: 50,
+      tenantId: 't-1',
+      tenantSlug: 'acme',
+      orderRef: 'ORD-9',
+      grossAmountInr: 1000,
+      actualDelhiveryChargeInr: 50,
       walletBilled: true,
     })
     // tenant share = 1000 - 50 commission, with NO shipping deduction
@@ -432,10 +475,15 @@ describe('recordCodSettlement', () => {
   it('swallows a DB error (best-effort ledger, never throws)', async () => {
     pool.query.mockRejectedValue(new Error('db down'))
     const { recordCodSettlement } = await import('@/lib/razorpay-route')
-    await expect(recordCodSettlement({
-      tenantId: 't-1', tenantSlug: 'acme', orderRef: 'ORD-2',
-      grossAmountInr: 500, actualDelhiveryChargeInr: 10,
-    })).resolves.toBeUndefined()
+    await expect(
+      recordCodSettlement({
+        tenantId: 't-1',
+        tenantSlug: 'acme',
+        orderRef: 'ORD-2',
+        grossAmountInr: 500,
+        actualDelhiveryChargeInr: 10,
+      })
+    ).resolves.toBeUndefined()
   })
 })
 
@@ -459,15 +507,27 @@ describe('mapBusinessType', () => {
 describe('inferProfileCategory', () => {
   it('classifies electronics / fashion / food / health', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
-    expect(inferProfileCategory('Electronics & gadgets')).toEqual({ category: 'ecommerce', subcategory: 'electronics_and_furniture' })
-    expect(inferProfileCategory('Fashion apparel')).toEqual({ category: 'ecommerce', subcategory: 'fashion_and_lifestyle' })
-    expect(inferProfileCategory('Groceries and food')).toEqual({ category: 'food', subcategory: 'online_food_ordering' })
+    expect(inferProfileCategory('Electronics & gadgets')).toEqual({
+      category: 'ecommerce',
+      subcategory: 'electronics_and_furniture',
+    })
+    expect(inferProfileCategory('Fashion apparel')).toEqual({
+      category: 'ecommerce',
+      subcategory: 'fashion_and_lifestyle',
+    })
+    expect(inferProfileCategory('Groceries and food')).toEqual({
+      category: 'food',
+      subcategory: 'online_food_ordering',
+    })
     expect(inferProfileCategory('Health & beauty')).toEqual({ category: 'healthcare', subcategory: 'pharmacy' })
   })
 
   it('defaults to generic e-commerce for null / unrecognised categories', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
     expect(inferProfileCategory(null)).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
-    expect(inferProfileCategory('random stuff')).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
+    expect(inferProfileCategory('random stuff')).toEqual({
+      category: 'ecommerce',
+      subcategory: 'ecommerce_marketplace',
+    })
   })
 })

@@ -33,7 +33,9 @@ function makeReq(searchParams: Record<string, string> = {}) {
   return new NextRequest(url)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/agent/conversations', () => {
   it('returns 401 when unauthenticated', async () => {

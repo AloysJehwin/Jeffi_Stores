@@ -15,7 +15,7 @@ vi.mock('@/lib/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -52,7 +52,10 @@ beforeEach(async () => {
 import { NextRequest } from 'next/server'
 
 const admin = {
-  adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['financial'],
+  adminId: 'a1',
+  username: 'admin',
+  role: 'super_admin',
+  scopes: ['financial'],
 }
 
 const params = Promise.resolve({ id: 'exp-1' })
@@ -150,9 +153,7 @@ describe('POST /api/admin/financial/payables/[id]/payout', () => {
   it('returns success on happy path with NEFT', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce(baseExpense)
-      .mockResolvedValueOnce({ paid: '500' })
+    mockQueryOne.mockResolvedValueOnce(baseExpense).mockResolvedValueOnce({ paid: '500' })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockFetch
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'cont_1' }) } as any)
@@ -168,9 +169,7 @@ describe('POST /api/admin/financial/payables/[id]/payout', () => {
   it('returns success on happy path with UPI', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ ...baseExpense, upi_id: 'test@upi' })
-      .mockResolvedValueOnce({ paid: '200' })
+    mockQueryOne.mockResolvedValueOnce({ ...baseExpense, upi_id: 'test@upi' }).mockResolvedValueOnce({ paid: '200' })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockFetch
       .mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'cont_2' }) } as any)

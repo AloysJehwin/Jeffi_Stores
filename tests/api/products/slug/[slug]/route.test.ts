@@ -42,9 +42,7 @@ const fullProduct = {
   base_price: '50.00',
   categories: { id: 'cat-1', name: 'Bolts', slug: 'bolts' },
   brands: { id: 'brand-1', name: 'Unbrako', slug: 'unbrako' },
-  product_images: [
-    { id: 'img-1', image_url: 'https://cdn.example.com/img.jpg', is_primary: true, display_order: 1 },
-  ],
+  product_images: [{ id: 'img-1', image_url: 'https://cdn.example.com/img.jpg', is_primary: true, display_order: 1 }],
   product_variants: [
     {
       id: 'var-1',
@@ -137,7 +135,9 @@ describe('GET /api/products/slug/[slug]', () => {
 describe('GET /api/products/slug/[slug] response shape', () => {
   const params = { params: Promise.resolve({ slug: 'test-bolt' }) }
 
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 404 when product not found', async () => {
     queryOneMock.mockResolvedValueOnce(null)

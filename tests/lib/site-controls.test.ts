@@ -38,14 +38,16 @@ describe('site-controls per-platform on-device flags', () => {
   })
 
   it('reads each per-platform key from the DB independently', async () => {
-    mockQueryMany.mockResolvedValueOnce(rows({
-      feature_ondevice_summary_enabled: 'true',
-      feature_ondevice_summary_desktop_enabled: 'true',
-      feature_ondevice_summary_mobile_enabled: 'false',
-      feature_ondevice_finetune_enabled: 'true',
-      feature_ondevice_finetune_desktop_enabled: 'true',
-      feature_ondevice_finetune_mobile_enabled: 'true',
-    }) as any)
+    mockQueryMany.mockResolvedValueOnce(
+      rows({
+        feature_ondevice_summary_enabled: 'true',
+        feature_ondevice_summary_desktop_enabled: 'true',
+        feature_ondevice_summary_mobile_enabled: 'false',
+        feature_ondevice_finetune_enabled: 'true',
+        feature_ondevice_finetune_desktop_enabled: 'true',
+        feature_ondevice_finetune_mobile_enabled: 'true',
+      }) as any
+    )
     const flags = await getFeatureFlags()
     expect(flags.ondeviceSummaryEnabled).toBe(true)
     expect(flags.ondeviceSummaryDesktopEnabled).toBe(true)
@@ -55,10 +57,12 @@ describe('site-controls per-platform on-device flags', () => {
   })
 
   it('mobile ON while desktop OFF (independent control)', async () => {
-    mockQueryMany.mockResolvedValueOnce(rows({
-      feature_ondevice_summary_mobile_enabled: 'true',
-      feature_ondevice_summary_desktop_enabled: 'false',
-    }) as any)
+    mockQueryMany.mockResolvedValueOnce(
+      rows({
+        feature_ondevice_summary_mobile_enabled: 'true',
+        feature_ondevice_summary_desktop_enabled: 'false',
+      }) as any
+    )
     const flags = await getFeatureFlags()
     expect(flags.ondeviceSummaryMobileEnabled).toBe(true)
     expect(flags.ondeviceSummaryDesktopEnabled).toBe(false)
@@ -81,7 +85,9 @@ describe('site-controls per-platform on-device flags', () => {
  * name there, and every tenant storefront then rendered "Jeffi Stores" until the TTL expired.
  */
 describe('site-controls tenant isolation', () => {
-  beforeEach(() => { mockTenantSlug = null })
+  beforeEach(() => {
+    mockTenantSlug = null
+  })
 
   it('does not serve a cached platform identity to a tenant host', async () => {
     // Platform request first — this is what poisoned the shared entry.
@@ -122,11 +128,14 @@ describe('site-controls tenant isolation', () => {
   })
 
   // A tenant's own configured values must still win over the derived defaults.
-  it('prefers the tenant\'s configured identity over the derived name', async () => {
+  it("prefers the tenant's configured identity over the derived name", async () => {
     mockTenantSlug = 'acme'
-    mockQueryMany.mockResolvedValueOnce(rows({
-      business_name: 'Acme Traders', business_email: 'hi@acme.in',
-    }) as any)
+    mockQueryMany.mockResolvedValueOnce(
+      rows({
+        business_name: 'Acme Traders',
+        business_email: 'hi@acme.in',
+      }) as any
+    )
     const c = await getSiteControls()
     expect(c.identity.name).toBe('Acme Traders')
     expect(c.identity.email).toBe('hi@acme.in')
@@ -155,7 +164,7 @@ describe('site-controls tenant isolation', () => {
   })
 
   // A tenant that DID set its own tagline keeps it (scoping suppresses only the flagship fallback).
-  it('respects a tenant\'s own configured tagline', async () => {
+  it("respects a tenant's own configured tagline", async () => {
     mockTenantSlug = 'acme'
     mockQueryMany.mockResolvedValueOnce(rows({ meta_tagline: 'Fresh Groceries Daily' }) as any)
     const c = await getSiteControls()

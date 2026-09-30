@@ -73,11 +73,13 @@ describe('integrations/resolve', () => {
 
     it("uses the TENANT's connected google_merchant creds (merchantId from the row, not env)", async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
-      registry.getIntegrationCredential.mockResolvedValue(credRow({
-        client_email: 'tenant@acme.iam.gserviceaccount.com',
-        private_key: 'TENANT_PK',
-        merchant_id: 'tenant-merchant-99',
-      }))
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({
+          client_email: 'tenant@acme.iam.gserviceaccount.com',
+          private_key: 'TENANT_PK',
+          merchant_id: 'tenant-merchant-99',
+        })
+      )
       const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
       const creds = await resolveGoogleMerchantCreds()
       expect(registry.getIntegrationCredential).toHaveBeenCalledWith('t-1', 'google_merchant')
@@ -92,11 +94,13 @@ describe('integrations/resolve', () => {
 
     it('un-escapes a private_key stored with literal "\\n" sequences', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
-      registry.getIntegrationCredential.mockResolvedValue(credRow({
-        client_email: 'tenant@acme.iam.gserviceaccount.com',
-        private_key: '-----BEGIN-----\\nLINE\\n-----END-----',
-        merchant_id: 'tenant-merchant-99',
-      }))
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({
+          client_email: 'tenant@acme.iam.gserviceaccount.com',
+          private_key: '-----BEGIN-----\\nLINE\\n-----END-----',
+          merchant_id: 'tenant-merchant-99',
+        })
+      )
       const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
       const creds = await resolveGoogleMerchantCreds()
       expect(creds.privateKey).toBe('-----BEGIN-----\nLINE\n-----END-----')
@@ -112,9 +116,16 @@ describe('integrations/resolve', () => {
 
     it('THROWS when the tenant row is not connected — never falls back to platform env', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
-      registry.getIntegrationCredential.mockResolvedValue(credRow({
-        client_email: 'x', private_key: 'y', merchant_id: 'z',
-      }, 'disconnected'))
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow(
+          {
+            client_email: 'x',
+            private_key: 'y',
+            merchant_id: 'z',
+          },
+          'disconnected'
+        )
+      )
       const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
       await expect(resolveGoogleMerchantCreds()).rejects.toThrow(/not connected/i)
       expect(google.loadGoogleServiceAccount).not.toHaveBeenCalled()
@@ -137,13 +148,15 @@ describe('integrations/resolve', () => {
 
     it("uses the TENANT's connected amazon_seller creds", async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
-      registry.getIntegrationCredential.mockResolvedValue(credRow({
-        client_id: 'tenant-cid',
-        client_secret: 'tenant-csecret',
-        refresh_token: 'tenant-rtok',
-        seller_id: 'tenant-seller',
-        marketplace_id: 'tenant-marketplace',
-      }))
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({
+          client_id: 'tenant-cid',
+          client_secret: 'tenant-csecret',
+          refresh_token: 'tenant-rtok',
+          seller_id: 'tenant-seller',
+          marketplace_id: 'tenant-marketplace',
+        })
+      )
       const { resolveAmazonCreds } = await import('@/lib/integrations/resolve')
       const creds = await resolveAmazonCreds()
       expect(registry.getIntegrationCredential).toHaveBeenCalledWith('t-1', 'amazon_seller')
@@ -158,10 +171,12 @@ describe('integrations/resolve', () => {
 
     it('defaults a tenant marketplace_id to env when the row omits it', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
-      registry.getIntegrationCredential.mockResolvedValue(credRow({
-        client_id: 'tenant-cid',
-        refresh_token: 'tenant-rtok',
-      }))
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({
+          client_id: 'tenant-cid',
+          refresh_token: 'tenant-rtok',
+        })
+      )
       const { resolveAmazonCreds } = await import('@/lib/integrations/resolve')
       const creds = await resolveAmazonCreds()
       expect(creds.clientId).toBe('tenant-cid')

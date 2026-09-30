@@ -174,7 +174,8 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
   it('follows PDF URL redirect when Delhivery returns JSON with pdf_download_link', async () => {
     mockQueryOne.mockResolvedValue(sampleOrder as any)
     const fakePdf = Buffer.from('%PDF-1.4 from s3')
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -226,7 +227,20 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ packages: [{ sort_code: 'RIP', pin: '492001', name: 'Alice', add: '123 Main', oid: 'ORD-001', prd: 'Hardware', cod: '0', total_amount: '1500.00' }] }),
+      json: async () => ({
+        packages: [
+          {
+            sort_code: 'RIP',
+            pin: '492001',
+            name: 'Alice',
+            add: '123 Main',
+            oid: 'ORD-001',
+            prd: 'Hardware',
+            cod: '0',
+            total_amount: '1500.00',
+          },
+        ],
+      }),
     } as any)
 
     const res = await GET(makeReq({ size: '4R' }), { params: Promise.resolve({ id: ORDER_ID }) })

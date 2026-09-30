@@ -43,14 +43,13 @@ const ADMIN = { adminId: 'admin-1', id: 'admin-1', username: 'admin', role: 'sup
 const RFQ_ID = '770e8400-e29b-41d4-a716-446655440003'
 
 function postReq(body: unknown = {}) {
-  return new NextRequest(new Request(
-    `http://localhost/api/admin/business/rfqs/${RFQ_ID}/convert-to-quotation`,
-    {
+  return new NextRequest(
+    new Request(`http://localhost/api/admin/business/rfqs/${RFQ_ID}/convert-to-quotation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    },
-  ))
+    })
+  )
 }
 
 const BASE_RFQ = {
@@ -147,16 +146,14 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   // --- Auth ---
 
   it('returns 401/403 when requireAdminScope rejects', async () => {
-    vi.mocked(requireAdminScope).mockResolvedValue(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    )
+    vi.mocked(requireAdminScope).mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
     const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope insufficient', async () => {
     vi.mocked(requireAdminScope).mockResolvedValue(
-      NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+      NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     )
     const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(403)
@@ -212,18 +209,18 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   it('inserts quotation_items for each RFQ item', async () => {
     await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
 
-    const insertItemCalls = vi.mocked(query).mock.calls.filter(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes('quotation_items'),
-    )
+    const insertItemCalls = vi
+      .mocked(query)
+      .mock.calls.filter((args: any[]) => typeof args[0] === 'string' && args[0].includes('quotation_items'))
     expect(insertItemCalls.length).toBeGreaterThanOrEqual(1)
   })
 
   it('updates RFQ status to converted', async () => {
     await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
 
-    const updateCalls = vi.mocked(query).mock.calls.filter(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes("status='converted'"),
-    )
+    const updateCalls = vi
+      .mocked(query)
+      .mock.calls.filter((args: any[]) => typeof args[0] === 'string' && args[0].includes("status='converted'"))
     expect(updateCalls.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -268,7 +265,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       BASE_RFQ.rfq_number,
       QUOTATION_ROW.quote_number,
       expect.any(Number),
-      expect.stringContaining('tok-abc123'),
+      expect.stringContaining('tok-abc123')
     )
   })
 

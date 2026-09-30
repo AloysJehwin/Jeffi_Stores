@@ -21,10 +21,16 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 
 const superAdmin = {
-  adminId: 'a1', username: 'admin', role: 'administrator', scopes: [],
+  adminId: 'a1',
+  username: 'admin',
+  role: 'administrator',
+  scopes: [],
 }
 const regularAdmin = {
-  adminId: 'a2', username: 'staff', role: 'admin', scopes: ['gst'],
+  adminId: 'a2',
+  username: 'staff',
+  role: 'admin',
+  scopes: ['gst'],
 }
 
 function makeReq(params: Record<string, string> = {}) {
@@ -50,7 +56,9 @@ const settingsRows = [
   { key: 'business_legal_name', value: 'Test Corp' },
 ]
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/gst/gstr3b', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -91,7 +99,7 @@ describe('GET /api/admin/gst/gstr3b', () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockQueryOne.mockResolvedValue(outwardRow)
     mockQueryMany
-      .mockResolvedValueOnce(byRateRows)   // byRate
+      .mockResolvedValueOnce(byRateRows) // byRate
       .mockResolvedValueOnce(settingsRows) // settings
     const res = await GET(makeReq({ from: '2024-01-01', to: '2024-01-31' }))
     expect(res.status).toBe(200)
@@ -105,9 +113,7 @@ describe('GET /api/admin/gst/gstr3b', () => {
   it('returns CSV when format=csv', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockQueryOne.mockResolvedValue(outwardRow)
-    mockQueryMany
-      .mockResolvedValueOnce(byRateRows)
-      .mockResolvedValueOnce(settingsRows)
+    mockQueryMany.mockResolvedValueOnce(byRateRows).mockResolvedValueOnce(settingsRows)
     const res = await GET(makeReq({ from: '2024-01-01', to: '2024-01-31', format: 'csv' }))
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('text/csv')
@@ -117,9 +123,7 @@ describe('GET /api/admin/gst/gstr3b', () => {
   it('handles null outward row gracefully', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockQueryOne.mockResolvedValue(null)
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
     const res = await GET(makeReq({ from: '2024-02-01', to: '2024-02-28' }))
     expect(res.status).toBe(200)
     const body = await res.json()

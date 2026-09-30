@@ -122,8 +122,8 @@ describe('POST /api/business/google', () => {
     mockIdTokenOk()
     const newUser = { ...APPROVED_USER, approval_status: 'pending' }
     mockQueryOne
-      .mockResolvedValueOnce(null)     // no existing user
-      .mockResolvedValueOnce(newUser)  // INSERT user
+      .mockResolvedValueOnce(null) // no existing user
+      .mockResolvedValueOnce(newUser) // INSERT user
     const res = await POST(makePost({ idToken: 'token', ...BIZ_PROFILE_FIELDS }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -135,8 +135,8 @@ describe('POST /api/business/google', () => {
   it('returns 500 when user insert fails', async () => {
     mockIdTokenOk()
     mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing user
-      .mockResolvedValueOnce(null)   // insert fails
+      .mockResolvedValueOnce(null) // no existing user
+      .mockResolvedValueOnce(null) // insert fails
     const res = await POST(makePost({ idToken: 'token', ...BIZ_PROFILE_FIELDS }) as any)
     expect(res.status).toBe(500)
     const body = await res.json()
@@ -189,10 +189,7 @@ describe('POST /api/business/google', () => {
     mockQueryOne.mockResolvedValue({ ...APPROVED_USER, google_id: null })
     const res = await POST(makePost({ idToken: 'token' }) as any)
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE users SET google_id/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE users SET google_id/), expect.any(Array))
   })
 
   it('uses accessToken path when no idToken provided', async () => {

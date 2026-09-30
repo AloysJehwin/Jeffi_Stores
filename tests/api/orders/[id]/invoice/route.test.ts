@@ -126,9 +126,7 @@ describe('GET /api/orders/[id]/invoice', () => {
   it('generates PDF for order without cached URL', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeRequest() as any, PARAMS)
@@ -140,9 +138,7 @@ describe('GET /api/orders/[id]/invoice', () => {
   it('generates PDF when invoice record exists but pdf_url is null', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce({ pdf_url: null })
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce({ pdf_url: null })
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeRequest() as any, PARAMS)
@@ -222,18 +218,15 @@ describe('GET /api/orders/[id]/invoice', () => {
       billing_address_id: 'addr-2',
       shipping_address_id: 'addr-1',
     }
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(orderWithBilling)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        full_name: 'Billing Name',
-        address_line1: '99 Billing Rd',
-        address_line2: null,
-        city: 'Pune',
-        state: 'Maharashtra',
-        postal_code: '411001',
-        phone: '8888888888',
-      })
+    vi.mocked(db.queryOne).mockResolvedValueOnce(orderWithBilling).mockResolvedValueOnce(null).mockResolvedValueOnce({
+      full_name: 'Billing Name',
+      address_line1: '99 Billing Rd',
+      address_line2: null,
+      city: 'Pune',
+      state: 'Maharashtra',
+      postal_code: '411001',
+      phone: '8888888888',
+    })
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeRequest() as any, PARAMS)
@@ -246,7 +239,7 @@ describe('GET /api/orders/[id]/invoice', () => {
       expect.objectContaining({ full_name: 'Billing Name' }),
       expect.any(Boolean),
       expect.any(String),
-      expect.any(Boolean),
+      expect.any(Boolean)
     )
   })
 
@@ -268,7 +261,7 @@ describe('GET /api/orders/[id]/invoice', () => {
       undefined,
       expect.any(Boolean),
       expect.any(String),
-      expect.any(Boolean),
+      expect.any(Boolean)
     )
   })
 
@@ -277,21 +270,41 @@ describe('GET /api/orders/[id]/invoice', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
     const orderItems = [
       {
-        product_name: 'Widget A', hsn_code: '8471', gst_rate: '18', quantity: 2,
-        unit_price: '100', total_price: '200', discount_amount: '0', mrp: '110',
-        sold_unit_factor: null, taxable_amount: '169.49', cgst_amount: '15.25',
-        sgst_amount: '15.25', igst_amount: '0', buy_mode: 'unit', buy_unit: null,
+        product_name: 'Widget A',
+        hsn_code: '8471',
+        gst_rate: '18',
+        quantity: 2,
+        unit_price: '100',
+        total_price: '200',
+        discount_amount: '0',
+        mrp: '110',
+        sold_unit_factor: null,
+        taxable_amount: '169.49',
+        cgst_amount: '15.25',
+        sgst_amount: '15.25',
+        igst_amount: '0',
+        buy_mode: 'unit',
+        buy_unit: null,
       },
       {
-        product_name: 'Gadget B', hsn_code: '9403', gst_rate: '12', quantity: 1,
-        unit_price: '500', total_price: '500', discount_amount: '10', mrp: '550',
-        sold_unit_factor: '10', taxable_amount: '446.43', cgst_amount: '26.79',
-        sgst_amount: '26.79', igst_amount: '0', buy_mode: 'pack', buy_unit: 'BOX',
+        product_name: 'Gadget B',
+        hsn_code: '9403',
+        gst_rate: '12',
+        quantity: 1,
+        unit_price: '500',
+        total_price: '500',
+        discount_amount: '10',
+        mrp: '550',
+        sold_unit_factor: '10',
+        taxable_amount: '446.43',
+        cgst_amount: '26.79',
+        sgst_amount: '26.79',
+        igst_amount: '0',
+        buy_mode: 'pack',
+        buy_unit: 'BOX',
       },
     ]
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce(orderItems as any)
       .mockResolvedValueOnce([{ key: 'business_legal_name', value: 'Jeffi Stores' }] as any)
@@ -315,9 +328,7 @@ describe('GET /api/orders/[id]/invoice', () => {
       sgst_amount: '0',
       buyer_gstin: '27AABCU9603R1ZM',
     }
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(igstOrder)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(igstOrder).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeRequest() as any, PARAMS)

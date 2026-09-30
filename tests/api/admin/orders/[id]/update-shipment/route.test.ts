@@ -120,7 +120,16 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockQueryOne.mockResolvedValue({ awb_number: 'AWB123456' })
     mockParseBody.mockReturnValue({
       ok: true,
-      data: { name: 'John Doe', phone: '9876543210', add: null, products_desc: null, gm: null, shipment_height: null, shipment_width: null, shipment_length: null },
+      data: {
+        name: 'John Doe',
+        phone: '9876543210',
+        add: null,
+        products_desc: null,
+        gm: null,
+        shipment_height: null,
+        shipment_width: null,
+        shipment_length: null,
+      },
     } as any)
     mockFetch.mockResolvedValue({
       ok: true,
@@ -143,7 +152,16 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockQueryOne.mockResolvedValue({ awb_number: 'AWB123456' })
     mockParseBody.mockReturnValue({
       ok: true,
-      data: { name: 'Test', phone: null, add: null, products_desc: null, gm: null, shipment_height: null, shipment_width: null, shipment_length: null },
+      data: {
+        name: 'Test',
+        phone: null,
+        add: null,
+        products_desc: null,
+        gm: null,
+        shipment_height: null,
+        shipment_width: null,
+        shipment_length: null,
+      },
     } as any)
     mockFetch.mockResolvedValue({
       ok: false,
@@ -171,7 +189,16 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockQueryOne.mockResolvedValue({ awb_number: 'DL-789-XYZ' })
     mockParseBody.mockReturnValue({
       ok: true,
-      data: { name: 'Jane', phone: null, add: null, products_desc: null, gm: null, shipment_height: null, shipment_width: null, shipment_length: null },
+      data: {
+        name: 'Jane',
+        phone: null,
+        add: null,
+        products_desc: null,
+        gm: null,
+        shipment_height: null,
+        shipment_width: null,
+        shipment_length: null,
+      },
     } as any)
     mockFetch.mockResolvedValue({
       ok: true,

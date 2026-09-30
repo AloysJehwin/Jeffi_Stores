@@ -66,10 +66,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
     expect(body.success).toBe(true)
     // Should have made two query calls: UPDATE + DELETE
     expect(mockQuery).toHaveBeenCalledTimes(2)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE support_sessions/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE support_sessions/), expect.any(Array))
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/DELETE FROM websocket_connections/),
       expect.any(Array)

@@ -86,8 +86,8 @@ describe('GET /api/orders/[id]/return', () => {
   it('returns returnRequest and monthlyLimitReached=false when no returns this month', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)              // no return request
-      .mockResolvedValueOnce({ cnt: '0' })      // monthly count = 0
+      .mockResolvedValueOnce(null) // no return request
+      .mockResolvedValueOnce({ cnt: '0' }) // monthly count = 0
     const res = await GET(makeGetRequest() as any, PARAMS)
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -99,8 +99,8 @@ describe('GET /api/orders/[id]/return', () => {
     const existingReturn = { id: 'rr-1', order_id: 'order-123', type: 'refund', status: 'pending' }
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(existingReturn)    // return request exists
-      .mockResolvedValueOnce({ cnt: '1' })      // monthly count = 1 (limit)
+      .mockResolvedValueOnce(existingReturn) // return request exists
+      .mockResolvedValueOnce({ cnt: '1' }) // monthly count = 1 (limit)
     const res = await GET(makeGetRequest() as any, PARAMS)
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -179,7 +179,15 @@ describe('POST /api/orders/[id]/return', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(DELIVERED_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([
-      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+      {
+        id: 'oi-1',
+        product_id: 'p-1',
+        variant_id: null,
+        product_name: 'Item',
+        variant_name: null,
+        quantity: '1',
+        unit_price: '100',
+      },
     ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({
       ok: false,
@@ -196,10 +204,18 @@ describe('POST /api/orders/[id]/return', () => {
   it('returns 400 when a return request already exists', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(DELIVERED_ORDER)   // order
+      .mockResolvedValueOnce(DELIVERED_ORDER) // order
       .mockResolvedValueOnce({ id: 'rr-existing' }) // existing return request
     vi.mocked(db.queryMany).mockResolvedValue([
-      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+      {
+        id: 'oi-1',
+        product_id: 'p-1',
+        variant_id: null,
+        product_name: 'Item',
+        variant_name: null,
+        quantity: '1',
+        unit_price: '100',
+      },
     ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)
 
@@ -213,11 +229,19 @@ describe('POST /api/orders/[id]/return', () => {
   it('returns 400 when monthly return limit is reached', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(DELIVERED_ORDER)    // order
-      .mockResolvedValueOnce(null)               // no existing return request
-      .mockResolvedValueOnce({ cnt: '1' })       // monthly count = 1 (limit reached)
+      .mockResolvedValueOnce(DELIVERED_ORDER) // order
+      .mockResolvedValueOnce(null) // no existing return request
+      .mockResolvedValueOnce({ cnt: '1' }) // monthly count = 1 (limit reached)
     vi.mocked(db.queryMany).mockResolvedValue([
-      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+      {
+        id: 'oi-1',
+        product_id: 'p-1',
+        variant_id: null,
+        product_name: 'Item',
+        variant_name: null,
+        quantity: '1',
+        unit_price: '100',
+      },
     ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)
 
@@ -240,12 +264,20 @@ describe('POST /api/orders/[id]/return', () => {
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(DELIVERED_ORDER)    // order
-      .mockResolvedValueOnce(null)               // no existing return request
-      .mockResolvedValueOnce({ cnt: '0' })       // monthly count = 0
-      .mockResolvedValueOnce(RETURN_REQUEST)     // inserted return request
+      .mockResolvedValueOnce(DELIVERED_ORDER) // order
+      .mockResolvedValueOnce(null) // no existing return request
+      .mockResolvedValueOnce({ cnt: '0' }) // monthly count = 0
+      .mockResolvedValueOnce(RETURN_REQUEST) // inserted return request
     vi.mocked(db.queryMany).mockResolvedValue([
-      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+      {
+        id: 'oi-1',
+        product_id: 'p-1',
+        variant_id: null,
+        product_name: 'Item',
+        variant_name: null,
+        quantity: '1',
+        unit_price: '100',
+      },
     ]) // order_items validation
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)

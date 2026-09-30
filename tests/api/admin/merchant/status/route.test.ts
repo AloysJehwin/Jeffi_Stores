@@ -31,7 +31,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/merchant/status')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/merchant/status', () => {
   it('returns 401 when unauthenticated', async () => {

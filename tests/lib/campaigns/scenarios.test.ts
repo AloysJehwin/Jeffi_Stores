@@ -56,12 +56,12 @@ vi.mock('nodemailer', () => ({
 // ---------------------------------------------------------------------------
 // Imports (after mocks are set up)
 // ---------------------------------------------------------------------------
-import { abandonedCart }  from '@/lib/campaigns/scenarios/abandoned-cart'
-import { postPurchase }   from '@/lib/campaigns/scenarios/post-purchase'
-import { priceDrop }      from '@/lib/campaigns/scenarios/price-drop'
-import { restock }        from '@/lib/campaigns/scenarios/restock'
+import { abandonedCart } from '@/lib/campaigns/scenarios/abandoned-cart'
+import { postPurchase } from '@/lib/campaigns/scenarios/post-purchase'
+import { priceDrop } from '@/lib/campaigns/scenarios/price-drop'
+import { restock } from '@/lib/campaigns/scenarios/restock'
 import { reviewReminder } from '@/lib/campaigns/scenarios/review-reminder'
-import { reviewRequest }  from '@/lib/campaigns/scenarios/review-request'
+import { reviewRequest } from '@/lib/campaigns/scenarios/review-request'
 
 import { queryMany, query } from '@/lib/db'
 import {
@@ -77,17 +77,17 @@ import { renderCampaignEmail } from '@/lib/email-campaigns'
 import { generateReviewToken } from '@/lib/jwt'
 
 // Typed mocks
-const mockQueryMany                 = vi.mocked(queryMany)
-const mockQuery                     = vi.mocked(query)
-const mockFetchUser                 = vi.mocked(fetchUserContext)
-const mockFetchProductImg           = vi.mocked(fetchProductImageUrl)
-const mockResolveCoupon             = vi.mocked(resolveCoupon)
-const mockSendEmail                 = vi.mocked(sendCampaignEmail)
-const mockSendEmailRendered         = vi.mocked(sendCampaignEmailRendered)
-const mockRenderItemRows            = vi.mocked(renderItemRows)
-const mockRenderHeroProduct         = vi.mocked(renderHeroProduct)
-const mockRenderCampaignEmail       = vi.mocked(renderCampaignEmail)
-const mockGenerateReviewToken       = vi.mocked(generateReviewToken)
+const mockQueryMany = vi.mocked(queryMany)
+const mockQuery = vi.mocked(query)
+const mockFetchUser = vi.mocked(fetchUserContext)
+const mockFetchProductImg = vi.mocked(fetchProductImageUrl)
+const mockResolveCoupon = vi.mocked(resolveCoupon)
+const mockSendEmail = vi.mocked(sendCampaignEmail)
+const mockSendEmailRendered = vi.mocked(sendCampaignEmailRendered)
+const mockRenderItemRows = vi.mocked(renderItemRows)
+const mockRenderHeroProduct = vi.mocked(renderHeroProduct)
+const mockRenderCampaignEmail = vi.mocked(renderCampaignEmail)
+const mockGenerateReviewToken = vi.mocked(generateReviewToken)
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -180,7 +180,7 @@ describe('abandonedCart scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys  = Object.keys(abandonedCart.defaultParams).sort()
+    const defKeys = Object.keys(abandonedCart.defaultParams).sort()
     const schemKeys = Object.keys(abandonedCart.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -203,9 +203,12 @@ describe('abandonedCart scenario', () => {
 
   // --- findEligible ---
   it('findEligible calls queryMany and returns its result', async () => {
-    const rows = [{ user_id: 'usr-1', sequence: 1 }, { user_id: 'usr-2', sequence: 1 }]
-    mockQueryMany.mockResolvedValueOnce(rows as any)  // seq1
-    mockQueryMany.mockResolvedValueOnce([])           // seq2
+    const rows = [
+      { user_id: 'usr-1', sequence: 1 },
+      { user_id: 'usr-2', sequence: 1 },
+    ]
+    mockQueryMany.mockResolvedValueOnce(rows as any) // seq1
+    mockQueryMany.mockResolvedValueOnce([]) // seq2
 
     const result = await abandonedCart.findEligible({
       campaign: makeCampaign() as any,
@@ -217,8 +220,8 @@ describe('abandonedCart scenario', () => {
   })
 
   it('findEligible passes campaign.kind and params to queryMany', async () => {
-    mockQueryMany.mockResolvedValueOnce([])  // seq1
-    mockQueryMany.mockResolvedValueOnce([])  // seq2
+    mockQueryMany.mockResolvedValueOnce([]) // seq1
+    mockQueryMany.mockResolvedValueOnce([]) // seq2
     const campaign = makeCampaign({ kind: 'abandoned_cart', delay_hours: 2 })
 
     await abandonedCart.findEligible({
@@ -266,7 +269,12 @@ describe('abandonedCart scenario', () => {
 
   it('send calls sendCampaignEmail with correct vars when items exist', async () => {
     const cartItem = {
-      product_id: 'p1', name: 'Widget', quantity: 2, price: 99, image_url: 'img.jpg', product_slug: 'widget',
+      product_id: 'p1',
+      name: 'Widget',
+      quantity: 2,
+      price: 99,
+      image_url: 'img.jpg',
+      product_slug: 'widget',
     }
     mockQueryMany.mockResolvedValueOnce([cartItem] as any)
 
@@ -331,7 +339,7 @@ describe('postPurchase scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys   = Object.keys(postPurchase.defaultParams).sort()
+    const defKeys = Object.keys(postPurchase.defaultParams).sort()
     const schemKeys = Object.keys(postPurchase.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -421,7 +429,7 @@ describe('priceDrop scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys   = Object.keys(priceDrop.defaultParams).sort()
+    const defKeys = Object.keys(priceDrop.defaultParams).sort()
     const schemKeys = Object.keys(priceDrop.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -448,8 +456,15 @@ describe('priceDrop scenario', () => {
 
   it('findEligible returns rows unchanged', async () => {
     const rows = [
-      { user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-        snapshot_price: '500', current_price: '400', current_in_stock: true },
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+        current_in_stock: true,
+      },
     ]
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValue(rows as any)
@@ -466,8 +481,15 @@ describe('priceDrop scenario', () => {
     mockFetchUser.mockResolvedValueOnce(null)
 
     const result = await priceDrop.send(
-      { user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-        snapshot_price: '500', current_price: '400', current_in_stock: true },
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+        current_in_stock: true,
+      },
       { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
     )
 
@@ -477,14 +499,19 @@ describe('priceDrop scenario', () => {
 
   it('send builds correct price vars and calls sendCampaignEmail', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-      snapshot_price: '500.00', current_price: '399.99', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500.00',
+      current_price: '399.99',
+      current_in_stock: true,
     }
 
-    await priceDrop.send(
-      row,
-      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
-    )
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
 
     expect(mockSendEmail).toHaveBeenCalledTimes(1)
     const [payload] = mockSendEmail.mock.calls[0]
@@ -497,14 +524,19 @@ describe('priceDrop scenario', () => {
 
   it('send calls renderHeroProduct with name, imageUrl, productUrl, oldPrice, newPrice', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-      snapshot_price: '500', current_price: '400', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+      current_in_stock: true,
     }
 
-    await priceDrop.send(
-      row,
-      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
-    )
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
 
     expect(mockRenderHeroProduct).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -518,14 +550,19 @@ describe('priceDrop scenario', () => {
 
   it('send updates wishlist snapshot after sending', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-      snapshot_price: '500', current_price: '400', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+      current_in_stock: true,
     }
 
-    await priceDrop.send(
-      row,
-      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
-    )
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE wishlist_items'),
@@ -536,14 +573,19 @@ describe('priceDrop scenario', () => {
   it('send still returns email result even if wishlist update throws', async () => {
     mockQuery.mockRejectedValueOnce(new Error('DB error'))
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-      snapshot_price: '500', current_price: '400', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+      current_in_stock: true,
     }
 
-    const result = await priceDrop.send(
-      row,
-      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
-    )
+    const result = await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
 
     // The catch(() => {}) in source means the update error is swallowed
     expect(result.ok).toBe(true)
@@ -567,7 +609,7 @@ describe('restock scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys   = Object.keys(restock.defaultParams).sort()
+    const defKeys = Object.keys(restock.defaultParams).sort()
     const schemKeys = Object.keys(restock.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -591,10 +633,16 @@ describe('restock scenario', () => {
   })
 
   it('findEligible returns rows from queryMany', async () => {
-    const rows = [{
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
-    }]
+    const rows = [
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        current_price: '50',
+        current_in_stock: true,
+      },
+    ]
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValue(rows as any)
 
@@ -610,8 +658,14 @@ describe('restock scenario', () => {
     mockFetchUser.mockResolvedValueOnce(null)
 
     const result = await restock.send(
-      { user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-        current_price: '50', current_in_stock: true },
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        current_price: '50',
+        current_in_stock: true,
+      },
       { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
     )
 
@@ -621,14 +675,15 @@ describe('restock scenario', () => {
 
   it('send calls renderHeroProduct with correct args (no oldPrice for restock)', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Bolt',
+      product_slug: 'bolt',
+      current_price: '50',
+      current_in_stock: true,
     }
 
-    await restock.send(
-      row,
-      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
-    )
+    await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
 
     expect(mockRenderHeroProduct).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -643,14 +698,15 @@ describe('restock scenario', () => {
 
   it('send builds email vars with productName and ctaUrl', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Bolt',
+      product_slug: 'bolt',
+      current_price: '50',
+      current_in_stock: true,
     }
 
-    await restock.send(
-      row,
-      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
-    )
+    await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
 
     const [payload] = mockSendEmail.mock.calls[0]
     expect(payload.vars.productName).toBe('Bolt')
@@ -660,14 +716,15 @@ describe('restock scenario', () => {
 
   it('send updates wishlist snapshot after sending', async () => {
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Bolt',
+      product_slug: 'bolt',
+      current_price: '50',
+      current_in_stock: true,
     }
 
-    await restock.send(
-      row,
-      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
-    )
+    await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE wishlist_items'),
@@ -678,14 +735,18 @@ describe('restock scenario', () => {
   it('send swallows wishlist update error', async () => {
     mockQuery.mockRejectedValueOnce(new Error('DB timeout'))
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Bolt',
+      product_slug: 'bolt',
+      current_price: '50',
+      current_in_stock: true,
     }
 
-    const result = await restock.send(
-      row,
-      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
-    )
+    const result = await restock.send(row, {
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
 
     expect(result.ok).toBe(true)
   })
@@ -709,7 +770,7 @@ describe('reviewReminder scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys   = Object.keys(reviewReminder.defaultParams).sort()
+    const defKeys = Object.keys(reviewReminder.defaultParams).sort()
     const schemKeys = Object.keys(reviewReminder.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -776,9 +837,7 @@ describe('reviewReminder scenario', () => {
   })
 
   it('send appends ?review=1 to product URLs via renderItemRows', async () => {
-    const items = [
-      { name: 'Product A', product_id: 'p1', product_slug: 'product-a', image_url: null },
-    ]
+    const items = [{ name: 'Product A', product_id: 'p1', product_slug: 'product-a', image_url: null }]
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValue(items as any)
 
@@ -811,9 +870,7 @@ describe('reviewReminder scenario', () => {
     )
 
     expect(mockRenderItemRows).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ productUrl: null }),
-      ])
+      expect.arrayContaining([expect.objectContaining({ productUrl: null })])
     )
   })
 })
@@ -825,14 +882,19 @@ describe('priceDrop scenario — branch coverage', () => {
   it('send falls back firstName to "there" when first_name is null', async () => {
     mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null } as any)
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
-      snapshot_price: '500', current_price: '400', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+      current_in_stock: true,
     }
 
-    await priceDrop.send(
-      row,
-      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
-    )
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
 
     const [payload] = mockSendEmail.mock.calls[0]
     expect(payload.vars.firstName).toBe('there')
@@ -846,14 +908,15 @@ describe('restock scenario — branch coverage', () => {
   it('send falls back firstName to "there" when first_name is null', async () => {
     mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null } as any)
     const row = {
-      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
-      current_price: '50', current_in_stock: true,
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Bolt',
+      product_slug: 'bolt',
+      current_price: '50',
+      current_in_stock: true,
     }
 
-    await restock.send(
-      row,
-      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
-    )
+    await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
 
     const [payload] = mockSendEmail.mock.calls[0]
     expect(payload.vars.firstName).toBe('there')
@@ -878,7 +941,7 @@ describe('reviewRequest scenario', () => {
   })
 
   it('paramSchema covers all defaultParam keys', () => {
-    const defKeys   = Object.keys(reviewRequest.defaultParams).sort()
+    const defKeys = Object.keys(reviewRequest.defaultParams).sort()
     const schemKeys = Object.keys(reviewRequest.paramSchema).sort()
     expect(schemKeys).toEqual(defKeys)
   })
@@ -932,9 +995,7 @@ describe('reviewRequest scenario', () => {
   })
 
   it('send calls renderCampaignEmail and sendCampaignEmailRendered with correct args', async () => {
-    const items = [
-      { name: 'Widget', product_id: 'p1', image_url: 'img.jpg', slug: 'widget' },
-    ]
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: 'img.jpg', slug: 'widget' }]
     mockQueryMany.mockResolvedValueOnce(items as any)
     const user = { ...makeUser(), baseUrl: 'https://jeffistores.com' }
     mockFetchUser.mockResolvedValueOnce(user as any)
@@ -1098,12 +1159,12 @@ describe('resolveParams', () => {
 // ===========================================================================
 describe('all scenarios — structural contract', () => {
   const scenarios = [
-    { name: 'abandonedCart',  mod: abandonedCart },
-    { name: 'postPurchase',   mod: postPurchase },
-    { name: 'priceDrop',      mod: priceDrop },
-    { name: 'restock',        mod: restock },
+    { name: 'abandonedCart', mod: abandonedCart },
+    { name: 'postPurchase', mod: postPurchase },
+    { name: 'priceDrop', mod: priceDrop },
+    { name: 'restock', mod: restock },
     { name: 'reviewReminder', mod: reviewReminder },
-    { name: 'reviewRequest',  mod: reviewRequest },
+    { name: 'reviewRequest', mod: reviewRequest },
   ]
 
   for (const { name, mod } of scenarios) {

@@ -114,10 +114,7 @@ describe('GET /api/admin/campaigns/scenarios', () => {
       total_converted: '5',
       last_run_at: '2026-06-01T00:00:00Z',
     }
-    mockQueryMany
-      .mockResolvedValueOnce([agg])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([agg]).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     const res = await GET(makeRequest())
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -140,10 +137,7 @@ describe('GET /api/admin/campaigns/scenarios', () => {
       discount_percent: 10,
       last_run_at: null,
     }
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([campaignRow])
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([campaignRow]).mockResolvedValueOnce([])
     const res = await GET(makeRequest())
     const body = await res.json()
     expect(body.scenarios[0].campaigns).toHaveLength(1)
@@ -165,10 +159,7 @@ describe('GET /api/admin/campaigns/scenarios', () => {
       parameters: { sendCooldownDays: 3 },
       approved_at: null,
     }
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([customRow])
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([customRow])
     const res = await GET(makeRequest())
     const body = await res.json()
     expect(body.scenarios).toHaveLength(1)
@@ -191,10 +182,7 @@ describe('GET /api/admin/campaigns/scenarios', () => {
       parameters: null,
       approved_at: null,
     }
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([customRow])
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([customRow])
     const res = await GET(makeRequest())
     const body = await res.json()
     // should only have 1 (the builtin), custom duplicate is skipped

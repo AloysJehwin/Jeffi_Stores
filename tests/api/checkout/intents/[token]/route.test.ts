@@ -39,7 +39,9 @@ function makeRequest() {
 const params = { params: Promise.resolve({ token: 'tok123' }) }
 
 describe('GET /api/checkout/intents/[token]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 when intent is invalid', async () => {
     mockVerifyIntent.mockResolvedValueOnce(null)
@@ -90,8 +92,12 @@ describe('GET /api/checkout/intents/[token]', () => {
   it('returns 400 for buyNow mode when resolve fails', async () => {
     mockVerifyIntent.mockResolvedValueOnce({
       mode: 'buyNow',
-      productId: 'p1', variantId: null, subVariantId: null,
-      qty: 1, buyMode: 'retail', buyUnit: 'pc',
+      productId: 'p1',
+      variantId: null,
+      subVariantId: null,
+      qty: 1,
+      buyMode: 'retail',
+      buyUnit: 'pc',
     } as any)
     mockResolve.mockResolvedValueOnce({ ok: false, error: 'out of stock' } as any)
 
@@ -104,17 +110,37 @@ describe('GET /api/checkout/intents/[token]', () => {
   it('returns buyNow data when resolve succeeds', async () => {
     mockVerifyIntent.mockResolvedValueOnce({
       mode: 'buyNow',
-      productId: 'p1', variantId: 'v1', subVariantId: null,
-      qty: 2, buyMode: 'retail', buyUnit: 'pc',
+      productId: 'p1',
+      variantId: 'v1',
+      subVariantId: null,
+      qty: 2,
+      buyMode: 'retail',
+      buyUnit: 'pc',
     } as any)
     mockResolve.mockResolvedValueOnce({
       ok: true,
-      item: { productId: 'p1', variantId: 'v1', subVariantId: null, qty: 2, buyMode: 'retail', buyUnit: 'pc', price: 200 },
+      item: {
+        productId: 'p1',
+        variantId: 'v1',
+        subVariantId: null,
+        qty: 2,
+        buyMode: 'retail',
+        buyUnit: 'pc',
+        price: 200,
+      },
     } as any)
     mockQueryOne.mockResolvedValueOnce({
-      name: 'Bolt', sku: 'B1', mrp: 250, gst_percentage: 18,
-      brand_name: 'Unbrako', variant_name: 'M6', variant_sku: 'V-B1',
-      variant_mrp: 250, sub_variant_name: null, sub_variant_sku: null, sub_variant_mrp: null,
+      name: 'Bolt',
+      sku: 'B1',
+      mrp: 250,
+      gst_percentage: 18,
+      brand_name: 'Unbrako',
+      variant_name: 'M6',
+      variant_sku: 'V-B1',
+      variant_mrp: 250,
+      sub_variant_name: null,
+      sub_variant_sku: null,
+      sub_variant_mrp: null,
     })
 
     const res = await GET(makeRequest() as any, params as any)

@@ -1,21 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Use vi.hoisted so mock factory variables are available before vi.mock hoisting
-const {
-  mockMkdtempSync,
-  mockWriteFileSync,
-  mockReadFileSync,
-  mockRmSync,
-  mockExecSync,
-  mockExecFileSync,
-} = vi.hoisted(() => ({
-  mockMkdtempSync: vi.fn().mockReturnValue('/tmp/cert-abc123'),
-  mockWriteFileSync: vi.fn(),
-  mockReadFileSync: vi.fn().mockReturnValue(Buffer.from('mock-p12-data')),
-  mockRmSync: vi.fn(),
-  mockExecSync: vi.fn().mockReturnValue(Buffer.from('')),
-  mockExecFileSync: vi.fn().mockReturnValue(Buffer.from('')),
-}))
+const { mockMkdtempSync, mockWriteFileSync, mockReadFileSync, mockRmSync, mockExecSync, mockExecFileSync } = vi.hoisted(
+  () => ({
+    mockMkdtempSync: vi.fn().mockReturnValue('/tmp/cert-abc123'),
+    mockWriteFileSync: vi.fn(),
+    mockReadFileSync: vi.fn().mockReturnValue(Buffer.from('mock-p12-data')),
+    mockRmSync: vi.fn(),
+    mockExecSync: vi.fn().mockReturnValue(Buffer.from('')),
+    mockExecFileSync: vi.fn().mockReturnValue(Buffer.from('')),
+  })
+)
 
 vi.mock('fs', () => ({
   default: {
@@ -44,7 +39,7 @@ vi.mock('os', () => ({
 // Mock crypto to get deterministic outputs
 // certificates.ts uses `import crypto from 'crypto'` (default import), so we must
 // patch both the named exports AND the default export object.
-vi.mock('crypto', async (importOriginal) => {
+vi.mock('crypto', async importOriginal => {
   const actual = await importOriginal<typeof import('crypto')>()
   const mockRandomBytes = vi.fn().mockImplementation((size: number) => {
     return { toString: (_enc: string) => 'deadbeef'.repeat(size / 4 + 1).slice(0, size * 2) }
@@ -125,7 +120,11 @@ describe('generateClientCertificate', () => {
   it('runs openssl req command to create CSR with subject', async () => {
     await generateClientCertificate('testadmin', 'aid1')
     const calls = mockExecFileSync.mock.calls
-    expect(calls.some((c: any) => c[0] === 'openssl' && c[1][0] === 'req' && c[1].some((a: string) => a.includes('testadmin')))).toBe(true)
+    expect(
+      calls.some(
+        (c: any) => c[0] === 'openssl' && c[1][0] === 'req' && c[1].some((a: string) => a.includes('testadmin'))
+      )
+    ).toBe(true)
   })
 
   it('runs openssl x509 to sign the cert', async () => {
@@ -155,7 +154,9 @@ describe('generateClientCertificate', () => {
   })
 
   it('cleans up temp directory even if execSync throws', async () => {
-    mockExecFileSync.mockImplementationOnce(() => { throw new Error('openssl not found') })
+    mockExecFileSync.mockImplementationOnce(() => {
+      throw new Error('openssl not found')
+    })
     await expect(generateClientCertificate('testadmin', 'aid1')).rejects.toThrow('openssl not found')
     expect(mockRmSync).toHaveBeenCalledWith('/tmp/cert-abc123', { recursive: true, force: true })
   })
@@ -176,29 +177,34 @@ describe('generateClientCertificate', () => {
   // --- Validation branch: invalid username ---
 
   it('throws on empty string username', async () => {
-    await expect(generateClientCertificate('', 'aid1'))
-      .rejects.toThrow('Invalid username format for certificate generation')
+    await expect(generateClientCertificate('', 'aid1')).rejects.toThrow(
+      'Invalid username format for certificate generation'
+    )
   })
 
   it('throws on username longer than 64 characters', async () => {
     const longName = 'a'.repeat(65)
-    await expect(generateClientCertificate(longName, 'aid1'))
-      .rejects.toThrow('Invalid username format for certificate generation')
+    await expect(generateClientCertificate(longName, 'aid1')).rejects.toThrow(
+      'Invalid username format for certificate generation'
+    )
   })
 
   it('throws on username with spaces', async () => {
-    await expect(generateClientCertificate('admin user', 'aid1'))
-      .rejects.toThrow('Invalid username format for certificate generation')
+    await expect(generateClientCertificate('admin user', 'aid1')).rejects.toThrow(
+      'Invalid username format for certificate generation'
+    )
   })
 
   it('throws on username with forward slash', async () => {
-    await expect(generateClientCertificate('admin/user', 'aid1'))
-      .rejects.toThrow('Invalid username format for certificate generation')
+    await expect(generateClientCertificate('admin/user', 'aid1')).rejects.toThrow(
+      'Invalid username format for certificate generation'
+    )
   })
 
   it('throws on username with semicolon', async () => {
-    await expect(generateClientCertificate('admin;drop', 'aid1'))
-      .rejects.toThrow('Invalid username format for certificate generation')
+    await expect(generateClientCertificate('admin;drop', 'aid1')).rejects.toThrow(
+      'Invalid username format for certificate generation'
+    )
   })
 
   it('does not throw for a 64-character username (boundary valid)', async () => {

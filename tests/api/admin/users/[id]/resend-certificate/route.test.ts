@@ -33,7 +33,9 @@ const sampleRow = {
 }
 
 describe('POST /api/admin/users/[id]/resend-certificate', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 403 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

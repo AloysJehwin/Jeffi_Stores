@@ -14,19 +14,29 @@ vi.mock('pdfkit', () => {
         dataCb?.(Buffer.from('mock-po-pdf'))
         endCb?.()
       }),
-      font: vi.fn().mockReturnThis(), fontSize: vi.fn().mockReturnThis(),
-      fillColor: vi.fn().mockReturnThis(), strokeColor: vi.fn().mockReturnThis(),
-      lineWidth: vi.fn().mockReturnThis(), text: vi.fn().mockReturnThis(),
-      moveDown: vi.fn().mockReturnThis(), moveTo: vi.fn().mockReturnThis(),
-      lineTo: vi.fn().mockReturnThis(), stroke: vi.fn().mockReturnThis(),
-      fill: vi.fn().mockReturnThis(), rect: vi.fn().mockReturnThis(),
-      image: vi.fn().mockReturnThis(), opacity: vi.fn().mockReturnThis(),
-      addPage: vi.fn().mockReturnThis(), switchToPage: vi.fn().mockReturnThis(),
-      save: vi.fn().mockReturnThis(), restore: vi.fn().mockReturnThis(),
+      font: vi.fn().mockReturnThis(),
+      fontSize: vi.fn().mockReturnThis(),
+      fillColor: vi.fn().mockReturnThis(),
+      strokeColor: vi.fn().mockReturnThis(),
+      lineWidth: vi.fn().mockReturnThis(),
+      text: vi.fn().mockReturnThis(),
+      moveDown: vi.fn().mockReturnThis(),
+      moveTo: vi.fn().mockReturnThis(),
+      lineTo: vi.fn().mockReturnThis(),
+      stroke: vi.fn().mockReturnThis(),
+      fill: vi.fn().mockReturnThis(),
+      rect: vi.fn().mockReturnThis(),
+      image: vi.fn().mockReturnThis(),
+      opacity: vi.fn().mockReturnThis(),
+      addPage: vi.fn().mockReturnThis(),
+      switchToPage: vi.fn().mockReturnThis(),
+      save: vi.fn().mockReturnThis(),
+      restore: vi.fn().mockReturnThis(),
       bufferedPageRange: vi.fn().mockReturnValue({ start: 0, count: 1 }),
       heightOfString: vi.fn().mockReturnValue(20),
       widthOfString: vi.fn().mockReturnValue(100),
-      x: 50, y: 100,
+      x: 50,
+      y: 100,
       page: { width: 595.28, height: 841.89, margins: { top: 0, bottom: 0, left: 0, right: 0 } },
     }
     return doc
@@ -110,9 +120,7 @@ describe('po-pdf', () => {
     })
 
     it('handles single item without variant', async () => {
-      const singleItem: POItem[] = [
-        { product_name: 'Widget', variant_name: null, quantity: 10, unit_cost: 100 },
-      ]
+      const singleItem: POItem[] = [{ product_name: 'Widget', variant_name: null, quantity: 10, unit_cost: 100 }]
       const result = await generatePurchaseOrderPDF(mockPO, singleItem, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })

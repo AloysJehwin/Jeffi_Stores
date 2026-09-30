@@ -79,9 +79,7 @@ describe('GET /api/admin/business/rfqs/[id]', () => {
   it('returns rfq, items and discountMap on success', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
     mockQueryOne.mockResolvedValue(sampleRfq)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems)
-      .mockResolvedValueOnce(sampleDiscounts)
+    mockQueryMany.mockResolvedValueOnce(sampleItems).mockResolvedValueOnce(sampleDiscounts)
 
     const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'rfq-1' }) })
     expect(res.status).toBe(200)
@@ -113,7 +111,9 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
 
   it('returns 400 for invalid status', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    const res = await PATCH(makePatchRequest('rfq-1', { status: 'invalid' }), { params: Promise.resolve({ id: 'rfq-1' }) })
+    const res = await PATCH(makePatchRequest('rfq-1', { status: 'invalid' }), {
+      params: Promise.resolve({ id: 'rfq-1' }),
+    })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/invalid status/i)
@@ -123,16 +123,15 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(
-      makePatchRequest('rfq-1', { status: 'reviewed', adminNote: 'Looks good' }),
-      { params: Promise.resolve({ id: 'rfq-1' }) },
-    )
+    const res = await PATCH(makePatchRequest('rfq-1', { status: 'reviewed', adminNote: 'Looks good' }), {
+      params: Promise.resolve({ id: 'rfq-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE business_rfqs'),
-      expect.arrayContaining(['reviewed', 'Looks good', 'rfq-1']),
+      expect.arrayContaining(['reviewed', 'Looks good', 'rfq-1'])
     )
   })
 
@@ -140,10 +139,9 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(
-      makePatchRequest('rfq-1', { status: 'rejected' }),
-      { params: Promise.resolve({ id: 'rfq-1' }) },
-    )
+    const res = await PATCH(makePatchRequest('rfq-1', { status: 'rejected' }), {
+      params: Promise.resolve({ id: 'rfq-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)

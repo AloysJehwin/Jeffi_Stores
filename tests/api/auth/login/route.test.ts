@@ -110,8 +110,8 @@ describe('POST /api/auth/login', () => {
     it('returns 200 with isNewUser:true when user does not exist at all', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
       vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)  // no customer
-        .mockResolvedValueOnce(null)  // no business either
+        .mockResolvedValueOnce(null) // no customer
+        .mockResolvedValueOnce(null) // no business either
 
       const res = await POST(makeRequest({ email: 'new@example.com', otp: '123456' }) as any)
       expect(res.status).toBe(200)
@@ -123,7 +123,7 @@ describe('POST /api/auth/login', () => {
     it('returns 403 when only a business account exists — prevents duplicate customer creation', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
       vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)                          // no customer account
+        .mockResolvedValueOnce(null) // no customer account
         .mockResolvedValueOnce({ id: 'biz-1', email: 'biz@example.com', user_type: 'business' }) // business account exists
 
       const res = await POST(makeRequest({ email: 'biz@example.com', otp: '123456' }) as any)
@@ -184,9 +184,7 @@ describe('POST /api/auth/login', () => {
   describe('guest cart merge', () => {
     it('merges guest cart when guest session cookie present', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(ACTIVE_USER)
-        .mockResolvedValueOnce({ id: 'guest-1' })
+      vi.mocked(db.queryOne).mockResolvedValueOnce(ACTIVE_USER).mockResolvedValueOnce({ id: 'guest-1' })
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await POST(makeRequest({ email: 'user@example.com', otp: '123456' }, 'guest_12345_abc') as any)

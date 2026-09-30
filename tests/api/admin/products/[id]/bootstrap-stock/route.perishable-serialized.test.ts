@@ -51,11 +51,13 @@ const LOCATION_ID = '333e4567-e89b-12d3-a456-426614174003'
 // ---------------------------------------------------------------------------
 
 function postReq(body: unknown, id: string = PRODUCT_ID) {
-  return new NextRequest(new Request(`http://localhost/api/admin/products/${id}/bootstrap-stock`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }))
+  return new NextRequest(
+    new Request(`http://localhost/api/admin/products/${id}/bootstrap-stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 function paramsFor(id: string = PRODUCT_ID) {
@@ -129,7 +131,12 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
   // --- 400 shelf location required per grain ---
 
   it('returns 400 when a grain has quantity but no location_id', async () => {
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
+    vi.mocked(queryOne).mockResolvedValueOnce({
+      id: PRODUCT_ID,
+      perishable: true,
+      serialized: false,
+      inventory_quantity: '10',
+    })
     const res = await POST(postReq({ assignments: [{ quantity: 5, expiry_date: '2027-01-01' }] }), paramsFor())
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -160,7 +167,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       serialized: true,
       inventory_quantity: '3',
     })
-    const res = await POST(postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B'] }] }), paramsFor())
+    const res = await POST(
+      postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B'] }] }),
+      paramsFor()
+    )
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/needs 3 serial/)
@@ -172,7 +182,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '3' })
       .mockResolvedValueOnce({ serial_number: 'A' }) // clash
-    const res = await POST(postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B', 'C'] }] }), paramsFor())
+    const res = await POST(
+      postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B', 'C'] }] }),
+      paramsFor()
+    )
     expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error).toMatch(/already exists in stock/)
@@ -186,7 +199,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       .mockResolvedValueOnce({ total: 1 }) // existing active stock
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
-    const res = await POST(postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }), paramsFor())
+    const res = await POST(
+      postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }),
+      paramsFor()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -204,15 +220,20 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
-    const res = await POST(postReq({
-      assignments: [{
-        quantity: 10,
-        expiry_date: '2027-01-01',
-        lot_number: 'LOT-1',
-        manufacture_date: '2026-01-01',
-        location_id: LOCATION_ID,
-      }],
-    }), paramsFor())
+    const res = await POST(
+      postReq({
+        assignments: [
+          {
+            quantity: 10,
+            expiry_date: '2027-01-01',
+            lot_number: 'LOT-1',
+            manufacture_date: '2026-01-01',
+            location_id: LOCATION_ID,
+          },
+        ],
+      }),
+      paramsFor()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -233,14 +254,19 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
-    const res = await POST(postReq({
-      assignments: [{
-        variant_id: VARIANT_ID,
-        quantity: 5,
-        location_id: LOCATION_ID,
-        expiry_date: '2027-01-01',
-      }],
-    }), paramsFor())
+    const res = await POST(
+      postReq({
+        assignments: [
+          {
+            variant_id: VARIANT_ID,
+            quantity: 5,
+            location_id: LOCATION_ID,
+            expiry_date: '2027-01-01',
+          },
+        ],
+      }),
+      paramsFor()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -257,13 +283,18 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
-    const res = await POST(postReq({
-      assignments: [{
-        quantity: 3,
-        serial_numbers: ['SN-1', 'SN-2', 'SN-3'],
-        location_id: LOCATION_ID,
-      }],
-    }), paramsFor())
+    const res = await POST(
+      postReq({
+        assignments: [
+          {
+            quantity: 3,
+            serial_numbers: ['SN-1', 'SN-2', 'SN-3'],
+            location_id: LOCATION_ID,
+          },
+        ],
+      }),
+      paramsFor()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -296,7 +327,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     }
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
-    const res = await POST(postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }), paramsFor())
+    const res = await POST(
+      postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }),
+      paramsFor()
+    )
     expect(res.status).toBe(500)
     const json = await res.json()
     expect(json.error).toBe('Duplicate lot number')

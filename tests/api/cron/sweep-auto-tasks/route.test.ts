@@ -50,19 +50,19 @@ describe('GET /api/cron/sweep-auto-tasks', () => {
   })
 
   it('creates tasks for matched rows', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ user_id: 'u1', ref_id: 'r1', title: 'Task 1' }])
-      .mockResolvedValue([])
+    mockQueryMany.mockResolvedValueOnce([{ user_id: 'u1', ref_id: 'r1', title: 'Task 1' }]).mockResolvedValue([])
     mockCreateAutoTask.mockResolvedValueOnce('task-id').mockResolvedValue(null)
 
     const res = await GET(makeRequest('Bearer test-cron-secret') as any)
     const json = await res.json()
     expect(json.totalCreated).toBe(1)
-    expect(mockCreateAutoTask).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 'u1',
-      sourceRefId: 'r1',
-      title: 'Task 1',
-    }))
+    expect(mockCreateAutoTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'u1',
+        sourceRefId: 'r1',
+        title: 'Task 1',
+      })
+    )
   })
 
   it('collects errors per rule and returns them', async () => {

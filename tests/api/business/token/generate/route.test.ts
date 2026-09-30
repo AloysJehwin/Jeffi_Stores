@@ -4,10 +4,18 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/jwt', () => ({ authenticateBusiness: vi.fn() }))
 vi.mock('jose', () => ({
   SignJWT: class {
-    setProtectedHeader() { return this }
-    setIssuedAt() { return this }
-    setExpirationTime() { return this }
-    async sign() { return 'mock-biz-token' }
+    setProtectedHeader() {
+      return this
+    }
+    setIssuedAt() {
+      return this
+    }
+    setExpirationTime() {
+      return this
+    }
+    async sign() {
+      return 'mock-biz-token'
+    }
   },
 }))
 

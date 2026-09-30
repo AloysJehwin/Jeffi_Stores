@@ -7,7 +7,11 @@ import { NextRequest } from 'next/server'
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn(), verifyToken: vi.fn(), authenticateServiceAccount: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/jwt', () => ({
+  authenticateAdmin: vi.fn(),
+  verifyToken: vi.fn(),
+  authenticateServiceAccount: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 
@@ -193,9 +197,7 @@ describe('GET /api/admin/replication/log', () => {
     mockAuthenticateAdmin.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
     mockHasScope.mockReturnValue(true)
 
-    const sampleRuns = [
-      { id: 1, run_id: 'repl-20240115T120000Z', status: 'ok', source: 'razer' },
-    ]
+    const sampleRuns = [{ id: 1, run_id: 'repl-20240115T120000Z', status: 'ok', source: 'razer' }]
     mockQueryMany.mockResolvedValue(sampleRuns as any)
 
     const res = await GET(makeGet())
@@ -215,10 +217,7 @@ describe('GET /api/admin/replication/log', () => {
     const body = await res.json()
     expect(body.limit).toBe(10)
     expect(body.offset).toBe(20)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      [10, 20]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), [10, 20])
   })
 
   it('caps limit at 200', async () => {

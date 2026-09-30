@@ -30,7 +30,9 @@ function makeReq(id: string, days?: string) {
   return new NextRequest(url)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/products/[id]/analytics', () => {
   it('returns 401 when not authenticated', async () => {

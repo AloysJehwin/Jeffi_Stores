@@ -44,7 +44,7 @@ vi.mock('@/lib/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(u
 vi.mock('@/lib/delhivery', () => ({
   checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -153,14 +153,16 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(bizDiscount.getBusinessDiscountMap).mockResolvedValue({})
     vi.mocked(gstLib.isInterState).mockReturnValue(false)
     vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 0, codFee: 0 })
-    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' } as any)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'not_found',
+    } as any)
   })
 
   it('uses variant price when price_at_addition is 0 and variant is present', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     const variantItem = baseCartItem({
       variant: { id: 'v1', variant_name: 'Red', sku: 'V-R', price: '150', mrp: 200, discount_pct: 0 },
       products: { ...baseCartItem().products, discount_pct: 0 },
@@ -188,9 +190,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('uses sub_variant price when sub_variant present (highest priority)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     const subItem = baseCartItem({
       variant: { id: 'v1', variant_name: 'Red', sku: 'V-R', price: '150' },
       sub_variant: { id: 'sv1', sub_variant_name: 'Small', sku: 'SV-S', price: '175', mrp: 220 },
@@ -218,9 +218,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('uses price_at_addition when > 0 (overrides base_price)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     const item = baseCartItem({ price_at_addition: '80', quantity: '3' })
     vi.mocked(db.queryMany).mockResolvedValue([item])
 
@@ -244,9 +242,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('quotes shipping when destination pin provided', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
     vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 75, codFee: 0 })
 
@@ -264,17 +260,19 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({
-      paymentMethod: 'cod',
-      shippingAddress: {
-        addressLine1: '1 Main',
-        city: 'Chennai',
-        state: 'TN',
-        postalCode: '600001',
-        fullName: 'Buyer',
-        phone: '9000000000',
-      },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        paymentMethod: 'cod',
+        shippingAddress: {
+          addressLine1: '1 Main',
+          city: 'Chennai',
+          state: 'TN',
+          postalCode: '600001',
+          fullName: 'Buyer',
+          phone: '9000000000',
+        },
+      }) as any
+    )
     expect(res.status).toBe(200)
     expect(capturedShipping).toBe(75)
     // subtotal 200 - 0 discount + 75 shipping = 275
@@ -292,9 +290,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('handles TAT branch for pincode starting with 49', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
@@ -304,18 +300,18 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({
-      paymentMethod: 'cod',
-      shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '491337' },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        paymentMethod: 'cod',
+        shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '491337' },
+      }) as any
+    )
     expect(res.status).toBe(200)
   })
 
   it('handles TAT branch for metro pincode (400xxx)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
@@ -325,18 +321,18 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({
-      paymentMethod: 'cod',
-      shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '400009' },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        paymentMethod: 'cod',
+        shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '400009' },
+      }) as any
+    )
     expect(res.status).toBe(200)
   })
 
   it('handles no shippingAddress branch (0 shipping quote)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     let capturedShipping = -1
@@ -361,9 +357,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
   it('uses default fullName/phone when shippingAddress missing them', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     const userNoName = { ...MOCK_USER, first_name: null, last_name: null, phone: null }
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(userNoName)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(userNoName).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     let insertAddrCalled = false
@@ -383,10 +377,12 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({
-      paymentMethod: 'cod',
-      shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '110001' },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        paymentMethod: 'cod',
+        shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '110001' },
+      }) as any
+    )
     expect(res.status).toBe(200)
     expect(insertAddrCalled).toBe(true)
   })

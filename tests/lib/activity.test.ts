@@ -57,12 +57,8 @@ describe('logActivity', () => {
   })
 
   it('does not throw when DB insert fails (silent catch)', async () => {
-    mockQuery
-      .mockRejectedValueOnce(new Error('primary fail'))
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
-    await expect(
-      logActivity({ userId: 'user-1', kind: 'logout', summary: 'Logged out' })
-    ).resolves.toBeUndefined()
+    mockQuery.mockRejectedValueOnce(new Error('primary fail')).mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
+    await expect(logActivity({ userId: 'user-1', kind: 'logout', summary: 'Logged out' })).resolves.toBeUndefined()
   })
 
   it('passes actorId when provided', async () => {

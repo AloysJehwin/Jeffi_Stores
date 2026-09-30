@@ -35,7 +35,8 @@ function req(method: string, body?: unknown) {
   })
 }
 
-const liveWrites = () => fake.state.statements.filter(s => /^(INSERT INTO|UPDATE|DELETE FROM) homepage_sections/.test(s))
+const liveWrites = () =>
+  fake.state.statements.filter(s => /^(INSERT INTO|UPDATE|DELETE FROM) homepage_sections/.test(s))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -90,8 +91,13 @@ describe('POST', () => {
     expect(res.status).toBe(200)
     const { section } = await res.json()
     expect(section).toMatchObject({
-      type: 'product_row', title: null, config: { source: 'best_sellers', limit: 4 },
-      display_order: 3, is_active: true, starts_at: null, ends_at: null,
+      type: 'product_row',
+      title: null,
+      config: { source: 'best_sellers', limit: 4 },
+      display_order: 3,
+      is_active: true,
+      starts_at: null,
+      ends_at: null,
     })
     expect(section.id).toMatch(/^[0-9a-f-]{36}$/)
     expect(fake.state.draft!.sections.map(s => s.id)).toEqual([A, B, C, section.id])
@@ -102,9 +108,13 @@ describe('POST', () => {
   })
 
   it('rejects an end time before the start time without creating a draft', async () => {
-    const res = await POST(req('POST', {
-      type: 'promo_banner', startsAt: '2026-10-02T00:00:00Z', endsAt: '2026-10-01T00:00:00Z',
-    }))
+    const res = await POST(
+      req('POST', {
+        type: 'promo_banner',
+        startsAt: '2026-10-02T00:00:00Z',
+        endsAt: '2026-10-01T00:00:00Z',
+      })
+    )
     expect(res.status).toBe(400)
     expect(fake.state.draft).toBeNull()
   })
@@ -118,7 +128,11 @@ describe('PATCH reorder', () => {
   it('reorders the draft only', async () => {
     const res = await PATCH(req('PATCH', { order: [C, A, B] }))
     expect(res.status).toBe(200)
-    expect(fake.state.draft!.sections.map(s => [s.id, s.display_order])).toEqual([[C, 0], [A, 1], [B, 2]])
+    expect(fake.state.draft!.sections.map(s => [s.id, s.display_order])).toEqual([
+      [C, 0],
+      [A, 1],
+      [B, 2],
+    ])
     expect(fake.state.live.sections.map(s => s.id)).toEqual([A, B, C])
     expect(liveWrites()).toEqual([])
   })
@@ -160,7 +174,10 @@ describe('PATCH one', () => {
   })
 
   it('rejects an end time before the start time', async () => {
-    const res = await PATCH_ONE(req('PATCH', { startsAt: '2026-10-02T00:00:00Z', endsAt: '2026-10-01T00:00:00Z' }), paramsFor(A))
+    const res = await PATCH_ONE(
+      req('PATCH', { startsAt: '2026-10-02T00:00:00Z', endsAt: '2026-10-01T00:00:00Z' }),
+      paramsFor(A)
+    )
     expect(res.status).toBe(400)
     expect(fake.state.draft).toBeNull()
   })

@@ -110,9 +110,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(sampleQuotation)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems)
-      .mockResolvedValueOnce(sampleSettings)
+    mockQueryMany.mockResolvedValueOnce(sampleItems).mockResolvedValueOnce(sampleSettings)
     const pdfBuffer = Buffer.from('%PDF-1.4 fake pdf content')
     mockGeneratePDF.mockResolvedValue(pdfBuffer)
 
@@ -126,9 +124,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(sampleQuotation)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems)
-      .mockResolvedValueOnce(sampleSettings)
+    mockQueryMany.mockResolvedValueOnce(sampleItems).mockResolvedValueOnce(sampleSettings)
     const pdfBuffer = Buffer.from('pdf')
     mockGeneratePDF.mockResolvedValue(pdfBuffer)
 
@@ -137,7 +133,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     expect(mockGeneratePDF).toHaveBeenCalledWith(
       sampleQuotation,
       expect.any(Array),
-      expect.objectContaining({ gstin: '27AAAA0000A1Z5' }),
+      expect.objectContaining({ gstin: '27AAAA0000A1Z5' })
     )
   })
 

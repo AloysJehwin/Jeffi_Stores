@@ -71,7 +71,10 @@ describe('POST /api/user/avatar', () => {
 
   it('uploads and returns avatarUrl on success', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(s3.uploadAvatarImage).mockResolvedValue({ url: 'https://cdn.example.com/avatar.jpg', s3Key: 'avatars/user-1.jpg' } as any)
+    vi.mocked(s3.uploadAvatarImage).mockResolvedValue({
+      url: 'https://cdn.example.com/avatar.jpg',
+      s3Key: 'avatars/user-1.jpg',
+    } as any)
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
     const res = await POST(makeFormDataRequest(makeJpegFile()) as any)

@@ -42,18 +42,30 @@ describe('verifyBankAccountFAV', () => {
   it('records unverified without calling FAV when RAZORPAYX_ACCOUNT_NUMBER is not configured', async () => {
     delete process.env.RAZORPAYX_ACCOUNT_NUMBER
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
-    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    const r = await verifyBankAccountFAV('owner-1', {
+      accountNumber: '001122334455',
+      ifsc: 'HDFC0001234',
+      holderName: 'A',
+    })
     expect(r).toEqual({ status: 'unverified', verifiedName: 'A', ref: 'format_ok' })
     expect(rzPost).not.toHaveBeenCalled()
-    expect(saveBankVerification).toHaveBeenCalledWith(expect.objectContaining({
-      ownerId: 'owner-1', status: 'unverified', ref: 'route_pending',
-    }))
+    expect(saveBankVerification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: 'owner-1',
+        status: 'unverified',
+        ref: 'route_pending',
+      })
+    )
   })
 
   it('treats an empty RAZORPAYX_ACCOUNT_NUMBER as unconfigured', async () => {
     process.env.RAZORPAYX_ACCOUNT_NUMBER = '   '
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
-    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    const r = await verifyBankAccountFAV('owner-1', {
+      accountNumber: '001122334455',
+      ifsc: 'HDFC0001234',
+      holderName: 'A',
+    })
     expect(r.status).toBe('unverified')
     expect(rzPost).not.toHaveBeenCalled()
   })
@@ -72,7 +84,11 @@ describe('verifyBankAccountFAV', () => {
     delete process.env.RAZORPAYX_ACCOUNT_NUMBER
     saveBankVerification.mockRejectedValue(new Error('db down'))
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
-    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    const r = await verifyBankAccountFAV('owner-1', {
+      accountNumber: '001122334455',
+      ifsc: 'HDFC0001234',
+      holderName: 'A',
+    })
     expect(r.status).toBe('failed')
     expect(r.reason).toMatch(/try again/i)
   })
@@ -93,8 +109,13 @@ describe('verifyBankAccountFAV', () => {
     const r = await verifyBankAccountFAV('owner-2', { accountNumber: '111', ifsc: 'HDFC0001234', holderName: 'John' })
     expect(r).toEqual({ status: 'verified', verifiedName: 'JOHN DOE', ref: 'fav_2' })
     expect(saveBankVerification).toHaveBeenCalledWith({
-      ownerId: 'owner-2', accountNumber: '111', ifsc: 'HDFC0001234', holderName: 'John',
-      status: 'verified', ref: 'fav_2', verifiedName: 'JOHN DOE',
+      ownerId: 'owner-2',
+      accountNumber: '111',
+      ifsc: 'HDFC0001234',
+      holderName: 'John',
+      status: 'verified',
+      ref: 'fav_2',
+      verifiedName: 'JOHN DOE',
     })
   })
 
@@ -112,7 +133,11 @@ describe('verifyBankAccountFAV', () => {
   it('falls back to details.holderName when both name sources absent', async () => {
     rzPost.mockResolvedValue({ id: 'fav_4', results: {} })
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
-    const r = await verifyBankAccountFAV('owner-4', { accountNumber: '333', ifsc: 'HDFC0001234', holderName: 'Fallback' })
+    const r = await verifyBankAccountFAV('owner-4', {
+      accountNumber: '333',
+      ifsc: 'HDFC0001234',
+      holderName: 'Fallback',
+    })
     expect(r.status).toBe('verified')
     expect(r.verifiedName).toBe('Fallback')
   })
@@ -222,11 +247,17 @@ describe('StubBankVerifier via getBankVerifier', () => {
 describe('legacy penny-drop helpers', () => {
   it('initiateDoublepennyDrop is a no-op that points to FAV', async () => {
     const { initiateDoublepennyDrop } = await import('@/lib/bank-verify')
-    await expect(initiateDoublepennyDrop()).resolves.toEqual({ initiated: false, error: 'Use verifyBankAccountFAV instead' })
+    await expect(initiateDoublepennyDrop()).resolves.toEqual({
+      initiated: false,
+      error: 'Use verifyBankAccountFAV instead',
+    })
   })
 
   it('confirmDoublepennyDrop is a no-op that points to FAV', async () => {
     const { confirmDoublepennyDrop } = await import('@/lib/bank-verify')
-    await expect(confirmDoublepennyDrop()).resolves.toEqual({ status: 'failed', reason: 'Use verifyBankAccountFAV instead' })
+    await expect(confirmDoublepennyDrop()).resolves.toEqual({
+      status: 'failed',
+      reason: 'Use verifyBankAccountFAV instead',
+    })
   })
 })

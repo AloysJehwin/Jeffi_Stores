@@ -81,28 +81,35 @@ function makeReq(opts: { auth?: string } = {}) {
 }
 
 const ORDER = {
-  id: 'ord-1', awb_number: 'AWB001', status: 'shipped',
-  order_number: 'ORD-001', customer_name: 'John Doe',
-  customer_email: 'john@example.com', user_id: 'user-1',
-  delhivery_quoted_weight_kg: 1, delhivery_charged_weight_kg: null,
+  id: 'ord-1',
+  awb_number: 'AWB001',
+  status: 'shipped',
+  order_number: 'ORD-001',
+  customer_name: 'John Doe',
+  customer_email: 'john@example.com',
+  user_id: 'user-1',
+  delhivery_quoted_weight_kg: 1,
+  delhivery_charged_weight_kg: null,
 }
 
 function makeShipmentData(awb: string, statusType: string, extra: Record<string, any> = {}) {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: extra.status ?? '',
-          StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: extra.status ?? '',
+            StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+          },
+          Scans: extra.scans ?? [],
+          DestRecieveDate: extra.destReceiveDate ?? null,
+          ReturnedDate: extra.returnedDate ?? null,
+          ...extra.shipmentExtra,
         },
-        Scans: extra.scans ?? [],
-        DestRecieveDate: extra.destReceiveDate ?? null,
-        ReturnedDate: extra.returnedDate ?? null,
-        ...extra.shipmentExtra,
       },
-    }],
+    ],
   }
 }
 
@@ -129,40 +136,45 @@ afterEach(() => {
 // ── RVP loop ──────────────────────────────────────────────────────────────────
 
 const RVP = {
-  id: 'rr-1', rvp_awb_number: 'RVP001',
-  order_id: 'ord-1', user_id: 'user-1', order_number: 'ORD-001',
+  id: 'rr-1',
+  rvp_awb_number: 'RVP001',
+  order_id: 'ord-1',
+  user_id: 'user-1',
+  order_number: 'ORD-001',
 }
 
 describe('POST — RVP return request loop', () => {
   it('marks received_at when destReceiveDate is set', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([])        // orders — so we skip order loop
-      // orders loop returns early with synced:0 total:0 before rvp... need orders > 0
-      // Actually when orders.length === 0 the route returns early.
-      // We need at least one order to get past the early return:
+    mockQueryMany.mockResolvedValueOnce([]) // orders — so we skip order loop
+    // orders loop returns early with synced:0 total:0 before rvp... need orders > 0
+    // Actually when orders.length === 0 the route returns early.
+    // We need at least one order to get past the early return:
     // Re-design: provide one order that won't sync, then RVP data
     mockQueryMany.mockReset()
     mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)           // orders (will get no matching shipment → synced=0)
-      .mockResolvedValueOnce([RVP] as any)              // rvp requests
+      .mockResolvedValueOnce([ORDER] as any) // orders (will get no matching shipment → synced=0)
+      .mockResolvedValueOnce([RVP] as any) // rvp requests
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ ShipmentData: [] }),       // orders fetch → nothing synced
+        json: async () => ({ ShipmentData: [] }), // orders fetch → nothing synced
       } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP001',
-              Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: '2024-06-10T10:00:00' },
-              Scans: [],
-              DestRecieveDate: '2024-06-10',
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP001',
+                Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: '2024-06-10T10:00:00' },
+                Scans: [],
+                DestRecieveDate: '2024-06-10',
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
 
@@ -170,9 +182,7 @@ describe('POST — RVP return request loop', () => {
     const body = await res.json()
     expect(body.rvp.received).toBe(1)
 
-    const rvpUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('UPDATE return_requests')
-    )
+    const rvpUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('UPDATE return_requests'))
     expect(rvpUpdate).toBeDefined()
     expect((rvpUpdate![1] as any[])[0]).toBe('rr-1')
     expect((rvpUpdate![1] as any[])[1]).toBe('2024-06-10')
@@ -184,54 +194,54 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('marks received when ReturnedDate is set (destReceiveDate null)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP001',
-              Status: { StatusType: 'DL', Status: '', StatusDateTime: null },
-              Scans: [],
-              DestRecieveDate: null,
-              ReturnedDate: '2024-06-11',
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP001',
+                Status: { StatusType: 'DL', Status: '', StatusDateTime: null },
+                Scans: [],
+                DestRecieveDate: null,
+                ReturnedDate: '2024-06-11',
+              },
             },
-          }],
+          ],
         }),
       } as any)
 
     const res = await POST(makeReq())
     expect((await res.json()).rvp.received).toBe(1)
-    const rvpUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('UPDATE return_requests')
-    )
+    const rvpUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('UPDATE return_requests'))
     expect((rvpUpdate![1] as any[])[1]).toBe('2024-06-11')
   })
 
   it('marks received when statusLabel is "delivered" (both date fields null)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP001',
-              Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: '2024-06-12T09:00:00' },
-              Scans: [],
-              DestRecieveDate: null,
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP001',
+                Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: '2024-06-12T09:00:00' },
+                Scans: [],
+                DestRecieveDate: null,
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
 
@@ -240,24 +250,25 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('skips RVP entry not yet received at warehouse', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP001',
-              Status: { StatusType: 'IT', Status: 'in transit', StatusDateTime: null },
-              Scans: [],
-              DestRecieveDate: null,
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP001',
+                Status: { StatusType: 'IT', Status: 'in transit', StatusDateTime: null },
+                Scans: [],
+                DestRecieveDate: null,
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
 
@@ -267,24 +278,25 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('does not call completeAutoTask when user_id is null', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([{ ...RVP, user_id: null }] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([{ ...RVP, user_id: null }] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP001',
-              Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: null },
-              Scans: [],
-              DestRecieveDate: '2024-06-10',
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP001',
+                Status: { StatusType: 'DL', Status: 'delivered', StatusDateTime: null },
+                Scans: [],
+                DestRecieveDate: '2024-06-10',
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
 
@@ -295,11 +307,10 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('records rvp error when RVP fetch returns non-ok', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({}) } as any)
 
@@ -310,11 +321,10 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('records rvp error when RVP fetch throws', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockRejectedValueOnce(new Error('RVP network error'))
 
@@ -325,11 +335,10 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('skips RVP entry when AWB does not match any return request', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([RVP] as any)
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([RVP] as any)
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
@@ -341,9 +350,7 @@ describe('POST — RVP return request loop', () => {
   })
 
   it('handles rvpRequests queryMany failure gracefully (returns [])', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockRejectedValueOnce(new Error('RVP query failed'))  // rvp queryMany throws → caught → []
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockRejectedValueOnce(new Error('RVP query failed')) // rvp queryMany throws → caught → []
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -361,9 +368,7 @@ describe('POST — RVP return request loop', () => {
 
 describe('POST — OT and OD statuses (out_for_delivery)', () => {
   it('syncs OT to out_for_delivery', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -374,9 +379,7 @@ describe('POST — OT and OD statuses (out_for_delivery)', () => {
   })
 
   it('syncs OD to out_for_delivery', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -391,9 +394,7 @@ describe('POST — OT and OD statuses (out_for_delivery)', () => {
 
 describe('POST — IT status (in-transit → shipped)', () => {
   it('syncs IT to shipped', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'confirmed' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'confirmed' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -408,9 +409,7 @@ describe('POST — IT status (in-transit → shipped)', () => {
 
 describe('POST — RTO-IT status', () => {
   it('syncs RTO-IT to shipped and fires createAutoTask (RTO prefix)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -48,7 +48,9 @@ function makeDeleteReq() {
   return new NextRequest('http://localhost/api/admin/mailer/camp-1', { method: 'DELETE' })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/mailer/[id]', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -150,12 +152,15 @@ describe('PATCH /api/admin/mailer/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ status: 'draft' })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
-    const res = await PATCH(makePatchReq({
-      title: 'Updated',
-      subject: 'New Subject',
-      template_data: { foo: 'bar' },
-      audience_filter: { city: 'Mumbai' },
-    }), { params })
+    const res = await PATCH(
+      makePatchReq({
+        title: 'Updated',
+        subject: 'New Subject',
+        template_data: { foo: 'bar' },
+        audience_filter: { city: 'Mumbai' },
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)

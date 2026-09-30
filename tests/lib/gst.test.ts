@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  getStateCode,
-  isInterState,
-  calculateGST,
-  getFinancialYear,
-  generateInvoiceNumber,
-} from '@/lib/gst'
+import { getStateCode, isInterState, calculateGST, getFinancialYear, generateInvoiceNumber } from '@/lib/gst'
 
 // ---------------------------------------------------------------------------
 // getStateCode

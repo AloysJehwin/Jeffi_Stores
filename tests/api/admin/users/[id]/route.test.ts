@@ -13,7 +13,16 @@ vi.mock('@/lib/scopes', () => ({
   ALL_SCOPE_KEYS: ['orders', 'products', 'invoices', 'inventory', 'mailer', 'customers'],
   isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
   // A tenant may only hand out what its plan sells; off-tenant this is the full set.
-  assignableScopeKeys: vi.fn(async () => ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent']),
+  assignableScopeKeys: vi.fn(async () => [
+    'products',
+    'orders',
+    'inventory',
+    'financial',
+    'customers',
+    'mailer',
+    'audit',
+    'agent',
+  ]),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -64,14 +73,18 @@ describe('PATCH /api/admin/users/[id]', () => {
 
   it('returns 403 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Unauthorized')
   })
 
   it('returns 403 when role is not super_admin', async () => {
     mockAuth.mockResolvedValue(REGULAR_ADMIN as any)
-    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(403)
   })
 
@@ -82,33 +95,43 @@ describe('PATCH /api/admin/users/[id]', () => {
   })
 
   it('returns 400 for invalid scopes', async () => {
-    const res = await PATCH(makePatch('target-1', { scopes: ['invalid-scope'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['invalid-scope'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invalid scopes')
   })
 
   it('returns 400 for non-array scopes', async () => {
-    const res = await PATCH(makePatch('target-1', { scopes: 'orders' }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: 'orders' }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invalid scopes')
   })
 
   it('returns 400 for invalid role', async () => {
-    const res = await PATCH(makePatch('target-1', { role: 'super_admin' }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { role: 'super_admin' }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invalid role')
   })
 
   it('returns 404 when admin not found after update', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Admin not found')
   })
 
   it('updates scopes successfully', async () => {
     mockQueryOne.mockResolvedValueOnce(updatedAdmin as any)
-    const res = await PATCH(makePatch('target-1', { scopes: ['orders', 'products'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['orders', 'products'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -123,19 +146,20 @@ describe('PATCH /api/admin/users/[id]', () => {
 
   it('updates role to moderator', async () => {
     mockQueryOne.mockResolvedValueOnce({ ...updatedAdmin, role: 'moderator' } as any)
-    const res = await PATCH(makePatch('target-1', { role: 'moderator' }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { role: 'moderator' }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(200)
   })
 
   it('updates is_active and revokes certificates when set to false', async () => {
     mockQueryOne.mockResolvedValueOnce({ ...updatedAdmin, is_active: false } as any)
-    const res = await PATCH(makePatch('target-1', { is_active: false }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { is_active: false }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(200)
     // Check certificate revocation query was called
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('is_revoked = true'),
-      ['target-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('is_revoked = true'), ['target-1'])
   })
 
   it('does not revoke certificates when is_active set to true', async () => {
@@ -150,42 +174,41 @@ describe('PATCH /api/admin/users/[id]', () => {
   // MFA reset
   describe('reset_mfa', () => {
     it('returns 400 when trying to reset own MFA', async () => {
-      const res = await PATCH(
-        makePatch('super-1', { reset_mfa: true }),
-        { params: Promise.resolve({ id: 'super-1' }) }
-      )
+      const res = await PATCH(makePatch('super-1', { reset_mfa: true }), { params: Promise.resolve({ id: 'super-1' }) })
       expect(res.status).toBe(400)
       expect((await res.json()).error).toBe('Cannot reset your own MFA')
     })
 
     it('returns 404 when target admin not found for MFA reset', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const res = await PATCH(makePatch('target-1', { reset_mfa: true }), { params: Promise.resolve({ id: 'target-1' }) })
+      const res = await PATCH(makePatch('target-1', { reset_mfa: true }), {
+        params: Promise.resolve({ id: 'target-1' }),
+      })
       expect(res.status).toBe(404)
       expect((await res.json()).error).toBe('Admin not found')
     })
 
     it('resets MFA successfully', async () => {
       mockQueryOne.mockResolvedValueOnce({ id: 'target-1' } as any) // target exists
-      const res = await PATCH(makePatch('target-1', { reset_mfa: true }), { params: Promise.resolve({ id: 'target-1' }) })
+      const res = await PATCH(makePatch('target-1', { reset_mfa: true }), {
+        params: Promise.resolve({ id: 'target-1' }),
+      })
       expect(res.status).toBe(200)
       expect((await res.json()).success).toBe(true)
       // MFA nullification query
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('mfa_secret_enc = NULL'),
-        ['target-1']
-      )
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('mfa_secret_enc = NULL'), ['target-1'])
       // Recovery codes deletion
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE FROM admin_mfa_recovery_codes'),
-        ['target-1']
-      )
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM admin_mfa_recovery_codes'), [
+        'target-1',
+      ])
     })
   })
 
   it('returns 500 on unexpected error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('DB error'))
-    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), { params: Promise.resolve({ id: 'target-1' }) })
+    const res = await PATCH(makePatch('target-1', { scopes: ['orders'] }), {
+      params: Promise.resolve({ id: 'target-1' }),
+    })
     expect(res.status).toBe(500)
   })
 })
@@ -239,15 +262,9 @@ describe('DELETE /api/admin/users/[id]', () => {
     const res = await DELETE(makeDelete('target-1'), { params: Promise.resolve({ id: 'target-1' }) })
     expect(res.status).toBe(200)
     // Check certificates deleted
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM admin_certificates'),
-      ['target-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM admin_certificates'), ['target-1'])
     // Check user deleted
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM users'),
-      ['user-99']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM users'), ['user-99'])
   })
 
   it('returns 500 on unexpected error', async () => {

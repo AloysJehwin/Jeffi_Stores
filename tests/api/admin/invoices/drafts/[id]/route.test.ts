@@ -219,8 +219,8 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(200)
     // Verify query was called with 'unpaid'
-    const updateCall = client.query.mock.calls.find((args: any[]) =>
-      typeof args[0] === 'string' && args[0].includes('UPDATE orders'),
+    const updateCall = client.query.mock.calls.find(
+      (args: any[]) => typeof args[0] === 'string' && args[0].includes('UPDATE orders')
     )
     expect(updateCall).toBeDefined()
     expect(updateCall![1]).toContain('unpaid')
@@ -295,7 +295,7 @@ describe('DELETE /api/admin/invoices/drafts/[id]', () => {
     await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
 
     const deleteCalls = client.query.mock.calls.filter(
-      (args: any[]) => typeof args[0] === 'string' && args[0].trim().startsWith('DELETE'),
+      (args: any[]) => typeof args[0] === 'string' && args[0].trim().startsWith('DELETE')
     )
     expect(deleteCalls.length).toBeGreaterThanOrEqual(3)
   })

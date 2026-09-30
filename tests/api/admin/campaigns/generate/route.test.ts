@@ -8,7 +8,11 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string, public provider: string, public cause?: unknown) {
+    constructor(
+      message: string,
+      public provider: string,
+      public cause?: unknown
+    ) {
       super(message)
       this.name = 'AiClientError'
     }
@@ -198,14 +202,16 @@ describe('POST /api/admin/campaigns/generate', () => {
     mockHasScope.mockReturnValue(true)
     mockAiChat.mockResolvedValue(validAiResponse)
 
-    await POST(makeRequest({
-      prompt: 'cart email',
-      scenarioKind: 'abandoned_cart',
-      scenarioName: 'Cart Abandon',
-      scenarioDescription: 'Fires when cart is abandoned',
-      scenarioTrigger: '2 hours after add to cart',
-      discountPercent: 10,
-    }))
+    await POST(
+      makeRequest({
+        prompt: 'cart email',
+        scenarioKind: 'abandoned_cart',
+        scenarioName: 'Cart Abandon',
+        scenarioDescription: 'Fires when cart is abandoned',
+        scenarioTrigger: '2 hours after add to cart',
+        discountPercent: 10,
+      })
+    )
 
     const aiCallArgs = mockAiChat.mock.calls[0][0]
     const userMsg = aiCallArgs.messages.find((m: any) => m.role === 'user')?.content

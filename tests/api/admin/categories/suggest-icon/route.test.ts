@@ -32,7 +32,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/categories/suggest-icon', () => {
   it('returns 401 when unauthenticated', async () => {

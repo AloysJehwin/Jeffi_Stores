@@ -28,7 +28,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/crm/dashboard')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/crm/dashboard', () => {
   it('returns 401 when unauthenticated', async () => {

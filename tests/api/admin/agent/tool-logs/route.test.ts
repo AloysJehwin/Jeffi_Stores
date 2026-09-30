@@ -23,11 +23,21 @@ function makeRequest(params: Record<string, string> = {}) {
 }
 
 const sampleMessages = [
-  { id: 'm1', conversation_id: 'c1', created_at: '2024-01-01', tool_calls: [], admin_username: 'admin', admin_first_name: 'Ad', admin_last_name: 'Min' },
+  {
+    id: 'm1',
+    conversation_id: 'c1',
+    created_at: '2024-01-01',
+    tool_calls: [],
+    admin_username: 'admin',
+    admin_first_name: 'Ad',
+    admin_last_name: 'Min',
+  },
 ]
 
 describe('GET /api/admin/agent/tool-logs', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

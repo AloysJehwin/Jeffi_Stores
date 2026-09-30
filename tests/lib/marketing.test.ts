@@ -137,10 +137,7 @@ describe('getCampaign', () => {
   it('calls queryOne with the campaign kind', async () => {
     mockQueryOne.mockResolvedValue({ kind: 'winback_90', name: 'Winback' } as any)
     const campaign = await getCampaign('winback_90')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('campaigns'),
-      ['winback_90']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('campaigns'), ['winback_90'])
     expect(campaign?.kind).toBe('winback_90')
   })
 
@@ -328,10 +325,7 @@ describe('attributeConversion', () => {
   it('runs UPDATE query and resolves', async () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     await expect(attributeConversion('user-1', 'order-1')).resolves.toBeUndefined()
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('email_campaigns_sent'),
-      ['user-1', 'order-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('email_campaigns_sent'), ['user-1', 'order-1'])
   })
 
   it('does not throw on DB error', async () => {
@@ -381,10 +375,7 @@ describe('generateCouponForCampaign', () => {
       expiresInDays: 30,
     })
     expect(code).toBe('BACK-EXIST')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('coupon_id'),
-      ['coupon-existing', 'winback_90']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('coupon_id'), ['coupon-existing', 'winback_90'])
   })
 
   it('creates a new coupon when none exists', async () => {

@@ -20,18 +20,36 @@ class FakeIntersectionObserver {
   constructor(private readonly callback: (entries: Entry[]) => void) {
     observer = this
   }
-  observe(el: Element) { this.observed = el }
+  observe(el: Element) {
+    this.observed = el
+  }
   disconnect() {}
-  fire(entry: Entry) { this.callback([entry]) }
+  fire(entry: Entry) {
+    this.callback([entry])
+  }
 }
 
-const scrolledPast: Entry = { isIntersecting: false, boundingClientRect: { top: -40, bottom: 20 }, rootBounds: { top: 80 } }
-const notReachedYet: Entry = { isIntersecting: false, boundingClientRect: { top: 900, bottom: 980 }, rootBounds: { top: 80 } }
+const scrolledPast: Entry = {
+  isIntersecting: false,
+  boundingClientRect: { top: -40, bottom: 20 },
+  rootBounds: { top: 80 },
+}
+const notReachedYet: Entry = {
+  isIntersecting: false,
+  boundingClientRect: { top: 900, bottom: 980 },
+  rootBounds: { top: 80 },
+}
 const inView: Entry = { isIntersecting: true, boundingClientRect: { top: 300, bottom: 400 }, rootBounds: { top: 80 } }
 
 const props = {
-  name: 'Taparia Torque Wrench', image: null, price: 1234, mrp: 1500, unitLabel: null,
-  quantity: 1, adding: false, onAdd: vi.fn(),
+  name: 'Taparia Torque Wrench',
+  image: null,
+  price: 1234,
+  mrp: 1500,
+  unitLabel: null,
+  quantity: 1,
+  adding: false,
+  onAdd: vi.fn(),
 }
 
 let buttons: HTMLDivElement

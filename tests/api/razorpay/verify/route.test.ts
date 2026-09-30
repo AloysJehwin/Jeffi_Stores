@@ -43,7 +43,7 @@ vi.mock('@/lib/auto-tasks', () => ({
 vi.mock('@/lib/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -71,10 +71,7 @@ import * as variantChange from '@/lib/variant-change'
 const SECRET = 'test_secret_key'
 
 function computeSignature(orderId: string, paymentId: string): string {
-  return crypto
-    .createHmac('sha256', SECRET)
-    .update(`${orderId}|${paymentId}`)
-    .digest('hex')
+  return crypto.createHmac('sha256', SECRET).update(`${orderId}|${paymentId}`).digest('hex')
 }
 
 function makeRequest(body: unknown, headers: Record<string, string> = {}) {
@@ -119,20 +116,26 @@ describe('POST /api/razorpay/verify', () => {
     // so leftover once-values from one test can leak into the next. Fully reset the
     // db query mocks (clears queued once-values), then restore safe defaults.
     vi.mocked(db.queryOne).mockReset()
-    vi.mocked(db.queryMany).mockReset().mockResolvedValue([] as any)
-    vi.mocked(db.query).mockReset().mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    vi.mocked(db.queryMany)
+      .mockReset()
+      .mockResolvedValue([] as any)
+    vi.mocked(db.query)
+      .mockReset()
+      .mockResolvedValue({ rows: [], rowCount: 0 } as any)
     vi.mocked(db.withTransaction).mockReset()
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(401)
@@ -143,12 +146,14 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
 
     // orderId must be a valid UUID so parseBody passes — the HMAC check fires after
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: 'badbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadb',
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: 'badbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadbadb',
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(400)
@@ -159,10 +164,12 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
 
     // Missing razorpay_payment_id
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_signature: VALID_SIGNATURE,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_signature: VALID_SIGNATURE,
+      }) as any
+    )
     const body = await res.json()
 
     // parseBody returns a 400-level error response
@@ -172,12 +179,14 @@ describe('POST /api/razorpay/verify', () => {
   it('returns 400 when neither orderId nor draftToken is provided (valid signature)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      // no orderId, no draftToken
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        // no orderId, no draftToken
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(400)
@@ -189,9 +198,9 @@ describe('POST /api/razorpay/verify', () => {
 
     // markLegacyOrderPaid: order lookup, withTransaction, user + orderItems, final order
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)        // order lookup for legacy path
-      .mockResolvedValueOnce(MOCK_USER)         // user after transaction
-      .mockResolvedValueOnce(MOCK_ORDER)        // updatedOrder after transaction
+      .mockResolvedValueOnce(MOCK_ORDER) // order lookup for legacy path
+      .mockResolvedValueOnce(MOCK_USER) // user after transaction
+      .mockResolvedValueOnce(MOCK_ORDER) // updatedOrder after transaction
 
     vi.mocked(db.queryMany).mockResolvedValue([]) // orderItems
 
@@ -202,12 +211,14 @@ describe('POST /api/razorpay/verify', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -222,12 +233,14 @@ describe('POST /api/razorpay/verify', () => {
       payment_status: 'paid',
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -241,12 +254,14 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(null) // order not found
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(404)
@@ -268,9 +283,9 @@ describe('POST /api/razorpay/verify', () => {
     } as any)
 
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)       // idempotency check: no existing payment
-      .mockResolvedValueOnce(MOCK_USER)  // user lookup
-      .mockResolvedValue(MOCK_ORDER)     // post-commit order/item lookups
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER) // user lookup
+      .mockResolvedValue(MOCK_ORDER) // post-commit order/item lookups
     vi.mocked(db.queryMany).mockResolvedValue([])
 
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
@@ -284,12 +299,14 @@ describe('POST /api/razorpay/verify', () => {
       total_amount: '500',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_valid',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_valid',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -303,12 +320,14 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue(null)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'bad-token',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'bad-token',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(400)
@@ -328,12 +347,14 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_mismatch',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_mismatch',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(403)
@@ -356,12 +377,14 @@ describe('POST /api/razorpay/verify', () => {
       .mockResolvedValueOnce(null) // idempotency check: no existing payment
       .mockResolvedValueOnce(null) // user not found
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_nouser',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_nouser',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(404)
@@ -381,16 +404,18 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)      // idempotency check: no existing payment
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
       .mockResolvedValueOnce(MOCK_USER) // user lookup
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([] as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_emptycart',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_emptycart',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(400)
@@ -410,18 +435,20 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)      // idempotency check: no existing payment
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
       .mockResolvedValueOnce(MOCK_USER) // user lookup
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
     vi.mocked(hashCartItems).mockReturnValue('different-hash')
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_changed',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_changed',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(409)
@@ -442,10 +469,10 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)                          // idempotency check: no existing payment
-      .mockResolvedValueOnce(MOCK_USER)                     // user
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER) // user
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'B001', gst_percentage: '18', hsn_code: '7318' }) // product
-      .mockResolvedValueOnce(MOCK_USER)                     // post-commit queryOne calls
+      .mockResolvedValueOnce(MOCK_USER) // post-commit queryOne calls
       .mockResolvedValueOnce({ id: 'order-new', order_number: 'ORD-NEW', total_amount: '500', payment_status: 'paid' })
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
@@ -454,12 +481,14 @@ describe('POST /api/razorpay/verify', () => {
       total_amount: '500',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_buynow',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_buynow',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -472,9 +501,9 @@ describe('POST /api/razorpay/verify', () => {
     // isBusiness branch: bizUser lookup, then order lookup
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: AUTH_USER.email, phone: null }) // bizUser
-      .mockResolvedValueOnce(MOCK_ORDER)                               // order
-      .mockResolvedValueOnce(MOCK_USER)                                // user post-transaction
-      .mockResolvedValueOnce(MOCK_ORDER)                               // updatedOrder
+      .mockResolvedValueOnce(MOCK_ORDER) // order
+      .mockResolvedValueOnce(MOCK_USER) // user post-transaction
+      .mockResolvedValueOnce(MOCK_ORDER) // updatedOrder
 
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
@@ -484,12 +513,17 @@ describe('POST /api/razorpay/verify', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }, { 'x-auth-portal': 'business' }) as any)
+    const res = await POST(
+      makeRequest(
+        {
+          razorpay_order_id: RZP_ORDER_ID,
+          razorpay_payment_id: RZP_PAYMENT_ID,
+          razorpay_signature: VALID_SIGNATURE,
+          orderId: ORDER_UUID,
+        },
+        { 'x-auth-portal': 'business' }
+      ) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -500,27 +534,30 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_ORDER) // order lookup
-      .mockResolvedValueOnce(MOCK_USER)  // user post-tx
+      .mockResolvedValueOnce(MOCK_USER) // user post-tx
       .mockResolvedValueOnce(MOCK_ORDER) // updatedOrder
 
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE orders
           .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // UPDATE payments (no match → triggers INSERT)
           .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT payment
-          .mockResolvedValue({ rows: [], rowCount: 1 }),    // DELETE cart
+          .mockResolvedValue({ rows: [], rowCount: 1 }), // DELETE cart
       }
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -542,9 +579,9 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)       // idempotency check: no existing payment
-      .mockResolvedValueOnce(MOCK_USER)  // user lookup
-      .mockResolvedValue(MOCK_ORDER)     // post-commit order/item lookups
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER) // user lookup
+      .mockResolvedValue(MOCK_ORDER) // post-commit order/item lookups
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
@@ -557,12 +594,14 @@ describe('POST /api/razorpay/verify', () => {
       total_amount: '50000',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      draftToken: 'tok_hv',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_hv',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
@@ -572,12 +611,14 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockRejectedValue(new Error('DB crash'))
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-      orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
 
     expect(res.status).toBe(500)
   })
@@ -586,15 +627,24 @@ describe('POST /api/razorpay/verify', () => {
     const { verifyDraftToken } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: null,
-      couponId: null, shippingAmount: 0, addressId: null, notes: null,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: null,
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
     } as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({ id: ORDER_UUID, order_number: 'ORD-001' })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_idem',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_idem',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -607,14 +657,16 @@ describe('POST /api/razorpay/verify', () => {
     const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-coup',
-      couponId: 'coup-uuid-1', shippingAmount: 0, addressId: null,
-      notes: null, businessDiscountAmount: 0,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: 'hash-coup',
+      couponId: 'coup-uuid-1',
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER).mockResolvedValue(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
@@ -623,37 +675,47 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ ok: true, appliedDiscount: 50 } as any)
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-coup', order_number: 'ORD-C', total_amount: '450',
+      id: 'order-coup',
+      order_number: 'ORD-C',
+      total_amount: '450',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_coupon',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_coupon',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
-    expect(orderCommit.validateCouponForUser).toHaveBeenCalledWith(
-      expect.objectContaining({ couponId: 'coup-uuid-1' })
-    )
+    expect(orderCommit.validateCouponForUser).toHaveBeenCalledWith(expect.objectContaining({ couponId: 'coup-uuid-1' }))
   })
 
   it('commitDraft buyNow: returns 404 when product not found', async () => {
     const { verifyDraftToken } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'buyNow',
+      userId: AUTH_USER.userId,
+      mode: 'buyNow',
       buyNowItem: { productId: 'missing-prod', variantId: null, subVariantId: null, price: 100, qty: 1 },
-      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null,
+      cartHash: null,
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
     } as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null) // product not found
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // product not found
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_noprod',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_noprod',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(404)
@@ -664,10 +726,15 @@ describe('POST /api/razorpay/verify', () => {
     const { verifyDraftToken } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'buyNow',
+      userId: AUTH_USER.userId,
+      mode: 'buyNow',
       buyNowItem: { productId: 'prod-1', variantId: 'var-1', subVariantId: 'sv-1', price: 500, qty: 2 },
-      cartHash: null, couponId: null, shippingAmount: 0, addressId: null,
-      notes: null, businessDiscountAmount: 0,
+      cartHash: null,
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
@@ -678,13 +745,19 @@ describe('POST /api/razorpay/verify', () => {
       .mockResolvedValue(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-bn', order_number: 'ORD-BN', total_amount: '1000',
+      id: 'order-bn',
+      order_number: 'ORD-BN',
+      total_amount: '1000',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_bn_variant',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_bn_variant',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'buyNow' }))
@@ -694,17 +767,24 @@ describe('POST /api/razorpay/verify', () => {
     const { verifyDraftToken } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'unknown_mode',
-      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null,
+      userId: AUTH_USER.userId,
+      mode: 'unknown_mode',
+      cartHash: null,
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
     } as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(MOCK_USER)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_bad_mode',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_bad_mode',
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(400)
@@ -720,19 +800,24 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [], rowCount: 1 })  // UPDATE orders
-          .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // UPDATE payments → no match
-          .mockResolvedValueOnce({ rows: [], rowCount: 1 })  // INSERT payment
-          .mockResolvedValue({ rows: [], rowCount: 1 }),     // DELETE cart
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE orders
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // UPDATE payments → no match
+          .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT payment
+          .mockResolvedValue({ rows: [], rowCount: 1 }), // DELETE cart
       }
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -745,13 +830,15 @@ describe('POST /api/razorpay/verify', () => {
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-hv',
-      couponId: null, shippingAmount: 0, addressId: null, notes: null,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: 'hash-hv',
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
     } as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER).mockResolvedValue(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
@@ -759,13 +846,19 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(orderCommit.cartSubtotal).mockReturnValue(50000)
     vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(7627)
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-hv', order_number: 'ORD-HV', total_amount: '50000',
+      id: 'order-hv',
+      order_number: 'ORD-HV',
+      total_amount: '50000',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_hv',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_hv',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
@@ -779,11 +872,13 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-1', amountPaise: null } as any)
     vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: true } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -795,13 +890,18 @@ describe('POST /api/razorpay/verify', () => {
   it('variant-change: returns success when already_applied', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-2', amountPaise: 15000 } as any)
-    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: false, reason: 'already_applied' } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({
+      applied: false,
+      reason: 'already_applied',
+    } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -811,13 +911,18 @@ describe('POST /api/razorpay/verify', () => {
   it('variant-change: returns 409 when settle fails for another reason', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-3', amountPaise: 15000 } as any)
-    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: false, reason: 'out_of_stock' } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({
+      applied: false,
+      reason: 'out_of_stock',
+    } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(409)
@@ -833,16 +938,16 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-4', amountPaise: null } as any)
     vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: true } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID,
-      razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+      }) as any
+    )
 
     expect(res.status).toBe(200)
-    expect(variantChange.settleVariantChangePayment).toHaveBeenCalledWith(
-      expect.objectContaining({ amountPaise: 0 })
-    )
+    expect(variantChange.settleVariantChangePayment).toHaveBeenCalledWith(expect.objectContaining({ amountPaise: 0 }))
   })
 
   it('commitDraft: sends SMS when user notification_channel is sms', async () => {
@@ -850,8 +955,14 @@ describe('POST /api/razorpay/verify', () => {
     const { sendOrderConfirmedSMS } = await import('@/lib/sms')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-sms',
-      couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: 'hash-sms',
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
@@ -864,13 +975,19 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
     vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-sms', order_number: 'ORD-SMS', total_amount: '500',
+      id: 'order-sms',
+      order_number: 'ORD-SMS',
+      total_amount: '500',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_sms',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_sms',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(vi.mocked(sendOrderConfirmedSMS)).toHaveBeenCalled()
@@ -889,10 +1006,14 @@ describe('POST /api/razorpay/verify', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(vi.mocked(sendOrderConfirmedSMS)).toHaveBeenCalled()
@@ -921,8 +1042,14 @@ describe('POST /api/razorpay/verify', () => {
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-ff',
-      couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: 'hash-ff',
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
@@ -936,17 +1063,23 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(orderCommit.cartSubtotal).mockReturnValue(60000)
     vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(9152)
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-ff', order_number: 'ORD-FF', total_amount: '60000',
+      id: 'order-ff',
+      order_number: 'ORD-FF',
+      total_amount: '60000',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_ff',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_ff',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     // Give queued microtasks a tick so rejected .catch closures run before assertions end
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(vi.mocked(email.sendOrderConfirmationEmail)).toHaveBeenCalled()
   })
 
@@ -974,13 +1107,17 @@ describe('POST /api/razorpay/verify', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
 
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(vi.mocked(invoice.createDraftInvoice)).toHaveBeenCalled()
   })
 
@@ -990,9 +1127,15 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(getFeatureFlags).mockResolvedValueOnce({ gstEnabled: false } as any)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'buyNow',
+      userId: AUTH_USER.userId,
+      mode: 'buyNow',
       buyNowItem: { productId: 'prod-1', variantId: null, subVariantId: null, price: 500, qty: 1 },
-      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+      cartHash: null,
+      couponId: null,
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(null)
@@ -1001,13 +1144,19 @@ describe('POST /api/razorpay/verify', () => {
       .mockResolvedValue(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-nogst', order_number: 'ORD-NG', total_amount: '500',
+      id: 'order-nogst',
+      order_number: 'ORD-NG',
+      total_amount: '500',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_nogst',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_nogst',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ taxAmount: 0 }))
@@ -1017,13 +1166,16 @@ describe('POST /api/razorpay/verify', () => {
     const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
-      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-cx',
-      couponId: 'coup-bad', shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+      userId: AUTH_USER.userId,
+      mode: 'cart',
+      cartHash: 'hash-cx',
+      couponId: 'coup-bad',
+      shippingAmount: 0,
+      addressId: null,
+      notes: null,
+      businessDiscountAmount: 0,
     } as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER).mockResolvedValue(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
@@ -1032,13 +1184,19 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ ok: false } as any)
     vi.mocked(orderCommit.commitOrder).mockResolvedValue({
-      id: 'order-cx', order_number: 'ORD-CX', total_amount: '500',
+      id: 'order-cx',
+      order_number: 'ORD-CX',
+      total_amount: '500',
     } as any)
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_couponbad',
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        draftToken: 'tok_couponbad',
+      }) as any
+    )
 
     expect(res.status).toBe(200)
     expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ appliedDiscount: 0 }))
@@ -1048,18 +1206,22 @@ describe('POST /api/razorpay/verify', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: true } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: 'biz@example.com', phone: '8888888888' }) // bizUser
-      .mockResolvedValueOnce(MOCK_ORDER)                                          // order
-      .mockResolvedValueOnce(null)                                                // user null post-tx
+      .mockResolvedValueOnce(MOCK_ORDER) // order
+      .mockResolvedValueOnce(null) // user null post-tx
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(200)
@@ -1069,20 +1231,24 @@ describe('POST /api/razorpay/verify', () => {
   it('markLegacyOrderPaid: bizUser null yields empty email/phone fallbacks', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: true } as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(null)       // bizUser null → '' email, null phone
+      .mockResolvedValueOnce(null) // bizUser null → '' email, null phone
       .mockResolvedValueOnce(MOCK_ORDER) // order
       .mockResolvedValueOnce({ ...MOCK_USER, first_name: null, last_name: null }) // user w/o names → 'Customer'
-      .mockResolvedValueOnce(null)       // updatedOrder null → falls back to order
+      .mockResolvedValueOnce(null) // updatedOrder null → falls back to order
     vi.mocked(db.queryMany).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
       return fn(client)
     })
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
 
     expect(res.status).toBe(200)
   })
@@ -1092,10 +1258,14 @@ describe('POST /api/razorpay/verify', () => {
     // queryOne rejects with a non-Error (no .message) → error?.message is undefined → fallback string
     vi.mocked(db.queryOne).mockRejectedValue('boom')
 
-    const res = await POST(makeRequest({
-      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
-      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        razorpay_order_id: RZP_ORDER_ID,
+        razorpay_payment_id: RZP_PAYMENT_ID,
+        razorpay_signature: VALID_SIGNATURE,
+        orderId: ORDER_UUID,
+      }) as any
+    )
     const body = await res.json()
 
     expect(res.status).toBe(500)

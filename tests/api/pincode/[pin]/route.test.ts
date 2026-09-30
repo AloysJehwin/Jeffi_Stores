@@ -51,7 +51,9 @@ const successResponse = [
 ]
 
 describe('GET /api/pincode/[pin]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 for non-6-digit pin', async () => {
     const res = await GET(makeRequest('123') as any, { params: Promise.resolve({ pin: '123' }) } as any)

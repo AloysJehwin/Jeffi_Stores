@@ -31,7 +31,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/inflation/logs')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/inflation/logs', () => {
   it('returns 401 when unauthenticated', async () => {

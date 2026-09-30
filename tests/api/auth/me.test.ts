@@ -141,10 +141,7 @@ describe('GET /api/auth/me', () => {
     vi.mocked(db.queryOne).mockResolvedValue(USER_ROW)
 
     await GET(meRequest('valid-token') as any)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.stringContaining('FROM users'),
-      ['user-1']
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('FROM users'), ['user-1'])
   })
 })
 
@@ -182,12 +179,8 @@ describe('POST /api/auth/logout', () => {
     vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
 
     await logoutPOST(logoutRequest() as any)
-    const sessionSetCalls = mockCookieStore.set.mock.calls.filter(
-      (c: any[]) => c[0] === 'session_id'
-    )
-    const guestCall = sessionSetCalls.find((c: any[]) =>
-      typeof c[1] === 'string' && c[1].startsWith('guest_')
-    )
+    const sessionSetCalls = mockCookieStore.set.mock.calls.filter((c: any[]) => c[0] === 'session_id')
+    const guestCall = sessionSetCalls.find((c: any[]) => typeof c[1] === 'string' && c[1].startsWith('guest_'))
     expect(guestCall).toBeDefined()
   })
 })

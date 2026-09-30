@@ -155,7 +155,9 @@ describe('merchant/sync', () => {
       mockQueryOne.mockResolvedValueOnce({ acquired: true })
 
       mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'BAD-SKU', name: 'Bad' }])
-      mockProductToGmcItems.mockImplementationOnce(() => { throw new Error('mapping failed') })
+      mockProductToGmcItems.mockImplementationOnce(() => {
+        throw new Error('mapping failed')
+      })
 
       const result = await syncAllProductsToMerchant()
       expect(result.errors.some(e => e.sku === 'BAD-SKU')).toBe(true)
@@ -188,7 +190,10 @@ describe('merchant/sync', () => {
 
     it('upserts inactive product as out_of_stock (not deleted)', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', sku: 'SKU-001', is_active: false, product_variants: [],
+        id: 'p1',
+        sku: 'SKU-001',
+        is_active: false,
+        product_variants: [],
       })
       mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU-001', availability: 'out of stock' }])
       await syncProductToMerchant('p1')
@@ -198,7 +203,9 @@ describe('merchant/sync', () => {
 
     it('upserts all variant items for inactive product with variants as out_of_stock', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', sku: 'SKU-001', is_active: false,
+        id: 'p1',
+        sku: 'SKU-001',
+        is_active: false,
         product_variants: [{ sku: 'SKU-001-S' }, { sku: 'SKU-001-L' }],
       })
       mockProductToGmcItems.mockReturnValueOnce([
@@ -212,7 +219,10 @@ describe('merchant/sync', () => {
 
     it('upserts inactive product with sanitized sku', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', sku: 'SKU 001/test', is_active: false, product_variants: [],
+        id: 'p1',
+        sku: 'SKU 001/test',
+        is_active: false,
+        product_variants: [],
       })
       mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU_001_test', availability: 'out of stock' }])
       await syncProductToMerchant('p1')
@@ -227,9 +237,7 @@ describe('merchant/sync', () => {
         product_variants: [],
       })
 
-      mockProductToGmcItems.mockReturnValueOnce([
-        { offerId: 'SKU-001', title: 'Widget' },
-      ])
+      mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU-001', title: 'Widget' }])
 
       await syncProductToMerchant('p1')
       expect(mockUpsertProduct).toHaveBeenCalledWith({ offerId: 'SKU-001', title: 'Widget' })
@@ -254,7 +262,9 @@ describe('merchant/sync', () => {
 
     it('upserts active product with all variant items', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', sku: 'SKU-001', is_active: true,
+        id: 'p1',
+        sku: 'SKU-001',
+        is_active: true,
         product_variants: [{ sku: 'SKU-001-S' }, { sku: 'SKU-001-L' }],
       })
       mockProductToGmcItems.mockReturnValueOnce([

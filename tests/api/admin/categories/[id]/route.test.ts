@@ -57,8 +57,8 @@ describe('PATCH /api/admin/categories/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryOne
-      .mockResolvedValueOnce(UPDATED_CAT as any)  // before (SELECT)
-      .mockResolvedValueOnce(UPDATED_CAT as any)  // after (SELECT)
+      .mockResolvedValueOnce(UPDATED_CAT as any) // before (SELECT)
+      .mockResolvedValueOnce(UPDATED_CAT as any) // after (SELECT)
     mockSuggestIcon.mockResolvedValue('wrench')
   })
 
@@ -95,10 +95,9 @@ describe('PATCH /api/admin/categories/[id]', () => {
   // ── Happy path ───────────────────────────────────────────────────────────
 
   it('updates category and returns updated row', async () => {
-    const res = await PATCH(
-      makeReq({ name: 'Fasteners', description: 'All fasteners', is_active: true }),
-      { params: Promise.resolve({ id: CAT_ID }) }
-    )
+    const res = await PATCH(makeReq({ name: 'Fasteners', description: 'All fasteners', is_active: true }), {
+      params: Promise.resolve({ id: CAT_ID }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.name).toBe('Fasteners')
@@ -111,30 +110,21 @@ describe('PATCH /api/admin/categories/[id]', () => {
       .mockResolvedValueOnce(UPDATED_CAT as any)
       .mockResolvedValueOnce({ ...UPDATED_CAT, icon_name: 'bolt' } as any)
 
-    const res = await PATCH(
-      makeReq({ name: 'Bolts', icon_name: 'bolt' }),
-      { params: Promise.resolve({ id: CAT_ID }) }
-    )
+    const res = await PATCH(makeReq({ name: 'Bolts', icon_name: 'bolt' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(200)
     // suggestIcon should NOT be called when icon_name is provided
     expect(mockSuggestIcon).not.toHaveBeenCalled()
   })
 
   it('calls suggestIcon when icon_name is not provided', async () => {
-    const res = await PATCH(
-      makeReq({ name: 'Nuts' }),
-      { params: Promise.resolve({ id: CAT_ID }) }
-    )
+    const res = await PATCH(makeReq({ name: 'Nuts' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(200)
     expect(mockSuggestIcon).toHaveBeenCalledWith('Nuts')
   })
 
   it('uses the default icon without calling suggestIcon when the plan has no AI', async () => {
     mockHasScope.mockImplementation((_role, _scopes, scope) => scope !== 'catalog_enrichment:write')
-    const res = await PATCH(
-      makeReq({ name: 'Nuts' }),
-      { params: Promise.resolve({ id: CAT_ID }) }
-    )
+    const res = await PATCH(makeReq({ name: 'Nuts' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(200)
     expect(mockSuggestIcon).not.toHaveBeenCalled()
     expect(mockQuery.mock.calls[0][1]).toContain('Package')
@@ -156,10 +146,9 @@ describe('PATCH /api/admin/categories/[id]', () => {
   })
 
   it('passes sku_prefix uppercased and sanitised', async () => {
-    const res = await PATCH(
-      makeReq({ name: 'Drill Bits', sku_prefix: 'dr-b!' }),
-      { params: Promise.resolve({ id: CAT_ID }) }
-    )
+    const res = await PATCH(makeReq({ name: 'Drill Bits', sku_prefix: 'dr-b!' }), {
+      params: Promise.resolve({ id: CAT_ID }),
+    })
     expect(res.status).toBe(200)
     // query should have been called — prefix normalised inside the route
     expect(mockQuery).toHaveBeenCalledOnce()

@@ -20,10 +20,18 @@ vi.mock('jose', () => {
     constructor(payload: Record<string, unknown>) {
       this.payload = payload
     }
-    setProtectedHeader() { return this }
-    setIssuedAt() { return this }
-    setExpirationTime() { return this }
-    async sign() { return mockSign(this.payload) }
+    setProtectedHeader() {
+      return this
+    }
+    setIssuedAt() {
+      return this
+    }
+    setExpirationTime() {
+      return this
+    }
+    async sign() {
+      return mockSign(this.payload)
+    }
   }
   return { SignJWT, jwtVerify: mockJwtVerify }
 })
@@ -88,7 +96,7 @@ function makeRequest(opts: {
   }
   return {
     headers: { get: (k: string) => headerStore.get(k.toLowerCase()) ?? null },
-    cookies: { get: (name: string) => cookieStore.has(name) ? { value: cookieStore.get(name) } : undefined },
+    cookies: { get: (name: string) => (cookieStore.has(name) ? { value: cookieStore.get(name) } : undefined) },
   } as any
 }
 
@@ -136,15 +144,17 @@ describe('jwt.ts – constants', () => {
 
 describe('verifyToken – opaque admin session resolve', () => {
   it('maps a resolved admin session onto the admin payload', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({
-      principalType: 'admin',
-      principalId: 'admin-123',
-      role: 'admin',
-      scopes: ['products'],
-      certCN: 'CN=bob',
-      email: 'bob@example.com',
-      sid: 'sid-abc',
-    }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({
+        principalType: 'admin',
+        principalId: 'admin-123',
+        role: 'admin',
+        scopes: ['products'],
+        certCN: 'CN=bob',
+        email: 'bob@example.com',
+        sid: 'sid-abc',
+      })
+    )
     const result = await verifyToken('sid-abc')
     expect(result).toEqual({
       adminId: 'admin-123',
@@ -173,23 +183,32 @@ describe('verifyToken – opaque admin session resolve', () => {
 
 describe('authenticateAdmin', () => {
   it('returns admin payload from Bearer header', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({
-      principalType: 'admin', principalId: 'admin-123', role: 'admin', scopes: ['products', 'orders'],
-    }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({
+        principalType: 'admin',
+        principalId: 'admin-123',
+        role: 'admin',
+        scopes: ['products', 'orders'],
+      })
+    )
     const req = makeRequest({ authHeader: 'Bearer sometoken' })
     const result = await authenticateAdmin(req)
     expect(result).toMatchObject({ adminId: 'admin-123', role: 'admin' })
   })
 
   it('returns admin payload from admin_sid cookie', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' })
+    )
     const req = makeRequest({ cookies: { admin_sid: 'cookietoken' } })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
   })
 
   it('exposes the session id (sid) on the payload', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', sid: 'sid-xyz' }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'admin-123', sid: 'sid-xyz' })
+    )
     const req = makeRequest({ cookies: { admin_sid: 'sid-xyz' } })
     const result = await authenticateAdmin(req)
     expect(result?.sid).toBe('sid-xyz')
@@ -223,7 +242,9 @@ describe('authenticateAdmin', () => {
   })
 
   it('Bearer header is case-insensitive', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' })
+    )
     const req = makeRequest({ authHeader: 'BEARER sometoken' })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
@@ -232,7 +253,9 @@ describe('authenticateAdmin', () => {
   // ── extension-token (scoped standalone JWT) fallback ──────────────────────────
   it('falls back to a scoped extension token when the Bearer value is not a session', async () => {
     mockResolveSession.mockResolvedValueOnce(null) // not a session sid
-    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', adminId: 'ext-1', role: 'admin', scopes: ['products:write'] } })
+    mockJwtVerify.mockResolvedValueOnce({
+      payload: { type: 'extension_token', adminId: 'ext-1', role: 'admin', scopes: ['products:write'] },
+    })
     const req = makeRequest({ authHeader: 'Bearer eyJext' })
     const result = await authenticateAdmin(req)
     expect(result).toMatchObject({ adminId: 'ext-1', scopes: ['products:write'] })
@@ -257,7 +280,9 @@ describe('authenticateAdmin', () => {
 
 describe('verifyExtensionToken', () => {
   it('accepts a valid type=extension_token JWT and maps its claims', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', adminId: 'a9', email: 'a@x.com', role: 'admin', scopes: ['products:write'] } })
+    mockJwtVerify.mockResolvedValueOnce({
+      payload: { type: 'extension_token', adminId: 'a9', email: 'a@x.com', role: 'admin', scopes: ['products:write'] },
+    })
     const r = await verifyExtensionToken('eyJok')
     expect(r).toMatchObject({ adminId: 'a9', email: 'a@x.com', role: 'admin', scopes: ['products:write'] })
   })
@@ -288,9 +313,14 @@ describe('verifyExtensionToken', () => {
 
 describe('authenticateUser – customer portal isolation', () => {
   it('returns user payload for valid customer session in user_sid cookie', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({
-      principalType: 'customer', principalId: 'user-456', email: 'customer@example.com', scopes: ['read'],
-    }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({
+        principalType: 'customer',
+        principalId: 'user-456',
+        email: 'customer@example.com',
+        scopes: ['read'],
+      })
+    )
     const req = makeRequest({ cookies: { user_sid: 'ctoken' } })
     const result = await authenticateUser(req)
     expect(result?.userId).toBe('user-456')
@@ -336,9 +366,15 @@ describe('authenticateUser – customer portal isolation', () => {
 
 describe('authenticateBusiness – business portal isolation', () => {
   it('returns business payload from business_sid cookie', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({
-      principalType: 'business', principalId: 'biz-789', email: 'biz@company.com', approvalStatus: 'approved', scopes: [],
-    }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({
+        principalType: 'business',
+        principalId: 'biz-789',
+        email: 'biz@company.com',
+        approvalStatus: 'approved',
+        scopes: [],
+      })
+    )
     const req = makeRequest({ cookies: { business_sid: 'btoken' } })
     const result = await authenticateBusiness(req)
     expect(result?.userId).toBe('biz-789')
@@ -411,7 +447,9 @@ describe('authenticateAnyUser – portal routing', () => {
 
 describe('requireAdminScope', () => {
   it('returns admin payload when scope is satisfied', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] })
+    )
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, 'products')
     expect((result as any).adminId).toBe('a1')
@@ -419,26 +457,32 @@ describe('requireAdminScope', () => {
 
   it('returns 401 when no token', async () => {
     const req = makeRequest({})
-    const result = await requireAdminScope(req, 'products') as any
+    const result = (await requireAdminScope(req, 'products')) as any
     expect(result.status).toBe(401)
   })
 
   it('returns 403 when admin lacks required scope', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] })
+    )
     const req = makeRequest({ authHeader: 'Bearer token' })
-    const result = await requireAdminScope(req, 'settings') as any
+    const result = (await requireAdminScope(req, 'settings')) as any
     expect(result.status).toBe(403)
   })
 
   it('super_admin bypasses scope check', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'super_admin', scopes: ['products'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'a1', role: 'super_admin', scopes: ['products'] })
+    )
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, 'settings')
     expect((result as any).role).toBe('super_admin')
   })
 
   it('returns admin when scope param is null (no scope check)', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] })
+    )
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, null)
     expect((result as any).adminId).toBe('a1')
@@ -449,7 +493,9 @@ describe('requireAdminScope', () => {
 
 describe('requireUserScope', () => {
   it('returns user payload when scope is present', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] })
+    )
     const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await requireUserScope(req, 'read')
     expect((result as any).userId).toBe('u1')
@@ -457,14 +503,16 @@ describe('requireUserScope', () => {
 
   it('returns 401 when no token', async () => {
     const req = makeRequest({})
-    const result = await requireUserScope(req, 'read') as any
+    const result = (await requireUserScope(req, 'read')) as any
     expect(result.status).toBe(401)
   })
 
   it('returns 403 when user lacks required scope', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] })
+    )
     const req = makeRequest({ cookies: { user_sid: 'token' } })
-    const result = await requireUserScope(req, 'write') as any
+    const result = (await requireUserScope(req, 'write')) as any
     expect(result.status).toBe(403)
   })
 })
@@ -477,7 +525,9 @@ describe('generateReviewToken', () => {
     mockSign.mockResolvedValue('review.jwt.token')
     const result = await generateReviewToken({ orderId: 'o1', productId: 'p1', userId: 'u1' })
     expect(result).toBe('review.jwt.token')
-    expect(mockSign).toHaveBeenCalledWith(expect.objectContaining({ type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' }))
+    expect(mockSign).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' })
+    )
   })
 })
 
@@ -485,7 +535,9 @@ describe('generateReviewToken', () => {
 
 describe('verifyReviewToken', () => {
   it('returns payload for a valid review_token', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' } })
+    mockJwtVerify.mockResolvedValueOnce({
+      payload: { type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' },
+    })
     const result = await verifyReviewToken('valid.review.token')
     expect(result).toEqual({ orderId: 'o1', productId: 'p1', userId: 'u1' })
   })
@@ -525,7 +577,9 @@ describe('verifyReviewToken', () => {
 
 describe('verifyUserToken – opaque customer session resolve', () => {
   it('returns user payload for a valid customer session', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', email: 'u@u.com', scopes: ['read'], sid: 'sid-1' }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'customer', principalId: 'u1', email: 'u@u.com', scopes: ['read'], sid: 'sid-1' })
+    )
     const result = await verifyUserToken('sid-1')
     expect(result?.userId).toBe('u1')
     expect(result?.scopes).toEqual(['read'])
@@ -548,7 +602,16 @@ describe('verifyUserToken – opaque customer session resolve', () => {
 
 describe('verifyBusinessToken – opaque business session resolve', () => {
   it('returns business payload for a valid session', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', email: 'b@b.com', approvalStatus: 'approved', scopes: [], sid: 'sid-b' }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({
+        principalType: 'business',
+        principalId: 'b1',
+        email: 'b@b.com',
+        approvalStatus: 'approved',
+        scopes: [],
+        sid: 'sid-b',
+      })
+    )
     const result = await verifyBusinessToken('sid-b')
     expect(result?.userId).toBe('b1')
     expect(result?.isBusiness).toBe(true)
@@ -562,7 +625,9 @@ describe('verifyBusinessToken – opaque business session resolve', () => {
   })
 
   it('defaults approvalStatus to pending (fail-closed) when the snapshot is absent', async () => {
-    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', approvalStatus: null }))
+    mockResolveSession.mockResolvedValueOnce(
+      resolved({ principalType: 'business', principalId: 'b1', approvalStatus: null })
+    )
     const result = await verifyBusinessToken('sid')
     expect(result?.approvalStatus).toBe('pending')
   })

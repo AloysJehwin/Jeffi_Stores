@@ -35,10 +35,9 @@ function makePost(body: Record<string, unknown>) {
 }
 
 function makeDelete(id?: string) {
-  return new NextRequest(
-    `http://localhost/api/admin/customer-tag-definitions${id ? `?id=${id}` : ''}`,
-    { method: 'DELETE' }
-  )
+  return new NextRequest(`http://localhost/api/admin/customer-tag-definitions${id ? `?id=${id}` : ''}`, {
+    method: 'DELETE',
+  })
 }
 
 const TAG_DEFS = [{ id: 't1', tag: 'vip', color: 'gold', sort_order: 10 }]
@@ -46,7 +45,9 @@ const TAG_DEFS = [{ id: 't1', tag: 'vip', color: 'gold', sort_order: 10 }]
 // ── GET tests ─────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/customer-tag-definitions', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -84,7 +85,9 @@ describe('GET /api/admin/customer-tag-definitions', () => {
 // ── POST tests ────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/customer-tag-definitions', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -166,7 +169,9 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 // ── DELETE tests ──────────────────────────────────────────────────────────────
 
 describe('DELETE /api/admin/customer-tag-definitions', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -197,9 +202,8 @@ describe('DELETE /api/admin/customer-tag-definitions', () => {
     const res = await DELETE(makeDelete('t1'))
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ success: true })
-    expect(vi.mocked(query)).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM customer_tag_definitions'),
-      ['t1']
-    )
+    expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM customer_tag_definitions'), [
+      't1',
+    ])
   })
 })

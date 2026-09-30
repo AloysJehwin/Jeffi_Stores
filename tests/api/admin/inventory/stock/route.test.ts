@@ -50,7 +50,14 @@ const mockUpsertShelfStock = vi.mocked(upsertShelfStock)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['inventory'], first_name: 'Test', last_name: 'Admin', username: 'testadmin' }
+const ADMIN = {
+  adminId: 'admin-1',
+  role: 'super_admin',
+  scopes: ['inventory'],
+  first_name: 'Test',
+  last_name: 'Admin',
+  username: 'testadmin',
+}
 const PRODUCT_UUID = '00000000-0000-4000-8000-000000000001'
 const VARIANT_UUID = '00000000-0000-4000-8000-000000000002'
 const SUB_VARIANT_UUID = '00000000-0000-4000-8000-000000000003'
@@ -127,15 +134,19 @@ describe('GET /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockGetStockValuation.mockResolvedValue({ items: [], total: 0, totalValue: 0 } as any)
-    await GET(makeGetReq('?view=valuation&search=bolt&category=Fasteners&brand=Unbrako&stock_status=low&page=2&limit=25'))
-    expect(mockGetStockValuation).toHaveBeenCalledWith(expect.objectContaining({
-      search: 'bolt',
-      categoryName: 'Fasteners',
-      brandName: 'Unbrako',
-      stockStatus: 'low',
-      limit: 25,
-      offset: 25,
-    }))
+    await GET(
+      makeGetReq('?view=valuation&search=bolt&category=Fasteners&brand=Unbrako&stock_status=low&page=2&limit=25')
+    )
+    expect(mockGetStockValuation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: 'bolt',
+        categoryName: 'Fasteners',
+        brandName: 'Unbrako',
+        stockStatus: 'low',
+        limit: 25,
+        offset: 25,
+      })
+    )
   })
 
   it('passes product_id/search/from/to params to getStockLedger', async () => {
@@ -143,14 +154,16 @@ describe('GET /api/admin/inventory/stock', () => {
     mockHasScope.mockReturnValue(true)
     mockGetStockLedger.mockResolvedValue({ rows: [], total: 0 } as any)
     await GET(makeGetReq(`?product_id=${PRODUCT_UUID}&search=nut&from=2024-01-01&to=2024-12-31&page=3&limit=10`))
-    expect(mockGetStockLedger).toHaveBeenCalledWith(expect.objectContaining({
-      productId: PRODUCT_UUID,
-      search: 'nut',
-      from: '2024-01-01',
-      to: '2024-12-31',
-      limit: 10,
-      offset: 20,
-    }))
+    expect(mockGetStockLedger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productId: PRODUCT_UUID,
+        search: 'nut',
+        from: '2024-01-01',
+        to: '2024-12-31',
+        limit: 10,
+        offset: 20,
+      })
+    )
   })
 
   it('returns 500 on unexpected error', async () => {
@@ -196,9 +209,11 @@ describe('GET /api/admin/inventory/stock?view=batch_valuation', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([] as any)
-    const res = await GET(makeGetReq(
-      `?view=batch_valuation&product_id=${PRODUCT_UUID}&variant_id=${VARIANT_UUID}&sub_variant_id=${SUB_VARIANT_UUID}`
-    ))
+    const res = await GET(
+      makeGetReq(
+        `?view=batch_valuation&product_id=${PRODUCT_UUID}&variant_id=${VARIANT_UUID}&sub_variant_id=${SUB_VARIANT_UUID}`
+      )
+    )
     expect(res.status).toBe(200)
     const call = vi.mocked(queryMany).mock.calls[0]
     expect(call[1]).toContain(PRODUCT_UUID)
@@ -286,10 +301,10 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     const client = makeDbClient([
-      { rows: [] },                              // BEGIN
-      { rows: [{ inventory_quantity: 5 }] },     // SELECT products
-      { rows: [] },                              // UPDATE products
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [{ inventory_quantity: 5 }] }, // SELECT products
+      { rows: [] }, // UPDATE products
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
     mockQueryOne.mockResolvedValue({ name: 'Test Bolt' } as any)
@@ -314,19 +329,21 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     const client = makeDbClient([
-      { rows: [] },                              // BEGIN
-      { rows: [{ inventory_quantity: 3 }] },     // SELECT product_variants
-      { rows: [] },                              // UPDATE product_variants
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [{ inventory_quantity: 3 }] }, // SELECT product_variants
+      { rows: [] }, // UPDATE product_variants
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
     mockQueryOne.mockResolvedValue({ name: 'Bolt Variant' } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      variant_id: VARIANT_UUID,
-      new_quantity: 15,
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        variant_id: VARIANT_UUID,
+        new_quantity: 15,
+      })
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -335,21 +352,23 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     const client = makeDbClient([
-      { rows: [] },                              // BEGIN
-      { rows: [{ inventory_quantity: 7 }] },     // SELECT product_sub_variants
-      { rows: [] },                              // UPDATE product_sub_variants
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [{ inventory_quantity: 7 }] }, // SELECT product_sub_variants
+      { rows: [] }, // UPDATE product_sub_variants
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
     mockQueryOne.mockResolvedValue({ name: 'Widget Sub' } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      variant_id: VARIANT_UUID,
-      sub_variant_id: SUB_VARIANT_UUID,
-      new_quantity: 50,
-      notes: 'Stock count',
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        variant_id: VARIANT_UUID,
+        sub_variant_id: SUB_VARIANT_UUID,
+        new_quantity: 50,
+        notes: 'Stock count',
+      })
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -359,22 +378,28 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockHasScope.mockReturnValue(true)
     // queryOne for unit lookup
     mockQueryOne.mockResolvedValueOnce({
-      id: UNIT_UUID, factor: '12', display_label: 'dozen', unit: 'dz', dimension: 'count',
+      id: UNIT_UUID,
+      factor: '12',
+      display_label: 'dozen',
+      unit: 'dz',
+      dimension: 'count',
     } as any)
     const client = makeDbClient([
-      { rows: [] },                              // BEGIN
-      { rows: [{ inventory_quantity: 24 }] },    // SELECT products
-      { rows: [] },                              // UPDATE products
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [{ inventory_quantity: 24 }] }, // SELECT products
+      { rows: [] }, // UPDATE products
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
     mockQueryOne.mockResolvedValueOnce({ name: 'Dozen Product' } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      unit_id: UNIT_UUID,
-      quantity_in_unit: 3,  // 3 dozen = 36 base units
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        unit_id: UNIT_UUID,
+        quantity_in_unit: 3, // 3 dozen = 36 base units
+      })
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     const logCall = mockLogStockMovement.mock.calls[0][1]
@@ -385,13 +410,15 @@ describe('PATCH /api/admin/inventory/stock', () => {
   it('returns 400 when unit_id not found in DB', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValueOnce(null)  // unit not found
+    mockQueryOne.mockResolvedValueOnce(null) // unit not found
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      unit_id: UNIT_UUID,
-      quantity_in_unit: 5,
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        unit_id: UNIT_UUID,
+        quantity_in_unit: 5,
+      })
+    )
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Unit not found')
   })
@@ -400,8 +427,9 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })           // BEGIN
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockRejectedValueOnce(new Error('Lock timeout')), // SELECT fails
       release: vi.fn(),
     }
@@ -419,12 +447,7 @@ describe('PATCH /api/admin/inventory/stock', () => {
   it('does not propagate logAdminAudit errors', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    const client = makeDbClient([
-      { rows: [] },
-      { rows: [{ inventory_quantity: 5 }] },
-      { rows: [] },
-      { rows: [] },
-    ])
+    const client = makeDbClient([{ rows: [] }, { rows: [{ inventory_quantity: 5 }] }, { rows: [] }, { rows: [] }])
     mockGetClient.mockResolvedValue(client as any)
     mockQueryOne.mockResolvedValue({ name: 'Product' } as any)
     mockLogAdminAudit.mockRejectedValue(new Error('Audit failure'))
@@ -438,10 +461,10 @@ describe('PATCH /api/admin/inventory/stock', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     const client = makeDbClient([
-      { rows: [] },                              // BEGIN
-      { rows: [{ inventory_quantity: 5 }] },     // SELECT products
-      { rows: [] },                              // UPDATE products
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [{ inventory_quantity: 5 }] }, // SELECT products
+      { rows: [] }, // UPDATE products
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
     // Source calls queryOne in order: (1) tracked-guard product row, (2) warehouse+product row,
@@ -452,11 +475,13 @@ describe('PATCH /api/admin/inventory/stock', () => {
       .mockResolvedValueOnce(undefined as any)
       .mockResolvedValueOnce({ name: 'Test Bolt' } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      new_quantity: 20,
-      warehouse_id: '00000000-0000-4000-8000-000000000010',
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        new_quantity: 20,
+        warehouse_id: '00000000-0000-4000-8000-000000000010',
+      })
+    )
     expect(res.status).toBe(200)
     expect(mockGetOrCreateOpenShelf).toHaveBeenCalled()
     expect(mockUpsertShelfStock).toHaveBeenCalledWith(
@@ -474,11 +499,13 @@ describe('PATCH /api/admin/inventory/stock', () => {
     // Tracked-guard product row: perishable=true short-circuits before any client work.
     mockQueryOne.mockResolvedValueOnce({ perishable: true, serialized: false } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      new_quantity: 10,
-      warehouse_id: '00000000-0000-4000-8000-000000000010',
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        new_quantity: 10,
+        warehouse_id: '00000000-0000-4000-8000-000000000010',
+      })
+    )
     expect(res.status).toBe(409)
     expect(mockGetClient).not.toHaveBeenCalled()
     expect(mockUpsertShelfStock).not.toHaveBeenCalled()
@@ -487,12 +514,7 @@ describe('PATCH /api/admin/inventory/stock', () => {
   it('uses explicit location_id when supplied with warehouse_id', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    const client = makeDbClient([
-      { rows: [] },
-      { rows: [{ inventory_quantity: 5 }] },
-      { rows: [] },
-      { rows: [] },
-    ])
+    const client = makeDbClient([{ rows: [] }, { rows: [{ inventory_quantity: 5 }] }, { rows: [] }, { rows: [] }])
     mockGetClient.mockResolvedValue(client as any)
     // Source calls: (1) tracked-guard product row, (2) warehouse+product row,
     // (3) DELETE shelf_stock, (4) product name
@@ -502,12 +524,14 @@ describe('PATCH /api/admin/inventory/stock', () => {
       .mockResolvedValueOnce(undefined as any)
       .mockResolvedValueOnce({ name: 'Test Product' } as any)
 
-    const res = await PATCH(makePatchReq({
-      product_id: PRODUCT_UUID,
-      new_quantity: 15,
-      warehouse_id: '00000000-0000-4000-8000-000000000010',
-      location_id: '00000000-0000-4000-8000-000000000020',
-    }))
+    const res = await PATCH(
+      makePatchReq({
+        product_id: PRODUCT_UUID,
+        new_quantity: 15,
+        warehouse_id: '00000000-0000-4000-8000-000000000010',
+        location_id: '00000000-0000-4000-8000-000000000020',
+      })
+    )
     expect(res.status).toBe(200)
     // explicit location_id — should NOT call getOrCreateOpenShelf
     expect(mockGetOrCreateOpenShelf).not.toHaveBeenCalled()

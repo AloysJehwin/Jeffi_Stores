@@ -130,11 +130,19 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
 
   it('inserts message and returns it on success', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
-    const savedMsg = { id: 'msg-1', sender: 'customer', message: 'Need better price', created_at: new Date().toISOString(), counter_items: null }
+    const savedMsg = {
+      id: 'msg-1',
+      sender: 'customer',
+      message: 'Need better price',
+      created_at: new Date().toISOString(),
+      counter_items: null,
+    }
     mockQueryOne
-      .mockResolvedValueOnce(OPEN_RFQ)  // rfq check
-      .mockResolvedValueOnce(savedMsg)  // message insert
-    const res = await POST(makePost(RFQ_ID, { message: 'Need better price' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+      .mockResolvedValueOnce(OPEN_RFQ) // rfq check
+      .mockResolvedValueOnce(savedMsg) // message insert
+    const res = await POST(makePost(RFQ_ID, { message: 'Need better price' }) as any, {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.message.id).toBe('msg-1')
@@ -143,9 +151,7 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
   it('updates status to negotiating when rfq was pending', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     const savedMsg = { id: 'msg-1', sender: 'customer', message: 'Counter', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce({ ...OPEN_RFQ, status: 'pending' })
-      .mockResolvedValueOnce(savedMsg)
+    mockQueryOne.mockResolvedValueOnce({ ...OPEN_RFQ, status: 'pending' }).mockResolvedValueOnce(savedMsg)
     const res = await POST(makePost(RFQ_ID, { message: 'Counter' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
@@ -157,13 +163,13 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
   it('does not update status to negotiating for negotiating rfq', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     const savedMsg = { id: 'msg-1', sender: 'customer', message: 'More counter', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce({ ...OPEN_RFQ, status: 'negotiating' })
-      .mockResolvedValueOnce(savedMsg)
-    const res = await POST(makePost(RFQ_ID, { message: 'More counter' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    mockQueryOne.mockResolvedValueOnce({ ...OPEN_RFQ, status: 'negotiating' }).mockResolvedValueOnce(savedMsg)
+    const res = await POST(makePost(RFQ_ID, { message: 'More counter' }) as any, {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(200)
-    const statusUpdates = mockQuery.mock.calls.filter((c: any) =>
-      typeof c[0] === 'string' && c[0].includes("status = 'negotiating'")
+    const statusUpdates = mockQuery.mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && c[0].includes("status = 'negotiating'")
     )
     expect(statusUpdates).toHaveLength(0)
   })
@@ -171,7 +177,9 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
   it('returns 400 when counter_items is not an array', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(OPEN_RFQ)
-    const res = await POST(makePost(RFQ_ID, { message: 'offer', counter_items: 'bad' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    const res = await POST(makePost(RFQ_ID, { message: 'offer', counter_items: 'bad' }) as any, {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/must be an array/i)
@@ -180,10 +188,13 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
   it('returns 400 when counter_items entry is invalid', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(OPEN_RFQ)
-    const res = await POST(makePost(RFQ_ID, {
-      message: 'offer',
-      counter_items: [{ rfq_item_id: null, offered_price: 10 }],
-    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    const res = await POST(
+      makePost(RFQ_ID, {
+        message: 'offer',
+        counter_items: [{ rfq_item_id: null, offered_price: 10 }],
+      }) as any,
+      { params: Promise.resolve({ id: RFQ_ID }) }
+    )
     expect(res.status).toBe(400)
   })
 
@@ -192,13 +203,16 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
     mockQueryOne.mockResolvedValue(OPEN_RFQ)
     // rows.length (1) !== ids.length (2) → mismatch
     mockQueryMany.mockResolvedValueOnce([{ id: 'item-1' }])
-    const res = await POST(makePost(RFQ_ID, {
-      message: 'counter',
-      counter_items: [
-        { rfq_item_id: 'item-1', offered_price: 10 },
-        { rfq_item_id: 'item-2', offered_price: 20 },
-      ],
-    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    const res = await POST(
+      makePost(RFQ_ID, {
+        message: 'counter',
+        counter_items: [
+          { rfq_item_id: 'item-1', offered_price: 10 },
+          { rfq_item_id: 'item-2', offered_price: 20 },
+        ],
+      }) as any,
+      { params: Promise.resolve({ id: RFQ_ID }) }
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/do not belong/i)
@@ -207,14 +221,15 @@ describe('POST /api/business/rfqs/[id]/messages', () => {
   it('accepts valid counter_items', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     const savedMsg = { id: 'msg-2', sender: 'customer', message: 'counter', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce(OPEN_RFQ)
-      .mockResolvedValueOnce(savedMsg)
+    mockQueryOne.mockResolvedValueOnce(OPEN_RFQ).mockResolvedValueOnce(savedMsg)
     mockQueryMany.mockResolvedValueOnce([{ id: 'item-1' }])
-    const res = await POST(makePost(RFQ_ID, {
-      message: 'counter offer',
-      counter_items: [{ rfq_item_id: 'item-1', offered_price: 50 }],
-    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    const res = await POST(
+      makePost(RFQ_ID, {
+        message: 'counter offer',
+        counter_items: [{ rfq_item_id: 'item-1', offered_price: 50 }],
+      }) as any,
+      { params: Promise.resolve({ id: RFQ_ID }) }
+    )
     expect(res.status).toBe(200)
   })
 })

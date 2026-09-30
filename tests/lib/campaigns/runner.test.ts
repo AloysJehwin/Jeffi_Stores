@@ -76,7 +76,8 @@ describe('runScenario', () => {
   it('counts sent and skipped correctly', async () => {
     mockGetCampaign.mockResolvedValue(makeCampaign())
     const rows = [{ id: '1' }, { id: '2' }, { id: '3' }]
-    const sendFn = vi.fn()
+    const sendFn = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: false, reason: 'no_user' })
       .mockResolvedValueOnce({ ok: true })
@@ -91,10 +92,9 @@ describe('runScenario', () => {
     mockGetCampaign.mockResolvedValue(makeCampaign())
     const scenario = makeScenario({ findEligible: vi.fn().mockResolvedValue([{ id: '1' }]) })
     await runScenario(scenario, 'abandoned_checkout')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE campaigns SET last_run_at'),
-      ['abandoned_checkout']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE campaigns SET last_run_at'), [
+      'abandoned_checkout',
+    ])
   })
 
   it('does not update last_run_at when no rows attempted', async () => {
@@ -151,9 +151,6 @@ describe('runScenarioForAllCampaigns', () => {
     mockQuery.mockResolvedValue({ rows: [] })
     const scenario = makeScenario({ kind: 'winback_90' })
     await runScenarioForAllCampaigns(scenario)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('scenario_kind = $1'),
-      ['winback_90']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('scenario_kind = $1'), ['winback_90'])
   })
 })

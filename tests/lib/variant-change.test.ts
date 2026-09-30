@@ -166,22 +166,27 @@ describe('applyVariantChange', () => {
     status: 'pending_customer',
   }
   const ORDER = {
-    id: 'order-1', order_number: 'ORD-1', user_id: 'user-1',
-    status: 'confirmed', payment_status: 'paid', payment_mode: 'razorpay',
-    awb_number: null, is_igst: false,
+    id: 'order-1',
+    order_number: 'ORD-1',
+    user_id: 'user-1',
+    status: 'confirmed',
+    payment_status: 'paid',
+    payment_mode: 'razorpay',
+    awb_number: null,
+    is_igst: false,
   }
   const ITEM = { id: 'item-1', product_id: 'prod-1', quantity: '2', gst_rate: '18' }
 
   it('applies successfully with GST on and logs activity', async () => {
     runWith([
-      [VCR],                 // SELECT vcr FOR UPDATE
-      [ORDER],               // SELECT order FOR UPDATE
-      [ITEM],                // SELECT order_item
-      [],                    // UPDATE order_items
+      [VCR], // SELECT vcr FOR UPDATE
+      [ORDER], // SELECT order FOR UPDATE
+      [ITEM], // SELECT order_item
+      [], // UPDATE order_items
       [{ subtotal: '240', taxable: '203.4', cgst: '18.3', sgst: '18.3', igst: '0', tax: '36.6' }], // sum
       [{ discount_amount: '0', business_discount_amount: '0', shipping_amount: '10' }], // current order
-      [],                    // UPDATE orders
-      [],                    // UPDATE vcr applied
+      [], // UPDATE orders
+      [], // UPDATE vcr applied
     ])
     // loadVariantPriceRow uses queryOne (variant branch)
     mockQueryOne.mockResolvedValue(makeVariant({ id: 'v-2', price: 120, gst_percentage: '18' }) as any)
@@ -207,7 +212,7 @@ describe('applyVariantChange', () => {
       [],
     ])
     mockQueryOne.mockResolvedValue(
-      makeVariant({ id: 'sv-9', parent_variant_name: 'Colour', name: 'Red', price_ex_gst: 80 }) as any,
+      makeVariant({ id: 'sv-9', parent_variant_name: 'Colour', name: 'Red', price_ex_gst: 80 }) as any
     )
 
     const res = await applyVariantChange('vcr-1')

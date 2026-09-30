@@ -44,7 +44,9 @@ const LOCATION = { id: 'loc-1', aisle_code: 'A', rack_code: 'R1', shelf_code: 'S
 // ── GET tests ─────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/shelving/locations', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -93,7 +95,9 @@ describe('GET /api/admin/shelving/locations', () => {
 // ── POST tests ────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/shelving/locations', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   const VALID_BODY = {
     warehouse_id: 'wh-1',
@@ -167,9 +171,7 @@ describe('POST /api/admin/shelving/locations', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.location).toEqual(LOCATION)
-    expect(vi.mocked(createLocation)).toHaveBeenCalledWith(
-      'wh-1', 'A1', 'R1', 'S1', 'B1', 'test note'
-    )
+    expect(vi.mocked(createLocation)).toHaveBeenCalledWith('wh-1', 'A1', 'R1', 'S1', 'B1', 'test note')
   })
 
   it('creates location with null bin_code and notes when omitted', async () => {

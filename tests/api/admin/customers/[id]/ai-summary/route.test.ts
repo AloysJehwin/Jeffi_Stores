@@ -24,7 +24,8 @@ const adminPayload = { adminId: 'admin-1', username: 'a', role: 'super_admin', s
 
 function makeRequest(method: 'GET' | 'POST', id = 'user-1') {
   return new NextRequest(`http://localhost/api/admin/customers/${id}/ai-summary`, {
-    method, headers: { cookie: 'admin_sid=valid' },
+    method,
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

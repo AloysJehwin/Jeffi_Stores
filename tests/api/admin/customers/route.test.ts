@@ -108,9 +108,7 @@ describe('GET /api/admin/customers', () => {
     const req = makeRequest({ segment: 'high_value' })
     const res = await GET(req)
     expect(res.status).toBe(200)
-    expect(mockGetCustomers).toHaveBeenCalledWith(
-      expect.objectContaining({ segment: 'high_value' }),
-    )
+    expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ segment: 'high_value' }))
   })
 
   it('passes limit parameter and caps at 100', async () => {
@@ -120,9 +118,7 @@ describe('GET /api/admin/customers', () => {
 
     const req = makeRequest({ limit: '50' })
     await GET(req)
-    expect(mockGetCustomers).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 50 }),
-    )
+    expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ limit: 50 }))
   })
 
   it('caps limit at 100 even if more is requested', async () => {
@@ -132,9 +128,7 @@ describe('GET /api/admin/customers', () => {
 
     const req = makeRequest({ limit: '500' })
     await GET(req)
-    expect(mockGetCustomers).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 100 }),
-    )
+    expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }))
   })
 
   it('sorts by lifetime_value descending by default', async () => {
@@ -144,9 +138,7 @@ describe('GET /api/admin/customers', () => {
 
     const req = makeRequest()
     await GET(req)
-    expect(mockGetCustomers).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: 'lifetime_value', dir: 'desc' }),
-    )
+    expect(mockGetCustomers).toHaveBeenCalledWith(expect.objectContaining({ sort: 'lifetime_value', dir: 'desc' }))
   })
 
   it('returns empty list when no customers found', async () => {

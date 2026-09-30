@@ -30,12 +30,12 @@ const sampleOrder = {
   total_amount: 1000,
 }
 
-const sampleItems = [
-  { product_name: 'Widget', quantity: 2, unit_price: 500, total_price: 1000 },
-]
+const sampleItems = [{ product_name: 'Widget', quantity: 2, unit_price: 500, total_price: 1000 }]
 
 describe('GET /api/admin/invoices/[id]/detail', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -80,9 +80,7 @@ describe('GET /api/admin/invoices/[id]/detail', () => {
   it('redirects to cash-sale when order not found but cash_sale exists', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'cs-abc' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'cs-abc' })
 
     const res = await GET(makeRequest(), { params })
     expect(res.status).toBe(200)

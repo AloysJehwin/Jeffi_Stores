@@ -139,10 +139,7 @@ describe('PATCH /api/user/addresses/[id]', () => {
 
     const res = await PATCH(makePatch({ ...VALID_PATCH_BODY, phone: '919876543210' }) as any, PARAMS)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['+919876543210'])
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['+919876543210']))
   })
 
   it('returns 404 when address not found', async () => {
@@ -210,14 +207,8 @@ describe('DELETE /api/user/addresses/[id]', () => {
     expect(body.message).toMatch(/deleted successfully/i)
     // null out FK references first (2 UPDATE calls), then DELETE
     expect(db.query).toHaveBeenCalledTimes(3)
-    expect(db.query).toHaveBeenCalledWith(
-      expect.stringContaining('shipping_address_id = NULL'),
-      ['addr-42']
-    )
-    expect(db.query).toHaveBeenCalledWith(
-      expect.stringContaining('billing_address_id = NULL'),
-      ['addr-42']
-    )
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('shipping_address_id = NULL'), ['addr-42'])
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('billing_address_id = NULL'), ['addr-42'])
     expect(db.query).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM addresses'),
       expect.arrayContaining(['addr-42', 'user-1'])

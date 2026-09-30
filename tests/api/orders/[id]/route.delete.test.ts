@@ -44,7 +44,7 @@ vi.mock('@/lib/marketing', () => ({
 vi.mock('@/lib/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -116,7 +116,10 @@ describe('DELETE /api/orders/[id]', () => {
   it('returns 400 when order is not pending', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', status: 'confirmed', payment_status: 'unpaid', committed_payment_count: 0,
+      id: 'order-1',
+      status: 'confirmed',
+      payment_status: 'unpaid',
+      committed_payment_count: 0,
     })
     const res = await DELETE(makeReq('DELETE') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -125,7 +128,10 @@ describe('DELETE /api/orders/[id]', () => {
   it('returns 400 when committed payments exist', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 1,
+      id: 'order-1',
+      status: 'pending',
+      payment_status: 'unpaid',
+      committed_payment_count: 1,
     })
     const res = await DELETE(makeReq('DELETE') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -135,12 +141,22 @@ describe('DELETE /api/orders/[id]', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({
-        id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 0,
+        id: 'order-1',
+        status: 'pending',
+        payment_status: 'unpaid',
+        committed_payment_count: 0,
       })
       .mockResolvedValueOnce({ id: 'existing-cart' }) // existing cart_item lookup
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '3', unit_price: '100', buy_mode: 'unit', buy_unit: null },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '3',
+        unit_price: '100',
+        buy_mode: 'unit',
+        buy_unit: null,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -159,12 +175,22 @@ describe('DELETE /api/orders/[id]', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({
-        id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 0,
+        id: 'order-1',
+        status: 'pending',
+        payment_status: 'unpaid',
+        committed_payment_count: 0,
       })
       .mockResolvedValueOnce(null) // no matching cart_item
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '3', unit_price: '100', buy_mode: 'unit', buy_unit: null },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '3',
+        unit_price: '100',
+        buy_mode: 'unit',
+        buy_unit: null,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -241,7 +267,15 @@ describe('DELETE /api/orders/[id] cart restore', () => {
       })
       .mockResolvedValueOnce({ id: 'ci-existing' }) // existing cart item found
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'prod-1', variant_id: null, sub_variant_id: null, quantity: '2', unit_price: '100', buy_mode: 'unit', buy_unit: null },
+      {
+        product_id: 'prod-1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '2',
+        unit_price: '100',
+        buy_mode: 'unit',
+        buy_unit: null,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -263,7 +297,15 @@ describe('DELETE /api/orders/[id] cart restore', () => {
       })
       .mockResolvedValueOnce(null) // no existing cart item
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'prod-1', variant_id: null, sub_variant_id: null, quantity: '1', unit_price: '200', buy_mode: 'unit', buy_unit: null },
+      {
+        product_id: 'prod-1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '1',
+        unit_price: '200',
+        buy_mode: 'unit',
+        buy_unit: null,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 

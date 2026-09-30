@@ -33,12 +33,12 @@ const sampleExpense = {
   po_number: 'PO-001',
 }
 
-const samplePayments = [
-  { id: 'pay-1', amount: 2000, payment_date: '2024-01-10', payment_method: 'bank_transfer' },
-]
+const samplePayments = [{ id: 'pay-1', amount: 2000, payment_date: '2024-01-10', payment_method: 'bank_transfer' }]
 
 describe('GET /api/admin/financial/payables/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

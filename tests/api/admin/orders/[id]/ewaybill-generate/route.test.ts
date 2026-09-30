@@ -90,7 +90,9 @@ const EWB_RESULT = {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/orders/[id]/ewaybill-generate', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -139,7 +141,10 @@ describe('POST /api/admin/orders/[id]/ewaybill-generate', () => {
     vi.mocked(queryMany)
       .mockResolvedValueOnce(ORDER_ITEMS as any)
       .mockResolvedValueOnce(SETTINGS_ROWS as any)
-    vi.mocked(parseBody).mockReturnValue({ ok: false, response: Response.json({ error: 'bad' }, { status: 422 }) } as any)
+    vi.mocked(parseBody).mockReturnValue({
+      ok: false,
+      response: Response.json({ error: 'bad' }, { status: 422 }),
+    } as any)
     const res = await POST(makePost(), PARAMS)
     expect(res.status).toBe(422)
   })
@@ -148,11 +153,11 @@ describe('POST /api/admin/orders/[id]/ewaybill-generate', () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(BASE_ORDER as any)     // order fetch
-      .mockResolvedValueOnce(undefined as any)       // UPDATE return
+      .mockResolvedValueOnce(BASE_ORDER as any) // order fetch
+      .mockResolvedValueOnce(undefined as any) // UPDATE return
     vi.mocked(queryMany)
-      .mockResolvedValueOnce(ORDER_ITEMS as any)     // items
-      .mockResolvedValueOnce(SETTINGS_ROWS as any)   // settings
+      .mockResolvedValueOnce(ORDER_ITEMS as any) // items
+      .mockResolvedValueOnce(SETTINGS_ROWS as any) // settings
     vi.mocked(parseBody).mockReturnValue({ ok: true, data: {} } as any)
     vi.mocked(generateEWayBill).mockResolvedValue(EWB_RESULT as any)
     vi.mocked(isEWayBillConfigured).mockReturnValue(true)
@@ -173,7 +178,10 @@ describe('POST /api/admin/orders/[id]/ewaybill-generate', () => {
     vi.mocked(queryMany)
       .mockResolvedValueOnce(ORDER_ITEMS as any)
       .mockResolvedValueOnce(SETTINGS_ROWS as any)
-    vi.mocked(parseBody).mockReturnValue({ ok: true, data: { transMode: '2', transDistance: 50, vehicleNo: 'TN01AB1234' } } as any)
+    vi.mocked(parseBody).mockReturnValue({
+      ok: true,
+      data: { transMode: '2', transDistance: 50, vehicleNo: 'TN01AB1234' },
+    } as any)
     vi.mocked(generateEWayBill).mockResolvedValue(EWB_RESULT as any)
     vi.mocked(isEWayBillConfigured).mockReturnValue(false)
     const res = await POST(makePost(), PARAMS)

@@ -145,34 +145,37 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
   })
 
   it('returns 404 when gallery image not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ images: [] } as any)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce(null)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }), params())
     expect(res.status).toBe(404)
     expect((await res.json()).error).toMatch(/Gallery image not found/)
   })
 
   it('returns 400 when gallery image has no s3_key', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ images: [] } as any)
-      .mockResolvedValueOnce({ id: 'g1', s3_key: null } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce({ id: 'g1', s3_key: null } as any)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }), params())
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/no usable source/)
   })
 
   it('copies a gallery image to the product prefix as primary and saves', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ images: [] } as any)
-      .mockResolvedValueOnce({
-        id: 'g1', s3_key: 'gallery/img.jpg', s3_thumbnail_key: 'gallery/t.jpg',
-        custom_name: 'nice.jpg', file_name: 'img.jpg',
-        file_size: 100, mime_type: 'image/jpeg', width: 10, height: 20,
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce({
+      id: 'g1',
+      s3_key: 'gallery/img.jpg',
+      s3_thumbnail_key: 'gallery/t.jpg',
+      custom_name: 'nice.jpg',
+      file_name: 'img.jpg',
+      file_size: 100,
+      mime_type: 'image/jpeg',
+      width: 10,
+      height: 20,
+    } as any)
     mockCopy.mockResolvedValue({
-      s3Bucket: 'bucket', s3Key: 'products/prod-1/img.jpg', s3ThumbnailKey: 'products/prod-1/t.jpg',
-      url: 'https://cdn/p.jpg', thumbnailUrl: 'https://cdn/pt.jpg',
+      s3Bucket: 'bucket',
+      s3Key: 'products/prod-1/img.jpg',
+      s3ThumbnailKey: 'products/prod-1/t.jpg',
+      url: 'https://cdn/p.jpg',
+      thumbnailUrl: 'https://cdn/pt.jpg',
     } as any)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }), params())
     expect(res.status).toBe(200)
@@ -189,16 +192,23 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
   })
 
   it('gallery image is not primary when others already exist', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ images: [{ id: 'x' }] } as any)
-      .mockResolvedValueOnce({
-        id: 'g2', s3_key: 'gallery/img2.jpg', s3_thumbnail_key: 'gallery/t2.jpg',
-        custom_name: null, file_name: 'img2.jpg',
-        file_size: 50, mime_type: 'image/png', width: 5, height: 6,
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [{ id: 'x' }] } as any).mockResolvedValueOnce({
+      id: 'g2',
+      s3_key: 'gallery/img2.jpg',
+      s3_thumbnail_key: 'gallery/t2.jpg',
+      custom_name: null,
+      file_name: 'img2.jpg',
+      file_size: 50,
+      mime_type: 'image/png',
+      width: 5,
+      height: 6,
+    } as any)
     mockCopy.mockResolvedValue({
-      s3Bucket: 'bucket', s3Key: 'products/prod-1/img2.jpg', s3ThumbnailKey: 'products/prod-1/t2.jpg',
-      url: 'https://cdn/p2.jpg', thumbnailUrl: 'https://cdn/pt2.jpg',
+      s3Bucket: 'bucket',
+      s3Key: 'products/prod-1/img2.jpg',
+      s3ThumbnailKey: 'products/prod-1/t2.jpg',
+      url: 'https://cdn/p2.jpg',
+      thumbnailUrl: 'https://cdn/pt2.jpg',
     } as any)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }), params())
     expect(res.status).toBe(200)
@@ -218,9 +228,16 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
   it('uploads a file and stages it as a fresh upload', async () => {
     mockQueryOne.mockResolvedValueOnce({ images: [] } as any)
     mockUpload.mockResolvedValue({
-      url: 'https://cdn/u.jpg', thumbnailUrl: 'https://cdn/ut.jpg',
-      s3Bucket: 'bucket', s3Key: 's3k', s3ThumbnailKey: 's3tk', fileName: 'u.jpg',
-      fileSize: 999, mimeType: 'image/jpeg', width: 100, height: 200,
+      url: 'https://cdn/u.jpg',
+      thumbnailUrl: 'https://cdn/ut.jpg',
+      s3Bucket: 'bucket',
+      s3Key: 's3k',
+      s3ThumbnailKey: 's3tk',
+      fileName: 'u.jpg',
+      fileSize: 999,
+      mimeType: 'image/jpeg',
+      width: 100,
+      height: 200,
     } as any)
     const form = new FormData()
     form.append('file', new File(['bytes'], 'u.jpg', { type: 'image/jpeg' }))

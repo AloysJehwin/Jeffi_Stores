@@ -67,7 +67,7 @@ vi.mock('@/lib/delhivery', () => ({
 vi.mock('@/lib/edd', () => ({
   computeEdd: vi.fn().mockReturnValue('2026-09-30'),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -132,8 +132,8 @@ const CREATED_ORDER = {
 function setupHappyPath() {
   vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
   vi.mocked(db.queryOne)
-    .mockResolvedValueOnce(MOCK_USER)        // user lookup
-    .mockResolvedValueOnce(null)             // min_order_amount setting
+    .mockResolvedValueOnce(MOCK_USER) // user lookup
+    .mockResolvedValueOnce(null) // min_order_amount setting
   vi.mocked(db.queryMany).mockResolvedValue([CART_ITEM])
 
   // withTransaction calls the callback and returns CREATED_ORDER
@@ -144,7 +144,7 @@ function setupHappyPath() {
     return fn(client)
   })
   // queryOne inside the transaction callback — return the created order
-  vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)        // user (already above)
+  vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER) // user (already above)
 
   return { authUser: AUTH_USER, user: MOCK_USER, cartItem: CART_ITEM }
 }
@@ -161,8 +161,8 @@ describe('POST /api/orders/create', () => {
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)        // user
-      .mockResolvedValueOnce(null)             // min_order_amount
+      .mockResolvedValueOnce(MOCK_USER) // user
+      .mockResolvedValueOnce(null) // min_order_amount
     vi.mocked(db.queryMany).mockResolvedValue([cartItem])
 
     // flat ₹25 off — validation resolves via order-commit helper
@@ -198,9 +198,10 @@ describe('POST /api/orders/create', () => {
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)        // user
-      .mockResolvedValueOnce(null)             // min_order_amount
-      .mockResolvedValueOnce({                 // coupon with per-user limit
+      .mockResolvedValueOnce(MOCK_USER) // user
+      .mockResolvedValueOnce(null) // min_order_amount
+      .mockResolvedValueOnce({
+        // coupon with per-user limit
         id: 'coupon-limited',
         discount_type: 'percentage',
         discount_value: 20,
@@ -213,12 +214,13 @@ describe('POST /api/orders/create', () => {
         valid_until: null,
         is_active: true,
       })
-      .mockResolvedValueOnce({ cnt: '1' })    // per-user usage = 1 (limit reached)
+      .mockResolvedValueOnce({ cnt: '1' }) // per-user usage = 1 (limit reached)
     vi.mocked(db.queryMany).mockResolvedValue([cartItem])
 
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [], rowCount: 0 })
           .mockResolvedValue({ rows: [CREATED_ORDER], rowCount: 1 }),
       }
@@ -237,17 +239,16 @@ describe('POST /api/orders/create', () => {
 
     vi.mocked(db.queryOne).mockReset()
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null) // min_order_amount
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // min_order_amount
     vi.mocked(db.queryMany).mockResolvedValue([CART_ITEM])
 
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [existingAddr], rowCount: 1 }) // existing address found
           .mockResolvedValueOnce({ rows: [existingAddr], rowCount: 1 }) // addr snapshot lookup
-          .mockResolvedValueOnce({ rows: [], rowCount: 0 })              // existingUnpaid
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existingUnpaid
           .mockResolvedValue({ rows: [CREATED_ORDER], rowCount: 1 }),
       }
       return fn(client)
@@ -273,18 +274,17 @@ describe('POST /api/orders/create', () => {
     const newAddr = { id: 'addr-new', full_name: 'Test User', city: 'Delhi', postal_code: '110001' }
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null) // min_order_amount
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // min_order_amount
     vi.mocked(db.queryMany).mockResolvedValue([CART_ITEM])
 
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [], rowCount: 0 })               // existing address NOT found
-          .mockResolvedValueOnce({ rows: [newAddr], rowCount: 1 })        // INSERT address RETURNING
-          .mockResolvedValueOnce({ rows: [newAddr], rowCount: 1 })        // addr snapshot lookup
-          .mockResolvedValueOnce({ rows: [], rowCount: 0 })               // existingUnpaid
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existing address NOT found
+          .mockResolvedValueOnce({ rows: [newAddr], rowCount: 1 }) // INSERT address RETURNING
+          .mockResolvedValueOnce({ rows: [newAddr], rowCount: 1 }) // addr snapshot lookup
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existingUnpaid
           .mockResolvedValue({ rows: [CREATED_ORDER], rowCount: 1 }),
       }
       return fn(client)
@@ -312,14 +312,13 @@ describe('POST /api/orders/create', () => {
     const highValueCartItem = { ...CART_ITEM, quantity: '500' } // 500 * 100 = 50000
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null) // min_order_amount
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // min_order_amount
     vi.mocked(db.queryMany).mockResolvedValue([highValueCartItem])
 
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // existingUnpaid
           .mockResolvedValue({ rows: [highValueOrder], rowCount: 1 }),
       }

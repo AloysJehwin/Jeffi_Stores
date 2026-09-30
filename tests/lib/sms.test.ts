@@ -46,15 +46,20 @@ describe('sms senders (happy path)', () => {
     const sms = await loadSms()
     const ok = await sms.sendOrderConfirmedSMS({ phone: '9876543210', orderNumber: 'ORD1', total: 1500 })
     expect(ok).toBe(true)
-    expect(messagesCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '+919876543210', from: '+18722179910' })
+    expect(messagesCreate).toHaveBeenCalledWith(expect.objectContaining({ to: '+919876543210', from: '+18722179910' }))
+    expect(mockLog).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'sent', kind: 'order_confirmed', providerSid: 'SM1' })
     )
-    expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ status: 'sent', kind: 'order_confirmed', providerSid: 'SM1' }))
   })
 
   it('sendOrderShippedSMS returns true with tracking + courier in body', async () => {
     const sms = await loadSms()
-    const ok = await sms.sendOrderShippedSMS({ phone: '9876543210', orderNumber: 'ORD2', trackingId: 'TRK', courier: 'Delhivery' })
+    const ok = await sms.sendOrderShippedSMS({
+      phone: '9876543210',
+      orderNumber: 'ORD2',
+      trackingId: 'TRK',
+      courier: 'Delhivery',
+    })
     expect(ok).toBe(true)
     const body = messagesCreate.mock.calls[0][0].body
     expect(body).toContain('TRK')

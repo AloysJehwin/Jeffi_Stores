@@ -51,7 +51,17 @@ const sampleRows = [
     irn_ack_no: null,
     irn_ack_dt: null,
     items: [
-      { product_name: 'Bolt M6', hsn_code: '7318', gst_rate: 18, quantity: 10, taxable_amount: '1000', cgst_amount: '90', sgst_amount: '90', igst_amount: '0', total_price: '1180' },
+      {
+        product_name: 'Bolt M6',
+        hsn_code: '7318',
+        gst_rate: 18,
+        quantity: 10,
+        taxable_amount: '1000',
+        cgst_amount: '90',
+        sgst_amount: '90',
+        igst_amount: '0',
+        total_price: '1180',
+      },
     ],
   },
   {

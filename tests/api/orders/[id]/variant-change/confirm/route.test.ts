@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAnyUser: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), query: vi.fn(), resolveRequestTenant: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/db', () => ({
+  queryOne: vi.fn(),
+  query: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
+}))
 vi.mock('@/lib/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   getRazorpayInstanceFor: vi.fn(),
@@ -97,8 +101,8 @@ describe('POST variant-change confirm', () => {
 
     it('400 when no payment to refund', async () => {
       vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(BASE_VCR as any)  // vcr
-        .mockResolvedValueOnce(null as any)      // payment
+        .mockResolvedValueOnce(BASE_VCR as any) // vcr
+        .mockResolvedValueOnce(null as any) // payment
       expect((await POST(makeReq(), PARAMS)).status).toBe(400)
     })
 
@@ -184,7 +188,7 @@ describe('POST variant-change confirm', () => {
       const body = await res.json()
       // flush the microtask queue so the .catch(() => {}) handler executes
       await Promise.resolve()
-      await new Promise((r) => setTimeout(r, 0))
+      await new Promise(r => setTimeout(r, 0))
       expect(res.status).toBe(200)
       expect(body.settlement).toBe('collect')
       expect(body.razorpayOrderId).toBe('rzp_order_1')
@@ -197,7 +201,12 @@ describe('POST variant-change confirm', () => {
       const rzp = makeRazorpay()
       vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
-      vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_VCR, settlement_type: 'collect', price_diff: 40, user_id: null } as any)
+      vi.mocked(db.queryOne).mockResolvedValueOnce({
+        ...BASE_VCR,
+        settlement_type: 'collect',
+        price_diff: 40,
+        user_id: null,
+      } as any)
       const res = await POST(makeReq(), PARAMS)
       expect(res.status).toBe(200)
       expect(activity.logActivity).not.toHaveBeenCalled()

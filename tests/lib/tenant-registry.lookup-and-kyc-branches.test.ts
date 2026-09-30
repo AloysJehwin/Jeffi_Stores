@@ -41,7 +41,7 @@ vi.mock('fs', () => {
 function queueRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
   poolQuery.mockReset()
   for (const r of results) {
-    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) })
+    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? r.rows?.length ?? 0 })
   }
   poolQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 }
@@ -50,7 +50,7 @@ function queueRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
 function queueClient(...results: Array<{ rows?: any[]; rowCount?: number }>) {
   clientQuery.mockReset()
   for (const r of results) {
-    clientQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) })
+    clientQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? r.rows?.length ?? 0 })
   }
   clientQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 }
@@ -112,29 +112,70 @@ describe('tenant-registry (data layer, extended)', () => {
   describe('lookupTenant branches', () => {
     it('maps a full infra row to a TenantContext', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [{
-        id: 't-1', slug: 'acme', status: 'active', plan: 'pro',
-        rds_endpoint: 'ep', rds_db: 'db1', rds_port: 6000, db_secret_ref: 'sec',
-        iam_auth: false, s3_bucket: 'buck', region: 'ap-south-1',
-      }] })
+      queueRows({
+        rows: [
+          {
+            id: 't-1',
+            slug: 'acme',
+            status: 'active',
+            plan: 'pro',
+            rds_endpoint: 'ep',
+            rds_db: 'db1',
+            rds_port: 6000,
+            db_secret_ref: 'sec',
+            iam_auth: false,
+            s3_bucket: 'buck',
+            region: 'ap-south-1',
+          },
+        ],
+      })
       const ctx = await mod.resolveTenantFromHost('acme.jeffistores.in')
       expect(ctx).toMatchObject({
-        tenantId: 't-1', slug: 'acme', plan: 'pro',
-        infra: { rdsEndpoint: 'ep', rdsDb: 'db1', rdsPort: 6000, dbSecretRef: 'sec', iamAuth: false, s3Bucket: 'buck', region: 'ap-south-1' },
+        tenantId: 't-1',
+        slug: 'acme',
+        plan: 'pro',
+        infra: {
+          rdsEndpoint: 'ep',
+          rdsDb: 'db1',
+          rdsPort: 6000,
+          dbSecretRef: 'sec',
+          iamAuth: false,
+          s3Bucket: 'buck',
+          region: 'ap-south-1',
+        },
       })
     })
 
     it('applies infra defaults when optional columns are null/empty', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [{
-        id: 't-2', slug: 'beta', status: 'active', plan: null,
-        rds_endpoint: 'ep2', rds_db: null, rds_port: null, db_secret_ref: null,
-        iam_auth: null, s3_bucket: null, region: null,
-      }] })
+      queueRows({
+        rows: [
+          {
+            id: 't-2',
+            slug: 'beta',
+            status: 'active',
+            plan: null,
+            rds_endpoint: 'ep2',
+            rds_db: null,
+            rds_port: null,
+            db_secret_ref: null,
+            iam_auth: null,
+            s3_bucket: null,
+            region: null,
+          },
+        ],
+      })
       const ctx = await mod.resolveTenantFromHost('beta.jeffistores.in')
       expect(ctx).toMatchObject({
         plan: null,
-        infra: { rdsDb: 'jeffi_stores', rdsPort: 5432, dbSecretRef: null, iamAuth: true, s3Bucket: null, region: 'us-east-1' },
+        infra: {
+          rdsDb: 'jeffi_stores',
+          rdsPort: 5432,
+          dbSecretRef: null,
+          iamAuth: true,
+          s3Bucket: null,
+          region: 'us-east-1',
+        },
       })
     })
 
@@ -218,7 +259,12 @@ describe('tenant-registry (data layer, extended)', () => {
 
   it('planMix returns the grouped distribution', async () => {
     const mod = await importRegistry()
-    queueRows({ rows: [{ plan: 'pro', count: 3 }, { plan: 'none', count: 1 }] })
+    queueRows({
+      rows: [
+        { plan: 'pro', count: 3 },
+        { plan: 'none', count: 1 },
+      ],
+    })
     await expect(mod.planMix()).resolves.toHaveLength(2)
   })
 
@@ -232,8 +278,10 @@ describe('tenant-registry (data layer, extended)', () => {
   describe('createTenant', () => {
     it('rejects an invalid slug', async () => {
       const mod = await importRegistry()
-      await expect(mod.createTenant({ slug: '-bad', displayName: 'X', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: expect.stringMatching(/Slug must be/) })
+      await expect(mod.createTenant({ slug: '-bad', displayName: 'X', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: expect.stringMatching(/Slug must be/),
+      })
     })
 
     it('rejects a reserved slug', async () => {
@@ -245,8 +293,10 @@ describe('tenant-registry (data layer, extended)', () => {
 
     it('rejects a missing display name', async () => {
       const mod = await importRegistry()
-      await expect(mod.createTenant({ slug: 'acme', displayName: '  ', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: 'Store name is required.' })
+      await expect(mod.createTenant({ slug: 'acme', displayName: '  ', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: 'Store name is required.',
+      })
     })
 
     it('rejects an unknown/inactive plan', async () => {
@@ -288,9 +338,9 @@ describe('tenant-registry (data layer, extended)', () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'plan-1' }] }, { rows: [] })
       clientQuery.mockReset()
-      clientQuery.mockResolvedValueOnce({ rows: [] })            // BEGIN
+      clientQuery.mockResolvedValueOnce({ rows: [] }) // BEGIN
       clientQuery.mockRejectedValueOnce(new Error('insert blew up')) // INSERT tenants
-      clientQuery.mockResolvedValue({ rows: [] })                // ROLLBACK
+      clientQuery.mockResolvedValue({ rows: [] }) // ROLLBACK
       const out: any = await mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'pro' })
       expect(out).toEqual({ ok: false, error: 'insert blew up' })
       expect(String(clientQuery.mock.calls.at(-1)![0])).toBe('ROLLBACK')
@@ -302,11 +352,14 @@ describe('tenant-registry (data layer, extended)', () => {
   it('getTenantBilling sums ledger balance and transaction totals', async () => {
     const mod = await importRegistry()
     queueRows(
-      { rows: [ // transactions
-        { gross_amount: '100', tenant_share: '80', platform_commission: '15', gateway_fee: '5' },
-        { gross_amount: '50', tenant_share: '40', platform_commission: '8', gateway_fee: '2' },
-      ] },
-      { rows: [{ amount: '90' }, { amount: '-10' }] }, // ledger
+      {
+        rows: [
+          // transactions
+          { gross_amount: '100', tenant_share: '80', platform_commission: '15', gateway_fee: '5' },
+          { gross_amount: '50', tenant_share: '40', platform_commission: '8', gateway_fee: '2' },
+        ],
+      },
+      { rows: [{ amount: '90' }, { amount: '-10' }] } // ledger
     )
     const out = await mod.getTenantBilling('t-1')
     expect(out.balance).toBe(80)
@@ -316,7 +369,12 @@ describe('tenant-registry (data layer, extended)', () => {
   it('billingSummary coerces the aggregate row to numbers', async () => {
     const mod = await importRegistry()
     queueRows({ rows: [{ mrr: '5000', paying: 4, comm: '300', gmv: '9000' }] })
-    await expect(mod.billingSummary()).resolves.toEqual({ mrr: 5000, commission30d: 300, gmv30d: 9000, payingTenants: 4 })
+    await expect(mod.billingSummary()).resolves.toEqual({
+      mrr: 5000,
+      commission30d: 300,
+      gmv30d: 9000,
+      payingTenants: 4,
+    })
   })
 
   // ── subscription / plan mutations ──
@@ -430,7 +488,12 @@ describe('tenant-registry (data layer, extended)', () => {
   it('saveBankVerification upserts and returns the row', async () => {
     const mod = await importRegistry()
     queueRows({ rows: [{ id: 'b-1', owner_id: 'o-1', verification_status: 'verified' }] })
-    const out = await mod.saveBankVerification({ ownerId: 'o-1', accountNumber: '123', ifsc: 'IFSC0', status: 'verified' })
+    const out = await mod.saveBankVerification({
+      ownerId: 'o-1',
+      accountNumber: '123',
+      ifsc: 'IFSC0',
+      status: 'verified',
+    })
     expect(out).toMatchObject({ id: 'b-1', verification_status: 'verified' })
     expect(poolQuery.mock.calls[0][1][0]).toBe('o-1')
   })
@@ -444,11 +507,13 @@ describe('tenant-registry (data layer, extended)', () => {
   // ── plan feature matrix ──
   it('planFeatureMatrix groups scope keys into a set per plan', async () => {
     const mod = await importRegistry()
-    queueRows({ rows: [
-      { slug: 'pro', scope_key: 'orders:read' },
-      { slug: 'pro', scope_key: 'gst:read' },
-      { slug: 'starter', scope_key: 'orders:read' },
-    ] })
+    queueRows({
+      rows: [
+        { slug: 'pro', scope_key: 'orders:read' },
+        { slug: 'pro', scope_key: 'gst:read' },
+        { slug: 'starter', scope_key: 'orders:read' },
+      ],
+    })
     const matrix = await mod.planFeatureMatrix()
     expect(matrix.pro).toBeInstanceOf(Set)
     expect(matrix.pro.has('gst:read')).toBe(true)
@@ -484,8 +549,8 @@ describe('tenant-registry (data layer, extended)', () => {
       process.env.POLICY_VERSION = '3'
       await mod.saveKyc('t-1', 'o-1', { business_name: 'Acme', legals_accepted: true })
       const args = poolQuery.mock.calls[0][1]
-      expect(args[12]).toBe('3')       // legals_accepted_version
-      expect(args[13]).not.toBeNull()  // legals_accepted_at
+      expect(args[12]).toBe('3') // legals_accepted_version
+      expect(args[13]).not.toBeNull() // legals_accepted_at
       delete process.env.POLICY_VERSION
     })
 
@@ -528,7 +593,12 @@ describe('tenant-registry (data layer, extended)', () => {
     const mod = await importRegistry()
     queueRows({ rows: [] })
     const exp = new Date('2030-01-01T00:00:00.000Z')
-    await mod.saveTenantSocialAccount({ tenantId: 't-1', provider: 'facebook', accessTokenEnc: 'enc', tokenExpiry: exp })
+    await mod.saveTenantSocialAccount({
+      tenantId: 't-1',
+      provider: 'facebook',
+      accessTokenEnc: 'enc',
+      tokenExpiry: exp,
+    })
     const args = poolQuery.mock.calls[0][1]
     expect(args[6]).toBe(exp.toISOString())
   })
@@ -610,7 +680,13 @@ describe('tenant-registry (data layer, extended)', () => {
     const mod = await importRegistry()
     queueRows({ rows: [] })
     const exp = new Date('2030-06-06T00:00:00.000Z')
-    await mod.saveIntegrationCredential({ tenantId: 't-1', provider: 'google', configEnc: 'enc', meta: { x: 1 }, expiresAt: exp })
+    await mod.saveIntegrationCredential({
+      tenantId: 't-1',
+      provider: 'google',
+      configEnc: 'enc',
+      meta: { x: 1 },
+      expiresAt: exp,
+    })
     const args = poolQuery.mock.calls[0][1]
     expect(args[4]).toBe(JSON.stringify({ x: 1 }))
     expect(args[5]).toBe(exp.toISOString())

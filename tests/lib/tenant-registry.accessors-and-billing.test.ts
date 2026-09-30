@@ -42,7 +42,7 @@ vi.mock('fs', () => {
 function queueRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
   poolQuery.mockReset()
   for (const r of results) {
-    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) })
+    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? r.rows?.length ?? 0 })
   }
   poolQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 }
@@ -51,7 +51,7 @@ function queueRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
 function queueClientRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
   clientQuery.mockReset()
   for (const r of results) {
-    clientQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) })
+    clientQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? r.rows?.length ?? 0 })
   }
   clientQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 }
@@ -133,8 +133,16 @@ describe('tenant-registry — extended coverage', () => {
 
     it('planMix passes rows straight through', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [{ plan: 'pro', count: 2 }, { plan: 'none', count: 1 }] })
-      await expect(mod.planMix()).resolves.toEqual([{ plan: 'pro', count: 2 }, { plan: 'none', count: 1 }])
+      queueRows({
+        rows: [
+          { plan: 'pro', count: 2 },
+          { plan: 'none', count: 1 },
+        ],
+      })
+      await expect(mod.planMix()).resolves.toEqual([
+        { plan: 'pro', count: 2 },
+        { plan: 'none', count: 1 },
+      ])
     })
 
     it('listPlans filters to active plans ordered by tier', async () => {
@@ -150,45 +158,55 @@ describe('tenant-registry — extended coverage', () => {
   describe('createTenant', () => {
     it('rejects a slug that fails the format regex', async () => {
       const mod = await importRegistry()
-      await expect(mod.createTenant({ slug: 'A!', displayName: 'X', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: expect.stringMatching(/3-63 chars/) })
+      await expect(mod.createTenant({ slug: 'A!', displayName: 'X', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: expect.stringMatching(/3-63 chars/),
+      })
       expect(poolQuery).not.toHaveBeenCalled()
     })
 
     it('rejects a reserved slug', async () => {
       const mod = await importRegistry()
-      await expect(mod.createTenant({ slug: 'admin', displayName: 'X', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: expect.stringMatching(/reserved/) })
+      await expect(mod.createTenant({ slug: 'admin', displayName: 'X', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: expect.stringMatching(/reserved/),
+      })
     })
 
     it('rejects an empty display name', async () => {
       const mod = await importRegistry()
-      await expect(mod.createTenant({ slug: 'acme', displayName: '   ', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: 'Store name is required.' })
+      await expect(mod.createTenant({ slug: 'acme', displayName: '   ', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: 'Store name is required.',
+      })
     })
 
     it('rejects an unknown/inactive plan', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [] }) // plan lookup empty
-      await expect(mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'ghost' }))
-        .resolves.toEqual({ ok: false, error: expect.stringMatching(/Unknown or inactive plan/) })
+      await expect(mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'ghost' })).resolves.toEqual({
+        ok: false,
+        error: expect.stringMatching(/Unknown or inactive plan/),
+      })
     })
 
     it('rejects a duplicate slug', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'plan-1' }] }, { rows: [{ '?column?': 1 }] }) // plan ok, dup found
-      await expect(mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'pro' }))
-        .resolves.toEqual({ ok: false, error: expect.stringMatching(/already taken/) })
+      await expect(mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'pro' })).resolves.toEqual({
+        ok: false,
+        error: expect.stringMatching(/already taken/),
+      })
     })
 
     it('creates the tenant + empty infra row inside a transaction on the happy path', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'plan-1' }] }, { rows: [] }) // plan ok, no dup
       queueClientRows(
-        { rows: [] },                    // BEGIN
-        { rows: [{ id: 'ten-1' }] },     // INSERT tenants RETURNING id
-        { rows: [] },                    // INSERT tenant_infra
-        { rows: [] },                    // COMMIT
+        { rows: [] }, // BEGIN
+        { rows: [{ id: 'ten-1' }] }, // INSERT tenants RETURNING id
+        { rows: [] }, // INSERT tenant_infra
+        { rows: [] } // COMMIT
       )
       const out = await mod.createTenant({ slug: 'acme', displayName: '  Acme  ', planSlug: 'pro', dailyPayout: true })
       expect(out).toEqual({ ok: true, tenantId: 'ten-1', slug: 'acme' })
@@ -207,9 +225,9 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'plan-1' }] }, { rows: [] })
       clientQuery.mockReset()
-      clientQuery.mockResolvedValueOnce({ rows: [] })            // BEGIN
+      clientQuery.mockResolvedValueOnce({ rows: [] }) // BEGIN
       clientQuery.mockRejectedValueOnce(new Error('unique violation')) // INSERT fails
-      clientQuery.mockResolvedValue({ rows: [] })                // ROLLBACK
+      clientQuery.mockResolvedValue({ rows: [] }) // ROLLBACK
       const out = await mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'pro' })
       expect(out).toEqual({ ok: false, error: 'unique violation' })
       expect(String(clientQuery.mock.calls.at(-1)![0])).toBe('ROLLBACK')
@@ -223,8 +241,8 @@ describe('tenant-registry — extended coverage', () => {
       await mod.createTenant({ slug: 'shop', displayName: 'Shop', planSlug: 'pro' })
       const insertTenantArgs = clientQuery.mock.calls[1][1]
       expect(insertTenantArgs[3]).toBe('provisioning') // status default
-      expect(insertTenantArgs[4]).toBe('monthly')      // billing default
-      expect(insertTenantArgs[5]).toBe(false)          // dailyPayout default
+      expect(insertTenantArgs[4]).toBe('monthly') // billing default
+      expect(insertTenantArgs[5]).toBe(false) // dailyPayout default
     })
   })
 
@@ -240,14 +258,18 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       // Promise.all → first pool.query = transactions, second = ledger.
       poolQuery.mockReset()
-      poolQuery.mockResolvedValueOnce({ rows: [
-        { gross_amount: '100', tenant_share: '80', platform_commission: '15', gateway_fee: '5' },
-        { gross_amount: '200', tenant_share: '160', platform_commission: '30', gateway_fee: '10' },
-      ] })
-      poolQuery.mockResolvedValueOnce({ rows: [
-        { id: 'l-1', entry_type: 'credit', amount: '240', note: null, occurred_at: 'x' },
-        { id: 'l-2', entry_type: 'debit', amount: '-40', note: null, occurred_at: 'y' },
-      ] })
+      poolQuery.mockResolvedValueOnce({
+        rows: [
+          { gross_amount: '100', tenant_share: '80', platform_commission: '15', gateway_fee: '5' },
+          { gross_amount: '200', tenant_share: '160', platform_commission: '30', gateway_fee: '10' },
+        ],
+      })
+      poolQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 'l-1', entry_type: 'credit', amount: '240', note: null, occurred_at: 'x' },
+          { id: 'l-2', entry_type: 'debit', amount: '-40', note: null, occurred_at: 'y' },
+        ],
+      })
       const out = await mod.getTenantBilling('t-1')
       expect(out.balance).toBe(200)
       expect(out.totals).toEqual({ gross: 300, tenantShare: 240, commission: 45, fees: 15 })
@@ -259,7 +281,10 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ mrr: '9999', paying: 4, comm: '1200', gmv: '50000' }] })
       await expect(mod.billingSummary()).resolves.toEqual({
-        mrr: 9999, commission30d: 1200, gmv30d: 50000, payingTenants: 4,
+        mrr: 9999,
+        commission30d: 1200,
+        gmv30d: 50000,
+        payingTenants: 4,
       })
     })
   })
@@ -353,7 +378,7 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows(
         { rows: [{ id: 'o-1', email: 'a@x.com', name: null, created_at: 't' }] }, // SELECT
-        { rows: [] }, // UPDATE name
+        { rows: [] } // UPDATE name
       )
       const owner = await mod.findOrCreateOwner('a@x.com', 'Al')
       expect(owner.name).toBe('Al')
@@ -364,7 +389,7 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows(
         { rows: [] }, // SELECT: none
-        { rows: [{ id: 'o-2', email: 'new@x.com', name: 'New', created_at: 't' }] }, // INSERT
+        { rows: [{ id: 'o-2', email: 'new@x.com', name: 'New', created_at: 't' }] } // INSERT
       )
       const owner = await mod.findOrCreateOwner('new@x.com', 'New')
       expect(owner).toMatchObject({ id: 'o-2' })
@@ -398,12 +423,15 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'b-1', owner_id: 'o-1', verification_status: 'verified' }] })
       const out = await mod.saveBankVerification({
-        ownerId: 'o-1', accountNumber: '', ifsc: 'HDFC0001', status: 'verified',
+        ownerId: 'o-1',
+        accountNumber: '',
+        ifsc: 'HDFC0001',
+        status: 'verified',
       })
       expect(out).toMatchObject({ id: 'b-1', verification_status: 'verified' })
       const args = poolQuery.mock.calls[0][1]
       expect(args[0]).toBe('o-1')
-      expect(args[1]).toBeNull()   // empty accountNumber → null
+      expect(args[1]).toBeNull() // empty accountNumber → null
       expect(args[2]).toBe('HDFC0001')
     })
 
@@ -459,9 +487,10 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [] })
       await mod.saveKyc('t-1', 'o-1', { business_name: 'Acme', legals_accepted: true })
       const args = poolQuery.mock.calls[0][1]
-      expect(args[12]).toBe('3')                 // legals_accepted_version
-      expect(typeof args[13]).toBe('string')     // legals_accepted_at ISO
-      if (saved) process.env.POLICY_VERSION = saved; else delete process.env.POLICY_VERSION
+      expect(args[12]).toBe('3') // legals_accepted_version
+      expect(typeof args[13]).toBe('string') // legals_accepted_at ISO
+      if (saved) process.env.POLICY_VERSION = saved
+      else delete process.env.POLICY_VERSION
     })
 
     it('saveKyc leaves the legals columns null when not accepted', async () => {
@@ -507,7 +536,11 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [] })
       const expiry = new Date('2030-01-01T00:00:00.000Z')
       await mod.saveTenantSocialAccount({
-        tenantId: 't-1', provider: 'facebook', pageId: 'p1', accessTokenEnc: 'enc', tokenExpiry: expiry,
+        tenantId: 't-1',
+        provider: 'facebook',
+        pageId: 'p1',
+        accessTokenEnc: 'enc',
+        tokenExpiry: expiry,
       })
       const args = poolQuery.mock.calls[0][1]
       expect(args[0]).toBe('t-1')
@@ -596,8 +629,12 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [] })
       const expiry = new Date('2030-02-02T00:00:00.000Z')
       await mod.saveIntegrationCredential({
-        tenantId: 't-1', provider: 'google_merchant', label: 'GMC', configEnc: 'enc',
-        meta: { accountId: '123' }, expiresAt: expiry,
+        tenantId: 't-1',
+        provider: 'google_merchant',
+        label: 'GMC',
+        configEnc: 'enc',
+        meta: { accountId: '123' },
+        expiresAt: expiry,
       })
       const args = poolQuery.mock.calls[0][1]
       expect(args[0]).toBe('t-1')
@@ -612,9 +649,9 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [] })
       await mod.saveIntegrationCredential({ tenantId: 't-1', provider: 'amazon', configEnc: 'enc' })
       const args = poolQuery.mock.calls[0][1]
-      expect(args[2]).toBeNull()             // label
+      expect(args[2]).toBeNull() // label
       expect(args[4]).toBe(JSON.stringify({})) // meta default
-      expect(args[5]).toBeNull()             // expiry
+      expect(args[5]).toBeNull() // expiry
     })
 
     it('getIntegrationCredential returns the row or null', async () => {
@@ -686,11 +723,13 @@ describe('tenant-registry — extended coverage', () => {
   describe('planFeatureMatrix', () => {
     it('groups scope keys by plan slug into Sets', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [
-        { slug: 'pro', scope_key: 'products:read' },
-        { slug: 'pro', scope_key: 'orders:read' },
-        { slug: 'basic', scope_key: 'products:read' },
-      ] })
+      queueRows({
+        rows: [
+          { slug: 'pro', scope_key: 'products:read' },
+          { slug: 'pro', scope_key: 'orders:read' },
+          { slug: 'basic', scope_key: 'products:read' },
+        ],
+      })
       const matrix = await mod.planFeatureMatrix()
       expect(matrix.pro).toBeInstanceOf(Set)
       expect(matrix.pro.has('products:read')).toBe(true)
@@ -704,15 +743,37 @@ describe('tenant-registry — extended coverage', () => {
   describe('resolveTenantFromHost — deeper branches', () => {
     it('resolves an active tenant WITH infra into a full context', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [{
-        id: 't-1', slug: 'acme', status: 'active', plan: 'pro',
-        rds_endpoint: 'ep', rds_db: 'db1', rds_port: 6000, db_secret_ref: 'sec',
-        iam_auth: false, s3_bucket: 'bkt', region: 'ap-south-1',
-      }] })
+      queueRows({
+        rows: [
+          {
+            id: 't-1',
+            slug: 'acme',
+            status: 'active',
+            plan: 'pro',
+            rds_endpoint: 'ep',
+            rds_db: 'db1',
+            rds_port: 6000,
+            db_secret_ref: 'sec',
+            iam_auth: false,
+            s3_bucket: 'bkt',
+            region: 'ap-south-1',
+          },
+        ],
+      })
       const ctx = await mod.resolveTenantFromHost('acme.jeffistores.in')
       expect(ctx).toMatchObject({
-        tenantId: 't-1', slug: 'acme', plan: 'pro',
-        infra: { rdsEndpoint: 'ep', rdsDb: 'db1', rdsPort: 6000, dbSecretRef: 'sec', iamAuth: false, s3Bucket: 'bkt', region: 'ap-south-1' },
+        tenantId: 't-1',
+        slug: 'acme',
+        plan: 'pro',
+        infra: {
+          rdsEndpoint: 'ep',
+          rdsDb: 'db1',
+          rdsPort: 6000,
+          dbSecretRef: 'sec',
+          iamAuth: false,
+          s3Bucket: 'bkt',
+          region: 'ap-south-1',
+        },
       })
     })
 
@@ -721,7 +782,14 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [{ id: 't-1', slug: 'acme', status: 'active', plan: null, rds_endpoint: 'ep' }] })
       const ctx = await mod.resolveTenantFromHost('acme.jeffistores.in')
       expect(ctx!.plan).toBeNull()
-      expect(ctx!.infra).toMatchObject({ rdsDb: 'jeffi_stores', rdsPort: 5432, iamAuth: true, region: 'us-east-1', dbSecretRef: null, s3Bucket: null })
+      expect(ctx!.infra).toMatchObject({
+        rdsDb: 'jeffi_stores',
+        rdsPort: 5432,
+        iamAuth: true,
+        region: 'us-east-1',
+        dbSecretRef: null,
+        s3Bucket: null,
+      })
     })
 
     it('returns null context (null infra) for a tenant with no rds_endpoint', async () => {

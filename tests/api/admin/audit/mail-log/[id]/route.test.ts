@@ -17,7 +17,9 @@ function makeReq(id: string) {
   return new NextRequest(`http://localhost/api/admin/audit/mail-log/${id}`)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/audit/mail-log/[id]', () => {
   it('returns 404 when row not found', async () => {
@@ -30,8 +32,12 @@ describe('GET /api/admin/audit/mail-log/[id]', () => {
 
   it('returns log row on happy path', async () => {
     const row = {
-      id: 'log-1', email: 'a@b.com', subject: 'Test', status: 'sent',
-      template_name: 'invoice', kind: 'transactional',
+      id: 'log-1',
+      email: 'a@b.com',
+      subject: 'Test',
+      status: 'sent',
+      template_name: 'invoice',
+      kind: 'transactional',
     }
     mockQueryOne.mockResolvedValue(row)
     const res = await GET(makeReq('log-1'), { params: Promise.resolve({ id: 'log-1' }) })

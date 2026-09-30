@@ -17,14 +17,25 @@ const BASIC = new Set(['products:read', 'products:write'])
 
 function row(tenantId: string | null) {
   return {
-    id: 'sess-1', principal_type: 'admin', principal_id: 'a-1',
+    id: 'sess-1',
+    principal_type: 'admin',
+    principal_id: 'a-1',
     revoked_at: null,
     expires_at: new Date(Date.now() + 3_600_000).toISOString(),
     last_seen_at: new Date().toISOString(),
-    role: 'super_admin', scopes: GRANTED, cert_cn: null, approval_status: null,
+    role: 'super_admin',
+    scopes: GRANTED,
+    cert_cn: null,
+    approval_status: null,
     tenant_id: tenantId,
-    user_agent: null, accept_lang: null, ua_platform: null, ip_net: null, fp_hash: null,
-    email: 'owner@acme.test', first_name: 'Acme', last_name: 'Owner',
+    user_agent: null,
+    accept_lang: null,
+    ua_platform: null,
+    ip_net: null,
+    fp_hash: null,
+    email: 'owner@acme.test',
+    first_name: 'Acme',
+    last_name: 'Owner',
   }
 }
 

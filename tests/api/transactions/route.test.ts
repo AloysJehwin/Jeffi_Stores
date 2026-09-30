@@ -83,10 +83,7 @@ describe('GET /api/transactions', () => {
     const body = await res.json()
     expect(body.page).toBe(3)
     // offset should be 20, limit 10
-    expect(db.queryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([AUTH_USER.userId, 10, 20])
-    )
+    expect(db.queryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([AUTH_USER.userId, 10, 20]))
   })
 
   it('clamps page to minimum 1', async () => {

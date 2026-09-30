@@ -38,24 +38,18 @@ describe('razorpay.ts module-level guard', () => {
   it('throws when RAZORPAY_KEY_ID is missing', async () => {
     process.env.RAZORPAY_KEY_SECRET = 'secret'
     const { getRazorpayInstance } = await import('@/lib/razorpay')
-    expect(() => getRazorpayInstance()).toThrow(
-      'RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set'
-    )
+    expect(() => getRazorpayInstance()).toThrow('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set')
   })
 
   it('throws when RAZORPAY_KEY_SECRET is missing', async () => {
     process.env.RAZORPAY_KEY_ID = 'key'
     const { getRazorpayInstance } = await import('@/lib/razorpay')
-    expect(() => getRazorpayInstance()).toThrow(
-      'RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set'
-    )
+    expect(() => getRazorpayInstance()).toThrow('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set')
   })
 
   it('throws when both env vars are missing', async () => {
     const { getRazorpayInstance } = await import('@/lib/razorpay')
-    expect(() => getRazorpayInstance()).toThrow(
-      'RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set'
-    )
+    expect(() => getRazorpayInstance()).toThrow('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set')
   })
 
   it('loads without error when both env vars are present', async () => {

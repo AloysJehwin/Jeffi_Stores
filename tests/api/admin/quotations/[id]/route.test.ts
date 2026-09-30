@@ -35,9 +35,15 @@ const QT_ID = 'qt-id-001'
 const PARAMS = { params: Promise.resolve({ id: QT_ID }) }
 
 const draftQt = {
-  id: QT_ID, status: 'draft', quote_number: 'QT/24-25/001',
-  total_amount: '1200', subtotal: '1000', cgst_amount: '100', sgst_amount: '100',
-  consignee_email: 'buyer@example.com', consignee_name: 'Buyer Corp',
+  id: QT_ID,
+  status: 'draft',
+  quote_number: 'QT/24-25/001',
+  total_amount: '1200',
+  subtotal: '1000',
+  cgst_amount: '100',
+  sgst_amount: '100',
+  consignee_email: 'buyer@example.com',
+  consignee_name: 'Buyer Corp',
   view_token: 'tok-abc',
 }
 
@@ -57,7 +63,9 @@ function makeDeleteReq() {
   return new NextRequest(`http://localhost/api/admin/quotations/${QT_ID}`, { method: 'DELETE' })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -142,9 +150,9 @@ describe('PATCH /api/admin/quotations/[id]', () => {
   it('updates fields without items on happy path', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValueOnce(draftQt)   // existing check
-    mockQueryOne.mockResolvedValueOnce({ ...draftQt, notes: 'updated' })  // UPDATE RETURNING
-    mockQueryMany.mockResolvedValueOnce([])        // savedItems
+    mockQueryOne.mockResolvedValueOnce(draftQt) // existing check
+    mockQueryOne.mockResolvedValueOnce({ ...draftQt, notes: 'updated' }) // UPDATE RETURNING
+    mockQueryMany.mockResolvedValueOnce([]) // savedItems
     const res = await PATCH(makePatchReq({ notes: 'updated' }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -156,16 +164,19 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQuery.mockResolvedValue({ rows: [] } as any)   // DELETE + INSERT calls
-    mockQueryOne.mockResolvedValueOnce(draftQt)        // UPDATE RETURNING
+    mockQuery.mockResolvedValue({ rows: [] } as any) // DELETE + INSERT calls
+    mockQueryOne.mockResolvedValueOnce(draftQt) // UPDATE RETURNING
     mockQueryMany.mockResolvedValueOnce([{ id: 'item1' }])
 
-    const res = await PATCH(makePatchReq({
-      items: [
-        { description: 'Bolt M6', quantity: 10, rate: 10, discount_pct: 0, gst_rate: 18 },
-        { description: 'Nut M6', quantity: 5, rate: 5, discount_pct: 5, gst_rate: 12, product_id: 'p1' },
-      ],
-    }), PARAMS)
+    const res = await PATCH(
+      makePatchReq({
+        items: [
+          { description: 'Bolt M6', quantity: 10, rate: 10, discount_pct: 0, gst_rate: 18 },
+          { description: 'Nut M6', quantity: 5, rate: 5, discount_pct: 5, gst_rate: 12, product_id: 'p1' },
+        ],
+      }),
+      PARAMS
+    )
     expect(res.status).toBe(200)
     // DELETE was called
     const deleteCalls = mockQuery.mock.calls.filter(([sql]) => (sql as string).includes('DELETE FROM quotation_items'))
@@ -183,9 +194,9 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockQueryMany.mockResolvedValueOnce([
       { amount: 500, gst_rate: 18 },
       { amount: 300, gst_rate: 5 },
-    ])  // existing items for recompute
-    mockQueryOne.mockResolvedValueOnce(draftQt)   // UPDATE RETURNING
-    mockQueryMany.mockResolvedValueOnce([])        // savedItems
+    ]) // existing items for recompute
+    mockQueryOne.mockResolvedValueOnce(draftQt) // UPDATE RETURNING
+    mockQueryMany.mockResolvedValueOnce([]) // savedItems
 
     const res = await PATCH(makePatchReq({ notes: 'recomputed' }), PARAMS)
     expect(res.status).toBe(200)
@@ -197,7 +208,7 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQueryOne.mockResolvedValueOnce(finalQt)   // UPDATE RETURNING with status=final
+    mockQueryOne.mockResolvedValueOnce(finalQt) // UPDATE RETURNING with status=final
     mockQueryMany.mockResolvedValueOnce([])
     mockSendEmail.mockResolvedValueOnce(undefined as any)
 
@@ -253,14 +264,17 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockQueryOne.mockResolvedValueOnce(draftQt)
     mockQueryMany.mockResolvedValueOnce([])
 
-    const res = await PATCH(makePatchReq({
-      quote_date: '2024-06-01',
-      status: 'sent',
-      consignee_name: 'New Name',
-      consignee_email: 'new@example.com',
-      buyer_name: 'Buyer',
-      notes: 'Revised',
-    }), PARAMS)
+    const res = await PATCH(
+      makePatchReq({
+        quote_date: '2024-06-01',
+        status: 'sent',
+        consignee_name: 'New Name',
+        consignee_email: 'new@example.com',
+        buyer_name: 'Buyer',
+        notes: 'Revised',
+      }),
+      PARAMS
+    )
     expect(res.status).toBe(200)
     // The UPDATE was called with multiple $N params
     const updateCall = mockQueryOne.mock.calls.find(([sql]) => (sql as string).includes('UPDATE quotations'))
@@ -306,8 +320,8 @@ describe('DELETE /api/admin/quotations/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
     mockQuery
-      .mockResolvedValueOnce({ rows: [] } as any)  // UPDATE business_rfqs detach
-      .mockResolvedValueOnce({ rows: [] } as any)  // DELETE quotations
+      .mockResolvedValueOnce({ rows: [] } as any) // UPDATE business_rfqs detach
+      .mockResolvedValueOnce({ rows: [] } as any) // DELETE quotations
     const res = await DELETE(makeDeleteReq(), PARAMS)
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)

@@ -5,7 +5,11 @@ describe('amazon/asin-backfill no SELLER_ID', () => {
 
   it('returns empty report when SELLER_ID is not set', async () => {
     vi.doMock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn() }))
-    vi.doMock('@/lib/amazon/client', () => ({ matchAsin: vi.fn(), getSellerId: vi.fn().mockResolvedValue(''), amazonConfigured: vi.fn().mockResolvedValue(false) }))
+    vi.doMock('@/lib/amazon/client', () => ({
+      matchAsin: vi.fn(),
+      getSellerId: vi.fn().mockResolvedValue(''),
+      amazonConfigured: vi.fn().mockResolvedValue(false),
+    }))
     const db = await import('@/lib/db')
     const mod = await import('@/lib/amazon/asin-backfill')
     const rep = await mod.backfillAsins()

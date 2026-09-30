@@ -45,7 +45,9 @@ const sampleOrder = {
 const storeSettings = { name: 'Test Store', address: '123 Main St' }
 
 describe('GET /api/admin/packing-slips/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

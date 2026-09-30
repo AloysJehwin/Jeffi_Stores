@@ -32,7 +32,11 @@ function makeGet(params: Record<string, string> = {}) {
 function makeQueryManyResults() {
   return [
     // funnel
-    [{ page: 'home', sessions: '100', users: '80' }, { page: 'product', sessions: '50', users: '40' }, { page: 'order_placed', sessions: '10', users: '9' }],
+    [
+      { page: 'home', sessions: '100', users: '80' },
+      { page: 'product', sessions: '50', users: '40' },
+      { page: 'order_placed', sessions: '10', users: '9' },
+    ],
     // topPages
     [{ path: '/', hits: '200', sessions: '100' }],
     // topReferrers
@@ -40,15 +44,36 @@ function makeQueryManyResults() {
     // dailySessions
     [{ date: '2024-01-01', sessions: '100', pageviews: '200' }],
     // devices
-    [{ type: 'Mobile', sessions: '60' }, { type: 'Desktop', sessions: '40' }],
+    [
+      { type: 'Mobile', sessions: '60' },
+      { type: 'Desktop', sessions: '40' },
+    ],
     // browsers
     [{ browser: 'Chrome', sessions: '80' }],
     // hourly
-    [{ hour: '10', hits: '30' }, { hour: '14', hits: '50' }],
+    [
+      { hour: '10', hits: '30' },
+      { hour: '14', hits: '50' },
+    ],
     // sessionDepths
-    [{ session_id: 's1', depth: '1' }, { session_id: 's2', depth: '5' }, { session_id: 's3', depth: '3' }],
+    [
+      { session_id: 's1', depth: '1' },
+      { session_id: 's2', depth: '5' },
+      { session_id: 's3', depth: '3' },
+    ],
     // topProducts
-    [{ product_id: 'p1', name: 'Bolt', slug: 'bolt', views: '100', unique_viewers: '80', orders: '5', revenue: '250.00', cart_adds: '20' }],
+    [
+      {
+        product_id: 'p1',
+        name: 'Bolt',
+        slug: 'bolt',
+        views: '100',
+        unique_viewers: '80',
+        orders: '5',
+        revenue: '250.00',
+        cart_adds: '20',
+      },
+    ],
     // conversionLaggards
     [{ product_id: 'p2', name: 'Nut', slug: 'nut', views: '50', orders: '0' }],
     // topSearchTerms
@@ -110,7 +135,7 @@ describe('GET /api/admin/traffic', () => {
     mockHasScope.mockReturnValue(true)
 
     const results = makeQueryManyResults()
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     const res = await GET(makeGet())
     const body = await res.json()
@@ -126,7 +151,7 @@ describe('GET /api/admin/traffic', () => {
     mockHasScope.mockReturnValue(true)
 
     const results = makeQueryManyResults()
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     const res = await GET(makeGet())
     const body = await res.json()
@@ -145,7 +170,7 @@ describe('GET /api/admin/traffic', () => {
     mockHasScope.mockReturnValue(true)
 
     const results = makeQueryManyResults()
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     const res = await GET(makeGet())
     const body = await res.json()
@@ -159,7 +184,7 @@ describe('GET /api/admin/traffic', () => {
     mockHasScope.mockReturnValue(true)
 
     const results = makeQueryManyResults()
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     // Pass days=999 — should be clamped to 90
     await GET(makeGet({ days: '999' }))
@@ -172,7 +197,7 @@ describe('GET /api/admin/traffic', () => {
     mockHasScope.mockReturnValue(true)
 
     const results = makeQueryManyResults()
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     const res = await GET(makeGet())
     const body = await res.json()
@@ -213,7 +238,7 @@ describe('GET /api/admin/traffic', () => {
     // Replace topSearchTerms and noResultSearches (indices 10 and 11) with rejections
     results[10] = [] as any
     results[11] = [] as any
-    results.forEach((r) => mockQueryMany.mockResolvedValueOnce(r as any))
+    results.forEach(r => mockQueryMany.mockResolvedValueOnce(r as any))
 
     const res = await GET(makeGet())
     expect(res.status).toBe(200)

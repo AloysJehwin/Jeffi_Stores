@@ -72,7 +72,9 @@ describe('schedule date conversion', () => {
     const iso = '2026-11-01T18:30:00.000Z'
     const d = new Date(iso)
     const pad = (n: number) => String(n).padStart(2, '0')
-    expect(isoToLocal(iso)).toBe(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+    expect(isoToLocal(iso)).toBe(
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    )
   })
 
   it('treats empty and invalid values as no date', () => {
@@ -94,11 +96,27 @@ describe('editor coverage', () => {
   it('maps every non-hero section type to an editor', () => {
     const config = readFileSync(join(DIR, 'SectionConfigFields.tsx'), 'utf8')
     for (const type of [
-      'about', 'benefits', 'brand_carousel', 'business_cta', 'category_grid',
-      'category_showcase', 'deal_of_the_day', 'featured_for_you', 'product_row',
-      'promo_banner', 'trust_strip', 'why_us',
-      'countdown_deal', 'testimonials', 'recently_viewed', 'category_tabs', 'bundle_spotlight',
-      'back_in_stock', 'blog_teaser', 'social_strip', 'value_stats',
+      'about',
+      'benefits',
+      'brand_carousel',
+      'business_cta',
+      'category_grid',
+      'category_showcase',
+      'deal_of_the_day',
+      'featured_for_you',
+      'product_row',
+      'promo_banner',
+      'trust_strip',
+      'why_us',
+      'countdown_deal',
+      'testimonials',
+      'recently_viewed',
+      'category_tabs',
+      'bundle_spotlight',
+      'back_in_stock',
+      'blog_teaser',
+      'social_strip',
+      'value_stats',
     ]) {
       expect(config).toContain(`${type}:`)
     }

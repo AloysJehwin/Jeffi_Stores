@@ -5,10 +5,18 @@ vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('jose', () => ({
   SignJWT: class {
-    setProtectedHeader() { return this }
-    setIssuedAt() { return this }
-    setExpirationTime() { return this }
-    async sign() { return 'mock-jwt-token' }
+    setProtectedHeader() {
+      return this
+    }
+    setIssuedAt() {
+      return this
+    }
+    setExpirationTime() {
+      return this
+    }
+    async sign() {
+      return 'mock-jwt-token'
+    }
   },
 }))
 

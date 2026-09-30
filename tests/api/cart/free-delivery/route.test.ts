@@ -9,7 +9,9 @@ import { getDeliverySettings } from '@/lib/delivery-settings'
 
 const mockSettings = vi.mocked(getDeliverySettings)
 
-function settings(overrides: Partial<{ enabled: boolean; freeThreshold: number; ratePerKg: number; freeWeightCeilingKg: number }> = {}) {
+function settings(
+  overrides: Partial<{ enabled: boolean; freeThreshold: number; ratePerKg: number; freeWeightCeilingKg: number }> = {}
+) {
   return { enabled: true, freeThreshold: 999, ratePerKg: 0, freeWeightCeilingKg: 5, ...overrides }
 }
 

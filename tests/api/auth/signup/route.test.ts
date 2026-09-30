@@ -125,9 +125,7 @@ describe('POST /api/auth/signup', () => {
 
     it('strips country code 91 prefix and accepts 12-digit number', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await POST(makeRequest({ ...VALID_BODY, phone: '919876543210' }) as any)
@@ -150,9 +148,7 @@ describe('POST /api/auth/signup', () => {
   describe('successful signup', () => {
     it('returns 200 with user data on successful registration', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await POST(makeRequest(VALID_BODY) as any)
@@ -165,9 +161,7 @@ describe('POST /api/auth/signup', () => {
 
     it('sets user_sid cookie on successful signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await POST(makeRequest(VALID_BODY) as any)
@@ -178,9 +172,7 @@ describe('POST /api/auth/signup', () => {
 
     it('deletes OTP and resets counter after signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await POST(makeRequest(VALID_BODY) as any)
@@ -192,9 +184,7 @@ describe('POST /api/auth/signup', () => {
   describe('DB insert fails', () => {
     it('returns 500 when INSERT returns null', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await POST(makeRequest(VALID_BODY) as any)

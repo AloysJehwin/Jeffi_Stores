@@ -6,15 +6,33 @@ vi.mock('@/lib/product-cards', () => ({ getProductCards: vi.fn(), getProductCard
 import { queryMany, queryOne } from '@/lib/db'
 import { getProductCards, getProductCardsByIds } from '@/lib/product-cards'
 import {
-  getBackInStock, getBundles, getCategoryTabs, getCountdownDeal, getTestimonials, getValueStats, loadSectionExtras,
+  getBackInStock,
+  getBundles,
+  getCategoryTabs,
+  getCountdownDeal,
+  getTestimonials,
+  getValueStats,
+  loadSectionExtras,
 } from '@/lib/homepage-extras'
 import type { HomepageSection, SectionType } from '@/lib/homepage-sections'
 
 const A = '11111111-1111-1111-1111-111111111111'
 const B = '22222222-2222-2222-2222-222222222222'
 const s = (type: SectionType, config: Record<string, unknown> = {}, id = 'sec') =>
-  ({ id, type, config, title: null, subtitle: null, eyebrow: null, cta_label: null, cta_url: null,
-     display_order: 0, is_active: true, starts_at: null, ends_at: null }) as HomepageSection
+  ({
+    id,
+    type,
+    config,
+    title: null,
+    subtitle: null,
+    eyebrow: null,
+    cta_label: null,
+    cta_url: null,
+    display_order: 0,
+    is_active: true,
+    starts_at: null,
+    ends_at: null,
+  }) as HomepageSection
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -31,24 +49,45 @@ describe('getCountdownDeal', () => {
   })
 
   it('hides once the countdown has ended', async () => {
-    expect(await getCountdownDeal(s('countdown_deal', { productId: A, endsAt: '2026-09-24T00:00:00Z' }), true, now)).toBeNull()
+    expect(
+      await getCountdownDeal(s('countdown_deal', { productId: A, endsAt: '2026-09-24T00:00:00Z' }), true, now)
+    ).toBeNull()
     expect(getProductCardsByIds).not.toHaveBeenCalled()
   })
 
   it('returns the live product with its end time', async () => {
     vi.mocked(getProductCardsByIds).mockResolvedValue([{ id: A, name: 'Drill' }])
-    expect(await getCountdownDeal(s('countdown_deal', { productId: A, endsAt: '2026-10-01T00:00:00Z' }), true, now))
-      .toEqual({ product: { id: A, name: 'Drill' }, endsAt: '2026-10-01T00:00:00Z' })
+    expect(
+      await getCountdownDeal(s('countdown_deal', { productId: A, endsAt: '2026-10-01T00:00:00Z' }), true, now)
+    ).toEqual({ product: { id: A, name: 'Drill' }, endsAt: '2026-10-01T00:00:00Z' })
   })
 })
 
 describe('getTestimonials', () => {
   it('passes rating and limit, and shortens reviewer names', async () => {
     vi.mocked(queryMany).mockResolvedValue([
-      { id: 'r1', rating: 5, title: ' Great ', comment: ' Works well ', is_verified_purchase: true,
-        product_name: 'Drill', product_slug: 'drill', first_name: 'Aloys', last_name: 'jehwin' },
-      { id: 'r2', rating: 4, title: null, comment: 'Solid', is_verified_purchase: false,
-        product_name: 'Saw', product_slug: 'saw', first_name: null, last_name: null },
+      {
+        id: 'r1',
+        rating: 5,
+        title: ' Great ',
+        comment: ' Works well ',
+        is_verified_purchase: true,
+        product_name: 'Drill',
+        product_slug: 'drill',
+        first_name: 'Aloys',
+        last_name: 'jehwin',
+      },
+      {
+        id: 'r2',
+        rating: 4,
+        title: null,
+        comment: 'Solid',
+        is_verified_purchase: false,
+        product_name: 'Saw',
+        product_slug: 'saw',
+        first_name: null,
+        last_name: null,
+      },
     ])
     const out = await getTestimonials(s('testimonials', { minRating: 5, limit: 3 }))
     const [sql, params] = vi.mocked(queryMany).mock.calls[0]
@@ -130,9 +169,10 @@ describe('loadSectionExtras', () => {
     vi.mocked(queryMany).mockRejectedValue(new Error('db down'))
     vi.mocked(queryOne).mockResolvedValue({ orders_shipped: '5', products: '5', cities: '5', customers: '5' })
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const extras = await loadSectionExtras([
-      s('hero', {}, 'h'), s('testimonials', {}, 't'), s('value_stats', {}, 'v'), s('social_strip', {}, 'so'),
-    ], true)
+    const extras = await loadSectionExtras(
+      [s('hero', {}, 'h'), s('testimonials', {}, 't'), s('value_stats', {}, 'v'), s('social_strip', {}, 'so')],
+      true
+    )
     expect([...extras.keys()]).toEqual(['v'])
     expect(err).toHaveBeenCalled()
     err.mockRestore()

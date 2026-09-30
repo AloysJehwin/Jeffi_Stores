@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { GET, POST } from '@/app/api/admin/products/[id]/units/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction, query as dbQuery} from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query as dbQuery } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -89,9 +89,7 @@ describe('GET /api/admin/products/[id]/units', () => {
     mockQueryOne.mockResolvedValue({ id: 'prod-1' })
     const units = [{ id: 'u1', unit: 'pc', factor: 1, is_base: true }]
     const rules = [{ id: 'r1', product_unit_id: 'u1', rule_type: 'min_qty' }]
-    mockQueryMany
-      .mockResolvedValueOnce(units)
-      .mockResolvedValueOnce(rules)
+    mockQueryMany.mockResolvedValueOnce(units).mockResolvedValueOnce(rules)
     const res = await GET(makeGetReq(), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -164,11 +162,14 @@ describe('POST /api/admin/products/[id]/units', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'prod-1' })
     const newUnit = { id: 'u1', unit: 'pc', factor: 1, is_base: true }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })          // clear base flags
-        .mockResolvedValueOnce({ rows: [newUnit] }),   // insert
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [] }) // clear base flags
+          .mockResolvedValueOnce({ rows: [newUnit] }), // insert
+      })
+    )
     const res = await POST(makePostReq({ unit: 'pc', factor: 1, is_base: true }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -202,9 +203,11 @@ describe('POST /api/admin/products/[id]/units', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'prod-1' })
     const newUnit = { id: 'u2', unit: 'kg', factor: 1, dimension: 'weight' }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'kg', factor: 1, dimension: 'weight' }), { params })
     expect(res.status).toBe(200)
   })

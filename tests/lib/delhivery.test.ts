@@ -23,7 +23,13 @@ vi.mock('@/lib/site-controls', () => ({
 
 global.fetch = mockFetch
 
-import { cancelDelhiveryShipment, createRVPShipment, listDelhiveryPickupLocations, setDefaultPickupLocation, deactivateDelhiveryPickupLocation } from '@/lib/delhivery'
+import {
+  cancelDelhiveryShipment,
+  createRVPShipment,
+  listDelhiveryPickupLocations,
+  setDefaultPickupLocation,
+  deactivateDelhiveryPickupLocation,
+} from '@/lib/delhivery'
 
 describe('cancelDelhiveryShipment', () => {
   beforeEach(() => {
@@ -31,8 +37,11 @@ describe('cancelDelhiveryShipment', () => {
     process.env.DELHIVERY_API_KEY = 'test-delhivery-key'
     mockQuery.mockResolvedValue({ rows: [] })
     mockGetBusinessValues.mockResolvedValue({
-      pickupLocation: 'Jeffi Stores', delhiveryOriginPincode: '492001',
-      sellerName: 'Jeffi Stores', sellerAddress: 'Raipur', sellerPhone: '9685354099',
+      pickupLocation: 'Jeffi Stores',
+      delhiveryOriginPincode: '492001',
+      sellerName: 'Jeffi Stores',
+      sellerAddress: 'Raipur',
+      sellerPhone: '9685354099',
     })
   })
 
@@ -81,7 +90,9 @@ describe('cancelDelhiveryShipment', () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
-      json: async () => { throw new Error('bad json') },
+      json: async () => {
+        throw new Error('bad json')
+      },
     })
     await expect(cancelDelhiveryShipment('AWB-BAD')).rejects.toThrow('Delhivery cancellation failed')
   })
@@ -111,8 +122,11 @@ describe('createRVPShipment', () => {
     vi.clearAllMocks()
     process.env.DELHIVERY_API_KEY = 'test-delhivery-key'
     mockGetBusinessValues.mockResolvedValue({
-      pickupLocation: 'Jeffi Stores', delhiveryOriginPincode: '492001',
-      sellerName: 'Jeffi Stores', sellerAddress: 'Raipur', sellerPhone: '9685354099',
+      pickupLocation: 'Jeffi Stores',
+      delhiveryOriginPincode: '492001',
+      sellerName: 'Jeffi Stores',
+      sellerAddress: 'Raipur',
+      sellerPhone: '9685354099',
     })
   })
 
@@ -256,7 +270,12 @@ describe('listDelhiveryPickupLocations', () => {
   })
 
   it('returns [] when there is no default and the table is empty', async () => {
-    mockGetBusinessValues.mockResolvedValue({ pickupLocation: '', delhiveryOriginPincode: '', sellerPhone: '', sellerAddress: '' })
+    mockGetBusinessValues.mockResolvedValue({
+      pickupLocation: '',
+      delhiveryOriginPincode: '',
+      sellerPhone: '',
+      sellerAddress: '',
+    })
     mockQuery.mockResolvedValue({ rows: [] })
     const locs = await listDelhiveryPickupLocations()
     expect(locs).toEqual([])
@@ -311,8 +330,9 @@ describe('deactivateDelhiveryPickupLocation', () => {
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) })
     const r = await deactivateDelhiveryPickupLocation('Bengaluru Home')
     expect(r.ok).toBe(true)
-    const update = mockQuery.mock.calls.find(([sql]) =>
-      String(sql).includes('UPDATE delhivery_pickup_locations') && String(sql).includes('active = false'))
+    const update = mockQuery.mock.calls.find(
+      ([sql]) => String(sql).includes('UPDATE delhivery_pickup_locations') && String(sql).includes('active = false')
+    )
     expect(update).toBeTruthy()
     expect(update![1]).toContain('Bengaluru Home')
   })

@@ -6,8 +6,8 @@ import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validatio
 // ---------------------------------------------------------------------------
 
 const BODY_WITH_PRODUCT_CARD = '<p>Hi {firstName}!</p>{productCard}<p>Buy now</p>'
-const BODY_WITH_ITEMS_HTML   = '<p>Hi {firstName}!</p>{itemsHtml}<p>Check out</p>'
-const BODY_GENERIC           = '<p>Hello {firstName}, thanks for shopping with us.</p>'
+const BODY_WITH_ITEMS_HTML = '<p>Hi {firstName}!</p>{itemsHtml}<p>Check out</p>'
+const BODY_GENERIC = '<p>Hello {firstName}, thanks for shopping with us.</p>'
 
 // ---------------------------------------------------------------------------
 // 1. Input validation

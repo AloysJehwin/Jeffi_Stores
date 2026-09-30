@@ -45,7 +45,9 @@ const PAYABLES_RESULT = {
 // ── GET tests ─────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/financial/payables', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -111,7 +113,9 @@ describe('GET /api/admin/financial/payables', () => {
 // ── POST tests ────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/financial/payables', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   const VALID_BODY = {
     supplier_name: 'Acme Supplies',

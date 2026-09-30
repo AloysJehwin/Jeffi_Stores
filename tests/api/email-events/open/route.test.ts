@@ -21,7 +21,9 @@ function makeRequest(params: Record<string, string> = {}) {
 }
 
 describe('GET /api/email-events/open', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 200 with image/gif content-type', async () => {
     const res = await GET(makeRequest() as any)
@@ -44,10 +46,7 @@ describe('GET /api/email-events/open', () => {
   it('updates DB opened_at when id is provided', async () => {
     mockQuery.mockResolvedValueOnce(undefined as any)
     await GET(makeRequest({ id: 'sent-456' }) as any)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('opened_at'),
-      ['sent-456']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('opened_at'), ['sent-456'])
   })
 
   it('does not call DB when id is absent', async () => {

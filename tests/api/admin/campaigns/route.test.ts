@@ -60,11 +60,13 @@ function makeReq(url: string) {
 }
 
 function jsonReq(url: string, body: unknown) {
-  return new NextRequest(new Request(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }))
+  return new NextRequest(
+    new Request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -75,9 +77,7 @@ describe('GET /api/admin/campaigns', () => {
   beforeEach(() => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(queryMany).mockResolvedValue([
-      { kind: 'welcome', name: 'Welcome', total_sent: 100 },
-    ] as any)
+    vi.mocked(queryMany).mockResolvedValue([{ kind: 'welcome', name: 'Welcome', total_sent: 100 }] as any)
     vi.mocked(queryOne).mockResolvedValue({ total: '1' } as any)
   })
 
@@ -145,25 +145,26 @@ describe('POST /api/admin/campaigns', () => {
   })
 
   it('creates a campaign with valid name and kind', async () => {
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'Black Friday Sale',
-      kind: 'black_friday',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'Black Friday Sale',
+        kind: 'black_friday',
+      })
+    )
     const json = await res.json()
 
     expect(res.status).toBe(200)
     expect(json).toMatchObject({ success: true, kind: 'black_friday' })
-    expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO campaigns'),
-      expect.any(Array),
-    )
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO campaigns'), expect.any(Array))
   })
 
   it('sanitises kind to lowercase alphanumeric underscores', async () => {
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'My Campaign',
-      kind: 'My Campaign Kind!',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'My Campaign',
+        kind: 'My Campaign Kind!',
+      })
+    )
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -173,10 +174,12 @@ describe('POST /api/admin/campaigns', () => {
   it('returns 409 when a campaign with same kind already exists', async () => {
     vi.mocked(queryOne).mockResolvedValue({ kind: 'welcome' } as any)
 
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'Welcome',
-      kind: 'welcome',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'Welcome',
+        kind: 'welcome',
+      })
+    )
     expect(res.status).toBe(409)
   })
 
@@ -187,44 +190,52 @@ describe('POST /api/admin/campaigns', () => {
       hint: 'Add {unsubscribeLink}',
     } as any)
 
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'Test',
-      kind: 'test',
-      body_template: '<p>Hi</p>',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'Test',
+        kind: 'test',
+        body_template: '<p>Hi</p>',
+      })
+    )
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBeTruthy()
   })
 
   it('returns 400 when name is empty', async () => {
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: '',
-      kind: 'some_kind',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: '',
+        kind: 'some_kind',
+      })
+    )
     expect(res.status).toBe(400)
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
 
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'Test',
-      kind: 'test',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'Test',
+        kind: 'test',
+      })
+    )
     expect(res.status).toBe(401)
   })
 
   it('returns 400 for unknown scenario_kind', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)    // no existing campaign
-      .mockResolvedValueOnce(null as any)    // scenario lookup returns null
+      .mockResolvedValueOnce(null as any) // no existing campaign
+      .mockResolvedValueOnce(null as any) // scenario lookup returns null
 
-    const res = await POST(jsonReq('http://localhost/api/admin/campaigns', {
-      name: 'Test',
-      kind: 'test_scenario',
-      scenario_kind: 'non_existent_scenario',
-    }))
+    const res = await POST(
+      jsonReq('http://localhost/api/admin/campaigns', {
+        name: 'Test',
+        kind: 'test_scenario',
+        scenario_kind: 'non_existent_scenario',
+      })
+    )
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toContain('scenario')

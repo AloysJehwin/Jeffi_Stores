@@ -4,11 +4,7 @@ vi.mock('@/lib/google-merchant-helpers', () => ({
   buildProductHighlights: vi.fn(),
 }))
 
-import {
-  productToAmazonListings,
-  productToAmazonOfferListing,
-  productLink,
-} from '@/lib/amazon/mapper'
+import { productToAmazonListings, productToAmazonOfferListing, productLink } from '@/lib/amazon/mapper'
 import * as helpers from '@/lib/google-merchant-helpers'
 
 const mockBuildProductHighlights = vi.mocked(helpers.buildProductHighlights)
@@ -58,12 +54,18 @@ describe('amazon/mapper', () => {
     })
 
     it('matches parent_name when name is not a known category', () => {
-      const listings = productToAmazonListings(makeProduct({ categories: { name: 'unknown-thing', parent_name: 'screws' } }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({ categories: { name: 'unknown-thing', parent_name: 'screws' } }),
+        MP
+      )
       expect(listings[0].productType).toBe('SCREWS')
     })
 
     it('falls back to HARDWARE_HANDLE for unknown categories', () => {
-      const listings = productToAmazonListings(makeProduct({ categories: { name: 'zzz-unknown', parent_name: 'yyy' } }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({ categories: { name: 'zzz-unknown', parent_name: 'yyy' } }),
+        MP
+      )
       expect(listings[0].productType).toBe('HARDWARE_HANDLE')
     })
 
@@ -230,7 +232,7 @@ describe('amazon/mapper', () => {
     it('sets bullet_point from highlights', () => {
       mockBuildProductHighlights.mockReturnValue(['A', 'B', 'C'])
       const listings = productToAmazonListings(makeProduct(), MP)
-      expect((listings[0].attributes.bullet_point as any)).toHaveLength(3)
+      expect(listings[0].attributes.bullet_point as any).toHaveLength(3)
     })
 
     it('omits bullet_point when highlights empty', () => {
@@ -300,24 +302,28 @@ describe('amazon/mapper', () => {
 
   describe('image attributes', () => {
     it('sets main image from primary and others', () => {
-      const listings = productToAmazonListings(makeProduct({
-        product_images: [
-          { id: 'i1', image_url: 'https://x/1.jpg', is_primary: true },
-          { id: 'i2', image_url: 'https://x/2.jpg', is_primary: false },
-          { id: 'i3', image_url: 'https://x/3.jpg', is_primary: false },
-        ],
-      }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({
+          product_images: [
+            { id: 'i1', image_url: 'https://x/1.jpg', is_primary: true },
+            { id: 'i2', image_url: 'https://x/2.jpg', is_primary: false },
+            { id: 'i3', image_url: 'https://x/3.jpg', is_primary: false },
+          ],
+        }),
+        MP
+      )
       expect((listings[0].attributes.main_product_image_locator as any)[0].media_location).toBe('https://x/1.jpg')
       expect(listings[0].attributes.other_product_image_locator_1).toBeDefined()
       expect(listings[0].attributes.other_product_image_locator_2).toBeDefined()
     })
 
     it('falls back to first image when none is primary', () => {
-      const listings = productToAmazonListings(makeProduct({
-        product_images: [
-          { id: 'i1', image_url: 'https://x/first.jpg', is_primary: false },
-        ],
-      }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({
+          product_images: [{ id: 'i1', image_url: 'https://x/first.jpg', is_primary: false }],
+        }),
+        MP
+      )
       expect((listings[0].attributes.main_product_image_locator as any)[0].media_location).toBe('https://x/first.jpg')
     })
 
@@ -327,9 +333,12 @@ describe('amazon/mapper', () => {
     })
 
     it('filters out images without image_url', () => {
-      const listings = productToAmazonListings(makeProduct({
-        product_images: [{ id: 'i1', image_url: null, is_primary: true }],
-      }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({
+          product_images: [{ id: 'i1', image_url: null, is_primary: true }],
+        }),
+        MP
+      )
       expect(listings[0].attributes.main_product_image_locator).toBeUndefined()
     })
   })
@@ -343,84 +352,100 @@ describe('amazon/mapper', () => {
     }
 
     it('returns parent + one child per priced variant', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' },
-        { sku: 'V2', variant_name: 'Large', price: 150, mrp: null, stock_status: 'Out of Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([
+          { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' },
+          { sku: 'V2', variant_name: 'Large', price: 150, mrp: null, stock_status: 'Out of Stock' },
+        ]),
+        MP
+      )
       expect(listings).toHaveLength(3)
       expect((listings[0].attributes.parentage_level as any)[0].value).toBe('parent')
       expect((listings[1].attributes.parentage_level as any)[0].value).toBe('child')
     })
 
     it('parent has no purchasable_offer', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' }]),
+        MP
+      )
       expect(listings[0].attributes.purchasable_offer).toBeUndefined()
     })
 
     it('skips variants with null price', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: null, mrp: null, stock_status: 'In Stock' },
-        { sku: 'V2', variant_name: 'Large', price: 150, mrp: 180, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([
+          { sku: 'V1', variant_name: 'Small', price: null, mrp: null, stock_status: 'In Stock' },
+          { sku: 'V2', variant_name: 'Large', price: 150, mrp: 180, stock_status: 'In Stock' },
+        ]),
+        MP
+      )
       // parent + only V2
       expect(listings).toHaveLength(2)
       expect(listings[1].sku).toBe('V2')
     })
 
     it('child item_name combines product + variant name', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' }]),
+        MP
+      )
       expect((listings[1].attributes.item_name as any)[0].value).toBe('Hex Bolt M12 - Small')
     })
 
     it('child sets size when variant_name present', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'In Stock' }]),
+        MP
+      )
       expect((listings[1].attributes.size as any)[0].value).toBe('Small')
     })
 
     it('child omits size when variant_name absent', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: '', price: 100, mrp: 120, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: '', price: 100, mrp: 120, stock_status: 'In Stock' }]),
+        MP
+      )
       expect(listings[1].attributes.size).toBeUndefined()
     })
 
     it('variant mrp fallback to product mrp when variant.mrp absent', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: null, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: null, stock_status: 'In Stock' }]),
+        MP
+      )
       // product.mrp=120 > 100 => sale, mrp side = 120
       const offer = (listings[1].attributes.purchasable_offer as any)[0]
       expect(offer.maximum_retail_price[0].schedule[0].value_with_tax).toBe(120)
     })
 
     it('uses variant.mrp when present', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 200, stock_status: 'In Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: 200, stock_status: 'In Stock' }]),
+        MP
+      )
       const offer = (listings[1].attributes.purchasable_offer as any)[0]
       expect(offer.maximum_retail_price[0].schedule[0].value_with_tax).toBe(200)
     })
 
     it('no variant mrp and no product mrp => listPrice = price', () => {
-      const listings = productToAmazonListings(makeProduct({
-        has_variants: true,
-        mrp: null,
-        product_variants: [{ sku: 'V1', variant_name: 'Small', price: 100, mrp: null, stock_status: 'In Stock' }],
-      }), MP)
+      const listings = productToAmazonListings(
+        makeProduct({
+          has_variants: true,
+          mrp: null,
+          product_variants: [{ sku: 'V1', variant_name: 'Small', price: 100, mrp: null, stock_status: 'In Stock' }],
+        }),
+        MP
+      )
       const offer = (listings[1].attributes.purchasable_offer as any)[0]
       expect(offer.our_price[0].schedule[0].value_with_tax).toBe(100)
     })
 
     it('child out of stock quantity 0', () => {
-      const listings = productToAmazonListings(makeVariantProduct([
-        { sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'Out of Stock' },
-      ]), MP)
+      const listings = productToAmazonListings(
+        makeVariantProduct([{ sku: 'V1', variant_name: 'Small', price: 100, mrp: 120, stock_status: 'Out of Stock' }]),
+        MP
+      )
       expect((listings[1].attributes.fulfillment_availability as any)[0].quantity).toBe(0)
     })
 
@@ -440,11 +465,12 @@ describe('amazon/mapper', () => {
     })
 
     it('uses variant sku/price/mrp/stock when variant given', () => {
-      const listing = productToAmazonOfferListing(
-        makeProduct(),
-        'B01', MP,
-        { sku: 'VAR-1', price: 90, mrp: 130, stock_status: 'Out of Stock' },
-      )
+      const listing = productToAmazonOfferListing(makeProduct(), 'B01', MP, {
+        sku: 'VAR-1',
+        price: 90,
+        mrp: 130,
+        stock_status: 'Out of Stock',
+      })
       expect(listing.sku).toBe('VAR-1')
       expect((listing.attributes.fulfillment_availability as any)[0].quantity).toBe(0)
       const offer = (listing.attributes.purchasable_offer as any)[0]
@@ -460,11 +486,12 @@ describe('amazon/mapper', () => {
     })
 
     it('variant with null price falls back to product base_price', () => {
-      const listing = productToAmazonOfferListing(
-        makeProduct({ base_price: 70 }),
-        'B03', MP,
-        { sku: 'VAR', price: null, mrp: null, stock_status: 'In Stock' },
-      )
+      const listing = productToAmazonOfferListing(makeProduct({ base_price: 70 }), 'B03', MP, {
+        sku: 'VAR',
+        price: null,
+        mrp: null,
+        stock_status: 'In Stock',
+      })
       const offer = (listing.attributes.purchasable_offer as any)[0]
       expect(offer.our_price[0].schedule[0].value_with_tax).toBe(70)
     })
@@ -475,11 +502,11 @@ describe('amazon/mapper', () => {
     })
 
     it('variant stock_status undefined uses product stock_status', () => {
-      const listing = productToAmazonOfferListing(
-        makeProduct({ stock_status: 'Out of Stock' }),
-        'B05', MP,
-        { sku: 'VAR', price: 10, mrp: null },
-      )
+      const listing = productToAmazonOfferListing(makeProduct({ stock_status: 'Out of Stock' }), 'B05', MP, {
+        sku: 'VAR',
+        price: 10,
+        mrp: null,
+      })
       expect((listing.attributes.fulfillment_availability as any)[0].quantity).toBe(0)
     })
   })

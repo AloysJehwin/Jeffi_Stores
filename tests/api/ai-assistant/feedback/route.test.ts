@@ -33,7 +33,9 @@ function makeRequest(body: object) {
 }
 
 describe('POST /api/ai-assistant/feedback', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -65,7 +67,15 @@ describe('POST /api/ai-assistant/feedback', () => {
   })
 
   it('inserts feedback and returns ok for all valid signals', async () => {
-    const validSignals = ['helpful', 'not_helpful', 'overall_helpful', 'overall_not_helpful', 'clicked', 'added_to_cart', 'purchased']
+    const validSignals = [
+      'helpful',
+      'not_helpful',
+      'overall_helpful',
+      'overall_not_helpful',
+      'clicked',
+      'added_to_cart',
+      'purchased',
+    ]
     for (const signal of validSignals) {
       vi.clearAllMocks()
       mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)

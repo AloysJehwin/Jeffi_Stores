@@ -608,7 +608,12 @@ describe('sendWinbackEmail', () => {
   })
 
   it('proceeds when no discount configured (no coupon_failed)', async () => {
-    mockGetCampaign.mockResolvedValue({ ...mockCampaign, kind: 'winback_180', discount_percent: 0, coupon_id: null } as any)
+    mockGetCampaign.mockResolvedValue({
+      ...mockCampaign,
+      kind: 'winback_180',
+      discount_percent: 0,
+      coupon_id: null,
+    } as any)
     mockQueryOne.mockResolvedValue(mockUser)
     mockCanSendMarketing.mockResolvedValue({ ok: true })
     mockAlreadySentForReference.mockResolvedValue(false)
@@ -672,9 +677,7 @@ describe('sendPriceDropEmail', () => {
 
   it('passes rounded oldPrice and newPrice in vars', async () => {
     mockGetCampaign.mockResolvedValue({ ...mockCampaign, kind: 'price_drop' } as any)
-    mockQueryOne
-      .mockResolvedValueOnce(mockUser)
-      .mockResolvedValueOnce(null) // no product image
+    mockQueryOne.mockResolvedValueOnce(mockUser).mockResolvedValueOnce(null) // no product image
     mockGetAssignedCouponCode.mockResolvedValue(null)
     mockGenerateCouponForCampaign.mockResolvedValue(null)
     mockCanSendMarketing.mockResolvedValue({ ok: true })

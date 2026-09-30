@@ -4,7 +4,7 @@ vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {},
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -23,7 +23,9 @@ function makeRequest(body: object) {
 }
 
 describe('POST /api/reviews/generate', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 when productName is missing', async () => {
     const res = await POST(makeRequest({ rating: 5, tags: [] }) as any)
@@ -41,9 +43,15 @@ describe('POST /api/reviews/generate', () => {
   })
 
   it('returns generated review text on success', async () => {
-    mockAiChat.mockResolvedValueOnce({ content: '  Great bolt, really strong na!  ', provider: 'openai', model: 'gpt-4o-mini' } as any)
+    mockAiChat.mockResolvedValueOnce({
+      content: '  Great bolt, really strong na!  ',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    } as any)
 
-    const res = await POST(makeRequest({ productName: 'Hex Bolt M6', rating: 5, tags: ['durable', 'good quality'] }) as any)
+    const res = await POST(
+      makeRequest({ productName: 'Hex Bolt M6', rating: 5, tags: ['durable', 'good quality'] }) as any
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.review).toBe('Great bolt, really strong na!') // trimmed

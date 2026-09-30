@@ -91,7 +91,11 @@ describe('POST /api/admin/ai-enrich-field', () => {
   })
 
   it('allows a tenant admin holding both the AI entitlement and the field scope', async () => {
-    mockAuth.mockResolvedValue({ adminId: 't1', role: 'super_admin', scopes: ['catalog_enrichment:write', 'brands:write'] } as any)
+    mockAuth.mockResolvedValue({
+      adminId: 't1',
+      role: 'super_admin',
+      scopes: ['catalog_enrichment:write', 'brands:write'],
+    } as any)
     aiReply(JSON.stringify({ result: 'Better brand blurb' }))
     const res = await POST(makeReq({ value: 'brand blurb', scope: 'brands:write' }))
     expect(res.status).toBe(200)

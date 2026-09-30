@@ -80,7 +80,7 @@ describe('PATCH /api/admin/cron/config', () => {
   it('updates job enabled=true successfully', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       await fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) } as any)
     })
 
@@ -93,7 +93,7 @@ describe('PATCH /api/admin/cron/config', () => {
   it('updates job enabled=false successfully', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const clientQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 })
       await fn({ query: clientQuery } as any)
     })

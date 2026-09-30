@@ -15,7 +15,14 @@ import { authenticateAnyUser } from '@/lib/jwt'
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 
 function coupon(overrides: Record<string, unknown> = {}) {
-  return { code: 'SAVE10', discount_type: 'percentage', discount_value: 10, min_purchase: 0, max_discount: null, ...overrides }
+  return {
+    code: 'SAVE10',
+    discount_type: 'percentage',
+    discount_value: 10,
+    min_purchase: 0,
+    max_discount: null,
+    ...overrides,
+  }
 }
 
 async function nudgeFor(subtotal?: string) {
@@ -26,7 +33,7 @@ async function nudgeFor(subtotal?: string) {
 }
 
 describe('GET /api/coupons/nudge — validation', () => {
-  it.each([undefined, 'abc', '-5'])('rejects subtotal=%s with 400', async (subtotal) => {
+  it.each([undefined, 'abc', '-5'])('rejects subtotal=%s with 400', async subtotal => {
     const { status, body } = await nudgeFor(subtotal)
     expect(status).toBe(400)
     expect(body.error).toBe('Invalid request')
@@ -149,7 +156,9 @@ describe('GET /api/coupons/nudge — picking the best coupon', () => {
   })
 
   it('does not nudge towards a minimum more than double the cart', async () => {
-    vi.mocked(queryMany).mockResolvedValue([coupon({ code: 'BULK', discount_type: 'fixed', discount_value: 500, min_purchase: 10000 })])
+    vi.mocked(queryMany).mockResolvedValue([
+      coupon({ code: 'BULK', discount_type: 'fixed', discount_value: 500, min_purchase: 10000 }),
+    ])
     const { body } = await nudgeFor('400')
     expect(body.nudge).toBeNull()
   })

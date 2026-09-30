@@ -143,9 +143,7 @@ describe('sendAuditedMail', () => {
       kind: 'order',
     })
 
-    expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ from: '"Custom" <custom@example.com>' })
-    )
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ from: '"Custom" <custom@example.com>' }))
   })
 
   it('serializes metadata to JSON in log', async () => {
@@ -181,9 +179,7 @@ describe('sendAuditedMail', () => {
       kind: 'order',
     })
 
-    expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'plain text body' })
-    )
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ text: 'plain text body' }))
   })
 
   it('passes attachments through to sendMail', async () => {
@@ -197,9 +193,7 @@ describe('sendAuditedMail', () => {
       attachments,
     })
 
-    expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ attachments })
-    )
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({ attachments }))
   })
 
   it('truncates long error messages to 2000 chars in log', async () => {
@@ -215,9 +209,7 @@ describe('sendAuditedMail', () => {
     ).rejects.toThrow()
 
     const [, insertArgs] = mockQueryOne.mock.calls[0]
-    const errorArg = insertArgs.find(
-      (a: unknown) => typeof a === 'string' && a.length <= 2000 && a.length > 0
-    )
+    const errorArg = insertArgs.find((a: unknown) => typeof a === 'string' && a.length <= 2000 && a.length > 0)
     expect(errorArg).toBeDefined()
     expect(errorArg!.length).toBeLessThanOrEqual(2000)
   })

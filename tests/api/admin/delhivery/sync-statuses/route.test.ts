@@ -81,28 +81,35 @@ function makeReq(opts: { auth?: string } = {}) {
 }
 
 const ORDER = {
-  id: 'ord-1', awb_number: 'AWB001', status: 'shipped',
-  order_number: 'ORD-001', customer_name: 'John Doe',
-  customer_email: 'john@example.com', user_id: 'user-1',
-  delhivery_quoted_weight_kg: 1, delhivery_charged_weight_kg: null,
+  id: 'ord-1',
+  awb_number: 'AWB001',
+  status: 'shipped',
+  order_number: 'ORD-001',
+  customer_name: 'John Doe',
+  customer_email: 'john@example.com',
+  user_id: 'user-1',
+  delhivery_quoted_weight_kg: 1,
+  delhivery_charged_weight_kg: null,
 }
 
 function makeShipmentData(awb: string, statusType: string, extra: Record<string, any> = {}) {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: extra.status ?? '',
-          StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: extra.status ?? '',
+            StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+          },
+          Scans: extra.scans ?? [],
+          DestRecieveDate: extra.destReceiveDate ?? null,
+          ReturnedDate: extra.returnedDate ?? null,
+          ...extra.shipmentExtra,
         },
-        Scans: extra.scans ?? [],
-        DestRecieveDate: extra.destReceiveDate ?? null,
-        ReturnedDate: extra.returnedDate ?? null,
-        ...extra.shipmentExtra,
       },
-    }],
+    ],
   }
 }
 
@@ -162,7 +169,7 @@ describe('POST /api/admin/delhivery/sync-statuses — auth / config', () => {
 
 describe('POST — no orders with AWB', () => {
   it('returns synced:0 total:0 when no orders found', async () => {
-    mockQueryMany.mockResolvedValueOnce([])   // orders
+    mockQueryMany.mockResolvedValueOnce([]) // orders
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -175,9 +182,7 @@ describe('POST — no orders with AWB', () => {
 
 describe('POST — DL status (delivered)', () => {
   it('updates order to delivered and sends email', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any)
-      .mockResolvedValueOnce([])   // rvp orders
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any).mockResolvedValueOnce([]) // rvp orders
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -190,21 +195,22 @@ describe('POST — DL status (delivered)', () => {
     expect(body.synced).toBe(1)
     expect(body.results[0].syncedTo).toBe('delivered')
 
-    const updateCall = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('UPDATE orders')
-    )
+    const updateCall = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('UPDATE orders'))
     expect(updateCall).toBeDefined()
     expect((updateCall![1] as any[])[0]).toBe('ord-1')
 
     expect(mockSendEmail).toHaveBeenCalledWith(
-      'john@example.com', 'John Doe', 'ORD-001', 'ord-1', 'delivered', 'out_for_delivery'
+      'john@example.com',
+      'John Doe',
+      'ORD-001',
+      'ord-1',
+      'delivered',
+      'out_for_delivery'
     )
   })
 
   it('does not update order when onlyIfCurrent guard fails (already delivered)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'delivered' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'delivered' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -216,9 +222,7 @@ describe('POST — DL status (delivered)', () => {
     const body = await res.json()
     expect(body.synced).toBe(0)
     // shipment_status write may still fire; assert STATUS_SYNC status write did not
-    expect(mockQuery).not.toHaveBeenCalledWith(
-      expect.stringContaining("status = 'delivered'"), expect.any(Array)
-    )
+    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining("status = 'delivered'"), expect.any(Array))
   })
 })
 
@@ -226,9 +230,7 @@ describe('POST — DL status (delivered)', () => {
 
 describe('POST — PU status (picked up → shipped)', () => {
   it('updates order to shipped with setShippedAt', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -245,9 +247,7 @@ describe('POST — PU status (picked up → shipped)', () => {
 
 describe('POST — RTO-DL status', () => {
   it('sets order status to returned and clears awb_number', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -258,9 +258,7 @@ describe('POST — RTO-DL status', () => {
     const body = await res.json()
     expect(body.results[0].syncedTo).toBe('returned')
 
-    const updateCall = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('awb_number = NULL')
-    )
+    const updateCall = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('awb_number = NULL'))
     expect(updateCall).toBeDefined()
   })
 })
@@ -269,9 +267,7 @@ describe('POST — RTO-DL status', () => {
 
 describe('POST — RTO event with user_id', () => {
   it('calls createAutoTask for address_rto when rawType starts with RTO', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -309,9 +305,7 @@ describe('POST — RTO event with user_id', () => {
 
 describe('POST — fetch non-ok HTTP response', () => {
   it('records error per AWB when fetch returns non-ok', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
@@ -332,9 +326,7 @@ describe('POST — fetch non-ok HTTP response', () => {
 
 describe('POST — fetch throws', () => {
   it('records error per AWB when fetch throws', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockRejectedValue(new Error('Network timeout'))
 
@@ -349,9 +341,7 @@ describe('POST — fetch throws', () => {
 
 describe('POST — unknown statusType skipped', () => {
   it('does not update order when statusType has no sync rule (e.g. MF)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([ORDER] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -373,9 +363,7 @@ describe('POST — unknown statusType skipped', () => {
 
 describe('POST — exception type NDR with status=delivered fallback', () => {
   it('resolves NDR to DL when Status.Status is "delivered"', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -388,9 +376,7 @@ describe('POST — exception type NDR with status=delivered fallback', () => {
   })
 
   it('resolves NDR to OD when Status.Status is "out for delivery"', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

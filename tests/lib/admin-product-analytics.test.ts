@@ -43,7 +43,7 @@ describe('getProductAnalyticsData', () => {
   it('returns product info with parsed fields', async () => {
     mockQueryOne
       .mockResolvedValueOnce(fakeProduct) // product lookup
-      .mockResolvedValueOnce(fakeTotals)   // totals
+      .mockResolvedValueOnce(fakeTotals) // totals
       .mockResolvedValueOnce(fakeCurrentCarts) // currentCarts
 
     mockQueryMany.mockResolvedValue([])

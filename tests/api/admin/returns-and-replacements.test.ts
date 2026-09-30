@@ -47,34 +47,22 @@ describe('GET /api/admin/returns', () => {
 
   it('filters by status=pending_approval', async () => {
     await getReturns(makeReq('http://localhost/api/admin/returns?status=pending_approval'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'pending_approval'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'pending_approval'"), [])
   })
 
   it('filters history by approved', async () => {
     await getReturns(makeReq('http://localhost/api/admin/returns?status=history&filter=approved'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'completed'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'completed'"), [])
   })
 
   it('filters history by rejected', async () => {
     await getReturns(makeReq('http://localhost/api/admin/returns?status=history&filter=rejected'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'rejected'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'rejected'"), [])
   })
 
   it('filters history all by default', async () => {
     await getReturns(makeReq('http://localhost/api/admin/returns?status=history'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status IN ('completed', 'rejected')"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status IN ('completed', 'rejected')"), [])
   })
 
   it('returns 500 on db error', async () => {
@@ -107,34 +95,22 @@ describe('GET /api/admin/replacements', () => {
 
   it('filters by pending_approval', async () => {
     await getReplacements(makeReq('http://localhost/api/admin/replacements?status=pending_approval'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'pending_approval'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'pending_approval'"), [])
   })
 
   it('filters history by approved', async () => {
     await getReplacements(makeReq('http://localhost/api/admin/replacements?status=history&filter=approved'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'completed'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'completed'"), [])
   })
 
   it('filters history by rejected', async () => {
     await getReplacements(makeReq('http://localhost/api/admin/replacements?status=history&filter=rejected'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status = 'rejected'"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status = 'rejected'"), [])
   })
 
   it('filters history all by default', async () => {
     await getReplacements(makeReq('http://localhost/api/admin/replacements?status=history'))
-    expect(queryMany).toHaveBeenCalledWith(
-      expect.stringContaining("rr.status IN ('completed', 'rejected')"),
-      [],
-    )
+    expect(queryMany).toHaveBeenCalledWith(expect.stringContaining("rr.status IN ('completed', 'rejected')"), [])
   })
 
   it('returns 500 on db error', async () => {

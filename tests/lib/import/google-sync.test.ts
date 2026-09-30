@@ -12,13 +12,23 @@ describe('extractSpreadsheetId', () => {
 
 describe('valuesToWorkbookBuffer', () => {
   it('keeps every template tab by title', () => {
-    const buf = valuesToWorkbookBuffer({ Products: [['sku'], ['A']], 'Product · Shipping': [['sku', 'weight_grams']], Variants: [] })
+    const buf = valuesToWorkbookBuffer({
+      Products: [['sku'], ['A']],
+      'Product · Shipping': [['sku', 'weight_grams']],
+      Variants: [],
+    })
     const wb = XLSX.read(buf, { type: 'buffer' })
     expect(wb.SheetNames).toEqual(['Products', 'Product · Shipping', 'Variants'])
   })
 
   it('wraps a single matrix as the Products tab', () => {
-    const wb = XLSX.read(valuesToWorkbookBuffer([['row_type', 'sku'], ['product', 'A']]), { type: 'buffer' })
+    const wb = XLSX.read(
+      valuesToWorkbookBuffer([
+        ['row_type', 'sku'],
+        ['product', 'A'],
+      ]),
+      { type: 'buffer' }
+    )
     expect(wb.SheetNames).toEqual(['Products'])
   })
 })

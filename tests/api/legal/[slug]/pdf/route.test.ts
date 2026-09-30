@@ -27,7 +27,9 @@ const mockPolicy = {
 }
 
 describe('GET /api/legal/[slug]/pdf', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 404 when policy not found', async () => {
     mockGetPolicy.mockReturnValueOnce(undefined as any)

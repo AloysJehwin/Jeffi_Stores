@@ -9,7 +9,9 @@ const mockStaffSessionFromRequest = vi.fn()
 vi.mock('@/lib/tenant-context', () => ({ resolveTenantId: (...a: unknown[]) => mockResolveTenantId(...a) }))
 vi.mock('@/lib/admin-identity', () => ({ resolveAdminByEmail: (...a: unknown[]) => mockResolveAdminByEmail(...a) }))
 vi.mock('@/lib/plan-gate', () => ({ hasPlanScope: (...a: unknown[]) => mockHasPlanScope(...a) }))
-vi.mock('@/lib/staff-session', () => ({ staffSessionFromRequest: (...a: unknown[]) => mockStaffSessionFromRequest(...a) }))
+vi.mock('@/lib/staff-session', () => ({
+  staffSessionFromRequest: (...a: unknown[]) => mockStaffSessionFromRequest(...a),
+}))
 
 import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
 
@@ -35,7 +37,10 @@ describe('requireStaff', () => {
   it('reads role and scopes from the admin record, not the cookie', async () => {
     const r = await requireStaff(req(), 'customers:write')
     expect(isStaffDenied(r)).toBe(false)
-    expect(r).toMatchObject({ session: { ...claims, role: 'administrator', scopes: ['customers:write'] }, tenantId: null })
+    expect(r).toMatchObject({
+      session: { ...claims, role: 'administrator', scopes: ['customers:write'] },
+      tenantId: null,
+    })
     expect(mockHasPlanScope).toHaveBeenCalledWith('administrator', ['customers:write'], 'customers:write')
   })
 

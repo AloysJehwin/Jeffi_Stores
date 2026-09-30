@@ -27,8 +27,12 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockWithTx = vi.mocked(withTransaction)
 
 const admin = {
-  adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation'],
-  first_name: 'Test', last_name: 'Admin',
+  adminId: 'a1',
+  username: 'admin',
+  role: 'super_admin',
+  scopes: ['inflation'],
+  first_name: 'Test',
+  last_name: 'Admin',
 }
 
 function makeReq(body: any) {
@@ -40,13 +44,19 @@ function makeReq(body: any) {
 }
 
 const validLog = {
-  id: 'log-1', category_id: 'cat-1', category_name: 'Bolts',
-  percentage: 5, applied_fields: ['mrp'], is_rollback: false,
+  id: 'log-1',
+  category_id: 'cat-1',
+  category_name: 'Bolts',
+  percentage: 5,
+  applied_fields: ['mrp'],
+  is_rollback: false,
   rolled_back_at: null,
   snapshot: [{ id: 'p1', before: { mrp: 100 }, variants: [] }],
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/inflation/rollback', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -129,14 +139,16 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockHasScope.mockReturnValue(true)
     const logWithVariants = {
       ...validLog,
-      snapshot: [{
-        id: 'p1',
-        before: { mrp: 200, base_price: 180 },
-        variants: [
-          { id: 'v1', before: { mrp: 210, base_price: 190 } },
-          { id: 'v2', before: { mrp: 220 } },
-        ],
-      }],
+      snapshot: [
+        {
+          id: 'p1',
+          before: { mrp: 200, base_price: 180 },
+          variants: [
+            { id: 'v1', before: { mrp: 210, base_price: 190 } },
+            { id: 'v2', before: { mrp: 220 } },
+          ],
+        },
+      ],
     }
     mockQueryOne.mockResolvedValue(logWithVariants)
     const mockClient = {
@@ -148,8 +160,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     // Verify variant UPDATE was called: set_config + product UPDATE + 2x variant UPDATE + log UPDATE + log INSERT = 6 calls
-    const updateCalls = mockClient.query.mock.calls.filter((c: any[]) =>
-      typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
+    const updateCalls = mockClient.query.mock.calls.filter(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
     )
     expect(updateCalls.length).toBe(2)
   })
@@ -159,13 +171,15 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockHasScope.mockReturnValue(true)
     const logWithEmptyVariantBefore = {
       ...validLog,
-      snapshot: [{
-        id: 'p1',
-        before: { mrp: 100 },
-        variants: [
-          { id: 'v1', before: {} },  // no before values — setClauses empty, no UPDATE
-        ],
-      }],
+      snapshot: [
+        {
+          id: 'p1',
+          before: { mrp: 100 },
+          variants: [
+            { id: 'v1', before: {} }, // no before values — setClauses empty, no UPDATE
+          ],
+        },
+      ],
     }
     mockQueryOne.mockResolvedValue(logWithEmptyVariantBefore)
     const mockClient = {
@@ -174,8 +188,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await POST(makeReq({ log_id: 'log-1' }))
     expect(res.status).toBe(200)
-    const variantUpdates = mockClient.query.mock.calls.filter((c: any[]) =>
-      typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
+    const variantUpdates = mockClient.query.mock.calls.filter(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
     )
     expect(variantUpdates).toHaveLength(0)
   })
@@ -205,8 +219,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await POST(makeReq({ log_id: 'log-1' }))
     expect(res.status).toBe(200)
-    const productUpdates = mockClient.query.mock.calls.filter((c: any[]) =>
-      typeof c[0] === 'string' && c[0].includes('UPDATE products SET')
+    const productUpdates = mockClient.query.mock.calls.filter(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('UPDATE products SET')
     )
     expect(productUpdates).toHaveLength(0)
   })

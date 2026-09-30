@@ -76,9 +76,7 @@ const sampleOrder = {
   shipping_address: null,
 }
 
-const sampleItems = [
-  { id: 'item-1', product_name: 'Widget', quantity: 2, unit_price: 250 },
-]
+const sampleItems = [{ id: 'item-1', product_name: 'Widget', quantity: 2, unit_price: 250 }]
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -235,10 +233,12 @@ describe('PATCH /api/admin/orders/[id]', () => {
     // 1st queryOne: EDD guard — non-delivered status
     // 2nd queryOne: UPDATE
     // 3rd queryOne: order lookup for email
-    mockQueryOne
-      .mockResolvedValueOnce({ status: 'processing' })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ order_number: 'ORD-001', id: 'order-1', email: 'customer@example.com', first_name: 'John' })
+    mockQueryOne.mockResolvedValueOnce({ status: 'processing' }).mockResolvedValueOnce(null).mockResolvedValueOnce({
+      order_number: 'ORD-001',
+      id: 'order-1',
+      email: 'customer@example.com',
+      first_name: 'John',
+    })
 
     const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
     const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
@@ -266,9 +266,9 @@ describe('PATCH /api/admin/orders/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true, data: { estimated_delivery_date: '2025-12-31' } } as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)  // EDD guard — order not found, non-delivered
-      .mockResolvedValueOnce(null)  // UPDATE
-      .mockResolvedValueOnce(null)  // order lookup for email — null
+      .mockResolvedValueOnce(null) // EDD guard — order not found, non-delivered
+      .mockResolvedValueOnce(null) // UPDATE
+      .mockResolvedValueOnce(null) // order lookup for email — null
 
     const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
     const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })

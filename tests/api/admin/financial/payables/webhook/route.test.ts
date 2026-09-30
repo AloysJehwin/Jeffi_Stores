@@ -83,10 +83,10 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     }
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE expense_payments SET payout_status/),
-      ['processed', 'pay_001']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE expense_payments SET payout_status/), [
+      'processed',
+      'pay_001',
+    ])
   })
 
   it('updates payout_status on payout.queued', async () => {
@@ -116,11 +116,11 @@ describe('POST /api/admin/financial/payables/webhook', () => {
       payload: { payout: { entity: { id: 'pay_004', status: 'failed' } } },
     }
     mockQuery
-      .mockResolvedValueOnce([] as any)                          // UPDATE payout_status
-      .mockResolvedValueOnce([{ expense_id: 'exp-1' }] as any)  // SELECT expense_id
-      .mockResolvedValueOnce([{ paid: '0' }] as any)            // SUM paid
+      .mockResolvedValueOnce([] as any) // UPDATE payout_status
+      .mockResolvedValueOnce([{ expense_id: 'exp-1' }] as any) // SELECT expense_id
+      .mockResolvedValueOnce([{ paid: '0' }] as any) // SUM paid
       .mockResolvedValueOnce([{ total_amount: '1000' }] as any) // total_amount
-      .mockResolvedValueOnce([] as any)                          // UPDATE expenses status
+      .mockResolvedValueOnce([] as any) // UPDATE expenses status
 
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)

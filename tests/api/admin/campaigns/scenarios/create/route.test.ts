@@ -151,7 +151,7 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
     mockQueryOne.mockResolvedValue(null) // kind is free
 
     const mockClient = { query: vi.fn().mockResolvedValue(undefined) }
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       await cb(mockClient as any)
     })
     mockQuery.mockResolvedValue(undefined as any)
@@ -170,7 +170,9 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
     mockQueryOne.mockResolvedValue(null)
 
     const mockClient = { query: vi.fn().mockResolvedValue(undefined) }
-    mockWithTransaction.mockImplementation(async (cb) => { await cb(mockClient as any) })
+    mockWithTransaction.mockImplementation(async cb => {
+      await cb(mockClient as any)
+    })
     mockQuery.mockResolvedValue(undefined as any)
 
     const res = await POST(makeRequest({ ...validBody, name: 'Hello World!! 2024' }))
@@ -186,7 +188,9 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
     mockQueryOne.mockResolvedValue(null)
 
     const mockClient = { query: vi.fn().mockResolvedValue(undefined) }
-    mockWithTransaction.mockImplementation(async (cb) => { await cb(mockClient as any) })
+    mockWithTransaction.mockImplementation(async cb => {
+      await cb(mockClient as any)
+    })
     mockQuery.mockResolvedValue(undefined as any)
 
     const res = await POST(makeRequest({ ...validBody, kind: 'my_custom_kind' }))
@@ -197,13 +201,17 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
   it('accepts optional product_sql and normalizes it', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockValidateSql
-      .mockReturnValueOnce(okValidation as any)
-      .mockReturnValueOnce({ ok: true, normalized: 'SELECT id FROM products WHERE 1=1', tablesReferenced: ['products'] } as any)
+    mockValidateSql.mockReturnValueOnce(okValidation as any).mockReturnValueOnce({
+      ok: true,
+      normalized: 'SELECT id FROM products WHERE 1=1',
+      tablesReferenced: ['products'],
+    } as any)
     mockQueryOne.mockResolvedValue(null)
 
     const mockClient = { query: vi.fn().mockResolvedValue(undefined) }
-    mockWithTransaction.mockImplementation(async (cb) => { await cb(mockClient as any) })
+    mockWithTransaction.mockImplementation(async cb => {
+      await cb(mockClient as any)
+    })
     mockQuery.mockResolvedValue(undefined as any)
 
     const res = await POST(makeRequest({ ...validBody, product_sql: 'SELECT id FROM products WHERE 1=1' }))
@@ -230,13 +238,12 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
     mockQueryOne.mockResolvedValue(null)
 
     const mockClient = { query: vi.fn().mockResolvedValue(undefined) }
-    mockWithTransaction.mockImplementation(async (cb) => { await cb(mockClient as any) })
+    mockWithTransaction.mockImplementation(async cb => {
+      await cb(mockClient as any)
+    })
     mockQuery.mockResolvedValue(undefined as any)
 
     await POST(makeRequest(validBody))
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("'save'"),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("'save'"), expect.any(Array))
   })
 })

@@ -4,7 +4,9 @@ import { decode, isBlurhashValid } from 'blurhash'
 import { computeBlurhash } from '@/lib/s3'
 
 async function solid(r: number, g: number, b: number, width = 600, height = 400) {
-  return sharp({ create: { width, height, channels: 3, background: { r, g, b } } }).png().toBuffer()
+  return sharp({ create: { width, height, channels: 3, background: { r, g, b } } })
+    .png()
+    .toBuffer()
 }
 
 describe('computeBlurhash', () => {

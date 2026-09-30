@@ -12,11 +12,13 @@ vi.mock('@/lib/search', () => ({
     params: [],
     nextIdx: startIdx,
   })),
-  buildVectorSearchClause: vi.fn((_search: string, _vec: string, _textCols: string[], _exactCols: string[], startIdx: number) => ({
-    clause: 'TRUE',
-    params: [],
-    nextIdx: startIdx,
-  })),
+  buildVectorSearchClause: vi.fn(
+    (_search: string, _vec: string, _textCols: string[], _exactCols: string[], startIdx: number) => ({
+      clause: 'TRUE',
+      params: [],
+      nextIdx: startIdx,
+    })
+  ),
 }))
 
 import { queryOne, queryMany } from '@/lib/db'
@@ -41,9 +43,7 @@ beforeEach(() => {
 
 describe('getCustomerCreditStatus', () => {
   it('returns credit status with available credit calculated', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ credit_limit: '50000' })
-      .mockResolvedValueOnce({ outstanding: '15000' })
+    mockQueryOne.mockResolvedValueOnce({ credit_limit: '50000' }).mockResolvedValueOnce({ outstanding: '15000' })
 
     const result = await getCustomerCreditStatus('user-1')
     expect(result.credit_limit).toBe(50000)
@@ -53,9 +53,7 @@ describe('getCustomerCreditStatus', () => {
   })
 
   it('is_over_limit is true when outstanding >= credit_limit', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ credit_limit: '10000' })
-      .mockResolvedValueOnce({ outstanding: '10000' })
+    mockQueryOne.mockResolvedValueOnce({ credit_limit: '10000' }).mockResolvedValueOnce({ outstanding: '10000' })
 
     const result = await getCustomerCreditStatus('user-2')
     expect(result.is_over_limit).toBe(true)
@@ -63,9 +61,7 @@ describe('getCustomerCreditStatus', () => {
   })
 
   it('is_over_limit is false when credit_limit is 0 (unlimited)', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ credit_limit: '0' })
-      .mockResolvedValueOnce({ outstanding: '5000' })
+    mockQueryOne.mockResolvedValueOnce({ credit_limit: '0' }).mockResolvedValueOnce({ outstanding: '5000' })
 
     const result = await getCustomerCreditStatus('user-3')
     // credit_limit=0 means "no limit set" — is_over_limit requires credit_limit > 0
@@ -73,9 +69,7 @@ describe('getCustomerCreditStatus', () => {
   })
 
   it('clamps available to 0 when over limit (no negative available)', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ credit_limit: '5000' })
-      .mockResolvedValueOnce({ outstanding: '8000' })
+    mockQueryOne.mockResolvedValueOnce({ credit_limit: '5000' }).mockResolvedValueOnce({ outstanding: '8000' })
 
     const result = await getCustomerCreditStatus('user-4')
     expect(result.available).toBe(0)
@@ -83,9 +77,7 @@ describe('getCustomerCreditStatus', () => {
   })
 
   it('defaults to 0 when profile row is null', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
 
     const result = await getCustomerCreditStatus('user-5')
     expect(result.credit_limit).toBe(0)
@@ -134,9 +126,7 @@ describe('getReceivablesAging', () => {
 
   it('aggregates 60+ bucket correctly', async () => {
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makeReceivableRow({ total_amount: 5000, aging_bucket: '60+' }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makeReceivableRow({ total_amount: 5000, aging_bucket: '60+' })])
 
     const result = await getReceivablesAging({})
     expect(result.summary.bucket_60plus).toBeCloseTo(5000, 2)
@@ -245,9 +235,7 @@ describe('getPayables', () => {
 
   it('returns rows, summary, and total count', async () => {
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 5900, paid_amount: 0 }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 5900, paid_amount: 0 })])
 
     const result = await getPayables({})
     expect(result.total).toBe(1)
@@ -257,9 +245,7 @@ describe('getPayables', () => {
 
   it('subtracts paid_amount from total_payable in summary', async () => {
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 5900, paid_amount: 1000 }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 5900, paid_amount: 1000 })])
 
     const result = await getPayables({})
     expect(result.summary.total_payable).toBeCloseTo(4900, 2)
@@ -271,9 +257,7 @@ describe('getPayables', () => {
     const dueDateStr = dueDate.toISOString().split('T')[0]
 
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 3000, paid_amount: 0, due_date: dueDateStr }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 3000, paid_amount: 0, due_date: dueDateStr })])
 
     const result = await getPayables({})
     expect(result.summary.due_this_week).toBeCloseTo(3000, 2)
@@ -284,9 +268,7 @@ describe('getPayables', () => {
     const pastDate = '2020-01-01' // clearly in the past
 
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 2000, paid_amount: 500, due_date: pastDate }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 2000, paid_amount: 500, due_date: pastDate })])
 
     const result = await getPayables({})
     expect(result.summary.overdue).toBeCloseTo(1500, 2)
@@ -328,9 +310,7 @@ describe('getPayables', () => {
     const dueDateStr = farFuture.toISOString().split('T')[0]
 
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 4000, paid_amount: 0, due_date: dueDateStr }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 4000, paid_amount: 0, due_date: dueDateStr })])
 
     const result = await getPayables({})
     expect(result.summary.total_payable).toBeCloseTo(4000, 2)
@@ -342,9 +322,7 @@ describe('getPayables', () => {
 
   it('applies specific status filter — adds e.status = $N condition', async () => {
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 1200, paid_amount: 0, status: 'overdue' }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 1200, paid_amount: 0, status: 'overdue' })])
 
     const result = await getPayables({ status: 'overdue' })
     expect(result.total).toBe(1)
@@ -366,9 +344,7 @@ describe('getPayables', () => {
 
   it('applies status filter for "pending" and also applies from/to date filters', async () => {
     mockQueryOne.mockResolvedValueOnce({ count: '1' })
-    mockQueryMany.mockResolvedValueOnce([
-      makePayableRow({ total_amount: 5000, paid_amount: 0, status: 'pending' }),
-    ])
+    mockQueryMany.mockResolvedValueOnce([makePayableRow({ total_amount: 5000, paid_amount: 0, status: 'pending' })])
 
     const result = await getPayables({
       status: 'pending',
@@ -411,7 +387,14 @@ describe('getPLReport', () => {
     // getPLReport uses Promise.all([revenueRows, refundRows, opexRows]) — 3 queries
     mockQueryMany
       .mockResolvedValueOnce([
-        { month: '2026-01', source: 'online', revenue: '100000', cogs: '60000', tax_collected: '18000', order_count: 50 },
+        {
+          month: '2026-01',
+          source: 'online',
+          revenue: '100000',
+          cogs: '60000',
+          tax_collected: '18000',
+          order_count: 50,
+        },
       ])
       .mockResolvedValueOnce([]) // refundRows
       .mockResolvedValueOnce([]) // opexRows
@@ -431,8 +414,22 @@ describe('getPLReport', () => {
   it('computes totals as sum of all monthly rows', async () => {
     mockQueryMany
       .mockResolvedValueOnce([
-        { month: '2026-01', source: 'online', revenue: '100000', cogs: '60000', tax_collected: '18000', order_count: 50 },
-        { month: '2026-02', source: 'online', revenue: '80000', cogs: '40000', tax_collected: '14400', order_count: 40 },
+        {
+          month: '2026-01',
+          source: 'online',
+          revenue: '100000',
+          cogs: '60000',
+          tax_collected: '18000',
+          order_count: 50,
+        },
+        {
+          month: '2026-02',
+          source: 'online',
+          revenue: '80000',
+          cogs: '40000',
+          tax_collected: '14400',
+          order_count: 40,
+        },
       ])
       .mockResolvedValueOnce([]) // refundRows
       .mockResolvedValueOnce([]) // opexRows
@@ -500,10 +497,17 @@ describe('getPLReport', () => {
   it('applies refunds to reduce net_revenue', async () => {
     mockQueryMany
       .mockResolvedValueOnce([
-        { month: '2026-01', source: 'online', revenue: '100000', cogs: '50000', tax_collected: '15000', order_count: 30 },
+        {
+          month: '2026-01',
+          source: 'online',
+          revenue: '100000',
+          cogs: '50000',
+          tax_collected: '15000',
+          order_count: 30,
+        },
       ])
       .mockResolvedValueOnce([{ month: '2026-01', refunds: '10000' }]) // refundRows
-      .mockResolvedValueOnce([])                                        // opexRows
+      .mockResolvedValueOnce([]) // opexRows
 
     const result = await getPLReport('2026-01-01', '2026-01-31')
     const m = result.monthly[0]
@@ -515,9 +519,16 @@ describe('getPLReport', () => {
   it('deducts operating_expenses from gross_profit to yield operating_profit', async () => {
     mockQueryMany
       .mockResolvedValueOnce([
-        { month: '2026-01', source: 'online', revenue: '80000', cogs: '40000', tax_collected: '12000', order_count: 25 },
+        {
+          month: '2026-01',
+          source: 'online',
+          revenue: '80000',
+          cogs: '40000',
+          tax_collected: '12000',
+          order_count: 25,
+        },
       ])
-      .mockResolvedValueOnce([])                                           // refundRows
+      .mockResolvedValueOnce([]) // refundRows
       .mockResolvedValueOnce([{ month: '2026-01', operating_expenses: '15000' }]) // opexRows
 
     const result = await getPLReport('2026-01-01', '2026-01-31')
@@ -535,8 +546,8 @@ describe('getCashflow', () => {
     // inRows: { month, source, amount }  poRows: { month, po_payments }  refundRows: { month, refunds_out }
     mockQueryMany
       .mockResolvedValueOnce([{ month: '2026-01', source: 'online', amount: '100000' }]) // inRows
-      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '40000' }])               // poRows
-      .mockResolvedValueOnce([])                                                          // refundRows
+      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '40000' }]) // poRows
+      .mockResolvedValueOnce([]) // refundRows
 
     const result = await getCashflow('2026-01-01', '2026-01-31')
     expect(result.monthly).toHaveLength(1)
@@ -561,15 +572,15 @@ describe('getCashflow', () => {
 
     const result = await getCashflow('2026-01-01', '2026-02-28')
     expect(result.monthly).toHaveLength(2)
-    expect(result.monthly[0].running_balance).toBe(40000)   // 100000 - 60000
-    expect(result.monthly[1].running_balance).toBe(90000)   // 40000 + (80000 - 30000)
+    expect(result.monthly[0].running_balance).toBe(40000) // 100000 - 60000
+    expect(result.monthly[1].running_balance).toBe(90000) // 40000 + (80000 - 30000)
   })
 
   it('handles months with only cash_in (no cash_out)', async () => {
     mockQueryMany
       .mockResolvedValueOnce([{ month: '2026-03', source: 'online', amount: '50000' }]) // inRows
-      .mockResolvedValueOnce([])  // poRows — no outflows
-      .mockResolvedValueOnce([])  // refundRows
+      .mockResolvedValueOnce([]) // poRows — no outflows
+      .mockResolvedValueOnce([]) // refundRows
 
     const result = await getCashflow('2026-03-01', '2026-03-31')
     expect(result.monthly[0].cash_out).toBe(0)
@@ -578,9 +589,9 @@ describe('getCashflow', () => {
 
   it('handles months with only cash_out via po_payments (no cash_in)', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([])                                           // inRows — no inflows
+      .mockResolvedValueOnce([]) // inRows — no inflows
       .mockResolvedValueOnce([{ month: '2026-03', po_payments: '20000' }]) // poRows
-      .mockResolvedValueOnce([])                                           // refundRows
+      .mockResolvedValueOnce([]) // refundRows
 
     const result = await getCashflow('2026-03-01', '2026-03-31')
     expect(result.monthly[0].cash_in).toBe(0)
@@ -611,8 +622,8 @@ describe('getCashflow', () => {
   it('rounds running_balance to 2 decimal places', async () => {
     mockQueryMany
       .mockResolvedValueOnce([{ month: '2026-01', source: 'online', amount: '1000.333' }]) // inRows
-      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '333.333' }])               // poRows
-      .mockResolvedValueOnce([])                                                            // refundRows
+      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '333.333' }]) // poRows
+      .mockResolvedValueOnce([]) // refundRows
 
     const result = await getCashflow('2026-01-01', '2026-01-31')
     // running_balance = Math.round((1000.333 - 333.333) * 100) / 100 = 667
@@ -622,10 +633,10 @@ describe('getCashflow', () => {
   it('breaks cash_in into source buckets (online, business, cash_sale, offline)', async () => {
     mockQueryMany
       .mockResolvedValueOnce([
-        { month: '2026-01', source: 'online',    amount: '40000' },
-        { month: '2026-01', source: 'business',  amount: '30000' },
+        { month: '2026-01', source: 'online', amount: '40000' },
+        { month: '2026-01', source: 'business', amount: '30000' },
         { month: '2026-01', source: 'cash_sale', amount: '20000' },
-        { month: '2026-01', source: 'pos',       amount: '10000' }, // offline fallback
+        { month: '2026-01', source: 'pos', amount: '10000' }, // offline fallback
       ])
       .mockResolvedValueOnce([]) // poRows
       .mockResolvedValueOnce([]) // refundRows
@@ -642,8 +653,8 @@ describe('getCashflow', () => {
   it('adds refunds_out to cash_out', async () => {
     mockQueryMany
       .mockResolvedValueOnce([{ month: '2026-01', source: 'online', amount: '100000' }]) // inRows
-      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '30000' }])               // poRows
-      .mockResolvedValueOnce([{ month: '2026-01', refunds_out: '5000' }])                // refundRows
+      .mockResolvedValueOnce([{ month: '2026-01', po_payments: '30000' }]) // poRows
+      .mockResolvedValueOnce([{ month: '2026-01', refunds_out: '5000' }]) // refundRows
 
     const result = await getCashflow('2026-01-01', '2026-01-31')
     const m = result.monthly[0]

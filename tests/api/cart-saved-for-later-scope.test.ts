@@ -8,7 +8,9 @@ const src = (path: string) => readFileSync(path, 'utf8')
 describe('checkout leaves saved-for-later items alone', () => {
   it('COD orders only the active cart lines', () => {
     const route = src('src/app/api/orders/create/route.ts')
-    expect(route).toMatch(/FROM cart_items ci[\s\S]*?WHERE ci\.user_id = \$1 AND COALESCE\(ci\.saved_for_later, FALSE\) = FALSE/)
+    expect(route).toMatch(
+      /FROM cart_items ci[\s\S]*?WHERE ci\.user_id = \$1 AND COALESCE\(ci\.saved_for_later, FALSE\) = FALSE/
+    )
   })
 
   it('every cart clear on payment keeps saved items', () => {

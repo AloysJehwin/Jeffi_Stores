@@ -52,12 +52,7 @@ const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440002'
 const VARIANT_ID = '550e8400-e29b-41d4-a716-446655440003'
 const CART_ITEM_ID = '550e8400-e29b-41d4-a716-446655440004'
 
-function makeRequest(
-  method: string,
-  url: string,
-  body?: unknown,
-  headers?: Record<string, string>,
-) {
+function makeRequest(method: string, url: string, body?: unknown, headers?: Record<string, string>) {
   return new Request(url, {
     method,
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -72,9 +67,7 @@ function makeRequest(
 describe('GET /api/cart', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
-    vi.mocked(queryMany).mockResolvedValue([
-      { id: CART_ITEM_ID, product_id: PRODUCT_ID, quantity: 2 },
-    ])
+    vi.mocked(queryMany).mockResolvedValue([{ id: CART_ITEM_ID, product_id: PRODUCT_ID, quantity: 2 }])
   })
 
   it('returns cart items for the resolved user', async () => {
@@ -172,13 +165,19 @@ describe('POST /api/cart — item currently saved for later', () => {
   })
 
   it('moves the saved row back into the cart as a fresh add instead of growing the saved row', async () => {
-    const res = await POST(makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 1 }) as any)
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 1 }) as any
+    )
     expect(res.status).toBe(200)
     const sql = vi.mocked(query).mock.calls[0]![0] as string
     expect(sql).toContain('saved_for_later = FALSE')
     expect(sql).toContain('saved_at = NULL')
-    expect(sql).toContain('CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END')
-    expect(sql).toContain('CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END')
+    expect(sql).toContain(
+      'CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END'
+    )
+    expect(sql).toContain(
+      'CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END'
+    )
   })
 })
 
@@ -325,10 +324,7 @@ describe('DELETE /api/cart', () => {
   })
 
   it('removes the item and returns 200 "Item removed from cart"', async () => {
-    const req = makeRequest(
-      'DELETE',
-      `http://localhost/api/cart?id=${CART_ITEM_ID}`,
-    )
+    const req = makeRequest('DELETE', `http://localhost/api/cart?id=${CART_ITEM_ID}`)
     const res = await DELETE(req as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -348,9 +344,7 @@ describe('DELETE /api/cart', () => {
 describe('GET /api/cart — saved items filter', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
-    vi.mocked(queryMany).mockResolvedValue([
-      { id: CART_ITEM_ID, product_id: PRODUCT_ID, saved_for_later: true },
-    ])
+    vi.mocked(queryMany).mockResolvedValue([{ id: CART_ITEM_ID, product_id: PRODUCT_ID, saved_for_later: true }])
   })
 
   it('returns saved items when saved=1 is passed', async () => {

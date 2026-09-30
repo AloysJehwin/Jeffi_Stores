@@ -50,22 +50,24 @@ function withHeaders(req: NextRequest, extra: Record<string, string | undefined>
   return req
 }
 
-function makePost(opts: {
-  body?: unknown
-  origin?: string | null
-  referer?: string | null
-  host?: string | null
-  xrw?: string | null
-} = {}) {
+function makePost(
+  opts: {
+    body?: unknown
+    origin?: string | null
+    referer?: string | null
+    host?: string | null
+    xrw?: string | null
+  } = {}
+) {
   const req = new NextRequest(`https://${HOST}/api/admin/merchant/amazon/sync`, {
     method: 'POST',
     body: typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body ?? {}),
   })
   const extra: Record<string, string | undefined> = {}
-  extra.host = opts.host === undefined ? HOST : opts.host ?? undefined
-  extra.origin = opts.origin === undefined ? `https://${HOST}` : opts.origin ?? undefined
+  extra.host = opts.host === undefined ? HOST : (opts.host ?? undefined)
+  extra.origin = opts.origin === undefined ? `https://${HOST}` : (opts.origin ?? undefined)
   if (opts.referer) extra.referer = opts.referer
-  extra['x-requested-with'] = opts.xrw === undefined ? 'jeffi-admin' : opts.xrw ?? undefined
+  extra['x-requested-with'] = opts.xrw === undefined ? 'jeffi-admin' : (opts.xrw ?? undefined)
   return withHeaders(req, extra)
 }
 

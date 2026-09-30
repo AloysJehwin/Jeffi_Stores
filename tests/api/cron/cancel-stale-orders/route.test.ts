@@ -38,9 +38,7 @@ describe('GET /api/cron/cancel-stale-orders', () => {
       { id: 'o1', order_number: 'ORD-001', order_type: 'standard' },
       { id: 'o2', order_number: 'ORD-002', order_type: 'direct' },
     ])
-    mockCancelOrder
-      .mockResolvedValueOnce({ success: true })
-      .mockResolvedValueOnce({ success: false, reason: 'locked' })
+    mockCancelOrder.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false, reason: 'locked' })
     const { GET } = await import('@/app/api/cron/cancel-stale-orders/route')
     const res = await GET(makeReq())
     const body = await res.json()

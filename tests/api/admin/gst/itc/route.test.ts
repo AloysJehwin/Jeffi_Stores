@@ -59,7 +59,9 @@ const ITC_ROWS = [
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/gst/itc', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)

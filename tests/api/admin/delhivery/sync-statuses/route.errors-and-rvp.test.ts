@@ -33,9 +33,7 @@ const mockCreateAutoTask = vi.mocked(createAutoTask)
 const mockCompleteAutoTask = vi.mocked(completeAutoTask)
 
 function makeReq(overrides: { auth?: string } = {}) {
-  const auth = overrides.auth !== undefined
-    ? overrides.auth
-    : `Bearer ${process.env.CRON_SECRET}`
+  const auth = overrides.auth !== undefined ? overrides.auth : `Bearer ${process.env.CRON_SECRET}`
   return new NextRequest('http://localhost/api/admin/delhivery/sync-statuses', {
     method: 'POST',
     headers: auth ? { authorization: auth } : {},
@@ -54,19 +52,21 @@ const sampleOrder = {
 
 function makeShipmentResponse(awb: string, statusType: string, statusLabel = 'In Transit') {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: statusLabel,
-          StatusDateTime: '2024-01-15T10:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: statusLabel,
+            StatusDateTime: '2024-01-15T10:00:00',
+          },
+          Scans: [],
+          DestRecieveDate: null,
+          ReturnedDate: null,
         },
-        Scans: [],
-        DestRecieveDate: null,
-        ReturnedDate: null,
       },
-    }],
+    ],
   }
 }
 
@@ -86,10 +86,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   // ── Delhivery API errors ─────────────────────────────────────────────────
 
   it('records error and continues when Delhivery returns non-ok', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: false, status: 503 } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
 
@@ -102,10 +101,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   })
 
   it('records error and continues when fetch throws', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockRejectedValueOnce(new Error('Network timeout'))
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
 
@@ -116,10 +114,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   })
 
   it('handles empty ShipmentData array gracefully', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
 
@@ -129,10 +126,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   })
 
   it('handles missing ShipmentData key gracefully', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
 
@@ -159,33 +155,31 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     }
     // First fetch: forward order status (returns empty ShipmentData so no sync)
     // Second fetch: RVP tracking
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP111',
-              Status: { StatusType: 'DL', Status: 'Delivered', StatusDateTime: '2024-01-15T10:00:00' },
-              DestRecieveDate: '2024-01-15',
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP111',
+                Status: { StatusType: 'DL', Status: 'Delivered', StatusDateTime: '2024-01-15T10:00:00' },
+                DestRecieveDate: '2024-01-15',
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
-    mockQueryMany
-      .mockResolvedValueOnce([noMatchOrder])
-      .mockResolvedValueOnce([rvpRequest])
+    mockQueryMany.mockResolvedValueOnce([noMatchOrder]).mockResolvedValueOnce([rvpRequest])
 
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.rvp.received).toBe(1)
     expect(body.rvp.results[0].returnRequestId).toBe('rr-1')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE return_requests'),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE return_requests'), expect.any(Array))
   })
 
   it('creates inspect_refund auto task after RVP received', async () => {
@@ -196,24 +190,25 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
       user_id: 'user-1',
       order_number: 'ORD-001',
     }
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP111',
-              Status: { Status: 'Delivered', StatusType: 'DL', StatusDateTime: null },
-              DestRecieveDate: '2024-01-15',
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP111',
+                Status: { Status: 'Delivered', StatusType: 'DL', StatusDateTime: null },
+                DestRecieveDate: '2024-01-15',
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
-    mockQueryMany
-      .mockResolvedValueOnce([noMatchOrder])
-      .mockResolvedValueOnce([rvpRequest])
+    mockQueryMany.mockResolvedValueOnce([noMatchOrder]).mockResolvedValueOnce([rvpRequest])
 
     await POST(makeReq())
     await new Promise(r => setTimeout(r, 0))
@@ -231,32 +226,30 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
       user_id: 'user-1',
       order_number: 'ORD-001',
     }
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'RVP111',
-              Status: { Status: 'In Transit', StatusType: 'IT', StatusDateTime: null },
-              DestRecieveDate: null,
-              ReturnedDate: null,
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'RVP111',
+                Status: { Status: 'In Transit', StatusType: 'IT', StatusDateTime: null },
+                DestRecieveDate: null,
+                ReturnedDate: null,
+              },
             },
-          }],
+          ],
         }),
       } as any)
-    mockQueryMany
-      .mockResolvedValueOnce([noMatchOrder])
-      .mockResolvedValueOnce([rvpRequest])
+    mockQueryMany.mockResolvedValueOnce([noMatchOrder]).mockResolvedValueOnce([rvpRequest])
 
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.rvp.received).toBe(0)
-    expect(mockQuery).not.toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE return_requests'),
-      expect.any(Array)
-    )
+    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE return_requests'), expect.any(Array))
   })
 
   it('records rvp error when Delhivery returns non-ok for RVP batch', async () => {
@@ -267,12 +260,11 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
       user_id: 'user-1',
       order_number: 'ORD-001',
     }
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({ ok: false, status: 500 } as any)
-    mockQueryMany
-      .mockResolvedValueOnce([noMatchOrder])
-      .mockResolvedValueOnce([rvpRequest])
+    mockQueryMany.mockResolvedValueOnce([noMatchOrder]).mockResolvedValueOnce([rvpRequest])
 
     const res = await POST(makeReq())
     const body = await res.json()
@@ -284,10 +276,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   // ── Response structure ───────────────────────────────────────────────────
 
   it('returns correct top-level response shape', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
 

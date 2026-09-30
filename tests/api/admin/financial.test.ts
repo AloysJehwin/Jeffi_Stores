@@ -68,7 +68,7 @@ describe('GET /api/admin/financial/pl', () => {
     expect(json).toMatchObject({ revenue: 100000, netProfit: 30000 })
     expect(getPLReport).toHaveBeenCalledWith(
       expect.stringMatching(/^\d{4}-04-01$/),
-      expect.stringMatching(/^\d{4}-03-31$/),
+      expect.stringMatching(/^\d{4}-03-31$/)
     )
   })
 
@@ -129,9 +129,11 @@ describe('GET /api/admin/financial/receivables', () => {
   it('passes from/to/search/page/customerPhone to getReceivablesAging', async () => {
     vi.mocked(getReceivablesAging).mockResolvedValue({ rows: [], total: 0 } as any)
 
-    await receivablesGET(makeReq(
-      'http://localhost/api/admin/financial/receivables?from=2024-01-01&to=2024-12-31&search=acme&customerPhone=9999999999&page=3'
-    ))
+    await receivablesGET(
+      makeReq(
+        'http://localhost/api/admin/financial/receivables?from=2024-01-01&to=2024-12-31&search=acme&customerPhone=9999999999&page=3'
+      )
+    )
 
     expect(getReceivablesAging).toHaveBeenCalledWith({
       from: '2024-01-01',

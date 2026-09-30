@@ -115,14 +115,24 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
 
   it('happy path: creates shipment, updates order, no SMS when channel not sms', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(baseOrder)                                     // order lookup
+      .mockResolvedValueOnce(baseOrder) // order lookup
       .mockResolvedValueOnce({ phone: '9876543210', notification_channel: 'email' }) // sms customer
     mockQueryMany.mockResolvedValue([
-      { quantity: '2', variant_id: null, variant_name: '', weight_grams: '500', package_type: 'flat_poly_auto', length_cm: '10', breadth_cm: '5', height_cm: '3' },
+      {
+        quantity: '2',
+        variant_id: null,
+        variant_name: '',
+        weight_grams: '500',
+        package_type: 'flat_poly_auto',
+        length_cm: '10',
+        breadth_cm: '5',
+        height_cm: '3',
+      },
     ] as any)
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())                            // create
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ tat: 3 }) })  // TAT lookup
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(okCreateResponse()) // create
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ tat: 3 }) }) // TAT lookup
 
     const res = await POST(makeReq(), params)
     const body = await res.json()
@@ -139,7 +149,8 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockQueryOne
       .mockResolvedValueOnce(baseOrder)
       .mockResolvedValueOnce({ phone: '9876543210', notification_channel: 'sms' })
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce(okCreateResponse())
       .mockResolvedValueOnce({ ok: true, json: async () => ({ tat: 0 }) }) // tat 0 → no EDD
 
@@ -153,27 +164,30 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockQueryOne
       .mockResolvedValueOnce(baseOrder)
       .mockResolvedValueOnce({ phone: '9876543210', notification_channel: 'sms' })
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: false })
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse()).mockResolvedValueOnce({ ok: false })
 
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(sendOrderShippedSMS).toHaveBeenCalled()
   })
 
   it('order item rows with missing dims/fields use fallbacks in map', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(baseOrder)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(baseOrder).mockResolvedValueOnce(null)
     // rows with null package_type / dims / non-numeric qty & weight → map fallbacks
     mockQueryMany.mockResolvedValue([
-      { quantity: null, variant_id: null, variant_name: '', weight_grams: null, package_type: null, length_cm: null, breadth_cm: null, height_cm: null },
+      {
+        quantity: null,
+        variant_id: null,
+        variant_name: '',
+        weight_grams: null,
+        package_type: null,
+        length_cm: null,
+        breadth_cm: null,
+        height_cm: null,
+      },
     ] as any)
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: false })
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse()).mockResolvedValueOnce({ ok: false })
 
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
@@ -183,14 +197,14 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockQueryOne
       .mockResolvedValueOnce({ ...baseOrder, payment_mode: 'cod', payment_status: 'pending' })
       .mockResolvedValueOnce(null) // no sms customer
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: false }) // TAT lookup non-ok → no EDD
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse()).mockResolvedValueOnce({ ok: false }) // TAT lookup non-ok → no EDD
 
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
     // decode the urlencoded data param
-    const decoded = JSON.parse(decodeURIComponent((vi.mocked(global.fetch).mock.calls[0][1] as any).body.split('data=')[1]))
+    const decoded = JSON.parse(
+      decodeURIComponent((vi.mocked(global.fetch).mock.calls[0][1] as any).body.split('data=')[1])
+    )
     expect(decoded.shipments[0].payment_mode).toBe('COD')
     expect(decoded.shipments[0].cod_amount).toBe('1500')
   })
@@ -198,7 +212,9 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
   it('returns 502 when Delhivery API returns non-ok / no packages', async () => {
     mockQueryOne.mockResolvedValueOnce(baseOrder)
     global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: false, status: 500, json: async () => ({ rmk: 'server error' }),
+      ok: false,
+      status: 500,
+      json: async () => ({ rmk: 'server error' }),
     })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(502)
@@ -208,7 +224,9 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
   it('returns 502 with default detail when data has no rmk', async () => {
     mockQueryOne.mockResolvedValueOnce(baseOrder)
     global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true, status: 200, json: async () => ({ packages: [] }),
+      ok: true,
+      status: 200,
+      json: async () => ({ packages: [] }),
     })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(502)
@@ -217,9 +235,9 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
 
   it('returns 422 when package status is Fail', async () => {
     mockQueryOne.mockResolvedValueOnce(baseOrder)
-    global.fetch = vi.fn().mockResolvedValueOnce(
-      okCreateResponse({ status: 'Fail', remarks: ['bad pin', 'no service'] })
-    )
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(okCreateResponse({ status: 'Fail', remarks: ['bad pin', 'no service'] }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(422)
     expect((await res.json()).details).toMatch(/bad pin; no service/)
@@ -227,9 +245,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
 
   it('returns 422 when package has err_code', async () => {
     mockQueryOne.mockResolvedValueOnce(baseOrder)
-    global.fetch = vi.fn().mockResolvedValueOnce(
-      okCreateResponse({ err_code: 'E101' })
-    )
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse({ err_code: 'E101' }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(422)
     expect((await res.json()).code).toBe('E101')
@@ -237,21 +253,15 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
 
   it('returns 502 when no AWB (waybill) returned', async () => {
     mockQueryOne.mockResolvedValueOnce(baseOrder)
-    global.fetch = vi.fn().mockResolvedValueOnce(
-      okCreateResponse({ waybill: '', sort_code: 'RIP' })
-    )
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse({ waybill: '', sort_code: 'RIP' }))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(502)
     expect((await res.json()).error).toMatch(/no awb/i)
   })
 
   it('proceeds without EDD when TAT lookup throws', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(baseOrder)
-      .mockResolvedValueOnce(null)
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockRejectedValueOnce(new Error('TAT down'))
+    mockQueryOne.mockResolvedValueOnce(baseOrder).mockResolvedValueOnce(null)
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse()).mockRejectedValueOnce(new Error('TAT down'))
 
     const res = await POST(makeReq(), params)
     const body = await res.json()
@@ -263,15 +273,19 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockQueryOne
       .mockResolvedValueOnce({
         ...baseOrder,
-        full_name: null, customer_name: null,      // → 'Customer'
-        consignee_phone: null, customer_phone: null, // → default 9999999999
-        order_number: null,                          // baseRef uses id slice
-        city: null, state: null,
+        full_name: null,
+        customer_name: null, // → 'Customer'
+        consignee_phone: null,
+        customer_phone: null, // → default 9999999999
+        order_number: null, // baseRef uses id slice
+        city: null,
+        state: null,
       })
       .mockResolvedValueOnce(null)
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: true, json: async () => ([{ tat: 2 }]) }) // array shape tat
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ tat: 2 }] }) // array shape tat
 
     const res = await POST(makeReq(), params)
     const body = await res.json()
@@ -280,16 +294,14 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
   })
 
   it('normalizes a 12-digit 91-prefixed phone to 10 digits', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ ...baseOrder, consignee_phone: '919876543210' })
-      .mockResolvedValueOnce(null)
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: false })
+    mockQueryOne.mockResolvedValueOnce({ ...baseOrder, consignee_phone: '919876543210' }).mockResolvedValueOnce(null)
+    global.fetch = vi.fn().mockResolvedValueOnce(okCreateResponse()).mockResolvedValueOnce({ ok: false })
 
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
-    const decoded = JSON.parse(decodeURIComponent((vi.mocked(global.fetch).mock.calls[0][1] as any).body.split('data=')[1]))
+    const decoded = JSON.parse(
+      decodeURIComponent((vi.mocked(global.fetch).mock.calls[0][1] as any).body.split('data=')[1])
+    )
     expect(decoded.shipments[0].phone).toBe('9876543210')
   })
 
@@ -312,11 +324,20 @@ describe('POST /api/admin/orders/[id]/create-shipment minimal order', () => {
   const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['orders'] }
 
   const minimalOrder = {
-    id: 'ord-1', order_number: 'ORD-001', total_amount: '500',
-    full_name: 'John Doe', address_line1: '123 Main St', address_line2: null, landmark: null,
-    city: 'Raipur', state: 'Chhattisgarh', postal_code: '492001',
-    consignee_phone: '9999999999', customer_phone: '9999999999',
-    awb_number: null, created_at: new Date().toISOString(),
+    id: 'ord-1',
+    order_number: 'ORD-001',
+    total_amount: '500',
+    full_name: 'John Doe',
+    address_line1: '123 Main St',
+    address_line2: null,
+    landmark: null,
+    city: 'Raipur',
+    state: 'Chhattisgarh',
+    postal_code: '492001',
+    consignee_phone: '9999999999',
+    customer_phone: '9999999999',
+    awb_number: null,
+    created_at: new Date().toISOString(),
   }
 
   function makeReqFor(id: string) {
@@ -395,7 +416,9 @@ describe('POST /api/admin/orders/[id]/create-shipment minimal order', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ packages: [{ waybill: 'AWB999', sort_code: 'RIP', status: 'Success', err_code: null, remarks: [] }] }),
+      json: async () => ({
+        packages: [{ waybill: 'AWB999', sort_code: 'RIP', status: 'Success', err_code: null, remarks: [] }],
+      }),
     } as any)
     const res = await POST(makeReqFor('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)

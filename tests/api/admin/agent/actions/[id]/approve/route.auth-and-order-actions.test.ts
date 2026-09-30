@@ -32,7 +32,12 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany, withTransaction, getClient } from '@/lib/db'
 import { sendTestCampaignEmail } from '@/lib/automation-emails'
-import { sendOrderDelayNotification, sendProductAnnouncementEmail, sendQuotationFinalizedEmail, transporter } from '@/lib/email'
+import {
+  sendOrderDelayNotification,
+  sendProductAnnouncementEmail,
+  sendQuotationFinalizedEmail,
+  transporter,
+} from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -89,8 +94,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 403 when action belongs to a different admin', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: 'other-admin', conversation_id: 'conv-1',
-      kind: 'send_test_email', payload: {}, status: 'proposed',
+      id: ACTION_ID,
+      admin_id: 'other-admin',
+      conversation_id: 'conv-1',
+      kind: 'send_test_email',
+      payload: {},
+      status: 'proposed',
     } as any)
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(403)
@@ -99,8 +108,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 400 when action is not in proposed status', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
-      kind: 'send_test_email', payload: {}, status: 'executed',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
+      kind: 'send_test_email',
+      payload: {},
+      status: 'executed',
     } as any)
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(400)
@@ -111,7 +124,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes send_test_email action successfully', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_test_email',
       payload: { campaignKind: 'welcome', toEmail: 'test@example.com' },
       status: 'proposed',
@@ -128,7 +143,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when send_test_email fails', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_test_email',
       payload: { campaignKind: 'welcome', toEmail: 'test@example.com' },
       status: 'proposed',
@@ -145,7 +162,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes toggle_campaign_enabled successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'toggle_campaign_enabled',
         payload: { campaignKind: 'welcome', enabled: true },
         status: 'proposed',
@@ -161,7 +180,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when campaign not found for toggle', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'toggle_campaign_enabled',
         payload: { campaignKind: 'nonexistent', enabled: false },
         status: 'proposed',
@@ -178,7 +199,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes mark_order_shipped successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'mark_order_shipped',
         payload: { orderId: 'order-1', awbNumber: 'AWB123' },
         status: 'proposed',
@@ -194,7 +217,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when order not found for mark_order_shipped', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'mark_order_shipped',
         payload: { orderId: 'bad-id', awbNumber: null },
         status: 'proposed',
@@ -210,9 +235,17 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes send_order_delay_email successfully', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_order_delay_email',
-      payload: { customerEmail: 'c@example.com', customerName: 'Alice', orderNumber: 'ORD-1', delayDays: 2, reason: 'Stock shortage' },
+      payload: {
+        customerEmail: 'c@example.com',
+        customerName: 'Alice',
+        orderNumber: 'ORD-1',
+        delayDays: 2,
+        reason: 'Stock shortage',
+      },
       status: 'proposed',
     } as any)
     vi.mocked(sendOrderDelayNotification).mockResolvedValue({ success: true, messageId: 'msg-1' } as any)
@@ -224,7 +257,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when send_order_delay_email missing required fields', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_order_delay_email',
       payload: { customerEmail: 'c@example.com' }, // missing orderNumber, delayDays, reason
       status: 'proposed',
@@ -239,7 +274,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when productIds missing for product_announcement', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_product_announcement_email',
       payload: { productIds: [], audience: 'test_only', testEmail: 'x@y.com', subject: 'Hi', intro: 'Hello' },
       status: 'proposed',
@@ -252,12 +289,22 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes product announcement for test_only audience', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_product_announcement_email',
-      payload: { productIds: ['pid-1'], audience: 'test_only', testEmail: 'x@y.com', subject: 'New!', intro: 'Check this' },
+      payload: {
+        productIds: ['pid-1'],
+        audience: 'test_only',
+        testEmail: 'x@y.com',
+        subject: 'New!',
+        intro: 'Check this',
+      },
       status: 'proposed',
     } as any)
-    mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
+    mockQueryMany.mockResolvedValueOnce([
+      { id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null },
+    ] as any)
     vi.mocked(sendProductAnnouncementEmail).mockResolvedValue({ success: true } as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
@@ -269,12 +316,16 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when testEmail missing for test_only audience', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_product_announcement_email',
       payload: { productIds: ['pid-1'], audience: 'test_only', testEmail: null, subject: 'S', intro: 'I' },
       status: 'proposed',
     } as any)
-    mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
+    mockQueryMany.mockResolvedValueOnce([
+      { id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null },
+    ] as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
@@ -283,12 +334,16 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 for unknown audience in product announcement', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_product_announcement_email',
       payload: { productIds: ['pid-1'], audience: 'unknown_audience', testEmail: null, subject: 'S', intro: 'I' },
       status: 'proposed',
     } as any)
-    mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
+    mockQueryMany.mockResolvedValueOnce([
+      { id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null },
+    ] as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
@@ -299,7 +354,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 for forbidden call_admin_api path', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'call_admin_api',
       payload: { method: 'POST', path: '/api/admin/agent/chat', body: null },
       status: 'proposed',
@@ -312,7 +369,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 for non-mutating method in call_admin_api', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'call_admin_api',
       payload: { method: 'GET', path: '/api/admin/products', body: null },
       status: 'proposed',
@@ -328,7 +387,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes update_order_status successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'update_order_status',
         payload: { orderId: 'order-1', newStatus: 'confirmed', awbNumber: null },
         status: 'proposed',
@@ -342,7 +403,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 for invalid status in update_order_status', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'update_order_status',
       payload: { orderId: 'order-1', newStatus: 'flying', awbNumber: null },
       status: 'proposed',
@@ -358,12 +421,19 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes mark_invoice_paid successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'mark_invoice_paid',
         payload: { orderId: 'order-1', paymentMode: 'cash', paidAt: null },
         status: 'proposed',
       } as any)
-      .mockResolvedValueOnce({ id: 'order-1', invoice_number: 'INV-1', payment_status: 'paid', invoice_date: null } as any)
+      .mockResolvedValueOnce({
+        id: 'order-1',
+        invoice_number: 'INV-1',
+        payment_status: 'paid',
+        invoice_date: null,
+      } as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
@@ -377,9 +447,19 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes create_coupon successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_coupon',
-        payload: { code: 'SAVE10', discountType: 'percentage', discountValue: 10, validUntil: null, minPurchaseAmount: null, usageLimit: null, description: null },
+        payload: {
+          code: 'SAVE10',
+          discountType: 'percentage',
+          discountValue: 10,
+          validUntil: null,
+          minPurchaseAmount: null,
+          usageLimit: null,
+          description: null,
+        },
         status: 'proposed',
       } as any)
       .mockResolvedValueOnce({ id: 'coupon-1', code: 'SAVE10' } as any)
@@ -392,7 +472,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when coupon code missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_coupon',
       payload: { code: '', discountType: 'percentage', discountValue: 10 },
       status: 'proposed',
@@ -407,7 +489,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when create_product payload invalid', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_product',
       payload: { name: '', sku: 'SKU1', slug: 'slug-1', basePrice: -5 },
       status: 'proposed',
@@ -421,13 +505,25 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes create_product successfully when sku is unique', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_product',
-        payload: { name: 'Bolt', sku: 'BLT-01', slug: 'bolt', basePrice: 100, brandId: null, categoryId: null, shortDescription: null, weightGrams: 50, gstPercentage: 18 },
+        payload: {
+          name: 'Bolt',
+          sku: 'BLT-01',
+          slug: 'bolt',
+          basePrice: 100,
+          brandId: null,
+          categoryId: null,
+          shortDescription: null,
+          weightGrams: 50,
+          gstPercentage: 18,
+        },
         status: 'proposed',
       } as any)
-      .mockResolvedValueOnce(null)  // dup check: no dup
-      .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'BLT-01' } as any)  // INSERT
+      .mockResolvedValueOnce(null) // dup check: no dup
+      .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'BLT-01' } as any) // INSERT
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
@@ -438,7 +534,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when update_product has no valid fields', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'update_product',
       payload: { productId: 'prod-1', changes: { unknown_field: 'value' } },
       status: 'proposed',

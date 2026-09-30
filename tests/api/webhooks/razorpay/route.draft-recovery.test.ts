@@ -9,9 +9,9 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-  withTransaction: vi.fn().mockImplementation(async (fn: any) =>
-    fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })
-  ),
+  withTransaction: vi
+    .fn()
+    .mockImplementation(async (fn: any) => fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })),
 }))
 
 vi.mock('@/lib/email', () => ({
@@ -160,7 +160,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     verifyDraftToken.mockResolvedValueOnce(null) // expired
     ;(createAutoTask as any).mockRejectedValueOnce(new Error('task fail'))
     const res = await POST(signedRequest(draftCaptured({ id: 'pay_e', order_id: 'ro2', amount: 10000 })))
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(res.status).toBe(200)
     expect(createAutoTask).toHaveBeenCalledWith(expect.objectContaining({ priority: 'high' }))
     expect(commitOrder).not.toHaveBeenCalled()
@@ -206,8 +206,12 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
-      mode: 'cart', addressId: 'a1', notes: 'n', couponId: 'c1',
-      shippingAmount: 0, businessDiscountAmount: 0,
+      mode: 'cart',
+      addressId: 'a1',
+      notes: 'n',
+      couponId: 'c1',
+      shippingAmount: 0,
+      businessDiscountAmount: 0,
     })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'A', last_name: 'B' }) // user
     loadActiveCart.mockResolvedValueOnce([{ productId: 'p1' }]) // has items
@@ -223,7 +227,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     ;(aiFeedback.recordImplicitSignalsForProducts as any).mockRejectedValueOnce(new Error('s'))
     ;(marketing.attributeConversion as any).mockRejectedValueOnce(new Error('c'))
     const res = await POST(signedRequest(draftCaptured({ id: 'pay_c1', order_id: 'ro6', amount: 10000 })))
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(res.status).toBe(200)
     expect(commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'cart', appliedDiscount: 10 }))
     expect(invoice.createDraftInvoice).toHaveBeenCalledWith('ord-1')
@@ -236,7 +240,9 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
-      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      mode: 'buyNow',
+      addressId: 'a1',
+      shippingAmount: 0,
       buyNowItem: { productId: 'p1', variantId: 'v1', subVariantId: 's1', price: 100, qty: 1 },
     })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: '', last_name: '' }) // user
@@ -255,7 +261,9 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
-      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      mode: 'buyNow',
+      addressId: 'a1',
+      shippingAmount: 0,
       buyNowItem: { productId: 'pX', price: 100, qty: 1 },
     })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
@@ -292,7 +300,9 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
     queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
-      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      mode: 'buyNow',
+      addressId: 'a1',
+      shippingAmount: 0,
       buyNowItem: { productId: 'p1', price: 100, qty: 2 },
     })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'X', last_name: 'Y' }) // user

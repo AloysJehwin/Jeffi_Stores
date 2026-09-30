@@ -84,9 +84,7 @@ describe('POST /api/razorpay/payment-link', () => {
 
   it('creates payment link successfully', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null) // UPDATE returns null via queryOne
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null) // UPDATE returns null via queryOne
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     rzpMock({ create: mockCreate })
     const res = await POST(makeRequest() as any)
@@ -122,9 +120,7 @@ describe('POST /api/razorpay/payment-link', () => {
       payment_link_id: 'plink_expired',
       payment_link_status: 'created',
     }
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(orderWithExpiredLink)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(orderWithExpiredLink).mockResolvedValueOnce(null)
     const mockFetch = vi.fn().mockResolvedValue({ status: 'expired' })
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     rzpMock({ fetch: mockFetch, create: mockCreate })
@@ -135,9 +131,7 @@ describe('POST /api/razorpay/payment-link', () => {
 
   it('respects custom expiryHours', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null)
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     rzpMock({ create: mockCreate })
     await POST(makeRequest({ orderId: 'order-123', expiryHours: 24 }) as any)

@@ -91,20 +91,35 @@ describe('runCustomScenario', () => {
   })
 
   it('returns empty result when scenario disabled', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: false })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: false,
+    })
     const result = await runCustomScenario('my_scenario', makeCampaign())
     expect(result.attempted).toBe(0)
   })
 
   it('returns empty result when SQL validation fails', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'DROP TABLE users', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'DROP TABLE users',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: false, error: 'Dangerous SQL' })
     const result = await runCustomScenario('my_scenario', makeCampaign())
     expect(result.attempted).toBe(0)
   })
 
   it('sends emails to eligible users', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users LIMIT $3', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users LIMIT $3',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT id FROM users LIMIT $3' })
 
     const client = makeDbClient([
@@ -126,7 +141,12 @@ describe('runCustomScenario', () => {
   })
 
   it('increments skipped when user not found', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT id FROM users' })
 
     const client = makeDbClient([
@@ -145,14 +165,15 @@ describe('runCustomScenario', () => {
   })
 
   it('increments skipped when sendCampaignEmail returns ok=false', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT id FROM users' })
 
-    const client = makeDbClient([
-      { rows: [] }, { rows: [] }, { rows: [] },
-      { rows: [{ id: 'u1' }] },
-      { rows: [] },
-    ])
+    const client = makeDbClient([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ id: 'u1' }] }, { rows: [] }])
     mockGetClient.mockResolvedValue(client)
     mockFetchUserContext.mockResolvedValue({ id: 'u1', first_name: 'Bob', email: 'b@x.com' })
     mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
@@ -163,11 +184,17 @@ describe('runCustomScenario', () => {
   })
 
   it('returns empty result when DB query throws', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT id FROM users' })
 
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [] }) // SET statement_timeout
         .mockResolvedValueOnce({ rows: [] }) // SET lock_timeout
@@ -182,7 +209,12 @@ describe('runCustomScenario', () => {
   })
 
   it('uses maxRecipientsPerSweep and sendCooldownDays from campaign parameters', async () => {
-    mockQueryOne.mockResolvedValue({ kind: 'my_scenario', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: true })
+    mockQueryOne.mockResolvedValue({
+      kind: 'my_scenario',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: true,
+    })
     mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT id FROM users' })
 
     const client = makeDbClient([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }])
@@ -208,7 +240,9 @@ describe('runCustomScenario', () => {
       .mockReturnValueOnce({ ok: true, normalized: 'SELECT product_id, name, slug, image_url, price FROM products' })
 
     const client = makeDbClient([
-      { rows: [] }, { rows: [] }, { rows: [] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
       { rows: [] }, // audience
       { rows: [{ product_id: 'p1', name: 'Bolt', slug: 'bolt', image_url: null, price: 10 }] }, // products
       { rows: [] }, // ROLLBACK

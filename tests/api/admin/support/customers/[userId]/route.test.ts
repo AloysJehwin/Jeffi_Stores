@@ -31,7 +31,9 @@ function makeReq(userId: string) {
   return new NextRequest(`http://localhost/api/admin/support/customers/${userId}`)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/support/customers/[userId]', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -60,7 +62,13 @@ describe('GET /api/admin/support/customers/[userId]', () => {
   it('returns open session on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const session = { id: 's1', status: 'open', created_at: '2024-01-01', admin_name: 'Admin', last_activity_at: '2024-01-01' }
+    const session = {
+      id: 's1',
+      status: 'open',
+      created_at: '2024-01-01',
+      admin_name: 'Admin',
+      last_activity_at: '2024-01-01',
+    }
     mockQueryOne.mockResolvedValue(session)
     const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(200)

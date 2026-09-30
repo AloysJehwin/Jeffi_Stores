@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // Mock path.join for logo path resolution
-vi.mock('path', async (importOriginal) => {
+vi.mock('path', async importOriginal => {
   const actual = await importOriginal<typeof import('path')>()
   return {
     ...actual,
@@ -121,17 +121,13 @@ describe('loadStoreSettings', () => {
   })
 
   it('uses business_trade_name when available', async () => {
-    mockQueryMany.mockResolvedValue([
-      { key: 'business_trade_name', value: 'Jeffi Stores' },
-    ])
+    mockQueryMany.mockResolvedValue([{ key: 'business_trade_name', value: 'Jeffi Stores' }])
     const result = await loadStoreSettings()
     expect(result.name).toBe('Jeffi Stores')
   })
 
   it('falls back to business_legal_name when trade_name absent', async () => {
-    mockQueryMany.mockResolvedValue([
-      { key: 'business_legal_name', value: 'Jeffi Stores Pvt Ltd' },
-    ])
+    mockQueryMany.mockResolvedValue([{ key: 'business_legal_name', value: 'Jeffi Stores Pvt Ltd' }])
     const result = await loadStoreSettings()
     expect(result.name).toBe('Jeffi Stores Pvt Ltd')
   })
@@ -167,7 +163,7 @@ describe('loadStoreSettings', () => {
     mockQueryMany.mockResolvedValue([])
     await loadStoreSettings()
     const [sql] = mockQueryMany.mock.calls[0]
-    expect(sql).toContain("business_%")
+    expect(sql).toContain('business_%')
   })
 })
 
@@ -215,7 +211,7 @@ describe('generatePackingSlipPDF', () => {
     const weightItem: PackingSlipItem = {
       product_name: 'Steel Wire',
       variant_name: null,
-      quantity: 2.500,
+      quantity: 2.5,
       buy_mode: 'weight',
       buy_unit: 'kg',
       unit_price: 100,
@@ -230,7 +226,7 @@ describe('generatePackingSlipPDF', () => {
     const lengthItem: PackingSlipItem = {
       product_name: 'Rope',
       variant_name: null,
-      quantity: 5.000,
+      quantity: 5.0,
       buy_mode: 'length',
       buy_unit: 'm',
       unit_price: 50,
@@ -415,7 +411,7 @@ describe('generatePackingSlipPDF — additional branches', () => {
       ...mockItems[0],
       mrp: 15,
       quantity: 5,
-      total_price: 75,  // mrp * qty = 75 = total_price, so discPct = 0
+      total_price: 75, // mrp * qty = 75 = total_price, so discPct = 0
     }
     const orderMrpNoDisc: PackingSlipOrder = { ...mockOrder, items: [itemMrpNoDisc] }
     const result = await generatePackingSlipPDF(orderMrpNoDisc, mockStore)

@@ -37,9 +37,18 @@ describe('POST /api/admin/data-source/google/sync', () => {
   it('reads every template tab present when the sheet was created from the template', async () => {
     mockTitles.mockResolvedValue(['Field Guide', 'Products', 'Product · Shipping', 'Variants', 'Sub-variants', 'Notes'])
     mockBatch.mockResolvedValue([
-      [['sku', 'name', 'category', 'brand', 'base_price'], ['A1', 'Thing', 'Cat', 'Brand', '10']],
-      [['sku', 'weight_grams'], ['A1', '250']],
-      [['parent_sku', 'variant.sku', 'variant.variant_name', 'variant.price'], ['A1', 'A1-S', 'Small', '10']],
+      [
+        ['sku', 'name', 'category', 'brand', 'base_price'],
+        ['A1', 'Thing', 'Cat', 'Brand', '10'],
+      ],
+      [
+        ['sku', 'weight_grams'],
+        ['A1', '250'],
+      ],
+      [
+        ['parent_sku', 'variant.sku', 'variant.variant_name', 'variant.price'],
+        ['A1', 'A1-S', 'Small', '10'],
+      ],
       [['parent_sku', 'variant_sku', 'sub_variant.sku', 'sub_variant.sub_variant_name']],
     ])
     const res = await POST(req())
@@ -48,12 +57,19 @@ describe('POST /api/admin/data-source/google/sync', () => {
     const ranges = mockBatch.mock.calls[0][1]
     expect(ranges).toEqual(["'Products'!A:ZZ", "'Product · Shipping'!A:ZZ", "'Variants'!A:ZZ", "'Sub-variants'!A:ZZ"])
     expect(mockRead).not.toHaveBeenCalled()
-    expect(vi.mocked(enqueueImportJob).mock.calls[0][0]).toMatchObject({ source: 'google_sheet', spreadsheetId: 'sheet-1', totalRows: 2 })
+    expect(vi.mocked(enqueueImportJob).mock.calls[0][0]).toMatchObject({
+      source: 'google_sheet',
+      spreadsheetId: 'sheet-1',
+      totalRows: 2,
+    })
   })
 
   it('falls back to the first tab as a flat grid when there is no Products tab', async () => {
     mockTitles.mockResolvedValue(['Sheet1'])
-    mockRead.mockResolvedValue([['row_type', 'sku', 'name', 'category', 'brand', 'base_price'], ['product', 'X1', 'Thing', 'Cat', 'Brand', '10']])
+    mockRead.mockResolvedValue([
+      ['row_type', 'sku', 'name', 'category', 'brand', 'base_price'],
+      ['product', 'X1', 'Thing', 'Cat', 'Brand', '10'],
+    ])
     const res = await POST(req())
     expect(res.status).toBe(200)
     expect(mockBatch).not.toHaveBeenCalled()

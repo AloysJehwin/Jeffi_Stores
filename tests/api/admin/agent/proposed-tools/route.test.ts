@@ -29,7 +29,9 @@ const sampleTools = [
 ]
 
 describe('GET /api/admin/agent/proposed-tools', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

@@ -69,7 +69,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when create_quotation items missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_quotation',
       payload: { customerEmail: 'a@b.com', consigneeName: 'Alice', notes: null, items: [] },
       status: 'proposed',
@@ -82,22 +84,36 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('executes create_quotation successfully', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_quotation',
       payload: {
         customerEmail: 'buyer@corp.com',
         consigneeName: 'Corp Ltd',
         notes: null,
-        items: [{ productId: 'p1', name: 'Bolt M6', sku: 'BM6', hsnCode: null, gstRate: 18, quantity: 10, unitPrice: 50, lineAmount: 500 }],
+        items: [
+          {
+            productId: 'p1',
+            name: 'Bolt M6',
+            sku: 'BM6',
+            hsnCode: null,
+            gstRate: 18,
+            quantity: 10,
+            unitPrice: 50,
+            lineAmount: 500,
+          },
+        ],
       },
       status: 'proposed',
     } as any)
 
     const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [{ max_seq: null }] })           // seq lookup
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ max_seq: null }] }) // seq lookup
         .mockResolvedValueOnce({ rows: [{ id: 'qt-1', quote_number: 'QT/25-26/JUN/1', view_token: 'tok-xyz' }] }) // INSERT quotation
-        .mockResolvedValueOnce({ rows: [] }),                            // INSERT item
+        .mockResolvedValueOnce({ rows: [] }), // INSERT item
     }
     mockWithTransaction.mockImplementation(async (fn: any) => fn(mockClient))
 
@@ -110,11 +126,26 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when create_quotation transaction throws', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_quotation',
       payload: {
-        customerEmail: 'a@b.com', consigneeName: 'Alice', notes: null,
-        items: [{ productId: 'p1', name: 'Bolt', sku: 'B', hsnCode: null, gstRate: 0, quantity: 1, unitPrice: 100, lineAmount: 100 }],
+        customerEmail: 'a@b.com',
+        consigneeName: 'Alice',
+        notes: null,
+        items: [
+          {
+            productId: 'p1',
+            name: 'Bolt',
+            sku: 'B',
+            hsnCode: null,
+            gstRate: 0,
+            quantity: 1,
+            unitPrice: 100,
+            lineAmount: 100,
+          },
+        ],
       },
       status: 'proposed',
     } as any)
@@ -129,7 +160,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when update_campaign_template campaignKind missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'update_campaign_template',
       payload: { campaignKind: '', newSubject: 'New Subject', newBody: null },
       status: 'proposed',
@@ -142,7 +175,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when update_campaign_template has no fields to update', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'update_campaign_template',
       payload: { campaignKind: 'welcome', newSubject: null, newBody: null },
       status: 'proposed',
@@ -156,7 +191,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes update_campaign_template successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'update_campaign_template',
         payload: { campaignKind: 'welcome', newSubject: 'Hello!', newBody: null },
         status: 'proposed',
@@ -173,7 +210,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when update_campaign_template campaign not found', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'update_campaign_template',
         payload: { campaignKind: 'nonexistent', newSubject: 'Hi', newBody: null },
         status: 'proposed',
@@ -189,7 +228,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when send_mailer_broadcast subject/body missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_mailer_broadcast',
       payload: { audience: 'test_only', testEmail: 'a@b.com', subject: '', body: '', fromName: 'Store' },
       status: 'proposed',
@@ -202,9 +243,17 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('executes send_mailer_broadcast for all_opted_in audience', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_mailer_broadcast',
-      payload: { audience: 'all_opted_in', testEmail: null, subject: 'Newsletter', body: '<p>Hi {firstName}</p>', fromName: 'Store' },
+      payload: {
+        audience: 'all_opted_in',
+        testEmail: null,
+        subject: 'Newsletter',
+        body: '<p>Hi {firstName}</p>',
+        fromName: 'Store',
+      },
       status: 'proposed',
     } as any)
     mockQueryMany.mockResolvedValueOnce([
@@ -222,9 +271,17 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('executes send_mailer_broadcast for recent_buyers audience', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_mailer_broadcast',
-      payload: { audience: 'recent_buyers', testEmail: null, subject: 'Sale!', body: '<p>Hello</p>', fromName: 'Store' },
+      payload: {
+        audience: 'recent_buyers',
+        testEmail: null,
+        subject: 'Sale!',
+        body: '<p>Hello</p>',
+        fromName: 'Store',
+      },
       status: 'proposed',
     } as any)
     mockQueryMany.mockResolvedValueOnce([{ email: 'c@example.com', name: 'Carol' }] as any)
@@ -237,7 +294,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when all sends fail in send_mailer_broadcast', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'send_mailer_broadcast',
       payload: { audience: 'test_only', testEmail: 'a@b.com', subject: 'Hi', body: '<p>Hey</p>', fromName: 'Store' },
       status: 'proposed',
@@ -253,9 +312,18 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when generate_personalized_coupon missing required fields', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'generate_personalized_coupon',
-      payload: { userId: '', discountType: '', discountValue: 0, daysValid: 30, campaign: 'SUMMER', validUntil: '2025-12-31' },
+      payload: {
+        userId: '',
+        discountType: '',
+        discountValue: 0,
+        daysValid: 30,
+        campaign: 'SUMMER',
+        validUntil: '2025-12-31',
+      },
       status: 'proposed',
     } as any)
 
@@ -267,9 +335,19 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes generate_personalized_coupon successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'generate_personalized_coupon',
-        payload: { userId: 'user-1', customerEmail: 'u@example.com', discountType: 'percentage', discountValue: 15, daysValid: 30, campaign: 'SUMMER', validUntil: '2025-12-31' },
+        payload: {
+          userId: 'user-1',
+          customerEmail: 'u@example.com',
+          discountType: 'percentage',
+          discountValue: 15,
+          daysValid: 30,
+          campaign: 'SUMMER',
+          validUntil: '2025-12-31',
+        },
         status: 'proposed',
       } as any)
       .mockResolvedValueOnce({ id: 'coupon-2', code: 'SUMMER-AB1234' } as any)
@@ -286,9 +364,21 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when create_product has duplicate SKU', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_product',
-        payload: { name: 'Bolt', sku: 'BLT-01', slug: 'bolt', basePrice: 100, brandId: null, categoryId: null, shortDescription: null, weightGrams: 50, gstPercentage: 18 },
+        payload: {
+          name: 'Bolt',
+          sku: 'BLT-01',
+          slug: 'bolt',
+          basePrice: 100,
+          brandId: null,
+          categoryId: null,
+          shortDescription: null,
+          weightGrams: 50,
+          gstPercentage: 18,
+        },
         status: 'proposed',
       } as any)
       .mockResolvedValueOnce({ id: 'existing-prod' } as any) // dup check finds existing
@@ -303,7 +393,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes update_product successfully with valid field', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'update_product',
         payload: { productId: 'prod-1', changes: { name: 'Updated Bolt', is_active: true } },
         status: 'proposed',
@@ -318,7 +410,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when update_product product not found', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'update_product',
         payload: { productId: 'bad-id', changes: { name: 'X' } },
         status: 'proposed',

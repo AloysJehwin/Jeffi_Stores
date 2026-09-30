@@ -11,7 +11,13 @@ vi.mock('@/contexts/StoreConfigContext', () => ({ useStoreConfig: () => ({ flags
 import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtTogether'
 
 const card = (over: Partial<PdpCard> & Pick<PdpCard, 'id' | 'name'>): PdpCard => ({
-  slug: over.id, hasVariants: false, displayPrice: 100, mrp: null, effectiveStock: 1, primaryImage: null, ...over,
+  slug: over.id,
+  hasVariants: false,
+  displayPrice: 100,
+  mrp: null,
+  effectiveStock: 1,
+  primaryImage: null,
+  ...over,
 })
 
 const current = card({ id: 'cur', name: 'Trolley Jack', displayPrice: 2500 })
@@ -79,14 +85,19 @@ describe('FrequentlyBoughtTogether', () => {
 
   it('reports the items the cart rejected', async () => {
     mockAffinity([cover])
-    addToCartMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('This item is currently out of stock'))
+    addToCartMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('This item is currently out of stock'))
     render(<FrequentlyBoughtTogether current={current} />)
     await screen.findByText('Frequently bought together')
 
     fireEvent.click(screen.getByRole('button', { name: 'Add selected to cart' }))
-    await waitFor(() => expect(showToastMock).toHaveBeenCalledWith(
-      'Added 1 of 2 items. Earth Bit Cover: This item is currently out of stock', 'error',
-    ))
+    await waitFor(() =>
+      expect(showToastMock).toHaveBeenCalledWith(
+        'Added 1 of 2 items. Earth Bit Cover: This item is currently out of stock',
+        'error'
+      )
+    )
   })
 
   it('points a variant product on its own page at the options above instead of adding it', async () => {

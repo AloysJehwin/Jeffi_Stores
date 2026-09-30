@@ -66,7 +66,9 @@ describe('POST /api/admin/campaigns/[kind]/run', () => {
     expect(body.sent).toBe(5)
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/cron/run-campaigns?kind=welcome'),
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: expect.stringContaining('Bearer') }) })
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: expect.stringContaining('Bearer') }),
+      })
     )
   })
 
@@ -92,9 +94,6 @@ describe('POST /api/admin/campaigns/[kind]/run', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     await POST(makeRequest('reorder'), { params: Promise.resolve({ kind: 'reorder' }) })
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('kind=reorder'),
-      expect.any(Object)
-    )
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('kind=reorder'), expect.any(Object))
   })
 })

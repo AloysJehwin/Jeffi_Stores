@@ -106,10 +106,24 @@ function makeMockClient(overrides: Partial<Record<string, any>> = {}) {
     if (/INSERT INTO order_items/i.test(s)) return { rows: [{ id: 'oi-1' }] }
     // deductOrderStock reads the persisted order_items back by order_id
     if (/FROM order_items\s+WHERE order_id/i.test(s)) {
-      return { rows: [{ id: 'oi-1', product_id: 'p-1', variant_id: null, sub_variant_id: null, product_name: 'Test Product', variant_name: null, quantity: '2', buy_unit: 'pcs' }] }
+      return {
+        rows: [
+          {
+            id: 'oi-1',
+            product_id: 'p-1',
+            variant_id: null,
+            sub_variant_id: null,
+            product_name: 'Test Product',
+            variant_name: null,
+            quantity: '2',
+            buy_unit: 'pcs',
+          },
+        ],
+      }
     }
     if (/FROM inventory_transactions/i.test(s)) return { rows: [] } // idempotency guard: not yet deducted
-    if (/product_units/i.test(s)) return { rows: [{ unit: 'pcs', factor: '1', dimension: 'count', qty_step: '1', min_qty: null, max_qty: null }] }
+    if (/product_units/i.test(s))
+      return { rows: [{ unit: 'pcs', factor: '1', dimension: 'count', qty_step: '1', min_qty: null, max_qty: null }] }
     if (/UPDATE orders/i.test(s)) return { rows: [] }
     if (/UPDATE quotations/i.test(s)) return { rows: [] }
     if (/INSERT INTO invoices/i.test(s)) return { rows: [] }
@@ -123,7 +137,8 @@ function makeMockClient(overrides: Partial<Record<string, any>> = {}) {
       return { rows: [{ perishable: false, serialized: false }] }
     }
     if (/FROM products/i.test(s)) return { rows: [{ inventory_quantity: '100' }] }
-    if (/FROM product_batches/i.test(s)) return { rows: [{ quantity_remaining: '100', lot_number: 'L1', expiry_date: null }] }
+    if (/FROM product_batches/i.test(s))
+      return { rows: [{ quantity_remaining: '100', lot_number: 'L1', expiry_date: null }] }
     if (/UPDATE product_batches/i.test(s)) return { rows: [{ lot_number: 'L1', expiry_date: null }] }
     if (/product_serials/i.test(s)) return { rows: [{ id: 's-1', batch_id: 'b-1' }] }
     return { rows: [] }

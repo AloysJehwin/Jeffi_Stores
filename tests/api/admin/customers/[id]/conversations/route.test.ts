@@ -58,9 +58,15 @@ describe('GET /api/admin/customers/[id]/conversations', () => {
     mockHasScope.mockReturnValue(true)
     mockList.mockResolvedValue({ items: [], nextBefore: null })
 
-    const res = await GET(makeRequest('user-42', {
-      channels: 'email,chat', limit: '10', before: '2024-01-01T00:00:00Z', q: 'invoice',
-    }), ctx('user-42'))
+    const res = await GET(
+      makeRequest('user-42', {
+        channels: 'email,chat',
+        limit: '10',
+        before: '2024-01-01T00:00:00Z',
+        q: 'invoice',
+      }),
+      ctx('user-42')
+    )
 
     expect(res.status).toBe(200)
     const [userId, opts] = mockList.mock.calls[0]

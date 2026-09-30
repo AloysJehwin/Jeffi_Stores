@@ -28,7 +28,9 @@ const sampleMessages = [
 ]
 
 describe('GET /api/admin/agent/conversations/[id]/messages', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

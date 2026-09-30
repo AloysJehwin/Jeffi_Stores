@@ -226,9 +226,14 @@ describe('PATCH /api/admin/inventory/suppliers/[id]', () => {
     } as any)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(makePatch({
-      name: 'New Supplier', phone: '1234567890', email: 'new@supplier.com',
-    }), routeParams as any)
+    const res = await PATCH(
+      makePatch({
+        name: 'New Supplier',
+        phone: '1234567890',
+        email: 'new@supplier.com',
+      }),
+      routeParams as any
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.success).toBe(true)

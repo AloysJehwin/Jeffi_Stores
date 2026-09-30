@@ -3,18 +3,34 @@ import { buildProductRowSql, planDataNeeds, planProductRows, type ProductRowQuer
 import { DEFAULT_SECTIONS, type HomepageSection } from '@/lib/homepage-sections'
 
 const make = (over: Partial<HomepageSection> = {}): HomepageSection => ({
-  id: 'x', type: 'product_row', title: null, subtitle: null, eyebrow: null,
-  cta_label: null, cta_url: null, config: {}, display_order: 0, is_active: true,
-  starts_at: null, ends_at: null, ...over,
+  id: 'x',
+  type: 'product_row',
+  title: null,
+  subtitle: null,
+  eyebrow: null,
+  cta_label: null,
+  cta_url: null,
+  config: {},
+  display_order: 0,
+  is_active: true,
+  starts_at: null,
+  ends_at: null,
+  ...over,
 })
 
 const defaults: HomepageSection[] = DEFAULT_SECTIONS.map((s, i) => ({
-  ...s, id: `d${i}`, is_active: true, starts_at: null, ends_at: null,
+  ...s,
+  id: `d${i}`,
+  is_active: true,
+  starts_at: null,
+  ends_at: null,
 }))
 
 const deps: ProductRowQueryDeps = {
-  minPriceSql: 'MINPRICE', variantStockTotalSql: 'STOCK',
-  variantMinMrpSql: 'MRP', totalSoldSql: 'SOLD',
+  minPriceSql: 'MINPRICE',
+  variantStockTotalSql: 'STOCK',
+  variantMinMrpSql: 'MRP',
+  totalSoldSql: 'SOLD',
 }
 
 describe('planDataNeeds', () => {
@@ -45,8 +61,7 @@ describe('planDataNeeds', () => {
 describe('planProductRows', () => {
   it('plans one query per distinct row', () => {
     const plan = planProductRows(defaults)
-    expect([...plan.values()].map(v => v.source).sort())
-      .toEqual(['best_sellers', 'featured', 'new_arrivals'])
+    expect([...plan.values()].map(v => v.source).sort()).toEqual(['best_sellers', 'featured', 'new_arrivals'])
   })
 
   it('collapses two identically-configured rows into one query', () => {

@@ -68,8 +68,13 @@ const params = { params: Promise.resolve({ id: ACTION_ID }) }
 
 function action(kind: string, payload: any, over: any = {}) {
   return {
-    id: ACTION_ID, admin_id: 'admin-1', conversation_id: 'conv-1',
-    kind, payload, status: 'proposed', ...over,
+    id: ACTION_ID,
+    admin_id: 'admin-1',
+    conversation_id: 'conv-1',
+    kind,
+    payload,
+    status: 'proposed',
+    ...over,
   }
 }
 
@@ -158,8 +163,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── toggle_campaign_enabled ───────────────────────────────────────────────
 
   it('toggle_campaign_enabled success', async () => {
-    primeAction(action('toggle_campaign_enabled', { campaignKind: 'welcome', enabled: true }),
-      { kind: 'welcome', name: 'Welcome', enabled: true })
+    primeAction(action('toggle_campaign_enabled', { campaignKind: 'welcome', enabled: true }), {
+      kind: 'welcome',
+      name: 'Welcome',
+      enabled: true,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -174,8 +182,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_order_shipped ────────────────────────────────────────────────────
 
   it('mark_order_shipped success', async () => {
-    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: 'AWB1' }),
-      { id: 'o1', order_number: 'ORD-1', status: 'shipped', awb_number: 'AWB1' })
+    primeAction(action('mark_order_shipped', { orderId: 'o1', awbNumber: 'AWB1' }), {
+      id: 'o1',
+      order_number: 'ORD-1',
+      status: 'shipped',
+      awb_number: 'AWB1',
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -196,16 +208,29 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_order_delay_email success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_order_delay_email',
-      { customerEmail: 'a@b.com', orderNumber: 'ORD-1', delayDays: 3, reason: 'stock' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_order_delay_email', {
+        customerEmail: 'a@b.com',
+        orderNumber: 'ORD-1',
+        delayDays: 3,
+        reason: 'stock',
+      })
+    )
     mockDelay.mockResolvedValue({ success: true, messageId: 'm1' } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('send_order_delay_email send failed', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_order_delay_email',
-      { customerEmail: 'a@b.com', customerName: 'Bob', orderNumber: 'ORD-1', delayDays: 3, reason: 'stock' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_order_delay_email', {
+        customerEmail: 'a@b.com',
+        customerName: 'Bob',
+        orderNumber: 'ORD-1',
+        delayDays: 3,
+        reason: 'stock',
+      })
+    )
     mockDelay.mockResolvedValue({ success: false } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -221,8 +246,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email no active products', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'test_only', testEmail: 't@b.com', subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'test_only',
+        testEmail: 't@b.com',
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([]) // products
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -230,8 +262,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email test_only missing testEmail', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'test_only', testEmail: null, subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'test_only',
+        testEmail: null,
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'X', slug: 'x', price: '1' }])
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -239,8 +278,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email test_only success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'test_only', testEmail: 't@b.com', subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'test_only',
+        testEmail: 't@b.com',
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'X', slug: 'x', price: '1' }])
     mockAnnounce.mockResolvedValue({ success: true } as any)
     const res = await POST(makeReq(), params)
@@ -248,11 +294,18 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email all_opted_in with all sends failing', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'all_opted_in', testEmail: null, subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'all_opted_in',
+        testEmail: null,
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'p1', name: 'X', slug: 'x', price: '1' }]) // products
-      .mockResolvedValueOnce([{ email: 'a@b.com', name: 'Al' }])               // recipients
+      .mockResolvedValueOnce([{ email: 'a@b.com', name: 'Al' }]) // recipients
     mockAnnounce.mockResolvedValue({ success: false } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -260,8 +313,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email recent_buyers success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'recent_buyers', testEmail: null, subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'recent_buyers',
+        testEmail: null,
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'p1', name: 'X', slug: 'x', price: '1' }])
       .mockResolvedValueOnce([{ email: 'a@b.com', name: 'Al' }])
@@ -271,8 +331,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_product_announcement_email unknown audience', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_product_announcement_email',
-      { productIds: ['p1'], audience: 'weird', testEmail: null, subject: 'S', intro: 'I' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_product_announcement_email', {
+        productIds: ['p1'],
+        audience: 'weird',
+        testEmail: null,
+        subject: 'S',
+        intro: 'I',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'X', slug: 'x', price: '1' }])
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -282,31 +349,42 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── call_admin_api ────────────────────────────────────────────────────────
 
   it('call_admin_api forbidden path', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'POST', path: '/api/admin/agent/x', body: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'POST', path: '/api/admin/agent/x', body: null })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/not permitted/i)
   })
 
   it('call_admin_api bad method', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'GET', path: '/api/admin/products', body: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'GET', path: '/api/admin/products', body: null })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/method not permitted/i)
   })
 
   it('call_admin_api success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'POST', path: '/api/admin/products', body: '{}' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'POST', path: '/api/admin/products', body: '{}' })
+    )
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ done: true }) } as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('call_admin_api upstream error + json parse fallback to text', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'PUT', path: '/api/admin/products', body: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'PUT', path: '/api/admin/products', body: null })
+    )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false, status: 400,
-      json: async () => { throw new Error('not json') },
+      ok: false,
+      status: 400,
+      json: async () => {
+        throw new Error('not json')
+      },
       text: async () => 'plain error',
     } as any)
     const res = await POST(makeReq(), params)
@@ -315,7 +393,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('call_admin_api fetch throws', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('call_admin_api', { method: 'DELETE', path: '/api/admin/products', body: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('call_admin_api', { method: 'DELETE', path: '/api/admin/products', body: null })
+    )
     global.fetch = vi.fn().mockRejectedValue(new Error('network'))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -332,17 +412,41 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_quotation success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_quotation', {
-      consignee_email: 'c@b.com', consignee_name: 'Cust', consignee_addr1: 'A1',
-      consignee_city: 'City', consignee_state: 'ST', buyer_same: true,
-      items: [{ description: 'X', quantity: 2, rate: 100, discount_pct: 0, hsn_code: '7318', gst_rate: 18, unit: 'PCS', buy_unit: null, product_id: 'prod-1', variant_id: 'var-1', sub_variant_id: 'sv-1', amount: 200 }],
-    }))
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [{ max_seq: '4' }] })                                   // seq
-        .mockResolvedValueOnce({ rows: [{ id: 'q1', quote_number: 'QT/26-27/JAN/5', view_token: 'tok' }] }) // insert quotation
-        .mockResolvedValue({ rows: [] }),                                                        // items
-    }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_quotation', {
+        consignee_email: 'c@b.com',
+        consignee_name: 'Cust',
+        consignee_addr1: 'A1',
+        consignee_city: 'City',
+        consignee_state: 'ST',
+        buyer_same: true,
+        items: [
+          {
+            description: 'X',
+            quantity: 2,
+            rate: 100,
+            discount_pct: 0,
+            hsn_code: '7318',
+            gst_rate: 18,
+            unit: 'PCS',
+            buy_unit: null,
+            product_id: 'prod-1',
+            variant_id: 'var-1',
+            sub_variant_id: 'sv-1',
+            amount: 200,
+          },
+        ],
+      })
+    )
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [{ max_seq: '4' }] }) // seq
+          .mockResolvedValueOnce({ rows: [{ id: 'q1', quote_number: 'QT/26-27/JAN/5', view_token: 'tok' }] }) // insert quotation
+          .mockResolvedValue({ rows: [] }), // items
+      })
+    )
     const res = await POST(makeReq(), params)
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -350,11 +454,32 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_quotation transaction error', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_quotation', {
-      consignee_email: 'c@b.com', consignee_name: null, consignee_addr1: null,
-      consignee_city: null, consignee_state: null, buyer_same: false,
-      items: [{ description: 'X', quantity: 1, rate: 50, discount_pct: 0, hsn_code: null, gst_rate: 0, unit: '', buy_unit: null, product_id: 'p', variant_id: null, sub_variant_id: null, amount: 50 }],
-    }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_quotation', {
+        consignee_email: 'c@b.com',
+        consignee_name: null,
+        consignee_addr1: null,
+        consignee_city: null,
+        consignee_state: null,
+        buyer_same: false,
+        items: [
+          {
+            description: 'X',
+            quantity: 1,
+            rate: 50,
+            discount_pct: 0,
+            hsn_code: null,
+            gst_rate: 0,
+            unit: '',
+            buy_unit: null,
+            product_id: 'p',
+            variant_id: null,
+            sub_variant_id: null,
+            amount: 50,
+          },
+        ],
+      })
+    )
     mockWithTx.mockRejectedValue(new Error('tx failed'))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -370,16 +495,30 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_quotation_email success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_quotation_email',
-      { quoteNumber: 'QT-1', toEmail: 'a@b.com', consigneeName: 'Cust', totalAmount: 100, viewToken: 'tok' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_quotation_email', {
+        quoteNumber: 'QT-1',
+        toEmail: 'a@b.com',
+        consigneeName: 'Cust',
+        totalAmount: 100,
+        viewToken: 'tok',
+      })
+    )
     mockQuoteEmail.mockResolvedValue(undefined as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('send_quotation_email send throws', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_quotation_email',
-      { quoteNumber: 'QT-1', toEmail: 'a@b.com', consigneeName: '', totalAmount: 100, viewToken: 'tok' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_quotation_email', {
+        quoteNumber: 'QT-1',
+        toEmail: 'a@b.com',
+        consigneeName: '',
+        totalAmount: 100,
+        viewToken: 'tok',
+      })
+    )
     mockQuoteEmail.mockRejectedValue(new Error('smtp'))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)

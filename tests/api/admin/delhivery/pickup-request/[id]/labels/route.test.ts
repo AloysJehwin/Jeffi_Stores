@@ -25,7 +25,9 @@ const PID = 'pickup-uuid-1'
 const req = () => new NextRequest(`http://localhost/api/admin/delhivery/pickup-request/${PID}/labels`)
 const params = { params: Promise.resolve({ id: PID }) }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET pickup-request/[id]/labels', () => {
   it('401 when unauthenticated', async () => {
@@ -40,25 +42,42 @@ describe('GET pickup-request/[id]/labels', () => {
   })
 
   it('404 when pickup request not found', async () => {
-    mockAuth.mockResolvedValue(admin as any); mockHasScope.mockReturnValue(true)
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
     expect((await GET(req(), params)).status).toBe(404)
   })
 
   it('404 when the pickup request has no AWBs', async () => {
-    mockAuth.mockResolvedValue(admin as any); mockHasScope.mockReturnValue(true)
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: PID, pickup_id: 'PU-1', awbs: [] } as any)
     expect((await GET(req(), params)).status).toBe(404)
   })
 
   it('returns a merged PDF with one label per AWB', async () => {
-    mockAuth.mockResolvedValue(admin as any); mockHasScope.mockReturnValue(true)
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: PID, pickup_id: 'PU-1', awbs: ['AWB1', 'AWB2'] } as any)
     // first queryMany = orders, second = order_items
     mockQueryMany
       .mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-1', awb_number: 'AWB1', total_amount: '100', payment_mode: 'cod', payment_status: 'cod_pending' },
-        { id: 'o2', order_number: 'ORD-2', awb_number: 'AWB2', total_amount: '200', payment_mode: 'razorpay', payment_status: 'paid' },
+        {
+          id: 'o1',
+          order_number: 'ORD-1',
+          awb_number: 'AWB1',
+          total_amount: '100',
+          payment_mode: 'cod',
+          payment_status: 'cod_pending',
+        },
+        {
+          id: 'o2',
+          order_number: 'ORD-2',
+          awb_number: 'AWB2',
+          total_amount: '200',
+          payment_mode: 'razorpay',
+          payment_status: 'paid',
+        },
       ] as any)
       .mockResolvedValueOnce([
         { order_id: 'o1', product_name: 'Bolt', variant_name: 'M8', quantity: 2, unit_price: 25, total_price: 50 },

@@ -10,7 +10,11 @@ function sheetsOf(buf: Buffer): Record<string, string[][]> {
   const wb = XLSX.read(buf, { type: 'buffer' })
   const out: Record<string, string[][]> = {}
   for (const name of wb.SheetNames) {
-    out[name] = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], { header: 1, blankrows: false, defval: '' }) as string[][]
+    out[name] = XLSX.utils.sheet_to_json<string[]>(wb.Sheets[name], {
+      header: 1,
+      blankrows: false,
+      defval: '',
+    }) as string[][]
   }
   return out
 }
@@ -31,7 +35,11 @@ describe('multi-sheet template', () => {
     const parsed = parseWorkbook(await buildTemplateWorkbook())
     expect(parsed.fatal).toBeUndefined()
     expect(parsed.rows.map(r => `${r.sheet}:${r.rowType}`)).toEqual([
-      'Products:product', 'Variants:variant', 'Variants:variant', 'Sub-variants:sub_variant', 'Sub-variants:sub_variant',
+      'Products:product',
+      'Variants:variant',
+      'Variants:variant',
+      'Sub-variants:sub_variant',
+      'Sub-variants:sub_variant',
     ])
     const { groups, orphans } = groupRows(parsed.rows)
     expect(orphans).toEqual([])
@@ -42,7 +50,10 @@ describe('multi-sheet template', () => {
     expect(p.imageUrls).toHaveLength(2)
     expect(p.values.weight_grams).toBe(200)
     expect(p.values.fragile).toBe(false)
-    expect(p.variants.map(v => [v.sku, v.subVariants.length])).toEqual([['TSHIRT-001-RED', 2], ['TSHIRT-001-BLU', 0]])
+    expect(p.variants.map(v => [v.sku, v.subVariants.length])).toEqual([
+      ['TSHIRT-001-RED', 2],
+      ['TSHIRT-001-BLU', 0],
+    ])
   })
 
   it('parses the same content when it arrives as per-tab value matrices (the Google Sheet path)', async () => {
@@ -56,8 +67,16 @@ describe('multi-sheet template', () => {
 
   it('flags an attribute row whose sku is not on the Products tab, and a row with no sku', () => {
     const buf = valuesToWorkbookBuffer({
-      Products: [['sku', 'name', 'category', 'brand', 'base_price'], ['A1', 'Thing', 'Cat', 'Brand', '10']],
-      'Product · Shipping': [['sku', 'weight_grams'], ['A1', '500'], ['NOPE', '5'], ['', '7']],
+      Products: [
+        ['sku', 'name', 'category', 'brand', 'base_price'],
+        ['A1', 'Thing', 'Cat', 'Brand', '10'],
+      ],
+      'Product · Shipping': [
+        ['sku', 'weight_grams'],
+        ['A1', '500'],
+        ['NOPE', '5'],
+        ['', '7'],
+      ],
     })
     const parsed = parseWorkbook(buf)
     expect(parsed.fatal).toBeUndefined()
@@ -71,8 +90,15 @@ describe('multi-sheet template', () => {
 
   it('works without the help row and ignores blank rows', () => {
     const buf = valuesToWorkbookBuffer({
-      Products: [['sku', 'name', 'category', 'brand', 'base_price'], ['', '', '', '', ''], ['B2', 'Bee', 'Cat', 'Brand', '20']],
-      Variants: [['parent_sku', 'variant.sku', 'variant.variant_name', 'variant.price'], ['B2', 'B2-S', 'Small', '20']],
+      Products: [
+        ['sku', 'name', 'category', 'brand', 'base_price'],
+        ['', '', '', '', ''],
+        ['B2', 'Bee', 'Cat', 'Brand', '20'],
+      ],
+      Variants: [
+        ['parent_sku', 'variant.sku', 'variant.variant_name', 'variant.price'],
+        ['B2', 'B2-S', 'Small', '20'],
+      ],
     })
     const parsed = parseWorkbook(buf)
     expect(parsed.rows.map(r => r.rowType)).toEqual(['product', 'variant'])
@@ -89,7 +115,17 @@ describe('multi-sheet template', () => {
 describe('legacy flat layout', () => {
   it('still parses a single sheet driven by row_type', () => {
     const buf = valuesToWorkbookBuffer([
-      ['row_type', 'sku', 'name', 'category', 'brand', 'base_price', 'parent_sku', 'variant.sku', 'variant.variant_name'],
+      [
+        'row_type',
+        'sku',
+        'name',
+        'category',
+        'brand',
+        'base_price',
+        'parent_sku',
+        'variant.sku',
+        'variant.variant_name',
+      ],
       ['product | variant | sub_variant', '', '', '', '', '', '', '', ''],
       ['product', 'X1', 'Thing', 'Cat', 'Brand', '10', '', '', ''],
       ['variant', '', '', '', '', '', 'X1', 'X1-R', 'Red'],
@@ -102,7 +138,12 @@ describe('legacy flat layout', () => {
   })
 
   it('rejects a flat sheet without row_type', () => {
-    const buf = valuesToWorkbookBuffer({ Sheet1: [['sku', 'name'], ['X', 'Y']] })
+    const buf = valuesToWorkbookBuffer({
+      Sheet1: [
+        ['sku', 'name'],
+        ['X', 'Y'],
+      ],
+    })
     expect(parseWorkbook(buf).fatal).toMatch(/row_type/)
   })
 })

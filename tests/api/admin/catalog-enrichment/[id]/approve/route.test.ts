@@ -40,7 +40,9 @@ function armPoolMock() {
     query: vi.fn().mockResolvedValue({ rows: [] }),
     end: vi.fn().mockResolvedValue(undefined),
   }
-  vi.mocked(Pool).mockImplementation(function() { return mockPool } as any)
+  vi.mocked(Pool).mockImplementation(function () {
+    return mockPool
+  } as any)
 }
 
 const ENRICHMENT_ROW = {

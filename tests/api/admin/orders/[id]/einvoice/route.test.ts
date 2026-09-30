@@ -151,10 +151,10 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
 
   it('generates IRN successfully', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(sampleOrder as any)    // order fetch
-      .mockResolvedValueOnce(undefined as any)      // UPDATE returning
+      .mockResolvedValueOnce(sampleOrder as any) // order fetch
+      .mockResolvedValueOnce(undefined as any) // UPDATE returning
     mockQueryMany
-      .mockResolvedValueOnce(sampleItems as any)    // order items
+      .mockResolvedValueOnce(sampleItems as any) // order items
       .mockResolvedValueOnce(sampleSettings as any) // site settings
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
@@ -171,9 +171,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
     mockQueryOne
       .mockResolvedValueOnce({ ...sampleOrder, buyer_gstin: '29ABCDE1234F1Z5' } as any)
       .mockResolvedValueOnce(undefined as any)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems as any)
-      .mockResolvedValueOnce(sampleSettings as any)
+    mockQueryMany.mockResolvedValueOnce(sampleItems as any).mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
     const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
@@ -184,12 +182,8 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
   })
 
   it('uses B2C supply type when buyer_gstin absent', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(sampleOrder as any)
-      .mockResolvedValueOnce(undefined as any)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems as any)
-      .mockResolvedValueOnce(sampleSettings as any)
+    mockQueryOne.mockResolvedValueOnce(sampleOrder as any).mockResolvedValueOnce(undefined as any)
+    mockQueryMany.mockResolvedValueOnce(sampleItems as any).mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
     await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
@@ -199,9 +193,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
 
   it('returns 500 when generateIRN throws', async () => {
     mockQueryOne.mockResolvedValueOnce(sampleOrder as any)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems as any)
-      .mockResolvedValueOnce(sampleSettings as any)
+    mockQueryMany.mockResolvedValueOnce(sampleItems as any).mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockRejectedValueOnce(new Error('IRP service unavailable'))
 
     const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
@@ -254,11 +246,13 @@ describe('DELETE /api/admin/orders/[id]/einvoice', () => {
 
   it('cancels IRN successfully for real IRN', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ irn: 'REAL-IRN-001', irn_status: 'generated' } as any)  // order fetch
-      .mockResolvedValueOnce(undefined as any)                                           // UPDATE
+      .mockResolvedValueOnce({ irn: 'REAL-IRN-001', irn_status: 'generated' } as any) // order fetch
+      .mockResolvedValueOnce(undefined as any) // UPDATE
     mockCancelIRN.mockResolvedValueOnce(undefined as any)
 
-    const res = await DELETE(makeDelete('ord-1', { reason: 1, remark: 'Test cancel' }), { params: Promise.resolve({ id: 'ord-1' }) })
+    const res = await DELETE(makeDelete('ord-1', { reason: 1, remark: 'Test cancel' }), {
+      params: Promise.resolve({ id: 'ord-1' }),
+    })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockCancelIRN).toHaveBeenCalledWith('REAL-IRN-001', 1, 'Test cancel')

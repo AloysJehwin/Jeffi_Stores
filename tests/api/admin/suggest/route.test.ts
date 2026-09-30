@@ -118,9 +118,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns product suggestions for type=products', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'p1', name: 'Hex Bolt M6', sku: 'BOLT-M6' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'p1', name: 'Hex Bolt M6', sku: 'BOLT-M6' }])
 
     const res = await GET(makeGet({ q: 'bolt', type: 'products' }))
     expect(res.status).toBe(200)
@@ -144,9 +142,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns order suggestions for type=orders', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'o1', order_number: 'ORD-001', customer_name: 'John Doe' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'o1', order_number: 'ORD-001', customer_name: 'John Doe' }])
 
     const res = await GET(makeGet({ q: 'ORD', type: 'orders' }))
     expect(res.status).toBe(200)
@@ -205,9 +201,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns category suggestions for type=categories', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'cat1', name: 'Fasteners', slug: 'fasteners' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'cat1', name: 'Fasteners', slug: 'fasteners' }])
 
     const res = await GET(makeGet({ q: 'fast', type: 'categories' }))
     expect(res.status).toBe(200)
@@ -220,9 +214,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns coupon suggestions with percentage discount', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'c1', code: 'SAVE10', discount_type: 'percentage', discount_value: '10' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'c1', code: 'SAVE10', discount_type: 'percentage', discount_value: '10' }])
 
     const res = await GET(makeGet({ q: 'SAVE', type: 'coupons' }))
     expect(res.status).toBe(200)
@@ -233,9 +225,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns coupon suggestions with flat discount', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'c2', code: 'FLAT50', discount_type: 'flat', discount_value: '50' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'c2', code: 'FLAT50', discount_type: 'flat', discount_value: '50' }])
 
     const res = await GET(makeGet({ q: 'FLAT', type: 'coupons' }))
     expect(res.status).toBe(200)
@@ -247,9 +237,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns brand suggestions for type=brands', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'b1', name: 'Unbrako' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'b1', name: 'Unbrako' }])
 
     const res = await GET(makeGet({ q: 'unbr', type: 'brands' }))
     expect(res.status).toBe(200)
@@ -261,9 +249,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns supplier suggestions for type=suppliers', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 's1', name: 'Acme Supplies', phone: '9876543210' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 's1', name: 'Acme Supplies', phone: '9876543210' }])
 
     const res = await GET(makeGet({ q: 'acme', type: 'suppliers' }))
     expect(res.status).toBe(200)
@@ -276,9 +262,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns PO suggestions for type=purchase_orders', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'po1', po_number: 'PO-001', supplier_name: 'Acme', total_amount: '5000' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'po1', po_number: 'PO-001', supplier_name: 'Acme', total_amount: '5000' }])
 
     const res = await GET(makeGet({ q: 'PO', type: 'purchase_orders' }))
     expect(res.status).toBe(200)
@@ -322,9 +306,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns quotation suggestions for type=quotations', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'q1', quote_number: 'QUO-001', consignee_name: 'Client A' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'q1', quote_number: 'QUO-001', consignee_name: 'Client A' }])
 
     const res = await GET(makeGet({ q: 'QUO', type: 'quotations' }))
     expect(res.status).toBe(200)
@@ -337,9 +319,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('returns review form suggestions for type=review_forms', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'rf1', title: 'Product Feedback', slug: 'product-feedback' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'rf1', title: 'Product Feedback', slug: 'product-feedback' }])
 
     const res = await GET(makeGet({ q: 'feed', type: 'review_forms' }))
     expect(res.status).toBe(200)
@@ -354,10 +334,18 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        name: 'Hex Bolt', variant_name: null, sku: 'BOLT-1',
-        base_price: 100, mrp: 118, gst_percentage: 18, hsn_code: '7318',
-        inventory_quantity: 50, discount_pct: 10,
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        name: 'Hex Bolt',
+        variant_name: null,
+        sku: 'BOLT-1',
+        base_price: 100,
+        mrp: 118,
+        gst_percentage: 18,
+        hsn_code: '7318',
+        inventory_quantity: 50,
+        discount_pct: 10,
       },
     ])
 
@@ -375,10 +363,18 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: null,
-        name: 'Bolt Set', variant_name: 'M6', sku: 'BOLT-M6',
-        base_price: 50, mrp: 59, gst_percentage: 18, hsn_code: null,
-        inventory_quantity: 20, discount_pct: 0,
+        product_id: 'p1',
+        variant_id: 'v1',
+        sub_variant_id: null,
+        name: 'Bolt Set',
+        variant_name: 'M6',
+        sku: 'BOLT-M6',
+        base_price: 50,
+        mrp: 59,
+        gst_percentage: 18,
+        hsn_code: null,
+        inventory_quantity: 20,
+        discount_pct: 0,
       },
     ])
 
@@ -394,9 +390,15 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: null,
-        name: 'Socket Wrench', variant_name: null, sku: 'SW-01',
-        base_price: 200, mrp: 240, gst_percentage: 12, hsn_code: '8204',
+        product_id: 'p1',
+        variant_id: null,
+        name: 'Socket Wrench',
+        variant_name: null,
+        sku: 'SW-01',
+        base_price: 200,
+        mrp: 240,
+        gst_percentage: 12,
+        hsn_code: '8204',
       },
     ])
 
@@ -411,9 +413,15 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: null,
-        name: 'Allen Key', variant_name: null, sku: 'AK-3',
-        base_price: 30, mrp: 35, gst_percentage: 18, hsn_code: null,
+        product_id: 'p1',
+        variant_id: null,
+        name: 'Allen Key',
+        variant_name: null,
+        sku: 'AK-3',
+        base_price: 30,
+        mrp: 35,
+        gst_percentage: 18,
+        hsn_code: null,
       },
     ])
 
@@ -429,9 +437,18 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'product:p1', name: 'Bolt', variant_name: null, sku: 'B-1', slug: 'bolt',
-        mrp: 100, price_ex_gst: 80, base_price: 90, gst_percentage: 12,
-        brand_name: 'Unbrako', gtin: null, inventory_quantity: 30,
+        id: 'product:p1',
+        name: 'Bolt',
+        variant_name: null,
+        sku: 'B-1',
+        slug: 'bolt',
+        mrp: 100,
+        price_ex_gst: 80,
+        base_price: 90,
+        gst_percentage: 12,
+        brand_name: 'Unbrako',
+        gtin: null,
+        inventory_quantity: 30,
       },
     ])
 
@@ -461,10 +478,18 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        name: 'Bolt', variant_name: null, sku: 'B-1',
-        base_price: null, mrp: null, gst_percentage: 18, hsn_code: null,
-        inventory_quantity: null, discount_pct: null,
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        name: 'Bolt',
+        variant_name: null,
+        sku: 'B-1',
+        base_price: null,
+        mrp: null,
+        gst_percentage: 18,
+        hsn_code: null,
+        inventory_quantity: null,
+        discount_pct: null,
       },
     ])
 
@@ -478,23 +503,31 @@ describe('GET /api/admin/suggest', () => {
     // encoded id: product_id|variant_id(empty)|base_price(empty)|gst|hsn(empty)|mrp(empty)|inv(empty)|sub_variant_id(empty)|discount_pct(0)
     const parts = item.id.split('|')
     expect(parts[0]).toBe('p1')
-    expect(parts[1]).toBe('')   // variant_id null -> ''
-    expect(parts[2]).toBe('')   // base_price null -> ''
-    expect(parts[4]).toBe('')   // hsn_code null -> ''
-    expect(parts[5]).toBe('')   // mrp null -> ''
-    expect(parts[6]).toBe('')   // inventory_quantity null -> ''
-    expect(parts[7]).toBe('')   // sub_variant_id null -> ''
-    expect(parts[8]).toBe('0')  // discount_pct null -> '0'
+    expect(parts[1]).toBe('') // variant_id null -> ''
+    expect(parts[2]).toBe('') // base_price null -> ''
+    expect(parts[4]).toBe('') // hsn_code null -> ''
+    expect(parts[5]).toBe('') // mrp null -> ''
+    expect(parts[6]).toBe('') // inventory_quantity null -> ''
+    expect(parts[7]).toBe('') // sub_variant_id null -> ''
+    expect(parts[8]).toBe('0') // discount_pct null -> '0'
   })
 
   it('line_items: encodes sub_variant_id when present', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1',
-        name: 'Bolt', variant_name: 'M8', sku: 'B-M8',
-        base_price: 75, mrp: 90, gst_percentage: 18, hsn_code: '7318',
-        inventory_quantity: 10, discount_pct: 5,
+        product_id: 'p1',
+        variant_id: 'v1',
+        sub_variant_id: 'sv1',
+        name: 'Bolt',
+        variant_name: 'M8',
+        sku: 'B-M8',
+        base_price: 75,
+        mrp: 90,
+        gst_percentage: 18,
+        hsn_code: '7318',
+        inventory_quantity: 10,
+        discount_pct: 5,
       },
     ])
 
@@ -523,10 +556,17 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p2', variant_id: null,
-        name: 'Wrench', variant_name: null, sku: 'WR-1',
-        base_price: null, mrp: null, gst_percentage: 12, hsn_code: null,
-        sell_unit_label: null, sell_unit_dimension: null,
+        product_id: 'p2',
+        variant_id: null,
+        name: 'Wrench',
+        variant_name: null,
+        sku: 'WR-1',
+        base_price: null,
+        mrp: null,
+        gst_percentage: 12,
+        hsn_code: null,
+        sell_unit_label: null,
+        sell_unit_dimension: null,
       },
     ])
 
@@ -538,22 +578,29 @@ describe('GET /api/admin/suggest', () => {
     expect(item.sublabel).toBe('WR-1')
     const parts = item.id.split('|')
     expect(parts[0]).toBe('p2')
-    expect(parts[1]).toBe('')  // variant_id null -> ''
-    expect(parts[2]).toBe('')  // base_price null -> ''
-    expect(parts[4]).toBe('')  // hsn_code null -> ''
-    expect(parts[5]).toBe('')  // mrp null -> ''
-    expect(parts[6]).toBe('')  // sell_unit_label null -> ''
-    expect(parts[7]).toBe('')  // sell_unit_dimension null -> ''
+    expect(parts[1]).toBe('') // variant_id null -> ''
+    expect(parts[2]).toBe('') // base_price null -> ''
+    expect(parts[4]).toBe('') // hsn_code null -> ''
+    expect(parts[5]).toBe('') // mrp null -> ''
+    expect(parts[6]).toBe('') // sell_unit_label null -> ''
+    expect(parts[7]).toBe('') // sell_unit_dimension null -> ''
   })
 
   it('po_line_items: encodes variant name in label when present', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        product_id: 'p2', variant_id: 'v2',
-        name: 'Wrench', variant_name: '1/2 inch', sku: 'WR-H',
-        base_price: 150, mrp: 180, gst_percentage: 12, hsn_code: '8204',
-        sell_unit_label: 'Piece', sell_unit_dimension: 'unit',
+        product_id: 'p2',
+        variant_id: 'v2',
+        name: 'Wrench',
+        variant_name: '1/2 inch',
+        sku: 'WR-H',
+        base_price: 150,
+        mrp: 180,
+        gst_percentage: 12,
+        hsn_code: '8204',
+        sell_unit_label: 'Piece',
+        sell_unit_dimension: 'unit',
       },
     ])
 
@@ -604,9 +651,7 @@ describe('GET /api/admin/suggest', () => {
 
   it('invoices: falls back to order_number when invoice_number is null', async () => {
     mockAuth.mockResolvedValue(admin as any)
-    mockQueryMany.mockResolvedValue([
-      { id: 'o2', invoice_number: null, order_number: 'ORD-999', customer_name: 'Dan' },
-    ])
+    mockQueryMany.mockResolvedValue([{ id: 'o2', invoice_number: null, order_number: 'ORD-999', customer_name: 'Dan' }])
     const res = await GET(makeGet({ q: 'ORD', type: 'invoices' }))
     expect(res.status).toBe(200)
     const data = await res.json()
@@ -667,10 +712,21 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'product:p1', name: 'Serial Bolt', variant_name: null, sku: 'SB-1', slug: 'serial-bolt',
-        mrp: 100, price_ex_gst: 85, base_price: 90, gst_percentage: 18,
-        brand_name: 'Unbrako', gtin: '890123', inventory_quantity: 12,
-        product_id: 'p1', sell_unit_id: 'su1', parent_variant_id: null,
+        id: 'product:p1',
+        name: 'Serial Bolt',
+        variant_name: null,
+        sku: 'SB-1',
+        slug: 'serial-bolt',
+        mrp: 100,
+        price_ex_gst: 85,
+        base_price: 90,
+        gst_percentage: 18,
+        brand_name: 'Unbrako',
+        gtin: '890123',
+        inventory_quantity: 12,
+        product_id: 'p1',
+        sell_unit_id: 'su1',
+        parent_variant_id: null,
       },
     ])
     const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
@@ -689,10 +745,21 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'variant:v1', name: 'Bolt', variant_name: 'M8', sku: 'B-M8', slug: 'bolt',
-        mrp: 50, price_ex_gst: 42, base_price: 45, gst_percentage: 18,
-        brand_name: null, gtin: null, inventory_quantity: 5,
-        product_id: 'p1', sell_unit_id: null, parent_variant_id: null,
+        id: 'variant:v1',
+        name: 'Bolt',
+        variant_name: 'M8',
+        sku: 'B-M8',
+        slug: 'bolt',
+        mrp: 50,
+        price_ex_gst: 42,
+        base_price: 45,
+        gst_percentage: 18,
+        brand_name: null,
+        gtin: null,
+        inventory_quantity: 5,
+        product_id: 'p1',
+        sell_unit_id: null,
+        parent_variant_id: null,
       },
     ])
     const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
@@ -707,22 +774,33 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'subvariant:s1', name: 'Bolt', variant_name: 'M8 (Set)', sku: 'B-S', slug: 'bolt',
-        mrp: null, price_ex_gst: null, base_price: null, gst_percentage: 18,
-        brand_name: null, gtin: null, inventory_quantity: null,
-        product_id: 'p1', sell_unit_id: null, parent_variant_id: 'v1',
+        id: 'subvariant:s1',
+        name: 'Bolt',
+        variant_name: 'M8 (Set)',
+        sku: 'B-S',
+        slug: 'bolt',
+        mrp: null,
+        price_ex_gst: null,
+        base_price: null,
+        gst_percentage: 18,
+        brand_name: null,
+        gtin: null,
+        inventory_quantity: null,
+        product_id: 'p1',
+        sell_unit_id: null,
+        parent_variant_id: 'v1',
       },
     ])
     const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
     expect(res.status).toBe(200)
     const data = await res.json()
     const parts = data.items[0].id.split('\x1f')
-    expect(parts[5]).toBe('0')   // mrp null -> '0'
-    expect(parts[6]).toBe('')    // price_ex_gst null -> ''
-    expect(parts[7]).toBe('0')   // base_price null -> '0'
-    expect(parts[9]).toBe('')    // brand_name null -> ''
-    expect(parts[10]).toBe('')   // gtin null -> ''
-    expect(parts[11]).toBe('0')  // inventory_quantity null -> '0'
+    expect(parts[5]).toBe('0') // mrp null -> '0'
+    expect(parts[6]).toBe('') // price_ex_gst null -> ''
+    expect(parts[7]).toBe('0') // base_price null -> '0'
+    expect(parts[9]).toBe('') // brand_name null -> ''
+    expect(parts[10]).toBe('') // gtin null -> ''
+    expect(parts[11]).toBe('0') // inventory_quantity null -> '0'
     expect(parts[14]).toBe('v1') // parent_variant_id present
   })
 
@@ -738,10 +816,21 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'product:p9', name: 'Perishable Item', variant_name: null, sku: 'PI-1', slug: 'perishable',
-        mrp: 200, price_ex_gst: 170, base_price: 180, gst_percentage: 12,
-        brand_name: 'FreshCo', gtin: null, inventory_quantity: 30,
-        product_id: 'p9', sell_unit_id: null, parent_variant_id: null,
+        id: 'product:p9',
+        name: 'Perishable Item',
+        variant_name: null,
+        sku: 'PI-1',
+        slug: 'perishable',
+        mrp: 200,
+        price_ex_gst: 170,
+        base_price: 180,
+        gst_percentage: 12,
+        brand_name: 'FreshCo',
+        gtin: null,
+        inventory_quantity: 30,
+        product_id: 'p9',
+        sell_unit_id: null,
+        parent_variant_id: null,
       },
     ])
     const res = await GET(makeGet({ q: 'item', type: 'batch_products' }))
@@ -765,10 +854,21 @@ describe('GET /api/admin/suggest', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockQueryMany.mockResolvedValue([
       {
-        id: 'variant:v2', name: 'Nut', variant_name: 'M6', sku: 'N-M6', slug: 'nut',
-        mrp: null, price_ex_gst: null, base_price: null, gst_percentage: 18,
-        brand_name: null, gtin: null, inventory_quantity: null,
-        product_id: 'p3', sell_unit_id: null, parent_variant_id: null,
+        id: 'variant:v2',
+        name: 'Nut',
+        variant_name: 'M6',
+        sku: 'N-M6',
+        slug: 'nut',
+        mrp: null,
+        price_ex_gst: null,
+        base_price: null,
+        gst_percentage: 18,
+        brand_name: null,
+        gtin: null,
+        inventory_quantity: null,
+        product_id: 'p3',
+        sell_unit_id: null,
+        parent_variant_id: null,
       },
     ])
     const res = await GET(makeGet({ q: 'nut', type: 'label_products' }))
@@ -776,10 +876,10 @@ describe('GET /api/admin/suggest', () => {
     const data = await res.json()
     expect(data.items[0].label).toBe('Nut — M6')
     const parts = data.items[0].id.split('\x1f')
-    expect(parts[5]).toBe('0')   // mrp null -> '0'
-    expect(parts[6]).toBe('')    // price_ex_gst null -> ''
-    expect(parts[7]).toBe('0')   // base_price null -> '0'
-    expect(parts[11]).toBe('0')  // inventory_quantity null -> '0'
+    expect(parts[5]).toBe('0') // mrp null -> '0'
+    expect(parts[6]).toBe('') // price_ex_gst null -> ''
+    expect(parts[7]).toBe('0') // base_price null -> '0'
+    expect(parts[11]).toBe('0') // inventory_quantity null -> '0'
   })
 
   it('label_products: handles null queryMany result', async () => {

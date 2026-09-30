@@ -3,25 +3,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockQuery = vi.fn()
 const mockEnd = vi.fn().mockResolvedValue(undefined)
 vi.mock('pg', () => ({
-  Pool: class { query = (...a: any[]) => mockQuery(...a); end = mockEnd },
+  Pool: class {
+    query = (...a: any[]) => mockQuery(...a)
+    end = mockEnd
+  },
 }))
 const cpQuery = vi.fn()
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: (...a: any[]) => cpQuery(...a) }) }))
 vi.mock('@/lib/tenant-migrations-schema', () => ({
-  buildTenantSchemaSql: () => 'CREATE TABLE IF NOT EXISTS public.t (id uuid);\nALTER TABLE public.t ADD COLUMN IF NOT EXISTS source text;\nALTER TABLE public.t ADD CONSTRAINT t_source_check CHECK (source IS NOT NULL);',
+  buildTenantSchemaSql: () =>
+    'CREATE TABLE IF NOT EXISTS public.t (id uuid);\nALTER TABLE public.t ADD COLUMN IF NOT EXISTS source text;\nALTER TABLE public.t ADD CONSTRAINT t_source_check CHECK (source IS NOT NULL);',
   desiredTableColumns: () => new Map([['t', ['id', 'source']]]),
 }))
 
-import { runMigrationFanout, describeSqlError, isTransientDbError, missingColumns, applySchemaToTenant } from '@/lib/tenant-migrations'
+import {
+  runMigrationFanout,
+  describeSqlError,
+  isTransientDbError,
+  missingColumns,
+  applySchemaToTenant,
+} from '@/lib/tenant-migrations'
 
-const SQL = 'CREATE TABLE IF NOT EXISTS public.t (id uuid);\nALTER TABLE public.t ADD COLUMN IF NOT EXISTS source text;\nALTER TABLE public.t ADD CONSTRAINT t_source_check CHECK (source IS NOT NULL);'
+const SQL =
+  'CREATE TABLE IF NOT EXISTS public.t (id uuid);\nALTER TABLE public.t ADD COLUMN IF NOT EXISTS source text;\nALTER TABLE public.t ADD CONSTRAINT t_source_check CHECK (source IS NOT NULL);'
 const liveRows = (cols: string[]) => ({ rows: cols.map(c => ({ table_name: 't', column_name: c })) })
 
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.RDS_MASTER_PASSWORD = 'pw'
   cpQuery.mockImplementation(async (text: string) => {
-    if (/FROM tenants/.test(text)) return { rows: [{ id: 't1', slug: 'acme', rds_endpoint: 'db', rds_port: 5432, rds_db: 'jeffi_stores', region: 'us-east-1' }] }
+    if (/FROM tenants/.test(text))
+      return {
+        rows: [
+          { id: 't1', slug: 'acme', rds_endpoint: 'db', rds_port: 5432, rds_db: 'jeffi_stores', region: 'us-east-1' },
+        ],
+      }
     if (/FROM tenant_migration_runs/.test(text)) return { rows: [] }
     return { rows: [], rowCount: 1 }
   })
@@ -29,14 +45,19 @@ beforeEach(() => {
 
 describe('describeSqlError', () => {
   it('names the statement at the reported position', () => {
-    const err = Object.assign(new Error('column "source" does not exist'), { code: '42703', position: String(SQL.indexOf('CHECK (source') + 8) })
+    const err = Object.assign(new Error('column "source" does not exist'), {
+      code: '42703',
+      position: String(SQL.indexOf('CHECK (source') + 8),
+    })
     const msg = describeSqlError(err, SQL)
     expect(msg).toContain('column "source" does not exist (code 42703)')
     expect(msg).toContain('near: ALTER TABLE public.t ADD CONSTRAINT t_source_check CHECK (source IS NOT NULL);')
   })
 
   it('falls back to the DO-block inner query, then to the bare message', () => {
-    expect(describeSqlError(Object.assign(new Error('boom'), { internalQuery: 'ALTER TABLE x ADD y' }), SQL)).toBe('boom near: ALTER TABLE x ADD y')
+    expect(describeSqlError(Object.assign(new Error('boom'), { internalQuery: 'ALTER TABLE x ADD y' }), SQL)).toBe(
+      'boom near: ALTER TABLE x ADD y'
+    )
     expect(describeSqlError(new Error('plain'), SQL)).toBe('plain')
   })
 })
@@ -52,7 +73,10 @@ describe('isTransientDbError', () => {
 
 describe('missingColumns', () => {
   it('lists absent columns and whole tables', () => {
-    const desired = new Map([['a', ['x', 'y']], ['b', ['z']]])
+    const desired = new Map([
+      ['a', ['x', 'y']],
+      ['b', ['z']],
+    ])
     const live = new Map([['a', new Set(['x'])]])
     expect(missingColumns(desired, live)).toEqual(['a.y', 'b.*'])
   })
@@ -70,16 +94,25 @@ describe('applySchemaToTenant', () => {
   }, 10_000)
 
   it('does not retry a real schema error and reports the failing statement', async () => {
-    mockQuery.mockRejectedValueOnce(Object.assign(new Error('column "source" does not exist'), { code: '42703', position: String(SQL.indexOf('CHECK (source') + 8) }))
+    mockQuery.mockRejectedValueOnce(
+      Object.assign(new Error('column "source" does not exist'), {
+        code: '42703',
+        position: String(SQL.indexOf('CHECK (source') + 8),
+      })
+    )
     const pool = { query: (...a: any[]) => mockQuery(...a) } as any
-    await expect(applySchemaToTenant(pool, SQL, new Map())).rejects.toThrow(/does not exist \(code 42703\) near: ALTER TABLE public\.t ADD CONSTRAINT/)
+    await expect(applySchemaToTenant(pool, SQL, new Map())).rejects.toThrow(
+      /does not exist \(code 42703\) near: ALTER TABLE public\.t ADD CONSTRAINT/
+    )
     expect(mockQuery).toHaveBeenCalledTimes(1)
   })
 
   it('fails when a declared column is still missing after the apply', async () => {
     mockQuery.mockResolvedValueOnce({}).mockResolvedValueOnce(liveRows(['id']))
     const pool = { query: (...a: any[]) => mockQuery(...a) } as any
-    await expect(applySchemaToTenant(pool, SQL, new Map([['t', ['id', 'source']]]))).rejects.toThrow(/post-apply verification: 1 column\(s\) still missing: t\.source/)
+    await expect(applySchemaToTenant(pool, SQL, new Map([['t', ['id', 'source']]]))).rejects.toThrow(
+      /post-apply verification: 1 column\(s\) still missing: t\.source/
+    )
   })
 })
 
@@ -105,7 +138,12 @@ describe('runMigrationFanout', () => {
 
   it('skips a tenant already recorded at this sha', async () => {
     cpQuery.mockImplementation(async (text: string) => {
-      if (/FROM tenants/.test(text)) return { rows: [{ id: 't1', slug: 'acme', rds_endpoint: 'db', rds_port: 5432, rds_db: 'jeffi_stores', region: 'us-east-1' }] }
+      if (/FROM tenants/.test(text))
+        return {
+          rows: [
+            { id: 't1', slug: 'acme', rds_endpoint: 'db', rds_port: 5432, rds_db: 'jeffi_stores', region: 'us-east-1' },
+          ],
+        }
       if (/FROM tenant_migration_runs/.test(text)) return { rows: [{ 1: 1 }] }
       return { rows: [] }
     })

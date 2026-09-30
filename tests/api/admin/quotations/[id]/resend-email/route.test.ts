@@ -33,7 +33,9 @@ const sampleQuotation = {
 }
 
 describe('POST /api/admin/quotations/[id]/resend-email', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

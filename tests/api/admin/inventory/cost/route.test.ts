@@ -90,20 +90,14 @@ describe('PATCH /api/admin/inventory/cost', () => {
     const res = await PATCH(makeReq({ product_id: 'p1', cost_price: 250 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE products SET cost_price/),
-      [250, 'p1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE products SET cost_price/), [250, 'p1'])
   })
 
   it('updates variant cost_price when variant_id is provided', async () => {
     const res = await PATCH(makeReq({ product_id: 'p1', variant_id: 'v1', cost_price: 99 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE product_variants SET cost_price/),
-      [99, 'v1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE product_variants SET cost_price/), [99, 'v1'])
   })
 
   it('accepts cost_price of 0', async () => {

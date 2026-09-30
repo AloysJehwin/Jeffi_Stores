@@ -100,16 +100,25 @@ describe('POST /api/admin/labels/batch — serial mode', () => {
     expect(res.headers.get('Content-Type')).toBe('application/pdf')
     expect(res.headers.get('Content-Disposition')).toMatch(/serial-labels-1\.pdf/)
     // serial_ids branch → ANY($1::uuid[]); filter(Boolean) drops empty string
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('ps.id = ANY($1::uuid[])'),
-      [['s1']]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('ps.id = ANY($1::uuid[])'), [['s1']])
     expect(mockSerialPdf).toHaveBeenCalledWith(
-      [{
-        serialNumber: 'SN1', productName: 'Bolt', sku: 'B1', variantName: 'M6', lotNumber: 'L1',
-        showPrice: false, mrp: undefined, priceExGst: undefined, gstPercentage: undefined, qrUrl: undefined,
-      }],
-      1, false, undefined
+      [
+        {
+          serialNumber: 'SN1',
+          productName: 'Bolt',
+          sku: 'B1',
+          variantName: 'M6',
+          lotNumber: 'L1',
+          showPrice: false,
+          mrp: undefined,
+          priceExGst: undefined,
+          gstPercentage: undefined,
+          qrUrl: undefined,
+        },
+      ],
+      1,
+      false,
+      undefined
     )
   })
 
@@ -119,10 +128,7 @@ describe('POST /api/admin/labels/batch — serial mode', () => {
     ])
     const res = await POST(makeReq({ serial_numbers: ['SN2'], copies: 2, sheet: true, size: '40x60' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('ps.serial_number = ANY($1::text[])'),
-      [['SN2']]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('ps.serial_number = ANY($1::text[])'), [['SN2']])
     expect(mockSerialPdf).toHaveBeenCalledWith(expect.any(Array), 2, true, '40x60')
   })
 
@@ -139,9 +145,14 @@ describe('POST /api/admin/labels/batch — batch mode (legacy batch_ids)', () =>
   it('generates one label per batch id', async () => {
     mockQueryMany.mockResolvedValue([
       {
-        batch_id: 'bid1', product_name: 'Bolt', sku: 'B1', variant_name: 'M6',
-        lot_number: 'LOT-1', manufacture_date: '2024-01-01T00:00:00Z',
-        expiry_date: '2025-01-01T00:00:00Z', quantity_remaining: 50,
+        batch_id: 'bid1',
+        product_name: 'Bolt',
+        sku: 'B1',
+        variant_name: 'M6',
+        lot_number: 'LOT-1',
+        manufacture_date: '2024-01-01T00:00:00Z',
+        expiry_date: '2025-01-01T00:00:00Z',
+        quantity_remaining: 50,
       },
     ])
     const res = await POST(makeReq({ batch_ids: ['b1', null, ''] }))
@@ -150,26 +161,41 @@ describe('POST /api/admin/labels/batch — batch mode (legacy batch_ids)', () =>
     // filter(Boolean) removes null and ''
     expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), [['b1']])
     expect(mockBatchPdf).toHaveBeenCalledWith(
-      [expect.objectContaining({
-        batchId: 'bid1', lotNumber: 'LOT-1',
-        manufactureDate: '2024-01-01', expiryDate: '2025-01-01', quantity: 50,
-      })],
-      1, false, undefined
+      [
+        expect.objectContaining({
+          batchId: 'bid1',
+          lotNumber: 'LOT-1',
+          manufactureDate: '2024-01-01',
+          expiryDate: '2025-01-01',
+          quantity: 50,
+        }),
+      ],
+      1,
+      false,
+      undefined
     )
   })
 
   it('maps null manufacture/expiry dates and null quantity', async () => {
     mockQueryMany.mockResolvedValue([
       {
-        batch_id: 'bid2', product_name: 'Nut', sku: 'N1', variant_name: null,
-        lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null,
+        batch_id: 'bid2',
+        product_name: 'Nut',
+        sku: 'N1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
       },
     ])
     const res = await POST(makeReq({ batch_ids: ['b2'] }))
     expect(res.status).toBe(200)
     expect(mockBatchPdf).toHaveBeenCalledWith(
       [expect.objectContaining({ manufactureDate: null, expiryDate: null, quantity: null })],
-      1, false, undefined
+      1,
+      false,
+      undefined
     )
   })
 
@@ -185,16 +211,36 @@ describe('POST /api/admin/labels/batch — batch mode (legacy batch_ids)', () =>
 describe('POST /api/admin/labels/batch — batch mode (batches[] with counts)', () => {
   it('expands count per batch and clamps count between 1 and 9999', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'Bolt', sku: 'B1', variant_name: null, lot_number: 'L1', manufacture_date: null, expiry_date: null, quantity_remaining: 3 },
-      { batch_id: 'bid2', product_name: 'Nut', sku: 'N1', variant_name: null, lot_number: 'L2', manufacture_date: null, expiry_date: null, quantity_remaining: 5 },
+      {
+        batch_id: 'bid1',
+        product_name: 'Bolt',
+        sku: 'B1',
+        variant_name: null,
+        lot_number: 'L1',
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: 3,
+      },
+      {
+        batch_id: 'bid2',
+        product_name: 'Nut',
+        sku: 'N1',
+        variant_name: null,
+        lot_number: 'L2',
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: 5,
+      },
     ])
-    const res = await POST(makeReq({
-      batches: [
-        { id: 'bid1', count: 3 },
-        { id: 'bid2', count: 0 },      // clamps to 1
-        { notId: true },               // filtered out (no string id)
-      ],
-    }))
+    const res = await POST(
+      makeReq({
+        batches: [
+          { id: 'bid1', count: 3 },
+          { id: 'bid2', count: 0 }, // clamps to 1
+          { notId: true }, // filtered out (no string id)
+        ],
+      })
+    )
     expect(res.status).toBe(200)
     // bid1 → 3 copies, bid2 → 1 copy = 4 total
     const call = mockBatchPdf.mock.calls[0]
@@ -205,8 +251,26 @@ describe('POST /api/admin/labels/batch — batch mode (batches[] with counts)', 
   it('defaults count to 1 when a batch row has no matching count entry', async () => {
     // batches[] references bid1 only, but query returns an extra row bid9
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
-      { batch_id: 'bid9', product_name: 'B', sku: 'B1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
+      {
+        batch_id: 'bid9',
+        product_name: 'B',
+        sku: 'B1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     const res = await POST(makeReq({ batches: [{ id: 'bid1', count: 2 }] }))
     expect(res.status).toBe(200)
@@ -218,7 +282,16 @@ describe('POST /api/admin/labels/batch — batch mode (batches[] with counts)', 
 describe('POST /api/admin/labels/batch — copies clamping & errors', () => {
   it('clamps copies to max 100', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     await POST(makeReq({ batch_ids: ['b1'], copies: 9999 }))
     expect(mockBatchPdf).toHaveBeenCalledWith(expect.any(Array), 100, false, undefined)
@@ -226,7 +299,16 @@ describe('POST /api/admin/labels/batch — copies clamping & errors', () => {
 
   it('clamps copies to min 1 for invalid/negative values', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     await POST(makeReq({ batch_ids: ['b1'], copies: 'abc' }))
     expect(mockBatchPdf).toHaveBeenCalledWith(expect.any(Array), 1, false, undefined)
@@ -234,7 +316,16 @@ describe('POST /api/admin/labels/batch — copies clamping & errors', () => {
 
   it('ignores non-string size (stays undefined)', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     await POST(makeReq({ batch_ids: ['b1'], size: 123 }))
     expect(mockBatchPdf).toHaveBeenCalledWith(expect.any(Array), 1, false, undefined)
@@ -242,7 +333,16 @@ describe('POST /api/admin/labels/batch — copies clamping & errors', () => {
 
   it('returns 500 when PDF generation throws (with message)', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     mockBatchPdf.mockRejectedValue(new Error('boom'))
     const res = await POST(makeReq({ batch_ids: ['b1'] }))
@@ -253,7 +353,16 @@ describe('POST /api/admin/labels/batch — copies clamping & errors', () => {
 
   it('returns 500 with fallback message when error has no message', async () => {
     mockQueryMany.mockResolvedValue([
-      { batch_id: 'bid1', product_name: 'A', sku: 'A1', variant_name: null, lot_number: null, manufacture_date: null, expiry_date: null, quantity_remaining: null },
+      {
+        batch_id: 'bid1',
+        product_name: 'A',
+        sku: 'A1',
+        variant_name: null,
+        lot_number: null,
+        manufacture_date: null,
+        expiry_date: null,
+        quantity_remaining: null,
+      },
     ])
     mockBatchPdf.mockRejectedValue({})
     const res = await POST(makeReq({ batch_ids: ['b1'] }))
