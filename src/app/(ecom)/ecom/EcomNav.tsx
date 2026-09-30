@@ -13,7 +13,7 @@ const HIDE_ON = ['/signin', '/signup', '/ecom/signin', '/ecom/signup']
 export default function EcomNav({ owner }: { owner: { email: string; name: string | null } | null }) {
   const router = useRouter()
   const pathname = usePathname()
-  if (HIDE_ON.includes(pathname) || pathname?.startsWith('/ecom/preview')) return null
+  if (HIDE_ON.includes(pathname)) return null
 
   async function signOut() {
     await fetch('/api/ecom/auth/signout', { method: 'POST' }).catch(() => {})
