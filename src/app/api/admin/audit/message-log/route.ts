@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryCount } from '@/lib/db'
+import { requireAdminScope } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
 // Outbound SMS / WhatsApp log. `channel` query param scopes to 'sms' or 'whatsapp'.
 // OTP is never stored, so it never appears here.
 export async function GET(request: NextRequest) {
+  const admin = await requireAdminScope(request, null)
+  if (admin instanceof NextResponse) return admin
+
   const url = new URL(request.url)
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
   const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') || '25', 10)))

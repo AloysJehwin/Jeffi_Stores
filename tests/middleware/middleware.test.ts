@@ -243,6 +243,16 @@ describe('middleware', () => {
       const res = await middleware(req)
       expect(res.status).toBe(429)
     })
+
+    it('passes through the RazorpayX payables webhook without an admin cookie', async () => {
+      const req = makeNextRequest('http://localhost/api/admin/financial/payables/webhook', {
+        host: 'localhost',
+      })
+      const res = await middleware(req)
+      // Public path — reachable server-to-server; the route handler verifies the HMAC.
+      expect(res.status).not.toBe(401)
+      expect(mockVerifyToken).not.toHaveBeenCalled()
+    })
   })
 
   // -------------------------------------------------------------------------

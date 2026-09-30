@@ -55,6 +55,37 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     const res = await POST(req)
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/invalid signature/i)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('fails closed with 401 when the signature header is missing', async () => {
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const raw = JSON.stringify(body)
+    const req = new NextRequest('http://localhost/api/admin/financial/payables/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: raw,
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('fails closed with 401 when the webhook secret is not configured', async () => {
+    delete process.env.RAZORPAYX_WEBHOOK_SECRET
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const res = await POST(makeReq(body, 'any-signature'))
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('rejects a valid-length signature that does not match', async () => {
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const raw = JSON.stringify(body)
+    const wrong = sign(raw, 'a-different-secret')
+    const res = await POST(makeReq(body, wrong))
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   // ── Payout with no entity ────────────────────────────────────────────────
@@ -177,7 +208,7 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     expect(mockQuery).not.toHaveBeenCalled()
   })
 
-  // ── Signature skipped when no secret configured ───────────────────────────
+  // ── Valid signature accepted ───────────────────────────────────────────────
 
   it('accepts request with valid signature', async () => {
     const body = {
