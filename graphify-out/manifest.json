@@ -295,8 +295,8 @@
     "semantic_hash": ""
   },
   "src/components/business/ProductCard.tsx": {
-    "mtime": 1790783552.72975,
-    "ast_hash": "2fe37e877070bf73359dd41ba6d64d28",
+    "mtime": 1790784351.2016904,
+    "ast_hash": "9852ed4f814f45a9257b9ac674b8a9a5",
     "semantic_hash": ""
   },
   "src/components/business/ProductDetailClient.tsx": {
@@ -435,8 +435,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/ProductCard.tsx": {
-    "mtime": 1790783535.0296693,
-    "ast_hash": "8a4a6a808e877793cf41a45844546468",
+    "mtime": 1790784216.1381018,
+    "ast_hash": "4ca79265d2464c471adeab0d8c6a696c",
     "semantic_hash": ""
   },
   "src/components/visitor/ProductDetailClient.tsx": {
@@ -12280,8 +12280,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/QuickAddButton.tsx": {
-    "mtime": 1790783513.5415092,
-    "ast_hash": "962dd97c36ed22fd87a14bb7da23ede0",
+    "mtime": 1790784193.1050792,
+    "ast_hash": "05b072dbfc4fe580f3ed992a1dac0596",
     "semantic_hash": ""
   },
   "src/components/visitor/home/Reveal.tsx": {
@@ -12324,19 +12324,19 @@
     "ast_hash": "8f7baba840415ddc56fb6d5b77035f39",
     "semantic_hash": ""
   },
-  "src/app/api/(public)/products/[slug]/variants/route.ts": {
+  "src/components/visitor/QuickAddPicker.tsx": {
+    "mtime": 1790784584.037055,
+    "ast_hash": "7963febc6d4af5d904c869f31643934f",
+    "semantic_hash": ""
+  },
+  "src/app/api/(public)/products/slug/[slug]/variants/route.ts": {
     "mtime": 1790783212.9217095,
     "ast_hash": "080d31370f1e79a6a9e9ac425b1d17ea",
     "semantic_hash": ""
   },
-  "src/components/visitor/QuickAddPicker.tsx": {
-    "mtime": 1790784002.0761726,
-    "ast_hash": "6f432ccfad6b2b5c37719ec9a54663b9",
-    "semantic_hash": ""
-  },
-  "tests/api/products/[slug]/variants/route.test.ts": {
-    "mtime": 1790783230.5568037,
-    "ast_hash": "0db49f2cd11f77f8ab547a7e7ddd82fa",
+  "tests/api/products/slug/[slug]/variants/route.test.ts": {
+    "mtime": 1790784468.5674517,
+    "ast_hash": "edd80509338c020ab8c6e526932e0701",
     "semantic_hash": ""
   }
 }
