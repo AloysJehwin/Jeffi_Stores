@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAnyUser: vi.fn(),
-  authenticateAdmin: vi.fn(),
-}))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const authenticateAdmin = vi.fn()
+  return {
+    authenticateAnyUser: vi.fn(),
+    authenticateAdmin,
+    requireAdminScope: vi.fn(async (request: any) => {
+      const admin = await authenticateAdmin(request)
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return admin
+    }),
+  }
+})
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
