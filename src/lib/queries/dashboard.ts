@@ -68,7 +68,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }
 }
 
-
 export async function getDashboardMetrics() {
   const [periodRevenue, orderFunnel, topProducts, recentOrders] = await Promise.all([
     queryOne<{
@@ -185,7 +184,6 @@ export async function getDashboardMetrics() {
     recentOrders,
   }
 }
-
 
 function rangeConfig(range: AnalyticsRange): {
   interval: string

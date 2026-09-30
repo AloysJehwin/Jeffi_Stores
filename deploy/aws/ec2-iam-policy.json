@@ -11,10 +11,7 @@
     {
       "Sid": "ReadProductionSecret",
       "Effect": "Allow",
-      "Action": [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret"
-      ],
+      "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
       "Resource": "arn:aws:secretsmanager:us-east-1:708835965056:secret:jeffi/production*"
     }
   ]

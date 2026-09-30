@@ -223,4 +223,3 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
     return { success: false, error }
   }
 }
-

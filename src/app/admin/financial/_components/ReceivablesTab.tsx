@@ -6,7 +6,20 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { labelCls, btnPrimary, btnSecondary, Skeleton, SummaryCard, StatusBadge, agingBadge, formatDate, formatINR, thCls, thRight, thCenter } from './shared'
+import {
+  labelCls,
+  btnPrimary,
+  btnSecondary,
+  Skeleton,
+  SummaryCard,
+  StatusBadge,
+  agingBadge,
+  formatDate,
+  formatINR,
+  thCls,
+  thRight,
+  thCenter,
+} from './shared'
 
 export function ReceivablesTab({ initialData }: { initialData: any }) {
   const [from, setFrom] = useState('')

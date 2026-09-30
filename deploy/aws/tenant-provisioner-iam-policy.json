@@ -4,11 +4,7 @@
     {
       "Sid": "TenantParameterGroups",
       "Effect": "Allow",
-      "Action": [
-        "rds:CreateDBParameterGroup",
-        "rds:ModifyDBParameterGroup",
-        "rds:DeleteDBParameterGroup"
-      ],
+      "Action": ["rds:CreateDBParameterGroup", "rds:ModifyDBParameterGroup", "rds:DeleteDBParameterGroup"],
       "Resource": "arn:aws:rds:us-east-1:708835965056:pg:jeffi-tenant-*"
     },
     {
@@ -32,11 +28,7 @@
     {
       "Sid": "RdsReadOnlyDescribesCannotBeResourceScoped",
       "Effect": "Allow",
-      "Action": [
-        "rds:DescribeDBInstances",
-        "rds:DescribeDBParameterGroups",
-        "rds:DescribeDBSubnetGroups"
-      ],
+      "Action": ["rds:DescribeDBInstances", "rds:DescribeDBParameterGroups", "rds:DescribeDBSubnetGroups"],
       "Resource": "*"
     },
     {
@@ -85,12 +77,7 @@
     {
       "Sid": "ManageOnlyTaggedTenantInstances",
       "Effect": "Allow",
-      "Action": [
-        "ec2:StartInstances",
-        "ec2:StopInstances",
-        "ec2:TerminateInstances",
-        "ec2:ModifyInstanceAttribute"
-      ],
+      "Action": ["ec2:StartInstances", "ec2:StopInstances", "ec2:TerminateInstances", "ec2:ModifyInstanceAttribute"],
       "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
       "Condition": {
         "StringEquals": { "ec2:ResourceTag/app": "jeffi-tenant" }
@@ -99,10 +86,7 @@
     {
       "Sid": "TenantSecurityGroupIngressOnly",
       "Effect": "Allow",
-      "Action": [
-        "ec2:AuthorizeSecurityGroupIngress",
-        "ec2:RevokeSecurityGroupIngress"
-      ],
+      "Action": ["ec2:AuthorizeSecurityGroupIngress", "ec2:RevokeSecurityGroupIngress"],
       "Resource": [
         "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0f4f1f26371fe723d",
         "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0e361f0f1b093bd83"
@@ -126,11 +110,7 @@
     {
       "Sid": "Route53ReadBack",
       "Effect": "Allow",
-      "Action": [
-        "route53:GetChange",
-        "route53:ListHostedZones",
-        "route53:ListResourceRecordSets"
-      ],
+      "Action": ["route53:GetChange", "route53:ListHostedZones", "route53:ListResourceRecordSets"],
       "Resource": "*"
     }
   ]

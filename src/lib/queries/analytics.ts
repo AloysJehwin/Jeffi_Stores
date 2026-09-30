@@ -13,7 +13,6 @@ const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> =
   { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' }, // amber
 ]
 
-
 // Monthly paid-revenue trend split by order source, for the requested period. Pivoted
 // server-side into one continuous (zero-filled) points array per source, aligned to a shared
 // months axis.

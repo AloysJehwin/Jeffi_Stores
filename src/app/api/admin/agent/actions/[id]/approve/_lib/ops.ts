@@ -52,16 +52,15 @@ export async function syncDelhiveryStatuses(): Promise<ActionResult> {
 }
 
 export async function payPayable(action: AgentAction, cookieHeader: string): Promise<ActionResult> {
-  const { payableId, expenseNumber, supplierName, amount, paymentMode, paidAt, transactionRef } =
-    action.payload as {
-      payableId: string
-      expenseNumber: string
-      supplierName: string
-      amount: number
-      paymentMode: string
-      paidAt: string
-      transactionRef: string | null
-    }
+  const { payableId, expenseNumber, supplierName, amount, paymentMode, paidAt, transactionRef } = action.payload as {
+    payableId: string
+    expenseNumber: string
+    supplierName: string
+    amount: number
+    paymentMode: string
+    paidAt: string
+    transactionRef: string | null
+  }
   if (!payableId || typeof amount !== 'number' || amount <= 0)
     return { result: null, error: 'invalid payableId/amount in payload' }
   const r = await callInternalApi(
