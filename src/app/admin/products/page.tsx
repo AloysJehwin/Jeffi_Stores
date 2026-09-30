@@ -36,7 +36,15 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrite }: { resolvedSearchParams: SP; isSuperAdmin: boolean; canWrite: boolean }) {
+async function ProductsListContent({
+  resolvedSearchParams,
+  isSuperAdmin,
+  canWrite,
+}: {
+  resolvedSearchParams: SP
+  isSuperAdmin: boolean
+  canWrite: boolean
+}) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
@@ -85,7 +93,9 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
       }
       pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
       renderCard={(product: any) => {
-        const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
+        const stock = product.has_variants
+          ? Number(product.variant_inventory_total)
+          : Number(product.inventory_quantity ?? 0)
         const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
         const stockStatus: string = product.stock_status || 'In Stock'
         const isOut = stock === 0 || stockStatus === 'Out of Stock'
@@ -95,19 +105,27 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
             <div className="flex items-start gap-3 mb-3">
               <div className="flex-shrink-0 h-12 w-12">
                 <ProductImage
-                  thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
+                  thumbnailUrl={
+                    product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url ||
+                    product.product_images?.[0]?.thumbnail_url
+                  }
                   altText={product.name}
                 />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{product.name}</div>
-                <div className="text-xs text-foreground-muted inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</div>
+                <div className="text-xs text-foreground-muted inline-flex items-center gap-1">
+                  {product.sku}
+                  {product.sku && <CopySku sku={product.sku} />}
+                </div>
               </div>
-              <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                product.is_active
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                  : 'bg-surface-secondary text-foreground'
-              }`}>
+              <span
+                className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                  product.is_active
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    : 'bg-surface-secondary text-foreground'
+                }`}
+              >
                 {product.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -118,11 +136,12 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
                     <span className="text-sm font-semibold text-primary-500">
                       From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
                     </span>
-                    {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
-                      <span className="text-xs text-foreground-muted line-through">
-                        Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN')}
-                      </span>
-                    )}
+                    {product.variant_min_mrp &&
+                      Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
+                        <span className="text-xs text-foreground-muted line-through">
+                          Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN')}
+                        </span>
+                      )}
                   </div>
                 ) : (
                   <div className="flex items-baseline gap-1.5">
@@ -140,7 +159,11 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-foreground-muted w-10">Inv</span>
-                  <span className={`text-sm font-semibold ${isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'}`}>{stock}</span>
+                  <span
+                    className={`text-sm font-semibold ${isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'}`}
+                  >
+                    {stock}
+                  </span>
                 </div>
                 {listedStock !== null && (
                   <div className="flex items-center gap-1.5">
@@ -150,21 +173,46 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
                 )}
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-foreground-muted w-10">Online</span>
-                  <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
-                    isOut ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                    : isLow ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                    : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                  }`}>{isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}</span>
+                  <span
+                    className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
+                      isOut
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                        : isLow
+                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                          : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    }`}
+                  >
+                    {isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}
+                  </span>
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs text-foreground-muted">
-              <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
+              <span>
+                {product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}
+              </span>
               <div className="flex items-center gap-3">
                 <div className="hidden md:inline-flex items-center gap-3">
-                  {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
-                  <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
-                  {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
+                  {canWrite && (
+                    <FeaturedToggleButton
+                      productId={product.id}
+                      isFeatured={product.is_featured}
+                      featuredCount={featuredCount}
+                    />
+                  )}
+                  <Link
+                    href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                    className="text-accent-500 font-medium"
+                  >
+                    Edit
+                  </Link>
+                  {canWrite && (
+                    <DeactivateProductButton
+                      productId={product.id}
+                      productName={product.name}
+                      isActive={product.is_active}
+                    />
+                  )}
                 </div>
                 <DownloadAdButton productId={product.id} productName={product.name} />
               </div>
@@ -174,18 +222,62 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
       }}
       tableHead={
         <>
-          <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <SortableHeader
+            label="Product"
+            column="name"
+            options={sortOptions('text')}
+            currentSort={sort}
+            currentDir={dir}
+          />
           <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-          <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-          <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-          <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-          <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-          <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-          <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+          <SortableHeader
+            label="Category"
+            column="category"
+            options={sortOptions('text')}
+            currentSort={sort}
+            currentDir={dir}
+          />
+          <SortableHeader
+            label="Brand"
+            column="brand"
+            options={sortOptions('text')}
+            currentSort={sort}
+            currentDir={dir}
+          />
+          <SortableHeader
+            label="Price"
+            column="price"
+            options={sortOptions('number')}
+            currentSort={sort}
+            currentDir={dir}
+          />
+          <SortableHeader
+            label="Stock"
+            column="stock"
+            options={sortOptions('number')}
+            currentSort={sort}
+            currentDir={dir}
+          />
+          <SortableHeader
+            label="Status"
+            column="status"
+            options={sortOptions('text')}
+            currentSort={sort}
+            currentDir={dir}
+          />
+          <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+            Actions
+          </th>
         </>
       }
       tableBody={
-        <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
+        <ProductsTableClient
+          products={products || []}
+          featuredCount={featuredCount}
+          backUrl={currentListUrl}
+          isSuperAdmin={isSuperAdmin}
+          canWrite={canWrite}
+        />
       }
     />
   )
@@ -242,7 +334,10 @@ async function ProductsStats() {
               <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
             </div>
             <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{featuredCount}<span className="text-xs font-normal text-white/70">/6</span></p>
+              <p className="text-lg sm:text-2xl font-bold leading-none">
+                {featuredCount}
+                <span className="text-xs font-normal text-white/70">/6</span>
+              </p>
               <p className="text-[10px] sm:text-xs text-white/80 mt-1">Featured</p>
             </div>
             <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
@@ -252,13 +347,25 @@ async function ProductsStats() {
           </div>
         </div>
         {/* Right: product breakdown chart */}
-        <ProductBreakdownChart byCategory={stats.byCategory} byBrand={stats.byBrand} byStock={stats.byStock} byInventoryValue={stats.byInventoryValue} />
+        <ProductBreakdownChart
+          byCategory={stats.byCategory}
+          byBrand={stats.byBrand}
+          byStock={stats.byStock}
+          byInventoryValue={stats.byInventoryValue}
+        />
       </div>
       {pendingDraftsCount > 0 && (
         <details className="mb-6 group">
           <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              <svg
+                className="w-4 h-4 transition-transform group-open:rotate-90"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
             <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
@@ -266,7 +373,7 @@ async function ProductsStats() {
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {/* Create-drafts: brand-new products not yet on the live list. Publish activates them. */}
-              {createDrafts.map((d) => (
+              {createDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={`new-${d.id}`}
@@ -284,12 +391,15 @@ async function ProductsStats() {
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">{d.sku}{d.sku && <CopySku sku={d.sku} />}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">
+                      {d.sku}
+                      {d.sku && <CopySku sku={d.sku} />}
+                    </p>
                     <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
                   </div>
                 )
-              ))}
-              {pendingDrafts.map((d) => (
+              )}
+              {pendingDrafts.map(d =>
                 canWrite ? (
                   <DraftRowActions
                     key={d.product_id}
@@ -305,10 +415,13 @@ async function ProductsStats() {
                 ) : (
                   <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">{d.sku}{d.sku && <CopySku sku={d.sku} />}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">
+                      {d.sku}
+                      {d.sku && <CopySku sku={d.sku} />}
+                    </p>
                   </div>
                 )
-              ))}
+              )}
             </div>
           </div>
         </details>
@@ -326,7 +439,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   let isSuperAdmin = false
   if (token) {
     try {
-      const payload = await verifyToken(token.value) as any
+      const payload = (await verifyToken(token.value)) as any
       isSuperAdmin = isPlatformOwner(payload?.role || '')
     } catch {}
   }
@@ -360,14 +473,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
         {canWrite && (
-        <div className="hidden md:block">
-          <Link
-            href={ap('/admin/products/add', host)}
-            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-          >
-            Add New Product
-          </Link>
-        </div>
+          <div className="hidden md:block">
+            <Link
+              href={ap('/admin/products/add', host)}
+              className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+            >
+              Add New Product
+            </Link>
+          </div>
         )}
       </div>
 
@@ -378,14 +491,34 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <AdminFilters
         filters={[
           { name: 'category_id', label: 'Category', options: categoryOptions },
-          { name: 'brand_id', label: 'Brand', options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })) },
-          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
-          { name: 'stock', label: 'Stock', options: [{ value: 'low', label: 'Low Stock' }, { value: 'out', label: 'Out of Stock' }] },
+          {
+            name: 'brand_id',
+            label: 'Brand',
+            options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
+          },
+          {
+            name: 'is_active',
+            label: 'Status',
+            options: [
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ],
+          },
+          {
+            name: 'stock',
+            label: 'Stock',
+            options: [
+              { value: 'low', label: 'Low Stock' },
+              { value: 'out', label: 'Out of Stock' },
+            ],
+          },
         ]}
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
         suggestType="products"
-        advancedContent={<AdvancedFilterPanel fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} mode="content" forceExpanded />}
+        advancedContent={
+          <AdvancedFilterPanel fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} mode="content" forceExpanded />
+        }
       />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
@@ -396,12 +529,24 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function ProductsListSection({ searchParams, isSuperAdmin, canWrite }: { searchParams: Promise<SP>; isSuperAdmin: boolean; canWrite: boolean }) {
+async function ProductsListSection({
+  searchParams,
+  isSuperAdmin,
+  canWrite,
+}: {
+  searchParams: Promise<SP>
+  isSuperAdmin: boolean
+  canWrite: boolean
+}) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
-      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
+      <ProductsListContent
+        resolvedSearchParams={resolvedSearchParams}
+        isSuperAdmin={isSuperAdmin}
+        canWrite={canWrite}
+      />
     </Suspense>
   )
 }

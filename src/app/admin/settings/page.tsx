@@ -29,13 +29,14 @@ export default async function SettingsPage() {
   const allAdmins = await getAllAdmins()
 
   const scopeLabels: Record<string, string> = {}
-  ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
+  ADMIN_SCOPES.forEach(s => {
+    scopeLabels[s.key] = s.label
+  })
 
   const isSuperAdmin = isPlatformOwner(adminInfo?.role || '')
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-foreground-muted mt-0.5">Manage account, users, and system configuration</p>
@@ -67,7 +68,9 @@ export default async function SettingsPage() {
               </div>
               <div>
                 <p className="text-foreground-muted text-xs mb-0.5">Joined</p>
-                <p className="font-medium text-foreground">{new Date(adminInfo.created_at).toLocaleDateString('en-IN')}</p>
+                <p className="font-medium text-foreground">
+                  {new Date(adminInfo.created_at).toLocaleDateString('en-IN')}
+                </p>
               </div>
               <div>
                 <p className="text-foreground-muted text-xs mb-0.5">Last Login</p>
@@ -81,10 +84,15 @@ export default async function SettingsPage() {
                 <p className="text-foreground-muted text-xs mb-1.5">Scopes</p>
                 <div className="flex flex-wrap gap-1.5">
                   {isSuperAdmin ? (
-                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
+                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                      All Access
+                    </span>
                   ) : (adminInfo.scopes || []).length > 0 ? (
                     (adminInfo.scopes || []).map((scope: string) => (
-                      <span key={scope} className="px-2 py-0.5 bg-surface-secondary border border-border-default text-foreground rounded-md text-xs">
+                      <span
+                        key={scope}
+                        className="px-2 py-0.5 bg-surface-secondary border border-border-default text-foreground rounded-md text-xs"
+                      >
                         {scopeLabels[scope] || scope}
                       </span>
                     ))
@@ -148,7 +156,6 @@ export default async function SettingsPage() {
           )}
         </div>
       </section>
-
     </div>
   )
 }

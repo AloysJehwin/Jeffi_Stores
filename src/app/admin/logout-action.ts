@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -19,7 +19,9 @@ export async function logoutAction() {
       const sid = (payload as any)?.sid
       if (typeof adminId === 'string' && adminId) await revokeAllForPrincipal('admin', adminId)
       else if (typeof sid === 'string' && sid) await revokeSession(sid)
-    } catch { /* best-effort revoke */ }
+    } catch {
+      /* best-effort revoke */
+    }
   }
   cookieStore.delete(await adminCookieName())
   cookieStore.delete('admin_session') // Clear old session cookie too

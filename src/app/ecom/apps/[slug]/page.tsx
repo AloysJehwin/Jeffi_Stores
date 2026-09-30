@@ -23,7 +23,9 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
     <div className="ecom-clean bg-[#eef1f5] text-foreground">
       <section className="w-full px-6 lg:px-12 pt-10 pb-16 sm:pt-14">
         <nav className="text-sm text-foreground-muted mb-8">
-          <Link href="/apps" className="hover:text-foreground">Apps</Link>
+          <Link href="/apps" className="hover:text-foreground">
+            Apps
+          </Link>
           <span className="mx-2">/</span>
           <span className="text-foreground-secondary">{app.group}</span>
         </nav>
@@ -42,7 +44,7 @@ export default async function AppDetailPage({ params }: { params: Promise<{ slug
           </div>
 
           <ul className="mt-8 space-y-3 max-w-2xl">
-            {benefits(app.blurb).map((b) => (
+            {benefits(app.blurb).map(b => (
               <li key={b} className="flex items-start gap-3">
                 <span className="ecom-accent-text shrink-0 mt-0.5">
                   <CheckMark className="w-5 h-5" />

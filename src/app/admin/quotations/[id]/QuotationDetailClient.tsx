@@ -17,11 +17,11 @@ function formatDate(s: string) {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  draft:    'bg-surface-secondary text-foreground-secondary',
-  final:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  draft: 'bg-surface-secondary text-foreground-secondary',
+  final: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   accepted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  expired:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  expired: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
 }
 
 export default function QuotationDetailClient({ id }: { id: string }) {
@@ -35,14 +35,18 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   useEffect(() => {
     fetch(`/api/admin/quotations/${id}`)
       .then(r => r.json())
-      .then(j => { setData(j); setLoading(false) })
+      .then(j => {
+        setData(j)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
 
   async function finalize() {
     const ok = await confirm({
       title: 'Finalize Quotation?',
-      message: 'This will mark the quotation as Final and send a confirmation email to the customer if an email address is on record. This action cannot be undone.',
+      message:
+        'This will mark the quotation as Final and send a confirmation email to the customer if an email address is on record. This action cannot be undone.',
       confirmLabel: 'Yes, Finalize',
       cancelLabel: 'Cancel',
     })
@@ -69,7 +73,9 @@ export default function QuotationDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Quotation not found.</p>
-        <Link href={ap('/admin/quotations')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Quotations</Link>
+        <Link href={ap('/admin/quotations')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">
+          ← Back to Quotations
+        </Link>
       </div>
     )
   }
@@ -93,11 +99,19 @@ export default function QuotationDetailClient({ id }: { id: string }) {
         {/* Info cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="h-3 w-28 bg-surface-secondary rounded animate-pulse" />
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, j) => (
-                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                  <div
+                    key={j}
+                    className="flex justify-between gap-4 animate-pulse"
+                    style={{ animationDelay: `${j * 40}ms` }}
+                  >
                     <div className="h-3.5 w-16 bg-surface-secondary rounded shrink-0" />
                     <div className="h-3.5 bg-surface-secondary rounded flex-1" />
                   </div>
@@ -142,19 +156,26 @@ export default function QuotationDetailClient({ id }: { id: string }) {
 
   // Recompute totals from items when stored values are zero (e.g. legacy RFQ-converted quotations)
   const computedSubtotal = items.reduce((s, i) => s + parseFloat(i.amount || '0'), 0)
-  const computedCgst = items.reduce((s, i) => s + parseFloat(i.amount || '0') * parseFloat(i.gst_rate || '0') / 200, 0)
+  const computedCgst = items.reduce(
+    (s, i) => s + (parseFloat(i.amount || '0') * parseFloat(i.gst_rate || '0')) / 200,
+    0
+  )
   const computedSgst = computedCgst
   const storedSubtotal = parseFloat(q.subtotal || '0')
   const subtotal = storedSubtotal > 0 ? storedSubtotal : computedSubtotal
   const cgstAmount = storedSubtotal > 0 ? parseFloat(q.cgst_amount || '0') : computedCgst
   const sgstAmount = storedSubtotal > 0 ? parseFloat(q.sgst_amount || '0') : computedSgst
-  const totalAmount = storedSubtotal > 0 ? parseFloat(q.total_amount || '0') : (computedSubtotal + computedCgst + computedSgst)
+  const totalAmount =
+    storedSubtotal > 0 ? parseFloat(q.total_amount || '0') : computedSubtotal + computedCgst + computedSgst
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <a href={ap('/admin/quotations')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap('/admin/quotations')}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Quotations
         </a>
@@ -166,7 +187,9 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-foreground font-mono">{q.quote_number}</h1>
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[q.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[q.status] || 'bg-surface-secondary text-foreground-secondary'}`}
+          >
             {q.status}
           </span>
         </div>
@@ -196,7 +219,12 @@ export default function QuotationDetailClient({ id }: { id: string }) {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             Download PDF
           </a>
@@ -243,7 +271,10 @@ export default function QuotationDetailClient({ id }: { id: string }) {
             {q.converted_order_id && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Converted</span>
-                <a href={ap(`/admin/invoices/${q.converted_order_id}`)} className="text-green-600 dark:text-green-400 text-xs font-medium hover:underline">
+                <a
+                  href={ap(`/admin/invoices/${q.converted_order_id}`)}
+                  className="text-green-600 dark:text-green-400 text-xs font-medium hover:underline"
+                >
                   View Invoice ↗
                 </a>
               </div>
@@ -283,7 +314,9 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary shrink-0">Address</span>
                 <span className="text-foreground text-right text-xs">
-                  {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).join(', ')}
+                  {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode]
+                    .filter(Boolean)
+                    .join(', ')}
                 </span>
               </div>
             )}
@@ -315,7 +348,9 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                 <div className="flex justify-between gap-4">
                   <span className="text-foreground-secondary shrink-0">Address</span>
                   <span className="text-foreground text-right text-xs">
-                    {[q.buyer_addr1, q.buyer_addr2, q.buyer_city, q.buyer_state, q.buyer_pincode].filter(Boolean).join(', ')}
+                    {[q.buyer_addr1, q.buyer_addr2, q.buyer_city, q.buyer_state, q.buyer_pincode]
+                      .filter(Boolean)
+                      .join(', ')}
                   </span>
                 </div>
               )}
@@ -333,14 +368,30 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Item</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">HSN</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">GST%</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Unit</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Qty</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Rate</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Disc%</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Amount</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Item
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  HSN
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  GST%
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Unit
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Qty
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Rate
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Disc%
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -349,17 +400,29 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.description}</div>
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
+                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">
+                    {item.hsn_code || '—'}
+                  </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.unit || 'PCS'}</td>
                   <td className="px-4 py-3 text-center text-foreground">
-                    {parseFloat(item.quantity)}{item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
-                      <span className="text-xs text-foreground-secondary ml-1">× {parseFloat(item.sell_unit_factor)} = <span className="font-semibold text-foreground">{Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs</span></span>
+                    {parseFloat(item.quantity)}
+                    {item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
+                      <span className="text-xs text-foreground-secondary ml-1">
+                        × {parseFloat(item.sell_unit_factor)} ={' '}
+                        <span className="font-semibold text-foreground">
+                          {Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs
+                        </span>
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.rate))}</td>
-                  <td className="px-4 py-3 text-right text-foreground-secondary">{item.discount_pct ? `${item.discount_pct}%` : '—'}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.amount))}</td>
+                  <td className="px-4 py-3 text-right text-foreground-secondary">
+                    {item.discount_pct ? `${item.discount_pct}%` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">
+                    {formatINR(parseFloat(item.amount))}
+                  </td>
                 </tr>
               ))}
             </tbody>

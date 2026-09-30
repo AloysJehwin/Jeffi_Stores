@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
@@ -31,14 +31,7 @@ interface BusinessCustomer {
   approved_at: string | null
 }
 
-async function getBusinessCustomers({
-  status,
-  search,
-  page }: {
-  status?: string
-  search?: string
-  page: number
-}) {
+async function getBusinessCustomers({ status, search, page }: { status?: string; search?: string; page: number }) {
   const conditions: string[] = []
   const values: unknown[] = []
   let idx = 1
@@ -80,16 +73,12 @@ async function getBusinessCustomers({
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
 
 // Builds a business-customers URL that preserves the active status/search
 // filters. Shared by the stat cards, status tabs and pagination.
-function buildUrl(
-  resolvedSearchParams: SP,
-  host: string,
-  p: number,
-  extra: Record<string, string> = {},
-) {
+function buildUrl(resolvedSearchParams: SP, host: string, p: number, extra: Record<string, string> = {}) {
   const params = new URLSearchParams()
   if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
   if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
@@ -104,26 +93,20 @@ function buildUrl(
 // header + filters stay mounted while both re-shimmer on filter change.
 // Numbers match the original page exactly: all=filtered total, pending=global
 // pending count, approved=approved rows on the current page.
-async function BusinessCustomersStats({
-  resolvedSearchParams,
-  host }: {
-  resolvedSearchParams: SP
-  host: string
-}) {
+async function BusinessCustomersStats({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const [{ customers, total }, pendingRows] = await Promise.all([
     getBusinessCustomers({
       status: resolvedSearchParams.status,
       search: resolvedSearchParams.search,
-      page }),
+      page,
+    }),
     queryMany<{ count: string }>(`SELECT COUNT(*) AS count FROM business_profiles WHERE approval_status='pending'`, []),
   ])
   const pendingCount = pendingRows[0]?.count || '0'
 
   const cardValue = (s: 'all' | 'pending' | 'approved') =>
-    s === 'all' ? total
-      : s === 'pending' ? pendingCount
-      : customers.filter(c => c.approval_status === s).length
+    s === 'all' ? total : s === 'pending' ? pendingCount : customers.filter(c => c.approval_status === s).length
 
   return (
     <div className="animate-fade-in">
@@ -151,7 +134,8 @@ async function BusinessCustomersStats({
 // plus pagination. Wrapped in a keyed Suspense so it re-shimmers on change.
 async function BusinessCustomersListContent({
   resolvedSearchParams,
-  host }: {
+  host,
+}: {
   resolvedSearchParams: SP
   host: string
 }) {
@@ -159,7 +143,8 @@ async function BusinessCustomersListContent({
   const { customers, total } = await getBusinessCustomers({
     status: resolvedSearchParams.status,
     search: resolvedSearchParams.search,
-    page })
+    page,
+  })
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
@@ -181,42 +166,54 @@ async function BusinessCustomersListContent({
           <tbody className="divide-y divide-border-default">
             {customers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-foreground-muted">No business customers found.</td>
-              </tr>
-            ) : customers.map(c => (
-              <tr key={c.user_id} className="hover:bg-surface-secondary transition-colors">
-                <td className="px-4 py-3 font-medium">
-                  <Link
-                    href={ap(`/admin/business/customers/${c.user_id}`, host)}
-                    className="text-foreground hover:text-accent-500 transition-colors"
-                  >
-                    {c.company_name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-foreground">{c.first_name} {c.last_name || ''}</p>
-                  <p className="text-xs text-foreground-muted">{c.email}</p>
-                </td>
-                <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{c.gst_number}</td>
-                <td className="px-4 py-3 text-foreground-secondary">{c.industry}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[c.approval_status] || ''}`}>
-                    {c.approval_status.charAt(0).toUpperCase() + c.approval_status.slice(1)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-foreground-secondary text-xs">
-                  {new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={ap(`/admin/business/customers/${c.user_id}`, host)}
-                    className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
-                  >
-                    View →
-                  </Link>
+                <td colSpan={7} className="px-4 py-12 text-center text-foreground-muted">
+                  No business customers found.
                 </td>
               </tr>
-            ))}
+            ) : (
+              customers.map(c => (
+                <tr key={c.user_id} className="hover:bg-surface-secondary transition-colors">
+                  <td className="px-4 py-3 font-medium">
+                    <Link
+                      href={ap(`/admin/business/customers/${c.user_id}`, host)}
+                      className="text-foreground hover:text-accent-500 transition-colors"
+                    >
+                      {c.company_name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-foreground">
+                      {c.first_name} {c.last_name || ''}
+                    </p>
+                    <p className="text-xs text-foreground-muted">{c.email}</p>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{c.gst_number}</td>
+                  <td className="px-4 py-3 text-foreground-secondary">{c.industry}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[c.approval_status] || ''}`}
+                    >
+                      {c.approval_status.charAt(0).toUpperCase() + c.approval_status.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-foreground-secondary text-xs">
+                    {new Date(c.created_at).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={ap(`/admin/business/customers/${c.user_id}`, host)}
+                      className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -227,13 +224,21 @@ async function BusinessCustomersListContent({
           <span>{total} total</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link href={buildUrl(resolvedSearchParams, host, page - 1)} className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors">
+              <Link
+                href={buildUrl(resolvedSearchParams, host, page - 1)}
+                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
+              >
                 Previous
               </Link>
             )}
-            <span className="px-3 py-1.5">Page {page} of {totalPages}</span>
+            <span className="px-3 py-1.5">
+              Page {page} of {totalPages}
+            </span>
             {page < totalPages && (
-              <Link href={buildUrl(resolvedSearchParams, host, page + 1)} className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors">
+              <Link
+                href={buildUrl(resolvedSearchParams, host, page + 1)}
+                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
+              >
                 Next
               </Link>
             )}
@@ -246,12 +251,7 @@ async function BusinessCustomersListContent({
 
 // Keys the table Suspense on the query string so filter/pagination changes
 // re-trigger the shimmer while the stats + filters above stay mounted.
-function BusinessCustomersListSection({
-  resolvedSearchParams,
-  host }: {
-  resolvedSearchParams: SP
-  host: string
-}) {
+function BusinessCustomersListSection({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
@@ -260,11 +260,7 @@ function BusinessCustomersListSection({
   )
 }
 
-export default async function BusinessCustomersPage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>
-}) {
+export default async function BusinessCustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
   // Auth gate runs synchronously in the shell — an unauthorized user is
   // redirected before any content (stats or list) is rendered/streamed.
   const resolvedSearchParams = await searchParams
@@ -273,7 +269,8 @@ export default async function BusinessCustomersPage({
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read'))
+    redirect(ap('/admin/dashboard', host))
 
   return (
     <div className="p-4 sm:p-6">
@@ -297,7 +294,10 @@ export default async function BusinessCustomersPage({
           placeholder="Search by email, company, GST…"
           className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
-        <button type="submit" className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
+        <button
+          type="submit"
+          className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+        >
           Search
         </button>
       </form>

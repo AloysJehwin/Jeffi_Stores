@@ -1,36 +1,36 @@
 export const dynamic = 'force-static'
 
 const kpis = [
-  { label: 'Sent',       value: '12,480',      sub: 'last 30 days' },
-  { label: 'Open Rate',  value: '38%',         sub: '+4.2% vs prev' },
-  { label: 'Click Rate', value: '6.2%',        sub: '+0.8% vs prev' },
-  { label: 'Revenue',    value: 'Rs. 2,84,500', sub: 'attributed' },
+  { label: 'Sent', value: '12,480', sub: 'last 30 days' },
+  { label: 'Open Rate', value: '38%', sub: '+4.2% vs prev' },
+  { label: 'Click Rate', value: '6.2%', sub: '+0.8% vs prev' },
+  { label: 'Revenue', value: 'Rs. 2,84,500', sub: 'attributed' },
 ]
 
 const campaigns = [
-  { name: 'Diwali Sale Blast',        channel: 'email', audience: 'All Subscribers', sent: '8,240', status: 'active'    },
-  { name: 'Abandoned Cart Recovery',  channel: 'email', audience: 'Cart Abandoners', sent: '1,120', status: 'active'    },
-  { name: 'Welcome Series',           channel: 'email', audience: 'New Signups',     sent: '640',   status: 'active'    },
-  { name: 'Winback 30d',              channel: 'sms',   audience: 'Dormant 30d+',    sent: '2,310', status: 'scheduled'},
-  { name: 'New Arrivals',             channel: 'push',  audience: 'App Installs',    sent: '0',     status: 'draft'     },
-  { name: 'VIP Early Access',         channel: 'email', audience: 'VIP Segment',     sent: '480',   status: 'completed' },
+  { name: 'Diwali Sale Blast', channel: 'email', audience: 'All Subscribers', sent: '8,240', status: 'active' },
+  { name: 'Abandoned Cart Recovery', channel: 'email', audience: 'Cart Abandoners', sent: '1,120', status: 'active' },
+  { name: 'Welcome Series', channel: 'email', audience: 'New Signups', sent: '640', status: 'active' },
+  { name: 'Winback 30d', channel: 'sms', audience: 'Dormant 30d+', sent: '2,310', status: 'scheduled' },
+  { name: 'New Arrivals', channel: 'push', audience: 'App Installs', sent: '0', status: 'draft' },
+  { name: 'VIP Early Access', channel: 'email', audience: 'VIP Segment', sent: '480', status: 'completed' },
 ]
 
 function channelBadge(c: string) {
-  if (c === 'email') return { cls: 'bg-blue-100 text-blue-800',   label: 'Email' }
-  if (c === 'sms')   return { cls: 'bg-green-100 text-green-800', label: 'SMS'   }
+  if (c === 'email') return { cls: 'bg-blue-100 text-blue-800', label: 'Email' }
+  if (c === 'sms') return { cls: 'bg-green-100 text-green-800', label: 'SMS' }
   return { cls: 'bg-purple-100 text-purple-700', label: 'Push' }
 }
 
 function statusCls(s: string) {
-  if (s === 'active')    return 'bg-green-100 text-green-800'
+  if (s === 'active') return 'bg-green-100 text-green-800'
   if (s === 'scheduled') return 'bg-blue-100 text-blue-800'
   if (s === 'completed') return 'bg-purple-100 text-purple-700'
   return 'bg-amber-100 text-amber-700'
 }
 
 const perfBars = [42, 58, 51, 70, 64, 82, 76, 90, 71, 88, 79, 95]
-const perfLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const perfLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export default function PreviewCampaigns() {
   return (
@@ -41,7 +41,9 @@ export default function PreviewCampaigns() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Campaigns</h1>
           <p className="text-sm text-foreground-secondary mt-0.5">6 campaigns · 3 active</p>
         </div>
-        <button className="px-3 py-1.5 rounded-lg bg-accent-600 text-white text-xs font-semibold">+ New Campaign</button>
+        <button className="px-3 py-1.5 rounded-lg bg-accent-600 text-white text-xs font-semibold">
+          + New Campaign
+        </button>
       </div>
 
       {/* KPI cards */}
@@ -60,8 +62,13 @@ export default function PreviewCampaigns() {
         <table className="min-w-full divide-y divide-border-default">
           <thead className="bg-surface-secondary">
             <tr>
-              {['Campaign','Type','Audience','Sent','Status'].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
+              {['Campaign', 'Type', 'Audience', 'Sent', 'Status'].map(h => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -87,7 +94,11 @@ export default function PreviewCampaigns() {
                   <td className="px-4 py-3 text-sm text-foreground">{c.audience}</td>
                   <td className="px-4 py-3 text-sm font-semibold text-foreground tabular-nums">{c.sent}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${statusCls(c.status)}`}>{c.status}</span>
+                    <span
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${statusCls(c.status)}`}
+                    >
+                      {c.status}
+                    </span>
                   </td>
                 </tr>
               )
@@ -99,19 +110,26 @@ export default function PreviewCampaigns() {
       {/* Performance over time */}
       <div className="bg-surface-elevated rounded-lg border border-border-default p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Performance over time</h2>
+          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
+            Performance over time
+          </h2>
           <span className="text-xs text-foreground-muted">Opens per month</span>
         </div>
         <div className="flex items-end gap-1.5 h-40">
           {perfBars.map((h, i) => (
             <div key={i} className="flex-1 flex flex-col justify-end">
-              <div className={`w-full rounded-t ${i % 3 === 0 ? 'bg-blue-500/70' : i % 3 === 1 ? 'bg-accent-500/70' : 'bg-purple-500/60'}`} style={{ height: `${h}%` }} />
+              <div
+                className={`w-full rounded-t ${i % 3 === 0 ? 'bg-blue-500/70' : i % 3 === 1 ? 'bg-accent-500/70' : 'bg-purple-500/60'}`}
+                style={{ height: `${h}%` }}
+              />
             </div>
           ))}
         </div>
         <div className="flex gap-1.5 mt-2">
           {perfLabels.map(l => (
-            <span key={l} className="flex-1 text-center text-[10px] text-foreground-muted">{l}</span>
+            <span key={l} className="flex-1 text-center text-[10px] text-foreground-muted">
+              {l}
+            </span>
           ))}
         </div>
       </div>

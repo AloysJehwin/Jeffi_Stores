@@ -23,7 +23,18 @@ interface AppliedCoupon {
 }
 
 export default function CartPage() {
-  const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
+  const {
+    cartItems,
+    savedItems,
+    cartCount,
+    isLoading,
+    removeFromCart,
+    updateQuantity,
+    saveForLater,
+    moveToCart,
+    getCartTotal,
+    getCartTax,
+  } = useCart()
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -99,7 +110,11 @@ export default function CartPage() {
       <div className="container mx-auto px-4 py-6">
         <div className="animate-pulse space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4 flex gap-4" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-4 flex gap-4"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <div className="w-20 h-20 bg-surface-secondary rounded-lg flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-surface-secondary rounded w-3/4" />
@@ -117,8 +132,19 @@ export default function CartPage() {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-md mx-auto text-center">
-          <svg aria-hidden="true" className="w-24 h-24 mx-auto text-foreground-muted mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          <svg
+            aria-hidden="true"
+            className="w-24 h-24 mx-auto text-foreground-muted mb-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+            />
           </svg>
           <h2 className="text-2xl font-bold text-foreground mb-2">Your cart is empty</h2>
           <p className="text-foreground-secondary mb-6">Start shopping to add items to your cart</p>
@@ -134,11 +160,14 @@ export default function CartPage() {
   }
 
   const total = cartItems.reduce((sum, item) => {
-    const price = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+    const price =
+      Number(item.price_at_addition) ||
+      Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
     const categoryId = item.products.category_id
-    const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-      ? (user.businessDiscountMap?.[categoryId] ?? 0)
-      : 0
+    const discountPct =
+      user?.isBusiness && user.approvalStatus === 'approved' && categoryId
+        ? (user.businessDiscountMap?.[categoryId] ?? 0)
+        : 0
     const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
     return sum + effectivePrice * Number(item.quantity)
   }, 0)
@@ -161,9 +190,17 @@ export default function CartPage() {
       if (!res.ok) {
         setCouponError(data.error || 'Invalid coupon')
       } else {
-        setAppliedCoupon({ couponId: data.couponId, code: data.code, description: data.description, discountAmount: data.discountAmount })
+        setAppliedCoupon({
+          couponId: data.couponId,
+          code: data.code,
+          description: data.description,
+          discountAmount: data.discountAmount,
+        })
         setCouponCode('')
-        showToast(`Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 'success')
+        showToast(
+          `Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          'success'
+        )
       }
     } catch {
       setCouponError('Failed to apply coupon')
@@ -187,246 +224,337 @@ export default function CartPage() {
           <div className="lg:col-span-2">
             {cartItems.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center">
-                <svg aria-hidden="true" className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                <svg
+                  aria-hidden="true"
+                  className="w-16 h-16 mx-auto text-foreground-muted mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
                 </svg>
                 <p className="text-foreground-secondary mb-4">Your cart is empty.</p>
-                <p className="text-sm text-foreground-muted">Move an item from below or <Link href={bp('/business/products')} className="text-accent-600 hover:text-accent-700 font-medium">browse products</Link>.</p>
+                <p className="text-sm text-foreground-muted">
+                  Move an item from below or{' '}
+                  <Link href={bp('/business/products')} className="text-accent-600 hover:text-accent-700 font-medium">
+                    browse products
+                  </Link>
+                  .
+                </p>
               </div>
             ) : (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              {cartItems.map((item) => {
-                const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-                const unitFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
-                const price = isCustomQty
-                  ? item.price_at_addition
-                  : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-                const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
-                const isOutOfStock = (item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status) === 'Out of Stock'
-                const categoryId = item.products.category_id
-                const itemDiscountPct = (!isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-                  ? (user.businessDiscountMap?.[categoryId] ?? 0)
-                  : 0
-                const discountedPrice = itemDiscountPct > 0 ? applyDiscount(Number(price), itemDiscountPct) : Number(price)
-                // Apply unit factor for display (e.g. box = 10 pcs → show price per box)
-                const displayUnitPrice = discountedPrice * unitFactor
-                const displayMrp = mrp ? Number(mrp) * unitFactor : null
-                const itemTotal = isCustomQty
-                  ? item.price_at_addition * item.quantity
-                  : displayUnitPrice * item.quantity
-                const isUpdating = updatingItems.has(item.id)
-                const showMrp = !isCustomQty && displayMrp !== null && displayMrp > displayUnitPrice
-                const discountPct = showMrp ? mrpDiscountPct(displayMrp!, displayUnitPrice) : 0
-                const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
-                const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
-                const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+                {cartItems.map(item => {
+                  const primaryImage =
+                    item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
+                  const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                  const unitFactor =
+                    !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
+                  const price = isCustomQty
+                    ? item.price_at_addition
+                    : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                  const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
+                  const isOutOfStock =
+                    (item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status) ===
+                    'Out of Stock'
+                  const categoryId = item.products.category_id
+                  const itemDiscountPct =
+                    !isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId
+                      ? (user.businessDiscountMap?.[categoryId] ?? 0)
+                      : 0
+                  const discountedPrice =
+                    itemDiscountPct > 0 ? applyDiscount(Number(price), itemDiscountPct) : Number(price)
+                  // Apply unit factor for display (e.g. box = 10 pcs → show price per box)
+                  const displayUnitPrice = discountedPrice * unitFactor
+                  const displayMrp = mrp ? Number(mrp) * unitFactor : null
+                  const itemTotal = isCustomQty
+                    ? item.price_at_addition * item.quantity
+                    : displayUnitPrice * item.quantity
+                  const isUpdating = updatingItems.has(item.id)
+                  const showMrp = !isCustomQty && displayMrp !== null && displayMrp > displayUnitPrice
+                  const discountPct = showMrp ? mrpDiscountPct(displayMrp!, displayUnitPrice) : 0
+                  const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                  const unitLabel =
+                    item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                  const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
-                return (
-                  <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
-                    <div className="flex gap-4 sm:gap-6">
-                      {/* Product Image */}
-                      <Link href={bp(`/business/products/${item.products.slug}`)} className="flex-shrink-0">
-                        <div className="w-24 h-24 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
-                          {primaryImage ? (
-                            <img
-                              src={primaryImage.thumbnail_url || primaryImage.image_url}
-                              alt={item.products.name}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <svg aria-hidden="true" className="w-12 h-12 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      </Link>
-
-                      {/* Product Details */}
-                      <div className="flex-1">
-                        <Link href={bp(`/business/products/${item.products.slug}`)} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
-                          {item.products.name}
-                        </Link>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          {item.products.brand_name && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
-                              {item.products.brand_name}
-                            </span>
-                          )}
-                          {sku && (
-                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>
-                          )}
-                          <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {item.variant && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
-                              {item.variant.variant_name}
-                            </span>
-                          )}
-                          {item.sub_variant && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
-                              {item.sub_variant.sub_variant_name}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-2 flex flex-col gap-0.5">
-                          {itemDiscountPct > 0 ? (
-                            <>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-foreground-muted">Regular:</span>
-                                <span className="text-sm text-foreground-muted line-through">
-                                  ₹{(Number(price) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">Business price:</span>
-                                <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                  ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{showUnitLabel ? `/${unitLabel}` : ''}
-                                </span>
-                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 whitespace-nowrap">
-                                  ✦ {itemDiscountPct}% extra off
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
-                              </span>
-                              {showMrp && (
-                                <>
-                                  <span className="text-sm text-foreground-muted line-through">
-                                    ₹{displayMrp!.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                  </span>
-                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
-                                    {discountPct}% off
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Quantity Controls */}
-                        <div className="mt-4 flex items-center gap-3 flex-wrap">
-                          {isCustomQty ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min="0.001"
-                                step="0.001"
-                                defaultValue={Number(item.quantity).toFixed(3)}
-                                onBlur={(e) => {
-                                  const val = parseFloat(e.target.value)
-                                  if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
-                                    handleQuantityChange(item.id, val)
-                                  } else {
-                                    e.target.value = Number(item.quantity).toFixed(3)
-                                  }
-                                }}
-                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                disabled={isUpdating}
-                                className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
+                  return (
+                    <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
+                      <div className="flex gap-4 sm:gap-6">
+                        {/* Product Image */}
+                        <Link href={bp(`/business/products/${item.products.slug}`)} className="flex-shrink-0">
+                          <div className="w-24 h-24 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
+                            {primaryImage ? (
+                              <img
+                                src={primaryImage.thumbnail_url || primaryImage.image_url}
+                                alt={item.products.name}
+                                className="w-full h-full object-cover rounded-lg"
                               />
-                              <span className="text-sm text-foreground-muted">{unitLabel ?? item.buy_unit}</span>
-                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{unitLabel ?? item.buy_unit}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center border border-border-secondary rounded-lg">
-                              <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
-                                disabled={isUpdating || Number(item.quantity) <= 1}
-                                aria-label={`Decrease quantity for ${item.products.name}`}
-                                className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <svg
+                                  aria-hidden="true"
+                                  className="w-12 h-12 text-foreground-muted"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
                                 </svg>
-                              </button>
-                              {isUpdating ? (
-                                <span role="status" aria-label="Loading" className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
-                                  <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+
+                        {/* Product Details */}
+                        <div className="flex-1">
+                          <Link
+                            href={bp(`/business/products/${item.products.slug}`)}
+                            className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors"
+                          >
+                            {item.products.name}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {item.products.brand_name && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.products.brand_name}
+                              </span>
+                            )}
+                            {sku && (
+                              <span className="text-xs text-foreground-muted font-mono">
+                                SKU: {sku}
+                                <CopySku sku={sku} className="ml-1" />
+                              </span>
+                            )}
+                            <ProductWarningBadges
+                              fragile={item.products?.fragile}
+                              hazardous={item.products?.hazardous}
+                              flammable={item.products?.flammable}
+                              size="xs"
+                            />
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                {item.variant.variant_name}
+                              </span>
+                            )}
+                            {item.sub_variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.sub_variant.sub_variant_name}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-2 flex flex-col gap-0.5">
+                            {itemDiscountPct > 0 ? (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-foreground-muted">Regular:</span>
+                                  <span className="text-sm text-foreground-muted line-through">
+                                    ₹
+                                    {(Number(price) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    {isCustomQty
+                                      ? `/${unitLabel ?? item.buy_unit}`
+                                      : showUnitLabel
+                                        ? `/${unitLabel}`
+                                        : ''}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">
+                                    Business price:
+                                  </span>
+                                  <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                                    ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    {showUnitLabel ? `/${unitLabel}` : ''}
+                                  </span>
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 whitespace-nowrap">
+                                    ✦ {itemDiscountPct}% extra off
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                                  ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  {isCustomQty
+                                    ? `/${unitLabel ?? item.buy_unit}`
+                                    : showUnitLabel
+                                      ? `/${unitLabel}`
+                                      : ''}
                                 </span>
-                              ) : (
+                                {showMrp && (
+                                  <>
+                                    <span className="text-sm text-foreground-muted line-through">
+                                      ₹{displayMrp!.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
+                                      {discountPct}% off
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quantity Controls */}
+                          <div className="mt-4 flex items-center gap-3 flex-wrap">
+                            {isCustomQty ? (
+                              <div className="flex items-center gap-2">
                                 <input
                                   type="number"
-                                  min="1"
-                                  defaultValue={Math.round(Number(item.quantity))}
-                                  onBlur={(e) => {
-                                    const val = parseInt(e.target.value, 10)
-                                    const safe = !isNaN(val) && val >= 1 ? val : 1
-                                    e.target.value = String(safe)
-                                    if (safe !== Math.round(Number(item.quantity))) {
-                                      handleQuantityChange(item.id, safe)
+                                  min="0.001"
+                                  step="0.001"
+                                  defaultValue={Number(item.quantity).toFixed(3)}
+                                  onBlur={e => {
+                                    const val = parseFloat(e.target.value)
+                                    if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
+                                      handleQuantityChange(item.id, val)
+                                    } else {
+                                      e.target.value = Number(item.quantity).toFixed(3)
                                     }
                                   }}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                                  className="w-16 px-1 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                  }}
+                                  disabled={isUpdating}
+                                  className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
                                 />
-                              )}
-                              <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
-                                disabled={isUpdating}
-                                aria-label={`Increase quantity for ${item.products.name}`}
-                                className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                              </button>
-                            </div>
-                          )}
+                                <span className="text-sm text-foreground-muted">{unitLabel ?? item.buy_unit}</span>
+                                <span className="text-xs text-foreground-muted">
+                                  @ ₹
+                                  {Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  /{unitLabel ?? item.buy_unit}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center border border-border-secondary rounded-lg">
+                                <button
+                                  onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
+                                  disabled={isUpdating || Number(item.quantity) <= 1}
+                                  aria-label={`Decrease quantity for ${item.products.name}`}
+                                  className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <svg
+                                    aria-hidden="true"
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                  </svg>
+                                </button>
+                                {isUpdating ? (
+                                  <span
+                                    role="status"
+                                    aria-label="Loading"
+                                    className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center"
+                                  >
+                                    <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
+                                  </span>
+                                ) : (
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    defaultValue={Math.round(Number(item.quantity))}
+                                    onBlur={e => {
+                                      const val = parseInt(e.target.value, 10)
+                                      const safe = !isNaN(val) && val >= 1 ? val : 1
+                                      e.target.value = String(safe)
+                                      if (safe !== Math.round(Number(item.quantity))) {
+                                        handleQuantityChange(item.id, safe)
+                                      }
+                                    }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                                    }}
+                                    className="w-16 px-1 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                )}
+                                <button
+                                  onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
+                                  disabled={isUpdating}
+                                  aria-label={`Increase quantity for ${item.products.name}`}
+                                  className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <svg
+                                    aria-hidden="true"
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4v16m8-8H4"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            )}
 
-                          {!isCustomQty && showUnitLabel && (
-                            <span className="text-sm text-foreground-muted">{unitLabel}</span>
-                          )}
+                            {!isCustomQty && showUnitLabel && (
+                              <span className="text-sm text-foreground-muted">{unitLabel}</span>
+                            )}
 
-                          <button
-                            onClick={async () => {
-                              try {
-                                await saveForLater(item.id)
-                                showToast('Saved for later', 'success')
-                              } catch {
-                                showToast('Failed to save', 'error')
-                              }
-                            }}
-                            aria-label={`Save ${item.products.name} for later`}
-                            className="text-foreground-secondary hover:text-accent-600 text-sm font-medium transition-colors"
-                          >
-                            Save for later
-                          </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await saveForLater(item.id)
+                                  showToast('Saved for later', 'success')
+                                } catch {
+                                  showToast('Failed to save', 'error')
+                                }
+                              }}
+                              aria-label={`Save ${item.products.name} for later`}
+                              className="text-foreground-secondary hover:text-accent-600 text-sm font-medium transition-colors"
+                            >
+                              Save for later
+                            </button>
 
-                          <button
-                            onClick={() => handleRemove(item.id)}
-                            aria-label={`Remove ${item.products.name} from cart`}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
+                            <button
+                              onClick={() => handleRemove(item.id)}
+                              aria-label={`Remove ${item.products.name} from cart`}
+                              className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
 
-                        {/* Item Total */}
-                        <div className="mt-4">
-                          <span className="text-sm text-foreground-secondary">Subtotal: </span>
-                          <span className="text-lg font-bold text-foreground">
-                            ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </span>
-                          {itemDiscountPct > 0 && (
-                            <span className="text-xs text-foreground-muted ml-2">
-                              ({Math.round(Number(item.quantity))}{unitLabel ? ` ${unitLabel}` : ''} × ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                          {/* Item Total */}
+                          <div className="mt-4">
+                            <span className="text-sm text-foreground-secondary">Subtotal: </span>
+                            <span className="text-lg font-bold text-foreground">
+                              ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
-                          )}
+                            {itemDiscountPct > 0 && (
+                              <span className="text-xs text-foreground-muted ml-2">
+                                ({Math.round(Number(item.quantity))}
+                                {unitLabel ? ` ${unitLabel}` : ''} × ₹
+                                {displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
             )}
 
             {savedItems.length > 0 && (
@@ -437,15 +565,17 @@ export default function CartPage() {
                   </h2>
                 </div>
                 <div className="divide-y divide-border-default">
-                  {savedItems.map((item) => {
-                    const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
+                  {savedItems.map(item => {
+                    const primaryImage =
+                      item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
                     const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
                     const price = isCustomQty
                       ? item.price_at_addition
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                     const isUpdating = updatingItems.has(item.id)
-                    const savedUnitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                    const savedUnitLabel =
+                      item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
                     const savedShowUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
                     return (
                       <div key={item.id} className="p-4 sm:p-6 flex gap-4">
@@ -459,15 +589,29 @@ export default function CartPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <svg aria-hidden="true" className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                <svg
+                                  aria-hidden="true"
+                                  className="w-8 h-8 text-foreground-muted"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={1}
+                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
                                 </svg>
                               </div>
                             )}
                           </div>
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={bp(`/business/products/${item.products.slug}`)} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
+                          <Link
+                            href={bp(`/business/products/${item.products.slug}`)}
+                            className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1"
+                          >
                             {item.products.name}
                           </Link>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -476,7 +620,12 @@ export default function CartPage() {
                                 {item.products.brand_name}
                               </span>
                             )}
-                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
+                            {sku && (
+                              <span className="text-[10px] text-foreground-muted font-mono">
+                                SKU: {sku}
+                                <CopySku sku={sku} className="ml-1" />
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {item.variant && (
@@ -491,7 +640,12 @@ export default function CartPage() {
                             )}
                           </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
-                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${savedUnitLabel ?? item.buy_unit}` : (savedShowUnitLabel ? `/${savedUnitLabel}` : '')}
+                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {isCustomQty
+                              ? `/${savedUnitLabel ?? item.buy_unit}`
+                              : savedShowUnitLabel
+                                ? `/${savedUnitLabel}`
+                                : ''}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <button
@@ -503,7 +657,11 @@ export default function CartPage() {
                                 } catch {
                                   showToast('Failed to move', 'error')
                                 } finally {
-                                  setUpdatingItems(prev => { const next = new Set(prev); next.delete(item.id); return next })
+                                  setUpdatingItems(prev => {
+                                    const next = new Set(prev)
+                                    next.delete(item.id)
+                                    return next
+                                  })
                                 }
                               }}
                               disabled={isUpdating}
@@ -533,148 +691,187 @@ export default function CartPage() {
 
           {/* Order Summary */}
           {cartItems.length > 0 && (
-          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-              <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
+            <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+                <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
 
-              {/* Coupon Input */}
-              <div className="mb-5">
-                {appliedCoupon ? (
-                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
-                    <div>
-                      <p className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</p>
-                      {appliedCoupon.description && (
-                        <p className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</p>
-                      )}
-                    </div>
-                    <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-600 font-medium ml-3">Remove</button>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={couponCode}
-                        onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError('') }}
-                        onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
-                        placeholder="Coupon code"
-                        className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
-                      />
+                {/* Coupon Input */}
+                <div className="mb-5">
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                      <div>
+                        <p className="text-sm font-semibold text-green-700 dark:text-green-400">
+                          {appliedCoupon.code} applied
+                        </p>
+                        {appliedCoupon.description && (
+                          <p className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</p>
+                        )}
+                      </div>
                       <button
-                        onClick={handleApplyCoupon}
-                        disabled={couponLoading || !couponCode.trim()}
-                        className="px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        onClick={handleRemoveCoupon}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium ml-3"
                       >
-                        {couponLoading ? '...' : 'Apply'}
+                        Remove
                       </button>
                     </div>
-                    {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-foreground-secondary">
-                  <span>Subtotal ({cartCount} items)</span>
-                  <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
-                {gstEnabled && (
-                  <div className="flex justify-between text-foreground-muted text-sm">
-                    <span>Incl. GST</span>
-                    <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                {discount > 0 && (
-                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
-                    <span>Coupon ({appliedCoupon!.code})</span>
-                    <span>-₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="border-t border-border-default pt-3">
-                  <div className="flex justify-between text-lg font-bold text-foreground">
-                    <span>Total</span>
-                    <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  {discount > 0 && (
-                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">You save ₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} with this coupon</p>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={e => {
+                            setCouponCode(e.target.value.toUpperCase())
+                            setCouponError('')
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                          placeholder="Coupon code"
+                          className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
+                        />
+                        <button
+                          onClick={handleApplyCoupon}
+                          disabled={couponLoading || !couponCode.trim()}
+                          className="px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {couponLoading ? '...' : 'Apply'}
+                        </button>
+                      </div>
+                      {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                    </div>
                   )}
-                  {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}
                 </div>
-              </div>
 
-              {user ? (
-                <button
-                  type="button"
-                  onClick={proceedToCheckout}
-                  disabled={proceedingToCheckout || cartCount === 0}
-                  className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
-                >
-                  {proceedingToCheckout ? 'Starting…' : 'Proceed to Checkout'}
-                  <svg aria-hidden="true" className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ) : (
-                <div className="space-y-3">
-                  <Link
-                    href={bp('/business/signin?redirect=/checkout')}
-                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between text-foreground-secondary">
+                    <span>Subtotal ({cartCount} items)</span>
+                    <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {gstEnabled && (
+                    <div className="flex justify-between text-foreground-muted text-sm">
+                      <span>Incl. GST</span>
+                      <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                      <span>Coupon ({appliedCoupon!.code})</span>
+                      <span>-₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-border-default pt-3">
+                    <div className="flex justify-between text-lg font-bold text-foreground">
+                      <span>Total</span>
+                      <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {discount > 0 && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        You save ₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} with this coupon
+                      </p>
+                    )}
+                    {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}
+                  </div>
+                </div>
+
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={proceedToCheckout}
+                    disabled={proceedingToCheckout || cartCount === 0}
+                    className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                   >
-                    Login to Checkout
-                    <svg aria-hidden="true" className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {proceedingToCheckout ? 'Starting…' : 'Proceed to Checkout'}
+                    <svg
+                      aria-hidden="true"
+                      className="w-5 h-5 ml-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                  </Link>
-                  <p className="text-sm text-foreground-secondary text-center">
-                    New customer? <Link href={bp('/business/signup')} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Create an account</Link>
-                  </p>
-                </div>
-              )}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <Link
+                      href={bp('/business/signin?redirect=/checkout')}
+                      className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                    >
+                      Login to Checkout
+                      <svg
+                        aria-hidden="true"
+                        className="w-5 h-5 ml-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                    <p className="text-sm text-foreground-secondary text-center">
+                      New customer?{' '}
+                      <Link
+                        href={bp('/business/signup')}
+                        className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium"
+                      >
+                        Create an account
+                      </Link>
+                    </p>
+                  </div>
+                )}
 
-              <Link
-                href={bp('/business/products')}
-                className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
-              >
-                Continue Shopping
-              </Link>
+                <Link
+                  href={bp('/business/products')}
+                  className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
+                >
+                  Continue Shopping
+                </Link>
 
-              <RequestQuoteButton
-                items={cartItems.map(item => {
-                  const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-                  const qItemFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
-                  const price = isCustomQty
-                    ? item.price_at_addition
-                    : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-                  const categoryId = item.products.category_id
-                  const discountPct = (!isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-                    ? (user.businessDiscountMap?.[categoryId] ?? 0)
-                    : 0
-                  const currentPrice = discountPct > 0 ? Number(price) * (1 - discountPct / 100) : Number(price)
-                  const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
-                  const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku || null
-                  const itemStockStatus = item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status
-                  const descriptionParts = [item.products?.name, item.variant?.variant_name, item.sub_variant?.sub_variant_name].filter(Boolean)
-                  return {
-                    productId: item.products?.id,
-                    variantId: item.variant?.id,
-                    subVariantId: item.sub_variant?.id,
-                    description: descriptionParts.join(' — '),
-                    quantity: Math.round(Number(item.quantity)) || 1,
-                    unit: item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? 'Nos',
-                    unitFactor: qItemFactor,
-                    currentPrice,
-                    imageUrl: primaryImage ? (primaryImage.thumbnail_url || primaryImage.image_url) : null,
-                    brandName: item.products?.brand_name ?? null,
-                    categoryName: null,
-                    sku,
-                    stockStatus: itemStockStatus !== 'Out of Stock' ? ('in' as const) : ('out' as const),
-                  }
-                })}
-                label="Request Quote for Cart"
-                className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
-              />
+                <RequestQuoteButton
+                  items={cartItems.map(item => {
+                    const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const qItemFactor =
+                      !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
+                    const price = isCustomQty
+                      ? item.price_at_addition
+                      : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                    const categoryId = item.products.category_id
+                    const discountPct =
+                      !isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId
+                        ? (user.businessDiscountMap?.[categoryId] ?? 0)
+                        : 0
+                    const currentPrice = discountPct > 0 ? Number(price) * (1 - discountPct / 100) : Number(price)
+                    const primaryImage =
+                      item.products.product_images?.find((img: any) => img.is_primary) ||
+                      item.products.product_images?.[0]
+                    const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku || null
+                    const itemStockStatus =
+                      item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status
+                    const descriptionParts = [
+                      item.products?.name,
+                      item.variant?.variant_name,
+                      item.sub_variant?.sub_variant_name,
+                    ].filter(Boolean)
+                    return {
+                      productId: item.products?.id,
+                      variantId: item.variant?.id,
+                      subVariantId: item.sub_variant?.id,
+                      description: descriptionParts.join(' — '),
+                      quantity: Math.round(Number(item.quantity)) || 1,
+                      unit: item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? 'Nos',
+                      unitFactor: qItemFactor,
+                      currentPrice,
+                      imageUrl: primaryImage ? primaryImage.thumbnail_url || primaryImage.image_url : null,
+                      brandName: item.products?.brand_name ?? null,
+                      categoryName: null,
+                      sku,
+                      stockStatus: itemStockStatus !== 'Out of Stock' ? ('in' as const) : ('out' as const),
+                    }
+                  })}
+                  label="Request Quote for Cart"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
+                />
+              </div>
             </div>
-          </div>
           )}
         </div>
       </div>

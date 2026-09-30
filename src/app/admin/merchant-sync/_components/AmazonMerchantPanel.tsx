@@ -31,10 +31,13 @@ const PAGE_SIZE = 50
 function StatusBadge({ status }: { status: string | null }) {
   const s = (status || 'unknown').toLowerCase()
   const cls =
-    s === 'approved' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-    : s === 'disapproved' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-    : s === 'pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
-    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+    s === 'approved'
+      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+      : s === 'disapproved'
+        ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+        : s === 'pending'
+          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
   return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cls}`}>{s}</span>
 }
 
@@ -60,27 +63,30 @@ export default function AmazonMerchantPanel() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const load = useCallback(async (opts?: { page?: number; search?: string; status?: string }) => {
-    setLoading(true)
-    try {
-      const p = opts?.page ?? page
-      const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
-      const s = opts?.search ?? search
-      const st = opts?.status ?? statusFilter
-      if (s) params.set('search', s)
-      if (st && st !== 'all') params.set('status', st)
-      const res = await fetch(`/api/admin/merchant/amazon/listing-status?${params.toString()}`)
-      if (!res.ok) throw new Error('Failed to load')
-      const data = await res.json()
-      setSummary(data.summary)
-      setRows(data.rows)
-      setTotal(data.total)
-    } catch {
-      setMsg('Failed to load Amazon listing data.')
-    } finally {
-      setLoading(false)
-    }
-  }, [page, search, statusFilter])
+  const load = useCallback(
+    async (opts?: { page?: number; search?: string; status?: string }) => {
+      setLoading(true)
+      try {
+        const p = opts?.page ?? page
+        const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
+        const s = opts?.search ?? search
+        const st = opts?.status ?? statusFilter
+        if (s) params.set('search', s)
+        if (st && st !== 'all') params.set('status', st)
+        const res = await fetch(`/api/admin/merchant/amazon/listing-status?${params.toString()}`)
+        if (!res.ok) throw new Error('Failed to load')
+        const data = await res.json()
+        setSummary(data.summary)
+        setRows(data.rows)
+        setTotal(data.total)
+      } catch {
+        setMsg('Failed to load Amazon listing data.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [page, search, statusFilter]
+  )
 
   useEffect(() => {
     load({ page: 1 })
@@ -89,19 +95,29 @@ export default function AmazonMerchantPanel() {
 
   // Load the DB->Amazon push status banner.
   useEffect(() => {
-    fetch('/api/admin/merchant/amazon/status').then(r => r.ok ? r.json() : null).then(d => d && setSyncStatus(d.status)).catch(() => {})
+    fetch('/api/admin/merchant/amazon/status')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => d && setSyncStatus(d.status))
+      .catch(() => {})
   }, [])
 
   const refresh = async () => {
-    setRefreshing(true); setMsg(null)
+    setRefreshing(true)
+    setMsg(null)
     try {
       const res = await fetch('/api/admin/merchant/amazon/listing-status/refresh', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-requested-with': 'jeffi-admin' }, body: '{}',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-requested-with': 'jeffi-admin' },
+        body: '{}',
       })
       const data = await res.json()
-      if (!res.ok) { setMsg(data.error || 'Refresh failed'); return }
+      if (!res.ok) {
+        setMsg(data.error || 'Refresh failed')
+        return
+      }
       setSummary(data.summary)
-      await load({ page: 1 }); setPage(1)
+      await load({ page: 1 })
+      setPage(1)
       setMsg('Refreshed from Amazon.')
     } catch {
       setMsg('Refresh failed.')
@@ -111,14 +127,26 @@ export default function AmazonMerchantPanel() {
   }
 
   const syncNow = async () => {
-    setSyncing(true); setMsg(null)
+    setSyncing(true)
+    setMsg(null)
     try {
       const res = await fetch('/api/admin/merchant/amazon/sync', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-requested-with': 'jeffi-admin' }, body: '{}',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-requested-with': 'jeffi-admin' },
+        body: '{}',
       })
       const data = await res.json()
-      setSyncStatus({ status: data.errors?.length ? 'error' : 'success', synced: data.synced, errors: data.errors, finished_at: data.finishedAt })
-      setMsg(data.errors?.length ? `Sync finished with ${data.errors.length} error(s).` : `Pushed ${data.synced ?? 0} items to Amazon.`)
+      setSyncStatus({
+        status: data.errors?.length ? 'error' : 'success',
+        synced: data.synced,
+        errors: data.errors,
+        finished_at: data.finishedAt,
+      })
+      setMsg(
+        data.errors?.length
+          ? `Sync finished with ${data.errors.length} error(s).`
+          : `Pushed ${data.synced ?? 0} items to Amazon.`
+      )
     } catch {
       setMsg('Sync failed.')
     } finally {
@@ -126,12 +154,23 @@ export default function AmazonMerchantPanel() {
     }
   }
 
-  const go = (p: number) => { setPage(p); load({ page: p }) }
-  const doSearch = () => { setPage(1); load({ page: 1 }) }
-  const changeStatus = (st: string) => { setStatusFilter(st); setPage(1); load({ page: 1, status: st }) }
+  const go = (p: number) => {
+    setPage(p)
+    load({ page: p })
+  }
+  const doSearch = () => {
+    setPage(1)
+    load({ page: 1 })
+  }
+  const changeStatus = (st: string) => {
+    setStatusFilter(st)
+    setPage(1)
+    load({ page: 1, status: st })
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const btn = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
+  const btn =
+    'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
   return (
     <section className="rounded-lg border border-border-default bg-surface-elevated">
@@ -147,10 +186,18 @@ export default function AmazonMerchantPanel() {
         </div>
         <div className="flex items-center gap-2">
           <RequireWrite scope="merchant_sync:write">
-            <button onClick={syncNow} disabled={syncing} className="px-3 py-1.5 text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors">
+            <button
+              onClick={syncNow}
+              disabled={syncing}
+              className="px-3 py-1.5 text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors"
+            >
               {syncing ? 'Pushing…' : 'Sync now (push to Amazon)'}
             </button>
-            <button onClick={refresh} disabled={refreshing} className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors">
+            <button
+              onClick={refresh}
+              disabled={refreshing}
+              className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
               {refreshing ? 'Refreshing…' : 'Refresh from Amazon'}
             </button>
           </RequireWrite>
@@ -177,16 +224,23 @@ export default function AmazonMerchantPanel() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') doSearch() }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') doSearch()
+              }}
               placeholder="Search SKU or title…"
               className="px-3 py-1.5 text-sm border border-border-default rounded-lg bg-surface text-foreground w-64 max-w-full"
             />
-            <button onClick={doSearch} className={btn}>Search</button>
+            <button onClick={doSearch} className={btn}>
+              Search
+            </button>
           </div>
           <div className="flex items-center gap-1">
             {['all', 'approved', 'pending', 'disapproved'].map(st => (
-              <button key={st} onClick={() => changeStatus(st)}
-                className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+              <button
+                key={st}
+                onClick={() => changeStatus(st)}
+                className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+              >
                 {st}
               </button>
             ))}
@@ -206,21 +260,36 @@ export default function AmazonMerchantPanel() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">Loading…</td></tr>
-              ) : rows.length === 0 ? (
-                <tr><td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">
-                  {summary?.last_refreshed_at ? 'No items match.' : 'No data yet — click “Refresh from Amazon”.'}
-                </td></tr>
-              ) : rows.map(r => (
-                <tr key={r.sku} className="border-t border-border-default">
-                  <td className="px-3 py-2 font-mono text-xs text-foreground"><span className="inline-flex items-center gap-1">{r.sku}{r.sku && <CopySku sku={r.sku} />}</span></td>
-                  <td className="px-3 py-2 text-foreground max-w-md truncate">{r.title || '—'}</td>
-                  <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                  <td className="px-3 py-2 text-xs text-foreground-secondary max-w-xs truncate">
-                    {r.issues?.[0]?.message || (r.status === 'approved' ? '—' : '')}
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">
+                    Loading…
                   </td>
                 </tr>
-              ))}
+              ) : rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">
+                    {summary?.last_refreshed_at ? 'No items match.' : 'No data yet — click “Refresh from Amazon”.'}
+                  </td>
+                </tr>
+              ) : (
+                rows.map(r => (
+                  <tr key={r.sku} className="border-t border-border-default">
+                    <td className="px-3 py-2 font-mono text-xs text-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        {r.sku}
+                        {r.sku && <CopySku sku={r.sku} />}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-foreground max-w-md truncate">{r.title || '—'}</td>
+                    <td className="px-3 py-2">
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td className="px-3 py-2 text-xs text-foreground-secondary max-w-xs truncate">
+                      {r.issues?.[0]?.message || (r.status === 'approved' ? '—' : '')}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -232,9 +301,15 @@ export default function AmazonMerchantPanel() {
               {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()}
             </p>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => go(page - 1)} disabled={page <= 1} className={btn}>Prev</button>
-              <span className="text-xs text-foreground-muted">{page}/{totalPages}</span>
-              <button onClick={() => go(page + 1)} disabled={page >= totalPages} className={btn}>Next</button>
+              <button onClick={() => go(page - 1)} disabled={page <= 1} className={btn}>
+                Prev
+              </button>
+              <span className="text-xs text-foreground-muted">
+                {page}/{totalPages}
+              </span>
+              <button onClick={() => go(page + 1)} disabled={page >= totalPages} className={btn}>
+                Next
+              </button>
             </div>
           </div>
         )}

@@ -14,32 +14,34 @@ async function createProduct(formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
-  const categoryId = (formData.get('category_id') as string || '').trim() || null
+  const categoryId = ((formData.get('category_id') as string) || '').trim() || null
   const brandId = formData.get('brand_id') as string
   const hasVariants = formData.get('has_variants') === 'true'
-  const variantType = formData.get('variant_type') as string || null
-  const subVariantType = formData.get('sub_variant_type') as string || null
+  const variantType = (formData.get('variant_type') as string) || null
+  const subVariantType = (formData.get('sub_variant_type') as string) || null
   const basePrice = hasVariants ? 0 : round2(parseFloat(formData.get('base_price') as string))
   const mrp = formData.get('mrp') ? round2(parseFloat(formData.get('mrp') as string)) : null
   const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
-  const supplierId = (formData.get('supplier_id') as string || '').trim() || null
-  const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
-  const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
-  const hsnCode = formData.get('hsn_code') as string || null
-  const mpn = formData.get('mpn') as string || null
-  const gtin = formData.get('gtin') as string || null
-  const stockStatus = hasVariants ? 'In Stock' : formData.get('stock_status') as string
+  const supplierId = ((formData.get('supplier_id') as string) || '').trim() || null
+  const discountPct = formData.get('discount_pct')
+    ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2))
+    : 0
+  const gstPercentage = parseFloat((formData.get('gst_percentage') as string) || '18')
+  const hsnCode = (formData.get('hsn_code') as string) || null
+  const mpn = (formData.get('mpn') as string) || null
+  const gtin = (formData.get('gtin') as string) || null
+  const stockStatus = hasVariants ? 'In Stock' : (formData.get('stock_status') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
-  const dimensions = formData.get('dimensions') as string || null
+  const dimensions = (formData.get('dimensions') as string) || null
   const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
-  const packageType = formData.get('package_type') as string || null
+  const packageType = (formData.get('package_type') as string) || null
   const lengthCm = formData.get('length_cm') ? parseFloat(formData.get('length_cm') as string) : null
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
-  const isActive = intent === 'draft' ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
+  const isActive = intent === 'draft' ? false : intent === 'publish' ? true : formData.get('is_active') === 'true'
   // Create-as-draft: intent 'draft' (or an implicit save) makes a create-draft (is_draft = true,
   // is_active = false) that lives ONLY in the Drafts section and never the live list/storefront.
   // 'publish' clears is_draft and activates. Existing is_active=true storefront queries already
@@ -58,18 +60,28 @@ async function createProduct(formData: FormData) {
       if (weightGrams == null || !(weightGrams > 0)) {
         errors.push('Shipping weight is required and must be greater than 0.')
       }
-      if (packageType && STORED_DIMS_TYPES.includes(packageType) && (lengthCm == null || breadthCm == null || heightCm == null)) {
+      if (
+        packageType &&
+        STORED_DIMS_TYPES.includes(packageType) &&
+        (lengthCm == null || breadthCm == null || heightCm == null)
+      ) {
         errors.push('Dimensions required for this package type')
       }
     } else {
       const variantsJsonRaw = formData.get('variants_json') as string | null
       let parsedVariants: any[] = []
-      try { parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : [] } catch { parsedVariants = [] }
+      try {
+        parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : []
+      } catch {
+        parsedVariants = []
+      }
       for (const v of parsedVariants) {
         if (v?._isDeleted) continue
         const w = v?.weight_grams != null && v.weight_grams !== '' ? parseFloat(v.weight_grams) : null
         if (w == null || !(w > 0)) {
-          errors.push(`Shipping weight is required for variant "${v?.variant_name || v?.sku || ''}" and must be greater than 0.`)
+          errors.push(
+            `Shipping weight is required for variant "${v?.variant_name || v?.sku || ''}" and must be greater than 0.`
+          )
           break
         }
         const pt = v?.package_type || 'flat_poly_auto'
@@ -88,13 +100,18 @@ async function createProduct(formData: FormData) {
   const uploadedImagesJson = formData.get('uploaded_images') as string
   const uploadedImages: any[] = uploadedImagesJson ? JSON.parse(uploadedImagesJson) : []
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
-  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
+  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson
+    ? JSON.parse(galleryImageIdsJson)
+    : []
   const imageOrderJson = formData.get('image_order') as string
   const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 
-  const skuFromForm = (formData.get('sku') as string || '').trim().toUpperCase()
+  const skuFromForm = ((formData.get('sku') as string) || '').trim().toUpperCase()
   let sku: string
   if (skuFromForm) {
     sku = skuFromForm
@@ -118,11 +135,37 @@ async function createProduct(formData: FormData) {
       RETURNING *`,
       [
         ...(productId ? [productId] : []),
-        name, slug, sku, description, categoryId, brandId || null,
-        basePrice, mrp, mrpExGst, salePrice, gstPercentage, hsnCode, mpn, gtin,
-        stockStatus, weight, dimensions, isActive, isDraft, isFeatured,
-        hasVariants, variantType, subVariantType,
-        weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice, discountPct, supplierId,
+        name,
+        slug,
+        sku,
+        description,
+        categoryId,
+        brandId || null,
+        basePrice,
+        mrp,
+        mrpExGst,
+        salePrice,
+        gstPercentage,
+        hsnCode,
+        mpn,
+        gtin,
+        stockStatus,
+        weight,
+        dimensions,
+        isActive,
+        isDraft,
+        isFeatured,
+        hasVariants,
+        variantType,
+        subVariantType,
+        weightGrams,
+        packageType,
+        lengthCm,
+        breadthCm,
+        heightCm,
+        costPrice,
+        discountPct,
+        supplierId,
       ]
     )
 
@@ -141,11 +184,19 @@ async function createProduct(formData: FormData) {
             height, display_order, is_primary
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
           [
-            data.id, img.url, img.thumbnailUrl,
+            data.id,
+            img.url,
+            img.thumbnailUrl,
             img.s3Bucket,
-            img.s3Key, img.s3ThumbnailKey,
-            img.fileName, img.fileSize, img.mimeType,
-            img.width, img.height, 999, false,
+            img.s3Key,
+            img.s3ThumbnailKey,
+            img.fileName,
+            img.fileSize,
+            img.mimeType,
+            img.width,
+            img.height,
+            999,
+            false,
           ]
         )
         if (inserted) newFileIds[i] = inserted.id
@@ -154,11 +205,10 @@ async function createProduct(formData: FormData) {
       const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
         const { copyGalleryImageToProduct } = await import('@/lib/s3')
-        const galleryImages = await queryMany(
-          `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
-          [galleryImageRefs.map(r => r.id)]
-        )
-        for (const gimg of (galleryImages || [])) {
+        const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
+          galleryImageRefs.map(r => r.id),
+        ])
+        for (const gimg of galleryImages || []) {
           let copied
           try {
             copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, data.id)
@@ -174,35 +224,54 @@ async function createProduct(formData: FormData) {
               height, display_order, is_primary
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
-              data.id, copied.url, copied.thumbnailUrl,
+              data.id,
+              copied.url,
+              copied.thumbnailUrl,
               copied.s3Bucket,
-              copied.s3Key, copied.s3ThumbnailKey,
-              gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-              gimg.width, gimg.height, 999, false,
+              copied.s3Key,
+              copied.s3ThumbnailKey,
+              gimg.custom_name || gimg.file_name,
+              gimg.file_size,
+              gimg.mime_type,
+              gimg.width,
+              gimg.height,
+              999,
+              false,
             ]
           )
           if (inserted) newGalleryIds[gimg.id] = inserted.id
         }
       }
 
-      const keys = imageOrder.length > 0 ? imageOrder : [
-        ...Object.keys(newFileIds).map(i => `file:${i}`),
-        ...galleryImageRefs.map(r => `gallery:${r.id}`),
-      ]
-      const primaryKey = keys.find(k => {
-        if (k.startsWith('gallery:')) return galleryImageRefs.find(r => r.id === k.slice(8))?.isPrimary
-        return false
-      }) || keys[0]
+      const keys =
+        imageOrder.length > 0
+          ? imageOrder
+          : [...Object.keys(newFileIds).map(i => `file:${i}`), ...galleryImageRefs.map(r => `gallery:${r.id}`)]
+      const primaryKey =
+        keys.find(k => {
+          if (k.startsWith('gallery:')) return galleryImageRefs.find(r => r.id === k.slice(8))?.isPrimary
+          return false
+        }) || keys[0]
 
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i]
         const isPrimary = key === primaryKey
         if (key.startsWith('file:')) {
           const pid = newFileIds[parseInt(key.slice(5))]
-          if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+          if (pid)
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+              i,
+              isPrimary,
+              pid,
+            ])
         } else if (key.startsWith('gallery:')) {
           const pid = newGalleryIds[key.slice(8)]
-          if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+          if (pid)
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+              i,
+              isPrimary,
+              pid,
+            ])
         }
       }
     }
@@ -225,8 +294,11 @@ async function createProduct(formData: FormData) {
               variant.price ? round2(parseFloat(variant.price)) : null,
               variant.mrp ? round2(parseFloat(variant.mrp)) : null,
               variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
-              variant.price_ex_gst ? round2(parseFloat(variant.price_ex_gst))
-                : variant.price ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100)) : null,
+              variant.price_ex_gst
+                ? round2(parseFloat(variant.price_ex_gst))
+                : variant.price
+                  ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100))
+                  : null,
               variant.stock_status || 'In Stock',
               variant.mpn || null,
               variant.gtin || null,
@@ -257,7 +329,7 @@ async function createProduct(formData: FormData) {
     syncProductToAmazon(data.id).catch(() => {})
 
     const host = await getHost()
-  redirect(ap('/admin/products', host))
+    redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     const raw = err?.message || ''
@@ -283,7 +355,10 @@ export default async function AddProductPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/products', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap('/admin/products', host)}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Products
         </a>

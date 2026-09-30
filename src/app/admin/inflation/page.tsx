@@ -5,9 +5,6 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function InflationPage() {
-  const [categories, brands] = await Promise.all([
-    getAllCategories().catch(() => []),
-    getAllBrands().catch(() => []),
-  ])
+  const [categories, brands] = await Promise.all([getAllCategories().catch(() => []), getAllBrands().catch(() => [])])
   return <InflationClient categories={categories || []} brands={brands || []} />
 }

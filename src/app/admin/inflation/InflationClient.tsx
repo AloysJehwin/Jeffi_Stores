@@ -84,7 +84,9 @@ function fmt(val: number | null): string {
 export default function InflationClient({ categories, brands }: { categories: Category[]; brands: Brand[] }) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [percentage, setPercentage] = useState('')
-  const [productList, setProductList] = useState<{ id: string; name: string; brand_id: string | null; brand_name: string | null }[]>([])
+  const [productList, setProductList] = useState<
+    { id: string; name: string; brand_id: string | null; brand_name: string | null }[]
+  >([])
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [selectedBrandId, setSelectedBrandId] = useState<string>('')
   const [productListLoading, setProductListLoading] = useState(false)
@@ -105,11 +107,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   const PAGE_SIZE = 25
   const [logsPage, setLogsPage] = useState(1)
   const logsTotalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE))
-  useEffect(() => { if (logsPage > logsTotalPages) setLogsPage(logsTotalPages) }, [logsPage, logsTotalPages])
-  const pagedLogs = useMemo(
-    () => logs.slice((logsPage - 1) * PAGE_SIZE, logsPage * PAGE_SIZE),
-    [logs, logsPage]
-  )
+  useEffect(() => {
+    if (logsPage > logsTotalPages) setLogsPage(logsTotalPages)
+  }, [logsPage, logsTotalPages])
+  const pagedLogs = useMemo(() => logs.slice((logsPage - 1) * PAGE_SIZE, logsPage * PAGE_SIZE), [logs, logsPage])
 
   async function loadProducts(category: Category, brandId?: string) {
     setProductListLoading(true)
@@ -120,11 +121,14 @@ export default function InflationClient({ categories, brands }: { categories: Ca
       const url = `/api/admin/inflation/products?category_id=${category.id}${brandId ? `&brand_id=${brandId}` : ''}`
       const res = await fetch(url)
       const data = await res.json()
-      const list: { id: string; name: string; brand_id: string | null; brand_name: string | null }[] = data.products || []
+      const list: { id: string; name: string; brand_id: string | null; brand_name: string | null }[] =
+        data.products || []
       setProductList(list)
       setSelectedProductIds(new Set(list.map(p => p.id)))
-    } catch {}
-    finally { setProductListLoading(false) }
+    } catch {
+    } finally {
+      setProductListLoading(false)
+    }
   }
 
   function toggleProduct(id: string) {
@@ -141,8 +145,11 @@ export default function InflationClient({ categories, brands }: { categories: Ca
     const allSelected = allFiltered.every(id => selectedProductIds.has(id))
     setSelectedProductIds(prev => {
       const next = new Set(prev)
-      if (allSelected) { allFiltered.forEach(id => next.delete(id)) }
-      else { allFiltered.forEach(id => next.add(id)) }
+      if (allSelected) {
+        allFiltered.forEach(id => next.delete(id))
+      } else {
+        allFiltered.forEach(id => next.add(id))
+      }
       return next
     })
     setPreview(null)
@@ -189,8 +196,12 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   // Brands that actually appear in the loaded product list
   const availableBrands = useMemo(() => {
     const seen = new Map<string, string>()
-    productList.forEach(p => { if (p.brand_id && p.brand_name) seen.set(p.brand_id, p.brand_name) })
-    return Array.from(seen.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+    productList.forEach(p => {
+      if (p.brand_id && p.brand_name) seen.set(p.brand_id, p.brand_name)
+    })
+    return Array.from(seen.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [productList])
 
   const brandOptions: SelectOption[] = [
@@ -199,7 +210,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   ]
 
   const filteredProductList = useMemo(
-    () => selectedBrandId ? productList.filter(p => p.brand_id === selectedBrandId) : productList,
+    () => (selectedBrandId ? productList.filter(p => p.brand_id === selectedBrandId) : productList),
     [productList, selectedBrandId]
   )
 
@@ -212,7 +223,9 @@ export default function InflationClient({ categories, brands }: { categories: Ca
       .finally(() => setLogsLoading(false))
   }, [])
 
-  useEffect(() => { fetchLogs() }, [fetchLogs])
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
 
   async function handlePreview() {
     if (!selectedCategory || !percentage || selectedProductIds.size === 0) return
@@ -254,7 +267,9 @@ export default function InflationClient({ categories, brands }: { categories: Ca
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to apply inflation')
-      setApplySuccess(`+${percentage}% applied to ${data.product_count} product${data.product_count !== 1 ? 's' : ''} in "${selectedCategory.name}".`)
+      setApplySuccess(
+        `+${percentage}% applied to ${data.product_count} product${data.product_count !== 1 ? 's' : ''} in "${selectedCategory.name}".`
+      )
       setPreview(null)
       setPercentage('')
       setSelectedCategory(null)
@@ -276,7 +291,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Price Inflation</h1>
-        <p className="text-foreground-secondary mt-1">Bulk-increase MRP (ex-GST) by percentage — all derived prices (MRP incl. GST, selling price, wholesale) are automatically recalculated using each product&apos;s discount % and GST rate.</p>
+        <p className="text-foreground-secondary mt-1">
+          Bulk-increase MRP (ex-GST) by percentage — all derived prices (MRP incl. GST, selling price, wholesale) are
+          automatically recalculated using each product&apos;s discount % and GST rate.
+        </p>
       </div>
 
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 space-y-5">
@@ -294,7 +312,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 setSelectedCategory(cat)
                 setPreview(null)
                 if (cat) loadProducts(cat, selectedBrandId || undefined)
-                else { setProductList([]); setSelectedProductIds(new Set()) }
+                else {
+                  setProductList([])
+                  setSelectedProductIds(new Set())
+                }
               }}
             />
           </div>
@@ -314,14 +335,19 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Percentage increase (%) *</label>
+            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+              Percentage increase (%) *
+            </label>
             <input
               type="number"
               step="0.01"
               min="0.01"
               max="100"
               value={percentage}
-              onChange={e => { setPercentage(e.target.value); setPreview(null) }}
+              onChange={e => {
+                setPercentage(e.target.value)
+                setPreview(null)
+              }}
               placeholder="e.g. 10 for +10%"
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             />
@@ -343,7 +369,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                       value={selectedBrandId}
                       placeholder="All Brands"
                       options={brandOptions}
-                      onChange={val => { setSelectedBrandId(val); setPreview(null) }}
+                      onChange={val => {
+                        setSelectedBrandId(val)
+                        setPreview(null)
+                      }}
                     />
                   </div>
                 )}
@@ -361,7 +390,11 @@ export default function InflationClient({ categories, brands }: { categories: Ca
             {productListLoading ? (
               <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 px-4 py-2.5 animate-pulse"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
                     <div className="w-4 h-4 rounded bg-surface-secondary shrink-0" />
                     <div className="h-3.5 bg-surface-secondary rounded flex-1" />
                     <div className="h-3 bg-surface-secondary rounded w-16" />
@@ -371,7 +404,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
             ) : (
               <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
                 {filteredProductList.map(p => (
-                  <label key={p.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors">
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors"
+                  >
                     <input
                       type="checkbox"
                       checked={selectedProductIds.has(p.id)}
@@ -383,7 +419,9 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                   </label>
                 ))}
                 {filteredProductList.length === 0 && (
-                  <p className="px-4 py-3 text-sm text-foreground-muted">No products for this brand in the selected category.</p>
+                  <p className="px-4 py-3 text-sm text-foreground-muted">
+                    No products for this brand in the selected category.
+                  </p>
                 )}
               </div>
             )}
@@ -420,7 +458,9 @@ export default function InflationClient({ categories, brands }: { categories: Ca
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">Preview — {selectedCategory?.name}</h2>
-            <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">+{percentage}% on MRP (Ex. GST)</span>
+            <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">
+              +{percentage}% on MRP (Ex. GST)
+            </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -428,7 +468,12 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 <tr>
                   <th className="text-left py-2.5 px-4 font-medium text-foreground-secondary">Product / Variant</th>
                   {PREVIEW_COLS.map(c => (
-                    <th key={c.key} className="text-right py-2.5 px-3 font-medium text-foreground-secondary whitespace-nowrap">{c.label}</th>
+                    <th
+                      key={c.key}
+                      className="text-right py-2.5 px-3 font-medium text-foreground-secondary whitespace-nowrap"
+                    >
+                      {c.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -443,24 +488,31 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                             <span className="text-foreground-muted text-xs">see variants</span>
                           ) : (
                             <>
-                              <span className="text-foreground-muted line-through mr-1.5 text-xs">{fmt(p.current[c.key])}</span>
-                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.projected[c.key])}</span>
+                              <span className="text-foreground-muted line-through mr-1.5 text-xs">
+                                {fmt(p.current[c.key])}
+                              </span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                {fmt(p.projected[c.key])}
+                              </span>
                             </>
                           )}
                         </td>
                       ))}
                     </tr>
-                    {p.has_variants && p.variants.map(v => (
-                      <tr key={v.id} className="bg-surface">
-                        <td className="py-2 px-4 pl-8 text-foreground-secondary text-xs">{v.variant_name}</td>
-                        {PREVIEW_COLS.map(c => (
-                          <td key={c.key} className="py-2 px-3 text-right text-xs">
-                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.current[c.key])}</span>
-                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.projected[c.key])}</span>
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
+                    {p.has_variants &&
+                      p.variants.map(v => (
+                        <tr key={v.id} className="bg-surface">
+                          <td className="py-2 px-4 pl-8 text-foreground-secondary text-xs">{v.variant_name}</td>
+                          {PREVIEW_COLS.map(c => (
+                            <td key={c.key} className="py-2 px-3 text-right text-xs">
+                              <span className="text-foreground-muted line-through mr-1.5">{fmt(v.current[c.key])}</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                {fmt(v.projected[c.key])}
+                              </span>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
                   </>
                 ))}
               </tbody>
@@ -507,19 +559,34 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                       <td className="py-2.5 px-4 font-medium text-foreground">
                         <span className="flex items-center gap-1.5">
                           {log.snapshot && (
-                            <svg className={`w-3.5 h-3.5 text-foreground-muted shrink-0 transition-transform ${expandedLogId === log.id ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg
+                              className={`w-3.5 h-3.5 text-foreground-muted shrink-0 transition-transform ${expandedLogId === log.id ? 'rotate-90' : ''}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                             </svg>
                           )}
                           {log.category_name}
                           {log.is_rollback && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 uppercase tracking-wide ml-1">Rollback</span>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 uppercase tracking-wide ml-1">
+                              Rollback
+                            </span>
                           )}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-semibold">
-                        <span className={log.is_rollback ? 'text-orange-600 dark:text-orange-400' : 'text-accent-600 dark:text-accent-400'}>
-                          {log.is_rollback ? '−' : '+'}{log.percentage}%
+                        <span
+                          className={
+                            log.is_rollback
+                              ? 'text-orange-600 dark:text-orange-400'
+                              : 'text-accent-600 dark:text-accent-400'
+                          }
+                        >
+                          {log.is_rollback ? '−' : '+'}
+                          {log.percentage}%
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right text-foreground">{log.product_count}</td>
@@ -553,9 +620,16 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                             <table className="w-full text-xs">
                               <thead className="bg-surface-secondary border-b border-border-default">
                                 <tr>
-                                  <th className="text-left py-2 px-6 font-medium text-foreground-secondary">Product / Variant</th>
+                                  <th className="text-left py-2 px-6 font-medium text-foreground-secondary">
+                                    Product / Variant
+                                  </th>
                                   {PREVIEW_COLS.map(c => (
-                                    <th key={c.key} className="text-right py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap">{c.label}</th>
+                                    <th
+                                      key={c.key}
+                                      className="text-right py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap"
+                                    >
+                                      {c.label}
+                                    </th>
                                   ))}
                                 </tr>
                               </thead>
@@ -570,24 +644,35 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                                             <span className="text-foreground-muted">see variants</span>
                                           ) : (
                                             <>
-                                              <span className="text-foreground-muted line-through mr-1.5">{fmt(p.before[c.key])}</span>
-                                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.after[c.key])}</span>
+                                              <span className="text-foreground-muted line-through mr-1.5">
+                                                {fmt(p.before[c.key])}
+                                              </span>
+                                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                                {fmt(p.after[c.key])}
+                                              </span>
                                             </>
                                           )}
                                         </td>
                                       ))}
                                     </tr>
-                                    {p.has_variants && p.variants.map(v => (
-                                      <tr key={v.id} className="bg-surface-secondary/50">
-                                        <td className="py-1.5 px-6 pl-10 text-foreground-secondary">{v.variant_name}</td>
-                                        {PREVIEW_COLS.map(c => (
-                                          <td key={c.key} className="py-1.5 px-3 text-right">
-                                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.before[c.key])}</span>
-                                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.after[c.key])}</span>
+                                    {p.has_variants &&
+                                      p.variants.map(v => (
+                                        <tr key={v.id} className="bg-surface-secondary/50">
+                                          <td className="py-1.5 px-6 pl-10 text-foreground-secondary">
+                                            {v.variant_name}
                                           </td>
-                                        ))}
-                                      </tr>
-                                    ))}
+                                          {PREVIEW_COLS.map(c => (
+                                            <td key={c.key} className="py-1.5 px-3 text-right">
+                                              <span className="text-foreground-muted line-through mr-1.5">
+                                                {fmt(v.before[c.key])}
+                                              </span>
+                                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                                {fmt(v.after[c.key])}
+                                              </span>
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      ))}
                                   </>
                                 ))}
                               </tbody>
@@ -603,15 +688,30 @@ export default function InflationClient({ categories, brands }: { categories: Ca
             {logsTotalPages > 1 && (
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border-default">
                 <p className="text-xs text-foreground-muted whitespace-nowrap">
-                  Showing <span className="font-medium text-foreground">{(logsPage - 1) * PAGE_SIZE + 1}–{Math.min(logsPage * PAGE_SIZE, logs.length)}</span>
-                  {' '}of <span className="font-medium text-foreground">{logs.length}</span>
+                  Showing{' '}
+                  <span className="font-medium text-foreground">
+                    {(logsPage - 1) * PAGE_SIZE + 1}–{Math.min(logsPage * PAGE_SIZE, logs.length)}
+                  </span>{' '}
+                  of <span className="font-medium text-foreground">{logs.length}</span>
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => Math.max(1, p - 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
-                  <span className="text-xs text-foreground-muted whitespace-nowrap">Page {logsPage} of {logsTotalPages}</span>
-                  <button disabled={logsPage >= logsTotalPages} onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+                  <button
+                    disabled={logsPage <= 1}
+                    onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-xs text-foreground-muted whitespace-nowrap">
+                    Page {logsPage} of {logsTotalPages}
+                  </span>
+                  <button
+                    disabled={logsPage >= logsTotalPages}
+                    onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             )}

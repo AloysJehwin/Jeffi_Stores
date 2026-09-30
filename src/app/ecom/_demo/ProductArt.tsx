@@ -71,13 +71,7 @@ type PartProps = { tint: string }
 function Electronics({ tint }: PartProps) {
   return (
     <g>
-      <path
-        d="M64 128 a56 56 0 0 1 112 0"
-        fill="none"
-        stroke={INK}
-        strokeWidth="9"
-        strokeLinecap="round"
-      />
+      <path d="M64 128 a56 56 0 0 1 112 0" fill="none" stroke={INK} strokeWidth="9" strokeLinecap="round" />
       <rect x="52" y="122" width="34" height="60" rx="14" fill={tint} />
       <rect x="154" y="122" width="34" height="60" rx="14" fill={tint} />
       <rect x="60" y="132" width="18" height="40" rx="9" fill={MUTE} />
@@ -97,13 +91,7 @@ function Fashion({ tint }: PartProps) {
         strokeWidth="6"
         strokeLinejoin="round"
       />
-      <path
-        d="M104 60 a16 16 0 0 0 32 0"
-        fill={PAPER}
-        stroke={INK}
-        strokeWidth="6"
-        strokeLinejoin="round"
-      />
+      <path d="M104 60 a16 16 0 0 0 32 0" fill={PAPER} stroke={INK} strokeWidth="6" strokeLinejoin="round" />
       <line x1="120" y1="96" x2="120" y2="176" stroke={PAPER} strokeWidth="4" opacity="0.6" />
     </g>
   )
@@ -122,20 +110,8 @@ function Kitchen({ tint }: PartProps) {
       />
       <rect x="60" y="108" width="120" height="14" rx="7" fill={INK} />
       <rect x="174" y="120" width="42" height="12" rx="6" fill={INK} />
-      <path
-        d="M116 92 q-6 -14 6 -24"
-        fill="none"
-        stroke={MUTE}
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M128 92 q-6 -14 6 -24"
-        fill="none"
-        stroke={MUTE}
-        strokeWidth="5"
-        strokeLinecap="round"
-      />
+      <path d="M116 92 q-6 -14 6 -24" fill="none" stroke={MUTE} strokeWidth="5" strokeLinecap="round" />
+      <path d="M128 92 q-6 -14 6 -24" fill="none" stroke={MUTE} strokeWidth="5" strokeLinecap="round" />
     </g>
   )
 }
@@ -156,13 +132,7 @@ function Sports({ tint }: PartProps) {
 function Home({ tint }: PartProps) {
   return (
     <g>
-      <path
-        d="M92 60 h56 l22 44 h-100 Z"
-        fill={tint}
-        stroke={INK}
-        strokeWidth="6"
-        strokeLinejoin="round"
-      />
+      <path d="M92 60 h56 l22 44 h-100 Z" fill={tint} stroke={INK} strokeWidth="6" strokeLinejoin="round" />
       <rect x="112" y="104" width="16" height="70" fill={INK} />
       <rect x="88" y="174" width="64" height="16" rx="6" fill={INK} />
       <ellipse cx="120" cy="118" rx="40" ry="14" fill={tint} opacity="0.25" />
@@ -181,11 +151,7 @@ function Beauty({ tint }: PartProps) {
         strokeLinejoin="round"
       />
       <rect x="104" y="92" width="32" height="30" rx="8" fill={MUTE} stroke={INK} strokeWidth="5" />
-      <path
-        d="M120 70 q-10 12 0 22 q10 -10 0 -22"
-        fill={tint}
-        opacity="0.6"
-      />
+      <path d="M120 70 q-10 12 0 22 q10 -10 0 -22" fill={tint} opacity="0.6" />
       <circle cx="102" cy="70" r="5" fill={tint} opacity="0.5" />
       <circle cx="140" cy="64" r="4" fill={tint} opacity="0.4" />
     </g>

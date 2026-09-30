@@ -46,11 +46,13 @@ function StatusBadge({ isRevoked }: { isRevoked: boolean }) {
 function ScopeBadge({ scope, label }: { scope: string; label: string }) {
   const isWrite = scope.endsWith(':write')
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-      isWrite
-        ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-        : 'bg-surface-secondary text-foreground-secondary'
-    }`}>
+    <span
+      className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+        isWrite
+          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+          : 'bg-surface-secondary text-foreground-secondary'
+      }`}
+    >
       {label}
     </span>
   )
@@ -67,7 +69,9 @@ export default async function ServiceAccountsPage() {
   const accounts = await getServiceAccounts()
 
   const scopeLabels: Record<string, string> = {}
-  ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
+  ADMIN_SCOPES.forEach(s => {
+    scopeLabels[s.key] = s.label
+  })
 
   const active = accounts.filter((a: any) => !a.is_revoked).length
   const revoked = accounts.length - active
@@ -75,14 +79,11 @@ export default async function ServiceAccountsPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Service Accounts</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            M2M authentication via mTLS client certificates
-          </p>
+          <p className="text-sm text-foreground-muted mt-0.5">M2M authentication via mTLS client certificates</p>
         </div>
         {canWrite && (
           <div className="hidden md:block">
@@ -105,7 +106,11 @@ export default async function ServiceAccountsPage() {
           { label: 'Total', value: accounts.length },
           { label: 'Active', value: active, color: 'text-green-600 dark:text-green-400' },
           { label: 'Revoked', value: revoked, color: revoked > 0 ? 'text-red-600 dark:text-red-400' : undefined },
-          { label: 'Never Used', value: neverUsed, color: neverUsed > 0 ? 'text-amber-600 dark:text-amber-400' : undefined },
+          {
+            label: 'Never Used',
+            value: neverUsed,
+            color: neverUsed > 0 ? 'text-amber-600 dark:text-amber-400' : undefined,
+          },
         ].map(stat => (
           <div key={stat.label} className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
             <p className="text-xs text-foreground-muted uppercase tracking-wider">{stat.label}</p>
@@ -119,15 +124,27 @@ export default async function ServiceAccountsPage() {
         <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">All Accounts</h2>
           {!canWrite && (
-            <span className="text-xs text-foreground-muted bg-surface-secondary px-2 py-1 rounded-lg">Read-only access</span>
+            <span className="text-xs text-foreground-muted bg-surface-secondary px-2 py-1 rounded-lg">
+              Read-only access
+            </span>
           )}
         </div>
 
         {accounts.length === 0 ? (
           <div className="px-5 py-16 text-center">
             <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-surface-secondary flex items-center justify-center">
-              <svg className="w-7 h-7 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              <svg
+                className="w-7 h-7 text-foreground-muted"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                />
               </svg>
             </div>
             <p className="text-sm font-medium text-foreground">No service accounts</p>
@@ -153,8 +170,18 @@ export default async function ServiceAccountsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                            <svg className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                            <svg
+                              className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                              />
                             </svg>
                           </div>
                           <p className="text-sm font-semibold text-foreground">{sa.name}</p>
@@ -164,9 +191,9 @@ export default async function ServiceAccountsPage() {
                       <StatusBadge isRevoked={sa.is_revoked} />
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {saScopes.length > 0 ? saScopes.map((s: string) => (
-                        <ScopeBadge key={s} scope={s} label={scopeLabels[s] || s} />
-                      )) : (
+                      {saScopes.length > 0 ? (
+                        saScopes.map((s: string) => <ScopeBadge key={s} scope={s} label={scopeLabels[s] || s} />)
+                      ) : (
                         <span className="text-xs text-foreground-muted">No scopes</span>
                       )}
                     </div>
@@ -174,7 +201,11 @@ export default async function ServiceAccountsPage() {
                       <span>Created {new Date(sa.created_at).toLocaleDateString('en-IN')}</span>
                       <span>{sa.last_used_at ? `Used ${relativeTime(sa.last_used_at)}` : 'Never used'}</span>
                     </div>
-                    {canWrite && !sa.is_revoked && <div className="hidden md:block"><ServiceAccountRevokeButton id={sa.id} name={sa.name} /></div>}
+                    {canWrite && !sa.is_revoked && (
+                      <div className="hidden md:block">
+                        <ServiceAccountRevokeButton id={sa.id} name={sa.name} />
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -185,13 +216,29 @@ export default async function ServiceAccountsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary/40">
-                    <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Account</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Cert CN</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Scopes</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Created</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Last Used</th>
-                    {canWrite && <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Actions</th>}
+                    <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                      Account
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                      Cert CN
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                      Scopes
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
+                      Last Used
+                    </th>
+                    {canWrite && (
+                      <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-default">
@@ -204,8 +251,18 @@ export default async function ServiceAccountsPage() {
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                              <svg className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                              <svg
+                                className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                                />
                               </svg>
                             </div>
                             <span className="font-medium text-foreground">{sa.name}</span>
@@ -220,7 +277,9 @@ export default async function ServiceAccountsPage() {
                                   <ScopeBadge key={s} scope={s} label={scopeLabels[s] || s} />
                                 ))}
                                 {overflow > 0 && (
-                                  <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">+{overflow}</span>
+                                  <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">
+                                    +{overflow}
+                                  </span>
                                 )}
                               </>
                             ) : (
@@ -228,13 +287,18 @@ export default async function ServiceAccountsPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3"><StatusBadge isRevoked={sa.is_revoked} /></td>
+                        <td className="px-4 py-3">
+                          <StatusBadge isRevoked={sa.is_revoked} />
+                        </td>
                         <td className="px-4 py-3 text-xs text-foreground-secondary">
                           {new Date(sa.created_at).toLocaleDateString('en-IN')}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {sa.last_used_at ? (
-                            <span className="text-foreground-secondary" title={new Date(sa.last_used_at).toLocaleString('en-IN')}>
+                            <span
+                              className="text-foreground-secondary"
+                              title={new Date(sa.last_used_at).toLocaleString('en-IN')}
+                            >
                               {relativeTime(sa.last_used_at)}
                             </span>
                           ) : (
@@ -260,7 +324,9 @@ export default async function ServiceAccountsPage() {
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
         <div className="px-5 py-4 border-b border-border-default">
           <h2 className="text-sm font-semibold text-foreground">Scope Roles</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">Assign the minimum scopes needed — write always implies read</p>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Assign the minimum scopes needed — write always implies read
+          </p>
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-surface rounded-lg border border-border-default p-4 space-y-3">
@@ -268,10 +334,17 @@ export default async function ServiceAccountsPage() {
               <span className="w-2 h-2 rounded-full bg-surface-secondary border border-foreground-muted shrink-0" />
               <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Read-only scopes</p>
             </div>
-            <p className="text-xs text-foreground-muted">Can call GET endpoints only. Safe to give to monitoring scripts, dashboards, and read-heavy automation.</p>
+            <p className="text-xs text-foreground-muted">
+              Can call GET endpoints only. Safe to give to monitoring scripts, dashboards, and read-heavy automation.
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {ADMIN_SCOPES.filter(s => s.key.endsWith(':read')).map(s => (
-                <span key={s.key} className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs">{s.label}</span>
+                <span
+                  key={s.key}
+                  className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs"
+                >
+                  {s.label}
+                </span>
               ))}
             </div>
           </div>
@@ -280,16 +353,23 @@ export default async function ServiceAccountsPage() {
               <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
               <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">Write scopes</p>
             </div>
-            <p className="text-xs text-foreground-muted">Can call POST, PUT, DELETE endpoints. Grants write implicitly includes read. Use only for automation that needs to mutate data.</p>
+            <p className="text-xs text-foreground-muted">
+              Can call POST, PUT, DELETE endpoints. Grants write implicitly includes read. Use only for automation that
+              needs to mutate data.
+            </p>
             <div className="flex flex-wrap gap-1.5">
               {ADMIN_SCOPES.filter(s => s.key.endsWith(':write')).map(s => (
-                <span key={s.key} className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs">{s.label}</span>
+                <span
+                  key={s.key}
+                  className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs"
+                >
+                  {s.label}
+                </span>
               ))}
             </div>
           </div>
         </div>
       </section>
-
     </div>
   )
 }

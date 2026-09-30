@@ -17,16 +17,25 @@ export default function StaffVoiceMemo({ onRecorded }: Props) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startedAt = useRef(0)
 
-  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    },
+    [previewUrl]
+  )
 
   async function start() {
     setError('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(m => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m))
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(
+        m => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)
+      )
       const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
       chunksRef.current = []
-      rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      rec.ondataavailable = e => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
       rec.onstop = () => {
         stream.getTracks().forEach(t => t.stop())
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' })
@@ -68,11 +77,20 @@ export default function StaffVoiceMemo({ onRecorded }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">Voice memo</p>
-          <p className="text-[11px] text-foreground-muted">{recording ? `Recording… ${seconds}s` : previewUrl ? `Recorded ${seconds}s` : 'Optional. Saved as an audio attachment.'}</p>
+          <p className="text-[11px] text-foreground-muted">
+            {recording
+              ? `Recording… ${seconds}s`
+              : previewUrl
+                ? `Recorded ${seconds}s`
+                : 'Optional. Saved as an audio attachment.'}
+          </p>
         </div>
         {!previewUrl && (
-          <button type="button" onClick={recording ? stop : start}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold ${recording ? 'bg-red-600 text-white' : 'bg-surface-secondary text-foreground border border-border-secondary'}`}>
+          <button
+            type="button"
+            onClick={recording ? stop : start}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold ${recording ? 'bg-red-600 text-white' : 'bg-surface-secondary text-foreground border border-border-secondary'}`}
+          >
             {recording ? 'Stop' : 'Record'}
           </button>
         )}
@@ -80,7 +98,9 @@ export default function StaffVoiceMemo({ onRecorded }: Props) {
       {previewUrl && (
         <div className="mt-3 flex items-center gap-3">
           <audio controls src={previewUrl} className="h-9 flex-1" />
-          <button type="button" onClick={discard} className="text-xs text-red-600 hover:underline">Discard</button>
+          <button type="button" onClick={discard} className="text-xs text-red-600 hover:underline">
+            Discard
+          </button>
         </div>
       )}
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}

@@ -25,9 +25,15 @@ function fromDateInput(value: string, endOfDay: boolean): string | null {
   return local.toISOString()
 }
 
-const INPUT_CLASS = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60'
+const INPUT_CLASS =
+  'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60'
 
-export default function OfferDetailClient({ offer, backHref, categoryOptions, brandOptions }: {
+export default function OfferDetailClient({
+  offer,
+  backHref,
+  categoryOptions,
+  brandOptions,
+}: {
   offer: ProductOffer
   backHref: string
   categoryOptions: AssignOption[]
@@ -42,28 +48,34 @@ export default function OfferDetailClient({ offer, backHref, categoryOptions, br
   const [isActive, setIsActive] = useState(offer.is_active)
   const [saving, setSaving] = useState(false)
 
-  const save = useCallback(async (patch: Record<string, unknown>): Promise<boolean> => {
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/admin/product-offers/${offer.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(patch),
-      })
-      if (!res.ok) showToast('Failed to save', 'error')
-      return res.ok
-    } catch {
-      showToast('Failed to save', 'error')
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }, [offer.id, showToast])
+  const save = useCallback(
+    async (patch: Record<string, unknown>): Promise<boolean> => {
+      setSaving(true)
+      try {
+        const res = await fetch(`/api/admin/product-offers/${offer.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(patch),
+        })
+        if (!res.ok) showToast('Failed to save', 'error')
+        return res.ok
+      } catch {
+        showToast('Failed to save', 'error')
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [offer.id, showToast]
+  )
 
   async function commitTitle() {
     const next = title.trim()
-    if (!next) { setTitle(savedTitle); return }
+    if (!next) {
+      setTitle(savedTitle)
+      return
+    }
     if (next === savedTitle) return
     if (await save({ title: next })) setSavedTitle(next)
   }
@@ -71,7 +83,10 @@ export default function OfferDetailClient({ offer, backHref, categoryOptions, br
   return (
     <div className="p-4 sm:p-6 w-full max-w-full min-w-0">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <Link href={backHref} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <Link
+          href={backHref}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
             <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -141,7 +156,10 @@ export default function OfferDetailClient({ offer, backHref, categoryOptions, br
               <Toggle
                 checked={isActive}
                 disabled={!canWrite}
-                onChange={next => { setIsActive(next); save({ isActive: next }) }}
+                onChange={next => {
+                  setIsActive(next)
+                  save({ isActive: next })
+                }}
               />
             </div>
           </div>
@@ -149,9 +167,13 @@ export default function OfferDetailClient({ offer, backHref, categoryOptions, br
           <div className="rounded-xl border border-border-default bg-surface-secondary p-4">
             <p className="text-sm text-foreground">
               Set this offer&apos;s card image, badge and colour in{' '}
-              <Link href={ap('/admin/settings/homepage')} className="font-medium text-accent-600 dark:text-accent-400 hover:underline">
+              <Link
+                href={ap('/admin/settings/homepage')}
+                className="font-medium text-accent-600 dark:text-accent-400 hover:underline"
+              >
                 Homepage &gt; Offer Slider
-              </Link>.
+              </Link>
+              .
             </p>
           </div>
         </div>

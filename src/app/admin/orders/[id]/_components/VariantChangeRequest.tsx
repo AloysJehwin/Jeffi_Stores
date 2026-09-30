@@ -67,7 +67,12 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
   const [itemId, setItemId] = useState<string>(items[0]?.id ?? '')
   const [variants, setVariants] = useState<Candidate[]>([])
   const [subVariants, setSubVariants] = useState<Candidate[]>([])
-  const [selected, setSelected] = useState<{ kind: 'variant' | 'sub'; id: string; price: number; name: string | null } | null>(null)
+  const [selected, setSelected] = useState<{
+    kind: 'variant' | 'sub'
+    id: string
+    price: number
+    name: string | null
+  } | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,17 +88,23 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
       const res = await fetch(`/api/admin/orders/${orderId}/variant-change?history=1`)
       const data = await res.json()
       if (res.ok) setHistory(data.history || [])
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
-  useEffect(() => { loadHistory() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [orderId])
+  useEffect(() => {
+    loadHistory() /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [orderId])
 
   async function cancelRequest(vcrId: string) {
     setCancellingId(vcrId)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/variant-change/${vcrId}/cancel`, { method: 'POST' })
       if (res.ok) await loadHistory()
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setCancellingId(null)
     }
   }
@@ -101,7 +112,9 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
   const hasPending = history.some(h => h.status === 'pending_customer' || h.status === 'awaiting_payment')
 
   async function loadCandidates(pid: string) {
-    setLoading(true); setError(null); setSelected(null)
+    setLoading(true)
+    setError(null)
+    setSelected(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/variant-change?productId=${pid}`)
       const data = await res.json()
@@ -121,13 +134,15 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
     if (selectedItem) loadCandidates(selectedItem.productId)
   }
 
-  const priceDiff = selected && selectedItem
-    ? Math.round((selected.price - selectedItem.unitPrice) * selectedItem.quantity * 100) / 100
-    : 0
+  const priceDiff =
+    selected && selectedItem
+      ? Math.round((selected.price - selectedItem.unitPrice) * selectedItem.quantity * 100) / 100
+      : 0
 
   async function submit() {
     if (!selectedItem || !selected) return
-    setSubmitting(true); setError(null)
+    setSubmitting(true)
+    setError(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/variant-change`, {
         method: 'POST',
@@ -157,7 +172,9 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
         <h2 className="text-lg font-semibold text-foreground">Request Variant Change</h2>
         {!open && !done && !hasPending && (
           <RequireWrite scope="orders:write">
-            <button onClick={openPanel} className="text-sm font-semibold text-accent-500 hover:text-accent-400">Start</button>
+            <button onClick={openPanel} className="text-sm font-semibold text-accent-500 hover:text-accent-400">
+              Start
+            </button>
           </RequireWrite>
         )}
       </div>
@@ -168,25 +185,41 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
             {history.map(h => {
               const diff = Number(h.price_diff)
               return (
-                <div key={h.id} className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border-default bg-surface-secondary">
+                <div
+                  key={h.id}
+                  className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border-default bg-surface-secondary"
+                >
                   <div className="min-w-0">
                     <p className="text-sm text-foreground">
                       <span className="line-through text-foreground-muted">{h.old_variant_name || h.product_name}</span>
-                      {' → '}<strong>{h.new_variant_name || '—'}</strong>
+                      {' → '}
+                      <strong>{h.new_variant_name || '—'}</strong>
                     </p>
                     <p className="text-xs text-foreground-muted mt-0.5">
-                      {h.settlement_type === 'refund' ? `Refund ₹${Math.abs(diff).toFixed(2)}` : h.settlement_type === 'collect' ? `Collect ₹${Math.abs(diff).toFixed(2)}` : h.settlement_type === 'cod_adjust' ? `COD ±₹${Math.abs(diff).toFixed(2)}` : 'No price change'}
-                      {' · '}{new Date(h.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      {h.settlement_type === 'refund'
+                        ? `Refund ₹${Math.abs(diff).toFixed(2)}`
+                        : h.settlement_type === 'collect'
+                          ? `Collect ₹${Math.abs(diff).toFixed(2)}`
+                          : h.settlement_type === 'cod_adjust'
+                            ? `COD ±₹${Math.abs(diff).toFixed(2)}`
+                            : 'No price change'}
+                      {' · '}
+                      {new Date(h.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLE[h.status] || 'bg-gray-100 text-gray-700'}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${STATUS_STYLE[h.status] || 'bg-gray-100 text-gray-700'}`}
+                    >
                       {STATUS_LABEL[h.status] || h.status}
                     </span>
                     {(h.status === 'pending_customer' || h.status === 'awaiting_payment') && (
                       <RequireWrite scope="orders:write">
-                        <button onClick={() => cancelRequest(h.id)} disabled={cancellingId === h.id}
-                          className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50">
+                        <button
+                          onClick={() => cancelRequest(h.id)}
+                          disabled={cancellingId === h.id}
+                          className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50"
+                        >
                           {cancellingId === h.id ? 'Cancelling…' : 'Cancel request'}
                         </button>
                       </RequireWrite>
@@ -201,16 +234,26 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
         {done ? (
           <p className="text-sm text-green-600 dark:text-green-400">{done}</p>
         ) : hasPending && !open ? (
-          <p className="text-sm text-foreground-muted">A variant change is pending customer action. Cancel it above to raise a new one.</p>
+          <p className="text-sm text-foreground-muted">
+            A variant change is pending customer action. Cancel it above to raise a new one.
+          </p>
         ) : !open ? (
-          <p className="text-sm text-foreground-muted">Swap an ordered item for a near-dimension variant of the same product. The customer confirms; any price difference is refunded, collected, or adjusted (COD) automatically, unless you choose to swap at the current price.</p>
+          <p className="text-sm text-foreground-muted">
+            Swap an ordered item for a near-dimension variant of the same product. The customer confirms; any price
+            difference is refunded, collected, or adjusted (COD) automatically, unless you choose to swap at the current
+            price.
+          </p>
         ) : (
           <>
             <div>
               <AdminSelect
                 label="Order item"
                 value={itemId}
-                onChange={(v) => { setItemId(v); const it = items.find(i => i.id === v); if (it) loadCandidates(it.productId) }}
+                onChange={v => {
+                  setItemId(v)
+                  const it = items.find(i => i.id === v)
+                  if (it) loadCandidates(it.productId)
+                }}
                 options={items.map(it => ({
                   value: it.id,
                   label: `${it.productName}${it.variantName ? ` — ${it.variantName}` : ''} (₹${it.unitPrice.toFixed(2)} × ${it.quantity})`,
@@ -223,7 +266,10 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
             ) : (
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 <label className="block text-sm font-medium text-foreground mb-1">Replacement</label>
-                {[...variants.map(v => ({ ...v, kind: 'variant' as const })), ...subVariants.map(s => ({ ...s, kind: 'sub' as const }))]
+                {[
+                  ...variants.map(v => ({ ...v, kind: 'variant' as const })),
+                  ...subVariants.map(s => ({ ...s, kind: 'sub' as const })),
+                ]
                   .filter(c => !(c.kind === 'variant' && c.id === selectedItem?.id))
                   .map(c => {
                     const isSel = selected?.kind === c.kind && selected?.id === c.id
@@ -235,13 +281,17 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                       >
                         <div className="flex justify-between gap-2">
                           <span className="font-medium text-foreground">
-                            {c.kind === 'sub' && c.parent_variant_name ? `${c.parent_variant_name} / ` : ''}{c.name || c.sku}{!c.name && c.sku && <CopySku sku={c.sku} />}
+                            {c.kind === 'sub' && c.parent_variant_name ? `${c.parent_variant_name} / ` : ''}
+                            {c.name || c.sku}
+                            {!c.name && c.sku && <CopySku sku={c.sku} />}
                           </span>
                           <span className="text-foreground">₹{Number(c.effectivePrice).toFixed(2)}</span>
                         </div>
                         <div className="text-xs text-foreground-muted mt-0.5 flex justify-between gap-2">
                           <span>{dims(c) || '—'}</span>
-                          <span className={c.stock_status === 'Out of Stock' ? 'text-red-500' : 'text-green-600'}>{c.stock_status}</span>
+                          <span className={c.stock_status === 'Out of Stock' ? 'text-red-500' : 'text-green-600'}>
+                            {c.stock_status}
+                          </span>
                         </div>
                       </button>
                     )
@@ -251,15 +301,37 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
 
             {selected && selectedItem && (
               <div className="bg-surface-secondary rounded-lg p-3 text-sm">
-                <div className="flex justify-between"><span className="text-foreground-muted">Current line</span><span>₹{(selectedItem.unitPrice * selectedItem.quantity).toFixed(2)}</span></div>
-                <div className="flex justify-between"><span className="text-foreground-muted">New line</span><span>₹{(selected.price * selectedItem.quantity).toFixed(2)}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-muted">Current line</span>
+                  <span>₹{(selectedItem.unitPrice * selectedItem.quantity).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-foreground-muted">New line</span>
+                  <span>₹{(selected.price * selectedItem.quantity).toFixed(2)}</span>
+                </div>
                 <div className="flex justify-between font-semibold mt-1 pt-1 border-t border-border-default">
                   <span>
-                    {priceDiff === 0 ? 'No price change'
-                      : !settlePayment ? 'Difference waived'
-                      : priceDiff < 0 ? 'Refund to customer' : 'Extra payable by customer'}
+                    {priceDiff === 0
+                      ? 'No price change'
+                      : !settlePayment
+                        ? 'Difference waived'
+                        : priceDiff < 0
+                          ? 'Refund to customer'
+                          : 'Extra payable by customer'}
                   </span>
-                  <span className={!settlePayment && priceDiff !== 0 ? 'text-foreground-muted line-through' : priceDiff < 0 ? 'text-green-600' : priceDiff > 0 ? 'text-orange-600' : ''}>₹{Math.abs(priceDiff).toFixed(2)}</span>
+                  <span
+                    className={
+                      !settlePayment && priceDiff !== 0
+                        ? 'text-foreground-muted line-through'
+                        : priceDiff < 0
+                          ? 'text-green-600'
+                          : priceDiff > 0
+                            ? 'text-orange-600'
+                            : ''
+                    }
+                  >
+                    ₹{Math.abs(priceDiff).toFixed(2)}
+                  </span>
                 </div>
 
                 {priceDiff !== 0 && (
@@ -274,17 +346,19 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                         onClick={() => setSettlePayment(v => !v)}
                         className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${settlePayment ? 'bg-accent-600' : 'bg-gray-300 dark:bg-gray-600'}`}
                       >
-                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settlePayment ? 'translate-x-6' : 'translate-x-1'}`} />
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settlePayment ? 'translate-x-6' : 'translate-x-1'}`}
+                        />
                       </button>
                     </div>
                     <p className="text-xs text-foreground-muted mt-1.5">
                       {settlePayment
-                        ? (priceDiff < 0
-                            ? `₹${Math.abs(priceDiff).toFixed(2)} is refunded to the customer once they confirm.`
-                            : `The customer is asked to pay ₹${Math.abs(priceDiff).toFixed(2)} more when they confirm (added to the amount due for COD).`)
-                        : (priceDiff < 0
-                            ? `No refund is made. The variant is swapped once the customer confirms, and they keep paying the current price, which is ₹${Math.abs(priceDiff).toFixed(2)} more than this variant's price.`
-                            : `No payment is requested. The variant is swapped once the customer confirms, and you absorb the ₹${Math.abs(priceDiff).toFixed(2)} difference.`)}
+                        ? priceDiff < 0
+                          ? `₹${Math.abs(priceDiff).toFixed(2)} is refunded to the customer once they confirm.`
+                          : `The customer is asked to pay ₹${Math.abs(priceDiff).toFixed(2)} more when they confirm (added to the amount due for COD).`
+                        : priceDiff < 0
+                          ? `No refund is made. The variant is swapped once the customer confirms, and they keep paying the current price, which is ₹${Math.abs(priceDiff).toFixed(2)} more than this variant's price.`
+                          : `No payment is requested. The variant is swapped once the customer confirms, and you absorb the ₹${Math.abs(priceDiff).toFixed(2)} difference.`}
                     </p>
                   </div>
                 )}
@@ -301,7 +375,16 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
               >
                 {submitting ? 'Requesting…' : 'Request change & notify customer'}
               </button>
-              <button onClick={() => { setOpen(false); setSelected(null); setError(null) }} className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground">Cancel</button>
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  setSelected(null)
+                  setError(null)
+                }}
+                className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground"
+              >
+                Cancel
+              </button>
             </div>
           </>
         )}

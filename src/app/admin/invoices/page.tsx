@@ -16,7 +16,11 @@ export default async function InvoicesPage() {
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null
-  try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
+  try {
+    session = await verifyToken(token.value)
+  } catch {
+    redirect(ap('/admin/login', host))
+  }
 
   if (!hasScope(session?.role || '', session?.scopes || [], 'invoices:read')) {
     redirect(ap('/admin/dashboard', host))

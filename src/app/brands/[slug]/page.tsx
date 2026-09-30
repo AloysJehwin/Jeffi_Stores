@@ -1,7 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import {
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
+} from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { pickUnitPrice } from '@/lib/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
@@ -10,10 +15,7 @@ import Pagination from '@/components/ui/Pagination'
 const PAGE_SIZE = 25
 
 async function getBrandBySlug(slug: string) {
-  return queryOne(
-    'SELECT * FROM brands WHERE slug = $1 AND is_active = true LIMIT 1',
-    [slug]
-  )
+  return queryOne('SELECT * FROM brands WHERE slug = $1 AND is_active = true LIMIT 1', [slug])
 }
 
 async function getBrandProducts(brandId: string, page: number, gstEnabled: boolean) {
@@ -26,7 +28,8 @@ async function getBrandProducts(brandId: string, page: number, gstEnabled: boole
 
   const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
-  const products = await queryMany(`
+  const products = await queryMany(
+    `
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
       json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -44,7 +47,9 @@ async function getBrandProducts(brandId: string, page: number, gstEnabled: boole
     WHERE p.brand_id = $1 AND p.is_active = true
     ORDER BY p.created_at DESC
     LIMIT $2 OFFSET $3
-  `, [brandId, PAGE_SIZE, offset])
+  `,
+    [brandId, PAGE_SIZE, offset]
+  )
 
   return { products, total }
 }
@@ -99,9 +104,7 @@ export default async function BrandDetailPage({
               <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
                 {brand.name}
               </h1>
-              {brand.description && (
-                <p className="text-foreground-secondary">{brand.description}</p>
-              )}
+              {brand.description && <p className="text-foreground-secondary">{brand.description}</p>}
               {brand.website && (
                 <a
                   href={brand.website}
@@ -120,29 +123,36 @@ export default async function BrandDetailPage({
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         <div>
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-foreground">
-              Products ({total})
-            </h2>
+            <h2 className="text-xl font-bold text-foreground">Products ({total})</h2>
           </div>
 
           {products.length > 0 ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {products.map((product) => {
-                  const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+                {products.map(product => {
+                  const primaryImage =
+                    product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                   const hasVariants = product.has_variants
-                  const displayPrice = hasVariants && product.variant_min_price
-                    ? product.variant_min_price
-                    : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
-                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-                  const rawMrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                  const displayPrice =
+                    hasVariants && product.variant_min_price
+                      ? product.variant_min_price
+                      : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+                  const effectiveStock = hasVariants
+                    ? Number(product.variant_stock_total)
+                    : product.stock_status !== 'Out of Stock'
+                      ? 1
+                      : 0
+                  const rawMrp = product.mrp
+                    ? Number(product.mrp)
+                    : product.variant_min_mrp
+                      ? Number(product.variant_min_mrp)
+                      : null
                   const gstRate = Number(product.gst_percentage ?? 0)
                   // When GST is off, displayPrice is ex-GST — put MRP on the same ex-GST basis before computing the discount and passing it to the card.
-                  const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
+                  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
                   const priceForDiscount = Number(displayPrice)
-                  const mrpDiscount = mrp && mrp > priceForDiscount
-                    ? Math.round(((mrp - priceForDiscount) / mrp) * 100)
-                    : 0
+                  const mrpDiscount =
+                    mrp && mrp > priceForDiscount ? Math.round(((mrp - priceForDiscount) / mrp) * 100) : 0
 
                   return (
                     <ProductCard
@@ -169,8 +179,18 @@ export default async function BrandDetailPage({
             </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-              <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              <svg
+                className="mx-auto h-24 w-24 text-foreground-muted mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                />
               </svg>
               <h3 className="text-xl font-semibold text-foreground mb-2">No Products Yet</h3>
               <p className="text-foreground-secondary mb-6">

@@ -19,7 +19,10 @@ const STATUS_STYLE: Record<string, string> = {
   expired: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
 }
 const STATUS_LABEL: Record<string, string> = {
-  available: 'Available', downloaded: 'Downloaded', revoked: 'Revoked', expired: 'Expired',
+  available: 'Available',
+  downloaded: 'Downloaded',
+  revoked: 'Revoked',
+  expired: 'Expired',
 }
 
 export default function CertList() {
@@ -35,14 +38,18 @@ export default function CertList() {
       .catch(e => setError(e.message))
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   async function download(serial: string, cn: string) {
     setBusy(serial)
     setError(null)
     setPassword(null)
     try {
-      const res = await fetch(`/api/certportal/certs/${encodeURIComponent(serial)}/download`, { credentials: 'include' })
+      const res = await fetch(`/api/certportal/certs/${encodeURIComponent(serial)}/download`, {
+        credentials: 'include',
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Download failed')
@@ -71,8 +78,8 @@ export default function CertList() {
   if (certs.length === 0) {
     return (
       <p className="mt-6 text-sm text-foreground-secondary">
-        No certificates are associated with this Google account. If you were invited, make sure you
-        signed in with the exact email the invitation was sent to.
+        No certificates are associated with this Google account. If you were invited, make sure you signed in with the
+        exact email the invitation was sent to.
       </p>
     )
   }
@@ -85,13 +92,21 @@ export default function CertList() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-medium text-foreground">{c.storeName || 'Jeffi Stores'}</p>
-              <p className="text-sm text-foreground-secondary">{c.commonName}{c.role ? ` · ${c.role}` : ''}</p>
+              <p className="text-sm text-foreground-secondary">
+                {c.commonName}
+                {c.role ? ` · ${c.role}` : ''}
+              </p>
               <p className="text-xs text-foreground-muted mt-1">
-                Expires {new Date(c.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                {c.downloadedAt ? ` · downloaded ${new Date(c.downloadedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                Expires{' '}
+                {new Date(c.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {c.downloadedAt
+                  ? ` · downloaded ${new Date(c.downloadedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                  : ''}
               </p>
             </div>
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${STATUS_STYLE[c.status]}`}>
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${STATUS_STYLE[c.status]}`}
+            >
               {STATUS_LABEL[c.status]}
             </span>
           </div>
@@ -111,8 +126,8 @@ export default function CertList() {
               <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Import password</p>
               <p className="mt-1 font-mono text-sm text-foreground break-all select-all">{password.value}</p>
               <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                You will need this password when installing the certificate. It is shown only now —
-                copy it before leaving this page.
+                You will need this password when installing the certificate. It is shown only now — copy it before
+                leaving this page.
               </p>
             </div>
           )}
@@ -131,19 +146,32 @@ function InstallHelp() {
       <div className="mt-3 space-y-3 text-sm text-foreground-secondary">
         <div>
           <p className="font-medium text-foreground">macOS (Keychain)</p>
-          <p>Double-click the .p12, enter the import password, then set the certificate to &quot;Always Trust&quot; in Keychain Access.</p>
+          <p>
+            Double-click the .p12, enter the import password, then set the certificate to &quot;Always Trust&quot; in
+            Keychain Access.
+          </p>
         </div>
         <div>
           <p className="font-medium text-foreground">Windows</p>
-          <p>Double-click the .p12 to open the Certificate Import Wizard, choose &quot;Current User&quot;, enter the password, and let Windows select the store automatically.</p>
+          <p>
+            Double-click the .p12 to open the Certificate Import Wizard, choose &quot;Current User&quot;, enter the
+            password, and let Windows select the store automatically.
+          </p>
         </div>
         <div>
           <p className="font-medium text-foreground">Chrome / Linux</p>
-          <p>Settings &gt; Privacy and security &gt; Security &gt; Manage certificates &gt; Your certificates &gt; Import, then choose the .p12 and enter the password.</p>
+          <p>
+            Settings &gt; Privacy and security &gt; Security &gt; Manage certificates &gt; Your certificates &gt;
+            Import, then choose the .p12 and enter the password.
+          </p>
         </div>
         <div>
           <p className="font-medium text-foreground">Certificate not working?</p>
-          <p>Make sure you imported into the same browser/profile you use for the admin panel, restart the browser, and confirm the certificate is not expired or revoked above. If it still fails, ask a super admin to re-issue it.</p>
+          <p>
+            Make sure you imported into the same browser/profile you use for the admin panel, restart the browser, and
+            confirm the certificate is not expired or revoked above. If it still fails, ask a super admin to re-issue
+            it.
+          </p>
         </div>
       </div>
     </details>

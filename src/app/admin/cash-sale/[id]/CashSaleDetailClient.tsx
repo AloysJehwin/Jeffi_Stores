@@ -28,7 +28,10 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
   useEffect(() => {
     fetch(`/api/admin/cash-sale/${id}/detail`)
       .then(r => r.json())
-      .then(j => { setData(j); setLoading(false) })
+      .then(j => {
+        setData(j)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
 
@@ -36,7 +39,9 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Sale not found.</p>
-        <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Invoices</Link>
+        <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">
+          ← Back to Invoices
+        </Link>
       </div>
     )
   }
@@ -56,11 +61,19 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
         {/* Info cards — 2-col grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="h-3 w-24 bg-surface-secondary rounded animate-pulse" />
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, j) => (
-                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                  <div
+                    key={j}
+                    className="flex justify-between gap-4 animate-pulse"
+                    style={{ animationDelay: `${j * 40}ms` }}
+                  >
                     <div className="h-3.5 w-16 bg-surface-secondary rounded shrink-0" />
                     <div className="h-3.5 bg-surface-secondary rounded flex-1" />
                   </div>
@@ -109,7 +122,10 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href={ap('/admin/invoices')} className="text-foreground-secondary hover:text-foreground transition-colors">
+          <Link
+            href={ap('/admin/invoices')}
+            className="text-foreground-secondary hover:text-foreground transition-colors"
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -118,11 +134,13 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
           <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
             Cash Sale
           </span>
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-            s.payment_status === 'paid'
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-          }`}>
+          <span
+            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              s.payment_status === 'paid'
+                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+            }`}
+          >
             {s.payment_status}
           </span>
         </div>
@@ -134,7 +152,12 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             Receipt PDF
           </a>
@@ -183,13 +206,27 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Item</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">GST%</th>
-                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Qty</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Unit Price</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Taxable</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Tax</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Total</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Item
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  GST%
+                </th>
+                <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Qty
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Unit Price
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Taxable
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Tax
+                </th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  Total
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -197,16 +234,26 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.product_name}</div>
-                    {variantLabel(item) && <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>}
+                    {variantLabel(item) && (
+                      <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>
-                  <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.taxable_amount || '0'))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">
-                    {formatINR(parseFloat(item.cgst_amount || '0') + parseFloat(item.sgst_amount || '0') + parseFloat(item.igst_amount || '0'))}
+                    {formatINR(parseFloat(item.taxable_amount || '0'))}
                   </td>
-                  <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.total_price))}</td>
+                  <td className="px-4 py-3 text-right text-foreground-secondary">
+                    {formatINR(
+                      parseFloat(item.cgst_amount || '0') +
+                        parseFloat(item.sgst_amount || '0') +
+                        parseFloat(item.igst_amount || '0')
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-foreground">
+                    {formatINR(parseFloat(item.total_price))}
+                  </td>
                 </tr>
               ))}
             </tbody>

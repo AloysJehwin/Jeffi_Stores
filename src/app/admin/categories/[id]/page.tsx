@@ -44,7 +44,10 @@ interface SubRow {
   display_order: number
 }
 
-export default async function CategoryViewPage({ params, searchParams }: {
+export default async function CategoryViewPage({
+  params,
+  searchParams,
+}: {
   params: Promise<{ id: string }>
   searchParams: Promise<{ back?: string }>
 }) {
@@ -59,14 +62,25 @@ export default async function CategoryViewPage({ params, searchParams }: {
   const [hasDraft, parent, subcategories, products, counts] = await Promise.all([
     queryOne<{ category_id: string }>('SELECT category_id FROM category_drafts WHERE category_id = $1', [id]),
     category.parent_category_id
-      ? queryOne<{ id: string; name: string; return_allowed: boolean | null; return_window_days: number | null; replacement_allowed: boolean | null; replacement_window_days: number | null }>(
-          'SELECT id, name, return_allowed, return_window_days, replacement_allowed, replacement_window_days FROM categories WHERE id = $1', [category.parent_category_id])
+      ? queryOne<{
+          id: string
+          name: string
+          return_allowed: boolean | null
+          return_window_days: number | null
+          replacement_allowed: boolean | null
+          replacement_window_days: number | null
+        }>(
+          'SELECT id, name, return_allowed, return_window_days, replacement_allowed, replacement_window_days FROM categories WHERE id = $1',
+          [category.parent_category_id]
+        )
       : Promise.resolve(null),
     queryMany<SubRow>(
-      'SELECT id, name, slug, is_active, display_order FROM categories WHERE parent_category_id = $1 ORDER BY display_order, name', [id]
+      'SELECT id, name, slug, is_active, display_order FROM categories WHERE parent_category_id = $1 ORDER BY display_order, name',
+      [id]
     ),
     queryMany<ProductRow>(
-      'SELECT id, name, sku, is_active, base_price FROM products WHERE category_id = $1 ORDER BY name LIMIT 20', [id]
+      'SELECT id, name, sku, is_active, base_price FROM products WHERE category_id = $1 ORDER BY name LIMIT 20',
+      [id]
     ),
     queryOne<{ total: string }>('SELECT COUNT(*)::text AS total FROM products WHERE category_id = $1', [id]),
   ])
@@ -84,7 +98,10 @@ export default async function CategoryViewPage({ params, searchParams }: {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 min-w-0">
-          <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors flex-shrink-0">
+          <Link
+            href={ap(backUrl, host)}
+            className="text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -92,18 +109,35 @@ export default async function CategoryViewPage({ params, searchParams }: {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{category.name}</h1>
-              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${category.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+              <span
+                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${category.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}
+              >
                 {category.is_active ? 'Active' : 'Inactive'}
               </span>
-              {category.parent_category_id
-                ? <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Subcategory</span>
-                : <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">Main</span>}
+              {category.parent_category_id ? (
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  Subcategory
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                  Main
+                </span>
+              )}
               {hasDraft && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Draft pending</span>
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  Draft pending
+                </span>
               )}
             </div>
             {category.description && <p className="text-sm text-foreground-secondary mt-1">{category.description}</p>}
-            <p className="text-xs text-foreground-muted mt-0.5">Created {new Date(category.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              Created{' '}
+              {new Date(category.created_at).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </p>
           </div>
         </div>
         <DraftEditButton entity="categories" id={id} name={category.name} hasDraft={!!hasDraft} backUrl={backUrl} />
@@ -111,10 +145,23 @@ export default async function CategoryViewPage({ params, searchParams }: {
 
       {hasDraft && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-start gap-3">
-          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg
+            className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
-          <p className="text-sm text-amber-800 dark:text-amber-200">This category has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.</p>
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            This category has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to
+            review and publish them.
+          </p>
         </div>
       )}
 
@@ -143,16 +190,39 @@ export default async function CategoryViewPage({ params, searchParams }: {
             </div>
             <div className="px-5 divide-y divide-border-default">
               {[
-                ['Slug', <span key="slug" className="font-mono">{category.slug}</span>],
-                ['Parent', parent
-                  ? <Link key="parent" href={ap(`/admin/categories/${parent.id}`, host)} className="text-accent-500 hover:underline">{parent.name}</Link>
-                  : '— (top level)'],
+                [
+                  'Slug',
+                  <span key="slug" className="font-mono">
+                    {category.slug}
+                  </span>,
+                ],
+                [
+                  'Parent',
+                  parent ? (
+                    <Link
+                      key="parent"
+                      href={ap(`/admin/categories/${parent.id}`, host)}
+                      className="text-accent-500 hover:underline"
+                    >
+                      {parent.name}
+                    </Link>
+                  ) : (
+                    '— (top level)'
+                  ),
+                ],
                 ['SKU Prefix', category.sku_prefix || '—'],
                 ['Google Category', category.google_product_category || '—'],
                 ['Icon', category.icon_name || '—'],
-                ['Policy Source', isInherited
-                  ? <span key="policy" className="text-blue-600 dark:text-blue-400">Inherited from {parent?.name ?? 'parent'}</span>
-                  : <span key="policy">Overridden</span>],
+                [
+                  'Policy Source',
+                  isInherited ? (
+                    <span key="policy" className="text-blue-600 dark:text-blue-400">
+                      Inherited from {parent?.name ?? 'parent'}
+                    </span>
+                  ) : (
+                    <span key="policy">Overridden</span>
+                  ),
+                ],
                 ['Returns', effReturnAllowed ? `${effReturnDays} days` : 'Not allowed'],
                 ['Replacement', effReplaceAllowed ? `${effReplaceDays} days` : 'Not allowed'],
               ].map(([label, value], i) => (
@@ -187,14 +257,25 @@ export default async function CategoryViewPage({ params, searchParams }: {
                     {subcategories.map(s => (
                       <tr key={s.id} className="hover:bg-surface-secondary/40">
                         <td className="px-4 py-2.5">
-                          <Link href={ap(`/admin/categories/${s.id}`, host)} className="font-medium text-accent-500 hover:underline">{s.name}</Link>
+                          <Link
+                            href={ap(`/admin/categories/${s.id}`, host)}
+                            className="font-medium text-accent-500 hover:underline"
+                          >
+                            {s.name}
+                          </Link>
                         </td>
                         <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.slug}</td>
                         <td className="px-4 py-2.5 text-foreground-muted">{s.display_order}</td>
                         <td className="px-4 py-2.5">
-                          {s.is_active
-                            ? <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Active</span>
-                            : <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-secondary text-foreground-muted">Inactive</span>}
+                          {s.is_active ? (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-secondary text-foreground-muted">
+                              Inactive
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -207,10 +288,16 @@ export default async function CategoryViewPage({ params, searchParams }: {
           <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
             <div className="px-5 py-3 border-b border-border-default bg-surface-secondary flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Products</h2>
-              <span className="text-xs text-foreground-muted">{totalProducts > 20 ? `Showing 20 of ${totalProducts}` : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`}</span>
+              <span className="text-xs text-foreground-muted">
+                {totalProducts > 20
+                  ? `Showing 20 of ${totalProducts}`
+                  : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`}
+              </span>
             </div>
             {products.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-foreground-muted text-center">No products assigned to this category.</p>
+              <p className="px-5 py-6 text-sm text-foreground-muted text-center">
+                No products assigned to this category.
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -226,14 +313,32 @@ export default async function CategoryViewPage({ params, searchParams }: {
                     {products.map(p => (
                       <tr key={p.id} className="hover:bg-surface-secondary/40">
                         <td className="px-4 py-2.5">
-                          <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">{p.name}</Link>
+                          <Link
+                            href={ap(`/admin/products/${p.id}`, host)}
+                            className="font-medium text-accent-500 hover:underline"
+                          >
+                            {p.name}
+                          </Link>
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></td>
-                        <td className="px-4 py-2.5 font-semibold text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">
+                          <span className="inline-flex items-center gap-1">
+                            {p.sku}
+                            {p.sku && <CopySku sku={p.sku} />}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 font-semibold text-foreground">
+                          ₹{Number(p.base_price).toLocaleString('en-IN')}
+                        </td>
                         <td className="px-4 py-2.5">
-                          {p.is_active
-                            ? <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Active</span>
-                            : <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-secondary text-foreground-muted">Inactive</span>}
+                          {p.is_active ? (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-secondary text-foreground-muted">
+                              Inactive
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}

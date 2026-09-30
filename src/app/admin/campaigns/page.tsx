@@ -9,7 +9,9 @@ export default function CampaignsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Campaigns</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Automated marketing campaigns triggered by customer behavior</p>
+          <p className="text-foreground-secondary mt-1 text-sm">
+            Automated marketing campaigns triggered by customer behavior
+          </p>
         </div>
       </div>
       <CampaignsListClient />

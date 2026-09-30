@@ -75,7 +75,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
   async function handleSaveRvpCharge() {
     const amount = Number(rvpCharge)
-    if (!(amount >= 0) || !Number.isFinite(amount)) { setRvpChargeMsg('Enter a valid amount.'); return }
+    if (!(amount >= 0) || !Number.isFinite(amount)) {
+      setRvpChargeMsg('Enter a valid amount.')
+      return
+    }
     setRvpChargeSaving(true)
     setRvpChargeMsg(null)
     try {
@@ -103,7 +106,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           ? d.locations.map((w: { name: string }) => ({ value: w.name, label: w.name }))
           : []
         setWarehouses(opts)
-        if (opts.length > 0) setPickupLocation((prev) => prev || opts[0].value)
+        if (opts.length > 0) setPickupLocation(prev => prev || opts[0].value)
       })
       .catch(() => {})
   }, [])
@@ -129,7 +132,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
     }
   }
 
-  async function submit(action: string, replacementVariants?: Record<string, { variant_id: string | null; sub_variant_id: string | null }>) {
+  async function submit(
+    action: string,
+    replacementVariants?: Record<string, { variant_id: string | null; sub_variant_id: string | null }>
+  ) {
     if (action === 'reject' && !adminNotes.trim()) {
       setError('Please provide a reason for rejection.')
       return
@@ -177,7 +183,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
       if (action === 'process' && data.refundFailed) {
         setRefundFailed(true)
-        setSuccess('Return marked as resolved. Note: Razorpay refund could not be initiated automatically — please issue it manually.')
+        setSuccess(
+          'Return marked as resolved. Note: Razorpay refund could not be initiated automatically — please issue it manually.'
+        )
       } else if (action === 'approve') {
         setSuccess('Return request approved. Customer notified.')
       } else if (action === 'reject') {
@@ -216,7 +224,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
     const map: Record<string, { variant_id: string | null; sub_variant_id: string | null }> = {}
     for (const it of variantPick) {
       const sel = pickSelections[it.order_item_id]
-      if (!sel) { setError('Please choose a replacement variant for every item.'); return }
+      if (!sel) {
+        setError('Please choose a replacement variant for every item.')
+        return
+      }
       // Encoded value: "variantId|subVariantId" (subVariantId may be empty).
       const [vid, svid] = sel.split('|')
       map[it.order_item_id] = { variant_id: vid || null, sub_variant_id: svid || null }
@@ -232,7 +243,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
       )}
       {success && (
-        <div className={`p-3 border rounded-lg text-sm ${refundFailed ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'}`}>
+        <div
+          className={`p-3 border rounded-lg text-sm ${refundFailed ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'}`}
+        >
           {success}
         </div>
       )}
@@ -247,7 +260,8 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           {variantPick.map((it: any) => (
             <div key={it.order_item_id} className="space-y-1">
               <p className="text-xs text-foreground-muted">
-                {it.product_name}{it.variant_name ? ` — original: ${it.variant_name}` : ''} (no longer available)
+                {it.product_name}
+                {it.variant_name ? ` — original: ${it.variant_name}` : ''} (no longer available)
               </p>
               <AdminSelect
                 sm
@@ -284,7 +298,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
         <div>
           <span className="text-foreground-secondary">Requested</span>
-          <p className="font-medium text-foreground">{new Date(returnRequest.created_at).toLocaleDateString('en-IN')}</p>
+          <p className="font-medium text-foreground">
+            {new Date(returnRequest.created_at).toLocaleDateString('en-IN')}
+          </p>
         </div>
         <div>
           <span className="text-foreground-secondary">Status</span>
@@ -308,7 +324,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                   {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
-                  <p className="text-xs text-foreground-secondary">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                  <p className="text-xs text-foreground-secondary">
+                    Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
+                  </p>
                   <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
                 </div>
               </div>
@@ -317,16 +335,21 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
       )}
 
-      {description && (        <div>
+      {description && (
+        <div>
           <p className="text-sm text-foreground-secondary mb-1">Customer description</p>
-          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">{description}</p>
+          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">
+            {description}
+          </p>
         </div>
       )}
 
       {admin_notes && (
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Admin notes</p>
-          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">{admin_notes}</p>
+          <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">
+            {admin_notes}
+          </p>
         </div>
       )}
 
@@ -395,7 +418,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 </div>
                 {canWrite && (
                   <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-1">Reverse delivery charge (Rs)</label>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1">
+                      Reverse delivery charge (Rs)
+                    </label>
                     <div className="flex items-stretch gap-2">
                       <input
                         type="number"
@@ -415,7 +440,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                         {rvpChargeSaving ? 'Saving...' : 'Save charge'}
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-foreground-muted">Charged to the tenant wallet for the reverse pickup. Re-saving updates the amount.</p>
+                    <p className="mt-1 text-xs text-foreground-muted">
+                      Charged to the tenant wallet for the reverse pickup. Re-saving updates the amount.
+                    </p>
                     {rvpChargeMsg && <p className="mt-1 text-xs text-foreground-secondary">{rvpChargeMsg}</p>}
                   </div>
                 )}
@@ -432,11 +459,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 </button>
                 {warehouses.length > 0 && (
                   <div className="w-44 shrink-0" title="Warehouse the return is picked up to">
-                    <AdminSelect
-                      value={pickupLocation}
-                      onChange={setPickupLocation}
-                      options={warehouses}
-                    />
+                    <AdminSelect value={pickupLocation} onChange={setPickupLocation} options={warehouses} />
                   </div>
                 )}
               </div>
@@ -473,25 +496,49 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         <div className="pt-2 border-t border-border-default space-y-4">
           {returnRequest.valuation_status !== 'approved' ? (
             <div className="flex items-start gap-3 px-3 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              <svg
+                className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+                />
               </svg>
               <div>
                 <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Valuation pending</p>
                 <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
-                  Complete the item valuation in the <strong>Returns page</strong> before processing the {type === 'refund' ? 'refund' : 'replacement'}.
+                  Complete the item valuation in the <strong>Returns page</strong> before processing the{' '}
+                  {type === 'refund' ? 'refund' : 'replacement'}.
                 </p>
               </div>
             </div>
           ) : (
             <>
               <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <span className="text-green-800 dark:text-green-300">
-                  Valuation complete — condition: <strong className="capitalize">{returnRequest.valuation_condition}</strong>
-                  {returnRequest.valuation_condition !== 'good' && <span className="text-red-600 dark:text-red-400 ml-1">(no restock)</span>}
+                  Valuation complete — condition:{' '}
+                  <strong className="capitalize">{returnRequest.valuation_condition}</strong>
+                  {returnRequest.valuation_condition !== 'good' && (
+                    <span className="text-red-600 dark:text-red-400 ml-1">(no restock)</span>
+                  )}
                 </span>
               </div>
               <div>

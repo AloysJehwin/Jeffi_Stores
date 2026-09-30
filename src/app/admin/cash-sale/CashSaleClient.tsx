@@ -16,7 +16,11 @@ import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from 
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/admin-path'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
-import SerialEntryModal, { type SerialItem, type SerialAssignment, SerialPicker } from '@/components/admin/SerialEntryModal'
+import SerialEntryModal, {
+  type SerialItem,
+  type SerialAssignment,
+  SerialPicker,
+} from '@/components/admin/SerialEntryModal'
 
 interface CashSale {
   id: string
@@ -62,7 +66,8 @@ const PAYMENT_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 }
 
-const inputCls = 'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
+const inputCls =
+  'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 function fmt(n: number) {
@@ -82,11 +87,11 @@ function calcTotals(items: LineItem[]) {
     const rawQty = parseFloat(String(it.quantity || 0))
     const gstRate = parseFloat(String(it.gst_rate || 18))
     const discPct = parseFloat(String(it.discount_pct || 0))
-    const factor = (it.sell_unit_dimension === 'count' && it.sell_unit_factor > 1) ? it.sell_unit_factor : 1
+    const factor = it.sell_unit_dimension === 'count' && it.sell_unit_factor > 1 ? it.sell_unit_factor : 1
     const effectiveQty = rawQty * factor
     const mrpEx = unitPrice / (1 + gstRate / 100)
     const lineEx = effectiveQty * mrpEx * (1 - discPct / 100)
-    const lineTax = lineEx * gstRate / 100
+    const lineTax = (lineEx * gstRate) / 100
     subtotal += lineEx + lineTax
     totalTax += lineTax
   })
@@ -118,7 +123,8 @@ export default function CashSaleClient() {
   function syncUrl(patch: Record<string, string>) {
     const p = new URLSearchParams(window.location.search)
     for (const [k, v] of Object.entries(patch)) {
-      if (v) p.set(k, v); else p.delete(k)
+      if (v) p.set(k, v)
+      else p.delete(k)
     }
     router.replace(ap(`/admin/cash-sale?${p.toString()}`), { scroll: false })
   }
@@ -136,8 +142,10 @@ export default function CashSaleClient() {
       if (cancelled || !seed) return
       setItems(prev => (prev.length === 1 && !prev[0].product_id ? [seed] : [seed, ...prev]))
     })
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
@@ -174,33 +182,43 @@ export default function CashSaleClient() {
   // Ordered server-side across all sales via sort/dir params.
   const sortedSales = sales
 
-  const fetchSales = useCallback(async (p = 1) => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (paymentFilter) params.set('payment', paymentFilter)
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
-      if (searchQ) params.set('search', searchQ)
-      if (sortCol && SORT_KEYS[sortCol]) { params.set('sort', SORT_KEYS[sortCol]); params.set('dir', sortDir || 'desc') }
-      params.set('page', String(p))
-      const res = await fetch(`/api/admin/cash-sale?${params}`, { credentials: 'include' })
-      if (!res.ok) throw new Error('Failed')
-      const data = await res.json()
-      setSales(data.sales || [])
-      setTotal(data.total || 0)
-      setPage(p)
-    } catch {
-      showToast('Failed to load cash sales', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast])
-
-  useEffect(() => { fetchSales(1) }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
+  const fetchSales = useCallback(
+    async (p = 1) => {
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (paymentFilter) params.set('payment', paymentFilter)
+        if (fromDate) params.set('from', fromDate)
+        if (toDate) params.set('to', toDate)
+        if (searchQ) params.set('search', searchQ)
+        if (sortCol && SORT_KEYS[sortCol]) {
+          params.set('sort', SORT_KEYS[sortCol])
+          params.set('dir', sortDir || 'desc')
+        }
+        params.set('page', String(p))
+        const res = await fetch(`/api/admin/cash-sale?${params}`, { credentials: 'include' })
+        if (!res.ok) throw new Error('Failed')
+        const data = await res.json()
+        setSales(data.sales || [])
+        setTotal(data.total || 0)
+        setPage(p)
+      } catch {
+        showToast('Failed to load cash sales', 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast]
+  )
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedSale(null) }
+    fetchSales(1)
+  }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedSale(null)
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
@@ -235,7 +253,10 @@ export default function CashSaleClient() {
         body: JSON.stringify({ action: 'cancel' }),
       })
       const data = await res.json()
-      if (!res.ok) { showToast(data.error || 'Failed to cancel', 'error'); return }
+      if (!res.ok) {
+        showToast(data.error || 'Failed to cancel', 'error')
+        return
+      }
       showToast('Cash sale cancelled and stock restored', 'success')
       fetchSales(page)
     } catch {
@@ -248,12 +269,18 @@ export default function CashSaleClient() {
   // Signature of what actually determines each line's serial requirement.
   const serialLineKey = items
     .filter(it => it.product_id && it.serialized)
-    .map(it => `${it.id}:${it.product_id}:${it.variant_id ?? ''}:${it.sub_variant_id ?? ''}:${it.quantity}:${it.sell_unit_factor ?? 1}`)
+    .map(
+      it =>
+        `${it.id}:${it.product_id}:${it.variant_id ?? ''}:${it.sub_variant_id ?? ''}:${it.quantity}:${it.sell_unit_factor ?? 1}`
+    )
     .join('|')
 
   useEffect(() => {
     const serialLines = items.filter(it => it.product_id && it.serialized)
-    if (serialLines.length === 0) { setInlineSerialItems({}); return }
+    if (serialLines.length === 0) {
+      setInlineSerialItems({})
+      return
+    }
     let cancelled = false
     ;(async () => {
       const next: Record<string, SerialItem> = {}
@@ -261,7 +288,10 @@ export default function CashSaleClient() {
         const params = new URLSearchParams({
           product_id: item.product_id!,
           line_item_id: item.id,
-          qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
+          qty: String(
+            (Number(item.quantity) || 1) *
+              (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)
+          ),
         })
         if (item.variant_id) params.set('variant_id', item.variant_id)
         if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
@@ -270,12 +300,16 @@ export default function CashSaleClient() {
           const data = await res.json()
           const si = data.serialized_items?.[0]
           if (si) next[item.id] = si
-        } catch { /* leave the line without an inline panel */ }
+        } catch {
+          /* leave the line without an inline panel */
+        }
       }
       if (!cancelled) setInlineSerialItems(next)
     })()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialLineKey])
 
   async function handleStockBadgeClick(item: LineItem) {
@@ -283,7 +317,9 @@ export default function CashSaleClient() {
     const params = new URLSearchParams({
       product_id: item.product_id,
       line_item_id: item.id,
-      qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
+      qty: String(
+        (Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)
+      ),
     })
     if (item.variant_id) params.set('variant_id', item.variant_id)
     if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
@@ -293,9 +329,9 @@ export default function CashSaleClient() {
       // Pre-fill any serials already assigned to this line (e.g. auto-recorded from
       // a scan) so the modal only asks for the delta.
       const pre = serialAssignments.filter(sa => sa.order_item_id === item.id).map(sa => sa.serial_number)
-      setSerialPickerItems(data.serialized_items.map((si: SerialItem) =>
-        si.order_item_id === item.id ? { ...si, preassigned: pre } : si
-      ))
+      setSerialPickerItems(
+        data.serialized_items.map((si: SerialItem) => (si.order_item_id === item.id ? { ...si, preassigned: pre } : si))
+      )
     } else if (data.items?.length > 0) {
       setBatchPickerItem(data.items[0])
     }
@@ -335,26 +371,28 @@ export default function CashSaleClient() {
     }
     // Serialized lines need assignments. The exact count is base/qty_step, which
     // this form does not carry — the picker sets it and the server enforces it.
-    const missingSerial = items.find(it =>
-      it.product_id && it.serialized &&
-      serialAssignments.filter(sa => sa.order_item_id === it.id).length === 0
+    const missingSerial = items.find(
+      it => it.product_id && it.serialized && serialAssignments.filter(sa => sa.order_item_id === it.id).length === 0
     )
     if (missingSerial) {
       setFormError(`Serial numbers required for "${productLabel(missingSerial)}" — click the stock badge to assign`)
       return
     }
     // Validate perishable items have batch assignments
-    const missingBatch = items.find(it =>
-      it.product_id && it.perishable && !it.serialized &&
-      !batchAssignments[it.id]?.length
+    const missingBatch = items.find(
+      it => it.product_id && it.perishable && !it.serialized && !batchAssignments[it.id]?.length
     )
     if (missingBatch) {
       setFormError(`Batch assignment required for "${productLabel(missingBatch)}" — click the stock badge to assign`)
       return
     }
-    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity)
+    const overstock = items.find(
+      it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity
+    )
     if (overstock) {
-      setFormError(`Insufficient stock for "${overstock.product_name}" — available: ${overstock.inventory_quantity}, required: ${overstock.quantity}`)
+      setFormError(
+        `Insufficient stock for "${overstock.product_name}" — available: ${overstock.inventory_quantity}, required: ${overstock.quantity}`
+      )
       return
     }
     setFormError('')
@@ -389,7 +427,10 @@ export default function CashSaleClient() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setFormError(data.error || 'Failed to create cash sale'); return }
+      if (!res.ok) {
+        setFormError(data.error || 'Failed to create cash sale')
+        return
+      }
       const { subtotal, tax } = calcTotals(items)
       setReceipt({
         invoiceNumber: data.invoiceNumber,
@@ -418,7 +459,10 @@ export default function CashSaleClient() {
       <div className="space-y-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { setReceipt(null); setView('list') }}
+            onClick={() => {
+              setReceipt(null)
+              setView('list')
+            }}
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -471,7 +515,9 @@ export default function CashSaleClient() {
                     <tr key={i} className="border-b border-border-default last:border-0">
                       <td className="px-5 py-3">
                         <p className="font-medium text-foreground">{item.product_name}</p>
-                        {item.variant_name && <p className="text-xs text-foreground-muted mt-0.5">{variantLabel(item)}</p>}
+                        {item.variant_name && (
+                          <p className="text-xs text-foreground-muted mt-0.5">{variantLabel(item)}</p>
+                        )}
                         {item.hsn_code && <p className="text-xs text-foreground-muted">HSN: {item.hsn_code}</p>}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground-secondary">{qty}</td>
@@ -518,19 +564,30 @@ export default function CashSaleClient() {
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   Print / Download Receipt
                 </a>
               )}
               <button
-                onClick={() => { setReceipt(null); setView('new') }}
+                onClick={() => {
+                  setReceipt(null)
+                  setView('new')
+                }}
                 className="px-4 py-2.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
               >
                 New Sale
               </button>
               <button
-                onClick={() => { setReceipt(null); setView('list') }}
+                onClick={() => {
+                  setReceipt(null)
+                  setView('list')
+                }}
                 className="px-4 py-2.5 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
               >
                 View All Sales
@@ -573,19 +630,23 @@ export default function CashSaleClient() {
               if (lineItem?.serialized) {
                 const totalQty = assignments.reduce((s, a) => s + a.qty, 0)
                 const step = batchPickerItem?.qty_step && batchPickerItem.qty_step > 0 ? batchPickerItem.qty_step : 1
-                setSerialPickerItems([{
-                  order_item_id: lineItem.id,
-                  product_name: lineItem.product_name,
-                  variant_name: lineItem.variant_name || null,
-                  required_qty: totalQty,
-                  required_serials: Math.round(totalQty / step),
-                  qty_step: step,
-                  already_assigned: false,
-                  preassigned: serialAssignments.filter(sa => sa.order_item_id === lineItem.id).map(sa => sa.serial_number),
-                  product_id: lineItem.product_id || undefined,
-                  variant_id: lineItem.variant_id || null,
-                  sub_variant_id: lineItem.sub_variant_id || null,
-                }])
+                setSerialPickerItems([
+                  {
+                    order_item_id: lineItem.id,
+                    product_name: lineItem.product_name,
+                    variant_name: lineItem.variant_name || null,
+                    required_qty: totalQty,
+                    required_serials: Math.round(totalQty / step),
+                    qty_step: step,
+                    already_assigned: false,
+                    preassigned: serialAssignments
+                      .filter(sa => sa.order_item_id === lineItem.id)
+                      .map(sa => sa.serial_number),
+                    product_id: lineItem.product_id || undefined,
+                    variant_id: lineItem.variant_id || null,
+                    sub_variant_id: lineItem.sub_variant_id || null,
+                  },
+                ])
               }
             }}
             onCancel={() => setBatchPickerItem(null)}
@@ -600,9 +661,7 @@ export default function CashSaleClient() {
                 // Serials confirmed in this modal, so we can drop them from OTHER
                 // lines too — a physical unit belongs to exactly one line.
                 const confirmedSerials = new Set(assignments.map(a => a.serial_number))
-                const kept = prev.filter(a =>
-                  !itemIds.has(a.order_item_id) && !confirmedSerials.has(a.serial_number)
-                )
+                const kept = prev.filter(a => !itemIds.has(a.order_item_id) && !confirmedSerials.has(a.serial_number))
                 return [...kept, ...assignments]
               })
               setSerialPickerItems(null)
@@ -612,7 +671,10 @@ export default function CashSaleClient() {
         )}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { resetForm(); setView('list') }}
+            onClick={() => {
+              resetForm()
+              setView('list')
+            }}
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -642,17 +704,19 @@ export default function CashSaleClient() {
                   assignedBatchLabels={assignedBatchLabels}
                   onSerialScanned={handleSerialScanned}
                   onQuantityReduced={handleQuantityReduced}
-                  lineAssignmentSummary={(item) => {
+                  lineAssignmentSummary={item => {
                     const si = inlineSerialItems[item.id]
                     if (!si) return null
                     const needed = si.required_serials ?? si.required_qty
                     const have = serialAssignments.filter(sa => sa.order_item_id === item.id).length
                     return { label: `Serials — ${have} of ${needed} selected`, complete: have === needed }
                   }}
-                  renderLineAssignment={(item) => {
+                  renderLineAssignment={item => {
                     const si = inlineSerialItems[item.id]
                     if (!si) return null
-                    const mine = serialAssignments.filter(sa => sa.order_item_id === item.id).map(sa => sa.serial_number)
+                    const mine = serialAssignments
+                      .filter(sa => sa.order_item_id === item.id)
+                      .map(sa => sa.serial_number)
                     const selected = new Set(mine)
                     return (
                       <SerialPicker
@@ -662,10 +726,12 @@ export default function CashSaleClient() {
                         item={{ ...si, preassigned: mine }}
                         selected={selected}
                         autoFill={false}
-                        onChange={(next) => setSerialAssignments(prev => [
-                          ...prev.filter(sa => sa.order_item_id !== item.id),
-                          ...Array.from(next).map(sn => ({ order_item_id: item.id, serial_number: sn })),
-                        ])}
+                        onChange={next =>
+                          setSerialAssignments(prev => [
+                            ...prev.filter(sa => sa.order_item_id !== item.id),
+                            ...Array.from(next).map(sn => ({ order_item_id: item.id, serial_number: sn })),
+                          ])
+                        }
                       />
                     )
                   }}
@@ -733,13 +799,13 @@ export default function CashSaleClient() {
                     <span className="text-xs text-foreground-muted">Walk-in Customer</span>
                   </div>
                   {canWrite && (
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full py-3 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-xl text-sm font-bold disabled:opacity-50 transition-colors"
-                  >
-                    {submitting ? 'Processing…' : 'Complete Sale'}
-                  </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-xl text-sm font-bold disabled:opacity-50 transition-colors"
+                    >
+                      {submitting ? 'Processing…' : 'Complete Sale'}
+                    </button>
                   )}
                 </div>
               </div>
@@ -758,15 +824,18 @@ export default function CashSaleClient() {
           <p className="text-foreground-secondary mt-1 text-sm">Walk-in sales — no customer details</p>
         </div>
         {canWrite && (
-        <button
-          onClick={() => { resetForm(); setView('new') }}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Cash Sale
-        </button>
+          <button
+            onClick={() => {
+              resetForm()
+              setView('new')
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Cash Sale
+          </button>
         )}
       </div>
 
@@ -777,21 +846,38 @@ export default function CashSaleClient() {
               type="invoices"
               value={searchInput}
               onChange={setSearchInput}
-              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label); syncUrl({ search: item.label }) }}
-              onEnter={val => { setSearchQ(val); syncUrl({ search: val }) }}
+              onSelect={item => {
+                setSearchInput(item.label)
+                setSearchQ(item.label)
+                syncUrl({ search: item.label })
+              }}
+              onEnter={val => {
+                setSearchQ(val)
+                syncUrl({ search: val })
+              }}
               placeholder="Search receipt no, order no…"
               inputClassName={inputCls + ' pr-9'}
             />
           </div>
           <button
-            onClick={() => { setSearchQ(searchInput); syncUrl({ search: searchInput }) }}
+            onClick={() => {
+              setSearchQ(searchInput)
+              syncUrl({ search: searchInput })
+            }}
             className="control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white font-medium transition-colors"
           >
             Search
           </button>
           {(searchQ || paymentFilter || fromDate || toDate) && (
             <button
-              onClick={() => { setSearchQ(''); setSearchInput(''); setPaymentFilter(''); setFromDate(''); setToDate(''); syncUrl({ search: '', payment: '', from: '', to: '' }) }}
+              onClick={() => {
+                setSearchQ('')
+                setSearchInput('')
+                setPaymentFilter('')
+                setFromDate('')
+                setToDate('')
+                syncUrl({ search: '', payment: '', from: '', to: '' })
+              }}
               className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Clear
@@ -802,7 +888,10 @@ export default function CashSaleClient() {
           <AdminSelect
             sm
             value={paymentFilter}
-            onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }}
+            onChange={v => {
+              setPaymentFilter(v)
+              syncUrl({ payment: v })
+            }}
             placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' },
@@ -811,9 +900,23 @@ export default function CashSaleClient() {
             ]}
           />
           <div className="flex items-center gap-2">
-            <DatePicker className="w-36" value={fromDate} onChange={v => { setFromDate(v); syncUrl({ from: v }) }} />
+            <DatePicker
+              className="w-36"
+              value={fromDate}
+              onChange={v => {
+                setFromDate(v)
+                syncUrl({ from: v })
+              }}
+            />
             <span className="text-foreground-secondary text-xs">to</span>
-            <DatePicker className="w-36" value={toDate} onChange={v => { setToDate(v); syncUrl({ to: v }) }} />
+            <DatePicker
+              className="w-36"
+              value={toDate}
+              onChange={v => {
+                setToDate(v)
+                syncUrl({ to: v })
+              }}
+            />
           </div>
         </div>
       </div>
@@ -822,7 +925,11 @@ export default function CashSaleClient() {
         {loading ? (
           <div className="p-4 space-y-2">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-2 py-1 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+              <div
+                key={i}
+                className="flex items-center gap-3 px-2 py-1 animate-pulse"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
                 <div className="h-4 w-24 bg-surface-secondary rounded" />
                 <div className="h-4 w-20 bg-surface-secondary rounded" />
                 <div className="h-4 flex-1 bg-surface-secondary rounded" />
@@ -840,11 +947,51 @@ export default function CashSaleClient() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
-                    <SortableHeader label="Receipt No" column="invoice_number" options={sortOptions('text')} onSort={(c, d) => { setSortCol(c); setSortDir(d) }} currentSort={sortCol} currentDir={sortDir} />
-                    <SortableHeader label="Date" column="date" options={sortOptions('date')} onSort={(c, d) => { setSortCol(c); setSortDir(d) }} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader
+                      label="Receipt No"
+                      column="invoice_number"
+                      options={sortOptions('text')}
+                      onSort={(c, d) => {
+                        setSortCol(c)
+                        setSortDir(d)
+                      }}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                    />
+                    <SortableHeader
+                      label="Date"
+                      column="date"
+                      options={sortOptions('date')}
+                      onSort={(c, d) => {
+                        setSortCol(c)
+                        setSortDir(d)
+                      }}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                    />
                     <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Customer</th>
-                    <SortableHeader label="Amount" column="amount" options={sortOptions('number')} onSort={(c, d) => { setSortCol(c); setSortDir(d) }} currentSort={sortCol} currentDir={sortDir} />
-                    <SortableHeader label="Payment" column="payment" options={sortOptions('text')} onSort={(c, d) => { setSortCol(c); setSortDir(d) }} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader
+                      label="Amount"
+                      column="amount"
+                      options={sortOptions('number')}
+                      onSort={(c, d) => {
+                        setSortCol(c)
+                        setSortDir(d)
+                      }}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                    />
+                    <SortableHeader
+                      label="Payment"
+                      column="payment"
+                      options={sortOptions('text')}
+                      onSort={(c, d) => {
+                        setSortCol(c)
+                        setSortDir(d)
+                      }}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                    />
                     <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary">Actions</th>
                   </tr>
                 </thead>
@@ -866,7 +1013,9 @@ export default function CashSaleClient() {
                                 {sale.invoice_number}
                               </a>
                             ) : (
-                              <span className="font-mono text-xs text-foreground-muted underline decoration-dotted underline-offset-2 cursor-default">—</span>
+                              <span className="font-mono text-xs text-foreground-muted underline decoration-dotted underline-offset-2 cursor-default">
+                                —
+                              </span>
                             )
                           }
                           align="left"
@@ -874,16 +1023,24 @@ export default function CashSaleClient() {
                           width="260px"
                         >
                           <div className="p-3 space-y-2">
-                            <p className="font-mono font-semibold text-foreground text-sm">{sale.invoice_number || sale.order_number}</p>
+                            <p className="font-mono font-semibold text-foreground text-sm">
+                              {sale.invoice_number || sale.order_number}
+                            </p>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                               <span className="text-foreground-muted">Customer</span>
                               <span className="text-foreground font-medium">Walk-in Customer</span>
                               <span className="text-foreground-muted">Date</span>
                               <span className="text-foreground">{fmtDate(sale.invoice_date)}</span>
                               <span className="text-foreground-muted">Total</span>
-                              <span className="text-foreground font-semibold">₹{fmt(parseFloat(sale.total_amount))}</span>
+                              <span className="text-foreground font-semibold">
+                                ₹{fmt(parseFloat(sale.total_amount))}
+                              </span>
                               <span className="text-foreground-muted">Payment</span>
-                              <span className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{sale.payment_status}</span>
+                              <span
+                                className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}
+                              >
+                                {sale.payment_status}
+                              </span>
                             </div>
                           </div>
                         </HoverCard>
@@ -899,12 +1056,15 @@ export default function CashSaleClient() {
                         </div>
                         {parseFloat(sale.taxable_amount) > 0 && (
                           <div className="text-xs text-foreground-muted mt-0.5">
-                            Taxable ₹{parseFloat(sale.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            Taxable ₹
+                            {parseFloat(sale.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}
+                        >
                           {sale.payment_status}
                         </span>
                         {sale.status === 'cancelled' && (
@@ -923,7 +1083,12 @@ export default function CashSaleClient() {
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
                             </svg>
                           </a>
                           <a
@@ -932,7 +1097,12 @@ export default function CashSaleClient() {
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                              />
                             </svg>
                           </a>
                           {sale.status !== 'cancelled' && canWrite && (
@@ -943,7 +1113,12 @@ export default function CashSaleClient() {
                               className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
                               </svg>
                             </button>
                           )}
@@ -985,7 +1160,9 @@ export default function CashSaleClient() {
                     <span className="text-xs text-foreground-muted shrink-0">{fmtDate(sale.invoice_date)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}
+                    >
                       {sale.payment_status}
                     </span>
                     {sale.status === 'cancelled' && (
@@ -1029,17 +1206,27 @@ export default function CashSaleClient() {
       {totalPages > 1 && (
         <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between gap-2">
           <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">{(page - 1) * 25 + 1}–{Math.min(page * 25, total)}</span>
-            {' '}of <span className="font-medium text-foreground">{total}</span> sales
+            <span className="font-medium text-foreground">
+              {(page - 1) * 25 + 1}–{Math.min(page * 25, total)}
+            </span>{' '}
+            of <span className="font-medium text-foreground">{total}</span> sales
           </p>
           <div className="flex items-center gap-1.5">
-            <button disabled={page <= 1} onClick={() => fetchSales(page - 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">
+            <button
+              disabled={page <= 1}
+              onClick={() => fetchSales(page - 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
               Prev
             </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => fetchSales(page + 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">
+            <span className="text-xs text-foreground-muted whitespace-nowrap">
+              {page}/{totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => fetchSales(page + 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
               Next
             </button>
           </div>
@@ -1050,14 +1237,25 @@ export default function CashSaleClient() {
         <SaleDetailModal
           sale={selectedSale}
           onClose={() => setSelectedSale(null)}
-          onCancelled={() => { setSelectedSale(null); fetchSales(page) }}
+          onCancelled={() => {
+            setSelectedSale(null)
+            fetchSales(page)
+          }}
         />
       )}
     </div>
   )
 }
 
-function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClose: () => void; onCancelled: () => void }) {
+function SaleDetailModal({
+  sale,
+  onClose,
+  onCancelled,
+}: {
+  sale: CashSale
+  onClose: () => void
+  onCancelled: () => void
+}) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('invoices')
@@ -1081,7 +1279,10 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
         body: JSON.stringify({ action: 'cancel' }),
       })
       const data = await res.json()
-      if (!res.ok) { showToast(data.error || 'Failed to cancel', 'error'); return }
+      if (!res.ok) {
+        showToast(data.error || 'Failed to cancel', 'error')
+        return
+      }
       showToast('Cash sale cancelled and stock restored', 'success')
       onCancelled()
     } catch {
@@ -1106,7 +1307,11 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               {sale.invoice_number || sale.order_number}
             </h2>
             <p className="text-xs text-foreground-muted mt-0.5">
-              {new Date(sale.invoice_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {new Date(sale.invoice_date).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
             </p>
           </div>
           <button
@@ -1121,7 +1326,9 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
 
         <div className="p-5 space-y-5">
           <div className="flex flex-wrap gap-2">
-            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[sale.payment_status] || ''}`}>
+            <span
+              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[sale.payment_status] || ''}`}
+            >
               {sale.payment_status}
             </span>
             <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-surface border border-border-default text-foreground-secondary">
@@ -1156,7 +1363,8 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               <div>
                 <p className="text-xs text-foreground-muted">CGST + SGST</p>
                 <p className="text-sm font-semibold text-foreground">
-                  ₹{parseFloat(sale.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹{parseFloat(sale.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{parseFloat(sale.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹
+                  {parseFloat(sale.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             )}
@@ -1183,7 +1391,12 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
               Receipt PDF
             </a>
@@ -1192,7 +1405,12 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
               </svg>
               View Order
             </a>

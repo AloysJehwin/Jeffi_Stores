@@ -14,18 +14,18 @@ export default function AppsIndexPage() {
             All apps
           </h1>
           <p className="mt-5 text-lg text-foreground-secondary max-w-2xl mx-auto">
-            Everything your store needs, grouped and ready — catalogue, sales, fulfilment,
-            finance, marketing and more. Turn on what you need as you grow.
+            Everything your store needs, grouped and ready — catalogue, sales, fulfilment, finance, marketing and more.
+            Turn on what you need as you grow.
           </p>
         </div>
       </section>
 
       <section className="w-full px-6 lg:px-12 py-12 space-y-12">
-        {APP_GROUPS.map((g) => (
+        {APP_GROUPS.map(g => (
           <div key={g.group}>
             <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-5">{g.group}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {g.apps.map((a) => (
+              {g.apps.map(a => (
                 <Link
                   key={a.slug}
                   href={`/apps/${a.slug}`}
@@ -48,7 +48,9 @@ export default function AppsIndexPage() {
       <section className="border-t border-border-default">
         <div className="w-full px-6 lg:px-12 py-16 text-center">
           <h2 className="text-3xl lg:text-4xl font-extrabold text-foreground">Start with all of it</h2>
-          <p className="text-foreground-secondary mt-3 text-lg">Set up your store in minutes and switch on the apps you need.</p>
+          <p className="text-foreground-secondary mt-3 text-lg">
+            Set up your store in minutes and switch on the apps you need.
+          </p>
           <Link
             href="/signup"
             className="ecom-accent-bg inline-block mt-7 px-8 py-3.5 rounded-lg text-white font-semibold text-lg transition-colors"

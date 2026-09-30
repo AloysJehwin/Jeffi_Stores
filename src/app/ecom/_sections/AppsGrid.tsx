@@ -1,13 +1,36 @@
 import Link from 'next/link'
 import type { ComponentType } from 'react'
 import {
-  Package, FolderTree, Boxes, Warehouse, Sparkles,
-  ShoppingCart, Store, FileSignature, TicketPercent, Star,
-  Truck, ScrollText, Barcode, Undo2,
-  FileText, CreditCard, LineChart, Banknote,
-  Megaphone, Mail, Share2, BadgePercent,
-  Building2, Handshake, Tags,
-  Users, LayoutDashboard, Bot, UserCog, Activity,
+  Package,
+  FolderTree,
+  Boxes,
+  Warehouse,
+  Sparkles,
+  ShoppingCart,
+  Store,
+  FileSignature,
+  TicketPercent,
+  Star,
+  Truck,
+  ScrollText,
+  Barcode,
+  Undo2,
+  FileText,
+  CreditCard,
+  LineChart,
+  Banknote,
+  Megaphone,
+  Mail,
+  Share2,
+  BadgePercent,
+  Building2,
+  Handshake,
+  Tags,
+  Users,
+  LayoutDashboard,
+  Bot,
+  UserCog,
+  Activity,
   LayoutGrid,
 } from 'lucide-react'
 import { APP_GROUPS } from '@/app/ecom/apps'
@@ -15,13 +38,36 @@ import { APP_GROUPS } from '@/app/ecom/apps'
 type IconType = ComponentType<{ className?: string }>
 
 const ICONS: Record<string, IconType> = {
-  Package, FolderTree, Boxes, Warehouse, Sparkles,
-  ShoppingCart, Store, FileSignature, TicketPercent, Star,
-  Truck, ScrollText, Barcode, Undo2,
-  FileText, CreditCard, LineChart, Banknote,
-  Megaphone, Mail, Share2, BadgePercent,
-  Building2, Handshake, Tags,
-  Users, LayoutDashboard, Bot, UserCog, Activity,
+  Package,
+  FolderTree,
+  Boxes,
+  Warehouse,
+  Sparkles,
+  ShoppingCart,
+  Store,
+  FileSignature,
+  TicketPercent,
+  Star,
+  Truck,
+  ScrollText,
+  Barcode,
+  Undo2,
+  FileText,
+  CreditCard,
+  LineChart,
+  Banknote,
+  Megaphone,
+  Mail,
+  Share2,
+  BadgePercent,
+  Building2,
+  Handshake,
+  Tags,
+  Users,
+  LayoutDashboard,
+  Bot,
+  UserCog,
+  Activity,
 }
 
 export default function AppsGrid() {
@@ -38,11 +84,11 @@ export default function AppsGrid() {
       </div>
 
       <div className="w-full space-y-12">
-        {APP_GROUPS.map((group) => (
+        {APP_GROUPS.map(group => (
           <div key={group.group}>
             <h3 className="text-lg font-bold text-foreground mb-4">{group.group}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {group.apps.map((app) => {
+              {group.apps.map(app => {
                 const Icon = ICONS[app.icon] ?? LayoutGrid
                 return (
                   <Link

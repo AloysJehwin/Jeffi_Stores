@@ -36,10 +36,18 @@ const DISCOUNT_TYPE_OPTIONS = [
   { value: 'fixed', label: 'Fixed Amount (₹)' },
 ]
 
-const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
+const inputClass =
+  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
-export default function CouponForm({ action, submitLabel, isDraft = false, showUserSelector = false, backUrl, defaultValues: d = {} }: CouponFormProps) {
+export default function CouponForm({
+  action,
+  submitLabel,
+  isDraft = false,
+  showUserSelector = false,
+  backUrl,
+  defaultValues: d = {},
+}: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
@@ -49,7 +57,9 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
-    if (el) { el.value = value }
+    if (el) {
+      el.value = value
+    }
   }
 
   function handleAIFill(values: Record<string, unknown>) {
@@ -229,27 +239,45 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
         <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Eligible Users</h2>
-            <p className="text-xs text-foreground-muted mt-1">Optional — restrict this coupon to specific customers. Leave empty to allow all users.</p>
+            <p className="text-xs text-foreground-muted mt-1">
+              Optional — restrict this coupon to specific customers. Leave empty to allow all users.
+            </p>
           </div>
           <CouponUserSelector name="eligible_user_ids" />
         </div>
       )}
 
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border-default">
-        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
+        <Link
+          href={ap(backUrl ?? '/admin/coupons')}
+          className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
+        >
           Cancel
         </Link>
         {isDraft ? (
           <>
-            <button type="submit" name="intent" value="draft" className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm">
+            <button
+              type="submit"
+              name="intent"
+              value="draft"
+              className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm"
+            >
               Save Draft
             </button>
-            <button type="submit" name="intent" value="publish" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
+            <button
+              type="submit"
+              name="intent"
+              value="publish"
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
+            >
               Publish
             </button>
           </>
         ) : (
-          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
+          <button
+            type="submit"
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
+          >
             {submitLabel || 'Save Changes'}
           </button>
         )}

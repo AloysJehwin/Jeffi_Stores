@@ -11,8 +11,16 @@ interface RowResult {
   outcome: 'created' | 'updated' | 'error' | 'warning' | 'deleted'
   message?: string
 }
-interface PendingDeletion { productId: string; sku: string; name: string }
-interface ImageProgress { total: number; fetched: number; failed: number }
+interface PendingDeletion {
+  productId: string
+  sku: string
+  name: string
+}
+interface ImageProgress {
+  total: number
+  fetched: number
+  failed: number
+}
 interface ImportJob {
   id: string
   source: string
@@ -68,7 +76,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [gsheet, setGsheet] = useState<GsheetStatus>(
-    initialGsheet ?? { enabled: false, connected: false, spreadsheetId: null, lastSync: null },
+    initialGsheet ?? { enabled: false, connected: false, spreadsheetId: null, lastSync: null }
   )
   const [sheetInput, setSheetInput] = useState(initialGsheet?.spreadsheetId ?? '')
   const [syncing, setSyncing] = useState(false)
@@ -76,9 +84,10 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const [reconciling, setReconciling] = useState(false)
 
   const requestedTab = searchParams.get('tab') as Tab | null
-  const tab: Tab = requestedTab && TAB_KEYS.includes(requestedTab) && (requestedTab !== 'google_sheet' || gsheet.enabled)
-    ? requestedTab
-    : 'import'
+  const tab: Tab =
+    requestedTab && TAB_KEYS.includes(requestedTab) && (requestedTab !== 'google_sheet' || gsheet.enabled)
+      ? requestedTab
+      : 'import'
 
   function selectTab(next: Tab) {
     const params = new URLSearchParams(searchParams.toString())
@@ -91,9 +100,11 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     const connected = searchParams.get('connected')
     if (connected === null) return
     const error = searchParams.get('error')
-    setNotice(connected === '0'
-      ? { kind: 'err', text: `Google connection failed${error ? `: ${error}` : '.'}` }
-      : { kind: 'ok', text: 'Google account connected.' })
+    setNotice(
+      connected === '0'
+        ? { kind: 'err', text: `Google connection failed${error ? `: ${error}` : '.'}` }
+        : { kind: 'ok', text: 'Google account connected.' }
+    )
     const params = new URLSearchParams(searchParams.toString())
     params.delete('connected')
     params.delete('error')
@@ -113,17 +124,26 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     }
   }, [])
 
-  useEffect(() => { loadJobs() }, [loadJobs])
-  useEffect(() => { loadGsheet() }, [loadGsheet])
+  useEffect(() => {
+    loadJobs()
+  }, [loadJobs])
+  useEffect(() => {
+    loadGsheet()
+  }, [loadGsheet])
 
   // Poll while any job is active so live progress (rows + images) updates without a refresh.
   useEffect(() => {
     if (!jobs.some(j => ACTIVE.has(j.status))) return
-    const t = setInterval(() => { loadJobs(); loadGsheet() }, 4000)
+    const t = setInterval(() => {
+      loadJobs()
+      loadGsheet()
+    }, 4000)
     return () => clearInterval(t)
   }, [jobs, loadJobs, loadGsheet])
 
-  const downloadTemplate = () => { window.location.href = '/api/admin/data-source/template' }
+  const downloadTemplate = () => {
+    window.location.href = '/api/admin/data-source/template'
+  }
 
   const connectSheet = () => {
     const q = sheetInput.trim() ? `?sheet=${encodeURIComponent(sheetInput.trim())}` : ''
@@ -131,11 +151,15 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   }
 
   const createSheet = async () => {
-    setCreating(true); setNotice(null)
+    setCreating(true)
+    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/create', { method: 'POST', credentials: 'include' })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) { setNotice({ kind: 'err', text: body.error || `Could not create sheet (${res.status})` }); return }
+      if (!res.ok) {
+        setNotice({ kind: 'err', text: body.error || `Could not create sheet (${res.status})` })
+        return
+      }
       if (body.spreadsheetId) setSheetInput(body.spreadsheetId)
       setNotice({ kind: 'ok', text: 'Created your template sheet. Fill it in, then Sync now.' })
       await loadGsheet()
@@ -145,15 +169,20 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   }
 
   const syncNow = async () => {
-    setSyncing(true); setNotice(null)
+    setSyncing(true)
+    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/sync', {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sheetInput.trim() ? { sheet: sheetInput.trim() } : {}),
       })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) { setNotice({ kind: 'err', text: body.error || `Sync failed (${res.status})` }); return }
+      if (!res.ok) {
+        setNotice({ kind: 'err', text: body.error || `Sync failed (${res.status})` })
+        return
+      }
       setNotice({ kind: 'ok', text: `Queued Google Sheet import of ${body.totalRows} rows.` })
       await Promise.all([loadJobs(), loadGsheet()])
     } finally {
@@ -164,20 +193,26 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const reconcile = async (decision: 'approve' | 'keep') => {
     const jobId = gsheet.lastSync?.id
     if (!jobId) return
-    setReconciling(true); setNotice(null)
+    setReconciling(true)
+    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/reconcile', {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, decision }),
       })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) { setNotice({ kind: 'err', text: body.error || `Reconcile failed (${res.status})` }); return }
+      if (!res.ok) {
+        setNotice({ kind: 'err', text: body.error || `Reconcile failed (${res.status})` })
+        return
+      }
       setNotice({
         kind: 'ok',
-        text: decision === 'approve'
-          ? `Removed ${body.applied} product(s) no longer in the sheet.`
-          : `Kept ${body.applied} product(s); they're now unmanaged by the sheet.`,
+        text:
+          decision === 'approve'
+            ? `Removed ${body.applied} product(s) no longer in the sheet.`
+            : `Kept ${body.applied} product(s); they're now unmanaged by the sheet.`,
       })
       await Promise.all([loadJobs(), loadGsheet()])
     } finally {
@@ -194,13 +229,17 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploading(true); setNotice(null)
+    setUploading(true)
+    setNotice(null)
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/admin/data-source/import', { method: 'POST', credentials: 'include', body: fd })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) { setNotice({ kind: 'err', text: body.error || `Upload failed (${res.status})` }); return }
+      if (!res.ok) {
+        setNotice({ kind: 'err', text: body.error || `Upload failed (${res.status})` })
+        return
+      }
       setNotice({ kind: 'ok', text: `Queued import of ${body.totalRows} rows. Processing in the background.` })
       await loadJobs()
     } finally {
@@ -210,8 +249,13 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   }
 
   const toggleDetail = async (id: string) => {
-    if (expanded === id) { setExpanded(null); setDetail(null); return }
-    setExpanded(id); setDetail(null)
+    if (expanded === id) {
+      setExpanded(null)
+      setDetail(null)
+      return
+    }
+    setExpanded(id)
+    setDetail(null)
     const res = await fetch(`/api/admin/data-source/jobs/${id}`, { credentials: 'include' })
     if (res.ok) setDetail((await res.json()).job)
   }
@@ -240,9 +284,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
         ))}
       </div>
 
-      {notice && (
-        <p className={`text-sm ${notice.kind === 'ok' ? 'text-green-600' : 'text-red-600'}`}>{notice.text}</p>
-      )}
+      {notice && <p className={`text-sm ${notice.kind === 'ok' ? 'text-green-600' : 'text-red-600'}`}>{notice.text}</p>}
 
       {tab === 'import' && (
         <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
@@ -277,9 +319,18 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
             )}
           </div>
           <ul className="text-xs text-foreground-secondary list-disc pl-5 space-y-1">
-            <li>One row per unit: <code>row_type</code> = product / variant / sub_variant, linked by <code>parent_sku</code> / <code>variant_sku</code>.</li>
-            <li>Existing SKU updates; new SKU creates. Category &amp; brand must already exist (by name) or the row errors.</li>
-            <li><code>image_urls</code> is pipe-delimited (<code>a.jpg|b.jpg</code>); images are fetched and uploaded in the background.</li>
+            <li>
+              One row per unit: <code>row_type</code> = product / variant / sub_variant, linked by{' '}
+              <code>parent_sku</code> / <code>variant_sku</code>.
+            </li>
+            <li>
+              Existing SKU updates; new SKU creates. Category &amp; brand must already exist (by name) or the row
+              errors.
+            </li>
+            <li>
+              <code>image_urls</code> is pipe-delimited (<code>a.jpg|b.jpg</code>); images are fetched and uploaded in
+              the background.
+            </li>
           </ul>
         </section>
       )}
@@ -288,14 +339,16 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
         <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-foreground">Google Sheet sync</h2>
-            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${gsheet.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+            <span
+              className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${gsheet.connected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}
+            >
               {gsheet.connected ? 'Connected' : 'Not connected'}
             </span>
           </div>
           <p className="text-xs text-foreground-secondary">
-            Connect your Google account, then create a template sheet in your own Drive with one click —
-            we copy the master template for you. Fill it in and Sync now. Or paste an existing sheet&apos;s
-            link below. Connecting requests access to sheets you own; you&apos;ll be asked to grant consent.
+            Connect your Google account, then create a template sheet in your own Drive with one click — we copy the
+            master template for you. Fill it in and Sync now. Or paste an existing sheet&apos;s link below. Connecting
+            requests access to sheets you own; you&apos;ll be asked to grant consent.
           </p>
 
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
@@ -332,7 +385,12 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-                <span className="text-foreground-secondary">Rows <span className="text-foreground">{gsheet.lastSync.processedRows}/{gsheet.lastSync.totalRows}</span></span>
+                <span className="text-foreground-secondary">
+                  Rows{' '}
+                  <span className="text-foreground">
+                    {gsheet.lastSync.processedRows}/{gsheet.lastSync.totalRows}
+                  </span>
+                </span>
                 <span className="text-green-600">Created {gsheet.lastSync.createdCount}</span>
                 <span className="text-blue-600">Updated {gsheet.lastSync.updatedCount}</span>
                 <span className="text-red-600">Errors {gsheet.lastSync.errorCount}</span>
@@ -341,9 +399,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   {gsheet.lastSync.imageProgress?.failed ? ` (${gsheet.lastSync.imageProgress.failed} failed)` : ''}
                 </span>
               </div>
-              {gsheet.lastSync.lastError && (
-                <p className="text-sm text-red-600">Error: {gsheet.lastSync.lastError}</p>
-              )}
+              {gsheet.lastSync.lastError && <p className="text-sm text-red-600">Error: {gsheet.lastSync.lastError}</p>}
             </div>
           ) : (
             gsheet.connected && <p className="text-sm text-foreground-secondary">No sync run yet.</p>
@@ -356,14 +412,16 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   {gsheet.lastSync.pendingDeletions.length} product(s) are no longer in the sheet
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  These were synced before but have since been removed from the connected sheet. Approving
-                  removal deletes products with no order history and deactivates the rest. Keeping them stops
-                  the sheet from managing them.
+                  These were synced before but have since been removed from the connected sheet. Approving removal
+                  deletes products with no order history and deactivates the rest. Keeping them stops the sheet from
+                  managing them.
                 </p>
               </div>
               <ul className="max-h-40 overflow-y-auto text-sm text-foreground list-disc pl-5 space-y-0.5">
                 {gsheet.lastSync.pendingDeletions.map(p => (
-                  <li key={p.productId}>{p.name} <span className="text-foreground-secondary">({p.sku})</span></li>
+                  <li key={p.productId}>
+                    {p.name} <span className="text-foreground-secondary">({p.sku})</span>
+                  </li>
                 ))}
               </ul>
               {canWrite && (
@@ -415,7 +473,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 <button
                   onClick={syncNow}
                   disabled={!gsheet.connected || syncing}
-                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white bg-blue-600 shadow-sm ${(!gsheet.connected || syncing) ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white bg-blue-600 shadow-sm ${!gsheet.connected || syncing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                 >
                   {syncing ? 'Syncing…' : 'Sync now'}
                 </button>
@@ -469,8 +527,16 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   )
 }
 
-function RowGroup({ job, expanded, detail, onToggle }: {
-  job: ImportJob; expanded: boolean; detail: ImportJob | null; onToggle: () => void
+function RowGroup({
+  job,
+  expanded,
+  detail,
+  onToggle,
+}: {
+  job: ImportJob
+  expanded: boolean
+  detail: ImportJob | null
+  onToggle: () => void
 }) {
   const img = job.image_progress || { total: 0, fetched: 0, failed: 0 }
   const rows = detail?.row_results ?? job.row_results ?? []
@@ -479,14 +545,23 @@ function RowGroup({ job, expanded, detail, onToggle }: {
       <tr className="border-t border-border-default">
         <td className="px-3 py-2 text-foreground-secondary">{new Date(job.created_at).toLocaleString()}</td>
         <td className="px-3 py-2">{job.source === 'google_sheet' ? 'Google Sheet' : 'Upload'}</td>
-        <td className="px-3 py-2"><StatusPill status={job.status} /></td>
-        <td className="px-3 py-2">{job.processed_rows}/{job.total_rows}</td>
+        <td className="px-3 py-2">
+          <StatusPill status={job.status} />
+        </td>
+        <td className="px-3 py-2">
+          {job.processed_rows}/{job.total_rows}
+        </td>
         <td className="px-3 py-2 text-green-600">{job.created_count}</td>
         <td className="px-3 py-2 text-blue-600">{job.updated_count}</td>
         <td className="px-3 py-2 text-red-600">{job.error_count}</td>
-        <td className="px-3 py-2 text-foreground-secondary">{img.fetched}/{img.total}{img.failed ? ` (${img.failed} failed)` : ''}</td>
+        <td className="px-3 py-2 text-foreground-secondary">
+          {img.fetched}/{img.total}
+          {img.failed ? ` (${img.failed} failed)` : ''}
+        </td>
         <td className="px-3 py-2 text-right">
-          <button onClick={onToggle} className="text-blue-600 hover:underline">{expanded ? 'Hide' : 'Details'}</button>
+          <button onClick={onToggle} className="text-blue-600 hover:underline">
+            {expanded ? 'Hide' : 'Details'}
+          </button>
         </td>
       </tr>
       {expanded && (
@@ -499,14 +574,21 @@ function RowGroup({ job, expanded, detail, onToggle }: {
               <div className="max-h-72 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="text-left text-foreground-secondary">
-                    <tr><th className="px-2 py-1">Row</th><th className="px-2 py-1">SKU</th><th className="px-2 py-1">Outcome</th><th className="px-2 py-1">Message</th></tr>
+                    <tr>
+                      <th className="px-2 py-1">Row</th>
+                      <th className="px-2 py-1">SKU</th>
+                      <th className="px-2 py-1">Outcome</th>
+                      <th className="px-2 py-1">Message</th>
+                    </tr>
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
                       <tr key={i} className="border-t border-border-default/60">
                         <td className="px-2 py-1">{r.row}</td>
                         <td className="px-2 py-1">{r.sku ?? '—'}</td>
-                        <td className="px-2 py-1"><OutcomePill outcome={r.outcome} /></td>
+                        <td className="px-2 py-1">
+                          <OutcomePill outcome={r.outcome} />
+                        </td>
                         <td className="px-2 py-1 text-foreground-secondary">{r.message ?? ''}</td>
                       </tr>
                     ))}

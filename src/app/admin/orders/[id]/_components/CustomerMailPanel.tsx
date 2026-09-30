@@ -107,7 +107,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: `${ctx} ${scenarioPrompt}`, subject }),
       })
-      const data = await res.json() as { html?: string; error?: string }
+      const data = (await res.json()) as { html?: string; error?: string }
       if (!res.ok || !data.html) {
         setScenarioError(data.error || 'Generation failed')
         return
@@ -122,7 +122,10 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   }
 
   async function handlePreview() {
-    if (showPreview) { setShowPreview(false); return }
+    if (showPreview) {
+      setShowPreview(false)
+      return
+    }
     setShowPreview(true)
     setPreviewHtml(null)
     setPreviewLoading(true)
@@ -171,16 +174,29 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       <button
         type="button"
-        onClick={() => { setOpen(o => !o); if (!open) applyTemplate(TEMPLATES[0].id) }}
+        onClick={() => {
+          setOpen(o => !o)
+          if (!open) applyTemplate(TEMPLATES[0].id)
+        }}
         className="w-full px-6 py-4 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-2">
           <svg className="w-5 h-5 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
           </svg>
           <h2 className="text-lg font-semibold text-foreground">Customer Mail</h2>
         </div>
-        <svg className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -189,9 +205,16 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         <div className="px-6 pb-6 border-t border-border-default pt-4 space-y-4">
           <div className="flex items-center gap-2 text-sm text-foreground-secondary">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              />
             </svg>
-            <span>To: <strong className="text-foreground">{customerName}</strong> &lt;{customerEmail}&gt;</span>
+            <span>
+              To: <strong className="text-foreground">{customerName}</strong> &lt;{customerEmail}&gt;
+            </span>
           </div>
 
           <div>
@@ -217,7 +240,13 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           {selectedTemplate === 'custom' && canUseAi && (
             <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-3 space-y-2">
               <label className="text-xs font-semibold text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+                  />
+                </svg>
                 Generate with AI
               </label>
               <textarea
@@ -234,19 +263,25 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                   disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 hover:bg-violet-600 text-white rounded text-xs font-medium disabled:opacity-50"
                 >
-                  {scenarioLoading ? 'Generating…' : (body ? 'Regenerate' : 'Generate')}
+                  {scenarioLoading ? 'Generating…' : body ? 'Regenerate' : 'Generate'}
                 </button>
                 {scenarioError && <span className="text-[11px] text-red-500">{scenarioError}</span>}
                 {scenarioLoading && !streamingTokens && (
                   <span className="inline-flex items-center gap-1.5 text-[11px] text-foreground-muted">
-                    <svg className="w-3 h-3 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    <svg className="w-3 h-3 animate-spin text-violet-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
                     AI is thinking…
                   </span>
                 )}
               </div>
               {scenarioLoading && streamingTokens && (
                 <div className="mt-2 p-2 rounded bg-violet-50 dark:bg-violet-900/10 border border-violet-200 dark:border-violet-800">
-                  <p className="text-[11px] text-violet-600 dark:text-violet-400 font-mono whitespace-pre-wrap line-clamp-3">{streamingTokens}<span className="animate-pulse">▍</span></p>
+                  <p className="text-[11px] text-violet-600 dark:text-violet-400 font-mono whitespace-pre-wrap line-clamp-3">
+                    {streamingTokens}
+                    <span className="animate-pulse">▍</span>
+                  </p>
                 </div>
               )}
             </div>
@@ -266,7 +301,8 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
             <RichTextEditor value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
-              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
+              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
+              are replaced with the actual customer details when the email is sent.
             </p>
           </div>
 
@@ -279,7 +315,11 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                  />
                 </svg>
                 {showPreview ? 'Hide Preview' : 'Preview Email'}
               </button>
@@ -292,7 +332,11 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                     <div className="flex items-center gap-2 text-xs text-foreground-muted p-4">
                       <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       Loading preview…
                     </div>
@@ -313,40 +357,51 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           )}
 
           {result && (
-            <div className={`px-4 py-3 rounded-lg text-sm ${
-              result.success
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
-            }`}>
+            <div
+              className={`px-4 py-3 rounded-lg text-sm ${
+                result.success
+                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+              }`}
+            >
               {result.message}
             </div>
           )}
 
           <div className="flex gap-3">
             <RequireWrite scope="customers:write">
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={sending || !subject.trim() || !body.trim()}
-              className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2"
-            >
-              {sending ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                  Send Email
-                </>
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={sending || !subject.trim() || !body.trim()}
+                className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2"
+              >
+                {sending ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                    Send Email
+                  </>
+                )}
+              </button>
             </RequireWrite>
             <button
               type="button"

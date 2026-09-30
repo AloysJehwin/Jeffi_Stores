@@ -16,7 +16,7 @@ async function getCategoryProductCounts() {
   )
 
   const counts: Record<string, number> = {}
-  rows.forEach((row) => {
+  rows.forEach(row => {
     counts[row.category_id] = parseInt(row.count, 10)
   })
 
@@ -30,8 +30,7 @@ export default async function BusinessCategoriesPage() {
   const productCounts = await getCategoryProductCounts()
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
-  const getSubcategories = (parentId: string) =>
-    categories.filter(c => c.parent_category_id === parentId)
+  const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
 
   return (
     <div className="bg-surface min-h-screen">
@@ -40,17 +39,16 @@ export default async function BusinessCategoriesPage() {
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
             All Categories
           </h1>
-          <p className="text-foreground-secondary">
-            Browse our complete range of product categories
-          </p>
+          <p className="text-foreground-secondary">Browse our complete range of product categories</p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {mainCategories.map((category) => {
+          {mainCategories.map(category => {
             const subcategories = getSubcategories(category.id)
-            const totalProducts = (productCounts[category.id] || 0) +
+            const totalProducts =
+              (productCounts[category.id] || 0) +
               subcategories.reduce((sum, sub) => sum + (productCounts[sub.id] || 0), 0)
 
             return (
@@ -80,16 +78,14 @@ export default async function BusinessCategoriesPage() {
                   </div>
 
                   {category.description && (
-                    <p className="text-sm text-foreground-secondary mb-4 line-clamp-2">
-                      {category.description}
-                    </p>
+                    <p className="text-sm text-foreground-secondary mb-4 line-clamp-2">{category.description}</p>
                   )}
 
                   {subcategories.length > 0 && (
                     <div className="border-t border-border-default pt-4">
                       <p className="text-xs font-medium text-foreground-muted mb-2">Subcategories:</p>
                       <div className="flex flex-wrap gap-2">
-                        {subcategories.slice(0, 5).map((sub) => (
+                        {subcategories.slice(0, 5).map(sub => (
                           <span
                             key={sub.id}
                             className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-1 rounded"
@@ -108,7 +104,12 @@ export default async function BusinessCategoriesPage() {
 
                   <div className="mt-4 flex items-center text-accent-500 group-hover:text-accent-600 font-semibold text-sm">
                     Browse Products
-                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                      className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>

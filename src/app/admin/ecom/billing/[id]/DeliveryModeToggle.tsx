@@ -56,9 +56,7 @@ export default function DeliveryModeToggle({
       >
         {busy ? 'Saving…' : ownDelhivery ? 'Switch to platform' : 'Switch to own Delhivery'}
       </button>
-      {!canEnable && (
-        <div className="text-[11px] text-foreground-muted mt-1">Connect a Delhivery token first.</div>
-      )}
+      {!canEnable && <div className="text-[11px] text-foreground-muted mt-1">Connect a Delhivery token first.</div>}
       {error && <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
     </div>
   )

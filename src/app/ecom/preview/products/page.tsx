@@ -1,11 +1,56 @@
 export const dynamic = 'force-static'
 
 const products = [
-  { id: '1', name: 'Wireless Headphones',     sku: 'SKU-1001', cat: 'Electronics', price: 'Rs. 2,499', stock: 24,  active: true,  featured: true  },
-  { id: '2', name: 'Cotton Casual Shirt',     sku: 'SKU-1012', cat: 'Apparel',     price: 'Rs. 899',   stock: 8,   active: true,  featured: false },
-  { id: '3', name: 'Stainless Steel Cookware', sku: 'SKU-1034', cat: 'Kitchen',     price: 'Rs. 1,299', stock: 0,   active: true,  featured: false },
-  { id: '4', name: 'Fitness Exercise Mat',    sku: 'SKU-1007', cat: 'Sports',      price: 'Rs. 649',   stock: 52,  active: true,  featured: true  },
-  { id: '5', name: 'Premium Bedsheet Set',    sku: 'SKU-1019', cat: 'Home',        price: 'Rs. 1,099', stock: 15,  active: false, featured: false },
+  {
+    id: '1',
+    name: 'Wireless Headphones',
+    sku: 'SKU-1001',
+    cat: 'Electronics',
+    price: 'Rs. 2,499',
+    stock: 24,
+    active: true,
+    featured: true,
+  },
+  {
+    id: '2',
+    name: 'Cotton Casual Shirt',
+    sku: 'SKU-1012',
+    cat: 'Apparel',
+    price: 'Rs. 899',
+    stock: 8,
+    active: true,
+    featured: false,
+  },
+  {
+    id: '3',
+    name: 'Stainless Steel Cookware',
+    sku: 'SKU-1034',
+    cat: 'Kitchen',
+    price: 'Rs. 1,299',
+    stock: 0,
+    active: true,
+    featured: false,
+  },
+  {
+    id: '4',
+    name: 'Fitness Exercise Mat',
+    sku: 'SKU-1007',
+    cat: 'Sports',
+    price: 'Rs. 649',
+    stock: 52,
+    active: true,
+    featured: true,
+  },
+  {
+    id: '5',
+    name: 'Premium Bedsheet Set',
+    sku: 'SKU-1019',
+    cat: 'Home',
+    price: 'Rs. 1,099',
+    stock: 15,
+    active: false,
+    featured: false,
+  },
 ]
 
 function stockCls(stock: number) {
@@ -19,7 +64,7 @@ function stockLabel(stock: number) {
   return 'In Stock'
 }
 
-const chartBars = [72,58,85,63,90,44,78,95,67,82,55,88]
+const chartBars = [72, 58, 85, 63, 90, 44, 78, 95, 67, 82, 55, 88]
 
 export default function PreviewProducts() {
   return (
@@ -43,7 +88,9 @@ export default function PreviewProducts() {
               <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
             </div>
             <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">4<span className="text-xs font-normal text-white/70">/6</span></p>
+              <p className="text-lg sm:text-2xl font-bold leading-none">
+                4<span className="text-xs font-normal text-white/70">/6</span>
+              </p>
               <p className="text-[10px] sm:text-xs text-white/80 mt-1">Featured</p>
             </div>
             <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
@@ -60,8 +107,14 @@ export default function PreviewProducts() {
             ))}
           </div>
           <div className="flex gap-3 mt-2 text-[10px] text-foreground-muted">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary-500/70 inline-block" />By category</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-accent-500/70 inline-block" />By brand</span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-primary-500/70 inline-block" />
+              By category
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-sm bg-accent-500/70 inline-block" />
+              By brand
+            </span>
           </div>
         </div>
       </div>
@@ -71,8 +124,13 @@ export default function PreviewProducts() {
         <table className="min-w-full divide-y divide-border-default">
           <thead className="bg-surface-secondary">
             <tr>
-              {['Product','Category','Price','Stock','Status'].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
+              {['Product', 'Category', 'Price', 'Stock', 'Status'].map(h => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -82,8 +140,18 @@ export default function PreviewProducts() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-surface-secondary border border-border-default flex items-center justify-center flex-shrink-0">
-                      <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <svg
+                        className="w-4 h-4 text-foreground-muted"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.5}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
                       </svg>
                     </div>
                     <div>
@@ -99,7 +167,9 @@ export default function PreviewProducts() {
                 <td className="px-4 py-3 text-sm font-semibold text-foreground">{p.price}</td>
                 <td className="px-4 py-3 text-sm text-foreground">{p.stock}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.active ? stockCls(p.stock) : 'bg-yellow-100 text-yellow-800'}`}>
+                  <span
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.active ? stockCls(p.stock) : 'bg-yellow-100 text-yellow-800'}`}
+                  >
                     {p.active ? stockLabel(p.stock) : 'Inactive'}
                   </span>
                 </td>

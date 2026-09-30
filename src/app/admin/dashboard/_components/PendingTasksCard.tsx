@@ -55,7 +55,10 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
           </Link>
           <svg
             className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
@@ -69,9 +72,7 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
             <span className={`w-1.5 h-1.5 rounded-full ${overdueCount > 0 ? 'bg-red-500' : 'bg-amber-500'}`} />
             {overdueCount > 0 ? `${overdueCount} overdue` : `${tasks.length} pending`}
           </span>
-          {tasks[0] && (
-            <span className="truncate text-foreground-secondary">{tasks[0].title}</span>
-          )}
+          {tasks[0] && <span className="truncate text-foreground-secondary">{tasks[0].title}</span>}
         </div>
       )}
 
@@ -83,15 +84,28 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
               <ul className="divide-y divide-border-default/70">
                 {paginated.map(t => (
                   <li key={t.id}>
-                    <Link href={viewAllHref} className="flex items-center gap-3 px-5 py-2.5 group hover:bg-surface-secondary transition-colors">
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-amber-500' : 'bg-foreground-muted/50'}`} />
+                    <Link
+                      href={viewAllHref}
+                      className="flex items-center gap-3 px-5 py-2.5 group hover:bg-surface-secondary transition-colors"
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-amber-500' : 'bg-foreground-muted/50'}`}
+                      />
                       <span className="flex-1 min-w-0">
-                        <span className="block text-sm text-foreground group-hover:text-accent-600 transition-colors truncate">{t.title}</span>
-                        {t.customer_name && <span className="block text-xs text-foreground-muted truncate">{t.customer_name}</span>}
+                        <span className="block text-sm text-foreground group-hover:text-accent-600 transition-colors truncate">
+                          {t.title}
+                        </span>
+                        {t.customer_name && (
+                          <span className="block text-xs text-foreground-muted truncate">{t.customer_name}</span>
+                        )}
                       </span>
                       {t.due_date && (
-                        <span className={`text-xs font-medium shrink-0 ${t.overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
-                          {t.overdue ? 'Overdue' : new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        <span
+                          className={`text-xs font-medium shrink-0 ${t.overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}
+                        >
+                          {t.overdue
+                            ? 'Overdue'
+                            : new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                         </span>
                       )}
                     </Link>
@@ -105,13 +119,19 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
                   </span>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => setPage(p => p - 1)} disabled={page === 0}
+                      onClick={() => setPage(p => p - 1)}
+                      disabled={page === 0}
                       className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
-                    >‹</button>
+                    >
+                      ‹
+                    </button>
                     <button
-                      onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page >= totalPages - 1}
                       className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
-                    >›</button>
+                    >
+                      ›
+                    </button>
                   </div>
                 </div>
               )}

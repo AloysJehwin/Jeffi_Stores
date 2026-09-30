@@ -108,11 +108,14 @@ export default function ScanClient() {
   }, [stopCamera])
 
   useEffect(() => {
-    if (!product) { setShelfLocations([]); return }
+    if (!product) {
+      setShelfLocations([])
+      return
+    }
     const params = new URLSearchParams({ product_id: product.product_id })
     if (product.variant_id) params.set('variant_id', product.variant_id)
     fetch(`/api/admin/shelving/stock?${params}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(d => setShelfLocations(d?.locations ?? []))
       .catch(() => setShelfLocations([]))
   }, [product])
@@ -123,24 +126,23 @@ export default function ScanClient() {
     scanningRef.current = true
 
     const codeReader = new BrowserQRCodeReader()
-    codeReader.decodeFromConstraints(
-      { video: { facingMode: 'environment' } },
-      videoRef.current,
-      async (result, _err, ctrl) => {
+    codeReader
+      .decodeFromConstraints({ video: { facingMode: 'environment' } }, videoRef.current, async (result, _err, ctrl) => {
         if (result) {
           ctrl.stop()
           controlsRef.current = null
           scanningRef.current = false
           await handleScanResult(result.getText())
         }
-      }
-    ).then(controls => {
-      controlsRef.current = controls
-    }).catch(() => {
-      setErrorMsg('Camera access denied or unavailable.')
-      setStage('error')
-      scanningRef.current = false
-    })
+      })
+      .then(controls => {
+        controlsRef.current = controls
+      })
+      .catch(() => {
+        setErrorMsg('Camera access denied or unavailable.')
+        setStage('error')
+        scanningRef.current = false
+      })
   }, [stage])
 
   async function handleScanResult(text: string) {
@@ -156,7 +158,10 @@ export default function ScanClient() {
     setStage('looking_up')
     try {
       const res = await fetch(`/api/admin/orders/by-number?q=${encodeURIComponent(orderNumber.trim())}`)
-      if (res.status === 404) { setStage('not_found'); return }
+      if (res.status === 404) {
+        setStage('not_found')
+        return
+      }
       if (!res.ok) throw new Error('Lookup failed')
       const data = await res.json()
       setOrder(data.order)
@@ -172,7 +177,10 @@ export default function ScanClient() {
     try {
       const res = await fetch(`/api/admin/products/by-sku?q=${encodeURIComponent(sku)}`)
       const data = await res.json()
-      if (res.status === 404) { setStage('not_found'); return }
+      if (res.status === 404) {
+        setStage('not_found')
+        return
+      }
       if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
       setProduct(data.item)
       setStage('found_product')
@@ -208,7 +216,9 @@ export default function ScanClient() {
         signal: AbortSignal.timeout(30000),
       })
       let d: any = {}
-      try { d = await res.json() } catch {}
+      try {
+        d = await res.json()
+      } catch {}
       if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
       setDoneStatus(s)
       setStage('done')
@@ -234,7 +244,9 @@ export default function ScanClient() {
         signal: AbortSignal.timeout(30000),
       })
       let d: any = {}
-      try { d = await res.json() } catch {}
+      try {
+        d = await res.json()
+      } catch {}
       if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
       setDoneStatus('shipped')
       setStage('done')
@@ -261,23 +273,38 @@ export default function ScanClient() {
   const incGst = product
     ? Number(((product.base_price || 0) * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
     : 0
-  const mrpIncGst = product && product.mrp > 0
-    ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
-    : null
+  const mrpIncGst =
+    product && product.mrp > 0 ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2)) : null
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {stage === 'idle' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-6 p-8">
           <div className="w-20 h-20 rounded-2xl bg-secondary-500/20 flex items-center justify-center">
-            <svg className="w-10 h-10 text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+            <svg
+              className="w-10 h-10 text-secondary-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z"
+              />
             </svg>
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">QuickScan</h1>
-            <p className="text-gray-400 mt-1 text-sm">Scan a packing slip QR to update orders, or a product label QR to view product details</p>
+            <p className="text-gray-400 mt-1 text-sm">
+              Scan a packing slip QR to update orders, or a product label QR to view product details
+            </p>
           </div>
           <button
             onClick={startCamera}
@@ -296,17 +323,9 @@ export default function ScanClient() {
 
       {stage === 'scanning' && (
         <div className="relative flex-1 bg-black overflow-hidden">
-          <video
-            ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
-            playsInline
-            muted
-          />
+          <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div
-              className="relative w-60 h-60 rounded-2xl"
-              style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
-            >
+            <div className="relative w-60 h-60 rounded-2xl" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}>
               <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-2xl" />
               <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-2xl" />
               <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-2xl" />
@@ -314,10 +333,7 @@ export default function ScanClient() {
             </div>
             <p className="mt-6 text-white/70 text-sm">Point at any QR code</p>
           </div>
-          <button
-            onClick={reset}
-            className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white"
-          >
+          <button onClick={reset} className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -366,14 +382,21 @@ export default function ScanClient() {
         <div className="flex flex-col items-center justify-center flex-1 gap-5 p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
             <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
             </svg>
           </div>
           <div>
             <p className="text-lg font-semibold text-white">Not found</p>
             <p className="text-gray-400 text-sm mt-1">This QR code does not match any order or product.</p>
           </div>
-          <button onClick={reset} className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
+          <button
+            onClick={reset}
+            className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+          >
             Try Again
           </button>
         </div>
@@ -396,7 +419,9 @@ export default function ScanClient() {
                 <p className="text-xs text-gray-400 mb-0.5">Order Number</p>
                 <p className="font-mono font-semibold text-white">#{order.order_number}</p>
               </div>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-700 text-gray-300'}`}>
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-700 text-gray-300'}`}
+              >
                 {statusLabel(order.status)}
               </span>
             </div>
@@ -445,22 +470,18 @@ export default function ScanClient() {
           <div className="bg-gray-800 rounded-2xl overflow-hidden">
             {product.image_url && (
               <div className="w-full h-48 bg-gray-900 flex items-center justify-center overflow-hidden">
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="w-full h-full object-contain"
-                />
+                <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
               </div>
             )}
             <div className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-white text-base leading-snug">{product.name}</p>
-                  {product.variant_name && (
-                    <p className="text-gray-400 text-sm mt-0.5">{product.variant_name}</p>
-                  )}
+                  {product.variant_name && <p className="text-gray-400 text-sm mt-0.5">{product.variant_name}</p>}
                 </div>
-                <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                <span
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                >
                   {product.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -468,13 +489,18 @@ export default function ScanClient() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-700/60 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-0.5">SKU</p>
-                  <p className="font-mono text-sm text-white break-all inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} className="text-white/70 hover:text-white" />}</p>
+                  <p className="font-mono text-sm text-white break-all inline-flex items-center gap-1">
+                    {product.sku}
+                    {product.sku && <CopySku sku={product.sku} className="text-white/70 hover:text-white" />}
+                  </p>
                 </div>
                 <div className="bg-gray-700/60 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-1">Stock</p>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-400">Inventory</span>
-                    <span className={`text-sm font-semibold ${product.inventory_quantity === 0 ? 'text-red-400' : product.inventory_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    <span
+                      className={`text-sm font-semibold ${product.inventory_quantity === 0 ? 'text-red-400' : product.inventory_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}
+                    >
                       {product.inventory_quantity}
                     </span>
                   </div>
@@ -536,7 +562,10 @@ export default function ScanClient() {
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {shelfLocations.map(l => (
-                      <div key={l.location_display_code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-600/60 text-xs">
+                      <div
+                        key={l.location_display_code}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-600/60 text-xs"
+                      >
                         <span className="font-mono text-white">{l.location_display_code}</span>
                         <span className="text-gray-500">·</span>
                         <span className="font-semibold text-secondary-400">{l.quantity}</span>
@@ -557,40 +586,42 @@ export default function ScanClient() {
         </div>
       )}
 
-      {stage === 'shipping' && order && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/60">
-          <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
-            <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
-            <h3 className="text-lg font-bold text-white">Mark as Shipped</h3>
-            <p className="text-gray-400 text-sm -mt-2">#{order.order_number}</p>
-            <div className="space-y-1.5">
-              <label className="text-sm text-gray-300">Tracking URL <span className="text-red-400">*</span></label>
-              <input
-                type="url"
-                placeholder="https://track.delhivery.com/..."
-                value={trackingUrl}
-                onChange={e => setTrackingUrl(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-secondary-500 text-sm"
-                autoFocus
-              />
+      {stage === 'shipping' &&
+        order &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/60">
+            <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
+              <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
+              <h3 className="text-lg font-bold text-white">Mark as Shipped</h3>
+              <p className="text-gray-400 text-sm -mt-2">#{order.order_number}</p>
+              <div className="space-y-1.5">
+                <label className="text-sm text-gray-300">
+                  Tracking URL <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://track.delhivery.com/..."
+                  value={trackingUrl}
+                  onChange={e => setTrackingUrl(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-secondary-500 text-sm"
+                  autoFocus
+                />
+              </div>
+              <button
+                onClick={confirmShipped}
+                disabled={!trackingUrl.trim()}
+                className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-colors"
+              >
+                Confirm Shipped
+              </button>
+              <button onClick={() => setStage('found_order')} className="w-full py-3 text-gray-400 text-sm">
+                Cancel
+              </button>
             </div>
-            <button
-              onClick={confirmShipped}
-              disabled={!trackingUrl.trim()}
-              className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-colors"
-            >
-              Confirm Shipped
-            </button>
-            <button
-              onClick={() => setStage('found_order')}
-              className="w-full py-3 text-gray-400 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body
+        )}
 
       {stage === 'updating' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 p-8">
@@ -602,7 +633,13 @@ export default function ScanClient() {
       {stage === 'done' && order && (
         <div className="flex flex-col items-center justify-center flex-1 gap-6 p-8 text-center">
           <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-            <svg className="w-10 h-10 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg
+              className="w-10 h-10 text-green-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
@@ -612,8 +649,7 @@ export default function ScanClient() {
               <span className="font-mono">#{order.order_number}</span>
             </p>
             <p className="text-gray-400 text-sm mt-1">
-              Status updated to{' '}
-              <span className="font-semibold text-green-400">{statusLabel(doneStatus)}</span>
+              Status updated to <span className="font-semibold text-green-400">{statusLabel(doneStatus)}</span>
             </p>
           </div>
           <button
@@ -629,14 +665,21 @@ export default function ScanClient() {
         <div className="flex flex-col items-center justify-center flex-1 gap-5 p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
             <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.05 3.378c.866-1.5 3.032-1.5 3.898 0L21.303 16.126zM12 15.75h.007v.008H12v-.008z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m9.303 3.376c.866 1.5-.217 3.374-1.948 3.374H4.645c-1.73 0-2.813-1.874-1.948-3.374L10.05 3.378c.866-1.5 3.032-1.5 3.898 0L21.303 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
             </svg>
           </div>
           <div>
             <p className="text-lg font-semibold text-white">Something went wrong</p>
             <p className="text-gray-400 text-sm mt-1">{errorMsg}</p>
           </div>
-          <button onClick={reset} className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
+          <button
+            onClick={reset}
+            className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+          >
             Try Again
           </button>
         </div>

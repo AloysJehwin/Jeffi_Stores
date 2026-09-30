@@ -17,9 +17,12 @@ interface HealthBreakdown {
 }
 
 const RISK_LABEL: Record<string, { label: string; color: string }> = {
-  healthy:        { label: 'Healthy',        color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  rising_concern: { label: 'Rising concern', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' },
-  high:           { label: 'High risk',      color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  healthy: { label: 'Healthy', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  rising_concern: {
+    label: 'Rising concern',
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  },
+  high: { label: 'High risk', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
 }
 
 function scoreColor(score: number) {
@@ -46,7 +49,13 @@ function Bar({ label, value, weight }: { label: string; value: number; weight: n
   )
 }
 
-export default function HealthScoreCard({ customerId, initial }: { customerId: string; initial: HealthBreakdown | null }) {
+export default function HealthScoreCard({
+  customerId,
+  initial,
+}: {
+  customerId: string
+  initial: HealthBreakdown | null
+}) {
   const [health, setHealth] = useState<HealthBreakdown | null>(initial)
   const [busy, setBusy] = useState(false)
 
@@ -72,14 +81,14 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
         <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Health Score</h2>
         <p className="text-sm text-foreground-muted">No score computed yet.</p>
         <RequireWrite scope="customers:write">
-        <button
-          type="button"
-          onClick={recompute}
-          disabled={busy}
-          className="mt-3 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
-        >
-          {busy ? 'Computing…' : 'Compute now'}
-        </button>
+          <button
+            type="button"
+            onClick={recompute}
+            disabled={busy}
+            className="mt-3 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+          >
+            {busy ? 'Computing…' : 'Compute now'}
+          </button>
         </RequireWrite>
       </div>
     )
@@ -91,25 +100,26 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
   const offset = circumference - (health.score / 100) * circumference
 
   const arrow = health.trend_delta_30d > 5 ? '▲' : health.trend_delta_30d < -5 ? '▼' : '→'
-  const arrowColor = health.trend_delta_30d > 5
-    ? 'text-green-600 dark:text-green-400'
-    : health.trend_delta_30d < -5
-    ? 'text-red-600 dark:text-red-400'
-    : 'text-foreground-muted'
+  const arrowColor =
+    health.trend_delta_30d > 5
+      ? 'text-green-600 dark:text-green-400'
+      : health.trend_delta_30d < -5
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-foreground-muted'
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Health Score</h2>
         <RequireWrite scope="customers:write">
-        <button
-          type="button"
-          onClick={recompute}
-          disabled={busy}
-          className="text-[10px] font-semibold text-accent-500 hover:text-accent-600 transition-colors disabled:opacity-50"
-        >
-          {busy ? 'Recomputing…' : 'Recompute'}
-        </button>
+          <button
+            type="button"
+            onClick={recompute}
+            disabled={busy}
+            className="text-[10px] font-semibold text-accent-500 hover:text-accent-600 transition-colors disabled:opacity-50"
+          >
+            {busy ? 'Recomputing…' : 'Recompute'}
+          </button>
         </RequireWrite>
       </div>
 
@@ -118,7 +128,11 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
           <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
             <circle cx="40" cy="40" r="36" strokeWidth="6" fill="none" className="stroke-surface-secondary" />
             <circle
-              cx="40" cy="40" r="36" strokeWidth="6" fill="none"
+              cx="40"
+              cy="40"
+              r="36"
+              strokeWidth="6"
+              fill="none"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
               strokeLinecap="round"
@@ -136,23 +150,24 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
             {risk.label}
           </span>
           <p className={`mt-2 text-xs ${arrowColor}`}>
-            <span className="font-bold">{arrow}</span>
-            {' '}
-            {health.trend_delta_30d > 0 ? '+' : ''}{health.trend_delta_30d} (30d)
+            <span className="font-bold">{arrow}</span> {health.trend_delta_30d > 0 ? '+' : ''}
+            {health.trend_delta_30d} (30d)
             {' · '}
-            {health.trend_delta_7d > 0 ? '+' : ''}{health.trend_delta_7d} (7d)
+            {health.trend_delta_7d > 0 ? '+' : ''}
+            {health.trend_delta_7d} (7d)
           </p>
           <p className="text-[10px] text-foreground-muted mt-1">
-            Updated {new Date(health.last_computed_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+            Updated{' '}
+            {new Date(health.last_computed_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
           </p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Bar label="Recency"      value={health.recency_score}      weight={40} />
-        <Bar label="Frequency"    value={health.frequency_score}    weight={30} />
-        <Bar label="Monetary"     value={health.monetary_score}     weight={20} />
-        <Bar label="Engagement"   value={health.engagement_score}   weight={5} />
+        <Bar label="Recency" value={health.recency_score} weight={40} />
+        <Bar label="Frequency" value={health.frequency_score} weight={30} />
+        <Bar label="Monetary" value={health.monetary_score} weight={20} />
+        <Bar label="Engagement" value={health.engagement_score} weight={5} />
         <Bar label="Satisfaction" value={health.satisfaction_score} weight={5} />
       </div>
     </div>

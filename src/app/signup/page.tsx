@@ -27,7 +27,11 @@ const ALL_CHANNEL_OPTIONS: { id: Channel; label: string; icon: React.ReactNode }
     label: 'Email',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+        />
       </svg>
     ),
   },
@@ -36,7 +40,11 @@ const ALL_CHANNEL_OPTIONS: { id: Channel; label: string; icon: React.ReactNode }
     label: 'SMS',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3"
+        />
       </svg>
     ),
   },
@@ -45,7 +53,11 @@ const ALL_CHANNEL_OPTIONS: { id: Channel; label: string; icon: React.ReactNode }
     label: 'WhatsApp',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"
+        />
       </svg>
     ),
   },
@@ -62,16 +74,17 @@ function SignupPage() {
   const [whatsappEnabled, setWhatsappEnabled] = useState(process.env.NEXT_PUBLIC_WHATSAPP_DISABLED !== 'true')
 
   useEffect(() => {
-    fetch('/api/feature-flags').then(r => r.json()).then(f => {
-      setSmsEnabled(f.smsEnabled ?? true)
-      setWhatsappEnabled(f.whatsappEnabled ?? true)
-    }).catch(() => {})
+    fetch('/api/feature-flags')
+      .then(r => r.json())
+      .then(f => {
+        setSmsEnabled(f.smsEnabled ?? true)
+        setWhatsappEnabled(f.whatsappEnabled ?? true)
+      })
+      .catch(() => {})
   }, [])
 
-  const channelOptions = ALL_CHANNEL_OPTIONS.filter(o =>
-    o.id === 'email' ||
-    (o.id === 'sms' && smsEnabled) ||
-    (o.id === 'whatsapp' && whatsappEnabled)
+  const channelOptions = ALL_CHANNEL_OPTIONS.filter(
+    o => o.id === 'email' || (o.id === 'sms' && smsEnabled) || (o.id === 'whatsapp' && whatsappEnabled)
   )
   const redirectTo = ['/login', '/signup'].some(p => rawRedirectTo.startsWith(p)) ? '/' : rawRedirectTo
 
@@ -112,18 +125,22 @@ function SignupPage() {
     const accessToken = params.get('access_token')
     if (!accessToken) return
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    setError(''); setGoogleLoading(true)
+    setError('')
+    setGoogleLoading(true)
     googleLoginWithAccessToken(accessToken)
-      .then(async (loggedInUser) => {
+      .then(async loggedInUser => {
         await refreshCart()
         const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
         const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
-        if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setPolicyAccepted(false); setShowPhoneVerify(true) }
-        else router.push(redirectTo)
+        if (needsPhone || needsPolicy) {
+          setPhoneRequiresPolicy(needsPolicy)
+          setPolicyAccepted(false)
+          setShowPhoneVerify(true)
+        } else router.push(redirectTo)
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
       .finally(() => setGoogleLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-switch channel back to email if phone is cleared
@@ -287,10 +304,7 @@ function SignupPage() {
     }
   }
 
-  const otpDestination =
-    channel === 'email'
-      ? email
-      : `+91 ••••• ${phone.slice(-4)}`
+  const otpDestination = channel === 'email' ? email : `+91 ••••• ${phone.slice(-4)}`
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -298,9 +312,7 @@ function SignupPage() {
         <div className="bg-surface-elevated rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
-            <p className="mt-2 text-sm text-foreground-secondary">
-              Join {config.identity.name} for exclusive deals
-            </p>
+            <p className="mt-2 text-sm text-foreground-secondary">Join {config.identity.name} for exclusive deals</p>
           </div>
 
           {fromLogin && step === 'details' && (
@@ -330,10 +342,22 @@ function SignupPage() {
                   <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                    <path
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      fill="#4285F4"
+                    />
+                    <path
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      fill="#34A853"
+                    />
+                    <path
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                      fill="#FBBC05"
+                    />
+                    <path
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      fill="#EA4335"
+                    />
                   </svg>
                 )}
                 {googleLoading ? 'Signing up…' : 'Sign up with Google'}
@@ -358,7 +382,10 @@ function SignupPage() {
                     First Name *
                   </label>
                   <input
-                    id="firstName" type="text" required value={firstName}
+                    id="firstName"
+                    type="text"
+                    required
+                    value={firstName}
                     onChange={e => setFirstName(e.target.value)}
                     className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                     placeholder="John"
@@ -370,7 +397,9 @@ function SignupPage() {
                     Last Name
                   </label>
                   <input
-                    id="lastName" type="text" value={lastName}
+                    id="lastName"
+                    type="text"
+                    value={lastName}
                     onChange={e => setLastName(e.target.value)}
                     className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                     placeholder="Doe"
@@ -383,7 +412,10 @@ function SignupPage() {
                   Email Address *
                 </label>
                 <input
-                  id="email" type="email" required value={email}
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                   placeholder="your@email.com"
@@ -399,7 +431,12 @@ function SignupPage() {
                     +91
                   </span>
                   <input
-                    id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone} required
+                    id="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phone}
+                    required
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                     placeholder="00000 00000"
@@ -447,8 +484,13 @@ function SignupPage() {
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
-                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending OTP...</>
-                ) : 'Send Verification Code'}
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Sending OTP...
+                  </>
+                ) : (
+                  'Send Verification Code'
+                )}
               </button>
             </form>
           )}
@@ -466,11 +508,17 @@ function SignupPage() {
                   Verification Code
                 </label>
                 <input
-                  id="otp" type="text" required maxLength={6} value={otp}
+                  id="otp"
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
                   ref={otpInputRef}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                   className={`w-full px-4 py-3 border rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest transition-all ${
-                    otp.length === 6 ? 'border-green-500 ring-2 ring-green-200 dark:ring-green-900/40' : 'border-border-secondary'
+                    otp.length === 6
+                      ? 'border-green-500 ring-2 ring-green-200 dark:ring-green-900/40'
+                      : 'border-border-secondary'
                   }`}
                   placeholder="000000"
                   autoFocus
@@ -489,7 +537,11 @@ function SignupPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setStep('details'); setOtp(''); submittedOtpRef.current = '' }}
+                  onClick={() => {
+                    setStep('details')
+                    setOtp('')
+                    submittedOtpRef.current = ''
+                  }}
                   className="text-foreground-secondary hover:text-foreground"
                 >
                   Change details
@@ -504,8 +556,24 @@ function SignupPage() {
                 />
                 <span>
                   I agree to the{' '}
-                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  <a
+                    href="/legal/privacy-policy"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Privacy Policy
+                  </a>{' '}
+                  and{' '}
+                  <a
+                    href="/legal/terms-and-conditions"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Terms &amp; Conditions
+                  </a>
+                  .
                 </span>
               </label>
               <button
@@ -514,8 +582,13 @@ function SignupPage() {
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isLoading ? (
-                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Creating Account...</>
-                ) : 'Verify & Create Account'}
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Creating Account...
+                  </>
+                ) : (
+                  'Verify & Create Account'
+                )}
               </button>
             </form>
           )}
@@ -533,8 +606,14 @@ function SignupPage() {
         <PhoneVerifyModal
           requiresPolicy={phoneRequiresPolicy}
           title={phoneRequiresPolicy ? 'Almost there' : undefined}
-          onVerified={() => { setShowPhoneVerify(false); router.push(redirectTo) }}
-          onCancel={() => { setShowPhoneVerify(false); logout() }}
+          onVerified={() => {
+            setShowPhoneVerify(false)
+            router.push(redirectTo)
+          }}
+          onCancel={() => {
+            setShowPhoneVerify(false)
+            logout()
+          }}
         />
       )}
     </div>

@@ -20,9 +20,7 @@ async function loadHeroData() {
     queryMany<{ slug: string; name: string }>(
       `SELECT slug, name FROM categories WHERE is_active = true AND slug IS NOT NULL ORDER BY name`
     ),
-    queryMany<{ id: string; name: string }>(
-      `SELECT id, name FROM brands WHERE is_active = true ORDER BY name`
-    ),
+    queryMany<{ id: string; name: string }>(`SELECT id, name FROM brands WHERE is_active = true ORDER BY name`),
     queryMany<{ grade: string }>(
       `SELECT DISTINCT grade FROM products WHERE grade IS NOT NULL AND grade != '' AND is_active = true ORDER BY grade`
     ),
@@ -40,11 +38,16 @@ async function loadHeroData() {
 
 async function loadSectionOptions(
   categories: { value: string; label: string }[],
-  brands: { value: string; label: string }[],
+  brands: { value: string; label: string }[]
 ): Promise<SectionOptions> {
   const [storefront, identity] = await Promise.all([getStorefrontContent(), getStoreIdentity()])
   const counts = await queryOne<{
-    featured: string; new_arrivals: string; best_sellers: string; on_sale: string; bundles: string; approved_reviews: string
+    featured: string
+    new_arrivals: string
+    best_sellers: string
+    on_sale: string
+    bundles: string
+    approved_reviews: string
   }>(
     `SELECT
        count(*) FILTER (WHERE is_featured = true)          AS featured,
@@ -85,15 +88,17 @@ export default async function HomepagePage() {
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
 
-  const admin = await queryOne<{ role: string; scopes: string[] }>(
-    `SELECT role, scopes FROM admins WHERE id = $1`, [adminId]
-  )
+  const admin = await queryOne<{ role: string; scopes: string[] }>(`SELECT role, scopes FROM admins WHERE id = $1`, [
+    adminId,
+  ])
   if (!admin || !hasScope(admin.role, admin.scopes || [], 'settings:write')) {
     redirect(ap('/admin/settings', host))
   }
 
   const [hero, editable, draftSummary] = await Promise.all([
-    loadHeroData(), getEditableHomepage(), getHomepageDraftSummary(),
+    loadHeroData(),
+    getEditableHomepage(),
+    getHomepageDraftSummary(),
   ])
   const sectionOptions = await loadSectionOptions(hero.categoryOptions, hero.brandOptions)
 
@@ -102,7 +107,9 @@ export default async function HomepagePage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Homepage</h1>
         <p className="text-sm text-foreground-muted mt-0.5">
-          Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes are saved as a draft and go live only when you publish.
+          Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to
+          edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes
+          are saved as a draft and go live only when you publish.
         </p>
       </div>
 

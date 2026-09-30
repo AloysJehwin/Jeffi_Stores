@@ -14,7 +14,11 @@ export default function Loading() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 stagger-grid gap-6">
           {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-3 animate-pulse" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-3 animate-pulse"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <div className="aspect-[5/3] bg-surface-secondary rounded-lg mb-4" />
               <div className="h-4 bg-surface-secondary rounded mb-2" />
               <div className="h-4 bg-surface-secondary rounded w-3/4 mb-3" />

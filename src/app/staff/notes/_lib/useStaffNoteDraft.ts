@@ -30,12 +30,20 @@ export function useStaffNoteDraft(logoutEndpoint: string) {
   const [recentNotes, setRecentNotes] = useState<CustomerNote[]>([])
 
   useEffect(() => {
-    if (customer || query.trim().length < 2) { setResults([]); return }
+    if (customer || query.trim().length < 2) {
+      setResults([])
+      return
+    }
     const t = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/staff/customers/search?q=${encodeURIComponent(query.trim())}`, { credentials: 'include' })
-        if (res.status === 401) { router.refresh(); return }
+        const res = await fetch(`/api/staff/customers/search?q=${encodeURIComponent(query.trim())}`, {
+          credentials: 'include',
+        })
+        if (res.status === 401) {
+          router.refresh()
+          return
+        }
         const data = await res.json().catch(() => ({}))
         setResults(data.customers || [])
       } finally {
@@ -47,15 +55,25 @@ export function useStaffNoteDraft(logoutEndpoint: string) {
 
   const loadRecent = useCallback(async (customerId: string) => {
     const res = await fetch(`/api/staff/notes?customerId=${customerId}`, { credentials: 'include' }).catch(() => null)
-    if (!res || !res.ok) { setRecentNotes([]); return }
+    if (!res || !res.ok) {
+      setRecentNotes([])
+      return
+    }
     const data = await res.json().catch(() => ({}))
     setRecentNotes(data.notes || [])
   }, [])
 
   useEffect(() => {
-    if (!customer) { setOrders([]); setOrderId(''); setRecentNotes([]); return }
+    if (!customer) {
+      setOrders([])
+      setOrderId('')
+      setRecentNotes([])
+      return
+    }
     fetch(`/api/staff/orders/search?customerId=${customer.id}`, { credentials: 'include' })
-      .then(r => r.json()).then(d => setOrders(d.orders || [])).catch(() => setOrders([]))
+      .then(r => r.json())
+      .then(d => setOrders(d.orders || []))
+      .catch(() => setOrders([]))
     loadRecent(customer.id)
   }, [customer, loadRecent])
 
@@ -68,23 +86,52 @@ export function useStaffNoteDraft(logoutEndpoint: string) {
     if (!list) return
     setPhotos(prev => [...prev, ...Array.from(list)].slice(0, MAX_FILES))
   }
-  function removePhoto(i: number) { setPhotos(prev => prev.filter((_, j) => j !== i)) }
-  function toggleTag(t: string) { setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]) }
-  function selectCustomer(c: CustomerHit) { setCustomer(c); setResults([]) }
-  function clearCustomer() { setCustomer(null); setQuery('') }
-  function onScanResult(text: string) { setScanning(false); setCustomer(null); setQuery(text) }
+  function removePhoto(i: number) {
+    setPhotos(prev => prev.filter((_, j) => j !== i))
+  }
+  function toggleTag(t: string) {
+    setTags(prev => (prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]))
+  }
+  function selectCustomer(c: CustomerHit) {
+    setCustomer(c)
+    setResults([])
+  }
+  function clearCustomer() {
+    setCustomer(null)
+    setQuery('')
+  }
+  function onScanResult(text: string) {
+    setScanning(false)
+    setCustomer(null)
+    setQuery(text)
+  }
 
   function reset(keepCustomer: boolean) {
-    setTitle(''); setBody(''); setTags([]); setShared(false); setPhotos([]); setAudio(null); setOrderId(''); setError(''); setDone(null)
+    setTitle('')
+    setBody('')
+    setTags([])
+    setShared(false)
+    setPhotos([])
+    setAudio(null)
+    setOrderId('')
+    setError('')
+    setDone(null)
     if (!keepCustomer) clearCustomer()
   }
 
   const canSubmit = !!customer && (!!title.trim() || !!body.trim() || photos.length > 0 || !!audio)
 
   async function submit() {
-    if (!customer) { setError('Pick a customer first'); return }
-    if (!canSubmit) { setError('Add a photo, a recording, or a note'); return }
-    setSubmitting(true); setError('')
+    if (!customer) {
+      setError('Pick a customer first')
+      return
+    }
+    if (!canSubmit) {
+      setError('Add a photo, a recording, or a note')
+      return
+    }
+    setSubmitting(true)
+    setError('')
     try {
       const fd = new FormData()
       fd.set('customerId', customer.id)
@@ -104,8 +151,14 @@ export function useStaffNoteDraft(logoutEndpoint: string) {
       fd.set('durations', JSON.stringify(durations))
       const res = await fetch('/api/staff/notes', { method: 'POST', body: fd, credentials: 'include' })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 401) { router.refresh(); return }
-      if (!res.ok) { setError(data.error || 'Failed to save'); return }
+      if (res.status === 401) {
+        router.refresh()
+        return
+      }
+      if (!res.ok) {
+        setError(data.error || 'Failed to save')
+        return
+      }
       setDone({ warnings: data.warnings || [] })
       loadRecent(customer.id)
     } catch {
@@ -121,12 +174,42 @@ export function useStaffNoteDraft(logoutEndpoint: string) {
   }
 
   return {
-    query, setQuery, results, searching, customer, selectCustomer, clearCustomer,
-    orders, orderId, setOrderId, selectedOrder,
-    title, setTitle, body, setBody, tags, toggleTag, shared, setShared,
-    photos, previews, addPhotos, removePhoto, audio, setAudio,
-    scanning, setScanning, onScanResult,
-    submitting, error, done, canSubmit, submit, reset, logout, recentNotes,
+    query,
+    setQuery,
+    results,
+    searching,
+    customer,
+    selectCustomer,
+    clearCustomer,
+    orders,
+    orderId,
+    setOrderId,
+    selectedOrder,
+    title,
+    setTitle,
+    body,
+    setBody,
+    tags,
+    toggleTag,
+    shared,
+    setShared,
+    photos,
+    previews,
+    addPhotos,
+    removePhoto,
+    audio,
+    setAudio,
+    scanning,
+    setScanning,
+    onScanResult,
+    submitting,
+    error,
+    done,
+    canSubmit,
+    submit,
+    reset,
+    logout,
+    recentNotes,
   }
 }
 

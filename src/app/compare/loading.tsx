@@ -30,10 +30,20 @@ export default function Loading() {
             ))}
           </div>
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className={`grid grid-cols-4 gap-4 px-4 py-3 border-b border-border-default last:border-0 ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}>
-              <div className="h-3 w-20 bg-surface-secondary rounded animate-pulse" style={{ animationDelay: `${i * 40}ms` }} />
+            <div
+              key={i}
+              className={`grid grid-cols-4 gap-4 px-4 py-3 border-b border-border-default last:border-0 ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-elevated'}`}
+            >
+              <div
+                className="h-3 w-20 bg-surface-secondary rounded animate-pulse"
+                style={{ animationDelay: `${i * 40}ms` }}
+              />
               {Array.from({ length: 3 }).map((_, j) => (
-                <div key={j} className="h-3 bg-surface-secondary rounded animate-pulse" style={{ width: `${60 + Math.random() * 30}%`, animationDelay: `${(i * 3 + j) * 30}ms` }} />
+                <div
+                  key={j}
+                  className="h-3 bg-surface-secondary rounded animate-pulse"
+                  style={{ width: `${60 + Math.random() * 30}%`, animationDelay: `${(i * 3 + j) * 30}ms` }}
+                />
               ))}
             </div>
           ))}

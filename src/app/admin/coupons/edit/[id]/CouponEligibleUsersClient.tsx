@@ -75,7 +75,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
               className="flex items-center gap-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               {allUsersMode ? 'Restrict to specific users' : 'Add user'}
             </button>
@@ -87,7 +87,11 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
                     ? 'Adding users will restrict this coupon — only they can redeem it'
                     : 'Search and add a user'}
                 </p>
-                <button type="button" onClick={() => setShowPicker(false)} className="text-xs text-foreground-muted hover:text-foreground">
+                <button
+                  type="button"
+                  onClick={() => setShowPicker(false)}
+                  className="text-xs text-foreground-muted hover:text-foreground"
+                >
                   Cancel
                 </button>
               </div>
@@ -101,10 +105,16 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
         <table className="w-full text-sm">
           <thead className="bg-surface-secondary">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">User</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Email</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Redeemed</th>
-              {showRemove && <th className="px-4 py-3 w-16"/>}
+              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
+                User
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
+                Email
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
+                Redeemed
+              </th>
+              {showRemove && <th className="px-4 py-3 w-16" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
@@ -115,9 +125,15 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
                 </td>
                 <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
                 <td className="px-4 py-3">
-                  {u.times_used > 0
-                    ? <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">{u.times_used}x used</span>
-                    : <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">Not used</span>}
+                  {u.times_used > 0 ? (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                      {u.times_used}x used
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">
+                      Not used
+                    </span>
+                  )}
                 </td>
                 {showRemove && (
                   <td className="px-4 py-3 text-right">

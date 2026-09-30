@@ -4,7 +4,11 @@ export default function Loading() {
       <div className="h-8 w-40 bg-surface-secondary rounded animate-pulse mb-6" />
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default divide-y divide-border-default">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+          <div
+            key={i}
+            className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 animate-pulse"
+            style={{ animationDelay: `${i * 100}ms` }}
+          >
             <div className="w-full sm:w-24 h-24 bg-surface-secondary rounded-lg shrink-0" />
             <div className="flex-1 space-y-2">
               <div className="flex items-center justify-between gap-2">

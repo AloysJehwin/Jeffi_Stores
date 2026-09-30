@@ -19,25 +19,29 @@ function ShelfLocationsSection({ productId }: { productId: string }) {
 
   useEffect(() => {
     fetch(`/api/admin/shelving/stock?product_id=${productId}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(d => setLocations(d?.locations ?? []))
       .catch(() => setLocations([]))
   }, [productId])
 
   if (locations === null) return null
-  if (locations.length === 0) return (
-    <div className="px-5 pb-4">
-      <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Shelf Locations</p>
-      <p className="text-xs text-foreground-muted italic">No stock assigned to any shelf location</p>
-    </div>
-  )
+  if (locations.length === 0)
+    return (
+      <div className="px-5 pb-4">
+        <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Shelf Locations</p>
+        <p className="text-xs text-foreground-muted italic">No stock assigned to any shelf location</p>
+      </div>
+    )
 
   return (
     <div className="px-5 pb-5">
       <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">Shelf Locations</p>
       <div className="flex flex-wrap gap-2">
         {locations.map(l => (
-          <div key={l.location_display_code} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border-default bg-surface-secondary text-xs">
+          <div
+            key={l.location_display_code}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border-default bg-surface-secondary text-xs"
+          >
             <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
             <span className="text-foreground-muted">·</span>
             <span className="font-semibold text-foreground">{l.quantity}</span>
@@ -70,7 +74,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   }, [product, fetchDetail])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -87,10 +93,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
 
       <div
@@ -111,7 +114,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight">{product.name}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span></p>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              <span className="inline-flex items-center gap-1">
+                {product.sku}
+                {product.sku && <CopySku sku={product.sku} />}
+              </span>
+            </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
@@ -145,7 +153,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       className="w-full h-full object-contain"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-foreground-muted"><Package className="w-12 h-12" /></div>
+                    <div className="w-full h-full flex items-center justify-center text-foreground-muted">
+                      <Package className="w-12 h-12" />
+                    </div>
                   )}
                 </div>
                 {images.length > 1 && (
@@ -156,7 +166,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         onClick={() => setImgIdx(idx)}
                         className={`w-12 h-12 rounded border-2 overflow-hidden flex-shrink-0 transition-colors ${idx === imgIdx ? 'border-accent-500' : 'border-border-default'}`}
                       >
-                        <ImgWithSkeleton src={img.thumbnail_url || img.image_url} alt="" blurhash={img.blurhash} className="w-full h-full object-cover" />
+                        <ImgWithSkeleton
+                          src={img.thumbnail_url || img.image_url}
+                          alt=""
+                          blurhash={img.blurhash}
+                          className="w-full h-full object-cover"
+                        />
                       </button>
                     ))}
                   </div>
@@ -167,17 +182,25 @@ export default function ProductDetailModal({ product, onClose }: Props) {
               <div className="space-y-4">
                 {/* Status badges */}
                 <div className="flex flex-wrap gap-2">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                  <span
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                  >
                     {p.is_active ? 'Active' : 'Inactive'}
                   </span>
                   {p.is_featured && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1">
+                      <Star className="w-3 h-3 fill-current" /> Featured
+                    </span>
                   )}
                   {p.stock_status === 'Out of Stock' && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Out of Stock</span>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                      Out of Stock
+                    </span>
                   )}
                   {p.stock_status === 'Low Stock' && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Low Stock</span>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                      Low Stock
+                    </span>
                   )}
                 </div>
                 <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
@@ -232,12 +255,16 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   </div>
                   <div>
                     <p className="text-xs text-foreground-muted">GST Rate</p>
-                    <p className="text-foreground font-medium">{p.gst_percentage != null ? `${p.gst_percentage}%` : '—'}</p>
+                    <p className="text-foreground font-medium">
+                      {p.gst_percentage != null ? `${p.gst_percentage}%` : '—'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-foreground-muted">Base Price</p>
                     <p className="text-foreground font-medium">
-                      {p.base_price ? `Rs. ${Number(p.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                      {p.base_price
+                        ? `Rs. ${Number(p.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        : '—'}
                     </p>
                   </div>
                 </div>
@@ -252,14 +279,23 @@ export default function ProductDetailModal({ product, onClose }: Props) {
               </div>
             </div>
 
-            {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
+            {(p.ai_description ||
+              p.ai_product_type ||
+              p.ai_use_cases?.length ||
+              p.ai_keywords?.length ||
+              p.ai_features?.length ||
+              p.ai_search_tags?.length ||
+              p.ai_who_uses_it ||
+              p.ai_application) && (
               <div className="px-5 pb-4 border-t border-border-default pt-4">
                 <p className="text-xs text-foreground-muted uppercase tracking-wide mb-3">AI Intelligence</p>
                 <div className="space-y-3">
                   {p.ai_product_type && (
                     <div>
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                      <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{p.ai_product_type}</span>
+                      <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                        {p.ai_product_type}
+                      </span>
                     </div>
                   )}
                   {p.ai_description && (
@@ -285,7 +321,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases</p>
                       <div className="flex flex-wrap gap-1">
                         {p.ai_use_cases.map((t: string) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded">{t}</span>
+                          <span
+                            key={t}
+                            className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+                          >
+                            {t}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -295,7 +336,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Keywords</p>
                       <div className="flex flex-wrap gap-1">
                         {p.ai_keywords.map((t: string) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                          <span
+                            key={t}
+                            className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                          >
+                            {t}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -305,7 +351,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Features</p>
                       <div className="flex flex-wrap gap-1">
                         {p.ai_features.map((t: string) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                          <span
+                            key={t}
+                            className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                          >
+                            {t}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -315,7 +366,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags</p>
                       <div className="flex flex-wrap gap-1">
                         {p.ai_search_tags.map((t: string) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                          <span
+                            key={t}
+                            className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                          >
+                            {t}
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -329,7 +385,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
             {/* Variants table */}
             {variants.length > 0 && (
               <div className="px-5 pb-5">
-                <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">Variants ({variants.length})</p>
+                <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">
+                  Variants ({variants.length})
+                </p>
                 <div className="rounded-lg border border-border-default overflow-hidden">
                   <table className="w-full text-sm divide-y divide-border-default table-fixed">
                     <thead className="bg-surface-secondary">
@@ -337,53 +395,98 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[26%]">Name</th>
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">SKU</th>
                         <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">Price</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Inventory</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">Listed</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Status</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">
+                          Inventory
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[16%]">
+                          Listed
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">
+                          Status
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {variants.map((v: any) => {
                         const subs: any[] = v.sub_variants || []
                         const hasSubs = subs.length > 0
-                        const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
+                        const vInventory = hasSubs
+                          ? Number(v.sub_variant_stock_total || 0)
+                          : Number(v.inventory_quantity || 0)
                         const vListed = hasSubs
-                          ? (subs.some((sv: any) => sv.stock_status && sv.stock_status !== 'Out of Stock') ? 'In Stock' : 'Out of Stock')
-                          : (v.stock_status || '—')
+                          ? subs.some((sv: any) => sv.stock_status && sv.stock_status !== 'Out of Stock')
+                            ? 'In Stock'
+                            : 'Out of Stock'
+                          : v.stock_status || '—'
                         const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                         return (
                           <React.Fragment key={v.id}>
                             <tr className="hover:bg-surface-secondary">
                               <td className="px-3 py-2 truncate font-medium text-foreground" title={v.variant_name}>
                                 {v.variant_name}
-                                {hasSubs && <span className="ml-1.5 text-[10px] font-normal text-foreground-muted">({subs.length} sub)</span>}
+                                {hasSubs && (
+                                  <span className="ml-1.5 text-[10px] font-normal text-foreground-muted">
+                                    ({subs.length} sub)
+                                  </span>
+                                )}
                               </td>
-                              <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}><span className="inline-flex items-center gap-1">{v.sku || '—'}{v.sku && <CopySku sku={v.sku} />}</span></td>
+                              <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}>
+                                <span className="inline-flex items-center gap-1">
+                                  {v.sku || '—'}
+                                  {v.sku && <CopySku sku={v.sku} />}
+                                </span>
+                              </td>
                               <td className="px-3 py-2 text-foreground">
-                                {hasSubs ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}` : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
+                                {hasSubs
+                                  ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}`
+                                  : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
                               </td>
                               <td className="px-3 py-2 text-foreground font-medium">{vInventory}</td>
                               <td className="px-3 py-2 text-foreground-muted whitespace-nowrap">{vListed}</td>
                               <td className="px-3 py-2">
-                                <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                                <span
+                                  className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                                >
                                   {v.is_active ? 'Active' : 'Off'}
                                 </span>
                               </td>
                             </tr>
-                            {hasSubs && subs.map((sv: any) => (
-                              <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 text-xs">
-                                <td className="px-3 py-1.5 pl-6 truncate text-foreground-secondary" title={sv.sub_variant_name}>↳ {sv.sub_variant_name}</td>
-                                <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
-                                <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
-                                <td className="px-3 py-1.5 text-foreground font-medium">{sv.inventory_quantity ?? 0}</td>
-                                <td className="px-3 py-1.5 text-foreground-muted whitespace-nowrap">{sv.stock_status || '—'}</td>
-                                <td className="px-3 py-1.5">
-                                  <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
-                                    {sv.is_active ? 'Active' : 'Off'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
+                            {hasSubs &&
+                              subs.map((sv: any) => (
+                                <tr
+                                  key={sv.id}
+                                  className="bg-surface-secondary/30 hover:bg-surface-secondary/50 text-xs"
+                                >
+                                  <td
+                                    className="px-3 py-1.5 pl-6 truncate text-foreground-secondary"
+                                    title={sv.sub_variant_name}
+                                  >
+                                    ↳ {sv.sub_variant_name}
+                                  </td>
+                                  <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}>
+                                    <span className="inline-flex items-center gap-1">
+                                      {sv.sku || '—'}
+                                      {sv.sku && <CopySku sku={sv.sku} />}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-1.5 text-foreground">
+                                    {sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-foreground font-medium">
+                                    {sv.inventory_quantity ?? 0}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-foreground-muted whitespace-nowrap">
+                                    {sv.stock_status || '—'}
+                                  </td>
+                                  <td className="px-3 py-1.5">
+                                    <span
+                                      className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                                    >
+                                      {sv.is_active ? 'Active' : 'Off'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
                           </React.Fragment>
                         )
                       })}

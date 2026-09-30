@@ -93,7 +93,10 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   async function handleValuate() {
-    if (!condition) { setError('Please select a condition.'); return }
+    if (!condition) {
+      setError('Please select a condition.')
+      return
+    }
     setIsSubmitting(true)
     setError(null)
     try {
@@ -128,16 +131,16 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
           >
             #{row.order_number}
           </Link>
-          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-700'}`}>
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-700'}`}
+          >
             {STATUS_LABELS[row.status] || row.status}
           </span>
           <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
             Replacement
           </span>
         </div>
-        <span className="text-xs text-foreground-muted">
-          {new Date(row.created_at).toLocaleDateString('en-IN')}
-        </span>
+        <span className="text-xs text-foreground-muted">{new Date(row.created_at).toLocaleDateString('en-IN')}</span>
       </div>
 
       <div className="p-4 space-y-4">
@@ -157,7 +160,9 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
               <p className="text-foreground-secondary text-xs mb-0.5">RVP AWB</p>
               <p className="font-mono text-sm text-foreground">{row.rvp_awb_number}</p>
               {row.rvp_created_at && (
-                <p className="text-xs text-foreground-muted">{new Date(row.rvp_created_at).toLocaleDateString('en-IN')}</p>
+                <p className="text-xs text-foreground-muted">
+                  {new Date(row.rvp_created_at).toLocaleDateString('en-IN')}
+                </p>
               )}
             </div>
           )}
@@ -203,7 +208,9 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
                     {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
-                    <p className="text-foreground-secondary text-xs">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                    <p className="text-foreground-secondary text-xs">
+                      Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
+                    </p>
                     <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
                   </div>
                 </div>
@@ -245,8 +252,18 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
         {/* Completed — show replacement order */}
         {isCompleted && row.replacement_order_id && (
           <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-            <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <span className="text-green-800 dark:text-green-300">
               Replacement order{' '}
@@ -270,13 +287,27 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
           <div className="pt-3 border-t border-border-default">
             {alreadyValuated ? (
               <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <span className="text-green-800 dark:text-green-300">
                   Valuation complete — <strong className="capitalize">{row.valuation_condition}</strong>
                   {row.valuation_condition === 'good' ? ' (replacement can be sent)' : ' (cannot send replacement)'}
-                  {row.valuated_at && <span className="text-green-700 dark:text-green-400 ml-1">· {new Date(row.valuated_at).toLocaleDateString('en-IN')}</span>}
+                  {row.valuated_at && (
+                    <span className="text-green-700 dark:text-green-400 ml-1">
+                      · {new Date(row.valuated_at).toLocaleDateString('en-IN')}
+                    </span>
+                  )}
                 </span>
               </div>
             ) : canWrite ? (
@@ -291,7 +322,9 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
                       onClick={() => setCondition(opt.value)}
                       className={`px-3 py-2.5 rounded-lg text-sm font-medium border text-left transition-colors ${
                         condition === opt.value
-                          ? opt.color === 'green' ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600'
+                          ? opt.color === 'green'
+                            ? 'bg-green-600 text-white border-green-600'
+                            : 'bg-red-600 text-white border-red-600'
                           : 'bg-surface text-foreground-secondary border-border-secondary hover:border-accent-400'
                       }`}
                     >
@@ -326,10 +359,22 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
 
       {/* Lightbox */}
       {lightboxUrl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxUrl(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxUrl(null)}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={lightboxUrl} alt="Photo" className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain" onClick={e => e.stopPropagation()} />
-          <button type="button" className="absolute top-4 right-4 text-white/80 hover:text-white" onClick={() => setLightboxUrl(null)}>
+          <img
+            src={lightboxUrl}
+            alt="Photo"
+            className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            onClick={() => setLightboxUrl(null)}
+          >
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -351,9 +396,10 @@ export default function AdminReplacementsClient() {
     setLoading(true)
     setError(null)
     try {
-      const url = activeTab === 'history'
-        ? `/api/admin/replacements?status=history&filter=${historyFilter}`
-        : `/api/admin/replacements?status=${activeTab}`
+      const url =
+        activeTab === 'history'
+          ? `/api/admin/replacements?status=history&filter=${historyFilter}`
+          : `/api/admin/replacements?status=${activeTab}`
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
@@ -365,7 +411,9 @@ export default function AdminReplacementsClient() {
     }
   }, [activeTab, historyFilter])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="space-y-4">
@@ -427,9 +475,11 @@ export default function AdminReplacementsClient() {
       ) : replacements.length === 0 ? (
         <div className="py-16 text-center text-foreground-muted text-sm">
           {activeTab === 'history'
-            ? historyFilter === 'approved' ? 'No approved replacements'
-              : historyFilter === 'rejected' ? 'No rejected replacements'
-              : 'No completed or rejected replacements'
+            ? historyFilter === 'approved'
+              ? 'No approved replacements'
+              : historyFilter === 'rejected'
+                ? 'No rejected replacements'
+                : 'No completed or rejected replacements'
             : 'No active replacement requests'}
         </div>
       ) : (

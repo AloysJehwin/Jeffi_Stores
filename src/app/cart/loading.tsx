@@ -7,7 +7,11 @@ export default function Loading() {
           <div className="lg:col-span-2">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="p-4 sm:p-6 border-b border-border-default last:border-b-0 flex gap-4 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
+                <div
+                  key={i}
+                  className="p-4 sm:p-6 border-b border-border-default last:border-b-0 flex gap-4 animate-pulse"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
                   <div className="w-24 h-24 bg-surface-secondary rounded-lg shrink-0" />
                   <div className="flex-1 space-y-2">
                     <div className="h-5 w-3/4 bg-surface-secondary rounded" />

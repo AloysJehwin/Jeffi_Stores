@@ -56,7 +56,10 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
               </button>
             )}
             {!hasMore && (
-              <Link href={ap('/admin/customers?segment=lead')} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+              <Link
+                href={ap('/admin/customers?segment=lead')}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+              >
                 View leads →
               </Link>
             )}
@@ -66,7 +69,9 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
           <p className="text-sm text-foreground-muted">No new signups yet.</p>
         ) : (
           <div className="divide-y divide-border-default">
-            {preview.map(s => <SignupRow key={s.id} s={s} />)}
+            {preview.map(s => (
+              <SignupRow key={s.id} s={s} />
+            ))}
             {hasMore && (
               <button
                 onClick={() => setOpen(true)}
@@ -79,45 +84,50 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
         )}
       </div>
 
-      {open && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setOpen(false)}
-        >
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
           <div
-            className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setOpen(false)}
           >
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <div>
-                <h2 className="text-base font-semibold text-foreground">Recent Signups</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">{items.length} new customers</p>
+            <div
+              className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Recent Signups</h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">{items.length} new customers</p>
+                </div>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="overflow-y-auto divide-y divide-border-default">
+                {items.map(s => (
+                  <SignupRow key={s.id} s={s} />
+                ))}
+              </div>
+              <div className="pt-4 shrink-0 border-t border-border-default mt-2">
+                <Link
+                  href={ap('/admin/customers?segment=lead')}
+                  className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
+                  onClick={() => setOpen(false)}
+                >
+                  View all leads in Customers →
+                </Link>
+              </div>
             </div>
-            <div className="overflow-y-auto divide-y divide-border-default">
-              {items.map(s => <SignupRow key={s.id} s={s} />)}
-            </div>
-            <div className="pt-4 shrink-0 border-t border-border-default mt-2">
-              <Link
-                href={ap('/admin/customers?segment=lead')}
-                className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
-                onClick={() => setOpen(false)}
-              >
-                View all leads in Customers →
-              </Link>
-            </div>
-          </div>
-        </div>
-      , document.body)}
+          </div>,
+          document.body
+        )}
     </>
   )
 }

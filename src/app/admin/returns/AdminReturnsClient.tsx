@@ -119,16 +119,16 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
           >
             #{row.order_number}
           </Link>
-          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-700'}`}>
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-700'}`}
+          >
             {STATUS_LABELS[row.status] || row.status}
           </span>
           <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-surface border border-border-default text-foreground-secondary capitalize">
             {row.type}
           </span>
         </div>
-        <span className="text-xs text-foreground-muted">
-          {new Date(row.created_at).toLocaleDateString('en-IN')}
-        </span>
+        <span className="text-xs text-foreground-muted">{new Date(row.created_at).toLocaleDateString('en-IN')}</span>
       </div>
 
       <div className="p-4 space-y-4">
@@ -148,7 +148,9 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
               <p className="text-foreground-secondary text-xs mb-0.5">RVP AWB</p>
               <p className="font-mono text-sm text-foreground">{row.rvp_awb_number}</p>
               {row.rvp_created_at && (
-                <p className="text-xs text-foreground-muted">{new Date(row.rvp_created_at).toLocaleDateString('en-IN')}</p>
+                <p className="text-xs text-foreground-muted">
+                  {new Date(row.rvp_created_at).toLocaleDateString('en-IN')}
+                </p>
               )}
             </div>
           )}
@@ -180,12 +182,12 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                 <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-surface text-sm">
                   <div className="min-w-0">
                     <p className="font-medium text-foreground truncate">{item.product_name}</p>
-                    {item.variant_name && (
-                      <p className="text-xs text-foreground-secondary">{item.variant_name}</p>
-                    )}
+                    {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
-                    <p className="text-foreground-secondary text-xs">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                    <p className="text-foreground-secondary text-xs">
+                      Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
+                    </p>
                     <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
                   </div>
                 </div>
@@ -195,7 +197,8 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
         )}
 
         {/* Customer description */}
-        {row.description && (          <div>
+        {row.description && (
+          <div>
             <p className="text-xs text-foreground-secondary mb-1">Customer description</p>
             <p className="text-sm text-foreground bg-surface-secondary rounded-lg border border-border-default px-3 py-2">
               {row.description}
@@ -228,22 +231,34 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
           <div className="pt-3 border-t border-border-default">
             {alreadyValuated ? (
               <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <span className="text-green-800 dark:text-green-300">
                   Valuation complete — <strong className="capitalize">{row.valuation_condition}</strong>
                   {row.valuation_condition === 'good' ? ' (will restock)' : ' (no restock)'}
-                  {row.valuated_at && <span className="text-green-700 dark:text-green-400 ml-1">· {new Date(row.valuated_at).toLocaleDateString('en-IN')}</span>}
+                  {row.valuated_at && (
+                    <span className="text-green-700 dark:text-green-400 ml-1">
+                      · {new Date(row.valuated_at).toLocaleDateString('en-IN')}
+                    </span>
+                  )}
                 </span>
               </div>
             ) : canWrite ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Item Valuation</p>
 
-                {error && (
-                  <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
 
                 <div className="grid grid-cols-3 gap-2">
                   {CONDITION_OPTIONS.map(opt => (
@@ -337,9 +352,10 @@ export default function AdminReturnsClient() {
     setLoading(true)
     setError(null)
     try {
-      const url = activeTab === 'history'
-        ? `/api/admin/returns?status=history&filter=${historyFilter}`
-        : `/api/admin/returns?status=${activeTab}`
+      const url =
+        activeTab === 'history'
+          ? `/api/admin/returns?status=history&filter=${historyFilter}`
+          : `/api/admin/returns?status=${activeTab}`
       const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
@@ -351,7 +367,9 @@ export default function AdminReturnsClient() {
     }
   }, [activeTab, historyFilter])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   return (
     <div className="space-y-4">
@@ -413,9 +431,11 @@ export default function AdminReturnsClient() {
       ) : returns.length === 0 ? (
         <div className="py-16 text-center text-foreground-muted text-sm">
           {activeTab === 'history'
-            ? historyFilter === 'approved' ? 'No approved returns'
-              : historyFilter === 'rejected' ? 'No rejected returns'
-              : 'No completed or rejected returns'
+            ? historyFilter === 'approved'
+              ? 'No approved returns'
+              : historyFilter === 'rejected'
+                ? 'No rejected returns'
+                : 'No completed or rejected returns'
             : 'No active return requests'}
         </div>
       ) : (

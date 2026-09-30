@@ -17,13 +17,15 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
 
   const sp = await searchParams
   const tenants = await listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') })
-  const provisioned = tenants.filter((t) => t.rds_endpoint).length
+  const provisioned = tenants.filter(t => t.rds_endpoint).length
 
   return (
     <div className="p-6 w-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Instances</h1>
-        <p className="text-sm text-foreground-muted mt-1">Per-tenant infrastructure — {provisioned}/{tenants.length} provisioned</p>
+        <p className="text-sm text-foreground-muted mt-1">
+          Per-tenant infrastructure — {provisioned}/{tenants.length} provisioned
+        </p>
       </div>
 
       <EcomFilters />
@@ -42,24 +44,41 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
           </thead>
           <tbody className="divide-y divide-border-default">
             {tenants.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-muted">No tenants match.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-foreground-muted">
+                  No tenants match.
+                </td>
+              </tr>
             )}
-            {tenants.map((t) => (
+            {tenants.map(t => (
               <tr key={t.id} className="hover:bg-surface-secondary">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  <Link href={`/admin/ecom/instances/${t.id}`} className="hover:text-accent-600">{t.display_name}</Link>
+                  <Link href={`/admin/ecom/instances/${t.id}`} className="hover:text-accent-600">
+                    {t.display_name}
+                  </Link>
                 </td>
-                <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}</td>
+                <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">
+                  {t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}
+                </td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.ec2_target || 'pool'}</td>
                 <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{t.s3_bucket || '—'}</td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.region || '—'}</td>
-                <td className="px-4 py-3 text-right"><Link href={`/admin/ecom/instances/${t.id}`} className="text-accent-600 dark:text-accent-400 hover:underline">Detail →</Link></td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={`/admin/ecom/instances/${t.id}`}
+                    className="text-accent-600 dark:text-accent-400 hover:underline"
+                  >
+                    Detail →
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-foreground-muted mt-4">Live AWS health (CloudWatch CPU/connections, RDS/EC2 status) wires in with the provisioning engine.</p>
+      <p className="text-xs text-foreground-muted mt-4">
+        Live AWS health (CloudWatch CPU/connections, RDS/EC2 status) wires in with the provisioning engine.
+      </p>
     </div>
   )
 }

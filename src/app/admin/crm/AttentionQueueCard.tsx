@@ -26,7 +26,9 @@ export default function AttentionQueueCard({ items }: { items: AttentionItem[] }
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[it.severity]}`} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground truncate group-hover:text-accent-600 transition-colors">{it.label}</p>
+                <p className="text-sm font-medium text-foreground truncate group-hover:text-accent-600 transition-colors">
+                  {it.label}
+                </p>
                 <p className="text-[11px] text-foreground-muted truncate mt-0.5">{it.sub}</p>
               </div>
             </Link>

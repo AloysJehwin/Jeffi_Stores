@@ -11,14 +11,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import {
-  PRODUCTS,
-  SEED_ORDERS,
-  SEED_METRICS,
-  SEED_ACTIVITY,
-  HERO_PRODUCT_ID,
-  HERO_CUSTOMER,
-} from './data'
+import { PRODUCTS, SEED_ORDERS, SEED_METRICS, SEED_ACTIVITY, HERO_PRODUCT_ID, HERO_CUSTOMER } from './data'
 
 export type OrderStatus = 'cart' | 'pending' | 'processing' | 'shipped' | 'delivered'
 
@@ -101,7 +94,7 @@ import type { FlowId, Flow, Chapter } from './chapters'
 import { FLOWS, CHAPTERS, FLOW_CHAPTERS } from './chapters'
 export { FLOWS, CHAPTERS, FLOW_CHAPTERS }
 function heroLines(): CartLine[] {
-  const p = PRODUCTS.find((x) => x.id === HERO_PRODUCT_ID)!
+  const p = PRODUCTS.find(x => x.id === HERO_PRODUCT_ID)!
   return [{ productId: p.id, name: p.name, qty: 1, price: p.price }]
 }
 
@@ -111,7 +104,7 @@ function makeHeroOrder(status: OrderStatus): Order {
     id: 'o1042',
     number: '1042',
     customer: HERO_CUSTOMER,
-    items: lines.map((l) => ({ productId: l.productId, name: l.name, qty: l.qty, price: l.price })),
+    items: lines.map(l => ({ productId: l.productId, name: l.name, qty: l.qty, price: l.price })),
     total: lines.reduce((s, l) => s + l.price * l.qty, 0),
     status,
     placedAt: '05 Sep 2026',
@@ -167,14 +160,14 @@ function pushActivity(list: ActivityRow[], row: ActivityRow): ActivityRow[] {
 }
 
 function withTimeline(order: Order, label: string, at: string): TimelineStep[] {
-  return order.timeline.map((s) => (s.label === label ? { ...s, at, done: true } : s))
+  return order.timeline.map(s => (s.label === label ? { ...s, at, done: true } : s))
 }
 
 function advanceOrder(state: World, next: Order, ev: ActivityRow): World {
   return {
     ...state,
     order: next,
-    orders: state.orders.map((o) => (o.id === next.id ? next : o)),
+    orders: state.orders.map(o => (o.id === next.id ? next : o)),
     activity: pushActivity(state.activity, ev),
   }
 }
@@ -184,31 +177,50 @@ function reducer(state: World, action: Action): World {
     case 'OPEN_PRODUCT':
       return { ...state, openProductId: action.id }
     case 'ADD_TO_CART': {
-      const p = state.products.find((x) => x.id === action.id)
+      const p = state.products.find(x => x.id === action.id)
       if (!p) return state
-      const existing = state.cart.find((l) => l.productId === p.id)
+      const existing = state.cart.find(l => l.productId === p.id)
       const cart = existing
-        ? state.cart.map((l) => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l))
+        ? state.cart.map(l => (l.productId === p.id ? { ...l, qty: l.qty + 1 } : l))
         : [...state.cart, { productId: p.id, name: p.name, qty: 1, price: p.price }]
       return { ...state, cart, openProductId: p.id }
     }
     case 'PAY': {
       const order = makeHeroOrder('pending')
       if (state.cart.length > 0) {
-        order.items = state.cart.map((l) => ({ productId: l.productId, name: l.name, qty: l.qty, price: l.price }))
+        order.items = state.cart.map(l => ({ productId: l.productId, name: l.name, qty: l.qty, price: l.price }))
         order.total = state.cart.reduce((s, l) => s + l.price * l.qty, 0)
       }
       return placeOrder(state, order)
     }
     case 'MARK_PROCESSING': {
       const order = state.order ?? makeHeroOrder('pending')
-      const next: Order = { ...order, status: 'processing', timeline: withTimeline(order, 'Processing', '05 Sep, 12:22') }
-      return advanceOrder(state, next, { id: 'ev-proc', label: `Order #${next.number} moved to processing`, at: 'just now', kind: 'order' })
+      const next: Order = {
+        ...order,
+        status: 'processing',
+        timeline: withTimeline(order, 'Processing', '05 Sep, 12:22'),
+      }
+      return advanceOrder(state, next, {
+        id: 'ev-proc',
+        label: `Order #${next.number} moved to processing`,
+        at: 'just now',
+        kind: 'order',
+      })
     }
     case 'SHIP': {
       const order = state.order ?? makeHeroOrder('processing')
-      const next: Order = { ...order, status: 'shipped', awb: 'DL42019384726', timeline: withTimeline(order, 'Shipped', '05 Sep, 15:40') }
-      return advanceOrder(state, next, { id: 'ev-ship', label: `Order #${next.number} shipped, AWB ${next.awb}`, at: 'just now', kind: 'shipment' })
+      const next: Order = {
+        ...order,
+        status: 'shipped',
+        awb: 'DL42019384726',
+        timeline: withTimeline(order, 'Shipped', '05 Sep, 15:40'),
+      }
+      return advanceOrder(state, next, {
+        id: 'ev-ship',
+        label: `Order #${next.number} shipped, AWB ${next.awb}`,
+        at: 'just now',
+        kind: 'shipment',
+      })
     }
     case 'GENERATE_INVOICE':
       if (!state.order) return state
@@ -219,7 +231,10 @@ function reducer(state: World, action: Action): World {
         ...state,
         campaignSent: true,
         activity: pushActivity(state.activity, {
-          id: 'ev-camp', label: 'Campaign "Festive Picks" sent to 1,284 customers', at: 'just now', kind: 'customer',
+          id: 'ev-camp',
+          label: 'Campaign "Festive Picks" sent to 1,284 customers',
+          at: 'just now',
+          kind: 'customer',
         }),
       }
     case 'CREATE_COUPON':
@@ -228,7 +243,10 @@ function reducer(state: World, action: Action): World {
         ...state,
         couponCreated: true,
         activity: pushActivity(state.activity, {
-          id: 'ev-coupon', label: 'Coupon FESTIVE15 created (15% off)', at: 'just now', kind: 'order',
+          id: 'ev-coupon',
+          label: 'Coupon FESTIVE15 created (15% off)',
+          at: 'just now',
+          kind: 'order',
         }),
       }
     case 'RAISE_PO':
@@ -261,14 +279,17 @@ function placeOrder(state: World, order: Order): World {
     order,
     cart: [],
     invoiceReady: false,
-    orders: [order, ...state.orders.filter((o) => o.id !== order.id)],
+    orders: [order, ...state.orders.filter(o => o.id !== order.id)],
     metrics: {
       revenue: state.metrics.revenue + order.total,
       orderCount: state.metrics.orderCount + 1,
       todayCount: state.metrics.todayCount + 1,
     },
     activity: pushActivity(state.activity, {
-      id: 'ev-pay', label: `Payment received from ${order.customer}`, at: 'just now', kind: 'payment',
+      id: 'ev-pay',
+      label: `Payment received from ${order.customer}`,
+      at: 'just now',
+      kind: 'payment',
     }),
   }
 }
@@ -397,7 +418,7 @@ export function DemoProvider({ children, initialChapter = 0 }: { children: React
   useEffect(() => {
     if (!isPlaying || isManual || reducedMotion) return
     timerRef.current = setInterval(() => {
-      setChapterIndex((i) => {
+      setChapterIndex(i => {
         const seq = FLOW_CHAPTERS[CHAPTERS[i]?.flow ?? 'shop']
         const pos = seq.indexOf(i)
         const next = seq[(pos + 1) % seq.length]
@@ -441,8 +462,8 @@ export function DemoProvider({ children, initialChapter = 0 }: { children: React
 
   const actions = useMemo<DemoValue['actions']>(
     () => ({
-      addToCart: (id) => manual(() => dispatch({ type: 'ADD_TO_CART', id })),
-      openProduct: (id) => manual(() => dispatch({ type: 'OPEN_PRODUCT', id })),
+      addToCart: id => manual(() => dispatch({ type: 'ADD_TO_CART', id })),
+      openProduct: id => manual(() => dispatch({ type: 'OPEN_PRODUCT', id })),
       pay: () => manual(() => dispatch({ type: 'PAY' })),
       markProcessing: () => manual(() => dispatch({ type: 'MARK_PROCESSING' })),
       ship: () => manual(() => dispatch({ type: 'SHIP' })),

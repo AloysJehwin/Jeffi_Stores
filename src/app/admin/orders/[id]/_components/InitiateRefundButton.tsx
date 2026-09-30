@@ -46,47 +46,49 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
       <div className="p-4 sm:p-6">
         <p className="text-sm text-foreground-secondary mb-4">
           This order was {isReturn ? 'returned' : 'cancelled'} but the payment of{' '}
-          <span className="font-semibold text-foreground">₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>{' '}
+          <span className="font-semibold text-foreground">
+            ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </span>{' '}
           has not yet been refunded. Initiating a refund will trigger it via Razorpay and notify the customer by email.
         </p>
 
         {showConfirm ? (
           <RequireWrite scope="orders:write">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleRefund}
-              disabled={isProcessing}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                  Processing...
-                </>
-              ) : (
-                'Confirm Refund'
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowConfirm(false)}
-              disabled={isProcessing}
-              className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleRefund}
+                disabled={isProcessing}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    Processing...
+                  </>
+                ) : (
+                  'Confirm Refund'
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                disabled={isProcessing}
+                className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
           </RequireWrite>
         ) : (
           <RequireWrite scope="orders:write">
-          <button
-            type="button"
-            onClick={() => setShowConfirm(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
-          >
-            Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </button>
+            <button
+              type="button"
+              onClick={() => setShowConfirm(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+            >
+              Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </button>
           </RequireWrite>
         )}
       </div>

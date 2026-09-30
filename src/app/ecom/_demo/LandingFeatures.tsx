@@ -29,7 +29,7 @@ function scrub(index: number) {
 export default function LandingFeatures() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-      {FEATURES.map((f) => {
+      {FEATURES.map(f => {
         const Icon = f.icon
         return (
           <button

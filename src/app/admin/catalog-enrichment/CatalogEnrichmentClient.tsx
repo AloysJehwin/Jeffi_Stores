@@ -40,7 +40,12 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
   return (
     <div className={`flex flex-wrap gap-1 ${className}`}>
       {tags.slice(0, max).map(t => (
-        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded">{t}</span>
+        <span
+          key={t}
+          className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+        >
+          {t}
+        </span>
       ))}
       {tags.length > max && <span className="text-[10px] text-foreground-muted">+{tags.length - max}</span>}
     </div>
@@ -63,24 +68,32 @@ export default function CatalogEnrichmentPage() {
   const PAGE_SIZE = 25
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const load = useCallback(async (p = 1) => {
-    setLoading(true)
-    setSelected(new Set())
-    try {
-      const res = await fetch(`/api/admin/catalog-enrichment?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`, { credentials: 'include' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Load failed')
-      setItems(data.items || [])
-      setTotal(data.total || 0)
-      setPage(p)
-    } catch (err: any) {
-      showToast(err?.message || 'Load failed', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter])
+  const load = useCallback(
+    async (p = 1) => {
+      setLoading(true)
+      setSelected(new Set())
+      try {
+        const res = await fetch(
+          `/api/admin/catalog-enrichment?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`,
+          { credentials: 'include' }
+        )
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Load failed')
+        setItems(data.items || [])
+        setTotal(data.total || 0)
+        setPage(p)
+      } catch (err: any) {
+        showToast(err?.message || 'Load failed', 'error')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [statusFilter]
+  )
 
-  useEffect(() => { load(1) }, [load])
+  useEffect(() => {
+    load(1)
+  }, [load])
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -125,15 +138,21 @@ export default function CatalogEnrichmentPage() {
     setBusyId(id)
     try {
       const res = await fetch(`/api/admin/catalog-enrichment/${id}/${decision}`, {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Action failed')
-      showToast(decision === 'approve'
-        ? (data.reEmbedded ? 'Approved + re-embedded' : 'Approved')
-        : 'Rejected', 'success')
+      showToast(
+        decision === 'approve' ? (data.reEmbedded ? 'Approved + re-embedded' : 'Approved') : 'Rejected',
+        'success'
+      )
       load(page)
-      setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
+      setSelected(prev => {
+        const n = new Set(prev)
+        n.delete(id)
+        return n
+      })
     } catch (err: any) {
       showToast(err?.message || 'Action failed', 'error')
     } finally {
@@ -172,7 +191,9 @@ export default function CatalogEnrichmentPage() {
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-accent-500" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Catalog Enrichment</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
+              Catalog Enrichment
+            </h1>
           </div>
           <p className="text-foreground-secondary mt-1 text-sm">AI-generated product intelligence for admin review</p>
         </div>
@@ -250,18 +271,32 @@ export default function CatalogEnrichmentPage() {
                       />
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden md:table-cell">AI Description</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden lg:table-cell">Use Cases</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">Proposed</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden md:table-cell">
+                    AI Description
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden lg:table-cell">
+                    Use Cases
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                    Proposed
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
                 {items.map(item => (
                   <Fragment key={item.id}>
-                    <tr className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}>
+                    <tr
+                      className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}
+                    >
                       {statusFilter === 'proposed' && (
                         <td className="pl-4 py-3 w-8">
                           {item.status === 'proposed' && (
@@ -282,7 +317,9 @@ export default function CatalogEnrichmentPage() {
                           {item.product_name}
                         </Link>
                         {item.ai_product_type && (
-                          <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">{item.ai_product_type}</p>
+                          <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">
+                            {item.ai_product_type}
+                          </p>
                         )}
                         <p className="text-[10px] text-foreground-muted mt-0.5">{item.model}</p>
                       </td>
@@ -293,7 +330,9 @@ export default function CatalogEnrichmentPage() {
                         <TagList tags={item.ai_use_cases} max={4} />
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[item.status] || ''}`}>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[item.status] || ''}`}
+                        >
                           {item.status}
                         </span>
                       </td>
@@ -307,7 +346,11 @@ export default function CatalogEnrichmentPage() {
                             className="p-1 text-foreground-muted hover:text-foreground rounded"
                             title="Expand"
                           >
-                            {expanded.has(item.id) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            {expanded.has(item.id) ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
                           </button>
                           {item.status === 'proposed' && (
                             <RequireWrite scope="catalog_enrichment:write">
@@ -317,7 +360,11 @@ export default function CatalogEnrichmentPage() {
                                 className="p-1 text-accent-500 hover:text-accent-600 disabled:opacity-50"
                                 title="Approve"
                               >
-                                {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                                {busyId === item.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                )}
                               </button>
                               <button
                                 disabled={busyId === item.id}
@@ -338,51 +385,69 @@ export default function CatalogEnrichmentPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {item.source_desc && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Original Description</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Original Description
+                                </p>
                                 <p className="text-xs text-foreground-muted">{item.source_desc}</p>
                               </div>
                             )}
                             <div>
-                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">AI Description</p>
+                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                AI Description
+                              </p>
                               <p className="text-xs text-foreground">{item.ai_description}</p>
                             </div>
                             {item.ai_application && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Application</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Application
+                                </p>
                                 <p className="text-xs text-foreground">{item.ai_application}</p>
                               </div>
                             )}
                             {item.ai_who_uses_it && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Who Uses It</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Who Uses It
+                                </p>
                                 <p className="text-xs text-foreground">{item.ai_who_uses_it}</p>
                               </div>
                             )}
                             <div>
-                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Use Cases ({item.ai_use_cases.length})</p>
+                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                Use Cases ({item.ai_use_cases.length})
+                              </p>
                               <TagList tags={item.ai_use_cases} max={20} />
                             </div>
                             {item.ai_keywords && item.ai_keywords.length > 0 && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Keywords ({item.ai_keywords.length})</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Keywords ({item.ai_keywords.length})
+                                </p>
                                 <TagList tags={item.ai_keywords} max={20} />
                               </div>
                             )}
                             {item.ai_features && item.ai_features.length > 0 && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Features ({item.ai_features.length})</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Features ({item.ai_features.length})
+                                </p>
                                 <TagList tags={item.ai_features} max={20} />
                               </div>
                             )}
                             {item.ai_search_tags && item.ai_search_tags.length > 0 && (
                               <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Search Tags ({item.ai_search_tags.length})</p>
+                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                  Search Tags ({item.ai_search_tags.length})
+                                </p>
                                 <TagList tags={item.ai_search_tags} max={20} />
                               </div>
                             )}
                             {item.error && (
                               <div>
-                                <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">Embed Error</p>
+                                <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">
+                                  Embed Error
+                                </p>
                                 <p className="text-xs text-red-600">{item.error}</p>
                               </div>
                             )}
@@ -398,17 +463,35 @@ export default function CatalogEnrichmentPage() {
           <div className="px-4 py-3 border-t border-border-default flex items-center justify-between gap-2">
             <div className="text-xs text-foreground-muted">
               {total > 0 && (
-                <>Showing <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span> of <span className="font-medium text-foreground">{total}</span></>
+                <>
+                  Showing{' '}
+                  <span className="font-medium text-foreground">
+                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+                  </span>{' '}
+                  of <span className="font-medium text-foreground">{total}</span>
+                </>
               )}
               {selected.size > 0 ? ` · ${selected.size} selected` : ''}
             </div>
             {totalPages > 1 && (
               <div className="flex items-center gap-1.5">
-                <button disabled={page <= 1} onClick={() => load(page - 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
-                <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
-                <button disabled={page >= totalPages} onClick={() => load(page + 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+                <button
+                  disabled={page <= 1}
+                  onClick={() => load(page - 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-foreground-muted whitespace-nowrap">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => load(page + 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                >
+                  Next
+                </button>
               </div>
             )}
           </div>

@@ -18,10 +18,7 @@ async function resolveDeliveryMode(): Promise<DeliveryMode> {
 }
 
 export default async function DelhiveryPage() {
-  const [c, deliveryMode] = await Promise.all([
-    getSiteControls(),
-    resolveDeliveryMode(),
-  ])
+  const [c, deliveryMode] = await Promise.all([getSiteControls(), resolveDeliveryMode()])
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -29,7 +26,9 @@ export default async function DelhiveryPage() {
         <Link href={ap('/admin/orders')} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
           ← Back to Orders
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Delhivery Pickup Request</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
+          Delhivery Pickup Request
+        </h1>
         <p className="text-foreground-secondary mt-1">
           Orders with an AWB not yet included in a pickup request. Pickup slot: 14:00–18:00.
         </p>

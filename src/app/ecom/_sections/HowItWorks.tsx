@@ -42,7 +42,7 @@ export default function HowItWorks() {
           aria-hidden
           className="hidden md:block absolute top-7 left-[16.666%] right-[16.666%] h-px border-border-default border-t"
         />
-        {STEPS.map((s) => {
+        {STEPS.map(s => {
           const Icon = s.icon
           return (
             <li

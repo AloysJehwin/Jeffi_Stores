@@ -18,14 +18,21 @@ function CopyButton({ text }: { text: string }) {
     })
   }
   return (
-    <button onClick={copy}
-      className="ml-2 text-xs px-2 py-0.5 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors flex-shrink-0">
+    <button
+      onClick={copy}
+      className="ml-2 text-xs px-2 py-0.5 rounded border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors flex-shrink-0"
+    >
       {copied ? 'Copied!' : 'Copy'}
     </button>
   )
 }
 
-export default function SubdomainList({ slug, plan, maxCustomDomains, rdsReady }: {
+export default function SubdomainList({
+  slug,
+  plan,
+  maxCustomDomains,
+  rdsReady,
+}: {
   slug: string
   plan: string | null
   maxCustomDomains: number
@@ -80,12 +87,21 @@ export default function SubdomainList({ slug, plan, maxCustomDomains, rdsReady }
 
   return (
     <div className="space-y-2">
-      {subdomains.map((s) => (
-        <div key={s.label} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${s.available ? 'border-border-default bg-surface' : 'border-border-default/60 bg-surface-secondary/40'}`}>
+      {subdomains.map(s => (
+        <div
+          key={s.label}
+          className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${s.available ? 'border-border-default bg-surface' : 'border-border-default/60 bg-surface-secondary/40'}`}
+        >
           <div className="flex items-center gap-3 min-w-0">
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'bg-green-500' : 'bg-foreground-muted/50'}`} />
+            <span
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'bg-green-500' : 'bg-foreground-muted/50'}`}
+            />
             <span className="text-foreground-secondary w-28 flex-shrink-0 text-xs font-medium">{s.label}</span>
-            <span className={`font-mono text-xs truncate ${s.available ? 'text-foreground' : 'text-foreground-secondary'}`}>{s.url}</span>
+            <span
+              className={`font-mono text-xs truncate ${s.available ? 'text-foreground' : 'text-foreground-secondary'}`}
+            >
+              {s.url}
+            </span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-3">
             {s.note && <span className="text-xs text-foreground-secondary hidden sm:inline">{s.note}</span>}
@@ -96,7 +112,8 @@ export default function SubdomainList({ slug, plan, maxCustomDomains, rdsReady }
 
       {maxCustomDomains > 0 && (
         <div className="px-4 py-2.5 rounded-xl border border-dashed border-border-default bg-surface text-sm text-foreground-secondary">
-          Up to <span className="font-medium text-foreground">{maxCustomDomains}</span> custom domain{maxCustomDomains > 1 ? 's' : ''} available — configure in store settings.
+          Up to <span className="font-medium text-foreground">{maxCustomDomains}</span> custom domain
+          {maxCustomDomains > 1 ? 's' : ''} available — configure in store settings.
         </div>
       )}
       {maxCustomDomains === 0 && (

@@ -7,7 +7,15 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 
 interface AnalyticsData {
-  product: { id: string; name: string; sku: string; slug: string; brandName: string | null; stock: number; basePrice: number }
+  product: {
+    id: string
+    name: string
+    sku: string
+    slug: string
+    brandName: string | null
+    stock: number
+    basePrice: number
+  }
   days: number
   totals: {
     views: number
@@ -75,7 +83,13 @@ function fmtLabel(date: string, mode: Granularity): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
-function Modal({ title: titleText, subtitle, onClose, children, footer }: {
+function Modal({
+  title: titleText,
+  subtitle,
+  onClose,
+  children,
+  footer,
+}: {
   title: string
   subtitle?: string
   onClose: () => void
@@ -109,9 +123,7 @@ function Modal({ title: titleText, subtitle, onClose, children, footer }: {
           </button>
         </div>
         <div className="overflow-y-auto flex-1">{children}</div>
-        {footer && (
-          <div className="pt-4 shrink-0 border-t border-border-default mt-2">{footer}</div>
-        )}
+        {footer && <div className="pt-4 shrink-0 border-t border-border-default mt-2">{footer}</div>}
       </div>
     </div>,
     document.body
@@ -165,9 +177,25 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold truncate">{data.product.name}</h1>
             <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400 flex-wrap">
-              <span className="font-mono">SKU: {data.product.sku}{data.product.sku && <CopySku sku={data.product.sku} className="ml-1" />}</span>
+              <span className="font-mono">
+                SKU: {data.product.sku}
+                {data.product.sku && <CopySku sku={data.product.sku} className="ml-1" />}
+              </span>
               {data.product.brandName && <span>Brand: {data.product.brandName}</span>}
-              <span>Stock: <span className={data.product.stock === 0 ? 'text-red-400' : data.product.stock < 10 ? 'text-orange-400' : 'text-green-400'}>{data.product.stock}</span></span>
+              <span>
+                Stock:{' '}
+                <span
+                  className={
+                    data.product.stock === 0
+                      ? 'text-red-400'
+                      : data.product.stock < 10
+                        ? 'text-orange-400'
+                        : 'text-green-400'
+                  }
+                >
+                  {data.product.stock}
+                </span>
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -187,11 +215,32 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
         </div>
 
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <Stat label="Views" value={data.totals.views.toLocaleString('en-IN')} sub={`${data.totals.uniqueViewers.toLocaleString('en-IN')} unique`} />
-          <Stat label="Cart Adds" value={data.totals.cartAdds.toLocaleString('en-IN')} sub={data.totals.activeCarts > 0 ? `${data.totals.activeCarts} active now` : ''} />
-          <Stat label="Orders" value={data.totals.orders.toLocaleString('en-IN')} sub={`${data.totals.quantitySold.toLocaleString('en-IN')} units sold`} />
-          <Stat label="Revenue" value={`₹${Math.round(data.totals.revenue).toLocaleString('en-IN')}`} sub={`₹${data.totals.revenuePerView}/view`} />
-          <Stat label="Conversion" value={`${data.totals.conversionRate}%`} sub={`${data.totals.cartConversionRate}% cart→order`} highlight={data.totals.conversionRate >= 5} />
+          <Stat
+            label="Views"
+            value={data.totals.views.toLocaleString('en-IN')}
+            sub={`${data.totals.uniqueViewers.toLocaleString('en-IN')} unique`}
+          />
+          <Stat
+            label="Cart Adds"
+            value={data.totals.cartAdds.toLocaleString('en-IN')}
+            sub={data.totals.activeCarts > 0 ? `${data.totals.activeCarts} active now` : ''}
+          />
+          <Stat
+            label="Orders"
+            value={data.totals.orders.toLocaleString('en-IN')}
+            sub={`${data.totals.quantitySold.toLocaleString('en-IN')} units sold`}
+          />
+          <Stat
+            label="Revenue"
+            value={`₹${Math.round(data.totals.revenue).toLocaleString('en-IN')}`}
+            sub={`₹${data.totals.revenuePerView}/view`}
+          />
+          <Stat
+            label="Conversion"
+            value={`${data.totals.conversionRate}%`}
+            sub={`${data.totals.cartConversionRate}% cart→order`}
+            highlight={data.totals.conversionRate >= 5}
+          />
         </div>
       </div>
 
@@ -220,8 +269,12 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
             <p className="text-sm text-foreground-muted py-2">
               No activity in this range.{' '}
               {hasZeros && (
-                <button onClick={() => setShowZeros(true)} className="underline hover:text-foreground transition-colors">
-                  Show all {aggregated.length} {granularity === 'daily' ? 'days' : granularity === 'weekly' ? 'weeks' : 'months'}
+                <button
+                  onClick={() => setShowZeros(true)}
+                  className="underline hover:text-foreground transition-colors"
+                >
+                  Show all {aggregated.length}{' '}
+                  {granularity === 'daily' ? 'days' : granularity === 'weekly' ? 'weeks' : 'months'}
                 </button>
               )}
             </p>
@@ -247,7 +300,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
                         style={{ width: `${(d.carts / maxCarts) * 100}%`, minWidth: d.carts > 0 ? '2px' : '0' }}
                         title={`${d.carts} cart adds`}
                       />
-                      <span className="text-amber-500 dark:text-amber-400 tabular-nums text-[10px] w-6 shrink-0">{d.carts}</span>
+                      <span className="text-amber-500 dark:text-amber-400 tabular-nums text-[10px] w-6 shrink-0">
+                        {d.carts}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1 h-2.5">
                       <div
@@ -255,7 +310,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
                         style={{ width: `${(d.orders / maxOrders) * 100}%`, minWidth: d.orders > 0 ? '2px' : '0' }}
                         title={`${d.orders} orders`}
                       />
-                      <span className="text-green-600 dark:text-green-400 tabular-nums text-[10px] font-semibold w-6 shrink-0">{d.orders}</span>
+                      <span className="text-green-600 dark:text-green-400 tabular-nums text-[10px] font-semibold w-6 shrink-0">
+                        {d.orders}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -265,9 +322,15 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-default text-xs text-foreground-muted flex-wrap gap-2">
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-blue-500 rounded-sm inline-block" /> Views</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-amber-400 rounded-sm inline-block" /> Cart adds</span>
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-green-500 rounded-sm inline-block" /> Orders</span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2.5 bg-blue-500 rounded-sm inline-block" /> Views
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2.5 bg-amber-400 rounded-sm inline-block" /> Cart adds
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-2.5 bg-green-500 rounded-sm inline-block" /> Orders
+              </span>
             </div>
             {hasZeros && (
               <button
@@ -287,7 +350,10 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Top Referrers</h2>
             {refHasMore && (
-              <button onClick={() => setRefModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+              <button
+                onClick={() => setRefModal(true)}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+              >
                 View all ({data.referrers.length}) →
               </button>
             )}
@@ -296,7 +362,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
             <p className="text-sm text-foreground-muted">No referrer data yet.</p>
           ) : (
             <div className="space-y-2.5">
-              {refPreview.map(r => <ReferrerRow key={r.referrer} r={r} />)}
+              {refPreview.map(r => (
+                <ReferrerRow key={r.referrer} r={r} />
+              ))}
               {refHasMore && (
                 <button
                   onClick={() => setRefModal(true)}
@@ -316,7 +384,10 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Variant Breakdown</h2>
             {variantHasMore && (
-              <button onClick={() => setVariantModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+              <button
+                onClick={() => setVariantModal(true)}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+              >
                 View all ({data.variantBreakdown.length}) →
               </button>
             )}
@@ -343,7 +414,10 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground">Recent Buyers</h2>
             {buyerHasMore && (
-              <button onClick={() => setBuyerModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+              <button
+                onClick={() => setBuyerModal(true)}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+              >
                 View all ({data.recentBuyers.length}) →
               </button>
             )}
@@ -352,7 +426,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
             <p className="text-sm text-foreground-muted">No buyers yet.</p>
           ) : (
             <div className="space-y-2.5">
-              {buyerPreview.map(b => <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} />)}
+              {buyerPreview.map(b => (
+                <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} />
+              ))}
               {buyerHasMore && (
                 <button
                   onClick={() => setBuyerModal(true)}
@@ -373,7 +449,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           onClose={() => setRefModal(false)}
         >
           <div className="space-y-2.5 py-1">
-            {data.referrers.map(r => <ReferrerRow key={r.referrer} r={r} />)}
+            {data.referrers.map(r => (
+              <ReferrerRow key={r.referrer} r={r} />
+            ))}
           </div>
         </Modal>
       )}
@@ -395,7 +473,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           onClose={() => setBuyerModal(false)}
         >
           <div className="divide-y divide-border-default">
-            {data.recentBuyers.map(b => <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} large />)}
+            {data.recentBuyers.map(b => (
+              <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} large />
+            ))}
           </div>
         </Modal>
       )}
@@ -412,7 +492,11 @@ function ReferrerRow({ r }: { r: { referrer: string; sessions: number } }) {
   )
 }
 
-function VariantTable({ rows }: { rows: { variantName: string | null; orders: number; quantity: number; revenue: number }[] }) {
+function VariantTable({
+  rows,
+}: {
+  rows: { variantName: string | null; orders: number; quantity: number; revenue: number }[]
+}) {
   return (
     <table className="min-w-full text-sm">
       <thead>
@@ -426,10 +510,14 @@ function VariantTable({ rows }: { rows: { variantName: string | null; orders: nu
       <tbody className="divide-y divide-border-default">
         {rows.map((v, i) => (
           <tr key={i}>
-            <td className="py-2 text-foreground">{v.variantName || <span className="text-foreground-muted italic">No variant</span>}</td>
+            <td className="py-2 text-foreground">
+              {v.variantName || <span className="text-foreground-muted italic">No variant</span>}
+            </td>
             <td className="py-2 text-right tabular-nums">{v.orders}</td>
             <td className="py-2 text-right tabular-nums">{v.quantity}</td>
-            <td className="py-2 text-right tabular-nums font-semibold">₹{Math.round(v.revenue).toLocaleString('en-IN')}</td>
+            <td className="py-2 text-right tabular-nums font-semibold">
+              ₹{Math.round(v.revenue).toLocaleString('en-IN')}
+            </td>
           </tr>
         ))}
       </tbody>
@@ -437,7 +525,13 @@ function VariantTable({ rows }: { rows: { variantName: string | null; orders: nu
   )
 }
 
-function BuyerRow({ b, large }: { b: { orderNumber: string; createdAt: string; quantity: number; total: number; customerName: string }; large?: boolean }) {
+function BuyerRow({
+  b,
+  large,
+}: {
+  b: { orderNumber: string; createdAt: string; quantity: number; total: number; customerName: string }
+  large?: boolean
+}) {
   return (
     <Link
       href={ap(`/admin/orders?search=${b.orderNumber}`)}
@@ -446,10 +540,13 @@ function BuyerRow({ b, large }: { b: { orderNumber: string; createdAt: string; q
       <div className="min-w-0 flex-1">
         <p className="text-foreground truncate">{b.customerName}</p>
         <p className="text-xs text-foreground-muted">
-          {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {b.quantity}× #{b.orderNumber}
+          {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} ·{' '}
+          {b.quantity}× #{b.orderNumber}
         </p>
       </div>
-      <span className="font-semibold text-foreground tabular-nums whitespace-nowrap ml-3">₹{Math.round(b.total).toLocaleString('en-IN')}</span>
+      <span className="font-semibold text-foreground tabular-nums whitespace-nowrap ml-3">
+        ₹{Math.round(b.total).toLocaleString('en-IN')}
+      </span>
     </Link>
   )
 }

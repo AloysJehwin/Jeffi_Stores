@@ -1,4 +1,4 @@
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { ap } from '@/lib/admin-path'
@@ -20,7 +20,9 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     const payload = await verifyToken(token.value)
     const { hasPlanScope } = await import('@/lib/plan-gate')
     hasInventory = await hasPlanScope(payload?.role ?? '', payload?.scopes ?? [], 'inventory:read')
-  } catch { redirect(ap('/admin/login', host)) }
+  } catch {
+    redirect(ap('/admin/login', host))
+  }
 
   return <ProductDetailClient id={id} hasInventory={hasInventory} />
 }

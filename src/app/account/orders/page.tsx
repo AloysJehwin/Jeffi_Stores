@@ -54,10 +54,16 @@ function fmt(n: number | string | null | undefined): string {
 
 function resolveOrderEdd(order: Order): string | null {
   if (!order.estimated_delivery_date) return null
-  return new Date(order.estimated_delivery_date + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })
+  return new Date(order.estimated_delivery_date + 'T00:00:00Z').toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 function getEddDisplay(order: Order, edd: string): { label: string; color: string } {
-  if (order.status === 'delivered') return { label: edd ? 'Delivered · ' + edd : 'Delivered', color: 'text-green-600 dark:text-green-400' }
+  if (order.status === 'delivered')
+    return { label: edd ? 'Delivered · ' + edd : 'Delivered', color: 'text-green-600 dark:text-green-400' }
   if (order.status === 'out_for_delivery') return { label: 'Arriving Today', color: 'text-accent-500' }
   const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   todayIST.setHours(0, 0, 0, 0)
@@ -71,32 +77,52 @@ function getEddDisplay(order: Order, edd: string): { label: string; color: strin
 
 function getStatusColor(status: string) {
   switch (status) {
-    case 'pending':        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-    case 'confirmed':      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-    case 'shipped':        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-    case 'out_for_delivery': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-    case 'delivered':      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-    case 'cancel_requested': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-    case 'cancelled':      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-    case 'return_requested': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'pending':
+      return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+    case 'confirmed':
+      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'shipped':
+      return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+    case 'out_for_delivery':
+      return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+    case 'delivered':
+      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+    case 'cancel_requested':
+      return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'cancelled':
+      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'return_requested':
+      return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
     case 'return_approved':
-    case 'return_received':  return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-    case 'return_rejected':  return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-    case 'returned':       return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-    default:               return 'bg-surface-secondary text-foreground'
+    case 'return_received':
+      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'return_rejected':
+      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'returned':
+      return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+    default:
+      return 'bg-surface-secondary text-foreground'
   }
 }
 
 function getStatusLabel(status: string) {
   switch (status) {
-    case 'cancel_requested':  return 'Cancellation Requested'
-    case 'cancel_rejected':   return 'Cancellation Rejected'
-    case 'out_for_delivery':  return 'Out for Delivery'
-    case 'return_requested':  return 'Return Requested'
-    case 'return_approved':   return 'Return Approved'
-    case 'return_received':   return 'Return Received'
-    case 'return_rejected':   return 'Return Rejected'
-    default: return status.charAt(0).toUpperCase() + status.slice(1)
+    case 'cancel_requested':
+      return 'Cancellation Requested'
+    case 'cancel_rejected':
+      return 'Cancellation Rejected'
+    case 'out_for_delivery':
+      return 'Out for Delivery'
+    case 'return_requested':
+      return 'Return Requested'
+    case 'return_approved':
+      return 'Return Approved'
+    case 'return_received':
+      return 'Return Received'
+    case 'return_rejected':
+      return 'Return Rejected'
+    default:
+      return status.charAt(0).toUpperCase() + status.slice(1)
   }
 }
 
@@ -130,10 +156,11 @@ export default function OrdersPage() {
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders
     const q = searchQuery.toLowerCase()
-    return orders.filter(o =>
-      o.order_number.toLowerCase().includes(q) ||
-      getStatusLabel(o.status).toLowerCase().includes(q) ||
-      o.order_items.some(i => i.product_name.toLowerCase().includes(q))
+    return orders.filter(
+      o =>
+        o.order_number.toLowerCase().includes(q) ||
+        getStatusLabel(o.status).toLowerCase().includes(q) ||
+        o.order_items.some(i => i.product_name.toLowerCase().includes(q))
     )
   }, [orders, searchQuery])
 
@@ -187,7 +214,11 @@ export default function OrdersPage() {
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div className="space-y-3 animate-pulse">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-4"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <div className="flex items-center justify-between mb-3">
                 <div className="h-4 bg-surface-secondary rounded w-40" />
                 <div className="h-5 bg-surface-secondary rounded-full w-20" />
@@ -213,83 +244,90 @@ export default function OrdersPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-
       {/* Mobile header */}
       <AccountMobileHeader />
 
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div>
-            {filteredOrders.length === 0 && !loading ? (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg
-                  className="w-16 h-16 text-foreground-muted mx-auto mb-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          {filteredOrders.length === 0 && !loading ? (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+              <svg
+                className="w-16 h-16 text-foreground-muted mx-auto mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                />
+              </svg>
+              <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
+              <p className="text-foreground-secondary mb-6">You haven&apos;t placed any orders yet.</p>
+              <Link
+                href="/products"
+                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+              >
+                Start Shopping
+              </Link>
+            </div>
+          ) : loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden animate-pulse"
+                  style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                  />
-                </svg>
-                <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
-                <p className="text-foreground-secondary mb-6">You haven&apos;t placed any orders yet.</p>
-                <Link
-                  href="/products"
-                  className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
-                >
-                  Start Shopping
-                </Link>
-              </div>
-            ) : loading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden animate-pulse"
-                    style={{ animationDelay: `${i * 50}ms` }}
-                  >
-                    {/* Header row */}
-                    <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-3 sm:py-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                          <div className="h-4 w-28 bg-surface-secondary rounded" />
-                          <div className="h-4 w-20 bg-surface-secondary rounded" />
-                          <div className="h-4 w-16 bg-surface-secondary rounded" />
-                        </div>
-                        <div className="h-5 w-20 bg-surface-secondary rounded-full" />
-                      </div>
-                    </div>
-                    {/* Item row */}
-                    <div className="p-4 sm:p-6">
-                      <div className="flex gap-4">
-                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface-secondary rounded-lg" />
-                        <div className="flex-1 space-y-2 py-1">
-                          <div className="h-4 w-3/4 bg-surface-secondary rounded" />
-                          <div className="h-3 w-1/3 bg-surface-secondary rounded" />
-                          <div className="h-3 w-1/4 bg-surface-secondary rounded" />
-                        </div>
-                      </div>
-                      <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
+                  {/* Header row */}
+                  <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-3 sm:py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                         <div className="h-4 w-28 bg-surface-secondary rounded" />
+                        <div className="h-4 w-20 bg-surface-secondary rounded" />
+                        <div className="h-4 w-16 bg-surface-secondary rounded" />
                       </div>
+                      <div className="h-5 w-20 bg-surface-secondary rounded-full" />
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredOrders.map((order) => {
-                  const firstItem = order.order_items[0]
-                  const firstItemImage = firstItem?.products?.product_images?.find(img => img.is_primary) || firstItem?.products?.product_images?.[0]
-                  const extraItems = order.order_items.length - 1
-                  const orderDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  {/* Item row */}
+                  <div className="p-4 sm:p-6">
+                    <div className="flex gap-4">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface-secondary rounded-lg" />
+                      <div className="flex-1 space-y-2 py-1">
+                        <div className="h-4 w-3/4 bg-surface-secondary rounded" />
+                        <div className="h-3 w-1/3 bg-surface-secondary rounded" />
+                        <div className="h-3 w-1/4 bg-surface-secondary rounded" />
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
+                      <div className="h-4 w-28 bg-surface-secondary rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredOrders.map(order => {
+                const firstItem = order.order_items[0]
+                const firstItemImage =
+                  firstItem?.products?.product_images?.find(img => img.is_primary) ||
+                  firstItem?.products?.product_images?.[0]
+                const extraItems = order.order_items.length - 1
+                const orderDate = new Date(order.created_at).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
 
-                  return (
-                  <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-
+                return (
+                  <div
+                    key={order.id}
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden"
+                  >
                     {/* Mobile card — compact header + first item only */}
                     <div className="sm:hidden">
                       <div className="bg-surface border-b border-border-default px-4 py-3">
@@ -300,7 +338,9 @@ export default function OrdersPage() {
                           >
                             {order.order_number}
                           </Link>
-                          <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                          <span
+                            className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                          >
                             {getStatusLabel(order.status)}
                           </span>
                         </div>
@@ -308,14 +348,17 @@ export default function OrdersPage() {
                           <span>{orderDate}</span>
                           <span className="w-px h-3 bg-border-default" />
                           <span className="font-semibold text-foreground">₹{fmt(order.total_amount)}</span>
-                          {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
-                            <>
-                              <span className="w-px h-3 bg-border-default" />
-                              <span className={`font-medium ${getEddDisplay(order, e).color}`}>
-                                {getEddDisplay(order, e).label}
-                              </span>
-                            </>
-                          ) : null })()}
+                          {(() => {
+                            const e = resolveOrderEdd(order)
+                            return e && !['cancelled', 'returned'].includes(order.status) ? (
+                              <>
+                                <span className="w-px h-3 bg-border-default" />
+                                <span className={`font-medium ${getEddDisplay(order, e).color}`}>
+                                  {getEddDisplay(order, e).label}
+                                </span>
+                              </>
+                            ) : null
+                          })()}
                         </div>
                       </div>
                       <div className="px-4 py-3">
@@ -323,11 +366,25 @@ export default function OrdersPage() {
                           <div className="flex gap-3 items-center">
                             <div className="w-12 h-12 flex-shrink-0 bg-surface rounded-lg overflow-hidden border border-border-default">
                               {firstItemImage ? (
-                                <img src={firstItemImage.thumbnail_url} alt={firstItem.product_name} className="w-full h-full object-cover" />
+                                <img
+                                  src={firstItemImage.thumbnail_url}
+                                  alt={firstItem.product_name}
+                                  className="w-full h-full object-cover"
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  <svg
+                                    className="w-5 h-5 text-foreground-muted"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
                                   </svg>
                                 </div>
                               )}
@@ -335,8 +392,15 @@ export default function OrdersPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-foreground truncate">{firstItem.product_name}</p>
                               <p className="text-xs text-foreground-secondary mt-0.5">
-                                Qty: {firstItem.buy_mode === 'weight' || firstItem.buy_mode === 'length' ? `${Number(firstItem.quantity).toFixed(3)} ${firstItem.buy_unit ?? ''}` : Math.round(Number(firstItem.quantity))}
-                                {extraItems > 0 && <span className="ml-1.5 text-foreground-muted">+{extraItems} more item{extraItems > 1 ? 's' : ''}</span>}
+                                Qty:{' '}
+                                {firstItem.buy_mode === 'weight' || firstItem.buy_mode === 'length'
+                                  ? `${Number(firstItem.quantity).toFixed(3)} ${firstItem.buy_unit ?? ''}`
+                                  : Math.round(Number(firstItem.quantity))}
+                                {extraItems > 0 && (
+                                  <span className="ml-1.5 text-foreground-muted">
+                                    +{extraItems} more item{extraItems > 1 ? 's' : ''}
+                                  </span>
+                                )}
                               </p>
                             </div>
                           </div>
@@ -352,7 +416,12 @@ export default function OrdersPage() {
                             </svg>
                           </Link>
                           {(order.status === 'pending' || order.status === 'confirmed') && (
-                            <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium disabled:opacity-50">
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrder(order.id)}
+                              disabled={cancellingOrderId === order.id}
+                              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium disabled:opacity-50"
+                            >
                               {cancellingOrderId === order.id ? 'Submitting…' : 'Request Cancellation'}
                             </button>
                           )}
@@ -382,52 +451,92 @@ export default function OrdersPage() {
                               <p className="text-xs text-foreground-muted mb-1">Total</p>
                               <p className="text-sm font-semibold text-foreground">₹{fmt(order.total_amount)}</p>
                             </div>
-                            {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
-                              <div>
-                                <p className="text-xs text-foreground-muted mb-1">Delivery</p>
-                                <p className={`text-sm font-medium ${getEddDisplay(order, e).color}`}>{getEddDisplay(order, e).label}</p>
-                              </div>
-                            ) : null })()}
+                            {(() => {
+                              const e = resolveOrderEdd(order)
+                              return e && !['cancelled', 'returned'].includes(order.status) ? (
+                                <div>
+                                  <p className="text-xs text-foreground-muted mb-1">Delivery</p>
+                                  <p className={`text-sm font-medium ${getEddDisplay(order, e).color}`}>
+                                    {getEddDisplay(order, e).label}
+                                  </p>
+                                </div>
+                              ) : null
+                            })()}
                           </div>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                          >
                             {getStatusLabel(order.status)}
                           </span>
                         </div>
                       </div>
                       <div className="p-6">
                         <div className="space-y-4">
-                          {order.order_items.slice(0, 2).map((item) => {
-                            const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
+                          {order.order_items.slice(0, 2).map(item => {
+                            const primaryImage =
+                              item.products?.product_images?.find(img => img.is_primary) ||
+                              item.products?.product_images?.[0]
                             return (
                               <div key={item.id} className="flex gap-4">
                                 <div className="relative w-20 h-20 flex-shrink-0 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                                   {primaryImage ? (
-                                    <img src={primaryImage.thumbnail_url} alt={item.product_name} className="w-full h-full object-cover rounded-lg" />
+                                    <img
+                                      src={primaryImage.thumbnail_url}
+                                      alt={item.product_name}
+                                      className="w-full h-full object-cover rounded-lg"
+                                    />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                      <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      <svg
+                                        className="w-8 h-8 text-foreground-muted"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                        />
                                       </svg>
                                     </div>
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <Link href={`/products/${item.products?.slug}`} className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block">
+                                  <Link
+                                    href={`/products/${item.products?.slug}`}
+                                    className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block"
+                                  >
                                     {item.product_name}
                                   </Link>
-                                  <p className="text-sm text-foreground-secondary">Quantity: {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</p>
+                                  <p className="text-sm text-foreground-secondary">
+                                    Quantity:{' '}
+                                    {item.buy_mode === 'weight' || item.buy_mode === 'length'
+                                      ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}`
+                                      : Math.round(Number(item.quantity))}
+                                  </p>
                                   <p className="text-sm font-semibold text-foreground mt-1">
-                                    ₹{fmt(item.unit_price)} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))} = ₹{fmt(item.total_price)}
+                                    ₹{fmt(item.unit_price)} ×{' '}
+                                    {item.buy_mode === 'weight' || item.buy_mode === 'length'
+                                      ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}`
+                                      : Math.round(Number(item.quantity))}{' '}
+                                    = ₹{fmt(item.total_price)}
                                   </p>
                                 </div>
                               </div>
                             )
                           })}
                           {order.order_items.length > 2 && (
-                            <Link href={`/account/orders/${order.id}`} className="flex items-center gap-3 text-sm text-foreground-muted hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
+                            <Link
+                              href={`/account/orders/${order.id}`}
+                              className="flex items-center gap-3 text-sm text-foreground-muted hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
+                            >
                               <div className="relative h-12 w-16 flex-shrink-0">
                                 {order.order_items.slice(2, Math.min(order.order_items.length, 5)).map((item, idx) => {
-                                  const img = item.products?.product_images?.find(i => i.is_primary) || item.products?.product_images?.[0]
+                                  const img =
+                                    item.products?.product_images?.find(i => i.is_primary) ||
+                                    item.products?.product_images?.[0]
                                   const bgColors = ['bg-white', 'bg-zinc-800', 'bg-zinc-600']
                                   return (
                                     <div
@@ -435,12 +544,15 @@ export default function OrdersPage() {
                                       className={`absolute rounded-xl overflow-hidden border-2 border-border-default ${bgColors[idx]}`}
                                       style={{ width: 44, height: 44, top: idx * 4, left: idx * 8, zIndex: 10 - idx }}
                                     >
-                                      {img && <img src={img.thumbnail_url} alt="" className="w-full h-full object-cover" />}
+                                      {img && (
+                                        <img src={img.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                                      )}
                                     </div>
                                   )
                                 })}
                               </div>
-                              +{order.order_items.length - 2} more item{order.order_items.length - 2 > 1 ? 's' : ''} — View all
+                              +{order.order_items.length - 2} more item{order.order_items.length - 2 > 1 ? 's' : ''} —
+                              View all
                             </Link>
                           )}
                         </div>
@@ -450,60 +562,72 @@ export default function OrdersPage() {
                             <div className="text-sm text-foreground-secondary">
                               <p>{order.addresses.address_line1}</p>
                               {order.addresses.address_line2 && <p>{order.addresses.address_line2}</p>}
-                              <p>{order.addresses.city}, {order.addresses.state} {order.addresses.postal_code}</p>
+                              <p>
+                                {order.addresses.city}, {order.addresses.state} {order.addresses.postal_code}
+                              </p>
                             </div>
                           </div>
                         )}
                         <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
-                          <Link href={`/account/orders/${order.id}`} className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm">
+                          <Link
+                            href={`/account/orders/${order.id}`}
+                            className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
+                          >
                             View Order Details
                             <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </Link>
                           {(order.status === 'pending' || order.status === 'confirmed') && (
-                            <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50">
+                            <button
+                              type="button"
+                              onClick={() => handleCancelOrder(order.id)}
+                              disabled={cancellingOrderId === order.id}
+                              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
+                            >
                               {cancellingOrderId === order.id ? 'Submitting…' : 'Request Cancellation'}
                             </button>
                           )}
                         </div>
                       </div>
                     </div>
-
                   </div>
-                  )
-                })}
+                )
+              })}
 
-                {total > pageSize && (
-                  <div className="flex items-center justify-between gap-2 pt-4">
-                    <p className="text-xs text-foreground-muted whitespace-nowrap">
-                      <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span>
-                      {' '}of <span className="font-medium text-foreground">{total}</span> orders
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                      >
-                        Prev
-                      </button>
-                      <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{Math.ceil(total / pageSize)}</span>
-                      <button
-                        onClick={() => setPage(p => p + 1)}
-                        disabled={page >= Math.ceil(total / pageSize)}
-                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
+              {total > pageSize && (
+                <div className="flex items-center justify-between gap-2 pt-4">
+                  <p className="text-xs text-foreground-muted whitespace-nowrap">
+                    <span className="font-medium text-foreground">
+                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
+                    </span>{' '}
+                    of <span className="font-medium text-foreground">{total}</span> orders
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-foreground-muted whitespace-nowrap">
+                      {page}/{Math.ceil(total / pageSize)}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page >= Math.ceil(total / pageSize)}
+                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Next
+                    </button>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
 }
-

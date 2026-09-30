@@ -16,7 +16,11 @@ export const dynamic = 'force-dynamic'
 export default async function OnboardSuccessPage({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
-  const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
+  const signals = {
+    userAgent: h.get('user-agent'),
+    acceptLanguage: h.get('accept-language'),
+    uaPlatform: h.get('sec-ch-ua-platform'),
+  }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
   if (!owner) redirect('/signin')
 
@@ -24,7 +28,7 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
 
   // Find the tenant and verify subscription status with Razorpay.
   const tenants = await getOwnerTenants(owner.id)
-  const tenant = tenantSlug ? tenants.find((t) => t.slug === tenantSlug) : tenants[0]
+  const tenant = tenantSlug ? tenants.find(t => t.slug === tenantSlug) : tenants[0]
 
   if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {
     const sub = await getSubscription(tenant.razorpay_subscription_id).catch(() => null)
@@ -57,13 +61,18 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
         <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Payment confirmed!</h1>
         <p className="text-sm text-green-700 dark:text-green-400 mt-3">
           {tenantSlug ? (
-            <>Your store <span className="font-semibold">{tenantSlug}.jeffistores.in</span> is being set up.</>
+            <>
+              Your store <span className="font-semibold">{tenantSlug}.jeffistores.in</span> is being set up.
+            </>
           ) : (
             <>Your store is being set up.</>
-          )}
-          {' '}You&apos;ll be notified when it&apos;s live.
+          )}{' '}
+          You&apos;ll be notified when it&apos;s live.
         </p>
-        <Link href="/dashboard" className="inline-block mt-7 w-full px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">
+        <Link
+          href="/dashboard"
+          className="inline-block mt-7 w-full px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors"
+        >
           Go to dashboard →
         </Link>
       </div>

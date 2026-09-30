@@ -33,7 +33,13 @@ export default async function FormPage({ params }: { params: Promise<{ slug: str
   return (
     <>
       <FormsTopNav />
-      <FormClient form={{ ...form, template_type: form.template_type || 'google_review', custom_fields: form.custom_fields || [] }} />
+      <FormClient
+        form={{
+          ...form,
+          template_type: form.template_type || 'google_review',
+          custom_fields: form.custom_fields || [],
+        }}
+      />
     </>
   )
 }

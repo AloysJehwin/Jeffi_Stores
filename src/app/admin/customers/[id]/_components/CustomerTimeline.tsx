@@ -3,9 +3,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
-  ShoppingCart, Package, CreditCard, Undo2, Tag, StickyNote, MessageSquare,
-  Unlock, Lock, Sparkles, MapPin, User, Flag, CheckCircle, Check, Circle,
-  Heart, Star, KeyRound, BellOff, BellRing, MessagesSquare, Eye, ShoppingBag,
+  ShoppingCart,
+  Package,
+  CreditCard,
+  Undo2,
+  Tag,
+  StickyNote,
+  MessageSquare,
+  Unlock,
+  Lock,
+  Sparkles,
+  MapPin,
+  User,
+  Flag,
+  CheckCircle,
+  Check,
+  Circle,
+  Heart,
+  Star,
+  KeyRound,
+  BellOff,
+  BellRing,
+  MessagesSquare,
+  Eye,
+  ShoppingBag,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { categoryFor, type ActivityCategory } from '@/lib/activity-shared'
@@ -26,48 +47,48 @@ interface ActivityEvent {
 }
 
 const KIND_META: Record<string, { Icon: LucideIcon; color: string; label: string }> = {
-  order_placed:           { Icon: ShoppingCart,  color: 'bg-blue-500',    label: 'Order placed' },
-  order_status:           { Icon: Package,       color: 'bg-indigo-500',  label: 'Order status' },
-  payment_status:         { Icon: CreditCard,    color: 'bg-emerald-500', label: 'Payment' },
-  return_requested:       { Icon: Undo2,         color: 'bg-purple-500',  label: 'Return' },
-  return_status:          { Icon: Undo2,         color: 'bg-purple-500',  label: 'Return status' },
-  cart_abandoned:         { Icon: ShoppingCart,  color: 'bg-orange-500',  label: 'Cart abandoned' },
-  cart_item_added:        { Icon: ShoppingBag,   color: 'bg-blue-400',    label: 'Cart add' },
-  cart_item_removed:      { Icon: ShoppingBag,   color: 'bg-zinc-400',    label: 'Cart remove' },
-  product_viewed:         { Icon: Eye,           color: 'bg-zinc-400',    label: 'Viewed' },
-  tag_added:              { Icon: Tag,           color: 'bg-cyan-500',    label: 'Tag added' },
-  tag_removed:            { Icon: Tag,           color: 'bg-zinc-500',    label: 'Tag removed' },
-  note_added:             { Icon: StickyNote,    color: 'bg-amber-500',   label: 'Note' },
-  support_message:        { Icon: MessageSquare, color: 'bg-sky-500',     label: 'Support' },
-  support_session_started:{ Icon: MessagesSquare,color: 'bg-sky-600',     label: 'Support chat' },
-  login:                  { Icon: Unlock,        color: 'bg-zinc-500',    label: 'Login' },
-  logout:                 { Icon: Lock,          color: 'bg-zinc-400',    label: 'Logout' },
-  signup:                 { Icon: Sparkles,      color: 'bg-pink-500',    label: 'Signup' },
-  address_added:          { Icon: MapPin,        color: 'bg-zinc-500',    label: 'Address added' },
-  address_updated:        { Icon: MapPin,        color: 'bg-zinc-500',    label: 'Address updated' },
-  address_removed:        { Icon: MapPin,        color: 'bg-zinc-400',    label: 'Address removed' },
-  profile_updated:        { Icon: User,          color: 'bg-zinc-500',    label: 'Profile' },
-  password_changed:       { Icon: KeyRound,      color: 'bg-zinc-600',    label: 'Password' },
-  wishlist_added:         { Icon: Heart,         color: 'bg-rose-500',    label: 'Wishlist' },
-  wishlist_removed:       { Icon: Heart,         color: 'bg-zinc-400',    label: 'Wishlist removed' },
-  review_submitted:       { Icon: Star,          color: 'bg-yellow-500',  label: 'Review' },
-  flagged:                { Icon: Flag,          color: 'bg-red-500',     label: 'Flagged' },
-  unflagged:              { Icon: CheckCircle,   color: 'bg-green-500',   label: 'Reactivated' },
-  task_created:           { Icon: Check,         color: 'bg-violet-500',  label: 'Task' },
-  task_completed:         { Icon: Check,         color: 'bg-green-500',   label: 'Task done' },
-  marketing_opted_in:     { Icon: BellRing,      color: 'bg-emerald-500', label: 'Marketing on' },
-  marketing_opted_out:    { Icon: BellOff,       color: 'bg-zinc-400',    label: 'Marketing off' },
+  order_placed: { Icon: ShoppingCart, color: 'bg-blue-500', label: 'Order placed' },
+  order_status: { Icon: Package, color: 'bg-indigo-500', label: 'Order status' },
+  payment_status: { Icon: CreditCard, color: 'bg-emerald-500', label: 'Payment' },
+  return_requested: { Icon: Undo2, color: 'bg-purple-500', label: 'Return' },
+  return_status: { Icon: Undo2, color: 'bg-purple-500', label: 'Return status' },
+  cart_abandoned: { Icon: ShoppingCart, color: 'bg-orange-500', label: 'Cart abandoned' },
+  cart_item_added: { Icon: ShoppingBag, color: 'bg-blue-400', label: 'Cart add' },
+  cart_item_removed: { Icon: ShoppingBag, color: 'bg-zinc-400', label: 'Cart remove' },
+  product_viewed: { Icon: Eye, color: 'bg-zinc-400', label: 'Viewed' },
+  tag_added: { Icon: Tag, color: 'bg-cyan-500', label: 'Tag added' },
+  tag_removed: { Icon: Tag, color: 'bg-zinc-500', label: 'Tag removed' },
+  note_added: { Icon: StickyNote, color: 'bg-amber-500', label: 'Note' },
+  support_message: { Icon: MessageSquare, color: 'bg-sky-500', label: 'Support' },
+  support_session_started: { Icon: MessagesSquare, color: 'bg-sky-600', label: 'Support chat' },
+  login: { Icon: Unlock, color: 'bg-zinc-500', label: 'Login' },
+  logout: { Icon: Lock, color: 'bg-zinc-400', label: 'Logout' },
+  signup: { Icon: Sparkles, color: 'bg-pink-500', label: 'Signup' },
+  address_added: { Icon: MapPin, color: 'bg-zinc-500', label: 'Address added' },
+  address_updated: { Icon: MapPin, color: 'bg-zinc-500', label: 'Address updated' },
+  address_removed: { Icon: MapPin, color: 'bg-zinc-400', label: 'Address removed' },
+  profile_updated: { Icon: User, color: 'bg-zinc-500', label: 'Profile' },
+  password_changed: { Icon: KeyRound, color: 'bg-zinc-600', label: 'Password' },
+  wishlist_added: { Icon: Heart, color: 'bg-rose-500', label: 'Wishlist' },
+  wishlist_removed: { Icon: Heart, color: 'bg-zinc-400', label: 'Wishlist removed' },
+  review_submitted: { Icon: Star, color: 'bg-yellow-500', label: 'Review' },
+  flagged: { Icon: Flag, color: 'bg-red-500', label: 'Flagged' },
+  unflagged: { Icon: CheckCircle, color: 'bg-green-500', label: 'Reactivated' },
+  task_created: { Icon: Check, color: 'bg-violet-500', label: 'Task' },
+  task_completed: { Icon: Check, color: 'bg-green-500', label: 'Task done' },
+  marketing_opted_in: { Icon: BellRing, color: 'bg-emerald-500', label: 'Marketing on' },
+  marketing_opted_out: { Icon: BellOff, color: 'bg-zinc-400', label: 'Marketing off' },
 }
 
 type FilterKey = ActivityCategory | 'all'
 
 const FILTERS: { key: FilterKey; label: string; ringColor: string }[] = [
-  { key: 'all',       label: 'All',       ringColor: 'ring-foreground' },
-  { key: 'auth',      label: 'Auth',      ringColor: 'ring-zinc-500' },
-  { key: 'orders',    label: 'Orders',    ringColor: 'ring-blue-500' },
-  { key: 'support',   label: 'Support',   ringColor: 'ring-sky-500' },
-  { key: 'account',   label: 'Account',   ringColor: 'ring-rose-500' },
-  { key: 'admin',     label: 'Admin',     ringColor: 'ring-amber-500' },
+  { key: 'all', label: 'All', ringColor: 'ring-foreground' },
+  { key: 'auth', label: 'Auth', ringColor: 'ring-zinc-500' },
+  { key: 'orders', label: 'Orders', ringColor: 'ring-blue-500' },
+  { key: 'support', label: 'Support', ringColor: 'ring-sky-500' },
+  { key: 'account', label: 'Account', ringColor: 'ring-rose-500' },
+  { key: 'admin', label: 'Admin', ringColor: 'ring-amber-500' },
   { key: 'marketing', label: 'Marketing', ringColor: 'ring-emerald-500' },
 ]
 
@@ -110,7 +131,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
       if (res.ok) {
         const data = await res.json()
         const newEvents: ActivityEvent[] = data.events || []
-        setEvents(prev => before ? [...prev, ...newEvents] : newEvents)
+        setEvents(prev => (before ? [...prev, ...newEvents] : newEvents))
         setHasMore(newEvents.length === 50)
       }
     } finally {
@@ -138,7 +159,16 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
   }
 
   const counts = useMemo(() => {
-    const c: Record<FilterKey, number> = { all: events.length, auth: 0, orders: 0, support: 0, account: 0, admin: 0, marketing: 0, other: 0 } as any
+    const c: Record<FilterKey, number> = {
+      all: events.length,
+      auth: 0,
+      orders: 0,
+      support: 0,
+      account: 0,
+      admin: 0,
+      marketing: 0,
+      other: 0,
+    } as any
     for (const e of events) {
       const cat = categoryFor(e.kind) as FilterKey
       c[cat] = (c[cat] || 0) + 1
@@ -217,7 +247,9 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
                   const link = refLink(e)
                   const content = (
                     <>
-                      <div className={`relative z-10 w-8 h-8 rounded-full ${meta.color} flex items-center justify-center text-white shrink-0 ring-4 ring-surface-elevated`}>
+                      <div
+                        className={`relative z-10 w-8 h-8 rounded-full ${meta.color} flex items-center justify-center text-white shrink-0 ring-4 ring-surface-elevated`}
+                      >
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
@@ -229,7 +261,11 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
                     </>
                   )
                   return link ? (
-                    <Link key={e.id} href={link} className="flex gap-3 items-start hover:bg-surface-secondary/50 -mx-2 px-2 py-1 rounded transition-colors">
+                    <Link
+                      key={e.id}
+                      href={link}
+                      className="flex gap-3 items-start hover:bg-surface-secondary/50 -mx-2 px-2 py-1 rounded transition-colors"
+                    >
                       {content}
                     </Link>
                   ) : (

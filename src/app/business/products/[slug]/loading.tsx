@@ -6,7 +6,11 @@ export default function Loading() {
           <div className="aspect-square bg-surface-secondary rounded-lg animate-pulse" />
           <div className="grid grid-cols-4 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="aspect-square bg-surface-secondary rounded-lg animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
+              <div
+                key={i}
+                className="aspect-square bg-surface-secondary rounded-lg animate-pulse"
+                style={{ animationDelay: `${i * 80}ms` }}
+              />
             ))}
           </div>
         </div>
@@ -18,7 +22,11 @@ export default function Loading() {
           <div className="h-px bg-border-default my-4" />
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-4 bg-surface-secondary rounded animate-pulse" style={{ width: `${90 - i * 10}%`, animationDelay: `${i * 80}ms` }} />
+              <div
+                key={i}
+                className="h-4 bg-surface-secondary rounded animate-pulse"
+                style={{ width: `${90 - i * 10}%`, animationDelay: `${i * 80}ms` }}
+              />
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3 pt-4">

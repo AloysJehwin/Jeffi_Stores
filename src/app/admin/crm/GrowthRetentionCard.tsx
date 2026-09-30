@@ -23,7 +23,9 @@ function CohortGrid({ rows }: { rows: CohortRow[] }) {
             <th className="text-left font-medium text-foreground-muted px-1 py-1">Cohort</th>
             <th className="text-right font-medium text-foreground-muted px-1 py-1">Size</th>
             {[0, 1, 2, 3, 4, 5].map(m => (
-              <th key={m} className="text-center font-medium text-foreground-muted px-1 py-1 tabular-nums">M{m}</th>
+              <th key={m} className="text-center font-medium text-foreground-muted px-1 py-1 tabular-nums">
+                M{m}
+              </th>
             ))}
           </tr>
         </thead>
@@ -51,18 +53,26 @@ export default function GrowthRetentionCard({ growth, cohorts }: { growth: Growt
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Growth and Retention</h2>
+      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
+        Growth and Retention
+      </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
         <CompactStat label="New customers" value={numStr(growth.newCustomers)} />
         <CompactStat label="Returning buyers" value={numStr(growth.returningCustomers)} />
-        <CompactStat label="Repeat rate" value={pctStr(growth.repeatRate, 0)} sub={`${numStr(growth.repeatBuyers)} of ${numStr(growth.buyers)} buyers`} />
+        <CompactStat
+          label="Repeat rate"
+          value={pctStr(growth.repeatRate, 0)}
+          sub={`${numStr(growth.repeatBuyers)} of ${numStr(growth.buyers)} buyers`}
+        />
         <CompactStat label="Median to 2nd order" value={daysStr(growth.medianDaysToSecond)} />
         <CompactStat label="Buyers in range" value={numStr(growth.buyers)} />
         <CompactStat label="Churned" value={numStr(growth.churned)} />
       </div>
       {cohorts.length > 0 && (
         <>
-          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">Monthly retention by cohort</p>
+          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">
+            Monthly retention by cohort
+          </p>
           <CohortGrid rows={cohorts} />
         </>
       )}

@@ -17,9 +17,16 @@ export default async function ProductAnalyticsPage({ params }: { params: Promise
     <div className="p-4 sm:p-6 max-w-full space-y-5">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-          <Link href={ap('/admin/products', host)} className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
+          <Link href={ap('/admin/products', host)} className="text-accent-500 hover:text-accent-600 transition-colors">
+            Products
+          </Link>
           <span>/</span>
-          <Link href={ap(`/admin/products/${id}`, host)} className="text-accent-500 hover:text-accent-600 transition-colors truncate max-w-[200px]">{data.product.name}</Link>
+          <Link
+            href={ap(`/admin/products/${id}`, host)}
+            className="text-accent-500 hover:text-accent-600 transition-colors truncate max-w-[200px]"
+          >
+            {data.product.name}
+          </Link>
           <span>/</span>
           <span className="text-foreground">Analytics</span>
         </div>

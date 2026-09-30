@@ -70,7 +70,9 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  useEffect(() => { fetchData() }, [statusFilter])
+  useEffect(() => {
+    fetchData()
+  }, [statusFilter])
 
   const updateStatus = async (submissionId: string, status: string) => {
     setUpdating(submissionId)
@@ -80,19 +82,30 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       body: JSON.stringify({ submissionId, status }),
     })
     if (res.ok) {
-      setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, status: status as Submission['status'] } : s))
+      setSubmissions(prev =>
+        prev.map(s => (s.id === submissionId ? { ...s, status: status as Submission['status'] } : s))
+      )
     }
     setUpdating(null)
   }
 
   const statusColor = (s: string) =>
-    s === 'approved' ? 'bg-green-100 text-green-700' : s === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-700'
+    s === 'approved'
+      ? 'bg-green-100 text-green-700'
+      : s === 'rejected'
+        ? 'bg-red-100 text-red-600'
+        : 'bg-yellow-100 text-yellow-700'
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={ap('/admin/review-forms')} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+        <Link
+          href={ap('/admin/review-forms')}
+          className="text-foreground-muted hover:text-foreground transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
@@ -117,7 +130,11 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-pulse">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
               <div className="aspect-video bg-surface-secondary" />
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
@@ -138,43 +155,64 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {submissions.map(s => (
             <div key={s.id} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-              <a href={s.screenshot_url} target="_blank" rel="noopener noreferrer" className="block relative aspect-video bg-surface-secondary overflow-hidden">
+              <a
+                href={s.screenshot_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block relative aspect-video bg-surface-secondary overflow-hidden"
+              >
                 <Image src={s.screenshot_url} alt="Review screenshot" fill className="object-cover" unoptimized />
               </a>
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium text-sm truncate">{s.email}</span>
-                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(s.status)}`}>{s.status}</span>
+                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(s.status)}`}>
+                    {s.status}
+                  </span>
                 </div>
 
                 {s.coupon_code && (
-                  <p className="text-xs text-foreground-secondary">Coupon: <span className="font-mono font-bold text-accent-500">{s.coupon_code}</span></p>
+                  <p className="text-xs text-foreground-secondary">
+                    Coupon: <span className="font-mono font-bold text-accent-500">{s.coupon_code}</span>
+                  </p>
                 )}
 
-                {formMeta?.custom_fields && formMeta.custom_fields.length > 0 && s.extra_fields && Object.keys(s.extra_fields).length > 0 && (
-                  <div className="space-y-1.5 pt-1 border-t border-border-default">
-                    {formMeta.custom_fields.map(field => {
-                      const val = s.extra_fields[field.id]
-                      if (!val) return null
-                      return (
-                        <div key={field.id}>
-                          <p className="text-xs text-foreground-muted">{field.label}</p>
-                          {field.type === 'rating' ? (
-                            <StarDisplay value={parseInt(val, 10)} />
-                          ) : field.type === 'image' ? (
-                            <a href={val} target="_blank" rel="noopener noreferrer">
-                              <Image src={val} alt={field.label} width={200} height={100} className="rounded-lg max-h-24 object-contain" unoptimized />
-                            </a>
-                          ) : (
-                            <p className="text-xs text-foreground">{val}</p>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                {formMeta?.custom_fields &&
+                  formMeta.custom_fields.length > 0 &&
+                  s.extra_fields &&
+                  Object.keys(s.extra_fields).length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t border-border-default">
+                      {formMeta.custom_fields.map(field => {
+                        const val = s.extra_fields[field.id]
+                        if (!val) return null
+                        return (
+                          <div key={field.id}>
+                            <p className="text-xs text-foreground-muted">{field.label}</p>
+                            {field.type === 'rating' ? (
+                              <StarDisplay value={parseInt(val, 10)} />
+                            ) : field.type === 'image' ? (
+                              <a href={val} target="_blank" rel="noopener noreferrer">
+                                <Image
+                                  src={val}
+                                  alt={field.label}
+                                  width={200}
+                                  height={100}
+                                  className="rounded-lg max-h-24 object-contain"
+                                  unoptimized
+                                />
+                              </a>
+                            ) : (
+                              <p className="text-xs text-foreground">{val}</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
-                <p className="text-xs text-foreground-muted">{new Date(s.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
+                <p className="text-xs text-foreground-muted">
+                  {new Date(s.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                </p>
 
                 {s.status === 'pending' && (
                   <RequireWrite scope="review_forms:write">

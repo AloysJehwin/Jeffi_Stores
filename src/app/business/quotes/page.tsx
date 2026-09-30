@@ -29,11 +29,11 @@ interface RFQ {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending:     'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  reviewed:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  reviewed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  converted:   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected:    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
 export default function MyQuotesPage() {
@@ -47,8 +47,8 @@ export default function MyQuotesPage() {
   const [total, setTotal] = useState(0)
   const PAGE_SIZE = 20
 
-  const filteredRfqs = useMemo(() =>
-    filterStatus === 'all' ? rfqs : rfqs.filter(r => r.status === filterStatus),
+  const filteredRfqs = useMemo(
+    () => (filterStatus === 'all' ? rfqs : rfqs.filter(r => r.status === filterStatus)),
     [rfqs, filterStatus]
   )
 
@@ -65,8 +65,16 @@ export default function MyQuotesPage() {
     setLoading(true)
     fetch(`/api/business/rfqs?page=${page}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setRfqs(d.rfqs || []); setTotal(d.total || 0); setLoading(false); setInitialLoading(false) })
-      .catch(() => { setLoading(false); setInitialLoading(false) })
+      .then(d => {
+        setRfqs(d.rfqs || [])
+        setTotal(d.total || 0)
+        setLoading(false)
+        setInitialLoading(false)
+      })
+      .catch(() => {
+        setLoading(false)
+        setInitialLoading(false)
+      })
   }, [user, page])
 
   if (isLoading || initialLoading) {
@@ -74,7 +82,11 @@ export default function MyQuotesPage() {
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div className="space-y-3 animate-pulse">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-4"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="h-4 bg-surface-secondary rounded w-36" />
                 <div className="h-5 bg-surface-secondary rounded-full w-20" />
@@ -93,7 +105,6 @@ export default function MyQuotesPage() {
       <BusinessAccountNavBar />
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-8">
-
         {/* Status filter */}
         {rfqs.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-4">
@@ -116,12 +127,27 @@ export default function MyQuotesPage() {
         <div>
           {rfqs.length === 0 && !loading ? (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-              <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+              <svg
+                className="w-16 h-16 mx-auto text-foreground-muted mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"
+                />
               </svg>
               <p className="text-foreground-secondary font-medium">No quote requests yet</p>
-              <p className="text-sm text-foreground-muted mt-1">Use the &ldquo;Request Quote&rdquo; button on any product page or cart to get started.</p>
-              <Link href={bp('/business/products')} className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700">
+              <p className="text-sm text-foreground-muted mt-1">
+                Use the &ldquo;Request Quote&rdquo; button on any product page or cart to get started.
+              </p>
+              <Link
+                href={bp('/business/products')}
+                className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700"
+              >
                 Browse Products
               </Link>
             </div>
@@ -152,7 +178,9 @@ export default function MyQuotesPage() {
           ) : (
             <div className="space-y-3">
               {filterStatus !== 'all' && filteredRfqs.length === 0 && (
-                <p className="text-sm text-foreground-secondary text-center py-8">No quotes with this status on this page.</p>
+                <p className="text-sm text-foreground-secondary text-center py-8">
+                  No quotes with this status on this page.
+                </p>
               )}
               {filteredRfqs.map(rfq => {
                 const displayTotal = rfq.quotation_total
@@ -170,7 +198,10 @@ export default function MyQuotesPage() {
                 }
 
                 return (
-                  <div key={rfq.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5">
+                  <div
+                    key={rfq.id}
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
+                  >
                     {/* Top row: RFQ number + status + amount */}
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="min-w-0">
@@ -181,18 +212,26 @@ export default function MyQuotesPage() {
                           {rfq.rfq_number}
                         </Link>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
+                          <span
+                            className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}
+                          >
                             {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
                           </span>
                           {rfq.order_id && rfq.payment_status && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              rfq.payment_status === 'paid'
-                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                rfq.payment_status === 'paid'
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                  : rfq.payment_status === 'partial'
+                                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              }`}
+                            >
+                              {rfq.payment_status === 'paid'
+                                ? 'Paid'
                                 : rfq.payment_status === 'partial'
-                                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            }`}>
-                              {rfq.payment_status === 'paid' ? 'Paid' : rfq.payment_status === 'partial' ? 'Partially paid' : 'Unpaid'}
+                                  ? 'Partially paid'
+                                  : 'Unpaid'}
                             </span>
                           )}
                         </div>
@@ -221,14 +260,14 @@ export default function MyQuotesPage() {
                     <p className="text-sm text-foreground-secondary mb-1">
                       {rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}
                       {' · '}
-                      {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(rfq.created_at).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                     </p>
-                    {rfq.notes && (
-                      <p className="text-xs text-foreground-muted mb-1 line-clamp-1">{rfq.notes}</p>
-                    )}
-                    <p className="text-xs text-foreground-muted italic mb-3">
-                      {statusMsg[rfq.status] ?? ''}
-                    </p>
+                    {rfq.notes && <p className="text-xs text-foreground-muted mb-1 line-clamp-1">{rfq.notes}</p>}
+                    <p className="text-xs text-foreground-muted italic mb-3">{statusMsg[rfq.status] ?? ''}</p>
 
                     {/* Action buttons — full width on mobile */}
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -246,9 +285,21 @@ export default function MyQuotesPage() {
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-xs font-medium transition-colors"
                         >
                           View Quotation
-                          {rfq.quote_number && <span className="opacity-70 truncate max-w-[120px]">({rfq.quote_number})</span>}
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          {rfq.quote_number && (
+                            <span className="opacity-70 truncate max-w-[120px]">({rfq.quote_number})</span>
+                          )}
+                          <svg
+                            className="w-3 h-3 flex-shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
                           </svg>
                         </a>
                       )}
@@ -260,36 +311,77 @@ export default function MyQuotesPage() {
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
                         >
                           View Invoice
-                          {rfq.invoice_number && <span className="opacity-80 truncate max-w-[120px]">({rfq.invoice_number})</span>}
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          {rfq.invoice_number && (
+                            <span className="opacity-80 truncate max-w-[120px]">({rfq.invoice_number})</span>
+                          )}
+                          <svg
+                            className="w-3 h-3 flex-shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
                           </svg>
                         </a>
                       )}
-                      {!rfq.order_id && (
-                        rfq.status === 'pending' ? (
+                      {!rfq.order_id &&
+                        (rfq.status === 'pending' ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 self-start">
-                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <svg
+                              className="w-3.5 h-3.5 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
                             </svg>
                             Pending review
                           </span>
                         ) : rfq.status === 'reviewed' ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium bg-blue-50 dark:bg-blue-900/20 self-start">
-                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            <svg
+                              className="w-3.5 h-3.5 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                              />
                             </svg>
                             In progress
                           </span>
                         ) : rfq.status === 'rejected' ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 self-start">
-                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            <svg
+                              className="w-3.5 h-3.5 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                              />
                             </svg>
                             Not accepted
                           </span>
-                        ) : null
-                      )}
+                        ) : null)}
                     </div>
                   </div>
                 )

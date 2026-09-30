@@ -97,7 +97,10 @@ export default function TransactionsPage() {
   const fetchTransactions = async (p: number) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/transactions?page=${p}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
+      const response = await fetch(`/api/transactions?page=${p}`, {
+        credentials: 'include',
+        headers: { 'X-Auth-Portal': 'business' },
+      })
       if (response.ok) {
         const data = await response.json()
         setTransactions(data.transactions || [])
@@ -116,7 +119,11 @@ export default function TransactionsPage() {
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div className="space-y-3 animate-pulse">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 70}ms` }}>
+            <div
+              key={i}
+              className="bg-surface-elevated rounded-lg border border-border-default p-4"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
               <div className="flex items-center justify-between mb-2">
                 <div className="h-3 bg-surface-secondary rounded w-32" />
                 <div className="h-5 bg-surface-secondary rounded-full w-16" />
@@ -136,12 +143,10 @@ export default function TransactionsPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-
       {/* Mobile header */}
       <BusinessAccountMobileHeader />
 
       <div className="container mx-auto px-4 pt-4 pb-8">
-
         {/* Filters */}
         {transactions.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -168,7 +173,9 @@ export default function TransactionsPage() {
               >
                 <option value="all">All Methods</option>
                 {availableMethods.map(m => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
                 ))}
               </select>
             )}
@@ -176,145 +183,151 @@ export default function TransactionsPage() {
         )}
 
         <div>
-            {transactions.length === 0 && !loading ? (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg
-                  className="w-16 h-16 text-foreground-muted mx-auto mb-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+          {transactions.length === 0 && !loading ? (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+              <svg
+                className="w-16 h-16 text-foreground-muted mx-auto mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
+                />
+              </svg>
+              <h3 className="text-xl font-semibold text-foreground mb-2">No transactions yet</h3>
+              <p className="text-foreground-secondary mb-6">
+                Your payment transactions will appear here once you place an order.
+              </p>
+              <Link
+                href={bp('/business/products')}
+                className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+              >
+                Browse Products
+              </Link>
+            </div>
+          ) : loading ? (
+            <div className="space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
+                  style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
-                  />
-                </svg>
-                <h3 className="text-xl font-semibold text-foreground mb-2">No transactions yet</h3>
-                <p className="text-foreground-secondary mb-6">
-                  Your payment transactions will appear here once you place an order.
-                </p>
-                <Link
-                  href={bp('/business/products')}
-                  className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex gap-2">
+                        <div className="h-5 w-20 bg-surface-secondary rounded-full" />
+                        <div className="h-5 w-24 bg-surface-secondary rounded-full" />
+                      </div>
+                      <div className="h-5 w-32 bg-surface-secondary rounded" />
+                      <div className="h-3 w-48 bg-surface-secondary rounded" />
+                    </div>
+                    <div className="space-y-1.5 sm:text-right flex-shrink-0">
+                      <div className="h-4 w-24 bg-surface-secondary rounded" />
+                      <div className="h-3 w-16 bg-surface-secondary rounded" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredTransactions.map(txn => (
+                <div
+                  key={txn.id}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
                 >
-                  Browse Products
-                </Link>
-              </div>
-            ) : loading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
-                    style={{ animationDelay: `${i * 50}ms` }}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <div className="flex gap-2">
-                          <div className="h-5 w-20 bg-surface-secondary rounded-full" />
-                          <div className="h-5 w-24 bg-surface-secondary rounded-full" />
-                        </div>
-                        <div className="h-5 w-32 bg-surface-secondary rounded" />
-                        <div className="h-3 w-48 bg-surface-secondary rounded" />
-                      </div>
-                      <div className="space-y-1.5 sm:text-right flex-shrink-0">
-                        <div className="h-4 w-24 bg-surface-secondary rounded" />
-                        <div className="h-3 w-16 bg-surface-secondary rounded" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredTransactions.map((txn) => (
-                  <div
-                    key={txn.id}
-                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      {/* Left side */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(txn.status)}`}>
-                            {getStatusLabel(txn.status)}
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary">
-                            {getMethodLabel(txn.paymentMethod, txn.paymentGateway)}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                          <span className="text-lg font-bold text-foreground">
-                            {txn.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                          </span>
-                          <Link
-                            href={bp(`/business/account/orders/${txn.orderId}`)}
-                            className="text-sm text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium"
-                          >
-                            Order #{txn.orderNumber}
-                          </Link>
-                        </div>
-
-                        {txn.transactionId && (
-                          <p className="text-xs text-foreground-muted mt-1 font-mono truncate">
-                            TXN: {txn.transactionId}
-                          </p>
-                        )}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Left side */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(txn.status)}`}
+                        >
+                          {getStatusLabel(txn.status)}
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary">
+                          {getMethodLabel(txn.paymentMethod, txn.paymentGateway)}
+                        </span>
                       </div>
 
-                      {/* Right side */}
-                      <div className="text-sm text-foreground-muted sm:text-right flex-shrink-0">
-                        <p>
-                          {new Date(txn.createdAt).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
+                      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                        <span className="text-lg font-bold text-foreground">
+                          {txn.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                        </span>
+                        <Link
+                          href={bp(`/business/account/orders/${txn.orderId}`)}
+                          className="text-sm text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium"
+                        >
+                          Order #{txn.orderNumber}
+                        </Link>
+                      </div>
+
+                      {txn.transactionId && (
+                        <p className="text-xs text-foreground-muted mt-1 font-mono truncate">
+                          TXN: {txn.transactionId}
                         </p>
-                        <p className="text-xs">
-                          {new Date(txn.createdAt).toLocaleTimeString('en-IN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'Asia/Kolkata',
-                          })}
-                        </p>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                ))}
 
-                {total > pageSize && (
-                  <div className="flex items-center justify-between gap-2 pt-2">
-                    <p className="text-xs text-foreground-muted whitespace-nowrap">
-                      <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span>
-                      {' '}of <span className="font-medium text-foreground">{total}</span> transactions
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page <= 1}
-                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                      >
-                        Prev
-                      </button>
-                      <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{Math.ceil(total / pageSize)}</span>
-                      <button
-                        onClick={() => setPage(p => p + 1)}
-                        disabled={page >= Math.ceil(total / pageSize)}
-                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                      >
-                        Next
-                      </button>
+                    {/* Right side */}
+                    <div className="text-sm text-foreground-muted sm:text-right flex-shrink-0">
+                      <p>
+                        {new Date(txn.createdAt).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-xs">
+                        {new Date(txn.createdAt).toLocaleTimeString('en-IN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Asia/Kolkata',
+                        })}
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+
+              {total > pageSize && (
+                <div className="flex items-center justify-between gap-2 pt-2">
+                  <p className="text-xs text-foreground-muted whitespace-nowrap">
+                    <span className="font-medium text-foreground">
+                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
+                    </span>{' '}
+                    of <span className="font-medium text-foreground">{total}</span> transactions
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page <= 1}
+                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-foreground-muted whitespace-nowrap">
+                      {page}/{Math.ceil(total / pageSize)}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page >= Math.ceil(total / pageSize)}
+                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+    </div>
   )
 }

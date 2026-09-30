@@ -24,7 +24,9 @@ function formatDate(s: string) {
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded ${accent ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'bg-surface-secondary text-foreground-secondary'}`}>
+    <span
+      className={`text-[10px] px-1.5 py-0.5 rounded ${accent ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'bg-surface-secondary text-foreground-secondary'}`}
+    >
       {tag}
     </span>
   )
@@ -48,7 +50,15 @@ interface EnrichmentItem {
   error: string | null
 }
 
-function AiPanel({ productId, onClose, onApproved }: { productId: string; onClose: () => void; onApproved: () => void }) {
+function AiPanel({
+  productId,
+  onClose,
+  onApproved,
+}: {
+  productId: string
+  onClose: () => void
+  onApproved: () => void
+}) {
   const [item, setItem] = useState<EnrichmentItem | null | undefined>(undefined)
   const [busy, setBusy] = useState(false)
 
@@ -64,11 +74,12 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
     setBusy(true)
     try {
       const res = await fetch(`/api/admin/catalog-enrichment/${item.id}/${action}`, {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
       })
       if (!res.ok) throw new Error('Failed')
       if (action === 'approve') onApproved()
-      else setItem(prev => prev ? { ...prev, status: 'rejected' } : prev)
+      else setItem(prev => (prev ? { ...prev, status: 'rejected' } : prev))
     } finally {
       setBusy(false)
     }
@@ -94,7 +105,10 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
             <Sparkles className="w-4 h-4 text-accent-500" />
             <span className="font-semibold text-foreground">AI Enrichment</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -107,24 +121,28 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
           )}
 
           {item === null && (
-            <div className="py-12 text-center text-sm text-foreground-muted">
-              No enrichment found for this product.
-            </div>
+            <div className="py-12 text-center text-sm text-foreground-muted">No enrichment found for this product.</div>
           )}
 
           {item && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[item.status] || ''}`}>
+                <span
+                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[item.status] || ''}`}
+                >
                   {item.status}
                 </span>
-                <span className="text-[10px] text-foreground-muted">{item.model} · {new Date(item.proposed_at).toLocaleDateString()}</span>
+                <span className="text-[10px] text-foreground-muted">
+                  {item.model} · {new Date(item.proposed_at).toLocaleDateString()}
+                </span>
               </div>
 
               {item.ai_product_type && (
                 <div>
                   <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                  <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{item.ai_product_type}</span>
+                  <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                    {item.ai_product_type}
+                  </span>
                 </div>
               )}
 
@@ -137,7 +155,9 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
 
               {item.source_desc && (
                 <div>
-                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Original Description</p>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">
+                    Original Description
+                  </p>
                   <p className="text-xs text-foreground-muted leading-relaxed">{item.source_desc}</p>
                 </div>
               )}
@@ -158,36 +178,52 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
 
               {item.ai_use_cases?.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases ({item.ai_use_cases.length})</p>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">
+                    Use Cases ({item.ai_use_cases.length})
+                  </p>
                   <div className="flex flex-wrap gap-1">
-                    {item.ai_use_cases.map(t => <TagBadge key={t} tag={t} accent />)}
+                    {item.ai_use_cases.map(t => (
+                      <TagBadge key={t} tag={t} accent />
+                    ))}
                   </div>
                 </div>
               )}
 
               {item.ai_keywords && item.ai_keywords.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Keywords ({item.ai_keywords.length})</p>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">
+                    Keywords ({item.ai_keywords.length})
+                  </p>
                   <div className="flex flex-wrap gap-1">
-                    {item.ai_keywords.map(t => <TagBadge key={t} tag={t} />)}
+                    {item.ai_keywords.map(t => (
+                      <TagBadge key={t} tag={t} />
+                    ))}
                   </div>
                 </div>
               )}
 
               {item.ai_features && item.ai_features.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Features ({item.ai_features.length})</p>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">
+                    Features ({item.ai_features.length})
+                  </p>
                   <div className="flex flex-wrap gap-1">
-                    {item.ai_features.map(t => <TagBadge key={t} tag={t} />)}
+                    {item.ai_features.map(t => (
+                      <TagBadge key={t} tag={t} />
+                    ))}
                   </div>
                 </div>
               )}
 
               {item.ai_search_tags && item.ai_search_tags.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags ({item.ai_search_tags.length})</p>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">
+                    Search Tags ({item.ai_search_tags.length})
+                  </p>
                   <div className="flex flex-wrap gap-1">
-                    {item.ai_search_tags.map(t => <TagBadge key={t} tag={t} />)}
+                    {item.ai_search_tags.map(t => (
+                      <TagBadge key={t} tag={t} />
+                    ))}
                   </div>
                 </div>
               )}
@@ -204,24 +240,24 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
 
         {item?.status === 'proposed' && (
           <RequireWrite scope="products:write">
-          <div className="px-5 py-4 border-t border-border-default flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => decide('approve')}
-              disabled={busy}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-              Approve
-            </button>
-            <button
-              onClick={() => decide('reject')}
-              disabled={busy}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              Reject
-            </button>
-          </div>
+            <div className="px-5 py-4 border-t border-border-default flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => decide('approve')}
+                disabled={busy}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                Approve
+              </button>
+              <button
+                onClick={() => decide('reject')}
+                disabled={busy}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                Reject
+              </button>
+            </div>
           </RequireWrite>
         )}
       </div>
@@ -229,7 +265,6 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
     document.body
   )
 }
-
 
 function Field({ label, value, mono }: { label: string; value?: any; mono?: boolean }) {
   if (value == null || value === '' || value === false) return null
@@ -253,11 +288,7 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && (
-        <div className="px-4 pb-4 pt-1 space-y-2.5">
-          {children}
-        </div>
-      )}
+      {open && <div className="px-4 pb-4 pt-1 space-y-2.5">{children}</div>}
     </div>
   )
 }
@@ -276,7 +307,10 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
         setLoading(true)
         fetch(`/api/admin/products/${productId}/supplier-details`, { credentials: 'include' })
           .then(r => r.json())
-          .then(d => { setData(d); setLoaded(true) })
+          .then(d => {
+            setData(d)
+            setLoaded(true)
+          })
           .catch(() => setLoaded(true))
           .finally(() => setLoading(false))
       }
@@ -301,29 +335,42 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
             <div className="space-y-4">
               {/* Primary Supplier */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">Primary Supplier</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">
+                  Primary Supplier
+                </p>
                 {data.primarySupplier ? (
                   <div className="bg-surface rounded-lg border border-border-default p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Link href={`/admin/suppliers/${data.primarySupplier.id}`} className="text-sm font-semibold text-accent-600 hover:underline">
+                      <Link
+                        href={`/admin/suppliers/${data.primarySupplier.id}`}
+                        className="text-sm font-semibold text-accent-600 hover:underline"
+                      >
                         {data.primarySupplier.name}
                       </Link>
-                      {data.primarySupplier.gstin && <span className="text-xs text-foreground-muted font-mono">{data.primarySupplier.gstin}</span>}
+                      {data.primarySupplier.gstin && (
+                        <span className="text-xs text-foreground-muted font-mono">{data.primarySupplier.gstin}</span>
+                      )}
                     </div>
-                    {data.primarySupplier.contact_name && <p className="text-xs text-foreground-secondary">{data.primarySupplier.contact_name}</p>}
+                    {data.primarySupplier.contact_name && (
+                      <p className="text-xs text-foreground-secondary">{data.primarySupplier.contact_name}</p>
+                    )}
                     <div className="flex gap-3 text-xs text-foreground-muted">
                       {data.primarySupplier.phone && <span>{data.primarySupplier.phone}</span>}
                       {data.primarySupplier.email && <span>{data.primarySupplier.email}</span>}
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-foreground-muted italic">No primary supplier set — edit product to assign one.</p>
+                  <p className="text-xs text-foreground-muted italic">
+                    No primary supplier set — edit product to assign one.
+                  </p>
                 )}
               </div>
 
               {/* Suppliers by price — grouped per leaf (product / variant / sub-variant) */}
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">Suppliers (by price)</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">
+                  Suppliers (by price)
+                </p>
                 {data.suppliers?.length > 0 ? (
                   <div className="space-y-4">
                     {(() => {
@@ -338,84 +385,131 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                           const label = row.sub_variant_id
                             ? `Sub-variant: ${row.sub_variant_name || row.sub_variant_id}`
                             : row.variant_id
-                            ? `Variant: ${row.variant_name || row.variant_id}`
-                            : 'Product'
+                              ? `Variant: ${row.variant_name || row.variant_id}`
+                              : 'Product'
                           g = { label, rows: [] }
                           groups.set(key, g)
                         }
                         g.rows.push(row)
                       }
                       return Array.from(groups.entries()).map(([leafKey, g]) => {
-                        const fmt = (v: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(v)
+                        const fmt = (v: number) =>
+                          new Intl.NumberFormat('en-IN', {
+                            style: 'currency',
+                            currency: 'INR',
+                            maximumFractionDigits: 2,
+                          }).format(v)
                         const leafLowest = data.lowestHistByLeaf?.[leafKey]
                         const leafLast = data.lastPurchaseByLeaf?.[leafKey]
                         return (
-                        <div key={leafKey} className="space-y-2">
-                          <p className="text-[11px] font-medium text-foreground-secondary mb-1">{g.label}</p>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-border-default text-foreground-muted">
-                                  <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
-                                  <th className="text-right pb-1.5 pr-3 font-medium">Buy Price</th>
-                                  <th className="text-center pb-1.5 pr-3 font-medium">Preferred</th>
-                                  <th className="text-right pb-1.5 pr-3 font-medium">MOQ</th>
-                                  <th className="text-right pb-1.5 font-medium">Lead (days)</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-border-default">
-                                {g.rows.map((row: any) => {
-                                  const isBest = row.supplier_id === bestByLeaf[leafKey]
-                                  return (
-                                    <tr key={row.id} className={isBest ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary transition-colors'}>
-                                      <td className="py-1.5 pr-3">
-                                        <Link href={`/admin/suppliers/${row.supplier_id}`} className="text-accent-600 hover:underline">{row.supplier_name}</Link>
-                                        {isBest && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">Best</span>}
-                                      </td>
-                                      <td className="py-1.5 pr-3 text-right font-semibold text-foreground">
-                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
-                                      </td>
-                                      <td className="py-1.5 pr-3 text-center">{row.is_preferred ? '★' : '—'}</td>
-                                      <td className="py-1.5 pr-3 text-right text-foreground-muted">{row.moq ?? '—'}</td>
-                                      <td className="py-1.5 text-right text-foreground-muted">{row.lead_time_days ?? '—'}</td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                          {(leafLowest != null || leafLast) && (
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {leafLowest != null && (
-                                <div className="flex-1 min-w-[130px] bg-surface border border-border-default rounded-lg px-3 py-2">
-                                  <p className="text-[10px] text-foreground-muted font-medium uppercase tracking-wide">Lowest ever paid (PO)</p>
-                                  <p className="text-sm font-bold text-foreground">{fmt(leafLowest)}</p>
-                                </div>
-                              )}
-                              {leafLast && (
-                                <div className="flex-1 min-w-[130px] bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
-                                  <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
-                                  <p className="text-sm font-bold text-accent-700 dark:text-accent-300">{fmt(leafLast.price)}</p>
-                                  <p className="text-[10px] text-foreground-muted">{new Date(leafLast.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                                </div>
-                              )}
+                          <div key={leafKey} className="space-y-2">
+                            <p className="text-[11px] font-medium text-foreground-secondary mb-1">{g.label}</p>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border-default text-foreground-muted">
+                                    <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                                    <th className="text-right pb-1.5 pr-3 font-medium">Buy Price</th>
+                                    <th className="text-center pb-1.5 pr-3 font-medium">Preferred</th>
+                                    <th className="text-right pb-1.5 pr-3 font-medium">MOQ</th>
+                                    <th className="text-right pb-1.5 font-medium">Lead (days)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border-default">
+                                  {g.rows.map((row: any) => {
+                                    const isBest = row.supplier_id === bestByLeaf[leafKey]
+                                    return (
+                                      <tr
+                                        key={row.id}
+                                        className={
+                                          isBest
+                                            ? 'bg-accent-50 dark:bg-accent-900/20'
+                                            : 'hover:bg-surface-secondary transition-colors'
+                                        }
+                                      >
+                                        <td className="py-1.5 pr-3">
+                                          <Link
+                                            href={`/admin/suppliers/${row.supplier_id}`}
+                                            className="text-accent-600 hover:underline"
+                                          >
+                                            {row.supplier_name}
+                                          </Link>
+                                          {isBest && (
+                                            <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">
+                                              Best
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className="py-1.5 pr-3 text-right font-semibold text-foreground">
+                                          {new Intl.NumberFormat('en-IN', {
+                                            style: 'currency',
+                                            currency: 'INR',
+                                            maximumFractionDigits: 2,
+                                          }).format(Number(row.unit_cost))}
+                                        </td>
+                                        <td className="py-1.5 pr-3 text-center">{row.is_preferred ? '★' : '—'}</td>
+                                        <td className="py-1.5 pr-3 text-right text-foreground-muted">
+                                          {row.moq ?? '—'}
+                                        </td>
+                                        <td className="py-1.5 text-right text-foreground-muted">
+                                          {row.lead_time_days ?? '—'}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
-                          )}
-                        </div>
+                            {(leafLowest != null || leafLast) && (
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {leafLowest != null && (
+                                  <div className="flex-1 min-w-[130px] bg-surface border border-border-default rounded-lg px-3 py-2">
+                                    <p className="text-[10px] text-foreground-muted font-medium uppercase tracking-wide">
+                                      Lowest ever paid (PO)
+                                    </p>
+                                    <p className="text-sm font-bold text-foreground">{fmt(leafLowest)}</p>
+                                  </div>
+                                )}
+                                {leafLast && (
+                                  <div className="flex-1 min-w-[130px] bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
+                                    <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">
+                                      Last Purchase Price
+                                    </p>
+                                    <p className="text-sm font-bold text-accent-700 dark:text-accent-300">
+                                      {fmt(leafLast.price)}
+                                    </p>
+                                    <p className="text-[10px] text-foreground-muted">
+                                      {new Date(leafLast.date).toLocaleDateString('en-IN', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )
                       })
                     })()}
                   </div>
                 ) : (
-                  <p className="text-xs text-foreground-muted italic">No suppliers linked — edit product to add suppliers &amp; prices.</p>
+                  <p className="text-xs text-foreground-muted italic">
+                    No suppliers linked — edit product to add suppliers &amp; prices.
+                  </p>
                 )}
               </div>
 
               {/* Purchase History */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Purchase History</p>
-                  <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">View all POs →</Link>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+                    Purchase History
+                  </p>
+                  <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">
+                    View all POs →
+                  </Link>
                 </div>
                 {data.purchaseHistory?.length > 0 ? (
                   <div>
@@ -433,46 +527,85 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-default">
-                          {data.purchaseHistory.slice(poPage * PO_PAGE_SIZE, (poPage + 1) * PO_PAGE_SIZE).map((row: any, idx: number) => (
-                            <tr key={`${row.po_id}-${poPage}-${idx}`} className="hover:bg-surface-secondary transition-colors">
-                              <td className="py-1.5 pr-3 font-mono text-accent-600">
-                                <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
-                              </td>
-                              <td className="py-1.5 pr-3 text-foreground-secondary">
-                                {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </td>
-                              <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
-                              <td className="py-1.5 pr-3 text-foreground-muted">
-                                {row.sku
-                                  ? <span className="inline-flex items-center gap-1 font-mono text-xs text-foreground">{row.sku}<CopySku sku={row.sku} /></span>
-                                  : row.sub_variant_name
-                                    ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}{row.sub_variant_name}</span>
-                                    : row.variant_name || '—'}
-                              </td>
-                              <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
-                              <td className="py-1.5 pr-3 text-right text-foreground">
-                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
-                              </td>
-                              <td className="py-1.5 text-right text-foreground">
-                                {row.line_total_incl_gst != null
-                                  ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
-                                  : '—'}
-                              </td>
-                            </tr>
-                          ))}
+                          {data.purchaseHistory
+                            .slice(poPage * PO_PAGE_SIZE, (poPage + 1) * PO_PAGE_SIZE)
+                            .map((row: any, idx: number) => (
+                              <tr
+                                key={`${row.po_id}-${poPage}-${idx}`}
+                                className="hover:bg-surface-secondary transition-colors"
+                              >
+                                <td className="py-1.5 pr-3 font-mono text-accent-600">
+                                  <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">
+                                    {row.po_number}
+                                  </Link>
+                                </td>
+                                <td className="py-1.5 pr-3 text-foreground-secondary">
+                                  {new Date(row.order_date).toLocaleDateString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </td>
+                                <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
+                                <td className="py-1.5 pr-3 text-foreground-muted">
+                                  {row.sku ? (
+                                    <span className="inline-flex items-center gap-1 font-mono text-xs text-foreground">
+                                      {row.sku}
+                                      <CopySku sku={row.sku} />
+                                    </span>
+                                  ) : row.sub_variant_name ? (
+                                    <span>
+                                      {row.variant_name ? `${row.variant_name} — ` : ''}
+                                      {row.sub_variant_name}
+                                    </span>
+                                  ) : (
+                                    row.variant_name || '—'
+                                  )}
+                                </td>
+                                <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
+                                <td className="py-1.5 pr-3 text-right text-foreground">
+                                  {new Intl.NumberFormat('en-IN', {
+                                    style: 'currency',
+                                    currency: 'INR',
+                                    maximumFractionDigits: 2,
+                                  }).format(Number(row.unit_cost))}
+                                </td>
+                                <td className="py-1.5 text-right text-foreground">
+                                  {row.line_total_incl_gst != null
+                                    ? new Intl.NumberFormat('en-IN', {
+                                        style: 'currency',
+                                        currency: 'INR',
+                                        maximumFractionDigits: 2,
+                                      }).format(Number(row.line_total_incl_gst))
+                                    : '—'}
+                                </td>
+                              </tr>
+                            ))}
                         </tbody>
                       </table>
                     </div>
                     {data.purchaseHistory.length > PO_PAGE_SIZE && (
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-default">
                         <span className="text-[11px] text-foreground-muted">
-                          {poPage * PO_PAGE_SIZE + 1}–{Math.min((poPage + 1) * PO_PAGE_SIZE, data.purchaseHistory.length)} of {data.purchaseHistory.length}
+                          {poPage * PO_PAGE_SIZE + 1}–
+                          {Math.min((poPage + 1) * PO_PAGE_SIZE, data.purchaseHistory.length)} of{' '}
+                          {data.purchaseHistory.length}
                         </span>
                         <div className="flex gap-1">
-                          <button onClick={() => setPoPage(p => p - 1)} disabled={poPage === 0}
-                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">‹ Prev</button>
-                          <button onClick={() => setPoPage(p => p + 1)} disabled={(poPage + 1) * PO_PAGE_SIZE >= data.purchaseHistory.length}
-                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">Next ›</button>
+                          <button
+                            onClick={() => setPoPage(p => p - 1)}
+                            disabled={poPage === 0}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
+                          >
+                            ‹ Prev
+                          </button>
+                          <button
+                            onClick={() => setPoPage(p => p + 1)}
+                            disabled={(poPage + 1) * PO_PAGE_SIZE >= data.purchaseHistory.length}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
+                          >
+                            Next ›
+                          </button>
                         </div>
                       </div>
                     )}
@@ -492,14 +625,22 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
   )
 }
 
-type ShelfRow = { location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }
+type ShelfRow = {
+  location_display_code: string
+  quantity: number
+  variant_id: string | null
+  sub_variant_id: string | null
+}
 
 function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
   if (rows.length === 0) return <span className="text-xs text-foreground-muted italic">—</span>
   return (
     <div className="flex flex-wrap gap-1">
       {rows.map(l => (
-        <span key={l.location_display_code} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border-default bg-surface-secondary text-xs">
+        <span
+          key={l.location_display_code}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border-default bg-surface-secondary text-xs"
+        >
           <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
           <span className="text-foreground-muted">·</span>
           <span className="font-semibold text-foreground">{l.quantity}</span>
@@ -509,7 +650,13 @@ function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
   )
 }
 
-function StatusToggle({ active, blockedBy, canWrite, busy, onToggle }: {
+function StatusToggle({
+  active,
+  blockedBy,
+  canWrite,
+  busy,
+  onToggle,
+}: {
   active: boolean
   blockedBy: string | null
   canWrite: boolean
@@ -523,7 +670,11 @@ function StatusToggle({ active, blockedBy, canWrite, busy, onToggle }: {
         type="button"
         onClick={() => canWrite && !busy && onToggle()}
         disabled={!canWrite || busy}
-        title={blockedBy ? `Set to ${active ? 'Active' : 'Inactive'}, but hidden because the ${blockedBy} is inactive` : undefined}
+        title={
+          blockedBy
+            ? `Set to ${active ? 'Active' : 'Inactive'}, but hidden because the ${blockedBy} is inactive`
+            : undefined
+        }
         className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${busy ? 'opacity-50' : ''} ${shownActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}
       >
         {shownActive ? 'Active' : 'Inactive'}
@@ -575,24 +726,34 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   useEffect(() => {
     try {
       const msg = sessionStorage.getItem('bootstrap_stock_error')
-      if (msg) { setBootstrapStockError(msg); sessionStorage.removeItem('bootstrap_stock_error') }
-    } catch { /* ignore */ }
+      if (msg) {
+        setBootstrapStockError(msg)
+        sessionStorage.removeItem('bootstrap_stock_error')
+      }
+    } catch {
+      /* ignore */
+    }
   }, [id])
 
   const loadProduct = useCallback(() => {
     setLoading(true)
     fetch(`/api/admin/products/${id}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(p => { setProduct(p); setLoading(false) })
+      .then(p => {
+        setProduct(p)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
 
-  useEffect(() => { loadProduct() }, [loadProduct])
+  useEffect(() => {
+    loadProduct()
+  }, [loadProduct])
 
   useEffect(() => {
     if (!canShelving) return
     fetch(`/api/admin/shelving/stock?product_id=${id}`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(d => setShelfStock(d?.locations ?? []))
       .catch(() => {})
   }, [id, canShelving])
@@ -601,7 +762,9 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
     return (
       <div className="p-6 space-y-3">
         <p className="text-foreground-secondary">Product not found.</p>
-        <Link href={ap('/admin/products')} className="text-accent-500 hover:underline text-sm">← Back to Products</Link>
+        <Link href={ap('/admin/products')} className="text-accent-500 hover:underline text-sm">
+          ← Back to Products
+        </Link>
       </div>
     )
   }
@@ -617,7 +780,11 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
           <div className="h-64 bg-surface-secondary rounded-xl animate-pulse" />
           <div className="lg:col-span-2 space-y-3">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-4 bg-surface-secondary rounded animate-pulse" style={{ animationDelay: `${i * 50}ms` }} />
+              <div
+                key={i}
+                className="h-4 bg-surface-secondary rounded animate-pulse"
+                style={{ animationDelay: `${i * 50}ms` }}
+              />
             ))}
           </div>
         </div>
@@ -631,21 +798,21 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   const primaryImg = images.find((i: any) => i.is_primary) || images[0]
   const displayImg = images[selectedImage] || primaryImg
 
-  const inventoryQty = p.has_variants
-    ? Number(p.variant_inventory_total || 0)
-    : Number(p.inventory_quantity || 0)
+  const inventoryQty = p.has_variants ? Number(p.variant_inventory_total || 0) : Number(p.inventory_quantity || 0)
   const listedQty = Number(p.variant_stock_total || 0)
 
-  const stockColor = inventoryQty === 0
-    ? 'text-red-600 dark:text-red-400'
-    : p.stock_status === 'Low Stock'
-    ? 'text-orange-600 dark:text-orange-400'
-    : 'text-green-600 dark:text-green-400'
+  const stockColor =
+    inventoryQty === 0
+      ? 'text-red-600 dark:text-red-400'
+      : p.stock_status === 'Low Stock'
+        ? 'text-orange-600 dark:text-orange-400'
+        : 'text-green-600 dark:text-green-400'
 
   function shelfFor(variantId: string | null, subVariantId: string | null) {
-    return shelfStock.filter(r =>
-      (variantId ? r.variant_id === variantId : r.variant_id === null) &&
-      (subVariantId ? r.sub_variant_id === subVariantId : r.sub_variant_id === null)
+    return shelfStock.filter(
+      r =>
+        (variantId ? r.variant_id === variantId : r.variant_id === null) &&
+        (subVariantId ? r.sub_variant_id === subVariantId : r.sub_variant_id === null)
     )
   }
 
@@ -659,49 +826,71 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <span className="font-semibold">Product published, but existing stock was not assigned:</span>{' '}
             {bootstrapStockError} You can re-open the product edit form and assign the stock again.
           </div>
-          <button type="button" onClick={() => setBootstrapStockError(null)} className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70">
+          <button
+            type="button"
+            onClick={() => setBootstrapStockError(null)}
+            className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href={ap('/admin/products')} className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
+        <Link href={ap('/admin/products')} className="text-accent-500 hover:text-accent-600 transition-colors">
+          Products
+        </Link>
         <span>/</span>
         <span className="text-foreground truncate">{p.name}</span>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href={ap('/admin/products')} className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
+          <Link
+            href={ap('/admin/products')}
+            className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors"
+          >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
           <div>
             <h1 className="text-xl font-bold text-foreground">{p.name}</h1>
-            <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</p>
+            <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">
+              {p.sku}
+              {p.sku && <CopySku sku={p.sku} />}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {p.is_active
-            ? <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</span>
-            : <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">Inactive</span>
-          }
+          {p.is_active ? (
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              Active
+            </span>
+          ) : (
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">
+              Inactive
+            </span>
+          )}
           {p.is_featured && (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1">
+              <Star className="w-3 h-3 fill-current" /> Featured
+            </span>
           )}
           <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
           {canEnrich && (
-          <button
-            onClick={() => setAiOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
-          >
-            <Sparkles className="w-4 h-4 text-accent-500" />
-            AI
-          </button>
+            <button
+              onClick={() => setAiOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            >
+              <Sparkles className="w-4 h-4 text-accent-500" />
+              AI
+            </button>
           )}
-          <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
+          <Link
+            href={ap(`/admin/products/${p.id}/analytics`)}
+            className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+          >
             Analytics
           </Link>
           <RequireWrite scope="products:write">
@@ -729,12 +918,21 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
         <div className="space-y-3">
           {displayImg ? (
             <div className="aspect-square rounded-xl overflow-hidden border border-border-default bg-surface-secondary">
-              <img src={displayImg.image_url || displayImg.thumbnail_url} alt={p.name} className="w-full h-full object-contain" />
+              <img
+                src={displayImg.image_url || displayImg.thumbnail_url}
+                alt={p.name}
+                className="w-full h-full object-contain"
+              />
             </div>
           ) : (
             <div className="aspect-square rounded-xl border border-border-default bg-surface-secondary flex items-center justify-center">
               <svg className="w-16 h-16 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
             </div>
           )}
@@ -751,7 +949,6 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               ))}
             </div>
           )}
-
         </div>
 
         <div className="lg:col-span-2 space-y-4">
@@ -760,21 +957,30 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'MRP', val: p.mrp },
-                { label: p.has_variants ? 'From' : 'Selling Price', val: p.has_variants ? p.variant_min_price : p.base_price },
+                {
+                  label: p.has_variants ? 'From' : 'Selling Price',
+                  val: p.has_variants ? p.variant_min_price : p.base_price,
+                },
                 { label: 'Ex-GST', val: p.has_variants ? null : p.price_ex_gst },
-              ].map(({ label, val }) => val != null && (
-                <div key={label}>
-                  <p className="text-xs text-foreground-secondary mb-0.5">{label}</p>
-                  <p className="text-base font-semibold text-foreground">{formatINR(Number(val))}</p>
-                </div>
-              ))}
+              ].map(
+                ({ label, val }) =>
+                  val != null && (
+                    <div key={label}>
+                      <p className="text-xs text-foreground-secondary mb-0.5">{label}</p>
+                      <p className="text-base font-semibold text-foreground">{formatINR(Number(val))}</p>
+                    </div>
+                  )
+              )}
               {(() => {
                 // Prefer the explicit product discount_pct; otherwise derive it from MRP vs selling price.
                 const selling = Number(p.has_variants ? p.variant_min_price : p.base_price) || 0
                 const mrp = Number(p.mrp) || 0
-                const pct = p.discount_pct != null && Number(p.discount_pct) > 0
-                  ? Number(p.discount_pct)
-                  : (mrp > 0 && mrp > selling ? Math.round(((mrp - selling) / mrp) * 100) : 0)
+                const pct =
+                  p.discount_pct != null && Number(p.discount_pct) > 0
+                    ? Number(p.discount_pct)
+                    : mrp > 0 && mrp > selling
+                      ? Math.round(((mrp - selling) / mrp) * 100)
+                      : 0
                 if (pct <= 0) return null
                 return (
                   <div>
@@ -810,7 +1016,10 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <CollapsibleCard title="Stock & Shipping">
               <div className="flex justify-between text-sm">
                 <span className="text-foreground-secondary">Inventory Stock</span>
-                <span className={`font-semibold ${stockColor}`}>{inventoryQty}{p.has_variants ? ' (variants)' : ''}</span>
+                <span className={`font-semibold ${stockColor}`}>
+                  {inventoryQty}
+                  {p.has_variants ? ' (variants)' : ''}
+                </span>
               </div>
               {p.has_variants && (
                 <div className="flex justify-between text-sm">
@@ -827,7 +1036,9 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               {(p.length_cm || p.breadth_cm || p.height_cm) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">L × B × H</span>
-                  <span className="text-foreground font-mono text-xs">{p.length_cm} × {p.breadth_cm} × {p.height_cm} cm</span>
+                  <span className="text-foreground font-mono text-xs">
+                    {p.length_cm} × {p.breadth_cm} × {p.height_cm} cm
+                  </span>
                 </div>
               )}
               <Field label="Package Type" value={p.package_type} />
@@ -849,11 +1060,16 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               <Field label="Tax Class" value={p.tax_class} />
               <Field label="Inclusive Tax" value={p.inclusive_tax ? 'Yes' : 'No'} />
               <Field label="COD Allowed" value={p.is_cod_allowed ? 'Yes' : 'No'} />
-              {p.is_subscription && <>
-                <Field label="Subscription" value="Yes" />
-                <Field label="Interval" value={p.subscription_interval} />
-                <Field label="Sub. Price" value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null} />
-              </>}
+              {p.is_subscription && (
+                <>
+                  <Field label="Subscription" value="Yes" />
+                  <Field label="Interval" value={p.subscription_interval} />
+                  <Field
+                    label="Sub. Price"
+                    value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null}
+                  />
+                </>
+              )}
             </CollapsibleCard>
 
             {/* — Description — */}
@@ -870,47 +1086,106 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
 
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
-              {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
-               !(Array.isArray(p.certifications) && p.certifications.length) &&
-               !p.compliance_standard && !p.safety_rating && !p.warranty_months &&
-               !p.fragile && !p.hazardous && !p.flammable && !p.perishable && !p.serialized ? (
+              {!p.material &&
+              !p.finish &&
+              !p.size &&
+              !p.color &&
+              !p.shelf_life_days &&
+              !(Array.isArray(p.certifications) && p.certifications.length) &&
+              !p.compliance_standard &&
+              !p.safety_rating &&
+              !p.warranty_months &&
+              !p.fragile &&
+              !p.hazardous &&
+              !p.flammable &&
+              !p.perishable &&
+              !p.serialized ? (
                 <p className="text-xs text-foreground-muted italic">No physical or compliance data configured.</p>
-              ) : (<>
-                <Field label="Material" value={p.material} />
-                <Field label="Finish" value={p.finish} />
-                <Field label="Size" value={p.size} />
-                <Field label="Color" value={p.color} />
-                <Field label="Color Hex" value={p.color_hex} mono />
-                <Field label="Shelf Life (days)" value={p.shelf_life_days} />
-                <Field label="Certifications" value={Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null} />
-                <Field label="Compliance Standard" value={p.compliance_standard} />
-                <Field label="Safety Rating" value={p.safety_rating} />
-                <Field label="Warranty" value={p.warranty_months ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null} />
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {p.fragile && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Fragile</span>}
-                  {p.hazardous && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Hazardous</span>}
-                  {p.flammable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Flammable</span>}
-                  {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
-                  {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
-                </div>
-              </>)}
+              ) : (
+                <>
+                  <Field label="Material" value={p.material} />
+                  <Field label="Finish" value={p.finish} />
+                  <Field label="Size" value={p.size} />
+                  <Field label="Color" value={p.color} />
+                  <Field label="Color Hex" value={p.color_hex} mono />
+                  <Field label="Shelf Life (days)" value={p.shelf_life_days} />
+                  <Field
+                    label="Certifications"
+                    value={
+                      Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null
+                    }
+                  />
+                  <Field label="Compliance Standard" value={p.compliance_standard} />
+                  <Field label="Safety Rating" value={p.safety_rating} />
+                  <Field
+                    label="Warranty"
+                    value={
+                      p.warranty_months
+                        ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}`
+                        : null
+                    }
+                  />
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {p.fragile && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                        Fragile
+                      </span>
+                    )}
+                    {p.hazardous && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                        Hazardous
+                      </span>
+                    )}
+                    {p.flammable && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+                        Flammable
+                      </span>
+                    )}
+                    {p.perishable && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                        Perishable
+                      </span>
+                    )}
+                    {p.serialized && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                        Serialized
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </CollapsibleCard>
 
             {/* — Lifecycle & Merchandising — */}
             <CollapsibleCard title="Lifecycle & Merchandising">
-              <Field label="Launch Date" value={p.launch_date ? new Date(p.launch_date).toLocaleDateString('en-IN') : null} />
-              <Field label="Discontinue Date" value={p.discontinue_date ? new Date(p.discontinue_date).toLocaleDateString('en-IN') : null} />
+              <Field
+                label="Launch Date"
+                value={p.launch_date ? new Date(p.launch_date).toLocaleDateString('en-IN') : null}
+              />
+              <Field
+                label="Discontinue Date"
+                value={p.discontinue_date ? new Date(p.discontinue_date).toLocaleDateString('en-IN') : null}
+              />
               <Field label="Sort Order" value={p.sort_order} />
               <Field label="Views" value={p.views_count} />
               <Field label="Sales" value={p.sales_count} />
               {p.is_bundle && <Field label="Bundle" value="Yes" />}
-              {p.is_digital && <>
-                <Field label="Digital Product" value="Yes" />
-                <Field label="Download URL" value={p.download_url} mono />
-                <Field label="License Type" value={p.license_type} />
-                <Field label="File Format" value={p.file_format} />
-                <Field label="Platform Compat." value={Array.isArray(p.platform_compatibility) && p.platform_compatibility.length ? p.platform_compatibility.join(', ') : null} />
-              </>}
+              {p.is_digital && (
+                <>
+                  <Field label="Digital Product" value="Yes" />
+                  <Field label="Download URL" value={p.download_url} mono />
+                  <Field label="License Type" value={p.license_type} />
+                  <Field label="File Format" value={p.file_format} />
+                  <Field
+                    label="Platform Compat."
+                    value={
+                      Array.isArray(p.platform_compatibility) && p.platform_compatibility.length
+                        ? p.platform_compatibility.join(', ')
+                        : null
+                    }
+                  />
+                </>
+              )}
             </CollapsibleCard>
 
             {/* — SEO & Audience — */}
@@ -919,8 +1194,16 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               <Field label="Meta Description" value={p.meta_description} />
               <Field label="Searchable" value={p.is_searchable ? 'Yes' : 'No'} />
               <Field label="Target Gender" value={p.target_gender} />
-              <Field label="Target Audience" value={Array.isArray(p.target_audience) && p.target_audience.length ? p.target_audience.join(', ') : null} />
-              <Field label="Age Range" value={(p.age_min != null || p.age_max != null) ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null} />
+              <Field
+                label="Target Audience"
+                value={
+                  Array.isArray(p.target_audience) && p.target_audience.length ? p.target_audience.join(', ') : null
+                }
+              />
+              <Field
+                label="Age Range"
+                value={p.age_min != null || p.age_max != null ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null}
+              />
             </CollapsibleCard>
           </div>
 
@@ -948,14 +1231,25 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             </CollapsibleCard>
           )}
 
-          {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
+          {(p.ai_description ||
+            p.ai_product_type ||
+            p.ai_use_cases?.length ||
+            p.ai_keywords?.length ||
+            p.ai_features?.length ||
+            p.ai_search_tags?.length ||
+            p.ai_who_uses_it ||
+            p.ai_application) && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">AI Intelligence</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">
+                AI Intelligence
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {p.ai_product_type && (
                   <div>
                     <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                    <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{p.ai_product_type}</span>
+                    <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                      {p.ai_product_type}
+                    </span>
                   </div>
                 )}
                 {p.ai_description && (
@@ -978,40 +1272,68 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                 )}
                 {p.ai_use_cases?.length > 0 && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases ({p.ai_use_cases.length})</p>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">
+                      Use Cases ({p.ai_use_cases.length})
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {p.ai_use_cases.map((t: string) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded">{t}</span>
+                        <span
+                          key={t}
+                          className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+                        >
+                          {t}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
                 {p.ai_keywords?.length > 0 && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Keywords ({p.ai_keywords.length})</p>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">
+                      Keywords ({p.ai_keywords.length})
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {p.ai_keywords.map((t: string) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        <span
+                          key={t}
+                          className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                        >
+                          {t}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
                 {p.ai_features?.length > 0 && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Features ({p.ai_features.length})</p>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">
+                      Features ({p.ai_features.length})
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {p.ai_features.map((t: string) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        <span
+                          key={t}
+                          className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                        >
+                          {t}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
                 {p.ai_search_tags?.length > 0 && (
                   <div>
-                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags ({p.ai_search_tags.length})</p>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">
+                      Search Tags ({p.ai_search_tags.length})
+                    </p>
                     <div className="flex flex-wrap gap-1">
                       {p.ai_search_tags.map((t: string) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        <span
+                          key={t}
+                          className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded"
+                        >
+                          {t}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -1043,169 +1365,285 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Image</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden sm:table-cell">SKU</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Amazon ASIN</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">ISBN</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Price (incl. GST)</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">Ex-GST</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">MRP</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Inventory</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Stock Status</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Image
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Variant
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden sm:table-cell">
+                    SKU
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">
+                    Amazon ASIN
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">
+                    ISBN
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Price (incl. GST)
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">
+                    Ex-GST
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">
+                    MRP
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Inventory
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">
+                    Stock Status
+                  </th>
                   {hasVariantShelf && (
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">Shelf</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">
+                      Shelf
+                    </th>
                   )}
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Status</th>
+                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
                 {variants.map((v: any) => {
                   const subVariants: any[] = v.sub_variants || []
                   const hasSubs = subVariants.length > 0
-                  const vInventory = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
-                  const vListed = hasSubs ? (v.stock_status || '—') : (v.stock_status || '—')
-                  const vStockColor = vInventory === 0 ? 'text-red-600 dark:text-red-400' : v.stock_status === 'Low Stock' ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                  const vInventory = hasSubs
+                    ? Number(v.sub_variant_inventory_total || 0)
+                    : Number(v.inventory_quantity || 0)
+                  const vListed = hasSubs ? v.stock_status || '—' : v.stock_status || '—'
+                  const vStockColor =
+                    vInventory === 0
+                      ? 'text-red-600 dark:text-red-400'
+                      : v.stock_status === 'Low Stock'
+                        ? 'text-orange-600 dark:text-orange-400'
+                        : 'text-foreground'
                   const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                   const vShelf = hasSubs ? [] : shelfFor(v.id, null)
                   const vImgs: any[] = Array.isArray(v.variant_images) ? v.variant_images : []
                   const vImg = vImgs.find((i: any) => i.is_primary) || vImgs[0] || null
                   return (
                     <React.Fragment key={v.id}>
-                    <tr className="hover:bg-surface-secondary/50 transition-colors">
-                      <td className="px-4 py-3">
-                        {vImg ? (
-                          <img
-                            src={vImg.thumbnail_url || vImg.image_url}
-                            alt={v.variant_name || ''}
-                            className="w-12 h-12 rounded object-cover border border-border-default"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded border border-dashed border-border-secondary flex items-center justify-center text-foreground-muted">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {hasSubs ? (
-                          <HoverCard
-                            trigger={
-                              <span className="cursor-help">
-                                {v.variant_name}
-                                <span className="ml-2 text-xs font-normal text-foreground-muted underline decoration-dotted">({subVariants.length} sub-variants)</span>
-                              </span>
-                            }
-                            align="left"
-                            side="bottom"
-                            width="360px"
-                          >
-                            <div className="p-3 space-y-2">
-                              <p className="text-sm font-semibold text-foreground">{v.variant_name}</p>
-                              <div className="border-t border-border-default pt-2 space-y-2">
-                                {subVariants.map((sv: any) => {
-                                  const svShelf = shelfFor(v.id, sv.id)
-                                  return (
-                                    <div key={sv.id} className="space-y-1">
-                                      <div className="flex items-center justify-between gap-3 text-xs">
-                                        <div className="flex flex-col min-w-0">
-                                          <span className="font-medium text-foreground truncate">{sv.sub_variant_name}</span>
-                                          {sv.sku && <span className="inline-flex items-center gap-1 font-mono text-foreground-muted text-[10px]">{sv.sku}<CopySku sku={sv.sku} /></span>}
-                                        </div>
-                                        <div className="flex items-center gap-3 text-right shrink-0">
-                                          <span className="text-foreground-secondary">{sv.price ? formatINR(Number(sv.price)) : '—'}</span>
-                                          <span className={`font-medium ${Number(sv.inventory_quantity || 0) === 0 ? 'text-red-600' : Number(sv.inventory_quantity || 0) <= 3 ? 'text-orange-600' : 'text-foreground'}`}>
-                                            Inv: {Number(sv.inventory_quantity || 0)}
-                                          </span>
-                                          <span className="text-foreground-muted">
-                                            Listed: {sv.stock_status || '—'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      {svShelf.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 pl-1">
-                                          {svShelf.map(l => (
-                                            <span key={l.location_display_code} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border-default bg-surface-secondary text-[10px]">
-                                              <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
-                                              <span className="text-foreground-muted">·</span>
-                                              <span className="font-semibold text-foreground">{l.quantity}</span>
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          </HoverCard>
-                        ) : (
-                          v.variant_name
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell"><span className="inline-flex items-center gap-1">{v.sku || '—'}{v.sku && <CopySku sku={v.sku} />}</span></td>
-                      <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden lg:table-cell">
-                        {v.asin ? (
-                          <span title={v.asin_match ? `matched via ${v.asin_match}` : undefined}>{v.asin}</span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden xl:table-cell">{v.isbn || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{!hasSubs && vMinPrice > 0 ? formatINR(vMinPrice) : '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vInventory}</td>
-                      <td className="px-4 py-3 text-right text-foreground-muted hidden lg:table-cell">{vListed}</td>
-                      {hasVariantShelf && (
-                        <td className="px-4 py-3 hidden xl:table-cell">
-                          {hasSubs
-                            ? <span className="text-xs text-foreground-muted italic">see sub-variants</span>
-                            : <ShelfBadges rows={vShelf} />
-                          }
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-center">
-                        <StatusToggle
-                          active={statusOverrides[v.id] ?? v.is_active}
-                          blockedBy={!p.is_active ? 'product' : null}
-                          canWrite={canWriteProducts}
-                          busy={statusBusy === v.id}
-                          onToggle={() => toggleStatus(v.id, `/api/admin/products/${id}/variants/${v.id}`, !(statusOverrides[v.id] ?? v.is_active))}
-                        />
-                      </td>
-                    </tr>
-                    {hasSubs && subVariants.map((sv: any) => {
-                      const svInventory = Number(sv.inventory_quantity || 0)
-                      const svListed = sv.stock_status || '—'
-                      const svStockColor = svInventory === 0 ? 'text-red-600 dark:text-red-400' : svInventory <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
-                      const svShelf = shelfFor(v.id, sv.id)
-                      return (
-                        <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
-                          <td className="px-4 py-2" />
-                          <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell"><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
-                          <td className="px-4 py-2 hidden lg:table-cell" />
-                          <td className="px-4 py-2 hidden xl:table-cell" />
-                          <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>
-                          <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}</td>
-                          <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.mrp ? formatINR(Number(sv.mrp)) : '—'}</td>
-                          <td className={`px-4 py-2 text-right text-sm font-medium ${svStockColor}`}>{svInventory}</td>
-                          <td className="px-4 py-2 text-right text-sm text-foreground-muted hidden lg:table-cell">{svListed}</td>
-                          {hasVariantShelf && (
-                            <td className="px-4 py-2 hidden xl:table-cell">
-                              <ShelfBadges rows={svShelf} />
-                            </td>
-                          )}
-                          <td className="px-4 py-2 text-center">
-                            <StatusToggle
-                              active={statusOverrides[sv.id] ?? sv.is_active}
-                              blockedBy={!p.is_active ? 'product' : !(statusOverrides[v.id] ?? v.is_active) ? 'variant' : null}
-                              canWrite={canWriteProducts}
-                              busy={statusBusy === sv.id}
-                              onToggle={() => toggleStatus(sv.id, `/api/admin/products/${id}/variants/${v.id}/sub-variants/${sv.id}`, !(statusOverrides[sv.id] ?? sv.is_active))}
+                      <tr className="hover:bg-surface-secondary/50 transition-colors">
+                        <td className="px-4 py-3">
+                          {vImg ? (
+                            <img
+                              src={vImg.thumbnail_url || vImg.image_url}
+                              alt={v.variant_name || ''}
+                              className="w-12 h-12 rounded object-cover border border-border-default"
                             />
+                          ) : (
+                            <div className="w-12 h-12 rounded border border-dashed border-border-secondary flex items-center justify-center text-foreground-muted">
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {hasSubs ? (
+                            <HoverCard
+                              trigger={
+                                <span className="cursor-help">
+                                  {v.variant_name}
+                                  <span className="ml-2 text-xs font-normal text-foreground-muted underline decoration-dotted">
+                                    ({subVariants.length} sub-variants)
+                                  </span>
+                                </span>
+                              }
+                              align="left"
+                              side="bottom"
+                              width="360px"
+                            >
+                              <div className="p-3 space-y-2">
+                                <p className="text-sm font-semibold text-foreground">{v.variant_name}</p>
+                                <div className="border-t border-border-default pt-2 space-y-2">
+                                  {subVariants.map((sv: any) => {
+                                    const svShelf = shelfFor(v.id, sv.id)
+                                    return (
+                                      <div key={sv.id} className="space-y-1">
+                                        <div className="flex items-center justify-between gap-3 text-xs">
+                                          <div className="flex flex-col min-w-0">
+                                            <span className="font-medium text-foreground truncate">
+                                              {sv.sub_variant_name}
+                                            </span>
+                                            {sv.sku && (
+                                              <span className="inline-flex items-center gap-1 font-mono text-foreground-muted text-[10px]">
+                                                {sv.sku}
+                                                <CopySku sku={sv.sku} />
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-3 text-right shrink-0">
+                                            <span className="text-foreground-secondary">
+                                              {sv.price ? formatINR(Number(sv.price)) : '—'}
+                                            </span>
+                                            <span
+                                              className={`font-medium ${Number(sv.inventory_quantity || 0) === 0 ? 'text-red-600' : Number(sv.inventory_quantity || 0) <= 3 ? 'text-orange-600' : 'text-foreground'}`}
+                                            >
+                                              Inv: {Number(sv.inventory_quantity || 0)}
+                                            </span>
+                                            <span className="text-foreground-muted">
+                                              Listed: {sv.stock_status || '—'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {svShelf.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 pl-1">
+                                            {svShelf.map(l => (
+                                              <span
+                                                key={l.location_display_code}
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border-default bg-surface-secondary text-[10px]"
+                                              >
+                                                <span className="font-mono font-medium text-foreground">
+                                                  {l.location_display_code}
+                                                </span>
+                                                <span className="text-foreground-muted">·</span>
+                                                <span className="font-semibold text-foreground">{l.quantity}</span>
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            </HoverCard>
+                          ) : (
+                            v.variant_name
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">
+                          <span className="inline-flex items-center gap-1">
+                            {v.sku || '—'}
+                            {v.sku && <CopySku sku={v.sku} />}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden lg:table-cell">
+                          {v.asin ? (
+                            <span title={v.asin_match ? `matched via ${v.asin_match}` : undefined}>{v.asin}</span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden xl:table-cell">
+                          {v.isbn || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground">
+                          {!hasSubs && vMinPrice > 0 ? formatINR(vMinPrice) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">
+                          {!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">
+                          {!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}
+                        </td>
+                        <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vInventory}</td>
+                        <td className="px-4 py-3 text-right text-foreground-muted hidden lg:table-cell">{vListed}</td>
+                        {hasVariantShelf && (
+                          <td className="px-4 py-3 hidden xl:table-cell">
+                            {hasSubs ? (
+                              <span className="text-xs text-foreground-muted italic">see sub-variants</span>
+                            ) : (
+                              <ShelfBadges rows={vShelf} />
+                            )}
                           </td>
-                        </tr>
-                      )
-                    })}
+                        )}
+                        <td className="px-4 py-3 text-center">
+                          <StatusToggle
+                            active={statusOverrides[v.id] ?? v.is_active}
+                            blockedBy={!p.is_active ? 'product' : null}
+                            canWrite={canWriteProducts}
+                            busy={statusBusy === v.id}
+                            onToggle={() =>
+                              toggleStatus(
+                                v.id,
+                                `/api/admin/products/${id}/variants/${v.id}`,
+                                !(statusOverrides[v.id] ?? v.is_active)
+                              )
+                            }
+                          />
+                        </td>
+                      </tr>
+                      {hasSubs &&
+                        subVariants.map((sv: any) => {
+                          const svInventory = Number(sv.inventory_quantity || 0)
+                          const svListed = sv.stock_status || '—'
+                          const svStockColor =
+                            svInventory === 0
+                              ? 'text-red-600 dark:text-red-400'
+                              : svInventory <= 3
+                                ? 'text-orange-600 dark:text-orange-400'
+                                : 'text-foreground'
+                          const svShelf = shelfFor(v.id, sv.id)
+                          return (
+                            <tr
+                              key={sv.id}
+                              className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors"
+                            >
+                              <td className="px-4 py-2" />
+                              <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">
+                                ↳ {sv.sub_variant_name}
+                              </td>
+                              <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell">
+                                <span className="inline-flex items-center gap-1">
+                                  {sv.sku || '—'}
+                                  {sv.sku && <CopySku sku={sv.sku} />}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 hidden lg:table-cell" />
+                              <td className="px-4 py-2 hidden xl:table-cell" />
+                              <td className="px-4 py-2 text-right text-sm text-foreground">
+                                {sv.price ? formatINR(Number(sv.price)) : '—'}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">
+                                {sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">
+                                {sv.mrp ? formatINR(Number(sv.mrp)) : '—'}
+                              </td>
+                              <td className={`px-4 py-2 text-right text-sm font-medium ${svStockColor}`}>
+                                {svInventory}
+                              </td>
+                              <td className="px-4 py-2 text-right text-sm text-foreground-muted hidden lg:table-cell">
+                                {svListed}
+                              </td>
+                              {hasVariantShelf && (
+                                <td className="px-4 py-2 hidden xl:table-cell">
+                                  <ShelfBadges rows={svShelf} />
+                                </td>
+                              )}
+                              <td className="px-4 py-2 text-center">
+                                <StatusToggle
+                                  active={statusOverrides[sv.id] ?? sv.is_active}
+                                  blockedBy={
+                                    !p.is_active
+                                      ? 'product'
+                                      : !(statusOverrides[v.id] ?? v.is_active)
+                                        ? 'variant'
+                                        : null
+                                  }
+                                  canWrite={canWriteProducts}
+                                  busy={statusBusy === sv.id}
+                                  onToggle={() =>
+                                    toggleStatus(
+                                      sv.id,
+                                      `/api/admin/products/${id}/variants/${v.id}/sub-variants/${sv.id}`,
+                                      !(statusOverrides[sv.id] ?? sv.is_active)
+                                    )
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          )
+                        })}
                     </React.Fragment>
                   )
                 })}
@@ -1219,7 +1657,10 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
         <AiPanel
           productId={id}
           onClose={() => setAiOpen(false)}
-          onApproved={() => { setAiOpen(false); loadProduct() }}
+          onApproved={() => {
+            setAiOpen(false)
+            loadProduct()
+          }}
         />
       )}
 

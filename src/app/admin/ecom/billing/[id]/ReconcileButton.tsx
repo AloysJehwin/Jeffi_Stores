@@ -14,7 +14,10 @@ export default function ReconcileButton({ tenantId }: { tenantId: string }) {
     try {
       const res = await fetch(`/api/admin/ecom/${tenantId}/reconcile-settlements`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setMsg(data?.error || 'Failed'); return }
+      if (!res.ok) {
+        setMsg(data?.error || 'Failed')
+        return
+      }
       setMsg(`Settled ${data.settled} of ${data.scanned}`)
       router.refresh()
     } catch {
@@ -37,7 +40,9 @@ export default function ReconcileButton({ tenantId }: { tenantId: string }) {
         {busy ? 'Reconciling…' : 'Reconcile now'}
       </button>
       {msg && <div className="text-[11px] text-foreground-muted mt-1">{msg}</div>}
-      <div className="text-[11px] text-foreground-muted mt-1">Settles captured rows whose transfer already processed at Razorpay.</div>
+      <div className="text-[11px] text-foreground-muted mt-1">
+        Settles captured rows whose transfer already processed at Razorpay.
+      </div>
     </div>
   )
 }

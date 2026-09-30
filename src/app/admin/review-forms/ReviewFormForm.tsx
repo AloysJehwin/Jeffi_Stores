@@ -29,9 +29,24 @@ interface CustomField {
 type TemplateType = 'google_review' | 'product_feedback' | 'testimonial'
 
 const TEMPLATES: { value: TemplateType; label: string; Icon: LucideIcon; description: string }[] = [
-  { value: 'google_review', label: 'Google Review', Icon: Star, description: 'Send customers to Google, then collect their screenshot' },
-  { value: 'product_feedback', label: 'Product Feedback', Icon: MessageSquare, description: 'Collect ratings and written feedback on a purchase' },
-  { value: 'testimonial', label: 'Testimonial', Icon: FileText, description: 'Gather a written testimonial with optional photo' },
+  {
+    value: 'google_review',
+    label: 'Google Review',
+    Icon: Star,
+    description: 'Send customers to Google, then collect their screenshot',
+  },
+  {
+    value: 'product_feedback',
+    label: 'Product Feedback',
+    Icon: MessageSquare,
+    description: 'Collect ratings and written feedback on a purchase',
+  },
+  {
+    value: 'testimonial',
+    label: 'Testimonial',
+    Icon: FileText,
+    description: 'Gather a written testimonial with optional photo',
+  },
 ]
 
 interface ReviewFormFormProps {
@@ -60,14 +75,23 @@ const FIELD_TYPES = [
   { value: 'rating', label: 'Star rating' },
 ]
 
-const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+const inputClass =
+  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 function randomId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateDraft = false, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
+export default function ReviewFormForm({
+  submitLabel,
+  isDraft = false,
+  isCreateDraft = false,
+  coupons,
+  formId,
+  backUrl,
+  defaultValues: d = {},
+}: ReviewFormFormProps) {
   const router = useRouter()
   const [templateType, setTemplateType] = useState<TemplateType>(d.template_type || 'google_review')
   const [title, setTitle] = useState(d.title || '')
@@ -81,7 +105,9 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
   const [error, setError] = useState('')
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
-  useEffect(() => { setFormsHost(formsHostForHost(window.location.host)) }, [])
+  useEffect(() => {
+    setFormsHost(formsHostForHost(window.location.host))
+  }, [])
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
 
@@ -91,7 +117,10 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
 
   useEffect(() => {
     if (!isDraft || !formId) return
-    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(async () => {
       const v = valuesRef.current
@@ -102,7 +131,10 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: v.title.trim(),
-            slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+            slug: v.slug
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9-]/g, '-'),
             template_type: v.templateType,
             google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
             coupon_id: v.couponId || null,
@@ -113,10 +145,14 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
         })
         setAutoSaveStatus('saved')
         setTimeout(() => setAutoSaveStatus('idle'), 2000)
-      } catch { setAutoSaveStatus('idle') }
+      } catch {
+        setAutoSaveStatus('idle')
+      }
     }, 1500)
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, slug, templateType, googleUrl, couponId, description, isActive, customFields])
 
   const couponOptions = [
@@ -132,7 +168,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
   }
 
   function updateField(id: string, patch: Partial<CustomField>) {
-    setCustomFields(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
+    setCustomFields(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)))
   }
 
   function removeField(id: string) {
@@ -147,7 +183,10 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
       const v = valuesRef.current
       const payload = {
         title: v.title.trim(),
-        slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+        slug: v.slug
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9-]/g, '-'),
         template_type: v.templateType,
         google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
         coupon_id: v.couponId || null,
@@ -166,7 +205,11 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, is_active: publish ? true : false, is_draft: publish ? false : true }),
         })
-        if (!res.ok) { const dd = await res.json(); setError(dd.error || 'Failed to save'); return }
+        if (!res.ok) {
+          const dd = await res.json()
+          setError(dd.error || 'Failed to save')
+          return
+        }
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
         router.refresh()
         return
@@ -177,16 +220,32 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
         const intent = (document.activeElement as HTMLButtonElement)?.value || 'draft'
         if (intent === 'publish') {
           // Save to draft then publish
-          await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+          await fetch(`/api/admin/review-forms/${formId}/draft`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
           const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'POST' })
-          if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to publish'); return }
+          if (!res.ok) {
+            const d = await res.json()
+            setError(d.error || 'Failed to publish')
+            return
+          }
           router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
           router.refresh()
           return
         }
         // Save draft, then return to the list.
-        const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save draft'); return }
+        const res = await fetch(`/api/admin/review-forms/${formId}/draft`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const d = await res.json()
+          setError(d.error || 'Failed to save draft')
+          return
+        }
         router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
         router.refresh()
         return
@@ -224,8 +283,16 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
 
   function handleAIFill(values: Record<string, unknown>) {
     if (values.title) setTitle(String(values.title))
-    if (values.slug) setSlug(String(values.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'))
-    if (values.template_type && ['google_review', 'product_feedback', 'testimonial'].includes(String(values.template_type))) {
+    if (values.slug)
+      setSlug(
+        String(values.slug)
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '-')
+      )
+    if (
+      values.template_type &&
+      ['google_review', 'product_feedback', 'testimonial'].includes(String(values.template_type))
+    ) {
       setTemplateType(values.template_type as TemplateType)
     }
     if (values.google_review_url) setGoogleUrl(String(values.google_review_url))
@@ -240,7 +307,11 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
           fields={[
             { name: 'title', label: 'Form Title', type: 'text' },
             { name: 'slug', label: 'URL Slug', type: 'text' },
-            { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
+            {
+              name: 'template_type',
+              label: 'Template (google_review, product_feedback, or testimonial)',
+              type: 'text',
+            },
             { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
             { name: 'description', label: 'Description', type: 'textarea' },
             { name: 'is_active', label: 'Active', type: 'boolean' },
@@ -265,8 +336,14 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
                     : 'border-border-default hover:border-accent-500/50'
                 }`}
               >
-                <span className="text-xl"><t.Icon className="w-5 h-5" /></span>
-                <span className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}>{t.label}</span>
+                <span className="text-xl">
+                  <t.Icon className="w-5 h-5" />
+                </span>
+                <span
+                  className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}
+                >
+                  {t.label}
+                </span>
                 <span className="text-xs text-foreground-muted leading-snug">{t.description}</span>
               </button>
             ))}
@@ -275,12 +352,21 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
 
         <div>
           <label className={labelClass}>Form Title *</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} required className={inputClass} placeholder="e.g. Leave Us a Google Review" />
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            required
+            className={inputClass}
+            placeholder="e.g. Leave Us a Google Review"
+          />
         </div>
 
         <div>
           <label className={labelClass}>
-            Slug * <span className="text-foreground-muted font-normal">— {formsHost}/<strong>{slug || 'this-slug'}</strong></span>
+            Slug *{' '}
+            <span className="text-foreground-muted font-normal">
+              — {formsHost}/<strong>{slug || 'this-slug'}</strong>
+            </span>
           </label>
           <input
             value={slug}
@@ -294,26 +380,39 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
         {templateType === 'google_review' && (
           <div>
             <label className={labelClass}>Google Review URL *</label>
-            <input value={googleUrl} onChange={e => setGoogleUrl(e.target.value)} type="url" required className={inputClass} placeholder="https://g.page/r/..." />
-            <p className="mt-1 text-xs text-foreground-muted">Customers are sent here first before submitting their screenshot</p>
+            <input
+              value={googleUrl}
+              onChange={e => setGoogleUrl(e.target.value)}
+              type="url"
+              required
+              className={inputClass}
+              placeholder="https://g.page/r/..."
+            />
+            <p className="mt-1 text-xs text-foreground-muted">
+              Customers are sent here first before submitting their screenshot
+            </p>
           </div>
         )}
 
-        <AdminSelect
-          label="Reward Coupon"
-          options={couponOptions}
-          value={couponId}
-          onChange={setCouponId}
-        />
+        <AdminSelect label="Reward Coupon" options={couponOptions} value={couponId} onChange={setCouponId} />
         {coupons.length === 0 && (
           <p className="text-xs text-amber-600">
-            No active coupons found. <Link href={ap('/admin/coupons/add')} className="underline">Create one first.</Link>
+            No active coupons found.{' '}
+            <Link href={ap('/admin/coupons/add')} className="underline">
+              Create one first.
+            </Link>
           </p>
         )}
 
         <div>
           <label className={labelClass}>Description</label>
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className={inputClass} placeholder="Optional — shown to customer on the form page" />
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            rows={2}
+            className={inputClass}
+            placeholder="Optional — shown to customer on the form page"
+          />
         </div>
 
         <div className="flex items-center gap-2">
@@ -323,16 +422,27 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
         <div>
           <div className="flex items-center justify-between mb-3">
             <p className={labelClass.replace(' mb-1.5', '')}>Custom Fields</p>
-            <button type="button" onClick={addField} className="text-xs text-accent-500 hover:text-accent-600 font-medium">+ Add Field</button>
+            <button
+              type="button"
+              onClick={addField}
+              className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+            >
+              + Add Field
+            </button>
           </div>
 
           {customFields.length === 0 && (
-            <p className="text-xs text-foreground-muted py-3 text-center border border-dashed border-border-default rounded-lg">No custom fields yet — click &quot;Add Field&quot; to add one</p>
+            <p className="text-xs text-foreground-muted py-3 text-center border border-dashed border-border-default rounded-lg">
+              No custom fields yet — click &quot;Add Field&quot; to add one
+            </p>
           )}
 
           <div className="space-y-3">
             {customFields.map((field, idx) => (
-              <div key={field.id} className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default">
+              <div
+                key={field.id}
+                className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default"
+              >
                 <span className="text-xs text-foreground-muted mt-2 shrink-0 w-4">{idx + 1}.</span>
                 <div className="flex-1 flex flex-col sm:flex-row gap-2">
                   <input
@@ -350,8 +460,20 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
                   />
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 shrink-0">
-                  <Toggle checked={field.required} onChange={v => updateField(field.id, { required: v })} label="Req" size="sm" />
-                  <button type="button" onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-500 leading-none" aria-label="Remove field"><X className="w-4 h-4" /></button>
+                  <Toggle
+                    checked={field.required}
+                    onChange={v => updateField(field.id, { required: v })}
+                    label="Req"
+                    size="sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeField(field.id)}
+                    className="text-red-400 hover:text-red-500 leading-none"
+                    aria-label="Remove field"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -361,24 +483,43 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, isCreateD
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex items-center gap-3 pt-2">
-          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
+          <Link
+            href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')}
+            className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
+          >
             Cancel
           </Link>
           <RequireWrite scope="review_forms:write">
             {isDraft || isCreateDraft ? (
               <>
-                <button type="submit" value="draft" disabled={submitting} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                <button
+                  type="submit"
+                  value="draft"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                >
                   {submitting ? 'Saving…' : 'Save Draft'}
                 </button>
-                <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                <button
+                  type="submit"
+                  value="publish"
+                  disabled={submitting}
+                  className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                >
                   {submitting ? 'Publishing…' : 'Publish'}
                 </button>
                 {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
-                {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                {autoSaveStatus === 'saved' && (
+                  <span className="text-xs text-green-600 dark:text-green-400">Saved</span>
+                )}
               </>
             ) : (
-              <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
-                {submitting ? 'Saving…' : (submitLabel || 'Save Changes')}
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
               </button>
             )}
           </RequireWrite>

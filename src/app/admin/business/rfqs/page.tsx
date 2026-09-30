@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { cookies} from 'next/headers'
+import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
@@ -33,7 +33,8 @@ const STATUS_STYLES: Record<string, string> = {
   negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   offer_accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
 
 const STATUS_LABELS: Record<string, string> = {
   all: 'All',
@@ -42,15 +43,12 @@ const STATUS_LABELS: Record<string, string> = {
   negotiating: 'Negotiating',
   offer_accepted: 'Offer Accepted',
   converted: 'Converted',
-  rejected: 'Rejected' }
+  rejected: 'Rejected',
+}
 
 type SP = { [key: string]: string | undefined }
 
-export default function BusinessRFQsPage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>
-}) {
+export default function BusinessRFQsPage({ searchParams }: { searchParams: Promise<SP> }) {
   // Auth gating + redirect must run BEFORE any list content renders, so an
   // unauthorized user never sees the shell. This wrapper resolves the auth
   // check (and host) then renders the static shell + keyed list Suspense.
@@ -66,7 +64,8 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read'))
+    redirect(ap('/admin/dashboard', host))
 
   const status = resolvedSearchParams.status
   const search = resolvedSearchParams.search
@@ -86,7 +85,9 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
     <div className="p-4 sm:p-6">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Business RFQs</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Review and respond to quote requests from business partners</p>
+        <p className="text-foreground-secondary mt-1 text-sm">
+          Review and respond to quote requests from business partners
+        </p>
       </div>
 
       {/* Filters */}
@@ -99,7 +100,10 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
           placeholder="Search by RFQ number, company, email…"
           className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
-        <button type="submit" className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
+        <button
+          type="submit"
+          className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+        >
           Search
         </button>
       </form>
@@ -130,13 +134,7 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
 }
 
 // Runs the FILTERED list + count query and renders the table + pagination.
-async function BusinessRFQsListContent({
-  resolvedSearchParams,
-  host,
-}: {
-  resolvedSearchParams: SP
-  host: string
-}) {
+async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const status = resolvedSearchParams.status
   const search = resolvedSearchParams.search
@@ -214,42 +212,54 @@ async function BusinessRFQsListContent({
           <tbody className="divide-y divide-border-default">
             {rfqs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-foreground-muted">No RFQs found.</td>
-              </tr>
-            ) : rfqs.map(rfq => (
-              <tr key={rfq.id} className="hover:bg-surface-secondary transition-colors">
-                <td className="px-4 py-3 font-mono text-xs font-semibold">
-                  <Link
-                    href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
-                    className="text-foreground hover:text-accent-500 hover:underline transition-colors"
-                  >
-                    {rfq.rfq_number}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 font-medium text-foreground">{rfq.company_name || '—'}</td>
-                <td className="px-4 py-3">
-                  <p className="text-foreground">{rfq.first_name} {rfq.last_name || ''}</p>
-                  <p className="text-xs text-foreground-muted">{rfq.email}</p>
-                </td>
-                <td className="px-4 py-3 text-center text-foreground-secondary">{rfq.item_count}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
-                    {STATUS_LABELS[rfq.status] ?? rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-foreground-secondary text-xs">
-                  {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Link
-                    href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
-                    className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
-                  >
-                    View →
-                  </Link>
+                <td colSpan={7} className="px-4 py-12 text-center text-foreground-muted">
+                  No RFQs found.
                 </td>
               </tr>
-            ))}
+            ) : (
+              rfqs.map(rfq => (
+                <tr key={rfq.id} className="hover:bg-surface-secondary transition-colors">
+                  <td className="px-4 py-3 font-mono text-xs font-semibold">
+                    <Link
+                      href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
+                      className="text-foreground hover:text-accent-500 hover:underline transition-colors"
+                    >
+                      {rfq.rfq_number}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 font-medium text-foreground">{rfq.company_name || '—'}</td>
+                  <td className="px-4 py-3">
+                    <p className="text-foreground">
+                      {rfq.first_name} {rfq.last_name || ''}
+                    </p>
+                    <p className="text-xs text-foreground-muted">{rfq.email}</p>
+                  </td>
+                  <td className="px-4 py-3 text-center text-foreground-secondary">{rfq.item_count}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-surface-secondary text-foreground-secondary'}`}
+                    >
+                      {STATUS_LABELS[rfq.status] ?? rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-foreground-secondary text-xs">
+                    {new Date(rfq.created_at).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
+                      className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                    >
+                      View →
+                    </Link>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -260,13 +270,21 @@ async function BusinessRFQsListContent({
           <span>{total} total</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link href={buildUrl(page - 1)} className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors">
+              <Link
+                href={buildUrl(page - 1)}
+                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
+              >
                 Previous
               </Link>
             )}
-            <span className="px-3 py-1.5">Page {page} of {totalPages}</span>
+            <span className="px-3 py-1.5">
+              Page {page} of {totalPages}
+            </span>
             {page < totalPages && (
-              <Link href={buildUrl(page + 1)} className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors">
+              <Link
+                href={buildUrl(page + 1)}
+                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
+              >
                 Next
               </Link>
             )}

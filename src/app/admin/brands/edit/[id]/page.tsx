@@ -19,7 +19,12 @@ async function updateBrand(brandId: string, formData: FormData) {
   'use server'
 
   const name = formData.get('name') as string
-  const slug = formData.get('slug') as string || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slug =
+    (formData.get('slug') as string) ||
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
   const description = (formData.get('description') as string) || null
   const website = (formData.get('website') as string) || null
   const logo_url = (formData.get('logo_url') as string) || null
@@ -31,26 +36,47 @@ async function updateBrand(brandId: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const host = await getHost()
 
-  const draftRow = await queryOne<{ brand_id: string }>(
-    `SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [brandId]
-  )
+  const draftRow = await queryOne<{ brand_id: string }>(`SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [
+    brandId,
+  ])
   const hasDraft = !!draftRow
 
-  const draftFields = { name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days }
+  const draftFields = {
+    name,
+    slug,
+    description,
+    website,
+    logo_url,
+    is_active,
+    return_allowed,
+    return_window_days,
+    replacement_allowed,
+    replacement_window_days,
+  }
 
   // Create-draft brand (is_draft = true, no brand_drafts row): edit the row in place, never
   // through brand_drafts. Save keeps it a draft; Publish flips is_draft = false + is_active.
-  const createDraftRow = await queryOne<{ is_draft: boolean }>(
-    `SELECT is_draft FROM brands WHERE id = $1`, [brandId]
-  )
+  const createDraftRow = await queryOne<{ is_draft: boolean }>(`SELECT is_draft FROM brands WHERE id = $1`, [brandId])
   if (!hasDraft && createDraftRow?.is_draft) {
     const publish = intent === 'publish'
     await query(
       `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5,
        is_active=$6, is_draft=$7, return_allowed=$8, return_window_days=$9,
        replacement_allowed=$10, replacement_window_days=$11 WHERE id=$12`,
-      [name, slug, description, website, logo_url, publish ? true : false, publish ? false : true,
-       return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+      [
+        name,
+        slug,
+        description,
+        website,
+        logo_url,
+        publish ? true : false,
+        publish ? false : true,
+        return_allowed,
+        return_window_days,
+        replacement_allowed,
+        replacement_window_days,
+        brandId,
+      ]
     )
     revalidatePath('/admin/brands')
     redirect(ap('/admin/brands', host))
@@ -72,13 +98,27 @@ async function updateBrand(brandId: string, formData: FormData) {
       )
 
       if (intent === 'publish') {
-        const prevIsActive = await queryOne<{ is_active: boolean }>('SELECT is_active FROM brands WHERE id = $1', [brandId])
+        const prevIsActive = await queryOne<{ is_active: boolean }>('SELECT is_active FROM brands WHERE id = $1', [
+          brandId,
+        ])
         await withTransaction(async (client: PoolClient) => {
           await client.query(
             `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5,
              is_active=$6, return_allowed=$7, return_window_days=$8,
              replacement_allowed=$9, replacement_window_days=$10, updated_at=NOW() WHERE id=$11`,
-            [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+            [
+              name,
+              slug,
+              description,
+              website,
+              logo_url,
+              is_active,
+              return_allowed,
+              return_window_days,
+              replacement_allowed,
+              replacement_window_days,
+              brandId,
+            ]
           )
           if (prevIsActive && prevIsActive.is_active !== is_active) {
             await client.query('UPDATE products SET is_active=$1 WHERE brand_id=$2', [is_active, brandId])
@@ -112,7 +152,13 @@ async function updateBrand(brandId: string, formData: FormData) {
   }
 }
 
-export default async function EditBrandPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function EditBrandPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
   const { id } = await params
   const { back } = await searchParams
   const brand = await getBrand(id).catch(() => null)
@@ -124,7 +170,8 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
   // brand with no draft (active or inactive) redirects to the detail page, where
   // the Edit button creates a draft first. The live brand is never edited directly.
   const draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
-    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
+    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`,
+    [id]
   )
   const isDraft = !!draftRow
   // A create-draft brand (is_draft = true) has no brand_drafts row but must still render its
@@ -144,7 +191,10 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap(backUrl, host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a
+          href={ap(backUrl, host)}
+          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+        >
           <ChevronLeft className="w-4 h-4" />
           Brands
         </a>
@@ -156,11 +206,15 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live brand stays unchanged until you publish.</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              Changes are saved to draft. The live brand stays unchanged until you publish.
+            </p>
           </div>
           <form action={updateBrand.bind(null, id)}>
             <input type="hidden" name="intent" value="discard" />
-            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
+              Discard draft
+            </button>
           </form>
         </div>
       )}
@@ -168,16 +222,28 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
       {isCreateDraft && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
           <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New brand — draft</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">This brand is not on the live list yet. Save keeps it a draft; Publish makes it live.</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            This brand is not on the live list yet. Save keeps it a draft; Publish makes it live.
+          </p>
         </div>
       )}
 
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isCreateDraft ? 'Edit Draft Brand' : isDraft ? 'Edit Draft' : 'Edit Brand'}</h1>
-        <p className="text-foreground-secondary mt-1">{isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update brand information'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
+          {isCreateDraft ? 'Edit Draft Brand' : isDraft ? 'Edit Draft' : 'Edit Brand'}
+        </h1>
+        <p className="text-foreground-secondary mt-1">
+          {isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update brand information'}
+        </p>
       </div>
 
-      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft || isCreateDraft} hasReturns={hasReturns} />
+      <BrandForm
+        brand={brandForForm}
+        action={updateBrand.bind(null, id)}
+        backUrl={backUrl}
+        isDraft={isDraft || isCreateDraft}
+        hasReturns={hasReturns}
+      />
     </div>
   )
 }

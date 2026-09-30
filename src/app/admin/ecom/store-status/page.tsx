@@ -11,7 +11,10 @@ type SP = { [k: string]: string | string[] | undefined }
 const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined))
 
 const DOT: Record<string, string> = {
-  active: 'bg-green-500', provisioning: 'bg-amber-500', suspended: 'bg-red-500', terminated: 'bg-foreground-muted',
+  active: 'bg-green-500',
+  provisioning: 'bg-amber-500',
+  suspended: 'bg-red-500',
+  terminated: 'bg-foreground-muted',
 }
 
 export default async function EcomStoreStatusPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -24,8 +27,8 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
     listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') }),
     tenantSummary(),
   ])
-  const provisioning = tenants.filter((t) => t.status === 'provisioning').length
-  const suspended = tenants.filter((t) => t.status === 'suspended').length
+  const provisioning = tenants.filter(t => t.status === 'provisioning').length
+  const suspended = tenants.filter(t => t.status === 'suspended').length
 
   return (
     <div className="p-6 w-full">
@@ -45,7 +48,9 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
           ]}
         />
         <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 lg:h-56 flex items-center justify-center">
-          <p className="text-sm text-foreground-muted text-center">Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.</p>
+          <p className="text-sm text-foreground-muted text-center">
+            Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.
+          </p>
         </div>
       </div>
 
@@ -53,9 +58,12 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tenants.length === 0 && <p className="text-foreground-muted">No tenants match.</p>}
-        {tenants.map((t) => (
-          <Link key={t.id} href={`/admin/ecom/store-status/${t.id}`}
-            className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors">
+        {tenants.map(t => (
+          <Link
+            key={t.id}
+            href={`/admin/ecom/store-status/${t.id}`}
+            className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors"
+          >
             <div className="flex items-center justify-between">
               <span className="font-medium text-foreground">{t.display_name}</span>
               <span className="flex items-center gap-1.5 text-xs text-foreground-muted">

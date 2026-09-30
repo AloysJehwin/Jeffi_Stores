@@ -7,8 +7,14 @@ import type { Health, HealthTransitions, HealthGain } from '@/lib/crm-insights-s
 
 const scoreStr = (v: number | null) => (v == null ? 'n/a' : v.toFixed(1))
 
-export default function HealthFactorsCard({ health, transitions, gains }: {
-  health: Health; transitions: HealthTransitions; gains: HealthGain[]
+export default function HealthFactorsCard({
+  health,
+  transitions,
+  gains,
+}: {
+  health: Health
+  transitions: HealthTransitions
+  gains: HealthGain[]
 }) {
   const empty = health.scored === 0 && transitions.compared === 0 && gains.length === 0
   if (empty) return null
@@ -37,7 +43,9 @@ export default function HealthFactorsCard({ health, transitions, gains }: {
 
       {gains.length > 0 && (
         <>
-          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">Biggest health gains</p>
+          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">
+            Biggest health gains
+          </p>
           <div className="divide-y divide-border-default">
             {gains.map(g => (
               <Link
@@ -45,7 +53,9 @@ export default function HealthFactorsCard({ health, transitions, gains }: {
                 href={ap(`/admin/customers/${g.id}`)}
                 className="flex items-center gap-3 py-2 group hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
               >
-                <span className="text-xs font-medium text-foreground flex-1 truncate group-hover:text-accent-600 transition-colors">{g.name}</span>
+                <span className="text-xs font-medium text-foreground flex-1 truncate group-hover:text-accent-600 transition-colors">
+                  {g.name}
+                </span>
                 <span className="text-xs text-foreground-secondary tabular-nums">Score {scoreStr(g.score)}</span>
                 <Chip tone="good">+{g.delta == null ? 0 : Math.round(g.delta)}</Chip>
               </Link>

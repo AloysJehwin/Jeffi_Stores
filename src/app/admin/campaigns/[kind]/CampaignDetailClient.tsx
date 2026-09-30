@@ -210,8 +210,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     }
   }
 
-  useEffect(() => { load(0) }, [kind])
-  useEffect(() => { loadEligible() }, [kind])
+  useEffect(() => {
+    load(0)
+  }, [kind])
+  useEffect(() => {
+    loadEligible()
+  }, [kind])
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [paramsBaseline, setParamsBaseline] = useState<string>('')
@@ -311,7 +315,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     setPublishing(true)
     try {
       const res = await fetch(`/api/admin/campaigns/${kind}/publish`, {
-        method: 'POST', credentials: 'include',
+        method: 'POST',
+        credentials: 'include',
       })
       if (res.ok) {
         setHasDraft(false)
@@ -322,12 +327,15 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         const data = await res.json().catch(() => ({}))
         showToast(data.error || 'Failed to publish', 'error')
       }
-    } finally { setPublishing(false) }
+    } finally {
+      setPublishing(false)
+    }
   }
 
   async function discardDraft() {
     const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
-      method: 'DELETE', credentials: 'include',
+      method: 'DELETE',
+      credentials: 'include',
     })
     if (res.ok) {
       setHasDraft(false)
@@ -348,7 +356,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       })
       const data = await res.json()
       showToast(
-        res.ok ? `Test email sent to ${testEmail}` : (data.error || 'Failed to send'),
+        res.ok ? `Test email sent to ${testEmail}` : data.error || 'Failed to send',
         res.ok ? 'success' : 'error'
       )
     } finally {
@@ -379,7 +387,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       })
       const data = await res.json()
       if (res.ok) {
-        setForm(f => f ? { ...f, subject_template: data.subject_template, body_template: data.body_template } : f)
+        setForm(f => (f ? { ...f, subject_template: data.subject_template, body_template: data.body_template } : f))
         showToast('Template updated', 'success')
       } else {
         setAiError(data.error || 'Generation failed')
@@ -410,22 +418,36 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
   const previewVars = selectedCoupon
-    ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
+    ? {
+        ...SAMPLE_VARS,
+        couponCode: selectedCoupon.code,
+        discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0,
+      }
     : SAMPLE_VARS
   const previewSubject = renderTemplate(form.subject_template, previewVars)
   const previewBody = renderTemplate(form.body_template, previewVars)
 
   const SINGLE_PRODUCT_KINDS = new Set(['restock', 'price_drop'])
-  const MULTI_PRODUCT_KINDS = new Set(['abandoned_cart', 'abandoned_checkout', 'post_purchase', 'review_reminder', 'winback_90', 'winback_180'])
+  const MULTI_PRODUCT_KINDS = new Set([
+    'abandoned_cart',
+    'abandoned_checkout',
+    'post_purchase',
+    'review_reminder',
+    'winback_90',
+    'winback_180',
+  ])
   const refKind = (form.scenario_kind || campaign?.kind || '').toLowerCase()
   const tplWarning = (() => {
     const b = form.body_template || ''
     const hasCard = /\{productCard\}/.test(b)
     const hasItems = /\{itemsHtml\}/.test(b) || /\{cartItems\}/.test(b)
     const usesProductTokens = /\{(productName|productImageUrl|oldPrice|newPrice|itemCount)\}/i.test(b)
-    if (SINGLE_PRODUCT_KINDS.has(refKind) && !hasCard) return 'This is a single-product scenario — body MUST include {productCard} so an image renders.'
-    if (MULTI_PRODUCT_KINDS.has(refKind) && !hasItems) return 'This is a multi-product scenario — body MUST include {itemsHtml} so the gallery renders.'
-    if (usesProductTokens && !hasCard && !hasItems) return 'Body uses product tokens but has no {productCard} or {itemsHtml} — the email will render without an image.'
+    if (SINGLE_PRODUCT_KINDS.has(refKind) && !hasCard)
+      return 'This is a single-product scenario — body MUST include {productCard} so an image renders.'
+    if (MULTI_PRODUCT_KINDS.has(refKind) && !hasItems)
+      return 'This is a multi-product scenario — body MUST include {itemsHtml} so the gallery renders.'
+    if (usesProductTokens && !hasCard && !hasItems)
+      return 'Body uses product tokens but has no {productCard} or {itemsHtml} — the email will render without an image.'
     return null
   })()
 
@@ -439,245 +461,288 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   function status(s: RecentSend): { label: string; color: string } {
     if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }
-    if (s.unsubscribed_at) return { label: 'Unsub', color: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }
-    if (s.converted_at) return { label: 'Converted', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' }
-    if (s.clicked_at) return { label: 'Clicked', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' }
-    if (s.opened_at) return { label: 'Opened', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' }
+    if (s.unsubscribed_at)
+      return { label: 'Unsub', color: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }
+    if (s.converted_at)
+      return { label: 'Converted', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' }
+    if (s.clicked_at)
+      return { label: 'Clicked', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' }
+    if (s.opened_at)
+      return { label: 'Opened', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' }
     return { label: 'Sent', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' }
   }
 
   return (
     <div className="space-y-5">
       <RequireWrite scope="campaigns:write">
-      <RequireAi scope="mailer:write">
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
-        <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Regenerate template with AI</p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={aiPrompt}
-            onChange={e => setAiPrompt(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && generateWithAI()}
-            placeholder="Describe changes you want to the email…"
-            className="field-normal flex-1 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
-          <button
-            type="button"
-            onClick={generateWithAI}
-            disabled={aiGenerating || !aiPrompt.trim()}
-            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
-          >
-            {aiGenerating ? 'Generating…' : 'Generate'}
-          </button>
-        </div>
-        {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
-        <p className="text-[10px] text-foreground-muted">AI will rewrite the subject and body. Your other settings are untouched.</p>
-      </div>
-      </RequireAi>
+        <RequireAi scope="mailer:write">
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
+            <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+              Regenerate template with AI
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={aiPrompt}
+                onChange={e => setAiPrompt(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+                placeholder="Describe changes you want to the email…"
+                className="field-normal flex-1 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <button
+                type="button"
+                onClick={generateWithAI}
+                disabled={aiGenerating || !aiPrompt.trim()}
+                className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+              >
+                {aiGenerating ? 'Generating…' : 'Generate'}
+              </button>
+            </div>
+            {aiError && <p className="text-xs text-red-600 dark:text-red-400">{aiError}</p>}
+            <p className="text-[10px] text-foreground-muted">
+              AI will rewrite the subject and body. Your other settings are untouched.
+            </p>
+          </div>
+        </RequireAi>
       </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-xl font-bold text-foreground">{campaign.name}</h2>
-            {campaign.description && <p className="text-sm text-foreground-secondary mt-1">{campaign.description}</p>}
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.enabled}
-              onChange={e => setForm({ ...form, enabled: e.target.checked })}
-              className="w-4 h-4"
-            />
-            <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
-          </label>
-        </div>
-
-        {campaignSupportsWhatsApp(kind) && (() => {
-          const waOn = !!form.parameters?.whatsappEnabled
-          return (
-            <div className="mt-3 flex">
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full ${
-                  waOn
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                    : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
-                }`}
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                WhatsApp: {waOn ? 'On' : 'Off'}
-              </span>
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">{campaign.name}</h2>
+              {campaign.description && <p className="text-sm text-foreground-secondary mt-1">{campaign.description}</p>}
             </div>
-          )
-        })()}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Delay (hours)
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.enabled}
+                onChange={e => setForm({ ...form, enabled: e.target.checked })}
+                className="w-4 h-4"
+              />
+              <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
             </label>
-            <input
-              type="number"
-              min={0}
-              max={720}
-              value={form.delay_hours}
-              onChange={e => setForm({ ...form, delay_hours: parseInt(e.target.value || '0', 10) })}
-              className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
-            <p className="text-[10px] text-foreground-muted mt-1">Hours after the trigger before sending</p>
           </div>
-          <div>
+
+          {campaignSupportsWhatsApp(kind) &&
+            (() => {
+              const waOn = !!form.parameters?.whatsappEnabled
+              return (
+                <div className="mt-3 flex">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full ${
+                      waOn
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                        : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
+                    }`}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WhatsApp: {waOn ? 'On' : 'Off'}
+                  </span>
+                </div>
+              )
+            })()}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+            <div>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Delay (hours)
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={720}
+                value={form.delay_hours}
+                onChange={e => setForm({ ...form, delay_hours: parseInt(e.target.value || '0', 10) })}
+                className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <p className="text-[10px] text-foreground-muted mt-1">Hours after the trigger before sending</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                Discount %
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={form.discount_percent}
+                onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
+                className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Auto-generates a unique per-user coupon if no coupon is assigned below
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Discount %
+              Assign coupon
             </label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={form.discount_percent}
-              onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
-              className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            <AdminSelect
+              value={form.coupon_id || ''}
+              options={couponOptions}
+              onChange={v => setForm({ ...form, coupon_id: v || null })}
+              sm
             />
-            <p className="text-[10px] text-foreground-muted mt-1">Auto-generates a unique per-user coupon if no coupon is assigned below</p>
+            {selectedCoupon && (
+              <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+                This coupon will be injected as {'{couponCode}'} in the template for all recipients.
+              </p>
+            )}
           </div>
-        </div>
 
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-            Assign coupon
-          </label>
-          <AdminSelect
-            value={form.coupon_id || ''}
-            options={couponOptions}
-            onChange={v => setForm({ ...form, coupon_id: v || null })}
-            sm
-          />
-          {selectedCoupon && (
-            <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
-              This coupon will be injected as {'{couponCode}'} in the template for all recipients.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-            Subject line
-          </label>
-          <AIEnrichButton
-            fieldLabel="Subject line"
-            value={form.subject_template}
-            onChange={v => setForm({ ...form, subject_template: v })}
-            scope="campaigns:write"
-            context={`Campaign: ${campaign.name ?? ''}`}
-          >
-            <input
-              type="text"
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Subject line
+            </label>
+            <AIEnrichButton
+              fieldLabel="Subject line"
               value={form.subject_template}
-              onChange={e => setForm({ ...form, subject_template: e.target.value })}
-              className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              onChange={v => setForm({ ...form, subject_template: v })}
+              scope="campaigns:write"
+              context={`Campaign: ${campaign.name ?? ''}`}
+            >
+              <input
+                type="text"
+                value={form.subject_template}
+                onChange={e => setForm({ ...form, subject_template: e.target.value })}
+                className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+            </AIEnrichButton>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              HTML body
+            </label>
+            <textarea
+              value={form.body_template}
+              onChange={e => setForm({ ...form, body_template: e.target.value })}
+              rows={10}
+              className="field-normal text-xs font-mono w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
-          </AIEnrichButton>
-        </div>
+            <p className="text-[10px] text-foreground-muted mt-1">
+              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code>{' '}
+              <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
+            </p>
+          </div>
 
-        <div className="mt-4">
-          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-            HTML body
-          </label>
-          <textarea
-            value={form.body_template}
-            onChange={e => setForm({ ...form, body_template: e.target.value })}
-            rows={10}
-            className="field-normal text-xs font-mono w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
-          <p className="text-[10px] text-foreground-muted mt-1">
-            Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
-          </p>
-        </div>
+          {hasDraft && (
+            <RequireWrite scope="campaigns:write">
+              <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+                <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
+                  Draft pending — changes not live yet.
+                </p>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                >
+                  Discard
+                </button>
+                <button
+                  type="button"
+                  onClick={publish}
+                  disabled={publishing}
+                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50"
+                >
+                  {publishing ? 'Publishing…' : 'Publish'}
+                </button>
+              </div>
+            </RequireWrite>
+          )}
 
-        {hasDraft && (
           <RequireWrite scope="campaigns:write">
-          <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
-            <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
-            <button type="button" onClick={discardDraft} className="text-xs text-amber-600 dark:text-amber-400 hover:underline">Discard</button>
-            <button type="button" onClick={publish} disabled={publishing}
-              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50">
-              {publishing ? 'Publishing…' : 'Publish'}
-            </button>
-          </div>
+            <div className="flex items-center gap-2 mt-5 flex-wrap">
+              <input
+                type="email"
+                value={testEmail}
+                onChange={e => setTestEmail(e.target.value)}
+                placeholder="your@email.com for test send"
+                className="h-10 flex-1 min-w-[200px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <button
+                type="button"
+                onClick={sendTest}
+                disabled={testBusy || !testEmail.trim()}
+                className="h-10 inline-flex items-center justify-center px-4 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                {testBusy ? 'Sending…' : 'Send test'}
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="h-10 inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save Draft'}
+              </button>
+            </div>
           </RequireWrite>
-        )}
-
-        <RequireWrite scope="campaigns:write">
-        <div className="flex items-center gap-2 mt-5 flex-wrap">
-          <input
-            type="email"
-            value={testEmail}
-            onChange={e => setTestEmail(e.target.value)}
-            placeholder="your@email.com for test send"
-            className="h-10 flex-1 min-w-[200px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
-          <button
-            type="button"
-            onClick={sendTest}
-            disabled={testBusy || !testEmail.trim()}
-            className="h-10 inline-flex items-center justify-center px-4 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-          >
-            {testBusy ? 'Sending…' : 'Send test'}
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="h-10 inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save Draft'}
-          </button>
         </div>
-        </RequireWrite>
-      </div>
 
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-        <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
-        {tplWarning && (
-          <div className="mb-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
-            <span className="font-semibold">⚠</span>
-            <span>{tplWarning}</span>
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
+          {tplWarning && (
+            <div className="mb-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+              <span className="font-semibold">⚠</span>
+              <span>{tplWarning}</span>
+            </div>
+          )}
+          <div className="border border-border-default rounded-lg overflow-hidden">
+            <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
+              <span className="text-foreground-muted">Subject:</span>{' '}
+              <span className="font-semibold text-foreground">{previewSubject}</span>
+            </div>
+            <div className="p-4 bg-white text-zinc-900" dangerouslySetInnerHTML={{ __html: previewBody }} />
           </div>
-        )}
-        <div className="border border-border-default rounded-lg overflow-hidden">
-          <div className="px-4 py-2 bg-surface-secondary border-b border-border-default text-xs">
-            <span className="text-foreground-muted">Subject:</span> <span className="font-semibold text-foreground">{previewSubject}</span>
-          </div>
-          <div
-            className="p-4 bg-white text-zinc-900"
-            dangerouslySetInnerHTML={{ __html: previewBody }}
-          />
         </div>
-      </div>
       </div>
 
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest">Scenario &amp; parameters</h3>
-          <span className={`text-[11px] font-medium ${
-            autoSaveStatus === 'saving' ? 'text-foreground-muted' :
-            autoSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' :
-            autoSaveStatus === 'error' ? 'text-red-600 dark:text-red-400' :
-            'text-foreground-muted/50'
-          }`}>
-            {autoSaveStatus === 'saving' ? 'Saving…' :
-             autoSaveStatus === 'saved' ? 'Saved' :
-             autoSaveStatus === 'error' ? 'Save failed' :
-             'Auto-saves on change'}
+          <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest">
+            Scenario &amp; parameters
+          </h3>
+          <span
+            className={`text-[11px] font-medium ${
+              autoSaveStatus === 'saving'
+                ? 'text-foreground-muted'
+                : autoSaveStatus === 'saved'
+                  ? 'text-green-600 dark:text-green-400'
+                  : autoSaveStatus === 'error'
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-foreground-muted/50'
+            }`}
+          >
+            {autoSaveStatus === 'saving'
+              ? 'Saving…'
+              : autoSaveStatus === 'saved'
+                ? 'Saved'
+                : autoSaveStatus === 'error'
+                  ? 'Save failed'
+                  : 'Auto-saves on change'}
           </span>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Scenario (trigger)</label>
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+            Scenario (trigger)
+          </label>
           {isSeededCampaign ? (
             <div className="px-3 py-2 text-sm bg-surface-secondary rounded-lg border border-border-default text-foreground-secondary">
-              {currentScenario ? `${currentScenario.name} — ${currentScenario.description}` : (form.scenario_kind || 'Built-in')}
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">Locked</span>
+              {currentScenario
+                ? `${currentScenario.name} — ${currentScenario.description}`
+                : form.scenario_kind || 'Built-in'}
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">
+                Locked
+              </span>
             </div>
           ) : (
             <AdminSelect
@@ -689,7 +754,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           )}
           <p className="text-[10px] text-foreground-muted mt-1">
             {isSeededCampaign
-              ? "Built-in campaigns keep their original scenario. Create a new campaign to use this scenario with a different template."
+              ? 'Built-in campaigns keep their original scenario. Create a new campaign to use this scenario with a different template.'
               : 'Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.'}
           </p>
         </div>
@@ -761,9 +826,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                           className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                         />
                       )}
-                      {def.description && (
-                        <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>
-                      )}
+                      {def.description && <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>}
                       {(def.min !== undefined || def.max !== undefined) && (
                         <p className="text-[10px] text-foreground-muted mt-0.5">
                           Range: {def.min ?? '-∞'} to {def.max ?? '∞'}
@@ -784,9 +847,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             <h3 className="text-sm font-semibold text-foreground">
               Eligible recipients{eligible !== null ? ` (${eligibleTotal})` : ''}
             </h3>
-            {eligibleTrigger && (
-              <p className="text-[11px] text-foreground-muted mt-0.5">{eligibleTrigger}</p>
-            )}
+            {eligibleTrigger && <p className="text-[11px] text-foreground-muted mt-0.5">{eligibleTrigger}</p>}
           </div>
           <button
             type="button"
@@ -807,17 +868,24 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <p className="p-8 text-sm text-foreground-muted text-center">
             No customers currently match this campaign&apos;s trigger.
             <br />
-            <span className="text-[11px]">When a customer crosses the threshold, they will appear here and the next sweep will email them.</span>
+            <span className="text-[11px]">
+              When a customer crosses the threshold, they will appear here and the next sweep will email them.
+            </span>
           </p>
         ) : eligible && eligible.length > 0 ? (
           <div className="divide-y divide-border-default max-h-96 overflow-y-auto">
             {eligible.map((r, i) => (
-              <div key={r.reference_id || `row-${i}`} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
+              <div
+                key={r.reference_id || `row-${i}`}
+                className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-foreground truncate">
                     {r.user_name || r.user_email || <span className="text-foreground-muted italic">No user</span>}
                     {r.marketing_opt_out && (
-                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">opted out</span>
+                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        opted out
+                      </span>
                     )}
                   </p>
                   <p className="text-[11px] text-foreground-muted truncate">
@@ -827,7 +895,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                     {r.raw?.product_name ? ` · ${r.raw.product_name}` : ''}
                   </p>
                 </div>
-                <span className="text-[10px] font-mono text-foreground-muted">{(r.reference_id || '').slice(0, 8) || '—'}…</span>
+                <span className="text-[10px] font-mono text-foreground-muted">
+                  {(r.reference_id || '').slice(0, 8) || '—'}…
+                </span>
               </div>
             ))}
           </div>
@@ -837,27 +907,34 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       {suppressed && suppressed.length > 0 && (
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="px-5 py-3 border-b border-border-default">
-            <h3 className="text-sm font-semibold text-foreground">
-              Suppressed ({suppressedTotal})
-            </h3>
+            <h3 className="text-sm font-semibold text-foreground">Suppressed ({suppressedTotal})</h3>
             <p className="text-[11px] text-foreground-muted mt-0.5">
               Customers who would otherwise qualify but are blocked from receiving this campaign right now.
             </p>
           </div>
           <div className="divide-y divide-border-default max-h-96 overflow-y-auto">
             {suppressed.map((r, i) => {
-              const reasonColor = r.reason === 'cooldown' || r.reason === 'recent_send'
-                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                : r.reason === 'opted_out'
-                  ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-              const reasonLabel = r.reason === 'cooldown' ? 'Cooldown'
-                : r.reason === 'recent_send' ? 'Already sent'
-                : r.reason === 'opted_out' ? 'Opted out'
-                : r.reason === 'inactive' ? 'Inactive'
-                : r.reason
+              const reasonColor =
+                r.reason === 'cooldown' || r.reason === 'recent_send'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  : r.reason === 'opted_out'
+                    ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+              const reasonLabel =
+                r.reason === 'cooldown'
+                  ? 'Cooldown'
+                  : r.reason === 'recent_send'
+                    ? 'Already sent'
+                    : r.reason === 'opted_out'
+                      ? 'Opted out'
+                      : r.reason === 'inactive'
+                        ? 'Inactive'
+                        : r.reason
               return (
-                <div key={r.reference_id || `sup-${i}`} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
+                <div
+                  key={r.reference_id || `sup-${i}`}
+                  className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-foreground truncate">
                       {r.user_name || r.user_email || <span className="text-foreground-muted italic">No user</span>}
@@ -865,10 +942,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                     <p className="text-[11px] text-foreground-muted truncate">
                       {r.user_email || ''}
                       {r.reason_detail ? ` · ${r.reason_detail}` : ''}
-                      {r.blocked_until ? ` · unblocks ${new Date(r.blocked_until).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}
+                      {r.blocked_until
+                        ? ` · unblocks ${new Date(r.blocked_until).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`
+                        : ''}
                     </p>
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${reasonColor}`}>{reasonLabel}</span>
+                  <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${reasonColor}`}>
+                    {reasonLabel}
+                  </span>
                 </div>
               )
             })}
@@ -887,22 +968,33 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             <div className="grid grid-cols-[1fr_140px_80px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Customer</span>
               <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">Total sends</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">Status</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">
+                Total sends
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">
+                Status
+              </span>
             </div>
             <div className="divide-y divide-border-default">
               {recentSends.map(s => {
                 const st = status(s)
                 return (
-                  <div key={s.id} className="grid grid-cols-[1fr_140px_80px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50">
+                  <div
+                    key={s.id}
+                    className="grid grid-cols-[1fr_140px_80px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50"
+                  >
                     <div className="min-w-0">
                       <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
                       <p className="text-[10px] text-foreground-muted truncate">{s.user_email}</p>
                     </div>
-                    <p className="text-xs text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                    <p className="text-xs text-foreground-muted">
+                      {new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </p>
                     <p className="text-sm font-semibold text-foreground text-center">{Number(s.send_count)}</p>
                     <div className="flex justify-end">
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>
+                        {st.label}
+                      </span>
                     </div>
                   </div>
                 )
@@ -910,18 +1002,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             </div>
             {sendsTotal > SENDS_LIMIT && (
               <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-sm text-foreground-muted">
-                <span>Showing {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}</span>
+                <span>
+                  Showing {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}
+                </span>
                 <div className="flex gap-2">
                   <button
                     disabled={sendsOffset === 0}
-                    onClick={() => { const o = sendsOffset - SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    onClick={() => {
+                      const o = sendsOffset - SENDS_LIMIT
+                      setSendsOffset(o)
+                      load(o)
+                    }}
                     className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                   >
                     Previous
                   </button>
                   <button
                     disabled={sendsOffset + SENDS_LIMIT >= sendsTotal}
-                    onClick={() => { const o = sendsOffset + SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    onClick={() => {
+                      const o = sendsOffset + SENDS_LIMIT
+                      setSendsOffset(o)
+                      load(o)
+                    }}
                     className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                   >
                     Next
@@ -944,19 +1046,30 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           ) : (
             <>
               <div className="grid grid-cols-[140px_1fr_140px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Recipient</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                  Recipient
+                </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Message</span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">Status</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">
+                  Status
+                </span>
               </div>
               <div className="divide-y divide-border-default">
                 {whatsappLogs.map((w, i) => {
                   const sent = w.status === 'sent'
                   return (
-                    <div key={`${w.to_number}-${w.sent_at}-${i}`} className="grid grid-cols-[140px_1fr_140px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50">
+                    <div
+                      key={`${w.to_number}-${w.sent_at}-${i}`}
+                      className="grid grid-cols-[140px_1fr_140px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50"
+                    >
                       <p className="text-xs font-mono text-foreground truncate">{maskNumber(w.to_number)}</p>
-                      <p className="text-xs text-foreground-muted truncate" title={w.body}>{w.body}</p>
-                      <p className="text-xs text-foreground-muted">{new Date(w.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      <p className="text-xs text-foreground-muted truncate" title={w.body}>
+                        {w.body}
+                      </p>
+                      <p className="text-xs text-foreground-muted">
+                        {new Date(w.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
                       <div className="flex justify-end">
                         <span
                           className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${

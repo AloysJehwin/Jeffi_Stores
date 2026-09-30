@@ -27,18 +27,16 @@ function sp(resolvedSearchParams: SP, key: string) {
 }
 
 async function OrdersStats() {
-  const [allStats, revenueTrend] = await Promise.all([
-    getFilteredOrders({}),
-    getRevenueTrendBySource(),
-  ])
+  const [allStats, revenueTrend] = await Promise.all([getFilteredOrders({}), getRevenueTrendBySource()])
 
   const totalOrders = allStats.total
   const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
   const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
   const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
-  const totalRevenue = allStats.orders?.reduce((sum: number, order: any) => {
-    return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
-  }, 0) || 0
+  const totalRevenue =
+    allStats.orders?.reduce((sum: number, order: any) => {
+      return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
+    }, 0) || 0
 
   return (
     <div className="animate-fade-in">
@@ -79,7 +77,11 @@ async function OrdersStats() {
 
 async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const h = await headers()
-  const canPackingSlips = hasScope(h.get('x-user-role') || '', JSON.parse(h.get('x-user-scopes') || '[]'), 'packing_slips:read')
+  const canPackingSlips = hasScope(
+    h.get('x-user-role') || '',
+    JSON.parse(h.get('x-user-scopes') || '[]'),
+    'packing_slips:read'
+  )
   const host = await getHost()
   const page = Math.max(1, parseInt(sp(resolvedSearchParams, 'page') || '1', 10))
   const sort = sp(resolvedSearchParams, 'sort')
@@ -108,7 +110,8 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
     if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
-    if (sp(resolvedSearchParams, 'payment_status')) params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
+    if (sp(resolvedSearchParams, 'payment_status'))
+      params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
     if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
     if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
     if (sort) params.set('sort', sort)
@@ -121,7 +124,8 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   const currentListUrl = (() => {
     const params = new URLSearchParams()
     if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
-    if (sp(resolvedSearchParams, 'payment_status')) params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
+    if (sp(resolvedSearchParams, 'payment_status'))
+      params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
     if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
     if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
     if (sort) params.set('sort', sort)
@@ -136,40 +140,63 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
       <div className="md:hidden space-y-3">
         {orders && orders.length > 0 ? (
           orders.map((order: any) => (
-            <div
-              key={order.id}
-              className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
-            >
-              <Link href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="block">
+            <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
+              <Link
+                href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                className="block"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">
                       #{order.order_number || order.id.slice(0, 8)}
                     </span>
-                    <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${
-                      order.source === 'online'
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                    <span
+                      className={`px-1.5 py-0.5 text-xs font-medium rounded ${
+                        order.source === 'online'
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                          : order.source === 'business'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      }`}
+                    >
+                      {order.source === 'online'
+                        ? 'Online'
                         : order.source === 'business'
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                          : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                    }`}>
-                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : order.source === 'cash_sale' ? 'Cash Sale' : 'Offline'}
+                          ? 'Business'
+                          : order.source === 'cash_sale'
+                            ? 'Cash Sale'
+                            : 'Offline'}
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                    order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : order.status === 'processing' || order.status === 'shipped' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                    : order.status === 'out_for_delivery' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-                    : order.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                    : order.status === 'cancel_requested' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                  }`}>
-                    {order.status === 'cancel_requested' ? 'Cancel Req.' : order.status === 'out_for_delivery' ? 'Out for Delivery' : order.status}
+                  <span
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      order.status === 'delivered'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : order.status === 'processing' || order.status === 'shipped'
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                          : order.status === 'out_for_delivery'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+                            : order.status === 'cancelled'
+                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                              : order.status === 'cancel_requested'
+                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                    }`}
+                  >
+                    {order.status === 'cancel_requested'
+                      ? 'Cancel Req.'
+                      : order.status === 'out_for_delivery'
+                        ? 'Out for Delivery'
+                        : order.status}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm text-foreground">
-                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
+                    {order.users
+                      ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() ||
+                        order.customer_name ||
+                        'Guest'
+                      : order.customer_name || 'Guest'}
                   </span>
                   <span className="text-sm font-semibold text-foreground">
                     Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -179,33 +206,49 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                   <span className="text-xs text-foreground-muted">
                     {new Date(order.created_at).toLocaleDateString('en-IN')}
                   </span>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                    order.payment_status === 'paid' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : order.payment_status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      order.payment_status === 'paid'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : order.payment_status === 'pending'
+                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    }`}
+                  >
                     {order.payment_status}
                   </span>
                 </div>
                 {order.estimated_delivery_date && (
                   <div className="text-xs text-foreground-muted mt-1">
-                    EDD: <span className="text-foreground">{new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    EDD:{' '}
+                    <span className="text-foreground">
+                      {new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
                   </div>
                 )}
               </Link>
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
                 {canPackingSlips && (
-                <a
-                  href={`/api/admin/packing-slips/${order.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Packing Slip
-                </a>
+                  <a
+                    href={`/api/admin/packing-slips/${order.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Packing Slip
+                  </a>
                 )}
                 {order.awb_number && (
                   <a
@@ -215,7 +258,12 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                     className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                      />
                     </svg>
                     Shipping Label
                   </a>
@@ -228,7 +276,12 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                     className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
                     </svg>
                     Invoice
                   </a>
@@ -249,15 +302,61 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
               <tr>
-                <SortableHeader label="Order ID" column="order_number" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Source" column="source" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Customer" column="customer" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Date" column="date" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">EDD</th>
-                <SortableHeader label="Total" column="total" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Payment" column="payment" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+                <SortableHeader
+                  label="Order ID"
+                  column="order_number"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Source"
+                  column="source"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Customer"
+                  column="customer"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Date"
+                  column="date"
+                  options={sortOptions('date')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                  EDD
+                </th>
+                <SortableHeader
+                  label="Total"
+                  column="total"
+                  options={sortOptions('number')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Payment"
+                  column="payment"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <SortableHeader
+                  label="Status"
+                  column="status"
+                  options={sortOptions('text')}
+                  currentSort={sort}
+                  currentDir={dir}
+                />
+                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
@@ -297,7 +396,8 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'business', label: 'Business' },
               { value: 'offline', label: 'Offline' },
               { value: 'cash_sale', label: 'Cash Sale' },
-            ] },
+            ],
+          },
           {
             name: 'status',
             label: 'Order Status',
@@ -315,7 +415,8 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'return_received', label: 'Return Received' },
               { value: 'return_rejected', label: 'Return Rejected' },
               { value: 'returned', label: 'Returned' },
-            ] },
+            ],
+          },
           {
             name: 'payment_status',
             label: 'Payment Status',
@@ -326,30 +427,67 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'refunded', label: 'Refunded' },
               { value: 'unpaid', label: 'Unpaid' },
               { value: 'cancelled', label: 'Cancelled' },
-            ] },
+            ],
+          },
         ]}
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"
         suggestType="orders"
-        advancedContent={<AdvancedFilterPanel fields={[
-          { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
-          { name: ['amount_min', 'amount_max'], label: 'Order Amount', type: 'range', section: 'Date & Amount', unit: '₹' },
-          { name: 'shipment_status', label: 'Shipment Status', type: 'multi-select', section: 'Shipment', options: [
-            { value: 'created', label: 'Created' },
-            { value: 'in_transit', label: 'In Transit' },
-            { value: 'out_for_delivery', label: 'Out for Delivery' },
-            { value: 'delivered', label: 'Delivered' },
-            { value: 'rto_initiated', label: 'RTO Initiated' },
-            { value: 'rto_delivered', label: 'RTO Delivered' },
-          ]},
-          { name: 'awb', label: 'AWB / Tracking No.', type: 'text', section: 'Shipment', placeholder: 'Search by AWB number' },
-          { name: 'payment_mode', label: 'Payment Mode', type: 'multi-select', section: 'Payment', options: [
-            { value: 'cod', label: 'Cash on Delivery' },
-            { value: 'prepaid', label: 'Prepaid' },
-          ]},
-          { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
-          { name: 'cod_pending', label: 'COD pending remittance', type: 'boolean', section: 'Payment' },
-        ]} mode="content" forceExpanded />}
+        advancedContent={
+          <AdvancedFilterPanel
+            fields={[
+              { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
+              {
+                name: ['amount_min', 'amount_max'],
+                label: 'Order Amount',
+                type: 'range',
+                section: 'Date & Amount',
+                unit: '₹',
+              },
+              {
+                name: 'shipment_status',
+                label: 'Shipment Status',
+                type: 'multi-select',
+                section: 'Shipment',
+                options: [
+                  { value: 'created', label: 'Created' },
+                  { value: 'in_transit', label: 'In Transit' },
+                  { value: 'out_for_delivery', label: 'Out for Delivery' },
+                  { value: 'delivered', label: 'Delivered' },
+                  { value: 'rto_initiated', label: 'RTO Initiated' },
+                  { value: 'rto_delivered', label: 'RTO Delivered' },
+                ],
+              },
+              {
+                name: 'awb',
+                label: 'AWB / Tracking No.',
+                type: 'text',
+                section: 'Shipment',
+                placeholder: 'Search by AWB number',
+              },
+              {
+                name: 'payment_mode',
+                label: 'Payment Mode',
+                type: 'multi-select',
+                section: 'Payment',
+                options: [
+                  { value: 'cod', label: 'Cash on Delivery' },
+                  { value: 'prepaid', label: 'Prepaid' },
+                ],
+              },
+              {
+                name: 'coupon_code',
+                label: 'Coupon Code',
+                type: 'text',
+                section: 'Payment',
+                placeholder: 'Search by coupon code',
+              },
+              { name: 'cod_pending', label: 'COD pending remittance', type: 'boolean', section: 'Payment' },
+            ]}
+            mode="content"
+            forceExpanded
+          />
+        }
       />
 
       <OrdersListSection searchParams={searchParams} />

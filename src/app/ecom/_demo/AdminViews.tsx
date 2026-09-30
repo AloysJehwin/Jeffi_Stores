@@ -72,7 +72,9 @@ export function Kv({ label, value, strong }: { label: string; value: ReactNode; 
   return (
     <div className="bg-surface-secondary rounded-lg border border-border-default p-3">
       <p className="text-xs text-foreground-muted">{label}</p>
-      <p className={clsx('text-sm text-foreground mt-0.5', strong ? 'font-bold tracking-wide' : 'font-medium')}>{value}</p>
+      <p className={clsx('text-sm text-foreground mt-0.5', strong ? 'font-bold tracking-wide' : 'font-medium')}>
+        {value}
+      </p>
     </div>
   )
 }
@@ -80,24 +82,40 @@ function Note() {
   return <p className="text-[11px] text-foreground-muted mt-3 shrink-0">Demo only. Dummy data, no live network.</p>
 }
 
-export type Col = { head: string; align?: 'left' | 'center' | 'right'; cell: (row: Record<string, unknown>) => ReactNode }
+export type Col = {
+  head: string
+  align?: 'left' | 'center' | 'right'
+  cell: (row: Record<string, unknown>) => ReactNode
+}
 const AL: Record<string, string> = { left: 'text-left', center: 'text-center', right: 'text-right' }
-export function DataTable({ cols, rows, keyOf }: { cols: Col[]; rows: Record<string, unknown>[]; keyOf: (r: Record<string, unknown>) => string }) {
+export function DataTable({
+  cols,
+  rows,
+  keyOf,
+}: {
+  cols: Col[]
+  rows: Record<string, unknown>[]
+  keyOf: (r: Record<string, unknown>) => string
+}) {
   return (
     <div className="flex-1 min-h-0 overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-foreground-secondary uppercase tracking-wider border-b border-border-default">
-            {cols.map((c) => (
-              <th key={c.head} className={clsx('font-semibold py-1.5', AL[c.align ?? 'left'])}>{c.head}</th>
+            {cols.map(c => (
+              <th key={c.head} className={clsx('font-semibold py-1.5', AL[c.align ?? 'left'])}>
+                {c.head}
+              </th>
             ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-border-default">
-          {rows.map((r) => (
+          {rows.map(r => (
             <tr key={keyOf(r)}>
-              {cols.map((c) => (
-                <td key={c.head} className={clsx('py-2', AL[c.align ?? 'left'])}>{c.cell(r)}</td>
+              {cols.map(c => (
+                <td key={c.head} className={clsx('py-2', AL[c.align ?? 'left'])}>
+                  {c.cell(r)}
+                </td>
               ))}
             </tr>
           ))}
@@ -111,8 +129,15 @@ function Steps({ steps, idx }: { steps: string[]; idx: number }) {
     <ol className="space-y-1.5">
       {steps.map((s, i) => (
         <li key={s} className="flex items-center gap-2 text-sm">
-          <span className={clsx('w-2 h-2 rounded-full', i <= idx ? 'ecom-accent-bg' : 'bg-surface-secondary border border-border-default')} />
-          <span className={i <= idx ? 'text-foreground font-medium' : 'text-foreground-muted'}>{s.replace('_', ' ')}</span>
+          <span
+            className={clsx(
+              'w-2 h-2 rounded-full',
+              i <= idx ? 'ecom-accent-bg' : 'bg-surface-secondary border border-border-default'
+            )}
+          />
+          <span className={i <= idx ? 'text-foreground font-medium' : 'text-foreground-muted'}>
+            {s.replace('_', ' ')}
+          </span>
         </li>
       ))}
     </ol>
@@ -121,20 +146,39 @@ function Steps({ steps, idx }: { steps: string[]; idx: number }) {
 
 export function InventoryView() {
   const value = STOCK_ROWS.reduce((s, r) => s + r.onHand, 0)
-  const low = STOCK_ROWS.filter((r) => r.status !== 'In Stock').length
+  const low = STOCK_ROWS.filter(r => r.status !== 'In Stock').length
   return (
     <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
-      <Head icon={<Boxes className="w-4 h-4" />} title="Inventory" right={<Chip label={`${low} need attention`} tone="bg-yellow-100 text-yellow-800" />} />
+      <Head
+        icon={<Boxes className="w-4 h-4" />}
+        title="Inventory"
+        right={<Chip label={`${low} need attention`} tone="bg-yellow-100 text-yellow-800" />}
+      />
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.id as string}
+          keyOf={r => r.id as string}
           rows={STOCK_ROWS as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'SKU', cell: (r) => <span className="font-mono text-xs text-foreground-secondary">{r.sku as string}</span> },
-            { head: 'Product', cell: (r) => <span className="text-foreground">{r.name as string}</span> },
-            { head: 'On hand', align: 'center', cell: (r) => <span className="text-foreground tabular-nums">{r.onHand as number}</span> },
-            { head: 'Reorder', align: 'center', cell: (r) => <span className="text-foreground-muted tabular-nums">{r.threshold as number}</span> },
-            { head: 'Status', align: 'right', cell: (r) => <Chip label={r.status as string} tone={STOCK_TONE[r.status as string]} /> },
+            {
+              head: 'SKU',
+              cell: r => <span className="font-mono text-xs text-foreground-secondary">{r.sku as string}</span>,
+            },
+            { head: 'Product', cell: r => <span className="text-foreground">{r.name as string}</span> },
+            {
+              head: 'On hand',
+              align: 'center',
+              cell: r => <span className="text-foreground tabular-nums">{r.onHand as number}</span>,
+            },
+            {
+              head: 'Reorder',
+              align: 'center',
+              cell: r => <span className="text-foreground-muted tabular-nums">{r.threshold as number}</span>,
+            },
+            {
+              head: 'Status',
+              align: 'right',
+              cell: r => <Chip label={r.status as string} tone={STOCK_TONE[r.status as string]} />,
+            },
           ]}
         />
       </div>
@@ -165,13 +209,29 @@ export function PoView() {
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.name as string}
+          keyOf={r => r.name as string}
           rows={po.lines as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Item', cell: (r) => <span className="text-foreground">{r.name as string}</span> },
-            { head: 'Qty', align: 'center', cell: (r) => <span className="text-foreground-secondary tabular-nums">{r.ordered as number}</span> },
-            { head: 'Rate', align: 'right', cell: (r) => <span className="text-foreground-secondary tabular-nums">{rupees(r.rate as number)}</span> },
-            { head: 'Amount', align: 'right', cell: (r) => <span className="text-foreground tabular-nums">{rupees((r.ordered as number) * (r.rate as number))}</span> },
+            { head: 'Item', cell: r => <span className="text-foreground">{r.name as string}</span> },
+            {
+              head: 'Qty',
+              align: 'center',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{r.ordered as number}</span>,
+            },
+            {
+              head: 'Rate',
+              align: 'right',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{rupees(r.rate as number)}</span>,
+            },
+            {
+              head: 'Amount',
+              align: 'right',
+              cell: r => (
+                <span className="text-foreground tabular-nums">
+                  {rupees((r.ordered as number) * (r.rate as number))}
+                </span>
+              ),
+            },
           ]}
         />
       </div>
@@ -204,12 +264,24 @@ export function GrnView() {
       <p className="text-xs text-foreground-muted mt-1 shrink-0">From {SUPPLIER.name}</p>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.name as string}
+          keyOf={r => r.name as string}
           rows={po.lines as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Item', cell: (r) => <span className="text-foreground">{r.name as string}</span> },
-            { head: 'Ordered', align: 'center', cell: (r) => <span className="text-foreground-secondary tabular-nums">{r.ordered as number}</span> },
-            { head: 'Received', align: 'center', cell: (r) => <span className="tabular-nums font-semibold text-foreground">{received ? (r.ordered as number) : 0}</span> },
+            { head: 'Item', cell: r => <span className="text-foreground">{r.name as string}</span> },
+            {
+              head: 'Ordered',
+              align: 'center',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{r.ordered as number}</span>,
+            },
+            {
+              head: 'Received',
+              align: 'center',
+              cell: r => (
+                <span className="tabular-nums font-semibold text-foreground">
+                  {received ? (r.ordered as number) : 0}
+                </span>
+              ),
+            },
           ]}
         />
       </div>
@@ -238,14 +310,16 @@ export function SettlementView() {
       <Head
         icon={<Wallet className="w-4 h-4" />}
         title="Settlement"
-        right={<Chip label={settled ? 'settled' : 'captured'} tone={settled ? STAGE_TONE.completed : STAGE_TONE.sent} />}
+        right={
+          <Chip label={settled ? 'settled' : 'captured'} tone={settled ? STAGE_TONE.completed : STAGE_TONE.sent} />
+        }
       />
       <div className="grid grid-cols-2 gap-3 mt-3 shrink-0">
         <Kv label="Gateway" value={s.gateway} strong />
         <Kv label="Mode" value={s.isCod ? 'COD' : 'Prepaid'} />
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden space-y-1.5 text-sm">
-        {rows.map((r) => (
+        {rows.map(r => (
           <div key={r.label} className="flex justify-between">
             <span className="text-foreground-secondary">{r.label}</span>
             <span className={clsx('tabular-nums', r.tone)}>{rupees(r.value)}</span>
@@ -310,7 +384,7 @@ export function GstInvoiceView() {
         </div>
       </div>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden space-y-1.5 text-sm">
-        {rows.map((r) => (
+        {rows.map(r => (
           <div key={r.label} className="flex justify-between">
             <span className="text-foreground-secondary">{r.label}</span>
             <span className="tabular-nums text-foreground">{rupees(r.value)}</span>
@@ -326,21 +400,32 @@ export function GstInvoiceView() {
 }
 
 export function ReportsView() {
-  const b2b = RECEIVABLES.filter((r) => r.customer !== INVOICE.buyer)
+  const b2b = RECEIVABLES.filter(r => r.customer !== INVOICE.buyer)
   const b2bTotal = b2b.reduce((s, r) => s + r.amount, 0)
-  const b2cTotal = RECEIVABLES.filter((r) => r.customer === INVOICE.buyer).reduce((s, r) => s + r.amount, 0)
+  const b2cTotal = RECEIVABLES.filter(r => r.customer === INVOICE.buyer).reduce((s, r) => s + r.amount, 0)
   return (
     <div className={clsx(PANEL, 'h-full min-h-0 p-4 flex flex-col')}>
       <Head icon={<LineChart className="w-4 h-4" />} title="Receivables & GSTR-1" />
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.id as string}
+          keyOf={r => r.id as string}
           rows={RECEIVABLES as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Invoice', cell: (r) => <span className="font-mono text-xs text-foreground-secondary">{r.invoice as string}</span> },
-            { head: 'Customer', cell: (r) => <span className="text-foreground">{r.customer as string}</span> },
-            { head: 'Amount', align: 'right', cell: (r) => <span className="text-foreground tabular-nums">{rupees(r.amount as number)}</span> },
-            { head: 'Ageing', align: 'right', cell: (r) => <Chip label={r.badge as string} tone={AGE_TONE[r.badge as string] ?? AGE_TONE.partial} /> },
+            {
+              head: 'Invoice',
+              cell: r => <span className="font-mono text-xs text-foreground-secondary">{r.invoice as string}</span>,
+            },
+            { head: 'Customer', cell: r => <span className="text-foreground">{r.customer as string}</span> },
+            {
+              head: 'Amount',
+              align: 'right',
+              cell: r => <span className="text-foreground tabular-nums">{rupees(r.amount as number)}</span>,
+            },
+            {
+              head: 'Ageing',
+              align: 'right',
+              cell: r => <Chip label={r.badge as string} tone={AGE_TONE[r.badge as string] ?? AGE_TONE.partial} />,
+            },
           ]}
         />
       </div>
@@ -400,24 +485,50 @@ export function QuoteView() {
         title={`Quotation ${q.number}`}
         right={<Chip label={final ? 'final' : 'draft'} tone={final ? STAGE_TONE.final : STAGE_TONE.draft} />}
       />
-      <p className="text-xs text-foreground-muted mt-1 shrink-0">{q.buyer} · GSTIN {q.buyerGstin}</p>
+      <p className="text-xs text-foreground-muted mt-1 shrink-0">
+        {q.buyer} · GSTIN {q.buyerGstin}
+      </p>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(r) => r.desc as string}
+          keyOf={r => r.desc as string}
           rows={q.lines as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Item', cell: (r) => <span className="text-foreground">{r.desc as string}</span> },
-            { head: 'HSN', cell: (r) => <span className="font-mono text-xs text-foreground-secondary">{r.hsn as string}</span> },
-            { head: 'Qty', align: 'center', cell: (r) => <span className="text-foreground-secondary tabular-nums">{r.qty as number}</span> },
-            { head: 'Rate', align: 'right', cell: (r) => <span className="text-foreground-secondary tabular-nums">{rupees(r.rate as number)}</span> },
-            { head: 'Disc', align: 'right', cell: (r) => <span className="text-foreground-secondary tabular-nums">{r.discount as number}%</span> },
+            { head: 'Item', cell: r => <span className="text-foreground">{r.desc as string}</span> },
+            {
+              head: 'HSN',
+              cell: r => <span className="font-mono text-xs text-foreground-secondary">{r.hsn as string}</span>,
+            },
+            {
+              head: 'Qty',
+              align: 'center',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{r.qty as number}</span>,
+            },
+            {
+              head: 'Rate',
+              align: 'right',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{rupees(r.rate as number)}</span>,
+            },
+            {
+              head: 'Disc',
+              align: 'right',
+              cell: r => <span className="text-foreground-secondary tabular-nums">{r.discount as number}%</span>,
+            },
           ]}
         />
       </div>
       <div className="mt-2 space-y-1 text-sm shrink-0">
-        <div className="flex justify-between text-foreground-secondary"><span>Net</span><span className="tabular-nums">{rupees(net)}</span></div>
-        <div className="flex justify-between text-foreground-secondary"><span>GST ({q.gstRate}%)</span><span className="tabular-nums">{rupees(gst)}</span></div>
-        <div className="flex justify-between font-bold text-foreground border-t border-border-default pt-1.5"><span>Total</span><span className="tabular-nums">{rupees(net + gst)}</span></div>
+        <div className="flex justify-between text-foreground-secondary">
+          <span>Net</span>
+          <span className="tabular-nums">{rupees(net)}</span>
+        </div>
+        <div className="flex justify-between text-foreground-secondary">
+          <span>GST ({q.gstRate}%)</span>
+          <span className="tabular-nums">{rupees(gst)}</span>
+        </div>
+        <div className="flex justify-between font-bold text-foreground border-t border-border-default pt-1.5">
+          <span>Total</span>
+          <span className="tabular-nums">{rupees(net + gst)}</span>
+        </div>
       </div>
       {!final ? (
         <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.finalizeQuote}>
@@ -444,19 +555,37 @@ export function RfqView() {
         title={`RFQ ${r.number}`}
         right={<Chip label={stage.replace('_', ' ')} tone={STAGE_TONE[stage]} />}
       />
-      <p className="text-xs text-foreground-muted mt-1 shrink-0">{r.company} · GSTIN {r.gstin}</p>
+      <p className="text-xs text-foreground-muted mt-1 shrink-0">
+        {r.company} · GSTIN {r.gstin}
+      </p>
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
-          keyOf={(row) => row.line as string}
+          keyOf={row => row.line as string}
           rows={r.offers as unknown as Record<string, unknown>[]}
           cols={[
-            { head: 'Item', cell: (o) => <span className="text-foreground">{o.line as string}</span> },
-            { head: 'Qty', align: 'center', cell: (o) => <span className="text-foreground-secondary tabular-nums">{o.qty as number}</span> },
-            { head: 'Requested', align: 'right', cell: (o) => <span className="text-foreground-secondary tabular-nums">{rupees(o.requested as number)}</span> },
-            { head: 'Offered', align: 'right', cell: (o) => <span className="text-foreground tabular-nums">{rupees(o.offered as number)}</span> },
+            { head: 'Item', cell: o => <span className="text-foreground">{o.line as string}</span> },
+            {
+              head: 'Qty',
+              align: 'center',
+              cell: o => <span className="text-foreground-secondary tabular-nums">{o.qty as number}</span>,
+            },
+            {
+              head: 'Requested',
+              align: 'right',
+              cell: o => (
+                <span className="text-foreground-secondary tabular-nums">{rupees(o.requested as number)}</span>
+              ),
+            },
+            {
+              head: 'Offered',
+              align: 'right',
+              cell: o => <span className="text-foreground tabular-nums">{rupees(o.offered as number)}</span>,
+            },
           ]}
         />
-        <div className="mt-3"><Steps steps={steps} idx={idx} /></div>
+        <div className="mt-3">
+          <Steps steps={steps} idx={idx} />
+        </div>
       </div>
       {!done ? (
         <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.advanceRfq}>

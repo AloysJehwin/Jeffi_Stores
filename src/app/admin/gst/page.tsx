@@ -8,25 +8,65 @@ import { ap } from '@/lib/admin-path'
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
 interface GSTSummary {
-  totalInvoices: number; totalTaxable: number; totalCgst: number
-  totalSgst: number; totalIgst: number; totalTax: number
-  b2bCount: number; b2cCount: number; totalInvoiceValue: number
+  totalInvoices: number
+  totalTaxable: number
+  totalCgst: number
+  totalSgst: number
+  totalIgst: number
+  totalTax: number
+  b2bCount: number
+  b2cCount: number
+  totalInvoiceValue: number
 }
-interface HsnRow { hsnCode: string; gstRate: number; taxableVal: number; cgstAmt: number; sgstAmt: number; igstAmt: number; totalTax: number }
+interface HsnRow {
+  hsnCode: string
+  gstRate: number
+  taxableVal: number
+  cgstAmt: number
+  sgstAmt: number
+  igstAmt: number
+  totalTax: number
+}
 interface InvoiceRow {
-  invoice_number: string; invoice_date: string; customer_name: string
-  buyer_gstin: string | null; taxable_amount: string; cgst_amount: string
-  sgst_amount: string; igst_amount: string; total_amount: string
-  irn: string | null; irn_ack_no: string | null; irn_ack_dt: string | null; irn_status: string | null
+  invoice_number: string
+  invoice_date: string
+  customer_name: string
+  buyer_gstin: string | null
+  taxable_amount: string
+  cgst_amount: string
+  sgst_amount: string
+  igst_amount: string
+  total_amount: string
+  irn: string | null
+  irn_ack_no: string | null
+  irn_ack_dt: string | null
+  irn_status: string | null
 }
 interface GSTR3BData {
-  gstin: string; legalName: string
+  gstin: string
+  legalName: string
   table31: { outwardTaxable: { taxableValue: number; integratedTax: number; centralTax: number; stateTax: number } }
-  summary: { totalInvoices: number; totalTaxable: number; totalCgst: number; totalSgst: number; totalIgst: number; totalTax: number; byGstRate: { gstRate: number; isIgst: boolean; taxable: number; cgst: number; sgst: number; igst: number }[] }
+  summary: {
+    totalInvoices: number
+    totalTaxable: number
+    totalCgst: number
+    totalSgst: number
+    totalIgst: number
+    totalTax: number
+    byGstRate: { gstRate: number; isIgst: boolean; taxable: number; cgst: number; sgst: number; igst: number }[]
+  }
 }
 interface ITCRow {
-  po_number: string; order_date: string; supplier_name: string; supplier_gstin: string | null
-  product_name: string; quantity: number; unit_cost: string; tax_rate: string; taxable_amount: string; tax_amount: string
+  po_number: string
+  order_date: string
+  supplier_name: string
+  supplier_gstin: string | null
+  product_name: string
+  quantity: number
+  unit_cost: string
+  tax_rate: string
+  taxable_amount: string
+  tax_amount: string
 }
 interface ITCData {
   summary: { lineCount: number; totalTaxable: number; totalTax: number }
@@ -34,12 +74,15 @@ interface ITCData {
   rows: ITCRow[]
 }
 
-const INR = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
-const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+const INR = (n: number) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
+const fmtDate = (s: string) =>
+  s ? new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
 function getPresetRange(preset: string): { from: string; to: string } {
   const now = new Date()
-  const y = now.getFullYear(), m = now.getMonth()
+  const y = now.getFullYear(),
+    m = now.getMonth()
   if (preset === 'this_month') {
     return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
   }
@@ -65,10 +108,29 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 }
 
 function Badge({ status }: { status: string | null }) {
-  if (status === 'generated') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">Generated</span>
-  if (status === 'stub') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Stub</span>
-  if (status === 'cancelled') return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Cancelled</span>
-  return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary dark:bg-surface-secondary text-foreground-muted">No IRN</span>
+  if (status === 'generated')
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+        Generated
+      </span>
+    )
+  if (status === 'stub')
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+        Stub
+      </span>
+    )
+  if (status === 'cancelled')
+    return (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+        Cancelled
+      </span>
+    )
+  return (
+    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary dark:bg-surface-secondary text-foreground-muted">
+      No IRN
+    </span>
+  )
 }
 
 export default function GSTPage() {
@@ -121,7 +183,9 @@ export default function GSTPage() {
     }
   }, [])
 
-  useEffect(() => { fetchAll(from, to) }, [])
+  useEffect(() => {
+    fetchAll(from, to)
+  }, [])
 
   function applyPreset(p: string) {
     setPreset(p)
@@ -132,7 +196,9 @@ export default function GSTPage() {
     }
   }
 
-  function handleFetch() { fetchAll(from, to) }
+  function handleFetch() {
+    fetchAll(from, to)
+  }
 
   function downloadCSV(type: 'gstr1' | 'gstr3b' | 'itc') {
     const a = document.createElement('a')
@@ -183,14 +249,29 @@ export default function GSTPage() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-foreground-secondary mb-1">From</label>
-            <DatePicker value={from} onChange={v => { setFrom(v); setPreset('custom') }} />
+            <DatePicker
+              value={from}
+              onChange={v => {
+                setFrom(v)
+                setPreset('custom')
+              }}
+            />
           </div>
           <div>
             <label className="block text-xs text-foreground-secondary mb-1">To</label>
-            <DatePicker value={to} onChange={v => { setTo(v); setPreset('custom') }} />
+            <DatePicker
+              value={to}
+              onChange={v => {
+                setTo(v)
+                setPreset('custom')
+              }}
+            />
           </div>
-          <button onClick={handleFetch} disabled={loading}
-            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+          <button
+            onClick={handleFetch}
+            disabled={loading}
+            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+          >
             {loading ? (
               <span className="flex items-center gap-1.5">
                 <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
@@ -199,7 +280,9 @@ export default function GSTPage() {
                 </svg>
                 Fetching…
               </span>
-            ) : 'Fetch Report'}
+            ) : (
+              'Fetch Report'
+            )}
           </button>
         </div>
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
@@ -209,7 +292,11 @@ export default function GSTPage() {
         <div className="animate-pulse space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm space-y-2" style={{ animationDelay: `${i * 50}ms` }}>
+              <div
+                key={i}
+                className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm space-y-2"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
                 <div className="h-3 w-20 bg-surface-secondary rounded" />
                 <div className="h-5 w-24 bg-surface-secondary rounded" />
               </div>
@@ -220,7 +307,11 @@ export default function GSTPage() {
 
       {gstr1Summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <SummaryCard label="Invoices" value={String(gstr1Summary.totalInvoices)} sub={`${gstr1Summary.b2bCount} B2B · ${gstr1Summary.b2cCount} B2C`} />
+          <SummaryCard
+            label="Invoices"
+            value={String(gstr1Summary.totalInvoices)}
+            sub={`${gstr1Summary.b2bCount} B2B · ${gstr1Summary.b2cCount} B2C`}
+          />
           <SummaryCard label="Taxable Value" value={INR(gstr1Summary.totalTaxable)} />
           <SummaryCard label="CGST" value={INR(gstr1Summary.totalCgst)} />
           <SummaryCard label="SGST" value={INR(gstr1Summary.totalSgst)} />
@@ -232,12 +323,15 @@ export default function GSTPage() {
       <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm overflow-hidden">
         <div className="flex border-b border-border-default overflow-x-auto">
           {tabs.map(t => (
-            <button key={t.id} onClick={() => handleTabChange(t.id)}
+            <button
+              key={t.id}
+              onClick={() => handleTabChange(t.id)}
               className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 tab === t.id
                   ? 'border-b-2 border-accent-500 text-accent-500'
                   : 'text-foreground-secondary hover:text-foreground'
-              }`}>
+              }`}
+            >
               {t.label}
             </button>
           ))}
@@ -253,11 +347,19 @@ export default function GSTPage() {
               <div className="rounded-lg border border-border-default overflow-hidden">
                 <div className="bg-surface-secondary px-4 py-2.5 flex gap-4">
                   {[...Array(9)].map((_, i) => (
-                    <div key={i} className="h-3 bg-surface-elevated rounded flex-1" style={{ animationDelay: `${i * 40}ms` }} />
+                    <div
+                      key={i}
+                      className="h-3 bg-surface-elevated rounded flex-1"
+                      style={{ animationDelay: `${i * 40}ms` }}
+                    />
                   ))}
                 </div>
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="px-4 py-3 border-t border-border-default flex gap-4" style={{ animationDelay: `${i * 60}ms` }}>
+                  <div
+                    key={i}
+                    className="px-4 py-3 border-t border-border-default flex gap-4"
+                    style={{ animationDelay: `${i * 60}ms` }}
+                  >
                     <div className="h-4 w-24 bg-surface-secondary rounded" />
                     <div className="h-4 w-20 bg-surface-secondary rounded" />
                     <div className="h-4 flex-1 bg-surface-secondary rounded" />
@@ -276,9 +378,18 @@ export default function GSTPage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">Outward Supplies</h2>
-                <button onClick={() => downloadCSV('gstr1')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <button
+                  onClick={() => downloadCSV('gstr1')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
                   Download CSV
                 </button>
               </div>
@@ -290,23 +401,38 @@ export default function GSTPage() {
                     <table className="min-w-full text-sm divide-y divide-border-default">
                       <thead className="bg-surface-secondary">
                         <tr>
-                          {['Invoice No', 'Date', 'Customer', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(h => (
-                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
-                          ))}
+                          {['Invoice No', 'Date', 'Customer', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(
+                            h => (
+                              <th
+                                key={h}
+                                className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}
+                              >
+                                {h}
+                              </th>
+                            )
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border-default">
                         {gstr1B2B.map((r, i) => (
                           <tr key={i} className="hover:bg-surface-secondary/50">
-                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{r.invoice_number}</td>
-                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
+                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
+                              {r.invoice_number}
+                            </td>
+                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
+                              {fmtDate(r.invoice_date)}
+                            </td>
                             <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.customer_name}</td>
                             <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">{r.buyer_gstin}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.taxable_amount))}</td>
+                            <td className="px-4 py-2.5 text-right text-foreground">
+                              {INR(parseFloat(r.taxable_amount))}
+                            </td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.cgst_amount))}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.sgst_amount))}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.igst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right font-medium text-foreground">{INR(parseFloat(r.total_amount))}</td>
+                            <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                              {INR(parseFloat(r.total_amount))}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -323,21 +449,34 @@ export default function GSTPage() {
                       <thead className="bg-surface-secondary">
                         <tr>
                           {['Invoice No', 'Date', 'Customer', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(h => (
-                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                            <th
+                              key={h}
+                              className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}
+                            >
+                              {h}
+                            </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border-default">
                         {gstr1B2C.map((r, i) => (
                           <tr key={i} className="hover:bg-surface-secondary/50">
-                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{r.invoice_number}</td>
-                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
+                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
+                              {r.invoice_number}
+                            </td>
+                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
+                              {fmtDate(r.invoice_date)}
+                            </td>
                             <td className="px-4 py-2.5 text-foreground max-w-[200px] truncate">{r.customer_name}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.taxable_amount))}</td>
+                            <td className="px-4 py-2.5 text-right text-foreground">
+                              {INR(parseFloat(r.taxable_amount))}
+                            </td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.cgst_amount))}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.sgst_amount))}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.igst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right font-medium text-foreground">{INR(parseFloat(r.total_amount))}</td>
+                            <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                              {INR(parseFloat(r.total_amount))}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -354,7 +493,12 @@ export default function GSTPage() {
                       <thead className="bg-surface-secondary">
                         <tr>
                           {['HSN Code', 'GST Rate', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                            <th
+                              key={h}
+                              className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}
+                            >
+                              {h}
+                            </th>
                           ))}
                         </tr>
                       </thead>
@@ -377,7 +521,9 @@ export default function GSTPage() {
               )}
 
               {!gstr1Summary && !loading && (
-                <p className="text-sm text-foreground-muted text-center py-8">Select a date range and click Fetch Report.</p>
+                <p className="text-sm text-foreground-muted text-center py-8">
+                  Select a date range and click Fetch Report.
+                </p>
               )}
             </div>
           )}
@@ -386,9 +532,18 @@ export default function GSTPage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">GSTR-3B Summary</h2>
-                <button onClick={() => downloadCSV('gstr3b')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <button
+                  onClick={() => downloadCSV('gstr3b')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
                   Download CSV
                 </button>
               </div>
@@ -397,8 +552,16 @@ export default function GSTPage() {
                 <>
                   {(gstr3b.gstin || gstr3b.legalName) && (
                     <div className="flex gap-6 text-sm text-foreground-secondary">
-                      {gstr3b.legalName && <span><span className="font-medium text-foreground">Entity:</span> {gstr3b.legalName}</span>}
-                      {gstr3b.gstin && <span><span className="font-medium text-foreground">GSTIN:</span> {gstr3b.gstin}</span>}
+                      {gstr3b.legalName && (
+                        <span>
+                          <span className="font-medium text-foreground">Entity:</span> {gstr3b.legalName}
+                        </span>
+                      )}
+                      {gstr3b.gstin && (
+                        <span>
+                          <span className="font-medium text-foreground">GSTIN:</span> {gstr3b.gstin}
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -408,7 +571,10 @@ export default function GSTPage() {
                     </div>
                     <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
                       <SummaryCard label="Taxable Value" value={INR(gstr3b.table31.outwardTaxable.taxableValue)} />
-                      <SummaryCard label="Integrated Tax (IGST)" value={INR(gstr3b.table31.outwardTaxable.integratedTax)} />
+                      <SummaryCard
+                        label="Integrated Tax (IGST)"
+                        value={INR(gstr3b.table31.outwardTaxable.integratedTax)}
+                      />
                       <SummaryCard label="Central Tax (CGST)" value={INR(gstr3b.table31.outwardTaxable.centralTax)} />
                       <SummaryCard label="State/UT Tax (SGST)" value={INR(gstr3b.table31.outwardTaxable.stateTax)} />
                     </div>
@@ -423,7 +589,12 @@ export default function GSTPage() {
                         <thead className="bg-surface-secondary/50">
                           <tr>
                             {['GST Rate', 'Supply Type', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                              <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                              <th
+                                key={h}
+                                className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}
+                              >
+                                {h}
+                              </th>
                             ))}
                           </tr>
                         </thead>
@@ -431,12 +602,16 @@ export default function GSTPage() {
                           {gstr3b.summary.byGstRate.map((r, i) => (
                             <tr key={i} className="hover:bg-surface-secondary/50">
                               <td className="px-4 py-2.5 font-medium text-foreground">{r.gstRate}%</td>
-                              <td className="px-4 py-2.5 text-foreground-secondary">{r.isIgst ? 'Inter-State' : 'Intra-State'}</td>
+                              <td className="px-4 py-2.5 text-foreground-secondary">
+                                {r.isIgst ? 'Inter-State' : 'Intra-State'}
+                              </td>
                               <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxable)}</td>
                               <td className="px-4 py-2.5 text-right text-foreground">{INR(r.cgst)}</td>
                               <td className="px-4 py-2.5 text-right text-foreground">{INR(r.sgst)}</td>
                               <td className="px-4 py-2.5 text-right text-foreground">{INR(r.igst)}</td>
-                              <td className="px-4 py-2.5 text-right font-medium text-foreground">{INR(r.cgst + r.sgst + r.igst)}</td>
+                              <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                                {INR(r.cgst + r.sgst + r.igst)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -458,7 +633,8 @@ export default function GSTPage() {
 
                   <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-800 dark:text-amber-300">
                     <span className="font-semibold">Note (Table 4 — ITC): </span>
-                    Input Tax Credit values are shown in the ITC Ledger tab. ITC is eligible only from received POs. Verify with purchase invoices before filing.
+                    Input Tax Credit values are shown in the ITC Ledger tab. ITC is eligible only from received POs.
+                    Verify with purchase invoices before filing.
                   </div>
                 </>
               ) : (
@@ -474,7 +650,8 @@ export default function GSTPage() {
                   e-Invoice (IRN) Status
                   {allInvoices.length > 0 && (
                     <span className="ml-2 text-sm font-normal text-foreground-secondary">
-                      {allInvoices.filter(r => r.irn).length} generated · {allInvoices.filter(r => !r.irn).length} pending
+                      {allInvoices.filter(r => r.irn).length} generated · {allInvoices.filter(r => !r.irn).length}{' '}
+                      pending
                     </span>
                   )}
                 </h2>
@@ -484,29 +661,63 @@ export default function GSTPage() {
                   <table className="min-w-full text-sm divide-y divide-border-default">
                     <thead className="bg-surface-secondary">
                       <tr>
-                        {['Invoice No', 'Date', 'Customer', 'Type', 'Amount', 'IRN', 'Ack No', 'Ack Date', 'Status'].map(h => (
-                          <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Amount'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                        {[
+                          'Invoice No',
+                          'Date',
+                          'Customer',
+                          'Type',
+                          'Amount',
+                          'IRN',
+                          'Ack No',
+                          'Ack Date',
+                          'Status',
+                        ].map(h => (
+                          <th
+                            key={h}
+                            className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Amount'].includes(h) ? 'text-right' : 'text-left'}`}
+                          >
+                            {h}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {allInvoices.map((r, i) => (
                         <tr key={i} className="hover:bg-surface-secondary/50">
-                          <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{r.invoice_number}</td>
-                          <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">{fmtDate(r.invoice_date)}</td>
+                          <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
+                            {r.invoice_number}
+                          </td>
+                          <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
+                            {fmtDate(r.invoice_date)}
+                          </td>
                           <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.customer_name}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.buyer_gstin ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.buyer_gstin ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                            >
                               {r.buyer_gstin ? 'B2B' : 'B2C'}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-foreground">{INR(parseFloat(r.total_amount))}</td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary max-w-[120px] truncate" title={r.irn || ''}>
-                            {r.irn ? r.irn.slice(0, 16) + '…' : <span className="text-yellow-600 dark:text-yellow-400">Pending</span>}
+                          <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                            {INR(parseFloat(r.total_amount))}
+                          </td>
+                          <td
+                            className="px-4 py-2.5 font-mono text-xs text-foreground-secondary max-w-[120px] truncate"
+                            title={r.irn || ''}
+                          >
+                            {r.irn ? (
+                              r.irn.slice(0, 16) + '…'
+                            ) : (
+                              <span className="text-yellow-600 dark:text-yellow-400">Pending</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5 text-xs text-foreground-secondary">{r.irn_ack_no || '—'}</td>
-                          <td className="px-4 py-2.5 text-xs text-foreground-secondary whitespace-nowrap">{r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}</td>
-                          <td className="px-4 py-2.5"><Badge status={r.irn_status} /></td>
+                          <td className="px-4 py-2.5 text-xs text-foreground-secondary whitespace-nowrap">
+                            {r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <Badge status={r.irn_status} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -522,9 +733,18 @@ export default function GSTPage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">Input Tax Credit Ledger</h2>
-                <button onClick={() => downloadCSV('itc')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <button
+                  onClick={() => downloadCSV('itc')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
                   Download CSV
                 </button>
               </div>
@@ -532,9 +752,17 @@ export default function GSTPage() {
               {itcData ? (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <SummaryCard label="PO Line Items" value={String(itcData.summary.lineCount)} sub="From received POs" />
+                    <SummaryCard
+                      label="PO Line Items"
+                      value={String(itcData.summary.lineCount)}
+                      sub="From received POs"
+                    />
                     <SummaryCard label="Total Taxable Purchases" value={INR(itcData.summary.totalTaxable)} />
-                    <SummaryCard label="Total ITC Claimable" value={INR(itcData.summary.totalTax)} sub="Verify with supplier invoices" />
+                    <SummaryCard
+                      label="Total ITC Claimable"
+                      value={INR(itcData.summary.totalTax)}
+                      sub="Verify with supplier invoices"
+                    />
                   </div>
 
                   {itcData.supplierSummary.length > 0 && (
@@ -545,7 +773,12 @@ export default function GSTPage() {
                           <thead className="bg-surface-secondary">
                             <tr>
                               {['Supplier', 'GSTIN', 'POs', 'Taxable', 'ITC (Tax)'].map(h => (
-                                <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['POs', 'Taxable', 'ITC (Tax)'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                                <th
+                                  key={h}
+                                  className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['POs', 'Taxable', 'ITC (Tax)'].includes(h) ? 'text-right' : 'text-left'}`}
+                                >
+                                  {h}
+                                </th>
                               ))}
                             </tr>
                           </thead>
@@ -553,10 +786,14 @@ export default function GSTPage() {
                             {itcData.supplierSummary.map((r, i) => (
                               <tr key={i} className="hover:bg-surface-secondary/50">
                                 <td className="px-4 py-2.5 font-medium text-foreground">{r.supplierName}</td>
-                                <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">{r.gstin || <span className="text-foreground-muted italic">No GSTIN</span>}</td>
+                                <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">
+                                  {r.gstin || <span className="text-foreground-muted italic">No GSTIN</span>}
+                                </td>
                                 <td className="px-4 py-2.5 text-right text-foreground">{r.poCount}</td>
                                 <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxable)}</td>
-                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">{INR(r.tax)}</td>
+                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">
+                                  {INR(r.tax)}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -572,23 +809,50 @@ export default function GSTPage() {
                         <table className="min-w-full text-sm divide-y divide-border-default">
                           <thead className="bg-surface-secondary">
                             <tr>
-                              {['PO No', 'Date', 'Supplier', 'Product', 'Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].map(h => (
-                                <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                              {[
+                                'PO No',
+                                'Date',
+                                'Supplier',
+                                'Product',
+                                'Qty',
+                                'Unit Cost',
+                                'GST %',
+                                'Taxable',
+                                'ITC',
+                              ].map(h => (
+                                <th
+                                  key={h}
+                                  className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].includes(h) ? 'text-right' : 'text-left'}`}
+                                >
+                                  {h}
+                                </th>
                               ))}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border-default">
                             {itcData.rows.map((r, i) => (
                               <tr key={i} className="hover:bg-surface-secondary/50">
-                                <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">{r.po_number}</td>
-                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">{fmtDate(r.order_date)}</td>
-                                <td className="px-4 py-2.5 text-foreground max-w-[140px] truncate">{r.supplier_name}</td>
+                                <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
+                                  {r.po_number}
+                                </td>
+                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
+                                  {fmtDate(r.order_date)}
+                                </td>
+                                <td className="px-4 py-2.5 text-foreground max-w-[140px] truncate">
+                                  {r.supplier_name}
+                                </td>
                                 <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.product_name}</td>
                                 <td className="px-4 py-2.5 text-right text-foreground">{r.quantity}</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.unit_cost))}</td>
+                                <td className="px-4 py-2.5 text-right text-foreground">
+                                  {INR(parseFloat(r.unit_cost))}
+                                </td>
                                 <td className="px-4 py-2.5 text-right text-foreground">{parseFloat(r.tax_rate)}%</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.taxable_amount))}</td>
-                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">{INR(parseFloat(r.tax_amount))}</td>
+                                <td className="px-4 py-2.5 text-right text-foreground">
+                                  {INR(parseFloat(r.taxable_amount))}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">
+                                  {INR(parseFloat(r.tax_amount))}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -598,16 +862,21 @@ export default function GSTPage() {
                   )}
 
                   {itcData.rows.length === 0 && (
-                    <p className="text-sm text-foreground-muted text-center py-8">No received purchase orders in this period.</p>
+                    <p className="text-sm text-foreground-muted text-center py-8">
+                      No received purchase orders in this period.
+                    </p>
                   )}
 
                   <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-800 dark:text-amber-300">
                     <span className="font-semibold">Note: </span>
-                    ITC is claimable only from suppliers with valid GSTIN. Verify all amounts against supplier tax invoices before filing GSTR-3B Table 4.
+                    ITC is claimable only from suppliers with valid GSTIN. Verify all amounts against supplier tax
+                    invoices before filing GSTR-3B Table 4.
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-foreground-muted text-center py-8">No ITC data available. Ensure purchase orders are marked as received.</p>
+                <p className="text-sm text-foreground-muted text-center py-8">
+                  No ITC data available. Ensure purchase orders are marked as received.
+                </p>
               )}
             </div>
           )}

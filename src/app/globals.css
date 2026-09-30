@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --color-surface: #F9FAFB;
-    --color-surface-elevated: #FFFFFF;
-    --color-surface-secondary: #F3F4F6;
+    --color-surface: #f9fafb;
+    --color-surface-elevated: #ffffff;
+    --color-surface-secondary: #f3f4f6;
     --color-foreground: #111827;
-    --color-foreground-secondary: #4B5563;
-    --color-foreground-muted: #6B7280;
-    --color-border: #D1D5DB;
-    --color-border-secondary: #9CA3AF;
+    --color-foreground-secondary: #4b5563;
+    --color-foreground-muted: #6b7280;
+    --color-border: #d1d5db;
+    --color-border-secondary: #9ca3af;
     --color-card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 
     /* Brand colors — light mode */
@@ -25,9 +25,9 @@
     --color-surface: #1a1b23;
     --color-surface-elevated: #24252f;
     --color-surface-secondary: #2e303b;
-    --color-foreground: #F3F4F6;
-    --color-foreground-secondary: #D1D5DB;
-    --color-foreground-muted: #AEB4C0;
+    --color-foreground: #f3f4f6;
+    --color-foreground-secondary: #d1d5db;
+    --color-foreground-muted: #aeb4c0;
     --color-border: #3f4150;
     --color-border-secondary: #4a4c5e;
 
@@ -40,14 +40,14 @@
 
   /* Force light-mode tokens even inside a .dark ancestor (landing-page preview shells) */
   .light-scope {
-    --color-surface: #F9FAFB;
-    --color-surface-elevated: #FFFFFF;
-    --color-surface-secondary: #F3F4F6;
+    --color-surface: #f9fafb;
+    --color-surface-elevated: #ffffff;
+    --color-surface-secondary: #f3f4f6;
     --color-foreground: #111827;
-    --color-foreground-secondary: #4B5563;
-    --color-foreground-muted: #6B7280;
-    --color-border: #D1D5DB;
-    --color-border-secondary: #9CA3AF;
+    --color-foreground-secondary: #4b5563;
+    --color-foreground-muted: #6b7280;
+    --color-border: #d1d5db;
+    --color-border-secondary: #9ca3af;
     --primary-500: #f59e0b;
     --primary-600: #d97706;
     --accent-500: #7cb900;
@@ -55,23 +55,55 @@
   }
 
   /* Remap brand utility classes to CSS vars so they shift with theme */
-  .bg-primary-500 { background-color: var(--primary-500) !important; }
-  .bg-primary-600 { background-color: var(--primary-600) !important; }
-  .hover\:bg-primary-600:hover { background-color: var(--primary-600) !important; }
-  .text-primary-500 { color: var(--primary-500) !important; }
-  .text-primary-600 { color: var(--primary-600) !important; }
-  .border-primary-500 { border-color: var(--primary-500) !important; }
+  .bg-primary-500 {
+    background-color: var(--primary-500) !important;
+  }
+  .bg-primary-600 {
+    background-color: var(--primary-600) !important;
+  }
+  .hover\:bg-primary-600:hover {
+    background-color: var(--primary-600) !important;
+  }
+  .text-primary-500 {
+    color: var(--primary-500) !important;
+  }
+  .text-primary-600 {
+    color: var(--primary-600) !important;
+  }
+  .border-primary-500 {
+    border-color: var(--primary-500) !important;
+  }
 
-  .bg-accent-500 { background-color: var(--accent-500) !important; }
-  .bg-accent-600 { background-color: var(--accent-600) !important; }
-  .hover\:bg-accent-500:hover { background-color: var(--accent-500) !important; }
-  .hover\:bg-accent-600:hover { background-color: var(--accent-600) !important; }
-  .text-accent-500 { color: var(--accent-500) !important; }
-  .text-accent-600 { color: var(--accent-600) !important; }
-  .border-accent-500 { border-color: var(--accent-500) !important; }
-  .border-b-accent-500 { border-bottom-color: var(--accent-500) !important; }
-  .focus\:ring-accent-500:focus { --tw-ring-color: var(--accent-500) !important; }
-  .group:hover .group-hover\:text-accent-600 { color: var(--accent-600) !important; }
+  .bg-accent-500 {
+    background-color: var(--accent-500) !important;
+  }
+  .bg-accent-600 {
+    background-color: var(--accent-600) !important;
+  }
+  .hover\:bg-accent-500:hover {
+    background-color: var(--accent-500) !important;
+  }
+  .hover\:bg-accent-600:hover {
+    background-color: var(--accent-600) !important;
+  }
+  .text-accent-500 {
+    color: var(--accent-500) !important;
+  }
+  .text-accent-600 {
+    color: var(--accent-600) !important;
+  }
+  .border-accent-500 {
+    border-color: var(--accent-500) !important;
+  }
+  .border-b-accent-500 {
+    border-bottom-color: var(--accent-500) !important;
+  }
+  .focus\:ring-accent-500:focus {
+    --tw-ring-color: var(--accent-500) !important;
+  }
+  .group:hover .group-hover\:text-accent-600 {
+    color: var(--accent-600) !important;
+  }
 
   * {
     @apply box-border;
@@ -99,7 +131,6 @@
     min-height: 100dvh;
   }
 
-
   /* Dark mode form input defaults */
   .dark input,
   .dark select,
@@ -107,11 +138,10 @@
     color-scheme: dark;
   }
 
-
   /* Light mode: make shadow-sm more visible so cards stand out from page bg */
   :root .shadow-sm,
   :root .hover\:shadow-xl:hover {
-    --tw-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+    --tw-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.06);
     box-shadow: var(--tw-shadow);
   }
 }
@@ -162,9 +192,15 @@
   }
 
   /* Icon-only: square, so a row of them lines up with the fields beside it. */
-  .control-md.control-icon { @apply w-[38px] px-0; }
-  .control-sm.control-icon { @apply w-[34px] px-0; }
-  .control-xs.control-icon { @apply w-[26px] px-0; }
+  .control-md.control-icon {
+    @apply w-[38px] px-0;
+  }
+  .control-sm.control-icon {
+    @apply w-[34px] px-0;
+  }
+  .control-xs.control-icon {
+    @apply w-[26px] px-0;
+  }
 }
 
 /* A textarea is the one control that must NOT be pinned — it grows with rows. */
@@ -236,28 +272,62 @@ textarea.field-xs {
   opacity: 0;
   animation: stagger-fade-up 0.5s ease-out forwards;
 }
-.stagger-grid > *:nth-child(1)  { animation-delay: 0ms; }
-.stagger-grid > *:nth-child(2)  { animation-delay: 50ms; }
-.stagger-grid > *:nth-child(3)  { animation-delay: 100ms; }
-.stagger-grid > *:nth-child(4)  { animation-delay: 150ms; }
-.stagger-grid > *:nth-child(5)  { animation-delay: 200ms; }
-.stagger-grid > *:nth-child(6)  { animation-delay: 250ms; }
-.stagger-grid > *:nth-child(7)  { animation-delay: 300ms; }
-.stagger-grid > *:nth-child(8)  { animation-delay: 350ms; }
-.stagger-grid > *:nth-child(9)  { animation-delay: 400ms; }
-.stagger-grid > *:nth-child(10) { animation-delay: 450ms; }
-.stagger-grid > *:nth-child(11) { animation-delay: 500ms; }
-.stagger-grid > *:nth-child(12) { animation-delay: 550ms; }
-.stagger-grid > *:nth-child(n+13) { animation-delay: 600ms; }
+.stagger-grid > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-grid > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.stagger-grid > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.stagger-grid > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger-grid > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.stagger-grid > *:nth-child(6) {
+  animation-delay: 250ms;
+}
+.stagger-grid > *:nth-child(7) {
+  animation-delay: 300ms;
+}
+.stagger-grid > *:nth-child(8) {
+  animation-delay: 350ms;
+}
+.stagger-grid > *:nth-child(9) {
+  animation-delay: 400ms;
+}
+.stagger-grid > *:nth-child(10) {
+  animation-delay: 450ms;
+}
+.stagger-grid > *:nth-child(11) {
+  animation-delay: 500ms;
+}
+.stagger-grid > *:nth-child(12) {
+  animation-delay: 550ms;
+}
+.stagger-grid > *:nth-child(n + 13) {
+  animation-delay: 600ms;
+}
 
 @keyframes img-shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes razorpay-marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .razorpay-scroll {
@@ -270,6 +340,12 @@ textarea.field-xs {
 }
 
 @keyframes adminSelectFadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

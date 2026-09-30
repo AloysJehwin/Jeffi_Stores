@@ -15,9 +15,7 @@ export default function EditProductError({ error, reset }: { error: Error & { di
           {error.message || 'An unexpected error occurred while rendering this page.'}
         </p>
         {error.digest && (
-          <p className="mt-2 text-xs font-mono text-red-600 dark:text-red-400">
-            Reference: {error.digest}
-          </p>
+          <p className="mt-2 text-xs font-mono text-red-600 dark:text-red-400">Reference: {error.digest}</p>
         )}
         <div className="mt-4 flex gap-3">
           <button

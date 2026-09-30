@@ -45,9 +45,7 @@ function categoryOptions(rows: CategoryRow[], direct: Map<string, number>): Assi
 
 async function loadAssignOptions() {
   const [categories, counts, brands] = await Promise.all([
-    queryMany<CategoryRow>(
-      `SELECT id, name, parent_category_id FROM categories WHERE is_active = true ORDER BY name`
-    ),
+    queryMany<CategoryRow>(`SELECT id, name, parent_category_id FROM categories WHERE is_active = true ORDER BY name`),
     queryMany<{ category_id: string; n: number }>(
       `SELECT category_id, count(*)::int AS n FROM products
         WHERE is_active = true AND category_id IS NOT NULL GROUP BY category_id`

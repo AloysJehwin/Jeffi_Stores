@@ -17,58 +17,58 @@ interface UpdateOrderStatusProps {
 }
 
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
-  pending:          ['confirmed', 'cancel_requested', 'cancelled'],
-  confirmed:        ['processing', 'cancel_requested', 'cancelled'],
-  processing:       ['shipped', 'cancel_requested'],
-  shipped:          ['out_for_delivery', 'delivered'],
+  pending: ['confirmed', 'cancel_requested', 'cancelled'],
+  confirmed: ['processing', 'cancel_requested', 'cancelled'],
+  processing: ['shipped', 'cancel_requested'],
+  shipped: ['out_for_delivery', 'delivered'],
   out_for_delivery: ['delivered'],
-  delivered:        [],
+  delivered: [],
   cancel_requested: ['cancelled', 'cancel_rejected'],
-  cancel_rejected:  [],
-  cancelled:        [],
+  cancel_rejected: [],
+  cancelled: [],
 }
 
 const VALID_PAYMENT_TRANSITIONS: Record<string, string[]> = {
-  pending:       ['paid', 'failed'],
-  unpaid:        ['paid', 'failed'],
-  paid:          ['refunded'],
-  failed:        ['paid', 'pending'],
-  refunded:      [],
-  cod_pending:   ['cod_collected', 'failed'],
+  pending: ['paid', 'failed'],
+  unpaid: ['paid', 'failed'],
+  paid: ['refunded'],
+  failed: ['paid', 'pending'],
+  refunded: [],
+  cod_pending: ['cod_collected', 'failed'],
   cod_collected: ['paid', 'refunded'],
 }
 
 const PAYMENT_ALLOWED_FOR_STATUS: Record<string, string[]> = {
-  pending:          ['pending', 'unpaid', 'cod_pending', 'failed'],
-  confirmed:        ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
-  processing:       ['paid', 'unpaid', 'cod_pending'],
-  shipped:          ['paid', 'cod_pending', 'cod_collected'],
+  pending: ['pending', 'unpaid', 'cod_pending', 'failed'],
+  confirmed: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  processing: ['paid', 'unpaid', 'cod_pending'],
+  shipped: ['paid', 'cod_pending', 'cod_collected'],
   out_for_delivery: ['paid', 'cod_pending', 'cod_collected'],
-  delivered:        ['paid', 'cod_collected'],
+  delivered: ['paid', 'cod_collected'],
   cancel_requested: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
-  cancel_rejected:  ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
-  cancelled:        ['paid', 'pending', 'unpaid', 'failed', 'refunded'],
+  cancel_rejected: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  cancelled: ['paid', 'pending', 'unpaid', 'failed', 'refunded'],
 }
 
 const ALL_STATUS_OPTIONS = [
-  { value: 'pending',          label: 'Pending' },
-  { value: 'confirmed',        label: 'Confirmed' },
-  { value: 'processing',       label: 'Processing' },
-  { value: 'shipped',          label: 'Shipped' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped', label: 'Shipped' },
   { value: 'out_for_delivery', label: 'Out for Delivery' },
-  { value: 'delivered',        label: 'Delivered' },
+  { value: 'delivered', label: 'Delivered' },
   { value: 'cancel_requested', label: 'Cancel Requested' },
-  { value: 'cancel_rejected',  label: 'Cancel Rejected' },
-  { value: 'cancelled',        label: 'Cancelled' },
+  { value: 'cancel_rejected', label: 'Cancel Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
 ]
 
 const ALL_PAYMENT_OPTIONS = [
-  { value: 'pending',       label: 'Pending' },
-  { value: 'unpaid',        label: 'Unpaid' },
-  { value: 'paid',          label: 'Paid' },
-  { value: 'failed',        label: 'Failed' },
-  { value: 'refunded',      label: 'Refunded' },
-  { value: 'cod_pending',   label: 'COD Pending' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'unpaid', label: 'Unpaid' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'refunded', label: 'Refunded' },
+  { value: 'cod_pending', label: 'COD Pending' },
   { value: 'cod_collected', label: 'COD Collected' },
 ]
 
@@ -76,15 +76,21 @@ const ALL_PAYMENT_OPTIONS = [
 // correcting a mis-set order needs them selectable.
 const OVERRIDE_ONLY_STATUS_OPTIONS = [
   { value: 'return_requested', label: 'Return Requested' },
-  { value: 'return_approved',  label: 'Return Approved' },
-  { value: 'return_received',  label: 'Return Received' },
-  { value: 'return_rejected',  label: 'Return Rejected' },
-  { value: 'returned',         label: 'Returned' },
+  { value: 'return_approved', label: 'Return Approved' },
+  { value: 'return_received', label: 'Return Received' },
+  { value: 'return_rejected', label: 'Return Rejected' },
+  { value: 'returned', label: 'Returned' },
 ]
 
 const MIN_REASON = 10
 
-export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus, canOverride = false, inventoryValidationEnabled = true }: UpdateOrderStatusProps) {
+export default function UpdateOrderStatus({
+  orderId,
+  currentStatus,
+  currentPaymentStatus,
+  canOverride = false,
+  inventoryValidationEnabled = true,
+}: UpdateOrderStatusProps) {
   const [status, setStatus] = useState(currentStatus)
   const [paymentStatus, setPaymentStatus] = useState(currentPaymentStatus)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -110,27 +116,31 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   const allowedForStatus = PAYMENT_ALLOWED_FOR_STATUS[status] ?? []
   const paymentOptions = overrideMode
     ? ALL_PAYMENT_OPTIONS
-    : ALL_PAYMENT_OPTIONS.filter(o =>
-        allowedPaymentStatuses.includes(o.value) && allowedForStatus.includes(o.value)
-      )
+    : ALL_PAYMENT_OPTIONS.filter(o => allowedPaymentStatuses.includes(o.value) && allowedForStatus.includes(o.value))
 
   useEffect(() => {
-    if (overrideMode) { setPaymentAutoResetNote(null); return }
+    if (overrideMode) {
+      setPaymentAutoResetNote(null)
+      return
+    }
     const allowed = PAYMENT_ALLOWED_FOR_STATUS[status] ?? []
     if (!allowed.includes(paymentStatus)) {
       const firstValid = allowedPaymentStatuses.find(ps => allowed.includes(ps))
       if (firstValid) {
         setPaymentStatus(firstValid)
-        setPaymentAutoResetNote(`Payment status reset to "${firstValid}" — not compatible with order status "${status}".`)
+        setPaymentAutoResetNote(
+          `Payment status reset to "${firstValid}" — not compatible with order status "${status}".`
+        )
       }
     } else {
       setPaymentAutoResetNote(null)
     }
   }, [status, overrideMode])
 
-  const crossFieldError = !overrideMode && !(PAYMENT_ALLOWED_FOR_STATUS[status] ?? []).includes(paymentStatus)
-    ? `Payment status "${paymentStatus}" is not valid for an order in "${status}" status.`
-    : null
+  const crossFieldError =
+    !overrideMode && !(PAYMENT_ALLOWED_FOR_STATUS[status] ?? []).includes(paymentStatus)
+      ? `Payment status "${paymentStatus}" is not valid for an order in "${status}" status.`
+      : null
 
   const reasonTooShort = overrideMode && overrideReason.trim().length < MIN_REASON
 
@@ -179,7 +189,10 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
     await submitUpdate(null)
   }
 
-  async function submitUpdate(batchAssignments: BatchAssignment[] | null, serialAssignments?: SerialAssignment[] | null) {
+  async function submitUpdate(
+    batchAssignments: BatchAssignment[] | null,
+    serialAssignments?: SerialAssignment[] | null
+  ) {
     setIsUpdating(true)
     setError(null)
     setSuccess(null)
@@ -233,25 +246,24 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
   const hasChanges = status !== currentStatus || paymentStatus !== currentPaymentStatus
 
-  const isTerminal = (VALID_STATUS_TRANSITIONS[currentStatus]?.length === 0) &&
-    (VALID_PAYMENT_TRANSITIONS[currentPaymentStatus]?.length === 0)
+  const isTerminal =
+    VALID_STATUS_TRANSITIONS[currentStatus]?.length === 0 &&
+    VALID_PAYMENT_TRANSITIONS[currentPaymentStatus]?.length === 0
 
   if (!canWrite) {
-    return (
-      <p className="text-sm text-foreground-muted">You do not have permission to modify this order.</p>
-    )
+    return <p className="text-sm text-foreground-muted">You do not have permission to modify this order.</p>
   }
 
   if (isTerminal && !canOverride) {
-    return (
-      <p className="text-sm text-foreground-muted">This order is in a terminal state and cannot be modified.</p>
-    )
+    return <p className="text-sm text-foreground-muted">This order is in a terminal state and cannot be modified.</p>
   }
 
   if (isTerminal && !overrideMode) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-foreground-muted">This order is in a terminal state and cannot be modified through the normal flow.</p>
+        <p className="text-sm text-foreground-muted">
+          This order is in a terminal state and cannot be modified through the normal flow.
+        </p>
         <button
           type="button"
           onClick={() => setOverrideMode(true)}
@@ -268,7 +280,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       {batchPickerItems && (
         <BatchPickerModal
           items={batchPickerItems}
-          onConfirm={(assignments) => {
+          onConfirm={assignments => {
             setBatchPickerItems(null)
             if (serialPickerItems) {
               // Chain: batch done → now collect serials
@@ -289,7 +301,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       {serialPickerItems && !batchPickerItems && (
         <SerialEntryModal
           items={serialPickerItems}
-          onConfirm={(assignments) => {
+          onConfirm={assignments => {
             setSerialPickerItems(null)
             submitUpdate(pendingBatchAssignments, assignments)
           }}
@@ -303,94 +315,108 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       )}
 
       <div className="space-y-4">
-      {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
+            {error}
+          </div>
+        )}
 
-      {success && (
-        <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-300 text-sm">
-          {success}
-        </div>
-      )}
+        {success && (
+          <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-300 text-sm">
+            {success}
+          </div>
+        )}
 
-      {paymentAutoResetNote && (
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-800 dark:text-blue-300 text-sm">
-          {paymentAutoResetNote}
-        </div>
-      )}
+        {paymentAutoResetNote && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-800 dark:text-blue-300 text-sm">
+            {paymentAutoResetNote}
+          </div>
+        )}
 
-      {canOverride && (
-        <div className="flex items-start justify-between gap-4 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">Override</div>
-            <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-              Set any status, ignoring the normal transition rules. Recorded in the audit log.
+        {canOverride && (
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">Override</div>
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                Set any status, ignoring the normal transition rules. Recorded in the audit log.
+              </p>
+            </div>
+            <div className="shrink-0 pt-0.5">
+              <Toggle
+                checked={overrideMode}
+                onChange={on => {
+                  setOverrideMode(on)
+                  setError(null)
+                  setPaymentAutoResetNote(null)
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {overrideMode && (
+          <div className="space-y-1">
+            <label className="block text-sm font-medium text-foreground">
+              Reason <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={overrideReason}
+              onChange={e => {
+                setOverrideReason(e.target.value)
+                setError(null)
+              }}
+              rows={2}
+              placeholder="Why is this override necessary? Recorded against your admin account."
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-background-secondary text-foreground resize-none"
+            />
+            <p className="text-xs text-foreground-muted">
+              {overrideReason.trim().length}/{MIN_REASON} minimum
             </p>
           </div>
-          <div className="shrink-0 pt-0.5">
-            <Toggle
-              checked={overrideMode}
-              onChange={(on) => { setOverrideMode(on); setError(null); setPaymentAutoResetNote(null) }}
-            />
-          </div>
-        </div>
-      )}
+        )}
 
-      {overrideMode && (
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-foreground">
-            Reason <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={overrideReason}
-            onChange={e => { setOverrideReason(e.target.value); setError(null) }}
-            rows={2}
-            placeholder="Why is this override necessary? Recorded against your admin account."
-            className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-background-secondary text-foreground resize-none"
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <AdminSelect
+            id="status"
+            label="Order Status"
+            value={status}
+            onChange={val => {
+              setStatus(val)
+              setError(null)
+            }}
+            options={statusOptions}
           />
-          <p className="text-xs text-foreground-muted">
-            {overrideReason.trim().length}/{MIN_REASON} minimum
-          </p>
+
+          <AdminSelect
+            id="payment_status"
+            label="Payment Status"
+            value={paymentStatus}
+            onChange={val => {
+              setPaymentStatus(val)
+              setError(null)
+              setPaymentAutoResetNote(null)
+            }}
+            options={paymentOptions}
+          />
         </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <AdminSelect
-          id="status"
-          label="Order Status"
-          value={status}
-          onChange={(val) => { setStatus(val); setError(null) }}
-          options={statusOptions}
-        />
+        {crossFieldError && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
+            {crossFieldError}
+          </div>
+        )}
 
-        <AdminSelect
-          id="payment_status"
-          label="Payment Status"
-          value={paymentStatus}
-          onChange={(val) => { setPaymentStatus(val); setError(null); setPaymentAutoResetNote(null) }}
-          options={paymentOptions}
-        />
+        <button
+          type="button"
+          onClick={handleUpdate}
+          disabled={isUpdating || !hasChanges || !!crossFieldError || reasonTooShort}
+          className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            overrideMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-accent-500 hover:bg-accent-600'
+          }`}
+        >
+          {isUpdating ? 'Updating...' : overrideMode ? 'Override Order Status' : 'Update Order'}
+        </button>
       </div>
-
-      {crossFieldError && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-          {crossFieldError}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={handleUpdate}
-        disabled={isUpdating || !hasChanges || !!crossFieldError || reasonTooShort}
-        className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          overrideMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-accent-500 hover:bg-accent-600'
-        }`}
-      >
-        {isUpdating ? 'Updating...' : overrideMode ? 'Override Order Status' : 'Update Order'}
-      </button>
-    </div>
     </>
   )
 }

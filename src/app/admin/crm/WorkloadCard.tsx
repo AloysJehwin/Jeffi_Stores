@@ -10,18 +10,30 @@ function Sparkline({ weeks }: { weeks: NotesWeek[] }) {
     <div className="flex items-end gap-1 h-10">
       {weeks.map(w => (
         <div key={w.week} className="flex-1 flex flex-col justify-end h-full" title={`${w.week}: ${w.count} notes`}>
-          <div className="w-full rounded-sm bg-accent-500/40" style={{ height: `${Math.max(w.count > 0 ? 8 : 2, Math.round((w.count / max) * 100))}%` }} />
+          <div
+            className="w-full rounded-sm bg-accent-500/40"
+            style={{ height: `${Math.max(w.count > 0 ? 8 : 2, Math.round((w.count / max) * 100))}%` }}
+          />
         </div>
       ))}
     </div>
   )
 }
 
-export default function WorkloadCard({ workload, tasksByAssignee, notesPerWeek }: {
-  workload: Workload; tasksByAssignee: Assignee[]; notesPerWeek: NotesWeek[]
+export default function WorkloadCard({
+  workload,
+  tasksByAssignee,
+  notesPerWeek,
+}: {
+  workload: Workload
+  tasksByAssignee: Assignee[]
+  notesPerWeek: NotesWeek[]
 }) {
-  const empty = workload.open === 0 && workload.overdue === 0 && tasksByAssignee.length === 0
-    && notesPerWeek.every(w => w.count === 0)
+  const empty =
+    workload.open === 0 &&
+    workload.overdue === 0 &&
+    tasksByAssignee.length === 0 &&
+    notesPerWeek.every(w => w.count === 0)
   if (empty) return null
 
   const rows = tasksByAssignee.map(a => ({
@@ -38,14 +50,20 @@ export default function WorkloadCard({ workload, tasksByAssignee, notesPerWeek }
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <CompactStat label="Open tasks" value={numStr(workload.open)} />
-        <CompactStat label="Overdue" value={numStr(workload.overdue)} tone={workload.overdue > 0 ? 'text-red-600 dark:text-red-400' : undefined} />
+        <CompactStat
+          label="Overdue"
+          value={numStr(workload.overdue)}
+          tone={workload.overdue > 0 ? 'text-red-600 dark:text-red-400' : undefined}
+        />
         <CompactStat label="Auto created" value={numStr(workload.openAuto)} />
         <CompactStat label="Median close time" value={hoursStr(workload.medianHours)} />
       </div>
 
       {rows.length > 0 && (
         <>
-          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-1">Open tasks by assignee</p>
+          <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-1">
+            Open tasks by assignee
+          </p>
           <ListRows rows={rows} />
         </>
       )}

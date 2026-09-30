@@ -52,7 +52,9 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
   const [overrides, setOverrides] = useState<Record<string, Record<string, number | boolean | string>>>({})
   const [savingKey, setSavingKey] = useState<string | null>(null)
 
-  useEffect(() => { load() }, [kind])
+  useEffect(() => {
+    load()
+  }, [kind])
 
   async function load() {
     setLoading(true)
@@ -114,7 +116,12 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
-        <Link href={ap('/admin/campaigns/scenarios')} className="text-foreground-muted hover:text-foreground transition-colors">Scenarios</Link>
+        <Link
+          href={ap('/admin/campaigns/scenarios')}
+          className="text-foreground-muted hover:text-foreground transition-colors"
+        >
+          Scenarios
+        </Link>
         <span className="text-foreground-muted">/</span>
         <span className="text-foreground font-medium">{scenario.name}</span>
       </div>
@@ -124,7 +131,9 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-foreground">{scenario.name}</h1>
-              <span className="px-2 py-0.5 text-xs font-mono rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">{scenario.kind}</span>
+              <span className="px-2 py-0.5 text-xs font-mono rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                {scenario.kind}
+              </span>
             </div>
             <p className="text-sm text-foreground-secondary mt-1">{scenario.description}</p>
           </div>
@@ -162,7 +171,9 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
       </div>
 
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Campaigns using this scenario ({campaigns.length})</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-3">
+          Campaigns using this scenario ({campaigns.length})
+        </h2>
         {campaigns.length === 0 ? (
           <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center">
             <p className="text-sm text-foreground-muted mb-4">No campaigns are using this scenario yet.</p>
@@ -185,11 +196,13 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="font-semibold text-foreground">{c.name}</h3>
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                          c.enabled
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                            c.enabled
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                          }`}
+                        >
                           {c.enabled ? 'Active' : 'Paused'}
                         </span>
                         {c.discount_percent > 0 && (
@@ -209,15 +222,40 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div><span className="text-foreground-muted">Sent: </span><span className="font-medium text-foreground tabular-nums">{c.total_sent.toLocaleString('en-IN')}</span></div>
-                    <div><span className="text-foreground-muted">Opened: </span><span className="font-medium text-foreground tabular-nums">{rate(c.total_opened, c.total_sent)}</span></div>
-                    <div><span className="text-foreground-muted">Clicked: </span><span className="font-medium text-foreground tabular-nums">{rate(c.total_clicked, c.total_sent)}</span></div>
-                    <div><span className="text-foreground-muted">Converted: </span><span className="font-medium text-green-600 dark:text-green-400 tabular-nums">{rate(c.total_converted, c.total_sent)}</span></div>
+                    <div>
+                      <span className="text-foreground-muted">Sent: </span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {c.total_sent.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-foreground-muted">Opened: </span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {rate(c.total_opened, c.total_sent)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-foreground-muted">Clicked: </span>
+                      <span className="font-medium text-foreground tabular-nums">
+                        {rate(c.total_clicked, c.total_sent)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-foreground-muted">Converted: </span>
+                      <span className="font-medium text-green-600 dark:text-green-400 tabular-nums">
+                        {rate(c.total_converted, c.total_sent)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-border-default">
-                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-2">Parameter overrides for this campaign</p>
-                    <p className="text-[10px] text-foreground-muted mb-3">Leave a field blank to use the scenario default. Only set values that should differ from the default.</p>
+                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-2">
+                      Parameter overrides for this campaign
+                    </p>
+                    <p className="text-[10px] text-foreground-muted mb-3">
+                      Leave a field blank to use the scenario default. Only set values that should differ from the
+                      default.
+                    </p>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {Object.entries(scenario.param_schema).map(([key, def]) => {
@@ -228,7 +266,11 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                           <div key={key}>
                             <label className="block text-xs font-semibold text-foreground-muted mb-1">
                               {def.label}
-                              {isOverridden && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">OVERRIDDEN</span>}
+                              {isOverridden && (
+                                <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
+                                  OVERRIDDEN
+                                </span>
+                              )}
                             </label>
                             {def.type === 'boolean' ? (
                               <AdminSelect
@@ -253,12 +295,19 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                                 onChange={e => {
                                   const raw = e.target.value
                                   if (raw === '') setOverrideValue(c.kind, key, null)
-                                  else setOverrideValue(c.kind, key, def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw))
+                                  else
+                                    setOverrideValue(
+                                      c.kind,
+                                      key,
+                                      def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw)
+                                    )
                                 }}
                                 className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                               />
                             )}
-                            {def.description && <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>}
+                            {def.description && (
+                              <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>
+                            )}
                             {(def.min !== undefined || def.max !== undefined) && (
                               <p className="text-[10px] text-foreground-muted mt-0.5">
                                 Range: {def.min ?? '-∞'} to {def.max ?? '∞'}

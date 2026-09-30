@@ -47,7 +47,9 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
   const canSubmit = accountNumber.length >= 9 && !mismatch && ifsc.length === 11 && holderName.trim().length > 0
 
   async function submit() {
-    setBusy(true); setError(null); setDone(null)
+    setBusy(true)
+    setError(null)
+    setDone(null)
     try {
       const res = await fetch('/api/ecom/bank/verify', {
         method: 'POST',
@@ -67,11 +69,14 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
           verificationRef: null,
           hasRouteAccount: !!data.pushedToRoute,
         })
-        setDone(data.pushedToRoute
-          ? 'Updated with the payment provider.'
-          : 'Saved. It will be sent to the payment provider when your store goes live.')
+        setDone(
+          data.pushedToRoute
+            ? 'Updated with the payment provider.'
+            : 'Saved. It will be sent to the payment provider when your store goes live.'
+        )
         setEditing(false)
-        setAccountNumber(''); setConfirmNumber('')
+        setAccountNumber('')
+        setConfirmNumber('')
       }
     } catch {
       setError('Network error — please try again.')
@@ -101,7 +106,10 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
           <p className="text-xs text-foreground-muted mt-3">{meta.blurb}</p>
           {done && <p className="text-xs text-green-700 dark:text-green-300 mt-2">{done}</p>}
           <button
-            onClick={() => { setEditing(true); setDone(null) }}
+            onClick={() => {
+              setEditing(true)
+              setDone(null)
+            }}
             className="mt-4 rounded-lg border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
           >
             {status === 'failed' ? 'Correct these details' : 'Change account'}
@@ -116,33 +124,55 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
           </p>
           <div>
             <label className={lbl}>Account number</label>
-            <input className={inp} value={accountNumber} inputMode="numeric" autoComplete="off"
-              onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))} />
+            <input
+              className={inp}
+              value={accountNumber}
+              inputMode="numeric"
+              autoComplete="off"
+              onChange={e => setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+            />
           </div>
           <div>
             <label className={lbl}>Re-enter account number</label>
-            <input className={inp} value={confirmNumber} inputMode="numeric" autoComplete="off"
-              onChange={(e) => setConfirmNumber(e.target.value.replace(/\D/g, '').slice(0, 18))} />
+            <input
+              className={inp}
+              value={confirmNumber}
+              inputMode="numeric"
+              autoComplete="off"
+              onChange={e => setConfirmNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
+            />
             {mismatch && <p className="text-xs text-red-600 dark:text-red-400 mt-1">The two numbers do not match.</p>}
           </div>
           <div>
             <label className={lbl}>IFSC</label>
-            <input className={inp} value={ifsc} maxLength={11}
-              onChange={(e) => setIfsc(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} />
+            <input
+              className={inp}
+              value={ifsc}
+              maxLength={11}
+              onChange={e => setIfsc(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            />
           </div>
           <div>
             <label className={lbl}>Account holder name</label>
-            <input className={inp} value={holderName} onChange={(e) => setHolderName(e.target.value)} />
+            <input className={inp} value={holderName} onChange={e => setHolderName(e.target.value)} />
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <div className="flex gap-2">
-            <button disabled={!canSubmit || busy} onClick={submit}
-              className="rounded-lg bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            <button
+              disabled={!canSubmit || busy}
+              onClick={submit}
+              className="rounded-lg bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
               {busy ? 'Checking…' : 'Save and verify'}
             </button>
             {bank && (
-              <button onClick={() => { setEditing(false); setError(null) }}
-                className="rounded-lg border border-border-default px-4 py-2 text-sm font-medium text-foreground">
+              <button
+                onClick={() => {
+                  setEditing(false)
+                  setError(null)
+                }}
+                className="rounded-lg border border-border-default px-4 py-2 text-sm font-medium text-foreground"
+              >
                 Cancel
               </button>
             )}

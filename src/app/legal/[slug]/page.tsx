@@ -4,15 +4,12 @@ import { getPolicyBySlug, policies } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/site-controls'
 
 export async function generateStaticParams() {
-  return policies.map((p) => ({ slug: p.slug }))
+  return policies.map(p => ({ slug: p.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const [policy, identity] = await Promise.all([
-    Promise.resolve(getPolicyBySlug(slug)),
-    getStoreIdentity(),
-  ])
+  const [policy, identity] = await Promise.all([Promise.resolve(getPolicyBySlug(slug)), getStoreIdentity()])
   if (!policy) return {}
   return {
     title: `${policy.title} | ${identity.name}`,
@@ -29,7 +26,10 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
     <div className="bg-surface min-h-screen">
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
-          <Link href="/legal" className="text-xs text-accent-500 hover:text-accent-600 font-semibold inline-flex items-center gap-1 mb-3">
+          <Link
+            href="/legal"
+            className="text-xs text-accent-500 hover:text-accent-600 font-semibold inline-flex items-center gap-1 mb-3"
+          >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -49,7 +49,11 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
               className="shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"
+                />
               </svg>
               Download PDF
             </a>
@@ -59,9 +63,15 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
 
       <div className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-6xl mx-auto space-y-4">
-
           {policy.sections.map((section, i) => (
-            <div key={i} id={section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} className="bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6">
+            <div
+              key={i}
+              id={section.heading
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '')}
+              className="bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6"
+            >
               <h2 className="text-base md:text-lg font-bold text-foreground mb-3">{section.heading}</h2>
               {Array.isArray(section.body) ? (
                 <ul className="space-y-2">
@@ -87,7 +97,6 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
               Contact Support
             </Link>
           </div>
-
         </div>
       </div>
     </div>

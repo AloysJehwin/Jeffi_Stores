@@ -78,7 +78,10 @@ export default function CustomerActionButton({
             {isLoading ? 'Flagging...' : 'Confirm Flag'}
           </button>
           <button
-            onClick={() => { setConfirm(null); setFlagReason('') }}
+            onClick={() => {
+              setConfirm(null)
+              setFlagReason('')
+            }}
             disabled={isLoading}
             className="px-4 py-2 text-foreground-secondary hover:text-foreground text-sm font-medium transition-colors"
           >
@@ -133,32 +136,32 @@ export default function CustomerActionButton({
 
   return (
     <RequireWrite scope="customers:write">
-    <div className="flex flex-wrap gap-3">
-      {(isActive || isFlagged) && (
-        <button
-          onClick={() => setConfirm('activate')}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Reactivate
-        </button>
-      )}
-      {isActive && !isFlagged && (
-        <button
-          onClick={() => setConfirm('deactivate')}
-          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Deactivate
-        </button>
-      )}
-      {!isFlagged && (
-        <button
-          onClick={() => setConfirm('flag')}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Flag as Suspicious
-        </button>
-      )}
-    </div>
+      <div className="flex flex-wrap gap-3">
+        {(isActive || isFlagged) && (
+          <button
+            onClick={() => setConfirm('activate')}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Reactivate
+          </button>
+        )}
+        {isActive && !isFlagged && (
+          <button
+            onClick={() => setConfirm('deactivate')}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Deactivate
+          </button>
+        )}
+        {!isFlagged && (
+          <button
+            onClick={() => setConfirm('flag')}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Flag as Suspicious
+          </button>
+        )}
+      </div>
     </RequireWrite>
   )
 }

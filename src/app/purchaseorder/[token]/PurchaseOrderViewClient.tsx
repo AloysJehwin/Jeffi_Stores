@@ -64,19 +64,22 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-
         {/* Header */}
         <div className="bg-[#1a3a4a] text-white px-6 py-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">PURCHASE ORDER</h1>
             <p className="text-[#7ecde4] font-mono text-sm mt-0.5">#{po.po_number}</p>
             <div className="text-sm mt-1 space-y-0.5">
-              <div className="text-gray-300">Date: <span className="text-white font-medium">{fmtDate(po.order_date)}</span></div>
+              <div className="text-gray-300">
+                Date: <span className="text-white font-medium">{fmtDate(po.order_date)}</span>
+              </div>
               {po.expected_date && (
                 <div className="text-gray-400 text-xs">Expected by: {fmtDate(po.expected_date)}</div>
               )}
               {po.status === 'draft' && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-400/20 text-yellow-300 text-xs font-semibold rounded">Draft</span>
+                <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-400/20 text-yellow-300 text-xs font-semibold rounded">
+                  Draft
+                </span>
               )}
             </div>
           </div>
@@ -93,7 +96,12 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
               </svg>
             ) : (
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
             )}
             Download PDF
@@ -101,7 +109,6 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
         </div>
 
         <div className="p-5 sm:p-6 space-y-6">
-
           {/* From + Supplier */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
@@ -158,14 +165,20 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                       <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
                       <td className="px-4 py-3 text-gray-800 font-medium leading-snug">
                         {label}
-                        {item.sku && <div className="text-xs text-gray-400 font-normal mt-0.5">{item.sku}<CopySku sku={item.sku} className="ml-1" /></div>}
+                        {item.sku && (
+                          <div className="text-xs text-gray-400 font-normal mt-0.5">
+                            {item.sku}
+                            <CopySku sku={item.sku} className="ml-1" />
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-700 font-medium">
                         {fmt(purchaseQty, purchaseQty % 1 === 0 ? 0 : 3)}
                         <span className="ml-1 text-gray-400 text-xs">{purchaseUnit}</span>
                         {purchaseFactor > 1 && (
                           <div className="text-xs text-gray-400 font-normal">
-                            1 {purchaseUnit} = {fmt(purchaseFactor, purchaseFactor % 1 === 0 ? 0 : 3)} {item.base_unit || 'units'}
+                            1 {purchaseUnit} = {fmt(purchaseFactor, purchaseFactor % 1 === 0 ? 0 : 3)}{' '}
+                            {item.base_unit || 'units'}
                           </div>
                         )}
                       </td>
@@ -181,9 +194,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                       </td>
                       <td className="px-4 py-3 text-right text-gray-500">
                         {taxRate > 0 ? `${taxRate}%` : '—'}
-                        {item.gst_inclusive && taxRate > 0 && (
-                          <div className="text-xs text-gray-400">(incl.)</div>
-                        )}
+                        {item.gst_inclusive && taxRate > 0 && <div className="text-xs text-gray-400">(incl.)</div>}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-800 font-semibold">₹{fmt(lineTotal)}</td>
                     </tr>
@@ -200,12 +211,13 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                 <span className="text-gray-500">Subtotal (excl. GST)</span>
                 <span className="text-gray-700 font-medium">₹{fmt(subtotal)}</span>
               </div>
-              {hasGst && Object.entries(gstLines).map(([rate, { gst }]) => (
-                <div key={rate} className="flex justify-between px-4 py-2 text-gray-500">
-                  <span>GST @ {rate}%</span>
-                  <span>₹{fmt(gst)}</span>
-                </div>
-              ))}
+              {hasGst &&
+                Object.entries(gstLines).map(([rate, { gst }]) => (
+                  <div key={rate} className="flex justify-between px-4 py-2 text-gray-500">
+                    <span>GST @ {rate}%</span>
+                    <span>₹{fmt(gst)}</span>
+                  </div>
+                ))}
               <div className="flex justify-between px-4 py-3 bg-[#1a3a4a] text-white font-bold">
                 <span>Total</span>
                 <span>₹{fmt(total)}</span>
@@ -227,7 +239,9 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                           <span className="font-mono text-xs font-semibold text-gray-700">{grn.grn_number}</span>
                           <span className="text-xs text-gray-500">{fmtDate(grn.received_date)}</span>
                         </div>
-                        {grn.notes && <span className="text-xs text-gray-400 italic truncate max-w-xs">{grn.notes}</span>}
+                        {grn.notes && (
+                          <span className="text-xs text-gray-400 italic truncate max-w-xs">{grn.notes}</span>
+                        )}
                       </div>
                       <div className="divide-y divide-gray-100">
                         {grnItems.map((gi: any, idx: number) => {
@@ -236,13 +250,9 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                           const recvBase = Number(gi.quantity_received) || 0
                           const recvPu = factor > 1 ? Math.round((recvBase / factor) * 1000) / 1000 : recvBase
                           const puLabel = matchItem?.purchase_unit || matchItem?.base_unit || 'unit'
-                          const productLabel = matchItem
-                            ? grainLabel(matchItem)
-                            : `Item #${idx + 1}`
+                          const productLabel = matchItem ? grainLabel(matchItem) : `Item #${idx + 1}`
                           const taxRate = Number(gi.tax_rate ?? matchItem?.tax_rate) || 0
-                          const costPerPu = gi.unit_cost
-                            ? Number(gi.unit_cost) * factor * (1 + taxRate / 100)
-                            : null
+                          const costPerPu = gi.unit_cost ? Number(gi.unit_cost) * factor * (1 + taxRate / 100) : null
                           return (
                             <div key={idx} className="flex items-center justify-between px-4 py-2">
                               <span className="text-gray-600">{productLabel}</span>
@@ -251,7 +261,11 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                                   {fmt(recvPu, recvPu % 1 === 0 ? 0 : 3)}
                                   <span className="ml-1 text-xs text-gray-400">{puLabel}</span>
                                 </span>
-                                {costPerPu != null && <span className="text-xs text-gray-400">@ ₹{fmt(costPerPu)}/{puLabel}</span>}
+                                {costPerPu != null && (
+                                  <span className="text-xs text-gray-400">
+                                    @ ₹{fmt(costPerPu)}/{puLabel}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )
@@ -277,10 +291,30 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
               <p className="font-semibold text-gray-600 mb-2">Bank Details</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-gray-500">
-                {settings.bank_name && <><span className="text-gray-400">Bank</span><span>{settings.bank_name}</span></>}
-                {settings.bank_account && <><span className="text-gray-400">Account No.</span><span className="font-mono">{settings.bank_account}</span></>}
-                {settings.bank_ifsc && <><span className="text-gray-400">IFSC</span><span className="font-mono">{settings.bank_ifsc}</span></>}
-                {settings.bank_branch && <><span className="text-gray-400">Branch</span><span>{settings.bank_branch}</span></>}
+                {settings.bank_name && (
+                  <>
+                    <span className="text-gray-400">Bank</span>
+                    <span>{settings.bank_name}</span>
+                  </>
+                )}
+                {settings.bank_account && (
+                  <>
+                    <span className="text-gray-400">Account No.</span>
+                    <span className="font-mono">{settings.bank_account}</span>
+                  </>
+                )}
+                {settings.bank_ifsc && (
+                  <>
+                    <span className="text-gray-400">IFSC</span>
+                    <span className="font-mono">{settings.bank_ifsc}</span>
+                  </>
+                )}
+                {settings.bank_branch && (
+                  <>
+                    <span className="text-gray-400">Branch</span>
+                    <span>{settings.bank_branch}</span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -289,7 +323,6 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
           <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100">
             This is a computer-generated purchase order. For queries contact {settings.business_email || tradeName}.
           </div>
-
         </div>
       </div>
     </div>

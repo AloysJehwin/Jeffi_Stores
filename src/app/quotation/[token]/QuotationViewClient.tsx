@@ -46,7 +46,7 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
   }, 0)
   const itemsCgst = items.reduce((s: number, i: any) => {
     const base = Number(i.amount) / (1 + Number(i.gst_rate) / 100)
-    return s + base * (Number(i.gst_rate) / 100) / 2
+    return s + (base * (Number(i.gst_rate) / 100)) / 2
   }, 0)
   const itemsSgst = itemsCgst
 
@@ -65,19 +65,20 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-
         {/* Header */}
         <div className="bg-[#1a3a4a] text-white px-6 py-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">QUOTATION</h1>
             <p className="text-[#7ecde4] font-mono text-sm mt-0.5">#{qt.quote_number}</p>
             <div className="text-sm mt-1 space-y-0.5">
-              <div className="text-gray-300">Date: <span className="text-white font-medium">{fmtDate(qt.quote_date)}</span></div>
-              {qt.valid_until && (
-                <div className="text-gray-400 text-xs">Valid until: {fmtDate(qt.valid_until)}</div>
-              )}
+              <div className="text-gray-300">
+                Date: <span className="text-white font-medium">{fmtDate(qt.quote_date)}</span>
+              </div>
+              {qt.valid_until && <div className="text-gray-400 text-xs">Valid until: {fmtDate(qt.valid_until)}</div>}
               {qt.status === 'draft' && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-400/20 text-yellow-300 text-xs font-semibold rounded">Draft</span>
+                <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-400/20 text-yellow-300 text-xs font-semibold rounded">
+                  Draft
+                </span>
               )}
             </div>
           </div>
@@ -91,7 +92,6 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
         </div>
 
         <div className="p-5 sm:p-6 space-y-6">
-
           {/* Seller + Consignee */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* From (seller) */}
@@ -114,7 +114,10 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
               {qt.consignee_addr1 && <p className="text-gray-500 mt-0.5">{qt.consignee_addr1}</p>}
               {qt.consignee_addr2 && <p className="text-gray-500">{qt.consignee_addr2}</p>}
               {(qt.consignee_city || qt.consignee_state) && (
-                <p className="text-gray-500">{[qt.consignee_city, qt.consignee_state].filter(Boolean).join(', ')}{qt.consignee_pincode ? ` - ${qt.consignee_pincode}` : ''}</p>
+                <p className="text-gray-500">
+                  {[qt.consignee_city, qt.consignee_state].filter(Boolean).join(', ')}
+                  {qt.consignee_pincode ? ` - ${qt.consignee_pincode}` : ''}
+                </p>
               )}
               {qt.consignee_gstin && <p className="text-gray-500 mt-0.5">GSTIN: {qt.consignee_gstin}</p>}
               {qt.consignee_phone && <p className="text-gray-500 mt-0.5">Ph: {qt.consignee_phone}</p>}
@@ -129,7 +132,10 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
                 {qt.buyer_addr1 && <p className="text-gray-500 mt-0.5">{qt.buyer_addr1}</p>}
                 {qt.buyer_addr2 && <p className="text-gray-500">{qt.buyer_addr2}</p>}
                 {(qt.buyer_city || qt.buyer_state) && (
-                  <p className="text-gray-500">{[qt.buyer_city, qt.buyer_state].filter(Boolean).join(', ')}{qt.buyer_pincode ? ` - ${qt.buyer_pincode}` : ''}</p>
+                  <p className="text-gray-500">
+                    {[qt.buyer_city, qt.buyer_state].filter(Boolean).join(', ')}
+                    {qt.buyer_pincode ? ` - ${qt.buyer_pincode}` : ''}
+                  </p>
                 )}
                 {qt.buyer_gstin && <p className="text-gray-500 mt-0.5">GSTIN: {qt.buyer_gstin}</p>}
                 {qt.buyer_phone && <p className="text-gray-500 mt-0.5">Ph: {qt.buyer_phone}</p>}
@@ -161,10 +167,14 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
                     <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
                     <td className="px-4 py-3 text-gray-800 font-medium leading-snug">{item.description}</td>
                     <td className="px-4 py-3 text-right text-gray-500 text-xs">{item.hsn_code || '—'}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{Number(item.quantity)} {item.unit}</td>
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {Number(item.quantity)} {item.unit}
+                    </td>
                     <td className="px-4 py-3 text-right text-gray-600">₹{fmt(item.rate)}</td>
                     {items.some(i => Number(i.discount_pct) > 0) && (
-                      <td className="px-4 py-3 text-right text-gray-500">{Number(item.discount_pct) > 0 ? `${item.discount_pct}%` : '—'}</td>
+                      <td className="px-4 py-3 text-right text-gray-500">
+                        {Number(item.discount_pct) > 0 ? `${item.discount_pct}%` : '—'}
+                      </td>
                     )}
                     <td className="px-4 py-3 text-right text-gray-500">{item.gst_rate}%</td>
                     <td className="px-4 py-3 text-right text-gray-800 font-semibold">₹{fmt(item.amount)}</td>
@@ -219,10 +229,30 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
               <p className="font-semibold text-gray-600 mb-2">Bank Details</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-gray-500">
-                {settings.bank_name && <><span className="text-gray-400">Bank</span><span>{settings.bank_name}</span></>}
-                {settings.bank_account && <><span className="text-gray-400">Account No.</span><span className="font-mono">{settings.bank_account}</span></>}
-                {settings.bank_ifsc && <><span className="text-gray-400">IFSC</span><span className="font-mono">{settings.bank_ifsc}</span></>}
-                {settings.bank_branch && <><span className="text-gray-400">Branch</span><span>{settings.bank_branch}</span></>}
+                {settings.bank_name && (
+                  <>
+                    <span className="text-gray-400">Bank</span>
+                    <span>{settings.bank_name}</span>
+                  </>
+                )}
+                {settings.bank_account && (
+                  <>
+                    <span className="text-gray-400">Account No.</span>
+                    <span className="font-mono">{settings.bank_account}</span>
+                  </>
+                )}
+                {settings.bank_ifsc && (
+                  <>
+                    <span className="text-gray-400">IFSC</span>
+                    <span className="font-mono">{settings.bank_ifsc}</span>
+                  </>
+                )}
+                {settings.bank_branch && (
+                  <>
+                    <span className="text-gray-400">Branch</span>
+                    <span>{settings.bank_branch}</span>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -231,7 +261,6 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
           <div className="text-center text-xs text-gray-400 pt-2 border-t border-gray-100">
             This is a computer-generated quotation. For queries contact {settings.business_email || tradeName}.
           </div>
-
         </div>
       </div>
     </div>

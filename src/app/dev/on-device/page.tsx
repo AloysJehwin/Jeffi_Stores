@@ -12,8 +12,8 @@ export default function OnDeviceDevPage() {
       <h1 className="text-lg font-bold text-foreground">On-device capability check</h1>
       <OnDeviceCapabilityDebug />
       <p className="text-xs text-foreground-muted max-w-sm text-center">
-        This checks WebGPU, device memory and GPU limits. The Gemma 3 270M
-        checkout summary only runs on devices that report CAPABLE.
+        This checks WebGPU, device memory and GPU limits. The Gemma 3 270M checkout summary only runs on devices that
+        report CAPABLE.
       </p>
     </div>
   )
