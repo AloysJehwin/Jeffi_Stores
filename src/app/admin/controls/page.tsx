@@ -1,5 +1,5 @@
 import { getAllCategories, getAllBrands } from '@/lib/queries'
-import { getSpecFilterFields } from '@/lib/product-attribute-filters.server'
+import { getSpecFilterFields } from '@/lib/product-attribute-filters'
 import ControlsClient from './ControlsClient'
 
 export const dynamic = 'force-dynamic'

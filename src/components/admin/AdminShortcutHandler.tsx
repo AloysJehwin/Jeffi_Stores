@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { KeyboardShortcuts } from '@/lib/site-controls'
+import type { KeyboardShortcuts } from '@/lib/site-controls'
 import { hasScope } from '@/lib/scopes'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
 import { ap } from '@/lib/admin-path'

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { CompactStat, rsCompact, rs, numStr, pctStr, daysStr, Chip } from '@/components/admin/dashboard/Primitives'
-import { CRM_SEGMENT_KEYS } from '@/lib/crm-insights-sql'
+import { CRM_SEGMENT_KEYS } from '@/lib/crm-insights-shared'
 import type { Economics, SegmentRate, SegmentReturn, CrmSegmentKey } from '@/lib/crm-insights-shared'
 
 const SEGMENT_LABEL: Record<CrmSegmentKey, string> = {

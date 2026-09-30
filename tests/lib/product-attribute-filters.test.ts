@@ -5,10 +5,10 @@ vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
 import { queryMany } from '@/lib/db'
 import {
   ADMIN_PRODUCT_FILTER_FIELDS, filterParamNames, joinFilterValues, specKeyFromParam, specParam, splitFilterValues,
-} from '@/lib/product-attribute-filters'
+} from '@/lib/product-attribute-filters-shared'
 import {
   buildAttributeFilterClauses, getAttributeValues, getSpecFilterFields,
-} from '@/lib/product-attribute-filters.server'
+} from '@/lib/product-attribute-filters'
 
 beforeEach(() => {
   vi.clearAllMocks()

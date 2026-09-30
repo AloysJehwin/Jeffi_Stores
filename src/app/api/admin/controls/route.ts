@@ -4,7 +4,7 @@ import { round2 } from '@/lib/gst'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/s3'
-import { buildAttributeFilterClauses } from '@/lib/product-attribute-filters.server'
+import { buildAttributeFilterClauses } from '@/lib/product-attribute-filters'
 import { buildProductSearchClause } from '@/lib/search'
 
 type SnapshotRow = {

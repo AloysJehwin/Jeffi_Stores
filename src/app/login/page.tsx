@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
 export default function LoginPageWrapper() {

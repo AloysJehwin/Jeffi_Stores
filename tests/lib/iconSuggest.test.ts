@@ -4,7 +4,7 @@ const { mockAiChat } = vi.hoisted(() => ({ mockAiChat: vi.fn() }))
 
 vi.mock('@/lib/ai-client', () => ({ aiChat: mockAiChat }))
 
-import { suggestIcon, ICON_OPTIONS } from '@/lib/iconSuggest'
+import { suggestIcon, ICON_OPTIONS } from '@/lib/icon-suggest'
 
 function makeAiResponse(content: string) {
   return { content, provider: 'ollama', model: 'm', latencyMs: 1, fallbackUsed: false }

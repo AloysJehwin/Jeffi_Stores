@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 import { ChevronLeft } from 'lucide-react'
 
 async function createCategory(formData: FormData) {

@@ -1,3 +1,4 @@
+import 'server-only'
 const PDFDocument = eval('require')('pdfkit')
 
 export interface ReceiptBusinessSettings {

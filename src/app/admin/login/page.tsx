@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 type Step = 'identity' | 'verify' | 'enroll'

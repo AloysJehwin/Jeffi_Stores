@@ -1,3 +1,4 @@
+import 'server-only'
 // eslint-disable-next-line no-eval
 const PDFDocument = eval('require')('pdfkit')
 // eslint-disable-next-line no-eval

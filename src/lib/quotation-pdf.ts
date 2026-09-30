@@ -1,3 +1,4 @@
+import 'server-only'
 import path from 'path'
 const PDFDocument = eval('require')('pdfkit')
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 import { canUseAi } from '@/lib/ai-scope'
 import { revalidatePath } from 'next/cache'
 

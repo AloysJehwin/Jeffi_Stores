@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/business-path'
 

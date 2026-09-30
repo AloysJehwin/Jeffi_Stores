@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ap } from '@/lib/admin-path'
-import { subscribeAdminEvents } from '@/lib/admin-events-client'
+import { subscribeAdminEvents } from '@/lib/client/admin-events-client'
 
 interface Notification {
   id: string

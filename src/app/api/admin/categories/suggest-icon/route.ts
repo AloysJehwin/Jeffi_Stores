@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 import { authenticateAdmin } from '@/lib/jwt'
 import { aiDenial } from '@/lib/ai-scope'
 
