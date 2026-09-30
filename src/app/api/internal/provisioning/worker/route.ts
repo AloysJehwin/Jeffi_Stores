@@ -3,6 +3,7 @@ import { activeProvisioningJobs, getProvisioningJob, controlPlanePool } from '@/
 import { advanceProvisioningJob } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
 import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +13,7 @@ export const dynamic = 'force-dynamic'
 // fire, so a job that parks on the ~10-min RDS wait needs an out-of-band driver to keep moving
 // it. Idempotent per step. Auth: Bearer ${CRON_SECRET}.
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

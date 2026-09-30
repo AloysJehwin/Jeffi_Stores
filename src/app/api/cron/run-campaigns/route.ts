@@ -5,6 +5,7 @@ import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 import { runCustomScenario } from '@/lib/campaigns/custom-runner'
 import { getCampaign } from '@/lib/marketing'
 import type { SweepResult } from '@/lib/campaigns/types'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +16,7 @@ interface CampaignRow {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

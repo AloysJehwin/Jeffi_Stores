@@ -3,6 +3,7 @@ import { query, queryMany } from '@/lib/db'
 import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { logAdminAudit } from '@/lib/admin-audit'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,11 +13,8 @@ export const dynamic = 'force-dynamic'
 // Never trusts x-service-account-id from the caller — that header is internal only.
 // -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-
   const sa = await authenticateServiceAccount(request)
-  const cronOk = !!cronSecret && authHeader === `Bearer ${cronSecret}`
+  const cronOk = verifyCronRequest(request)
 
   if (!sa && !cronOk) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

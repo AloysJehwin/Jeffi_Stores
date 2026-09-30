@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runMigrationFilesFanout } from '@/lib/tenant-migrations'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 // The fan-out opens a connection per tenant and applies each pending migration file.
@@ -12,9 +13,7 @@ export const maxDuration = 300
 // customer database rather than only the flagship. Idempotent — each tenant DB's own
 // schema_migrations ledger decides which files are still pending, so re-calls are safe.
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { reverseTransfersForRefund } from '@/lib/razorpay-route'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +19,7 @@ export const dynamic = 'force-dynamic'
 const UNRECOVERED_NOTE = 'Refund NOT reversed (owed by tenant)%'
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

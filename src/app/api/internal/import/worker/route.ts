@@ -5,6 +5,7 @@ import { runWithTenantContext, type TenantContext } from '@/lib/tenant-context'
 import { getImportFile } from '@/lib/s3'
 import { runImport } from '@/lib/product-import'
 import { upsertSheetLinks, computeOrphans } from '@/lib/import/sheet-links'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,8 +16,7 @@ export const runtime = 'nodejs'
 // written back to import_jobs as each product group completes. Driven by instrumentation.ts.
 // Auth: Bearer ${CRON_SECRET}.
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get('authorization')
-  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

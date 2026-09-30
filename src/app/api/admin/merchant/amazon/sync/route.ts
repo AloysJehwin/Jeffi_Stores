@@ -8,6 +8,7 @@ import {
   validateProductForAmazon,
   dryRunAmazonSync,
 } from '@/lib/amazon/sync'
+import { verifyCronRequest } from '@/lib/cron-auth'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300
@@ -79,9 +80,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
+  const isCron = verifyCronRequest(request)
 
   if (!isCron) {
     const admin = await authenticateAdmin(request)
