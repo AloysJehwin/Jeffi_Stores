@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import { useToast } from '@/contexts/ToastContext'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -156,12 +157,12 @@ export default function OnboardWizard({
   reusingPreviousDetails?: boolean
 }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const init = initialDraft?.data ?? {}
 
   const [step, setStep] = useState<StepIdx>((initialDraft?.current_step as StepIdx) ?? 0)
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
 
   // Step 0 — Plan
   const [planSlug, setPlanSlug] = useState<string>(init.planSlug ?? plans[0]?.slug ?? 'basic')
@@ -322,7 +323,6 @@ export default function OnboardWizard({
   async function goTo(next: StepIdx) {
     await autosave(next)
     setStep(next)
-    setErr(null)
   }
 
   // ── GST cert upload ──────────────────────────────────────────────────────────
@@ -412,7 +412,6 @@ export default function OnboardWizard({
   // ── Final submit ─────────────────────────────────────────────────────────────
   async function submit() {
     setBusy(true)
-    setErr(null)
     try {
       const res = await fetch('/api/ecom/onboard/submit', {
         method: 'POST',
@@ -447,7 +446,7 @@ export default function OnboardWizard({
       })
       const data = await res.json()
       if (!res.ok) {
-        setErr(data.error || 'Submission failed')
+        showToast(data.error || 'Submission failed', 'error')
         return
       }
       // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
@@ -455,7 +454,7 @@ export default function OnboardWizard({
       router.push('/onboard')
       router.refresh()
     } catch {
-      setErr('Network error')
+      showToast('Network error', 'error')
     } finally {
       setBusy(false)
     }
@@ -1345,7 +1344,6 @@ export default function OnboardWizard({
                 After submitting, our team will review your GST certificate (1–2 business days). You&apos;ll receive an
                 email when approved — then you&apos;ll complete payment and your store goes live.
               </div>
-              {err && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{err}</p>}
               <button
                 onClick={submit}
                 disabled={busy}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 import type { TenantRow } from '@/lib/tenant-registry'
 
 interface Plan {
@@ -35,13 +36,12 @@ export default function BillingClient({
   renewalDate: string | null
 }) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [selectedPlan, setSelectedPlan] = useState(tenant.plan ?? 'basic')
   const [interval, setInterval] = useState<Interval>((tenant.billing_interval as Interval) ?? 'monthly')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [cancelBusy, setCancelBusy] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
-  const [cancelMsg, setCancelMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const currentTier = plans.find(p => p.slug === tenant.plan)?.tier ?? 1
   const newTier = plans.find(p => p.slug === selectedPlan)?.tier ?? 1
@@ -56,7 +56,6 @@ export default function BillingClient({
   async function changePlan() {
     if (unchanged) return
     setBusy(true)
-    setMsg(null)
     try {
       const res = await fetch('/api/ecom/billing/change-plan', {
         method: 'POST',
@@ -65,7 +64,7 @@ export default function BillingClient({
       })
       const data = await res.json()
       if (!res.ok) {
-        setMsg({ ok: false, text: data.error || 'Failed to change plan' })
+        showToast(data.error || 'Failed to change plan', 'error')
         return
       }
 
@@ -81,10 +80,10 @@ export default function BillingClient({
             year: 'numeric',
           })
         : 'next renewal'
-      setMsg({ ok: true, text: `Plan change scheduled — takes effect on ${effectiveDate}.` })
+      showToast(`Plan change scheduled — takes effect on ${effectiveDate}.`, 'success')
       router.refresh()
     } catch {
-      setMsg({ ok: false, text: 'Network error' })
+      showToast('Network error', 'error')
     } finally {
       setBusy(false)
     }
@@ -97,7 +96,6 @@ export default function BillingClient({
 
   async function cancelSubscription() {
     setCancelBusy(true)
-    setCancelMsg(null)
     try {
       const res = await fetch('/api/ecom/provisioning', {
         method: 'POST',
@@ -106,17 +104,17 @@ export default function BillingClient({
       })
       const data = await res.json()
       if (!res.ok) {
-        setCancelMsg({ ok: false, text: data.error || 'Failed to cancel' })
+        showToast(data.error || 'Failed to cancel', 'error')
         return
       }
-      setCancelMsg({
-        ok: true,
-        text: 'Subscription cancelled — your store stays live until the end of the current billing cycle, then closes.',
-      })
+      showToast(
+        'Subscription cancelled — your store stays live until the end of the current billing cycle, then closes.',
+        'success'
+      )
       setConfirmCancel(false)
       router.refresh()
     } catch {
-      setCancelMsg({ ok: false, text: 'Network error' })
+      showToast('Network error', 'error')
     } finally {
       setCancelBusy(false)
     }
@@ -237,14 +235,6 @@ export default function BillingClient({
           </div>
         )}
 
-        {msg && (
-          <p
-            className={`text-sm mb-3 ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-          >
-            {msg.text}
-          </p>
-        )}
-
         <button
           onClick={changePlan}
           disabled={busy || unchanged}
@@ -264,19 +254,9 @@ export default function BillingClient({
             Cancelling stops future billing. Your store stays live until the end of the current billing cycle, then it
             is closed and its data is backed up.
           </p>
-          {cancelMsg && (
-            <p
-              className={`text-sm mb-3 ${cancelMsg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-            >
-              {cancelMsg.text}
-            </p>
-          )}
           {!confirmCancel ? (
             <button
-              onClick={() => {
-                setConfirmCancel(true)
-                setCancelMsg(null)
-              }}
+              onClick={() => setConfirmCancel(true)}
               className="px-5 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold transition-colors"
             >
               Cancel subscription

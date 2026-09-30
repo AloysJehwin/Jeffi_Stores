@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Domain {
   id: string
@@ -18,12 +19,11 @@ export default function CustomDomains({
   slug: string
   maxDomains: number
 }) {
+  const { showToast } = useToast()
   const [domains, setDomains] = useState<Domain[]>([])
   const [cnameTarget, setCnameTarget] = useState(`${slug}.jeffistores.in`)
   const [newDomain, setNewDomain] = useState('')
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
 
   async function load() {
     const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}`)
@@ -40,8 +40,6 @@ export default function CustomDomains({
 
   async function addDomain() {
     setBusy(true)
-    setErr(null)
-    setMsg(null)
     const res = await fetch('/api/ecom/domains', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -49,24 +47,22 @@ export default function CustomDomains({
     })
     const data = await res.json()
     if (!res.ok) {
-      setErr(data.error)
+      showToast(data.error, 'error')
       setBusy(false)
       return
     }
     setNewDomain('')
-    setMsg(data.instructions)
+    showToast(data.instructions, 'info')
     await load()
     setBusy(false)
   }
 
   async function verify(id: string) {
     setBusy(true)
-    setErr(null)
-    setMsg(null)
     const res = await fetch(`/api/ecom/domains/${id}/verify`, { method: 'POST' })
     const data = await res.json()
-    if (!res.ok) setErr(data.error)
-    else setMsg(data.message)
+    if (!res.ok) showToast(data.error, 'error')
+    else showToast(data.message, 'success')
     await load()
     setBusy(false)
   }
@@ -140,9 +136,6 @@ export default function CustomDomains({
           </p>
         </div>
       )}
-
-      {err && <p className="text-sm text-red-600 dark:text-red-400 mt-2">{err}</p>}
-      {msg && <p className="text-sm text-green-600 dark:text-green-400 mt-2">{msg}</p>}
     </div>
   )
 }

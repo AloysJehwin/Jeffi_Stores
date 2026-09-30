@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function DeliveryAccount({
   tenantId,
@@ -11,15 +12,14 @@ export default function DeliveryAccount({
   ownDelhivery: boolean
   tokenConnected: boolean
 }) {
+  const { showToast } = useToast()
   const [connected, setConnected] = useState(tokenConnected)
   const [open, setOpen] = useState(false)
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const save = async () => {
     setBusy(true)
-    setMsg(null)
     try {
       const res = await fetch('/api/ecom/delivery-account', {
         method: 'PUT',
@@ -31,9 +31,9 @@ export default function DeliveryAccount({
       setConnected(true)
       setToken('')
       setOpen(false)
-      setMsg({ ok: true, text: 'Delhivery token verified and saved. New shipments use it right away.' })
+      showToast('Delhivery token verified and saved. New shipments use it right away.', 'success')
     } catch (err: any) {
-      setMsg({ ok: false, text: err.message })
+      showToast(err.message, 'error')
     } finally {
       setBusy(false)
     }
@@ -103,7 +103,6 @@ export default function DeliveryAccount({
                   onClick={() => {
                     setOpen(false)
                     setToken('')
-                    setMsg(null)
                   }}
                   disabled={busy}
                   className="px-4 py-2 rounded-lg text-sm text-foreground-secondary hover:text-foreground disabled:opacity-50"
@@ -115,24 +114,13 @@ export default function DeliveryAccount({
           ) : (
             <button
               type="button"
-              onClick={() => {
-                setOpen(true)
-                setMsg(null)
-              }}
+              onClick={() => setOpen(true)}
               className="mt-3 text-sm font-medium text-accent-600 dark:text-accent-400 hover:underline"
             >
               {connected ? 'Replace token' : 'Add token'}
             </button>
           )}
         </>
-      )}
-
-      {msg && (
-        <p
-          className={`text-sm mt-3 ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-        >
-          {msg.text}
-        </p>
       )}
     </div>
   )

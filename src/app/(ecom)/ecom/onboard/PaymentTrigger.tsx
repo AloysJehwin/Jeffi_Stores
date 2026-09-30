@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Props {
   subscriptionId: string
@@ -25,8 +26,8 @@ export default function PaymentTrigger({
   razorpayKeyId,
 }: Props) {
   const router = useRouter()
+  const { showToast } = useToast()
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
   const [scriptLoaded, setScriptLoaded] = useState(false)
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export default function PaymentTrigger({
     const script = document.createElement('script')
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.onload = () => setScriptLoaded(true)
-    script.onerror = () => setErr('Failed to load payment gateway. Please refresh.')
+    script.onerror = () => showToast('Failed to load payment gateway. Please refresh.', 'error')
     document.body.appendChild(script)
     return () => {
       try {
@@ -48,11 +49,10 @@ export default function PaymentTrigger({
 
   function openCheckout() {
     if (!scriptLoaded) {
-      setErr('Payment gateway not ready. Please refresh.')
+      showToast('Payment gateway not ready. Please refresh.', 'error')
       return
     }
     setBusy(true)
-    setErr(null)
 
     const options = {
       key: razorpayKeyId,
@@ -74,7 +74,7 @@ export default function PaymentTrigger({
 
     const rzp = new (window as any).Razorpay(options)
     rzp.on('payment.failed', (response: any) => {
-      setErr(response.error?.description || 'Payment failed. Please try again.')
+      showToast(response.error?.description || 'Payment failed. Please try again.', 'error')
       setBusy(false)
     })
     rzp.open()
@@ -103,8 +103,6 @@ export default function PaymentTrigger({
           Your GST certificate has been verified. Complete your subscription payment to launch{' '}
           <span className="font-semibold">{displayName}</span> ({slug}.jeffistores.in).
         </p>
-
-        {err && <p className="text-sm text-red-600 dark:text-red-400 mt-4">{err}</p>}
 
         <button
           onClick={openCheckout}
