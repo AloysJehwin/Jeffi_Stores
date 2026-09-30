@@ -692,7 +692,7 @@ function CheckoutPage() {
       }
 
       if (!isBuyNow) clearCart()
-      router.push(`/account/orders/${data.order.id}`)
+      router.push(`/account/orders/confirmation?orderId=${data.order.id}`)
     } catch (err: any) {
       showToast(err.message, 'error')
       setIsSubmitting(false)
