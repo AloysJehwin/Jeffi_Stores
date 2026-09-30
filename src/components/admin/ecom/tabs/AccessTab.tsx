@@ -1,5 +1,5 @@
 import type { TenantDetail, TenantSocialAccount, IntegrationCredential } from '@/lib/tenant-registry'
-import type { AdminCertRow } from '@/lib/tenant-ca'
+import type { AdminCertRow } from '@/lib/tenancy/tenant-ca'
 import { Field, FieldGrid, Mono, Section } from '../EcomUI'
 
 type Integration = Omit<IntegrationCredential, 'config_enc'>

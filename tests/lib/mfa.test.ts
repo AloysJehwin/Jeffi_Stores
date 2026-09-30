@@ -54,7 +54,7 @@ import {
   verifyTotp,
   generateRecoveryCodes,
   hashRecoveryCode,
-} from '@/lib/mfa'
+} from '@/lib/auth/mfa'
 
 // ─────────────────────────────────────────────────────────────────────────────
 

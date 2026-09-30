@@ -1,16 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { variantLabel } from '@/lib/product-label'
+import { variantLabel } from '@/lib/catalog/product-label'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Pencil, QrCode } from 'lucide-react'
 import CopySku from '@/components/ui/CopySku'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { formatINR, formatDate } from '@/lib/format'
+import { formatINR, formatDate } from '@/lib/shared/format'
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',

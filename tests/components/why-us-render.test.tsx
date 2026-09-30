@@ -3,7 +3,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import SectionRenderer, { type SectionData } from '@/components/visitor/home/SectionRenderer'
-import { visibleSections, withDefaults, DEFAULT_SECTIONS, type HomepageSection } from '@/lib/homepage-sections'
+import { visibleSections, withDefaults, DEFAULT_SECTIONS, type HomepageSection } from '@/lib/catalog/homepage-sections'
 
 afterEach(cleanup)
 

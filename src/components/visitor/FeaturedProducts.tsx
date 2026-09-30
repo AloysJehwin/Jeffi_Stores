@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { mrpDiscountPct } from '@/lib/catalog/pricing'
 
 interface Product {
   id: string

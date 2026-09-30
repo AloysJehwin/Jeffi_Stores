@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadAvatarImage: vi.fn(),
 }))
 
 import { POST } from '@/app/api/user/avatar/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as s3 from '@/lib/s3'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as s3 from '@/lib/shared/s3'
 
 const AUTH_USER = { userId: 'user-1' }
 

@@ -175,7 +175,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // churned owner). No key → fresh store → fall through to optional seeding.
         const key = res.restoreFromKey as string | undefined
         if (key) {
-          const { getTenantBackup } = await import('../tenant-backup-store')
+          const { getTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
           const archive = await getTenantBackup(key)
           await provider.restoreDb(res.endpoint, 'jeffi_stores', archive)
           res.restored = true
@@ -286,7 +286,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             res.computeMode = 'dedicated'
           }
         } else {
-          const { ensurePoolInstance } = await import('../pool-autoscale')
+          const { ensurePoolInstance } = await import('@/lib/tenancy/pool-autoscale')
           const { ip } = await ensurePoolInstance()
           res.ec2Target = ip
           res.computeMode = 'pool'
@@ -309,7 +309,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           const wh = (draft?.data as any)?.wh
           const kyc = await getKyc(job.tenant_id).catch(() => null)
           if (wh?.sellerPhone && wh?.originPincode) {
-            const { createDelhiveryPickupLocation } = await import('../delhivery')
+            const { createDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
             const r = await createDelhiveryPickupLocation({
               name: wh.pickupLocation || tenant.slug,
               phone: wh.sellerPhone,
@@ -689,7 +689,7 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
       computeChanged = true
     } else if (!wantDedicated && hadDedicated) {
       // higher → Basic: fall back to the shared pool, terminate the dedicated instance.
-      const { ensurePoolInstance } = await import('../pool-autoscale')
+      const { ensurePoolInstance } = await import('@/lib/tenancy/pool-autoscale')
       const { ip } = await ensurePoolInstance()
       const oldInstance = created.ec2InstanceId
       targetIp = ip
@@ -765,7 +765,7 @@ export async function deprovisionTenant(
     // 2. Backup (only if there was ever a DB to back up).
     if (endpoint) {
       const archive = await provider.backupDb(endpoint, tenant.rds_db || 'jeffi_stores')
-      const { putTenantBackup } = await import('../tenant-backup-store')
+      const { putTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
       const { ownerKey } = await putTenantBackup({
         buffer: archive,
         ownerId: ctx.ownerId || 'unknown',
@@ -786,7 +786,7 @@ export async function deprovisionTenant(
     if (dedicatedInstanceId) {
       await provider.deleteAppInstance(dedicatedInstanceId).catch(() => {})
     } else {
-      const { deletePoolIfEmpty } = await import('../pool-autoscale')
+      const { deletePoolIfEmpty } = await import('@/lib/tenancy/pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
     }
 
@@ -822,7 +822,7 @@ export async function deprovisionTenant(
     if (dnsRemovalFailed) manualCleanup.dnsHosts = dnsRemovalFailed
     try {
       if (tenant.razorpay_linked_account_id) {
-        const { markLinkedAccountDeprovisioned } = await import('../razorpay-route')
+        const { markLinkedAccountDeprovisioned } = await import('@/lib/payments/razorpay-route')
         const marked = await markLinkedAccountDeprovisioned(tenant.razorpay_linked_account_id, slug)
         manualCleanup.routeAccount = {
           id: tenant.razorpay_linked_account_id,
@@ -835,7 +835,7 @@ export async function deprovisionTenant(
       const { getDraft: loadDraft } = await import('../tenant-registry')
       const draft = await loadDraft((created.ownerId as string) ?? '').catch(() => null)
       const pickupName = (draft?.data as any)?.wh?.pickupLocation || slug
-      const { deactivateDelhiveryPickupLocation } = await import('../delhivery')
+      const { deactivateDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
       const deactivated = await deactivateDelhiveryPickupLocation(pickupName).catch((e: any) => ({
         ok: false,
         error: e?.message ?? String(e),

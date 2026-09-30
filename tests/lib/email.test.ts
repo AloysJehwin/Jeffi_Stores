@@ -1,10 +1,10 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
@@ -17,8 +17,8 @@ vi.mock('nodemailer', () => ({
   },
 }))
 
-import * as mailAudit from '@/lib/mail-audit'
-import * as db from '@/lib/db'
+import * as mailAudit from '@/lib/shared/mail-audit'
+import * as db from '@/lib/shared/db'
 import {
   sendOTPEmail,
   sendWelcomeEmail,

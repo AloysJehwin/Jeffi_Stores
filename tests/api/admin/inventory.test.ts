@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks — must be declared before any imports of the modules under test
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
@@ -31,22 +31,22 @@ vi.mock('@/lib/db', () => ({
   }),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   getStockLedger: vi.fn(),
   getStockValuation: vi.fn(),
   logStockMovement: vi.fn(),
   recomputeStockStatusForProduct: vi.fn(),
 }))
 
-vi.mock('@/lib/admin-audit', () => ({
+vi.mock('@/lib/shared/admin-audit', () => ({
   logAdminAudit: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   const { z } = require('zod')
   const zUuid = z.string().uuid()
   const zCurrency = z.coerce.number().min(0)
@@ -73,11 +73,11 @@ vi.mock('@/lib/validate', () => {
 
 import { GET as stockGET, PATCH as stockPATCH } from '@/app/api/admin/inventory/stock/route'
 import { GET as poGET, POST as poPOST } from '@/app/api/admin/inventory/po/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, getClient, withTransaction } from '@/lib/db'
-import { getStockLedger, getStockValuation } from '@/lib/inventory'
-import { buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query, getClient, withTransaction } from '@/lib/shared/db'
+import { getStockLedger, getStockValuation } from '@/lib/orders/inventory'
+import { buildSearchClause } from '@/lib/catalog/search'
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,4 +1,4 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n))
@@ -383,7 +383,7 @@ export const MARKETING_TOOLS: ToolDef[] = [
         count = r?.n || 0
       }
 
-      const { currentBrandNameAsync } = await import('@/lib/brand')
+      const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
       const fromN =
         String(fromName || '')
           .trim()

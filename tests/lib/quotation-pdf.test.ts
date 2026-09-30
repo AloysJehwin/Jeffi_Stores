@@ -44,8 +44,8 @@ vi.mock('pdfkit', () => {
   return { default: vi.fn().mockImplementation(() => makeMockDoc()) }
 })
 
-import { generateQuotationPDF } from '@/lib/quotation-pdf'
-import type { QuotationBusiness, QuotationItem, QuotationData } from '@/lib/quotation-pdf'
+import { generateQuotationPDF } from '@/lib/documents/quotation-pdf'
+import type { QuotationBusiness, QuotationItem, QuotationData } from '@/lib/documents/quotation-pdf'
 
 const mockBusiness: QuotationBusiness = {
   gstin: '22AAAAA0000A1Z5',

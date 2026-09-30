@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/crm-insights-attention', () => ({
+vi.mock('@/lib/shared/crm-insights-attention', () => ({
   getCrmAttention: vi.fn(),
 }))
 
-import { getCrmInsights, CRM_SEGMENT_KEYS } from '@/lib/crm-insights'
-import { queryOne, queryMany } from '@/lib/db'
-import { getCrmAttention } from '@/lib/crm-insights-attention'
+import { getCrmInsights, CRM_SEGMENT_KEYS } from '@/lib/shared/crm-insights'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { getCrmAttention } from '@/lib/shared/crm-insights-attention'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

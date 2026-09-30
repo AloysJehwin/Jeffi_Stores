@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
-import { buildProductRowSql } from '@/lib/homepage-data'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
+import { buildProductRowSql } from '@/lib/catalog/homepage-data'
 import {
   productSource,
   sectionLimit,
@@ -16,7 +16,7 @@ import {
   type SectionType,
   type HomepageSection,
   type PreviewItem,
-} from '@/lib/homepage-sections'
+} from '@/lib/catalog/homepage-sections'
 import {
   getBackInStock,
   getBundles,
@@ -24,16 +24,16 @@ import {
   getCountdownDeal,
   getTestimonials,
   getValueStats,
-} from '@/lib/homepage-extras'
+} from '@/lib/catalog/homepage-extras'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { getFeatureFlags, getStorefrontContent } from '@/lib/site-controls'
-import { getEditableHomepage } from '@/lib/homepage-draft'
-import { listActiveOffers, listOffersByIds } from '@/lib/product-offers'
+import { getFeatureFlags, getStorefrontContent } from '@/lib/catalog/site-controls'
+import { getEditableHomepage } from '@/lib/catalog/homepage-draft'
+import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
 
 export const dynamic = 'force-dynamic'
 

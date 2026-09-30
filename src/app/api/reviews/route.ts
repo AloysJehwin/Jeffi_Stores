@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
-import { uploadReviewImage } from '@/lib/s3'
-import { logActivity } from '@/lib/activity'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { createAdminNotification } from '@/lib/admin-notify'
-import { parseBody, zUuid } from '@/lib/validate'
+import { uploadReviewImage } from '@/lib/shared/s3'
+import { logActivity } from '@/lib/shared/activity'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const CreateReviewSchema = z.object({
   productId: zUuid,

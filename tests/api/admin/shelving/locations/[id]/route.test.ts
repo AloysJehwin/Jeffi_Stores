@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/catalog/shelf', () => ({
   updateLocation: vi.fn(),
   deleteLocation: vi.fn(),
 }))
@@ -13,9 +13,9 @@ vi.mock('@/lib/shelf', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { PATCH, DELETE } from '@/app/api/admin/shelving/locations/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { updateLocation, deleteLocation } from '@/lib/shelf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { updateLocation, deleteLocation } from '@/lib/catalog/shelf'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 interface RFQItem {
   description: string

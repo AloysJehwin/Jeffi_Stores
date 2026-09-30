@@ -3,9 +3,9 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { queryOne, queryMany } from '@/lib/db'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { queryOne, queryMany } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

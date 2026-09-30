@@ -1,18 +1,18 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/quotation-pdf', () => ({
+vi.mock('@/lib/documents/quotation-pdf', () => ({
   generateQuotationPDF: vi.fn(),
 }))
 
 import { GET } from '@/app/api/public/quotation/[token]/pdf/route'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateQuotationPDF } from '@/lib/quotation-pdf'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateQuotationPDF } from '@/lib/documents/quotation-pdf'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

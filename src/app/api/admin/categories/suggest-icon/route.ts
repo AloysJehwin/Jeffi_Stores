@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { suggestIcon } from '@/lib/icon-suggest'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiDenial } from '@/lib/ai-scope'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiDenial } from '@/lib/auth/ai-scope'
 
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)

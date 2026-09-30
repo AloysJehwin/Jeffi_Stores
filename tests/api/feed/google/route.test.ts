@@ -5,14 +5,14 @@ const { queryManyMock } = vi.hoisted(() => ({
   queryManyMock: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: queryManyMock,
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/google-merchant-helpers', () => ({
+vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   getGoogleProductCategory: vi.fn().mockReturnValue('Hardware > Fasteners'),
   buildProductType: vi.fn().mockReturnValue('Bolts > Hex Bolts'),
   buildProductHighlights: vi.fn().mockReturnValue(['Made of steel']),

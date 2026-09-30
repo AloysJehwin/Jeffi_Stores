@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

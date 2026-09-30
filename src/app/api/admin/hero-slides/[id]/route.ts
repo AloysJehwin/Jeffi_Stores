@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
-import { parseBody } from '@/lib/validate'
-import { applyDraftPatch, withHomepageDraft } from '@/lib/homepage-draft'
+import { parseBody } from '@/lib/shared/validate'
+import { applyDraftPatch, withHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/delivery-settings', () => ({
+vi.mock('@/lib/shipping/delivery-settings', () => ({
   getDeliverySettings: vi.fn(),
 }))
 
 import { GET } from '@/app/api/cart/free-delivery/route'
-import { getDeliverySettings } from '@/lib/delivery-settings'
+import { getDeliverySettings } from '@/lib/shipping/delivery-settings'
 
 const mockSettings = vi.mocked(getDeliverySettings)
 

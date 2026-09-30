@@ -1,5 +1,5 @@
-import { query, queryOne } from '@/lib/db'
-import { logActivity } from '@/lib/activity'
+import { query, queryOne } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function addCustomerNote(action: AgentAction): Promise<ActionResult> {

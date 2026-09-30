@@ -1,7 +1,7 @@
 'use client'
 
 import { CompactStat, numStr, rsCompact, pctStr } from '@/components/admin/dashboard/Primitives'
-import type { B2b } from '@/lib/crm-insights-shared'
+import type { B2b } from '@/lib/shared/crm-insights-shared'
 
 export default function B2bCard({ b2b }: { b2b: B2b }) {
   const empty =

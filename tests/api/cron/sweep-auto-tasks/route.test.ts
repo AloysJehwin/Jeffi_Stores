@@ -1,16 +1,16 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rowCount: 0 }),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn() }))
+vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn() }))
 
 import { GET } from '@/app/api/cron/sweep-auto-tasks/route'
-import { queryMany } from '@/lib/db'
-import { createAutoTask } from '@/lib/auto-tasks'
+import { queryMany } from '@/lib/shared/db'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockCreateAutoTask = vi.mocked(createAutoTask)

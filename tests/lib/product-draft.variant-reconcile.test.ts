@@ -9,14 +9,14 @@ const mockQueryMany = vi.fn()
 const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: any[]) => mockQueryOne(...args),
   queryMany: (...args: any[]) => mockQueryMany(...args),
   withTransaction: (...args: any[]) => mockWithTransaction(...args),
 }))
 
 const mockRecompute = vi.fn()
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   recomputeStockStatusForProduct: (...args: any[]) => mockRecompute(...args),
 }))
 
@@ -46,7 +46,7 @@ function baseFields(over: Record<string, unknown> = {}) {
   }
 }
 
-import { publishProductDraft } from '@/lib/product-draft'
+import { publishProductDraft } from '@/lib/catalog/product-draft'
 
 const V_ID = 'aaaaaaaa-0000-4000-8000-000000000001'
 

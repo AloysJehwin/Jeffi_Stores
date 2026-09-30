@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/customer-health', () => ({
+vi.mock('@/lib/shared/customer-health', () => ({
   getHealth: vi.fn(),
   recomputeHealth: vi.fn(),
 }))
@@ -19,9 +19,9 @@ vi.mock('@/lib/customer-health', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/customers/[id]/health/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getHealth, recomputeHealth } from '@/lib/customer-health'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getHealth, recomputeHealth } from '@/lib/shared/customer-health'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

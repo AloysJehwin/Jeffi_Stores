@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { aiChat, AiClientError, type AiToolDef, type AiChatMessage } from '@/lib/ai-client'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { aiChat, AiClientError, type AiToolDef, type AiChatMessage } from '@/lib/shared/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
-import { findSimilar } from '@/lib/rag'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { findSimilar } from '@/lib/shared/rag'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -105,7 +105,7 @@ async function buildSystemPromptWithDynamic(userMessage?: string): Promise<strin
       // RAG unavailable — fall through to tool-only mode
     }
   }
-  const { currentBrandNameAsync } = await import('@/lib/brand')
+  const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
   const brand = await currentBrandNameAsync()
   return buildSystemPromptBody(ragContext, brand)
 }

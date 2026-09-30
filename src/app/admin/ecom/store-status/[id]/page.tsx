@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob, getTenantOwners } from '@/lib/tenant-registry'
 import TenantObjectHeader from '@/components/admin/ecom/TenantObjectHeader'
 import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'

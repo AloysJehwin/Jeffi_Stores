@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAdminScope } from '@/lib/jwt'
-import { resolveTenant } from '@/lib/tenant-context'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 

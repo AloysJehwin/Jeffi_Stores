@@ -20,10 +20,10 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '../pg-pool'
-import { buildTenantSchemaSql } from '../tenant-migrations-schema'
-import { dumpTenantDb, restoreTenantDb } from '../tenant-db-backup'
-import { upsertTenantDns, deleteTenantDns } from '../tenant-dns'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
+import { buildTenantSchemaSql } from '@/lib/tenant-migrations-schema'
+import { dumpTenantDb, restoreTenantDb } from '@/lib/tenancy/tenant-db-backup'
+import { upsertTenantDns, deleteTenantDns } from '@/lib/tenancy/tenant-dns'
 import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
 
 /**
@@ -136,7 +136,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
    */
   private async openLocalRdsAccess(): Promise<void> {
     try {
-      const { currentPublicIp, authorizeSgIngress } = await import('../ec2-client')
+      const { currentPublicIp, authorizeSgIngress } = await import('@/lib/shared/ec2-client')
       const ip = await currentPublicIp()
       if (!ip) {
         process.stderr.write(
@@ -373,7 +373,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     args: { name: string; instanceType: string; userData?: string },
     onLaunched?: (instanceId: string) => Promise<void>
   ): Promise<{ instanceId: string; ip: string }> {
-    const { runInstance, waitForState, getInstanceIp } = await import('../ec2-client')
+    const { runInstance, waitForState, getInstanceIp } = await import('@/lib/shared/ec2-client')
     const { instanceId } = await runInstance(args)
     // Record the id BEFORE waiting. Everything below can throw, and an id known only to this
     // stack frame is an instance nothing can find again — it stays running, billing, and
@@ -391,14 +391,14 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async deleteAppInstance(instanceId: string): Promise<void> {
-    const { terminateInstance } = await import('../ec2-client')
+    const { terminateInstance } = await import('@/lib/shared/ec2-client')
     await terminateInstance(instanceId).catch((e: any) => {
       if (!/NotFound|InvalidInstanceID/i.test(e?.message || '')) throw e
     })
   }
 
   async isInstanceGone(instanceId: string): Promise<boolean> {
-    const { isInstanceGone } = await import('../ec2-client')
+    const { isInstanceGone } = await import('@/lib/shared/ec2-client')
     return isInstanceGone(instanceId)
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { computeEdd } from '@/lib/edd'
-import { getBusinessValues } from '@/lib/site-controls'
+import { computeEdd } from '@/lib/shipping/edd'
+import { getBusinessValues } from '@/lib/catalog/site-controls'
 
 export async function GET(request: NextRequest) {
   const pin = request.nextUrl.searchParams.get('pin') ?? ''

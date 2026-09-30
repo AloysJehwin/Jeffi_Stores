@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { listPlans, getOwnerTenants, getDraft } from '@/lib/tenant-registry'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
 

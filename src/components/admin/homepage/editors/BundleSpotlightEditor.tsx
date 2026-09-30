@@ -1,6 +1,6 @@
 'use client'
 
-import { configIds } from '@/lib/homepage-sections'
+import { configIds } from '@/lib/catalog/homepage-sections'
 import {
   CtaFields,
   Grid,

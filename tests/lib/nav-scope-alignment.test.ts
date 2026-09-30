@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { getScopeForPath, ADMIN_SCOPES } from '@/lib/scopes'
+import { getScopeForPath, ADMIN_SCOPES } from '@/lib/auth/scopes'
 
 const LAYOUT = path.join(process.cwd(), 'src/app/admin/layout.tsx')
 

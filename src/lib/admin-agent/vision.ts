@@ -1,5 +1,5 @@
-import { aiVision } from '@/lib/ai-client'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { aiVision } from '@/lib/shared/ai-client'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 // OCR/vision now runs through the ai-platform gateway (PaddleOCR-first, Ollama-vision fallback,
 // queue + retry). This file keeps the DOMAIN logic — the quotation extraction prompt and PDF

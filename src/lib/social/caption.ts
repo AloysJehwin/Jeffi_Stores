@@ -3,8 +3,8 @@
 // to click the AIEnrichButton in the composer. Goes through the ai-platform gateway
 // (JSON mode, truncation-tolerant parse).
 
-import { aiChat } from '@/lib/ai-client'
-import { AI_ADMIN_SCOPE } from '@/lib/ai-scope'
+import { aiChat } from '@/lib/shared/ai-client'
+import { AI_ADMIN_SCOPE } from '@/lib/auth/ai-scope'
 
 const SYSTEM_PROMPT = (store: string) => `You write short social media captions for ${store}.
 Return ONLY valid JSON: {"caption":"<caption text>"}
@@ -29,9 +29,9 @@ export async function generateSocialCaption(opts: {
     .join('\n')
 
   try {
-    const { currentTenantPlanGate } = await import('@/lib/plan-gate')
+    const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
     if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) return ''
-    const { storeDescriptorForPrompt } = await import('@/lib/brand')
+    const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
     const r = await aiChat({
       modelHint: 'email',
       jsonMode: true,

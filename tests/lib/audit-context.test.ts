@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from '@/lib/audit-context'
+import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from '@/lib/auth/audit-context'
 
 describe('audit-context', () => {
   describe('getCurrentAuditAdminId', () => {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock } from '@/lib/shelf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { syncPerishableStock } from '@/lib/catalog/shelf'
 
 export const dynamic = 'force-dynamic'
 

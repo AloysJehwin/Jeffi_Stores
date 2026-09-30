@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { buildTemplateWorkbook } from '@/lib/import/template'
 
 export const dynamic = 'force-dynamic'

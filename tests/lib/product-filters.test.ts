@@ -8,12 +8,12 @@ const { mockQueryMany, mockQueryOne } = vi.hoisted(() => ({
   mockQueryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: mockQueryMany,
   queryOne: mockQueryOne,
 }))
 
-import { buildProductFilterClauses, getFilterFacets } from '@/lib/product-filters'
+import { buildProductFilterClauses, getFilterFacets } from '@/lib/catalog/product-filters'
 
 describe('buildProductFilterClauses', () => {
   it('returns empty clauses for empty params', () => {

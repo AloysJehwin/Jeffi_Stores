@@ -5,16 +5,16 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
-import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
-import { bp } from '@/lib/business-path'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
+import { getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
+import { bp } from '@/lib/shared/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
 import ProductSpecifications from '@/components/visitor/pdp/ProductSpecifications'
 import ProductReviews from '@/components/visitor/ProductReviews'
@@ -334,7 +334,7 @@ export default async function ProductDetailPage({
     getRelatedProducts(product.id, product.category_id, product.name),
     // Use the authoritative delivery setting (same one checkout uses), not the
     // stale separate 'free_shipping_threshold' key.
-    (await import('@/lib/delivery-settings')).getDeliverySettings(),
+    (await import('@/lib/shipping/delivery-settings')).getDeliverySettings(),
   ])
   const freeShippingThreshold = deliverySettings.freeThreshold
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'

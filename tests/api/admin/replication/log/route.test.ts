@@ -7,20 +7,20 @@ import { NextRequest } from 'next/server'
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   verifyToken: vi.fn(),
   authenticateServiceAccount: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST, GET } from '@/app/api/admin/replication/log/route'
-import { verifyToken, authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
+import { verifyToken, authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
 
 const mockVerifyToken = vi.mocked(verifyToken)

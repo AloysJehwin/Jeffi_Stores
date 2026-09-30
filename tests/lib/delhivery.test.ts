@@ -8,7 +8,7 @@ const { mockQuery, mockFetch } = vi.hoisted(() => ({
   mockFetch: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 const mockGetBusinessValues = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getBusinessValues: mockGetBusinessValues,
   invalidateSiteControlsCache: vi.fn(),
 }))
@@ -29,7 +29,7 @@ import {
   listDelhiveryPickupLocations,
   setDefaultPickupLocation,
   deactivateDelhiveryPickupLocation,
-} from '@/lib/delhivery'
+} from '@/lib/shipping/delhivery'
 
 describe('cancelDelhiveryShipment', () => {
   beforeEach(() => {

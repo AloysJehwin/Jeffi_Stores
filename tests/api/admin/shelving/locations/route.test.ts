@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/catalog/shelf', () => ({
   listLocations: vi.fn(),
   createLocation: vi.fn(),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: 'zNonEmpty',
   zUuid: 'zUuid',
@@ -18,10 +18,10 @@ vi.mock('@/lib/validate', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/shelving/locations/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { listLocations, createLocation } from '@/lib/shelf'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { listLocations, createLocation } from '@/lib/catalog/shelf'
+import { parseBody } from '@/lib/shared/validate'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

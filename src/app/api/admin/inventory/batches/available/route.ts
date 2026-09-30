@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne } from '@/lib/db'
-import { resolveGrainUnit, serialCountForBaseQuantity, type SellingUnit } from '@/lib/selling-unit'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { resolveGrainUnit, serialCountForBaseQuantity, type SellingUnit } from '@/lib/catalog/selling-unit'
 
 export const dynamic = 'force-dynamic'
 

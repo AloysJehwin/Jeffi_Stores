@@ -9,7 +9,7 @@ vi.mock('path', async importOriginal => {
   }
 })
 
-import { generatePolicyPDF } from '@/lib/policy-pdf'
+import { generatePolicyPDF } from '@/lib/documents/policy-pdf'
 import type { Policy, Section } from '@/lib/legals/policies'
 
 beforeEach(() => {

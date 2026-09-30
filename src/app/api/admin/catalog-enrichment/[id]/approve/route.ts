@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +21,7 @@ interface EnrichmentRow {
 
 async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    const { embed } = await import('@/lib/rag')
+    const { embed } = await import('@/lib/shared/rag')
     const { Pool } = await import('pg')
 
     const pool = new Pool({

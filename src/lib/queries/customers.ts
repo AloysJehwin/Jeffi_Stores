@@ -1,5 +1,5 @@
 import { queryOne, queryMany, queryCount } from './shared'
-import { buildSearchClause } from '../search'
+import { buildSearchClause } from '@/lib/catalog/search'
 
 const CUSTOMER_SORT_COLS: Record<string, string> = {
   name: "u.first_name || ' ' || u.last_name",

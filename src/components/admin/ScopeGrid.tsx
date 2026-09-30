@@ -1,6 +1,6 @@
 'use client'
 
-import { ADMIN_SCOPES, assignableScopes, type ScopeDefinition } from '@/lib/scopes'
+import { ADMIN_SCOPES, assignableScopes, type ScopeDefinition } from '@/lib/auth/scopes'
 
 interface Props {
   selected: string[]

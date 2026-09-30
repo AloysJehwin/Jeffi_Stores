@@ -79,9 +79,9 @@ vi.mock('fs', () => {
 // Dynamic imports made inside the provider
 vi.mock('@/lib/tenant-migrations-schema', () => ({ buildTenantSchemaSql: vi.fn(() => 'CREATE TABLE x();') }))
 const dbBackup = { dumpTenantDb: vi.fn(), restoreTenantDb: vi.fn() }
-vi.mock('@/lib/tenant-db-backup', () => dbBackup)
+vi.mock('@/lib/tenancy/tenant-db-backup', () => dbBackup)
 const dns = { upsertTenantDns: vi.fn(), deleteTenantDns: vi.fn() }
-vi.mock('@/lib/tenant-dns', () => dns)
+vi.mock('@/lib/tenancy/tenant-dns', () => dns)
 
 /** Build an AWS-shaped error whose `name` drives the provider's branching. */
 function awsError(name: string) {

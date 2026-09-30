@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,18 +13,18 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/email', () => ({
   sendAgentConnectedEmail: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/support/sessions/[sessionId]/messages/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { sendAgentConnectedEmail } from '@/lib/email'
-import { logActivity } from '@/lib/activity'
+import { logActivity } from '@/lib/shared/activity'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

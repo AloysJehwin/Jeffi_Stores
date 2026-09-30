@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
-import { offerHref, type ProductOffer } from '@/lib/product-offers-shared'
+import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 export type PromoOffer = Pick<
   ProductOffer,

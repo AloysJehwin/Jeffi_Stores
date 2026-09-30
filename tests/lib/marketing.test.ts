@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -22,8 +22,8 @@ import {
   getAllCampaigns,
   generateCouponForCampaign,
   getAssignedCouponCode,
-} from '@/lib/marketing'
-import { query, queryOne } from '@/lib/db'
+} from '@/lib/shared/marketing'
+import { query, queryOne } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)

@@ -1,12 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
@@ -15,26 +15,26 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/email', () => ({
   sendNewReviewNotification: vi.fn(),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadReviewImage: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { GET, PATCH, POST } from '@/app/api/reviews/route'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { queryOne, queryMany, query } from '@/lib/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
 import { sendNewReviewNotification } from '@/lib/email'
-import { uploadReviewImage } from '@/lib/s3'
-import { createAutoTask } from '@/lib/auto-tasks'
+import { uploadReviewImage } from '@/lib/shared/s3'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
 
 const mockAuth = vi.mocked(authenticateUser)
 const mockQueryOne = vi.mocked(queryOne)

@@ -28,7 +28,7 @@ import {
   type LabelProduct,
   type LabelSize,
   type ShelfLabelItem,
-} from '@/lib/label-pdf'
+} from '@/lib/documents/label-pdf'
 
 const mockProduct: LabelProduct = {
   id: 'p1',

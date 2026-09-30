@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { CompactStat, numStr, hoursStr, Chip } from '@/components/admin/dashboard/Primitives'
-import type { Service, LowReview } from '@/lib/crm-insights-shared'
+import type { Service, LowReview } from '@/lib/shared/crm-insights-shared'
 
 function agoStr(iso: string | null): string {
   if (!iso) return ''

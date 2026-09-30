@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
@@ -12,34 +12,34 @@ vi.mock('@/lib/email', () => ({
   sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
   sendNewOrderNotification: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ totalTax: 45, taxableAmount: 455, cgst: 22.5, sgst: 22.5, igst: 0 }),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
   quoteShipping: vi.fn().mockResolvedValue({ shipping: 0, codFee: 0 }),
   validateCouponForUser: vi.fn().mockResolvedValue({ ok: false }),
   loadAddress: vi.fn(),
 }))
-vi.mock('@/lib/business-discount', () => ({
+vi.mock('@/lib/catalog/business-discount', () => ({
   getBusinessDiscountMap: vi.fn().mockResolvedValue({}),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
-vi.mock('@/lib/checkout-intent', () => ({
+vi.mock('@/lib/orders/checkout-intent', () => ({
   verifyIntent: vi.fn(),
 }))
-vi.mock('@/lib/edd', () => ({
+vi.mock('@/lib/shipping/edd', () => ({
   computeEdd: vi.fn().mockReturnValue(null),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: true,
     codEnabled: true,
@@ -71,15 +71,15 @@ vi.mock('@/lib/site-controls', () => ({
     sellerPhone: '07713585374',
   }),
 }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
 
 import { POST } from '@/app/api/orders/create-direct/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as orderCommit from '@/lib/order-commit'
-import * as checkoutIntent from '@/lib/checkout-intent'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as orderCommit from '@/lib/orders/order-commit'
+import * as checkoutIntent from '@/lib/orders/checkout-intent'
 
 const USER = { userId: 'user-1' }
 
@@ -470,7 +470,7 @@ describe('POST /api/orders/create-direct', () => {
 
   it('applies business discount when category discount exists', async () => {
     vi.mocked(db.queryOne).mockReset()
-    const { getBusinessDiscountMap } = await import('@/lib/business-discount')
+    const { getBusinessDiscountMap } = await import('@/lib/catalog/business-discount')
     vi.mocked(getBusinessDiscountMap).mockResolvedValue({ 'cat-1': 10 } as any)
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
@@ -546,7 +546,7 @@ describe('POST /api/orders/create-direct — targeted fallback branches', () => 
 
   // Lines 153-154: category_id present but pct=0 — businessDiscountAmount stays 0
   it('skips business discount when category pct is 0', async () => {
-    const { getBusinessDiscountMap } = await import('@/lib/business-discount')
+    const { getBusinessDiscountMap } = await import('@/lib/catalog/business-discount')
     vi.mocked(getBusinessDiscountMap).mockResolvedValue({ 'cat-1': 0 } as any)
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
@@ -589,7 +589,7 @@ describe('POST /api/orders/create-direct — targeted fallback branches', () => 
 
   // Lines 183-185: isGSTEnabled=true, isIGST=true path (inter-state order)
   it('calculates IGST for inter-state order when GST enabled', async () => {
-    const { isInterState, calculateGST } = await import('@/lib/gst')
+    const { isInterState, calculateGST } = await import('@/lib/catalog/gst')
     vi.mocked(isInterState).mockReturnValue(true)
     vi.mocked(calculateGST).mockReturnValue({
       totalTax: 90,

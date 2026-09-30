@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
-import { resolveSession } from '@/lib/auth-sessions'
-import { readAdminSid } from '@/lib/admin-cookie'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { resolveSession } from '@/lib/auth/auth-sessions'
+import { readAdminSid } from '@/lib/auth/admin-cookie'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 // Passive: a tab asking "am I still signed in, and until when?" is not the admin being active,
 // so this never touches last_seen_at. deadlineAt is the idle-or-absolute deadline the server

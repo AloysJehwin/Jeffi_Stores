@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { humanizeLabel, formatINR, formatDate, numberToWords } from '@/lib/format'
+import { humanizeLabel, formatINR, formatDate, numberToWords } from '@/lib/shared/format'
 
 describe('humanizeLabel', () => {
   it('title-cases an underscore key', () => {

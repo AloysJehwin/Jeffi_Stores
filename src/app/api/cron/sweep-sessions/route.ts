@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sweepExpiredAdminSessions } from '@/lib/auth-sessions'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { sweepExpiredAdminSessions } from '@/lib/auth/auth-sessions'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

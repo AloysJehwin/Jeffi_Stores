@@ -1,7 +1,7 @@
-import { resolveTenant, resolveTenantId } from '../tenant-context'
+import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential } from '../tenant-registry'
 import { decryptToken } from '../crypto/token-cipher'
-import { loadGoogleServiceAccount } from '../google-credentials'
+import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 
 // Runtime credential resolution for external integrations. The rule is uniform: if there is a
 // tenant in the AsyncLocalStorage context (a tenant-scoped request/job), use THAT tenant's

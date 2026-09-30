@@ -35,7 +35,7 @@ const backupStore = {
   getTenantBackup: vi.fn(),
   putTenantBackup: vi.fn(),
 }
-vi.mock('@/lib/tenant-backup-store', () => backupStore)
+vi.mock('@/lib/tenancy/tenant-backup-store', () => backupStore)
 
 const seedMod = { seedTenantData: vi.fn().mockResolvedValue(undefined) }
 vi.mock('@/lib/provisioning/seed', () => seedMod)

@@ -5,11 +5,11 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
@@ -20,8 +20,8 @@ vi.mock('@/lib/db', () => ({
 // ---------------------------------------------------------------------------
 
 import { GET, POST } from '@/app/api/admin/business/rfqs/[id]/messages/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany, query } from '@/lib/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
 
 // ---------------------------------------------------------------------------
 // Helpers

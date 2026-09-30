@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.brand_carousel
 

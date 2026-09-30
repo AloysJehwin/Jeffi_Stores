@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -11,11 +11,11 @@ vi.mock('@/lib/email', () => ({
   sendNewOrderNotification: vi.fn(),
   sendPaymentStatusUpdate: vi.fn(),
 }))
-vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn() }))
-vi.mock('@/lib/marketing', () => ({ attributeConversion: vi.fn() }))
+vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn() }))
+vi.mock('@/lib/shared/marketing', () => ({ attributeConversion: vi.fn() }))
 
 import { POST } from '@/app/api/webhooks/razorpay/route'
-import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import crypto from 'crypto'
 
 const mockQueryOne = vi.mocked(queryOne)

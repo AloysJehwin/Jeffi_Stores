@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { useStoreConfig } from './StoreConfigContext'
-import { pickUnitPrice } from '@/lib/pricing'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 
 interface CartItem {
   id: string

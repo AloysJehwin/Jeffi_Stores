@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { productLabel as grainLabel } from '@/lib/product-label'
+import { productLabel as grainLabel } from '@/lib/catalog/product-label'
 import CopySku from '@/components/ui/CopySku'
 
 interface Props {

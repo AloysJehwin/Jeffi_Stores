@@ -1,13 +1,13 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   getClient: vi.fn(),
 }))
 
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),
@@ -20,8 +20,8 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 }))
 
 import { isCustomScenario, runCustomScenario } from '@/lib/campaigns/custom-runner'
-import { queryOne, getClient } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/automation-emails'
+import { queryOne, getClient } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 
 const mockQueryOne = queryOne as ReturnType<typeof vi.fn>

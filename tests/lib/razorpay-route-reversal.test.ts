@@ -3,14 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockFetchTransfer = vi.fn()
 const mockReverse = vi.fn()
 
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: () => ({
     payments: { fetchTransfer: mockFetchTransfer },
     transfers: { reverse: mockReverse },
   }),
 }))
 
-import { reverseTransfersForRefund, fetchTransfersForPayment } from '@/lib/razorpay-route'
+import { reverseTransfersForRefund, fetchTransfersForPayment } from '@/lib/payments/razorpay-route'
 
 beforeEach(() => {
   vi.clearAllMocks()

@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import type { AnalyticsRange } from '@/lib/queries'
-import type { CrmInsights as CrmInsightsData, CrmSegment, CrmSegmentKey } from '@/lib/crm-insights-shared'
-import { CRM_SEGMENT_KEYS } from '@/lib/crm-insights-shared'
+import type { CrmInsights as CrmInsightsData, CrmSegment, CrmSegmentKey } from '@/lib/shared/crm-insights-shared'
+import { CRM_SEGMENT_KEYS } from '@/lib/shared/crm-insights-shared'
 import GrowthRetentionCard from './GrowthRetentionCard'
 import EconomicsCard from './EconomicsCard'
 import HealthFactorsCard from './HealthFactorsCard'

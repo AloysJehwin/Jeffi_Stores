@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, resolveRequestTenant } from '@/lib/db'
-import { getRazorpayInstanceFor } from '@/lib/razorpay'
-import { storeBaseUrlAsync } from '@/lib/brand'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, resolveRequestTenant } from '@/lib/shared/db'
+import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

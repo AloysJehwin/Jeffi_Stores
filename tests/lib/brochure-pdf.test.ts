@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 
 // db is mocked so loadBrochureStore can be exercised without a real DB.
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
@@ -83,8 +83,8 @@ import {
   type BrochureProductInput,
   type BrochureStore,
   type BrochureOptions,
-} from '@/lib/brochure-pdf'
-import { queryMany } from '@/lib/db'
+} from '@/lib/documents/brochure-pdf'
+import { queryMany } from '@/lib/shared/db'
 
 const p = (id: string, name: string) => ({ id, name, sku: id, slug: id }) as any
 

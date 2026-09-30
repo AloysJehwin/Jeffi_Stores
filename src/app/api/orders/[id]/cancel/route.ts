@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { cancelOrder } from '@/lib/orders'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { cancelOrder } from '@/lib/orders/orders'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

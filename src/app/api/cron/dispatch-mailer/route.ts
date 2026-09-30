@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { sendCampaign } from '@/lib/email-campaigns'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { queryMany } from '@/lib/shared/db'
+import { sendCampaign } from '@/lib/shared/email-campaigns'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

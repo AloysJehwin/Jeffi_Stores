@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { webcrypto } from 'crypto'
 
-vi.mock('@/lib/db', () => ({ query: vi.fn().mockResolvedValue({ rows: [] }), queryOne: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn().mockResolvedValue({ rows: [] }), queryOne: vi.fn() }))
 
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import {
   mintBindCookie,
   verifyBindCookie,
@@ -13,7 +13,7 @@ import {
   bindingMode,
   BIND_COOKIE,
   canRegisterKey,
-} from '@/lib/session-binding'
+} from '@/lib/auth/session-binding'
 
 const b64url = (b: ArrayBuffer) => Buffer.from(b).toString('base64url')
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 import ThemeToggle from '@/components/ThemeToggle'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 

@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
-import { queryOne, queryMany, query } from '@/lib/db'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
 import Link from 'next/link'
 import ReviewFormForm from '../../ReviewFormForm'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { discardReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'

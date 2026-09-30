@@ -1,10 +1,10 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiChat } from '@/lib/ai-client'
-import { resolveAiScope, parseAiJson, aiDenial } from '@/lib/ai-scope'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiChat } from '@/lib/shared/ai-client'
+import { resolveAiScope, parseAiJson, aiDenial } from '@/lib/auth/ai-scope'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 function systemPrompt(store: string): string {
   return `You are a form-filling assistant for ${store}.

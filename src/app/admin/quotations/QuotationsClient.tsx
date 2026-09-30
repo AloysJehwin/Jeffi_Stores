@@ -7,7 +7,7 @@ import { Check, ExternalLink } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem, fetchSeedLineItem } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, {
@@ -26,7 +26,7 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
-import { lineItemExGst } from '@/lib/pricing'
+import { lineItemExGst } from '@/lib/catalog/pricing'
 
 interface Quotation {
   id: string

@@ -3,7 +3,7 @@
 // in the edge runtime and cause a module evaluation crash if imported at the
 // top level of instrumentation.ts (which Turbopack evaluates in both runtimes).
 
-import { CRON_JOBS } from '@/lib/cron-jobs'
+import { CRON_JOBS } from '@/lib/shared/cron-jobs'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
@@ -29,7 +29,7 @@ export async function register() {
   // Redis is imported dynamically so ioredis is never evaluated in the edge runtime.
   const acquireLock = async (jobId: string, ttlMs: number): Promise<boolean> => {
     try {
-      const { default: redis } = await import('@/lib/redis')
+      const { default: redis } = await import('@/lib/shared/redis')
       const key = `cron:lock:${jobId}`
       const result = await redis.set(key, '1', 'PX', ttlMs, 'NX' as any)
       return result === 'OK'

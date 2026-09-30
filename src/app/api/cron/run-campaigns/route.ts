@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { runScenario } from '@/lib/campaigns/runner'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 import { runCustomScenario } from '@/lib/campaigns/custom-runner'
-import { getCampaign } from '@/lib/marketing'
+import { getCampaign } from '@/lib/shared/marketing'
 import type { SweepResult } from '@/lib/campaigns/types'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

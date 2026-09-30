@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne } from '@/lib/db'
-import { generateQuotationPDF, QuotationBusiness } from '@/lib/quotation-pdf'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { generateQuotationPDF, QuotationBusiness } from '@/lib/documents/quotation-pdf'
 
 export const dynamic = 'force-dynamic'
 

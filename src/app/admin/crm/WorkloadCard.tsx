@@ -1,8 +1,8 @@
 'use client'
 
 import { CompactStat, ListRows, numStr, hoursStr } from '@/components/admin/dashboard/Primitives'
-import { ap } from '@/lib/admin-path'
-import type { Workload, Assignee, NotesWeek } from '@/lib/crm-insights-shared'
+import { ap } from '@/lib/shared/admin-path'
+import type { Workload, Assignee, NotesWeek } from '@/lib/shared/crm-insights-shared'
 
 function Sparkline({ weeks }: { weeks: NotesWeek[] }) {
   const max = Math.max(1, ...weeks.map(w => w.count))

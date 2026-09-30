@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
+import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { sendWelcomeEmail } from '@/lib/email'
-import { queryOne } from '@/lib/db'
-import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
-import { logActivity } from '@/lib/activity'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { queryOne } from '@/lib/shared/db'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/auth/issue-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { logActivity } from '@/lib/shared/activity'
+import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 
 if (!process.env.JWT_SECRET) {

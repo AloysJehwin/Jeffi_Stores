@@ -3,31 +3,31 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   authenticateServiceAccount: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/admin-audit', () => ({
+vi.mock('@/lib/shared/admin-audit', () => ({
   logAdminAudit: vi.fn(),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/audit/route'
-import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryCount } from '@/lib/db'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryCount } from '@/lib/shared/db'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockAuthSA = vi.mocked(authenticateServiceAccount)

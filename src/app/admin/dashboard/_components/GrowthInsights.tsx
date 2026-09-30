@@ -1,7 +1,7 @@
 'use client'
 
 import { useHasScope } from '@/contexts/AdminScopesContext'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
 import { DonutSplit, RankedBars } from '@/components/admin/dashboard/Charts'
 import {

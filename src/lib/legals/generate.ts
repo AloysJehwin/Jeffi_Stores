@@ -1,7 +1,7 @@
 import type { Policy, Section } from '@/lib/legals/policies'
 import { policies, POLICY_VERSION } from '@/lib/legals/policies'
-import { generatePolicyPDF } from '@/lib/policy-pdf'
-import { tenantNoReplyAddress } from '../brand'
+import { generatePolicyPDF } from '@/lib/documents/policy-pdf'
+import { tenantNoReplyAddress } from '@/lib/catalog/brand'
 
 export interface TenantLegalInfo {
   businessName: string

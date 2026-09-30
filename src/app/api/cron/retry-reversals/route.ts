@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { reverseTransfersForRefund } from '@/lib/razorpay-route'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { reverseTransfersForRefund } from '@/lib/payments/razorpay-route'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

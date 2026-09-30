@@ -7,10 +7,10 @@ const { mockQuery, mockQueryOne, mockGetTenantPlan, mockPool } = vi.hoisted(() =
   mockPool: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({ query: mockQuery, queryOne: mockQueryOne }))
-vi.mock('@/lib/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
+vi.mock('@/lib/shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }))
+vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: mockPool }) }))
-vi.mock('@/lib/tenant-ca', () => ({
+vi.mock('@/lib/tenancy/tenant-ca', () => ({
   issueTenantAdminCert: vi.fn().mockResolvedValue({
     serial: 'AB',
     p12Buffer: Buffer.from(''),
@@ -20,8 +20,8 @@ vi.mock('@/lib/tenant-ca', () => ({
 }))
 vi.mock('@/lib/email', () => ({ sendAdminCertificateEmail: vi.fn() }))
 
-import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
-import { TENANT_SCOPE_KEYS } from '@/lib/scopes'
+import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { TENANT_SCOPE_KEYS } from '@/lib/auth/scopes'
 
 const BASIC = new Set(['products:read', 'products:write', 'orders:read', 'dashboard:read'])
 

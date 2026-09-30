@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, billingSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
 

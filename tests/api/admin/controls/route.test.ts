@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), query: vi.fn(), withTransaction: vi.fn() }))
-vi.mock('@/lib/gst', () => ({ round2: vi.fn().mockImplementation((n: number) => Math.round(n * 100) / 100) }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), query: vi.fn(), withTransaction: vi.fn() }))
+vi.mock('@/lib/catalog/gst', () => ({ round2: vi.fn().mockImplementation((n: number) => Math.round(n * 100) / 100) }))
+vi.mock('@/lib/shared/s3', () => ({
   uploadProductImage: vi.fn().mockResolvedValue({
     url: 'https://cdn/x.jpg',
     thumbnailUrl: 'https://cdn/x-t.jpg',
@@ -26,9 +26,9 @@ vi.mock('@/lib/s3', () => ({
 }))
 
 import { GET, POST } from '@/app/api/admin/controls/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query, withTransaction } from '@/lib/shared/db'
 
 const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['controls:read', 'controls:write'] }
 
@@ -699,7 +699,7 @@ describe('POST /api/admin/controls', () => {
     expect((await res.json()).job_id).toBe('jobG')
     await new Promise(r => setTimeout(r, 0))
     await new Promise(r => setTimeout(r, 0))
-    const { copyGalleryImageToProduct } = await import('@/lib/s3')
+    const { copyGalleryImageToProduct } = await import('@/lib/shared/s3')
     expect(copyGalleryImageToProduct).toHaveBeenCalled()
   })
 

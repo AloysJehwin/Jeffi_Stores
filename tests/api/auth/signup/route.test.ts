@@ -9,20 +9,20 @@ const mockCookieStore = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/otp', () => ({
+vi.mock('@/lib/auth/otp', () => ({
   isOTPVerified: vi.fn(),
   deleteOTP: vi.fn().mockResolvedValue(undefined),
   resetSendOtpCounter: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 // Opaque sessions: signup issues a server-side session and sets cookie = sid.
 // Mocking issueUserToken avoids exercising createSession's DB INSERT.
-vi.mock('@/lib/issue-session', () => ({
+vi.mock('@/lib/auth/issue-session', () => ({
   issueUserToken: vi.fn().mockResolvedValue({ sid: 'user-sid' }),
   USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
 }))
@@ -31,11 +31,11 @@ vi.mock('@/lib/email', () => ({
   sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
@@ -48,8 +48,8 @@ vi.mock('next/headers', () => ({
 }))
 
 import { POST } from '@/app/api/auth/signup/route'
-import * as otpLib from '@/lib/otp'
-import * as db from '@/lib/db'
+import * as otpLib from '@/lib/auth/otp'
+import * as db from '@/lib/shared/db'
 
 function makeRequest(body: object) {
   return new Request('http://localhost/api/auth/signup', {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { checkPincodeServiceability } from '@/lib/delhivery'
+import { checkPincodeServiceability } from '@/lib/shipping/delhivery'
 
 const OK = (postal: Record<string, unknown>) => ({
   ok: true,

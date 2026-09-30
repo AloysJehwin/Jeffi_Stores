@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { NAV_ICONS } from '@/components/admin/AdminSidebarNav'
 
 interface Action {

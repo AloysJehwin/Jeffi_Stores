@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
   getFinancialYear: vi.fn(),
@@ -19,11 +19,11 @@ vi.mock('@/lib/gst', () => ({
   getNextInvoiceSequence: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
   lineItemExGst: vi.fn(),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   // gstEnabled is read live from the env var so tests that set/delete
   // ENABLE_GST continue to drive the GST-enabled code path.
   getFeatureFlags: vi.fn(async () => ({
@@ -35,13 +35,13 @@ vi.mock('@/lib/site-controls', () => ({
   })),
   getBusinessValues: vi.fn(async () => ({ businessStateCode: '22' })),
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
-vi.mock('@/lib/validate', async () => {
+vi.mock('@/lib/shared/validate', async () => {
   const { z } = await import('zod')
   return {
     parseBody: vi.fn(),
@@ -53,15 +53,15 @@ vi.mock('@/lib/validate', async () => {
 // ── Imports ────────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/orders/create/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { withTransaction } from '@/lib/db'
-import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { withTransaction } from '@/lib/shared/db'
+import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
-import { parseBody } from '@/lib/validate'
-import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
+import { parseBody } from '@/lib/shared/validate'
+import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

@@ -9,8 +9,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from './FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
-import { ap } from '@/lib/admin-path'
-import { formsHostForHost } from '@/lib/forms-host'
+import { ap } from '@/lib/shared/admin-path'
+import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Coupon {

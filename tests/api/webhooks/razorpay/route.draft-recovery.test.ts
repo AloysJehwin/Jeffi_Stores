@@ -5,7 +5,7 @@ import crypto from 'crypto'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -20,20 +20,20 @@ vi.mock('@/lib/email', () => ({
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/order-draft', () => ({
+vi.mock('@/lib/orders/order-draft', () => ({
   verifyDraftToken: vi.fn().mockResolvedValue(null),
   hashCartItems: vi.fn().mockReturnValue('hash'),
 }))
 
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   loadActiveCart: vi.fn().mockResolvedValue([]),
   cartSubtotal: vi.fn().mockReturnValue(100),
   cartTaxAmount: vi.fn().mockReturnValue(18),
@@ -42,36 +42,36 @@ vi.mock('@/lib/order-commit', () => ({
   commitOrder: vi.fn().mockResolvedValue({ id: 'ord-1', order_number: 'JS-001', total_amount: '100' }),
 }))
 
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
 
 // getFeatureFlags() runs a real queryMany (site-controls) unless mocked, which
 // would consume a queued db mock and desync the sequence. Stub it out.
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }),
 }))
 
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/webhooks/razorpay/route'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as email from '@/lib/email'
-import * as autoTasks from '@/lib/auto-tasks'
-import * as orderDraft from '@/lib/order-draft'
-import * as orderCommit from '@/lib/order-commit'
-import * as invoice from '@/lib/invoice'
-import * as activity from '@/lib/activity'
-import * as aiFeedback from '@/lib/ai-feedback'
-import * as marketing from '@/lib/marketing'
+import * as autoTasks from '@/lib/shared/auto-tasks'
+import * as orderDraft from '@/lib/orders/order-draft'
+import * as orderCommit from '@/lib/orders/order-commit'
+import * as invoice from '@/lib/documents/invoice'
+import * as activity from '@/lib/shared/activity'
+import * as aiFeedback from '@/lib/shared/ai-feedback'
+import * as marketing from '@/lib/shared/marketing'
 
 const queryOne = db.queryOne as unknown as ReturnType<typeof vi.fn>
 const queryMany = db.queryMany as unknown as ReturnType<typeof vi.fn>

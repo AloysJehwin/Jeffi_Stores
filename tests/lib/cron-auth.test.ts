@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 function reqWith(authorization: string | null) {
   return {

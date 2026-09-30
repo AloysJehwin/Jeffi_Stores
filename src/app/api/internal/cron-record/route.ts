@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-import { isCronJobId } from '@/lib/cron-jobs'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { query, queryOne } from '@/lib/shared/db'
+import { isCronJobId } from '@/lib/shared/cron-jobs'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

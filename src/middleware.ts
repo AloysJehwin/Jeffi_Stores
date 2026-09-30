@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyToken, verifyBusinessToken } from './lib/jwt'
-import { isPassiveAdminRequest } from './lib/passive-admin-paths'
-import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
-import { applyRateLimit } from './lib/rate-limit'
-import { extractSessionSignals } from './lib/session-signals-request'
+import { verifyToken, verifyBusinessToken } from './lib/auth/jwt'
+import { isPassiveAdminRequest } from './lib/auth/passive-admin-paths'
+import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/auth/scopes'
+import { applyRateLimit } from './lib/shared/rate-limit'
+import { extractSessionSignals } from './lib/auth/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
-import { runWithTenantContext } from './lib/tenant-context'
-import { adminCookieNameForHost } from './lib/admin-cookie'
-import { bindingGate } from './lib/session-binding-gate'
+import { runWithTenantContext } from './lib/tenancy/tenant-context'
+import { adminCookieNameForHost } from './lib/auth/admin-cookie'
+import { bindingGate } from './lib/auth/session-binding-gate'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -194,7 +194,7 @@ export async function middleware(request: NextRequest) {
       request.cookies.get('business_sid')?.value
     if (anySid) {
       const sess = await inTenant(async () => {
-        const { resolveSession } = await import('./lib/auth-sessions')
+        const { resolveSession } = await import('./lib/auth/auth-sessions')
         return resolveSession(anySid, reqSignals).catch(() => null)
       })
       if (sess && sess.tenantId !== tenant.tenantId) {
@@ -212,7 +212,7 @@ export async function middleware(request: NextRequest) {
     const PORTAL_PROTECTED = ['/certs']
     if (PORTAL_PROTECTED.some(p => pathname === p || pathname.startsWith(p + '/'))) {
       const portalTok = request.cookies.get('cert_portal')?.value
-      const { verifyPortalToken } = await import('./lib/portal-session')
+      const { verifyPortalToken } = await import('./lib/auth/portal-session')
       const session = await verifyPortalToken(portalTok).catch(() => null)
       if (!session) {
         const res = NextResponse.redirect(new URL('/', request.url))
@@ -242,7 +242,7 @@ export async function middleware(request: NextRequest) {
       if (!ownerSid) {
         return addSecurityHeaders(NextResponse.redirect(new URL('/signin', request.url)))
       }
-      const { resolveOwnerSession } = await import('./lib/owner-session')
+      const { resolveOwnerSession } = await import('./lib/auth/owner-session')
       const owner = await resolveOwnerSession(ownerSid, reqSignals).catch(() => null)
       if (!owner) {
         const res = NextResponse.redirect(new URL('/signin', request.url))
@@ -372,7 +372,7 @@ export async function middleware(request: NextRequest) {
   // check-session never saw the verified identity, so the panel reported "not detected"
   // however valid the cert was.
   if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
-    const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenant-mtls')
+    const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenancy/tenant-mtls')
     const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
     const v = await verifyTenantClientCert(pem, tenant.tenantId).catch(
       (): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' })

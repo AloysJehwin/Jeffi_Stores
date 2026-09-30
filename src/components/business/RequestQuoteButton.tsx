@@ -8,8 +8,8 @@ import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import QuantityInput from '@/components/shared/QuantityInput'
 import CopySku from '@/components/ui/CopySku'
-import { applyDiscount } from '@/lib/pricing'
-import { bp } from '@/lib/business-path'
+import { applyDiscount } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 
 interface SubVariantOption {
   id: string

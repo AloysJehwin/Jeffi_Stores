@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { recomputeHealth, getHealth } from '@/lib/customer-health'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { recomputeHealth, getHealth } from '@/lib/shared/customer-health'
 
 export const dynamic = 'force-dynamic'
 

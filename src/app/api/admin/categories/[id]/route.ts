@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { suggestIcon } from '@/lib/icon-suggest'
-import { canUseAi } from '@/lib/ai-scope'
+import { query, queryOne } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
+import { canUseAi } from '@/lib/auth/ai-scope'
 import { revalidatePath } from 'next/cache'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { query } from '@/lib/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { query } from '@/lib/shared/db'
 
 // PATCH /api/categories/reorder
 // Body: { updates: Array<{ id: string, display_order: number, parent_category_id: string | null }> }

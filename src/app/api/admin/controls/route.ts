@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
-import { round2 } from '@/lib/gst'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/s3'
-import { buildAttributeFilterClauses } from '@/lib/product-attribute-filters'
-import { buildProductSearchClause } from '@/lib/search'
+import { queryMany, queryOne, query, withTransaction } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/shared/s3'
+import { buildAttributeFilterClauses } from '@/lib/catalog/product-attribute-filters'
+import { buildProductSearchClause } from '@/lib/catalog/search'
 
 type SnapshotRow = {
   id: string

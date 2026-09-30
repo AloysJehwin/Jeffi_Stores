@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/packing-slip-pdf', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/documents/packing-slip-pdf', () => ({
   generatePackingSlipPDF: vi.fn(),
   loadStoreSettings: vi.fn(),
 }))
 
 import { GET } from '@/app/api/admin/packing-slips/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
-import { generatePackingSlipPDF, loadStoreSettings } from '@/lib/packing-slip-pdf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
+import { generatePackingSlipPDF, loadStoreSettings } from '@/lib/documents/packing-slip-pdf'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

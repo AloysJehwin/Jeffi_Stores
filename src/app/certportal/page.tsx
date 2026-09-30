@@ -1,6 +1,6 @@
 import PortalShell from '@/components/portal/PortalShell'
 import PortalSignIn from '@/components/portal/PortalSignIn'
-import { CERT_PORTAL } from '@/lib/portal-config'
+import { CERT_PORTAL } from '@/lib/tenancy/portal-config'
 
 export const dynamic = 'force-dynamic'
 

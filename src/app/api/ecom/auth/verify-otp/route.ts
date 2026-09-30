@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
-import { issueOwnerSession, setOwnerCookie } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
+import { issueOwnerSession, setOwnerCookie } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 // Ecom OWNER verify-otp → creates/finds the owner + issues an owner session.
 // Same endpoint for signup + signin (findOrCreateOwner upserts). name optional (new signups).

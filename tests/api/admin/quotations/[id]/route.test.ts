@@ -3,22 +3,22 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({ sendQuotationFinalizedEmail: vi.fn() }))
-vi.mock('@/lib/pricing', () => ({ lineItemExGst: vi.fn().mockReturnValue(100) }))
+vi.mock('@/lib/catalog/pricing', () => ({ lineItemExGst: vi.fn().mockReturnValue(100) }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET, PATCH, DELETE } from '@/app/api/admin/quotations/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)

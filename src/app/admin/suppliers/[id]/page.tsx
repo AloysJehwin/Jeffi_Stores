@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { verifyToken } from '@/lib/jwt'
+import { verifyToken } from '@/lib/auth/jwt'
 import SupplierDetailClient from './SupplierDetailClient'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 

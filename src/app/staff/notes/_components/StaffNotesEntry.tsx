@@ -1,7 +1,7 @@
 'use client'
 
 import { useIsMobile } from '@/contexts/PortalDeviceContext'
-import { STAFF_NOTES } from '@/lib/portal-config'
+import { STAFF_NOTES } from '@/lib/tenancy/portal-config'
 import { useStaffNoteDraft } from '@/app/staff/notes/_lib/useStaffNoteDraft'
 import StaffNotesFormMobile from './StaffNotesFormMobile'
 import StaffNotesFormDesktop from './StaffNotesFormDesktop'

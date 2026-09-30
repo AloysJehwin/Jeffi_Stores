@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: vi.fn(),
 }))
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/campaigns/types', () => ({
   resolveParams: vi.fn().mockReturnValue({ sendCooldownDays: 7 }),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   getClient: vi.fn(),
@@ -40,12 +40,12 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 // ---------------------------------------------------------------------------
 
 import { GET } from '@/app/api/admin/campaigns/[kind]/eligible/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCampaign } from '@/lib/marketing'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCampaign } from '@/lib/shared/marketing'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 import { resolveParams } from '@/lib/campaigns/types'
-import { queryMany, queryOne, getClient } from '@/lib/db'
+import { queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 
 // ---------------------------------------------------------------------------

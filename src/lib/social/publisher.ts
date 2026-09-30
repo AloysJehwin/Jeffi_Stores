@@ -11,8 +11,8 @@ import {
   publishInstagramImage,
   publishInstagramCarousel,
   publishInstagramReel,
-} from '../meta'
-import { queryOne } from '../db'
+} from '@/lib/catalog/meta'
+import { queryOne } from '@/lib/shared/db'
 import { generateSocialCaption } from './caption'
 import { withProductLink, productUrl } from './product-url'
 

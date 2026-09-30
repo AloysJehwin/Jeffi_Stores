@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { syncAllProductsToSheet } from '@/lib/google-sheets'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { syncAllProductsToSheet } from '@/lib/shared/google-sheets'
 
 export const dynamic = 'force-dynamic'
 

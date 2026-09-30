@@ -4,9 +4,9 @@ const { create, edit } = vi.hoisted(() => ({
   create: vi.fn().mockResolvedValue({ id: 'acc_TEST' }),
   edit: vi.fn().mockResolvedValue({ id: 'acc_TEST' }),
 }))
-vi.mock('@/lib/razorpay', () => ({ getRazorpayInstance: () => ({ accounts: { create, edit } }) }))
+vi.mock('@/lib/payments/razorpay', () => ({ getRazorpayInstance: () => ({ accounts: { create, edit } }) }))
 
-import { createLinkedAccount, mapBusinessType } from '@/lib/razorpay-route'
+import { createLinkedAccount, mapBusinessType } from '@/lib/payments/razorpay-route'
 
 const BASE = {
   businessName: 'Aloys Jehwin',

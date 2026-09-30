@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/auth/jwt'
 import { getImportJob, resolveImportTenantId } from '@/lib/import/jobs'
 
 export const dynamic = 'force-dynamic'

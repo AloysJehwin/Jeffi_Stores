@@ -1,21 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
 }))
-vi.mock('@/lib/order-draft', () => ({
+vi.mock('@/lib/orders/order-draft', () => ({
   verifyDraftToken: vi.fn(),
   hashCartItems: vi.fn(),
 }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   loadActiveCart: vi.fn(),
   cartSubtotal: vi.fn(),
   cartTaxAmount: vi.fn(),
@@ -28,29 +28,29 @@ vi.mock('@/lib/email', () => ({
   sendNewOrderNotification: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/razorpay/check-pending/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpay from '@/lib/razorpay'
-import * as orderDraft from '@/lib/order-draft'
-import * as orderCommit from '@/lib/order-commit'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpay from '@/lib/payments/razorpay'
+import * as orderDraft from '@/lib/orders/order-draft'
+import * as orderCommit from '@/lib/orders/order-commit'
 
 // ------------------------------------------------------------------ helpers
 
@@ -275,10 +275,10 @@ describe('POST /api/razorpay/check-pending', () => {
 
   it('commits a cart-mode order successfully (happy path with coupon)', async () => {
     // Force the fire-and-forget side-effects to reject so their .catch() closures execute
-    const invoice = await import('@/lib/invoice')
+    const invoice = await import('@/lib/documents/invoice')
     const email = await import('@/lib/email')
-    const activity = await import('@/lib/activity')
-    const aiFeedback = await import('@/lib/ai-feedback')
+    const activity = await import('@/lib/shared/activity')
+    const aiFeedback = await import('@/lib/shared/ai-feedback')
     vi.mocked(invoice.createDraftInvoice).mockRejectedValue(new Error('x'))
     vi.mocked(email.sendOrderConfirmationEmail).mockRejectedValue(new Error('x'))
     vi.mocked(email.sendNewOrderNotification).mockRejectedValue(new Error('x'))

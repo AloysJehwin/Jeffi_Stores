@@ -67,7 +67,7 @@ vi.mock('qrcode', () => ({
   toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,mockqr'),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn().mockResolvedValue([]),
   queryOne: vi.fn().mockResolvedValue(null),
   query: vi.fn().mockResolvedValue({ rows: [] }),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 export async function GET(request: NextRequest) {
   const authUser = await authenticateUser(request)

@@ -3,17 +3,17 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
   getClient: vi.fn(),
 }))
-vi.mock('@/lib/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+vi.mock('@/lib/shared/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
 
 vi.mock('@/lib/email', () => ({
   sendOrderDelayNotification: vi.fn(),
@@ -22,23 +22,23 @@ vi.mock('@/lib/email', () => ({
   transporter: { sendMail: vi.fn() },
 }))
 vi.mock('@/lib/queries', () => ({ VARIANT_MIN_PRICE_SQL: 'COALESCE(0,0)' }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn() }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/agent/actions/[id]/approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany, withTransaction, getClient } from '@/lib/db'
-import { sendTestCampaignEmail } from '@/lib/automation-emails'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany, withTransaction, getClient } from '@/lib/shared/db'
+import { sendTestCampaignEmail } from '@/lib/shared/automation-emails'
 import {
   sendOrderDelayNotification,
   sendProductAnnouncementEmail,
   sendQuotationFinalizedEmail,
   transporter,
 } from '@/lib/email'
-import { logStockMovement } from '@/lib/inventory'
+import { logStockMovement } from '@/lib/orders/inventory'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

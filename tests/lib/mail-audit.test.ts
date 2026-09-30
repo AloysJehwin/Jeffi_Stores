@@ -9,15 +9,15 @@ vi.mock('nodemailer', () => ({
   },
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import * as db from '@/lib/db'
-import { sendAuditedMail } from '@/lib/mail-audit'
+import * as db from '@/lib/shared/db'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
 
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>
 

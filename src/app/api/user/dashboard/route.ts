@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 
 export async function GET(request: NextRequest) {
   try {

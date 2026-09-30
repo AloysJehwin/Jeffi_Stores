@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 import {
   approveKyc,
   getTenant,
@@ -13,7 +13,7 @@ import {
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -22,11 +22,11 @@ import {
   inferProfileCategory,
   normalizeIndianPhone,
   isValidCompanyPan,
-} from '@/lib/razorpay-route'
-import { sendKycApprovedEmail } from '@/lib/ecom-emails'
+} from '@/lib/payments/razorpay-route'
+import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
-import { stateFromPincode } from '@/lib/india-pincode-state'
-import { isPaymentBypassed, bypassAuditNote } from '@/lib/ecom-payment-bypass'
+import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
+import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
 import { setSubscriptionStatus } from '@/lib/tenant-registry'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 

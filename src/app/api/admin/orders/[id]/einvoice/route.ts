@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateIRN, cancelIRN, isEInvoiceConfigured, EInvoicePayload, EInvoiceItem } from '@/lib/einvoice'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateIRN, cancelIRN, isEInvoiceConfigured, EInvoicePayload, EInvoiceItem } from '@/lib/shipping/einvoice'
 
 export const dynamic = 'force-dynamic'
 

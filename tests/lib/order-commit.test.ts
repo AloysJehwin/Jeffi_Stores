@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Mocks — must be declared before any imports that transitively use them
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockImplementation((price: number, rate: number, isIGST: boolean) => {
     if (rate <= 0) return { taxableAmount: price, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }
@@ -23,11 +23,11 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
-vi.mock('@/lib/shipping-rate', () => ({
+vi.mock('@/lib/shipping/shipping-rate', () => ({
   computeShippingRate: vi.fn(),
 }))
 
@@ -45,9 +45,9 @@ import {
   findExistingUnpaidRazorpayOrder,
   commitOrder,
   type CartLine,
-} from '@/lib/order-commit'
-import { queryMany, queryOne, withTransaction } from '@/lib/db'
-import { computeShippingRate } from '@/lib/shipping-rate'
+} from '@/lib/orders/order-commit'
+import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
+import { computeShippingRate } from '@/lib/shipping/shipping-rate'
 
 const mockComputeShippingRate = vi.mocked(computeShippingRate)
 const mockQueryMany = vi.mocked(queryMany)

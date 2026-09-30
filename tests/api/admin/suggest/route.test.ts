@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildProductSearchClause: vi.fn(),
   buildProductSearchRank: vi.fn(),
   buildVectorSearchClause: vi.fn(),
@@ -19,14 +19,14 @@ vi.mock('@/lib/search', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/suggest/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
 import {
   buildProductSearchClause,
   buildProductSearchRank,
   buildVectorSearchClause,
   buildSearchClause,
-} from '@/lib/search'
+} from '@/lib/catalog/search'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryOne } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { parseBody, zNonEmpty, zCurrency } from '@/lib/validate'
-import { round2 } from '@/lib/gst'
+import { queryOne } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { parseBody, zNonEmpty, zCurrency } from '@/lib/shared/validate'
+import { round2 } from '@/lib/catalog/gst'
 
 const ApplyCouponSchema = z.union([
   z.object({ code: zNonEmpty, subtotal: zCurrency, couponId: z.string().uuid().optional() }),

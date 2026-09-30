@@ -17,7 +17,7 @@ import {
   serialCountForBaseQuantity,
   serialSlotsForBaseQuantity,
   validateUnitQuantityBounds,
-} from '@/lib/selling-unit'
+} from '@/lib/catalog/selling-unit'
 
 function unit(over: Partial<SellingUnit> = {}): SellingUnit {
   return { unit: 'm', factor: 1, dimension: 'length', qty_step: 0.5, min_qty: 0.5, max_qty: null, ...over }

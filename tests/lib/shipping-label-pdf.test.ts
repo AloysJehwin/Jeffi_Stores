@@ -62,7 +62,7 @@ vi.mock('path', () => ({
   join: (...parts: string[]) => parts.join('/'),
 }))
 
-import { buildLabelPDF, buildMergedLabelsPDF, type LabelItem, type LabelInput } from '@/lib/shipping-label-pdf'
+import { buildLabelPDF, buildMergedLabelsPDF, type LabelItem, type LabelInput } from '@/lib/documents/shipping-label-pdf'
 
 beforeEach(() => {
   vi.clearAllMocks()

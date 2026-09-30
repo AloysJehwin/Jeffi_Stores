@@ -1,9 +1,9 @@
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { notFound } from 'next/navigation'
 import ProductAnalyticsClient from './ProductAnalyticsClient'
-import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
+import { getProductAnalyticsData } from '@/lib/shared/admin-product-analytics'
 
 export const dynamic = 'force-dynamic'
 

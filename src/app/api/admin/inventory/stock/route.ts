@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getStockLedger, getStockValuation, logStockMovement, recomputeStockStatusForProduct } from '@/lib/inventory'
-import { getClient, queryOne, query } from '@/lib/db'
-import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/shelf'
-import { logAdminAudit } from '@/lib/admin-audit'
-import { parseBody, zUuid } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getStockLedger, getStockValuation, logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
+import { getClient, queryOne, query } from '@/lib/shared/db'
+import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/catalog/shelf'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const PatchSchema = z
   .object({
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       if (stockStatus === 'expiring_soon')
         conditions.push(`pb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`)
       const where = conditions.join(' AND ')
-      const rows = await import('@/lib/db').then(m =>
+      const rows = await import('@/lib/shared/db').then(m =>
         m.queryMany<any>(
           `
         SELECT

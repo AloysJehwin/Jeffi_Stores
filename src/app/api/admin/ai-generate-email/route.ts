@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiChat } from '@/lib/ai-client'
-import { aiDenial } from '@/lib/ai-scope'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiChat } from '@/lib/shared/ai-client'
+import { aiDenial } from '@/lib/auth/ai-scope'
 
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   const userPrompt = [body.subject ? `Subject: ${body.subject}` : null, scenario].filter(Boolean).join('\n')
 
   try {
-    const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/brand')
+    const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/catalog/brand')
     const [descriptor, storeUrl] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync()])
     // 'email' hint = the fast model: the large copy model truncates the HTML mid-JSON.
     const r = await aiChat({

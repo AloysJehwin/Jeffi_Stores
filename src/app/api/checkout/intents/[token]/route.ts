@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
-import { verifyIntent } from '@/lib/checkout-intent'
-import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/order-commit'
-import { getBusinessDiscountMap } from '@/lib/business-discount'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { round2 } from '@/lib/gst'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
+import { verifyIntent } from '@/lib/orders/checkout-intent'
+import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/orders/order-commit'
+import { getBusinessDiscountMap } from '@/lib/catalog/business-discount'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { round2 } from '@/lib/catalog/gst'
 
 interface ProductDisplay {
   name: string

@@ -1,26 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }),
 }))
-vi.mock('@/lib/product-cards', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/product-cards')>()),
+vi.mock('@/lib/catalog/product-cards', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/catalog/product-cards')>()),
   getProductCardsByIds: vi.fn(),
 }))
 
 import { GET } from '@/app/api/account/buy-again/route'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
-import { getProductCardsByIds } from '@/lib/product-cards'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
+import { getProductCardsByIds } from '@/lib/catalog/product-cards'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 const P1 = '550e8400-e29b-41d4-a716-446655440010'

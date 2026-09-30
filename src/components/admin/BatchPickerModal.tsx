@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { productLabel } from '@/lib/product-label'
+import { productLabel } from '@/lib/catalog/product-label'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 export interface BatchOption {

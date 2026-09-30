@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ verifyReviewToken: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ verifyReviewToken: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
 import { GET, POST } from '@/app/api/reviews/from-token/route'
-import { verifyReviewToken } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { verifyReviewToken } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 const PAYLOAD = { orderId: 'ord-1', productId: 'prod-1', userId: 'user-1' }
 

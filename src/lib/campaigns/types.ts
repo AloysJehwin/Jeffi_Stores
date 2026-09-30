@@ -1,4 +1,4 @@
-import type { Campaign, CampaignKind } from '@/lib/marketing'
+import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
 
 export type ParamDef =
   | { type: 'integer'; min?: number; max?: number; label: string; description?: string }

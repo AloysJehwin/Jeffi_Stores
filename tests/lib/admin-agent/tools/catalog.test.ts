@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('@/lib/queries', () => ({
 }))
 
 import { CATALOG_TOOLS } from '@/lib/admin-agent/tools/catalog'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)

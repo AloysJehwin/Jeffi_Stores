@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
@@ -9,14 +9,14 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: '(SELECT MIN(price) FROM product_variants WHERE product_id = p.id)',
   EFFECTIVE_STOCK_SQL: 'COALESCE(stock, 0)',
 }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   embed: vi.fn(),
   findSimilarProductIds: vi.fn(),
 }))
 
 import { CUSTOMER_TOOLS, getCustomerTool } from '@/lib/customer-agent/tools'
-import * as db from '@/lib/db'
-import * as rag from '@/lib/rag'
+import * as db from '@/lib/shared/db'
+import * as rag from '@/lib/shared/rag'
 
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)

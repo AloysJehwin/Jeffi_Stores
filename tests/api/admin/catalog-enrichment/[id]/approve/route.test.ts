@@ -3,14 +3,14 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
 // Mock dynamic imports used inside reEmbedProduct
-vi.mock('@/lib/rag', () => ({ embed: vi.fn() }))
+vi.mock('@/lib/shared/rag', () => ({ embed: vi.fn() }))
 vi.mock('pg', () => ({
   Pool: vi.fn(),
 }))
@@ -18,9 +18,9 @@ vi.mock('pg', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/catalog-enrichment/[id]/approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
 import { Pool } from 'pg'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ describe('POST /api/admin/catalog-enrichment/[id]/approve', () => {
       .mockResolvedValueOnce(ENRICHMENT_ROW as any)
       .mockResolvedValueOnce(PRODUCT_ROW as any)
 
-    const ragMod = await import('@/lib/rag')
+    const ragMod = await import('@/lib/shared/rag')
     vi.mocked(ragMod.embed).mockRejectedValueOnce(new Error('embed service unavailable'))
 
     const res = await POST(makePost(), PARAMS)
@@ -153,8 +153,8 @@ describe('POST /api/admin/catalog-enrichment/[id]/approve', () => {
     vi.mocked(query).mockResolvedValue(undefined as any)
     armPoolMock()
 
-    // Mock dynamic import of @/lib/rag
-    const ragMod = await import('@/lib/rag')
+    // Mock dynamic import of @/lib/shared/rag
+    const ragMod = await import('@/lib/shared/rag')
     vi.mocked(ragMod.embed).mockResolvedValue(Array(384).fill(0.1))
 
     // queryOne: first = enrichment row, second = product fetch inside reEmbedProduct

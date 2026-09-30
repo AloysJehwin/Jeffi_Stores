@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import type { Tab } from './_components/shared'
 import { ReceivablesTab } from './_components/ReceivablesTab'
 import { PayablesTab } from './_components/PayablesTab'

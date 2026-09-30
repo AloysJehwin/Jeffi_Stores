@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { logAdminAudit } from '@/lib/admin-audit'
-import { uploadImportFile } from '@/lib/s3'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { uploadImportFile } from '@/lib/shared/s3'
 import { parseWorkbook } from '@/lib/import/parse'
 import { enqueueImportJob, resolveImportTenantId } from '@/lib/import/jobs'
 

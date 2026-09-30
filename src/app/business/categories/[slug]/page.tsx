@@ -3,16 +3,16 @@ export const dynamic = 'force-dynamic'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import Link from 'next/link'
-import { queryOne, queryMany } from '@/lib/db'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { bp } from '@/lib/business-path'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { bp } from '@/lib/shared/business-path'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/business/ProductCard'

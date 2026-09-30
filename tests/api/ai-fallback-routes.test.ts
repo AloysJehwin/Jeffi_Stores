@@ -1,15 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn() }))
-vi.mock('@/lib/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: vi.fn() }))
+vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
 import { POST as recapPOST } from '@/app/api/ai-recap/route'
 import { POST as cartPOST } from '@/app/api/ai-cart-insight/route'
 import { POST as affirmPOST } from '@/app/api/ai-affirmation/route'
-import { aiChat } from '@/lib/ai-client'
-import { currentTenantPlanGate } from '@/lib/plan-gate'
+import { aiChat } from '@/lib/shared/ai-client'
+import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 
 const mockAiChat = vi.mocked(aiChat)
 const mockGate = vi.mocked(currentTenantPlanGate)

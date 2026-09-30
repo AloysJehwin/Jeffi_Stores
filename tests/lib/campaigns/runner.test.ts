@@ -1,18 +1,18 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: vi.fn(),
 }))
 
 import { runScenario, runScenarioForAllCampaigns } from '@/lib/campaigns/runner'
-import { query } from '@/lib/db'
-import { getCampaign } from '@/lib/marketing'
+import { query } from '@/lib/shared/db'
+import { getCampaign } from '@/lib/shared/marketing'
 
 const mockQuery = query as ReturnType<typeof vi.fn>
 const mockGetCampaign = getCampaign as ReturnType<typeof vi.fn>

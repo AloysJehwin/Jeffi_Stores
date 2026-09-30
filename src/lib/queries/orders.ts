@@ -1,5 +1,5 @@
 import { queryOne, queryMany, queryCount } from './shared'
-import { buildVectorSearchClause } from '../search'
+import { buildVectorSearchClause } from '@/lib/catalog/search'
 
 export async function getAllOrders() {
   return queryMany(`

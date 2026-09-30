@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiChat, AiClientError } from '@/lib/ai-client'
-import { aiDenial } from '@/lib/ai-scope'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
+import { aiDenial } from '@/lib/auth/ai-scope'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   if (!prompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
 
-  const { storeDescriptorForPrompt } = await import('@/lib/brand')
+  const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
   const systemPrompt = `You write ONE email-campaign template for ${await storeDescriptorForPrompt()}.
 
 Output ONLY this JSON object, nothing else. All 4 keys must be non-empty:

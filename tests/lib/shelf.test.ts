@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -28,8 +28,8 @@ import {
   syncPerishableStock,
   decrementNonPerishableShelfStock,
   upsertShelfStock,
-} from '@/lib/shelf'
-import { query, queryOne, queryMany, getClient } from '@/lib/db'
+} from '@/lib/catalog/shelf'
+import { query, queryOne, queryMany, getClient } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
@@ -447,7 +447,7 @@ describe('adjustStock', () => {
     mockQueryOne.mockResolvedValue({ id: 'ss-new', quantity: 5 } as any)
 
     // Re-mock adjustStock's internal getClient import
-    vi.doMock('@/lib/db', () => ({
+    vi.doMock('@/lib/shared/db', () => ({
       query: mockQuery,
       queryOne: mockQueryOne,
       queryMany: mockQueryMany,

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({ query: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 
 import { POST } from '@/app/api/notify-back-in-stock/route'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 

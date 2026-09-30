@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProductCard from './ProductCard'
 import SortDropdown from './SortDropdown'
-import { pickUnitPrice } from '@/lib/pricing'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 
 interface ProductItem {
   id: string

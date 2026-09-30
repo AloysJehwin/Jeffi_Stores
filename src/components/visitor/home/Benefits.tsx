@@ -1,5 +1,5 @@
 import IconByName from './IconByName'
-import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 export interface BenefitItem {
   icon: string

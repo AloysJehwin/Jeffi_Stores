@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryCount } from '@/lib/db'
-import { buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryCount } from '@/lib/shared/db'
+import { buildSearchClause } from '@/lib/catalog/search'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const createCouponSchema = z.object({
   code: zNonEmpty,

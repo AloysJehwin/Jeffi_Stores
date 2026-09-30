@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
-import { parseBody, zCurrency } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
+import { parseBody, zCurrency } from '@/lib/shared/validate'
 
 const PayoutSchema = z.object({
   mode: z.enum(['NEFT', 'RTGS', 'IMPS', 'UPI']),

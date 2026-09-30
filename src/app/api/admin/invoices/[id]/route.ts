@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/product-label'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { productLabel } from '@/lib/catalog/product-label'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, withTransaction } from '@/lib/shared/db'
 import {
   isInterState,
   calculateGST,
@@ -10,13 +10,13 @@ import {
   getNextInvoiceSequence,
   getFinancialYear,
   round2,
-} from '@/lib/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
+} from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
-import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
-import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/catalog/shelf'
+import { deleteBatchIfEmpty } from '@/lib/orders/inventory-deduct'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

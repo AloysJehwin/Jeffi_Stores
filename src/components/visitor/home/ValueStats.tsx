@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { friendlyCount, SECTION_COPY_DEFAULTS, type ValueStatMetric } from '@/lib/homepage-sections'
+import { friendlyCount, SECTION_COPY_DEFAULTS, type ValueStatMetric } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.value_stats
 

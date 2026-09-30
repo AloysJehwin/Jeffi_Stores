@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
@@ -23,11 +23,11 @@ vi.mock('@/lib/tenant-registry', () => ({
   persistLinkedAccountToOwnerBank: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay-subscriptions', () => ({
+vi.mock('@/lib/payments/razorpay-subscriptions', () => ({
   createRazorpaySubscription: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay-route', () => ({
+vi.mock('@/lib/payments/razorpay-route', () => ({
   createLinkedAccount: vi.fn(),
   createRouteStakeholder: vi.fn(),
   configureRouteSettlement: vi.fn(),
@@ -55,7 +55,7 @@ vi.mock('@/lib/razorpay-route', () => ({
   }),
 }))
 
-vi.mock('@/lib/ecom-emails', () => ({
+vi.mock('@/lib/shared/ecom-emails', () => ({
   sendKycApprovedEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -64,7 +64,7 @@ vi.mock('@/lib/ecom-emails', () => ({
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/ecom/kyc/[tenantId]/approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 import {
   approveKyc,
   getTenant,
@@ -78,7 +78,7 @@ import {
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
 import {
   createLinkedAccount,
   createRouteStakeholder,
@@ -86,8 +86,8 @@ import {
   mapBusinessType,
   inferProfileCategory,
   normalizeIndianPhone,
-} from '@/lib/razorpay-route'
-import { sendKycApprovedEmail } from '@/lib/ecom-emails'
+} from '@/lib/payments/razorpay-route'
+import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
 
 // ---------------------------------------------------------------------------
 // Helpers / fixtures

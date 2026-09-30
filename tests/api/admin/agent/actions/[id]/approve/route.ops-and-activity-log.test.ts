@@ -3,17 +3,17 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
   getClient: vi.fn(),
 }))
-vi.mock('@/lib/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+vi.mock('@/lib/shared/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
 
 vi.mock('@/lib/email', () => ({
   sendOrderDelayNotification: vi.fn(),
@@ -22,18 +22,18 @@ vi.mock('@/lib/email', () => ({
   transporter: { sendMail: vi.fn() },
 }))
 vi.mock('@/lib/queries', () => ({ VARIANT_MIN_PRICE_SQL: '0' }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn().mockResolvedValue(undefined) }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/agent/actions/[id]/approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne, withTransaction, getClient } from '@/lib/db'
-import { sendTestCampaignEmail } from '@/lib/automation-emails'
-import * as activity from '@/lib/activity'
-import { sendAuditedMail } from '@/lib/mail-audit'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryOne, withTransaction, getClient } from '@/lib/shared/db'
+import { sendTestCampaignEmail } from '@/lib/shared/automation-emails'
+import * as activity from '@/lib/shared/activity'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import {
   sendOrderDelayNotification,
   sendProductAnnouncementEmail,

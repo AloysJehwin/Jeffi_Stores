@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: 'NULL',
   EFFECTIVE_STOCK_SQL: 'COALESCE(stock, 0)',
 }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
   findSimilarProductIds: vi.fn(),
   queryManyReplica: vi.fn(),
@@ -23,15 +23,15 @@ vi.mock('@/lib/admin-agent/vision', () => ({
   ocrPdfPages: vi.fn(),
   isVisionConfigured: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
 }))
 
 import { SALES_TOOLS } from '@/lib/admin-agent/tools/sales'
-import * as db from '@/lib/db'
-import * as rag from '@/lib/rag'
+import * as db from '@/lib/shared/db'
+import * as rag from '@/lib/shared/rag'
 import * as vision from '@/lib/admin-agent/vision'
-import * as aiClient from '@/lib/ai-client'
+import * as aiClient from '@/lib/shared/ai-client'
 
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)

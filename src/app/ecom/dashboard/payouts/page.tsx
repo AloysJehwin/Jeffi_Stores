@@ -1,7 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { getOwnerBankWithRoute } from '@/lib/tenant-registry'
 import PayoutsClient, { type BankState } from './PayoutsClient'
 

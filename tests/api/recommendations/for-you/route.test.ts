@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({ query: vi.fn() }))
-vi.mock('@/lib/jwt', () => ({ authenticateUser: vi.fn() }))
-vi.mock('@/lib/recommendations', () => ({
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateUser: vi.fn() }))
+vi.mock('@/lib/catalog/recommendations', () => ({
   getFeaturedForUser: vi.fn(),
   getBestSellerCards: vi.fn(),
 }))
@@ -13,9 +13,9 @@ vi.mock('@/lib/recommendations', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/recommendations/for-you/route'
-import { query } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
-import { getFeaturedForUser, getBestSellerCards } from '@/lib/recommendations'
+import { query } from '@/lib/shared/db'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { getFeaturedForUser, getBestSellerCards } from '@/lib/catalog/recommendations'
 
 const mockQuery = vi.mocked(query)
 const mockAuth = vi.mocked(authenticateUser)

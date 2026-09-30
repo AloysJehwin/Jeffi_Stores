@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { deductOrderStock } from '@/lib/inventory-deduct'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { deductOrderStock } from '@/lib/orders/inventory-deduct'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
+import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/documents/invoice'
 
 export const dynamic = 'force-dynamic'
 

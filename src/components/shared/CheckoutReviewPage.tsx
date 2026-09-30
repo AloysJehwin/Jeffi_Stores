@@ -12,9 +12,9 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
-import { round2 } from '@/lib/gst'
-import { bp } from '@/lib/business-path'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
+import { round2 } from '@/lib/catalog/gst'
+import { bp } from '@/lib/shared/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {

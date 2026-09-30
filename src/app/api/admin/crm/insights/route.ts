@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCrmInsights } from '@/lib/crm-insights'
-import { isCrmRange, isCrmSegment } from '@/lib/crm-insights-sql'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCrmInsights } from '@/lib/shared/crm-insights'
+import { isCrmRange, isCrmSegment } from '@/lib/shared/crm-insights-sql'
 import type { AnalyticsRange } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'

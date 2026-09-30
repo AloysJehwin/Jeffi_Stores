@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { verifyToken } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
 import RFQDetailClient from './RFQDetailClient'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export default async function BusinessRFQDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

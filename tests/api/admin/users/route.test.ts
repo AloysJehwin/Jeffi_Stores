@@ -3,19 +3,19 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
 
-vi.mock('@/lib/auth', () => ({
+vi.mock('@/lib/auth/auth', () => ({
   createAdminUser: vi.fn(),
 }))
 
-vi.mock('@/lib/certificates', () => ({
+vi.mock('@/lib/tenancy/certificates', () => ({
   generateClientCertificate: vi.fn(),
 }))
 
@@ -23,8 +23,8 @@ vi.mock('@/lib/email', () => ({
   sendAdminCertificateEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/tenancy/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
+vi.mock('@/lib/auth/scopes', () => ({
   ALL_SCOPE_KEYS: ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent'],
   hasScope: vi.fn(),
   isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
@@ -44,10 +44,10 @@ vi.mock('@/lib/scopes', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/users/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query } from '@/lib/db'
-import { createAdminUser } from '@/lib/auth'
-import { generateClientCertificate } from '@/lib/certificates'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query } from '@/lib/shared/db'
+import { createAdminUser } from '@/lib/auth/auth'
+import { generateClientCertificate } from '@/lib/tenancy/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)

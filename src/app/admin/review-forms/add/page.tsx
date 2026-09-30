@@ -1,8 +1,8 @@
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 import Link from 'next/link'
 import ReviewFormForm from '../ReviewFormForm'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
 export const dynamic = 'force-dynamic'
 

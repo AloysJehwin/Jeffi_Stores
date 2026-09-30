@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { logActivity } from '@/lib/activity'
-import { query } from '@/lib/db'
+import { logActivity } from '@/lib/shared/activity'
+import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 

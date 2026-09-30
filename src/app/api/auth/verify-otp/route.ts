@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP } from '@/lib/otp'
+import { verifyOTP } from '@/lib/auth/otp'
 
 export async function POST(request: NextRequest) {
   try {

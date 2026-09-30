@@ -1,6 +1,6 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { query } from '@/lib/db'
-import { retireProduct } from '@/lib/product-delete'
+import { query } from '@/lib/shared/db'
+import { retireProduct } from '@/lib/catalog/product-delete'
 
 export interface SheetOrphan {
   productId: string

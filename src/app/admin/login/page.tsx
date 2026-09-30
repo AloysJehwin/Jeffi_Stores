@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 

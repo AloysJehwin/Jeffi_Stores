@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export default function BusinessPendingPage() {

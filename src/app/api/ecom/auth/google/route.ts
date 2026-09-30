@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyGoogle } from '@/lib/google-verify'
-import { issueOwnerSession, setOwnerCookie } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { verifyGoogle } from '@/lib/shared/google-verify'
+import { issueOwnerSession, setOwnerCookie } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 // Ecom OWNER Google sign-in/up. Reuses the shared Google token verification, then
 // upserts the owner + issues an owner session. body: { idToken } or { accessToken }.

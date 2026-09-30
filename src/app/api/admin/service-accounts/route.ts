@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
-import { generateClientCertificate } from '@/lib/certificates'
-import { issueTenantAdminCert } from '@/lib/tenant-ca'
-import { resolveTenant } from '@/lib/tenant-context'
+import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany } from '@/lib/shared/db'
+import { generateClientCertificate } from '@/lib/tenancy/certificates'
+import { issueTenantAdminCert } from '@/lib/tenancy/tenant-ca'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 

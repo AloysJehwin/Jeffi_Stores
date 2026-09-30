@@ -1,34 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/lib/whatsapp', () => ({
+vi.mock('@/lib/shared/whatsapp', () => ({
   WA_TEMPLATE_REGISTRY: { promo_offer: { label: 'Promo', category: 'marketing', fields: ['code'] } },
   sendTemplateByKey: vi.fn().mockResolvedValue(true),
   sendFreeTextWhatsApp: vi.fn().mockResolvedValue(true),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { GET, POST } from '@/app/api/admin/customers/[id]/whatsapp/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { sendTemplateByKey, sendFreeTextWhatsApp } from '@/lib/whatsapp'
-import { logActivity } from '@/lib/activity'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { sendTemplateByKey, sendFreeTextWhatsApp } from '@/lib/shared/whatsapp'
+import { logActivity } from '@/lib/shared/activity'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

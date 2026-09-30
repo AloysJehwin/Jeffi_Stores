@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: () => ({}) },
   zPhone: { optional: () => ({}) },
 }))
 
 import { PATCH } from '@/app/api/user/update/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as validate from '@/lib/validate'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as validate from '@/lib/shared/validate'
 
 const AUTH_USER = { userId: 'user-1' }
 const EXISTING_USER = { first_name: 'Jane', last_name: 'Doe', phone: '9876543210' }

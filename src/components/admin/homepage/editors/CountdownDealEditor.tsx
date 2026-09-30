@@ -1,6 +1,6 @@
 'use client'
 
-import { configId } from '@/lib/homepage-sections'
+import { configId } from '@/lib/catalog/homepage-sections'
 import {
   DateTimeField,
   Grid,

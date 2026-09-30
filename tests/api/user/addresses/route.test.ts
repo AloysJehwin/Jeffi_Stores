@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: () => ({}) },
   zPhone: { optional: () => ({}) },
@@ -19,9 +19,9 @@ vi.mock('@/lib/validate', () => ({
 }))
 
 import { GET, POST } from '@/app/api/user/addresses/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as validate from '@/lib/validate'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as validate from '@/lib/shared/validate'
 
 const AUTH_USER = { userId: 'user-1' }
 const ADDRESS_ROW = { id: 'addr-1', city: 'Mumbai', state: 'MH' }

@@ -5,11 +5,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // because vi.mock() is hoisted to the top of the file.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
@@ -24,21 +24,21 @@ vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }))
 
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Use vi.fn() with no default — each test sets its own return value via beforeEach
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
   loadActiveCart: vi.fn(),
 }))
 
-vi.mock('@/lib/checkout-intent', () => ({
+vi.mock('@/lib/orders/checkout-intent', () => ({
   signIntent: vi.fn(),
   verifyIntent: vi.fn(),
 }))
@@ -47,9 +47,9 @@ vi.mock('@/lib/checkout-intent', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 import { POST } from '@/app/api/checkout/intents/route'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
-import { signIntent } from '@/lib/checkout-intent'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { resolveBuyNowItem, loadActiveCart } from '@/lib/orders/order-commit'
+import { signIntent } from '@/lib/orders/checkout-intent'
 
 const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440002'
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'

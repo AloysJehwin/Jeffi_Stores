@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryCount } from '@/lib/db'
-import { requireAdminScope } from '@/lib/jwt'
+import { query, queryCount } from '@/lib/shared/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

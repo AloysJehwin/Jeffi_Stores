@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -15,20 +15,20 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/email', () => ({
   sendReturnStatusEmail: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/return-policy', () => ({
+vi.mock('@/lib/catalog/return-policy', () => ({
   checkReturnEligibility: vi.fn(),
 }))
 
 import { GET, POST } from '@/app/api/orders/[id]/return/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as returnPolicy from '@/lib/return-policy'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as returnPolicy from '@/lib/catalog/return-policy'
 
 // ------------------------------------------------------------------ helpers
 

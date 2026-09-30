@@ -44,8 +44,8 @@ vi.mock('pdfkit', () => {
   return { default: vi.fn().mockImplementation(() => makeMockDoc()) }
 })
 
-import { generatePurchaseOrderPDF } from '@/lib/po-pdf'
-import type { POItem, POBusinessSettings } from '@/lib/po-pdf'
+import { generatePurchaseOrderPDF } from '@/lib/documents/po-pdf'
+import type { POItem, POBusinessSettings } from '@/lib/documents/po-pdf'
 
 const mockBusiness: POBusinessSettings = {
   legalName: 'Jeffi Stores Pvt Ltd',

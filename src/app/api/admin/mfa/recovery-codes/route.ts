@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
-import { generateRecoveryCodes } from '@/lib/mfa'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
+import { generateRecoveryCodes } from '@/lib/auth/mfa'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)

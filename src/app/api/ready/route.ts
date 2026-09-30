@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { query } from '@/lib/db'
-import lazyRedis from '@/lib/redis'
+import { query } from '@/lib/shared/db'
+import lazyRedis from '@/lib/shared/redis'
 
 export const dynamic = 'force-dynamic'
 

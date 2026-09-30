@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 

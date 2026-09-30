@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { pickUnitPrice } from '@/lib/pricing'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.category_showcase
 

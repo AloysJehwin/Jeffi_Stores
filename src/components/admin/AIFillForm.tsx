@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useCanUseAi } from '@/contexts/AdminScopesContext'
-import type { AiActionScope } from '@/lib/ai-scope'
+import type { AiActionScope } from '@/lib/auth/ai-scope'
 
 export interface AIFillField {
   name: string

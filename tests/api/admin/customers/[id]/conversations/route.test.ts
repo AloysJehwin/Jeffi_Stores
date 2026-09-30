@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/customer-conversations', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/customer-conversations')>('@/lib/customer-conversations')
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/customer-conversations', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/shared/customer-conversations')>('@/lib/shared/customer-conversations')
   return { ...actual, listConversations: vi.fn() }
 })
 
 import { GET } from '@/app/api/admin/customers/[id]/conversations/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { listConversations } from '@/lib/customer-conversations'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { listConversations } from '@/lib/shared/customer-conversations'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

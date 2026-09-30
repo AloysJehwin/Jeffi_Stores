@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dueSocialPosts, lookupTenantContextById, updateSocialPost } from '@/lib/tenant-registry'
-import { runWithTenantContext } from '@/lib/tenant-context'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { publishScheduledPost } from '@/lib/social/publisher'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

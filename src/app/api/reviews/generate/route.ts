@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { aiChat } from '@/lib/ai-client'
-import { storefrontAiGate } from '@/lib/storefront-ai'
-import { parseBody } from '@/lib/validate'
+import { aiChat } from '@/lib/shared/ai-client'
+import { storefrontAiGate } from '@/lib/shared/storefront-ai'
+import { parseBody } from '@/lib/shared/validate'
 
 const Schema = z.object({
   productName: z.string().min(1).max(200),

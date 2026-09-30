@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { hasScope } from '@/lib/scopes'
+import { hasScope } from '@/lib/auth/scopes'
 import ReviewsClient from './ReviewsClient'
 
 export default async function AdminReviewsPage() {

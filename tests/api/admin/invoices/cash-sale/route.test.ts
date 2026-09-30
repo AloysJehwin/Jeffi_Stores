@@ -5,19 +5,19 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   calculateGST: vi.fn(),
   getFinancialYear: vi.fn(),
   generateInvoiceNumber: vi.fn(),
@@ -25,28 +25,28 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
   recomputeStockStatusForProduct: vi.fn(),
 }))
 
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 // The route now reads GST state via getFeatureFlags() instead of ENABLE_GST
 // directly. Mirror that env-driven state so per-test ENABLE_GST still applies.
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn(async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' })),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   return {
     parseBody: vi.fn((schema: any, data: any) => {
       const result = schema.safeParse(data)
@@ -64,14 +64,14 @@ vi.mock('@/lib/validate', () => {
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/invoices/cash-sale/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { withTransaction } from '@/lib/db'
-import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { withTransaction } from '@/lib/shared/db'
+import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
 
 // ---------------------------------------------------------------------------
 // Helpers

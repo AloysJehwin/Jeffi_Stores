@@ -3,38 +3,38 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   generateInvoiceNumber: vi.fn().mockReturnValue('JS/2025-26/00001'),
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
   getFinancialYear: vi.fn().mockReturnValue('2025-26'),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
   recomputeStockStatusForProduct: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendBusinessInvoiceGeneratedEmail: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemExGst: vi.fn((qty: number, rate: number, disc: number) => qty * rate * (1 - disc / 100)),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
 }))
 vi.mock('sharp', () => ({
@@ -44,10 +44,10 @@ vi.mock('sharp', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/quotations/[id]/convert-to-invoice/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { getRazorpayInstance } from '@/lib/razorpay'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { getRazorpayInstance } from '@/lib/payments/razorpay'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -326,7 +326,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('handles inter-state GST when buyer has GSTIN in different state', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    const { isInterState } = await import('@/lib/gst')
+    const { isInterState } = await import('@/lib/catalog/gst')
     vi.mocked(isInterState).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue({
       ...FINAL_QUOTATION,
@@ -463,7 +463,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     })
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
-    const { syncPerishableStock } = await import('@/lib/shelf')
+    const { syncPerishableStock } = await import('@/lib/catalog/shelf')
     const res = await POST(makePost({}), PARAMS)
     expect(res.status).toBe(200)
     expect(syncPerishableStock).toHaveBeenCalled()

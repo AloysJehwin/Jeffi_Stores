@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mailShell, escapeHtml, MAIL_BASE_CSS } from '@/lib/mail-template'
+import { mailShell, escapeHtml, MAIL_BASE_CSS } from '@/lib/shared/mail-template'
 
 describe('mailShell', () => {
   it('wraps content in the standard container, brand header and footer', () => {

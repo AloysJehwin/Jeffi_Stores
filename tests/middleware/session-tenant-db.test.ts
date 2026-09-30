@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 
 const { mockResolveTenant, mockVerifyToken, mockResolveSession, seenTenantIds } = vi.hoisted(() => ({
   mockResolveTenant: vi.fn(),
@@ -9,19 +9,19 @@ const { mockResolveTenant, mockVerifyToken, mockResolveSession, seenTenantIds } 
   seenTenantIds: [] as (string | null)[],
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: mockVerifyToken,
   verifyBusinessToken: vi.fn(),
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/shared/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/auth/scopes', () => ({
   getScopeForPath: vi.fn().mockReturnValue(null),
   hasScope: vi.fn().mockReturnValue(true),
   isPlatformAdmin: vi.fn().mockReturnValue(true),
 }))
-vi.mock('@/lib/auth-sessions', () => ({ resolveSession: mockResolveSession }))
-vi.mock('@/lib/tenant-mtls', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({ resolveSession: mockResolveSession }))
+vi.mock('@/lib/tenancy/tenant-mtls', () => ({
   decodeClientCertHeader: vi.fn().mockReturnValue('pem'),
   verifyTenantClientCert: vi.fn().mockResolvedValue({ ok: true, serial: 'AB', commonName: 'owner' }),
 }))
@@ -31,7 +31,7 @@ vi.mock('@/lib/tenant-registry', async () => {
 })
 
 import { middleware } from '@/middleware'
-import { adminCookieNameForHost } from '@/lib/admin-cookie'
+import { adminCookieNameForHost } from '@/lib/auth/admin-cookie'
 
 const ACTIVE = {
   tenantId: 't-1',

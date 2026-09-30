@@ -2,15 +2,15 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
-import { pickUnitPrice } from '@/lib/pricing'
+import { getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
 import ProductSpecifications from '@/components/visitor/pdp/ProductSpecifications'
 import ProductReviews from '@/components/visitor/ProductReviews'
@@ -20,10 +20,10 @@ import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
 import ProductPitchLine from '@/components/on-device/ProductPitchLine'
-import { cardPropsFor } from '@/lib/product-cards'
+import { cardPropsFor } from '@/lib/catalog/product-cards'
 import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtTogether'
 import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
-import { getApprovedReviewSummary } from '@/lib/review-summary'
+import { getApprovedReviewSummary } from '@/lib/shared/review-summary'
 import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
 
 const getProductBySlug = cache(async (slug: string) => {
@@ -331,7 +331,7 @@ export default async function ProductDetailPage({
     getRelatedProducts(product.id, product.category_id, product.name),
     // Use the authoritative delivery setting (same one checkout uses), not the
     // stale separate 'free_shipping_threshold' key.
-    (await import('@/lib/delivery-settings')).getDeliverySettings(),
+    (await import('@/lib/shipping/delivery-settings')).getDeliverySettings(),
     getApprovedReviewSummary(product.id),
   ])
   const freeShippingThreshold = deliverySettings.freeThreshold

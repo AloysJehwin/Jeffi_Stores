@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { verifyToken } from '@/lib/auth/jwt'
 
 export async function POST(req: NextRequest) {
   try {

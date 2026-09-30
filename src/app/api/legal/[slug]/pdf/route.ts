@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getPolicyBySlug } from '@/lib/legals/policies'
-import { generatePolicyPDF } from '@/lib/policy-pdf'
+import { generatePolicyPDF } from '@/lib/documents/policy-pdf'
 
 export const dynamic = 'force-dynamic'
 

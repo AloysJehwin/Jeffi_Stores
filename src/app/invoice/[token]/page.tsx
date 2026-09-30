@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import InvoiceViewClient from './InvoiceViewClient'
 
 export const dynamic = 'force-dynamic'

@@ -11,7 +11,7 @@ import {
   visibleSections,
   withDefaults,
   type HomepageSection,
-} from '@/lib/homepage-sections'
+} from '@/lib/catalog/homepage-sections'
 
 const make = (over: Partial<HomepageSection> = {}): HomepageSection => ({
   id: 'x',

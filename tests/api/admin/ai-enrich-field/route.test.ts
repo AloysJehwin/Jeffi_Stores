@@ -3,16 +3,16 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/ai-enrich-field/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiChat } from '@/lib/ai-client'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiChat } from '@/lib/shared/ai-client'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

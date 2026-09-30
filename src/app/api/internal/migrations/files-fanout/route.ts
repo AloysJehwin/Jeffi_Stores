@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runMigrationFilesFanout } from '@/lib/tenant-migrations'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 // The fan-out opens a connection per tenant and applies each pending migration file.

@@ -10,18 +10,18 @@ const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQueryMany = vi.hoisted(() => vi.fn())
 const mockLogActivity = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: mockAuthenticateAnyUser,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 

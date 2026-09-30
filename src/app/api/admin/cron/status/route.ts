@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { CRON_JOBS } from '@/lib/cron-jobs'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { CRON_JOBS } from '@/lib/shared/cron-jobs'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

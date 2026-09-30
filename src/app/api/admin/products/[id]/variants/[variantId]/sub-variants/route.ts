@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { generateVariantSku } from '@/lib/sku'
-import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { generateVariantSku } from '@/lib/catalog/sku'
+import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/shared/validate'
 
 const PostSchema = z.object({
   sub_variant_name: zNonEmpty,

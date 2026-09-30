@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasPlanScope } from '@/lib/plan-gate'
-import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
+import { queryMany } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

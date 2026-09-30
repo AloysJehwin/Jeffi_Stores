@@ -1,4 +1,4 @@
-import { buildProductHighlights, buildProductDetails } from '@/lib/google-merchant-helpers'
+import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 const TARGET_COUNTRY = 'IN'

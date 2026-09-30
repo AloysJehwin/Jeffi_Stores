@@ -1,11 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
 }))
 
 import { POST } from '@/app/api/products/[id]/buy-now-quote/route'
-import { resolveBuyNowItem } from '@/lib/order-commit'
+import { resolveBuyNowItem } from '@/lib/orders/order-commit'
 
 const mockResolve = vi.mocked(resolveBuyNowItem)
 

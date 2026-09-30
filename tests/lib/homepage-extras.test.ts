@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
-vi.mock('@/lib/product-cards', () => ({ getProductCards: vi.fn(), getProductCardsByIds: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/catalog/product-cards', () => ({ getProductCards: vi.fn(), getProductCardsByIds: vi.fn() }))
 
-import { queryMany, queryOne } from '@/lib/db'
-import { getProductCards, getProductCardsByIds } from '@/lib/product-cards'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { getProductCards, getProductCardsByIds } from '@/lib/catalog/product-cards'
 import {
   getBackInStock,
   getBundles,
@@ -13,8 +13,8 @@ import {
   getTestimonials,
   getValueStats,
   loadSectionExtras,
-} from '@/lib/homepage-extras'
-import type { HomepageSection, SectionType } from '@/lib/homepage-sections'
+} from '@/lib/catalog/homepage-extras'
+import type { HomepageSection, SectionType } from '@/lib/catalog/homepage-sections'
 
 const A = '11111111-1111-1111-1111-111111111111'
 const B = '22222222-2222-2222-2222-222222222222'

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { clearStaffCookie } from '@/lib/staff-session'
+import { clearStaffCookie } from '@/lib/auth/staff-session'
 
 export const dynamic = 'force-dynamic'
 

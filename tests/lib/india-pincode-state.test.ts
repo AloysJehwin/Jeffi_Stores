@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { stateFromPincode } from '@/lib/india-pincode-state'
+import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 
 /**
  * Razorpay rejects an unrecognised state name. The old code took it positionally from the

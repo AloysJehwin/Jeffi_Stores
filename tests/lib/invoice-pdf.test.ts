@@ -55,8 +55,8 @@ vi.mock('qrcode', () => ({
   toDataURL: vi.fn().mockResolvedValue('data:image/png;base64,mockqr'),
 }))
 
-import { generateInvoicePDF } from '@/lib/invoice-pdf'
-import type { InvoiceOrder, InvoiceOrderItem, InvoiceBusinessSettings, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
+import { generateInvoicePDF } from '@/lib/documents/invoice-pdf'
+import type { InvoiceOrder, InvoiceOrderItem, InvoiceBusinessSettings, InvoiceBuyerAddress } from '@/lib/documents/invoice-pdf'
 
 const mockBusiness: InvoiceBusinessSettings = {
   gstin: '22AAAAA0000A1Z5',

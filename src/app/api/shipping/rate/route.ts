@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { parseBody, zIndianPin, zCurrency } from '@/lib/validate'
-import { computeShippingRate } from '@/lib/shipping-rate'
+import { parseBody, zIndianPin, zCurrency } from '@/lib/shared/validate'
+import { computeShippingRate } from '@/lib/shipping/shipping-rate'
 
 const postSchema = z.object({
   destinationPin: zIndianPin,

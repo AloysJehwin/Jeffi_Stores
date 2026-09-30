@@ -1,5 +1,5 @@
-import { queryMany } from '@/lib/db'
-import { heroSlideHref } from '@/lib/hero-slides'
+import { queryMany } from '@/lib/shared/db'
+import { heroSlideHref } from '@/lib/catalog/hero-slides'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
@@ -8,18 +8,18 @@ import {
 } from '@/lib/queries'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
-import { getHost } from '@/lib/get-host'
-import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
-import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/homepage-data'
-import { loadSectionExtras } from '@/lib/homepage-extras'
+import { getHost } from '@/lib/tenancy/get-host'
+import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
+import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/catalog/homepage-data'
+import { loadSectionExtras } from '@/lib/catalog/homepage-extras'
 import {
   productRowKey,
   sectionLimit,
   defaultAboutCopy,
   resolveAboutStats,
   type ProductSource,
-} from '@/lib/homepage-sections'
-import { listActiveOffers, listOffersByIds } from '@/lib/product-offers'
+} from '@/lib/catalog/homepage-sections'
+import { listActiveOffers, listOffersByIds } from '@/lib/catalog/product-offers'
 
 export const revalidate = 120
 
@@ -149,7 +149,7 @@ async function getFreeShippingThreshold() {
   // Use the SAME setting checkout/shipping uses (delivery_free_threshold) so the
   // homepage always matches the real free-delivery threshold — not the stale,
   // separate 'free_shipping_threshold' key.
-  const { getDeliverySettings } = await import('@/lib/delivery-settings')
+  const { getDeliverySettings } = await import('@/lib/shipping/delivery-settings')
   const { freeThreshold } = await getDeliverySettings()
   return freeThreshold
 }

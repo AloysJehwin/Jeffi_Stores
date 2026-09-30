@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useIsMobile } from '@/contexts/PortalDeviceContext'
-import type { PortalSurfaceConfig } from '@/lib/portal-config'
+import type { PortalSurfaceConfig } from '@/lib/tenancy/portal-config'
 
 // Shared sign-in for the portal surfaces: Google (popup OAuth, then the surface's Google route
 // mints its cookie) and a one-time email code (start -> verify). Copy and endpoints come from the

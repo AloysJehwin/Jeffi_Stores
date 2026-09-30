@@ -10,8 +10,8 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import CopySku from '@/components/ui/CopySku'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
-import { bp } from '@/lib/business-path'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null

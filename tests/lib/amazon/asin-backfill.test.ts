@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
 }))
@@ -11,7 +11,7 @@ vi.mock('@/lib/amazon/client', () => ({
 }))
 
 import { backfillAsins } from '@/lib/amazon/asin-backfill'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as client from '@/lib/amazon/client'
 
 const mockQuery = vi.mocked(db.query)

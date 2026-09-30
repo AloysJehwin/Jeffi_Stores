@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { embed, runWithHnswTuning } from '@/lib/rag'
-import { storefrontAiAllowed } from '@/lib/storefront-ai'
+import { queryMany } from '@/lib/shared/db'
+import { embed, runWithHnswTuning } from '@/lib/shared/rag'
+import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 

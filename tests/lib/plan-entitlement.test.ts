@@ -5,10 +5,10 @@ const { mockGetTenantPlan, mockQueryOne } = vi.hoisted(() => ({
   mockQueryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
-vi.mock('@/lib/db', () => ({ query: vi.fn(), queryOne: mockQueryOne, queryMany: vi.fn() }))
+vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: mockQueryOne, queryMany: vi.fn() }))
 
-import { resolveSession } from '@/lib/auth-sessions'
+import { resolveSession } from '@/lib/auth/auth-sessions'
 import crypto from 'crypto'
 
 const TOKEN = crypto.randomBytes(32).toString('hex')

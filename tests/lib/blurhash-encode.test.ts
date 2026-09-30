@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { decode, isBlurhashValid } from 'blurhash'
-import { computeBlurhash } from '@/lib/s3'
+import { computeBlurhash } from '@/lib/shared/s3'
 
 async function solid(r: number, g: number, b: number, width = 600, height = 400) {
   return sharp({ create: { width, height, channels: 3, background: { r, g, b } } })

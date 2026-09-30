@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 import { renderProductCard, persistCardToBucket } from '@/lib/social/card'
-import { currentBrandNameAsync, storeBaseUrlAsync } from '@/lib/brand'
+import { currentBrandNameAsync, storeBaseUrlAsync } from '@/lib/catalog/brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

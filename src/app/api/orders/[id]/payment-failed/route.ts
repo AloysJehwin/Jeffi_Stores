@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { queryOne, query } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { sendPaymentStatusUpdate, sendPaymentFailedAdminNotification } from '@/lib/email'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { logActivity } from '@/lib/activity'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { logActivity } from '@/lib/shared/activity'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
-import { productCardProps } from '@/lib/product-card-props'
+import { productCardProps } from '@/lib/catalog/product-card-props'
 
 interface ProductRowSectionProps {
   title: string

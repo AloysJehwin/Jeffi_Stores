@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyWebhookSignature } from '@/lib/razorpay-subscriptions'
+import { verifyWebhookSignature } from '@/lib/payments/razorpay-subscriptions'
 import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
-import { sendStoreLiveEmail } from '@/lib/ecom-emails'
+import { sendStoreLiveEmail } from '@/lib/shared/ecom-emails'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'

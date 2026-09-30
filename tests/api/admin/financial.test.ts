@@ -5,20 +5,20 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/financial', () => ({
+vi.mock('@/lib/payments/financial', () => ({
   getPLReport: vi.fn(),
   getReceivablesAging: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   getFinancialYear: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
@@ -29,9 +29,9 @@ vi.mock('@/lib/gst', () => ({
 
 import { GET as plGET } from '@/app/api/admin/financial/pl/route'
 import { GET as receivablesGET } from '@/app/api/admin/financial/receivables/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getPLReport, getReceivablesAging } from '@/lib/financial'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getPLReport, getReceivablesAging } from '@/lib/payments/financial'
 
 // ---------------------------------------------------------------------------
 // Helpers

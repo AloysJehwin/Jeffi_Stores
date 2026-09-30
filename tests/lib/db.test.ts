@@ -117,9 +117,9 @@ async function importDb(
   }))
 
   // Opaque sessions: getRequestAdminId now dynamically imports resolveSession from
-  // @/lib/auth-sessions (the cookie value is the opaque session id, not a JWT).
+  // @/lib/auth/auth-sessions (the cookie value is the opaque session id, not a JWT).
   // Resolve to an admin principal only when an admin_sid cookie is present.
-  vi.doMock('@/lib/auth-sessions', () => ({
+  vi.doMock('@/lib/auth/auth-sessions', () => ({
     resolveSession: vi.fn().mockImplementation(async (sid: string) => {
       if (!sid || !adminToken) return null
       return {
@@ -143,7 +143,7 @@ async function importDb(
     delete process.env.RDS_IAM_AUTH
   }
 
-  const mod = await import('@/lib/db')
+  const mod = await import('@/lib/shared/db')
   return { mod, pg }
 }
 
@@ -315,7 +315,7 @@ describe('query() – mutation wrapping', () => {
     vi.doMock('jose', () => ({
       jwtVerify: vi.fn().mockResolvedValue({ payload: { adminId: 'admin-err' } }),
     }))
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockResolvedValue({
         sid: 'tok',
         principalType: 'admin',
@@ -326,7 +326,7 @@ describe('query() – mutation wrapping', () => {
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     await expect(query('INSERT INTO t VALUES ($1)', [1])).rejects.toThrow('DB constraint')
 
     const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
@@ -502,13 +502,13 @@ describe('getRequestAdminId – error handling', () => {
       }),
     }))
     // resolveSession throws — exercises the catch block in getRequestAdminId
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockRejectedValue(new Error('db unreachable')),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
     process.env.JWT_SECRET = 'secret'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     // INSERT would wrap in transaction only if adminId is non-null.
     // Since resolveSession throws, adminId should be null -> falls through to pool.query
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
@@ -537,12 +537,12 @@ describe('getRequestAdminId – error handling', () => {
       }),
     }))
     // Session not found / expired (e.g. a legacy JWT cookie) -> null
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockResolvedValue(null),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     // No session -> adminId null -> no transaction wrapping
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
     expect(pg.poolConnect).not.toHaveBeenCalled()
@@ -584,7 +584,7 @@ describe('query() – runWithAuditContext takes precedence over cookie', () => {
 
     // Importing audit-context after resetModules ensures we share the same
     // AsyncLocalStorage instance as the db module loaded in this cycle.
-    const { runWithAuditContext } = await import('@/lib/audit-context')
+    const { runWithAuditContext } = await import('@/lib/auth/audit-context')
 
     await runWithAuditContext('ctx-admin', async () => {
       await mod.query('INSERT INTO orders (id) VALUES ($1)', ['o2'])

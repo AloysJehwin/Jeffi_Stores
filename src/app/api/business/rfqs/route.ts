@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateBusiness } from '@/lib/jwt'
-import { queryMany, queryCount, query, queryOne } from '@/lib/db'
-import { sendRfqSubmittedEmail } from '@/lib/email-business'
-import { createAdminNotification } from '@/lib/admin-notify'
+import { authenticateBusiness } from '@/lib/auth/jwt'
+import { queryMany, queryCount, query, queryOne } from '@/lib/shared/db'
+import { sendRfqSubmittedEmail } from '@/lib/shared/email-business'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
 
 function buildRfqNumber(now: Date, seq: number): string {
   const month = now.getMonth()

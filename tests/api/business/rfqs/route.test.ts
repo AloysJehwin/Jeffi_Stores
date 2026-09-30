@@ -14,11 +14,11 @@ const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockSendRfqSubmittedEmail = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateBusiness: mockAuthenticateBusiness,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
@@ -26,7 +26,7 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendRfqSubmittedEmail: mockSendRfqSubmittedEmail,
 }))
 

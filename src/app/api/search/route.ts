@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
-import { authenticateUser } from '@/lib/jwt'
-import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/catalog/search'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

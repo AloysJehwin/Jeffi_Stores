@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
-import { signIntent } from '@/lib/checkout-intent'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody, zUuid } from '@/lib/validate'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { resolveBuyNowItem, loadActiveCart } from '@/lib/orders/order-commit'
+import { signIntent } from '@/lib/orders/checkout-intent'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const IntentSchema = z.object({
   mode: z.string().optional(),

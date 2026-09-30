@@ -11,11 +11,11 @@ import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { pickUnitPrice } from '@/lib/pricing'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
-import type { ReviewSummary } from '@/lib/review-summary-types'
+import type { ReviewSummary } from '@/lib/shared/review-summary-types'
 
 interface ProductImage {
   id: string

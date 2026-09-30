@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,9 +20,9 @@ interface LogRow {
 
 async function reEmbed(productId: string): Promise<boolean> {
   try {
-    const { embed } = await import('@/lib/rag')
+    const { embed } = await import('@/lib/shared/rag')
     const { Pool } = await import('pg')
-    const { queryOne } = await import('@/lib/db')
+    const { queryOne } = await import('@/lib/shared/db')
 
     const product = await queryOne<{
       name: string

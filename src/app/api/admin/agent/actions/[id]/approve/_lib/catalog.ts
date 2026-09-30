@@ -1,5 +1,5 @@
-import { queryOne, getClient } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
+import { queryOne, getClient } from '@/lib/shared/db'
+import { logStockMovement } from '@/lib/orders/inventory'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function createCoupon(action: AgentAction): Promise<ActionResult> {

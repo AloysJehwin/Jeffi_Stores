@@ -10,7 +10,7 @@ import {
   computeVolumeFactor,
   sameDimensionFactor,
   type Dimension,
-} from '@/lib/units'
+} from '@/lib/catalog/units'
 
 // ---------------------------------------------------------------------------
 // Static catalogue

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query, queryMany } from '@/lib/db'
-import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/selling-unit'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query, queryMany } from '@/lib/shared/db'
+import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
 
 export const dynamic = 'force-dynamic'
 

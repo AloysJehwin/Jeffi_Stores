@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/auth/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 import AdminSelect from '@/components/admin/AdminSelect'
 

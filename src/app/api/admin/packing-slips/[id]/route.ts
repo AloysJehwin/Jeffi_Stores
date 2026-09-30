@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { generatePackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/packing-slip-pdf'
+import { queryOne } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { generatePackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/documents/packing-slip-pdf'
 
 async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
   const row = await queryOne(

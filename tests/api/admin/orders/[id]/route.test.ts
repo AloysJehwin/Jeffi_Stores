@@ -3,30 +3,30 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: vi.fn() },
 }))
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn().mockResolvedValue({ messageId: 'msg-1' }),
 }))
 
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
   getRazorpayInstance: vi.fn(),
 }))
@@ -34,11 +34,11 @@ vi.mock('@/lib/razorpay', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, PATCH } from '@/app/api/admin/orders/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne, queryMany } from '@/lib/db'
-import { hasScope } from '@/lib/scopes'
-import { parseBody } from '@/lib/validate'
-import { sendAuditedMail } from '@/lib/mail-audit'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { hasScope } from '@/lib/auth/scopes'
+import { parseBody } from '@/lib/shared/validate'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryOne = vi.mocked(queryOne)

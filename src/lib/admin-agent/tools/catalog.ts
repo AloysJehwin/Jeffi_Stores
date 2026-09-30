@@ -1,4 +1,4 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
 import type { ToolDef } from '../tools'
 import { ok } from '../tool-envelope'

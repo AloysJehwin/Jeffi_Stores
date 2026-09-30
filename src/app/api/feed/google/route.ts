@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { currentBrandNameAsync } from '@/lib/brand'
-import { getStorefrontContent } from '@/lib/site-controls'
-import { buildProductHighlights, buildProductDetails } from '@/lib/google-merchant-helpers'
+import { queryMany } from '@/lib/shared/db'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { getStorefrontContent } from '@/lib/catalog/site-controls'
+import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
 
 export const dynamic = 'force-dynamic'
 

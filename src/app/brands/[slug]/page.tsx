@@ -1,14 +1,14 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { pickUnitPrice } from '@/lib/pricing'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
 import Pagination from '@/components/ui/Pagination'
 

@@ -1,36 +1,36 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/shipping', () => ({
+vi.mock('@/lib/shipping/shipping', () => ({
   packIntoCartons: vi.fn(),
   fallbackShippingRate: vi.fn(),
   CARTON_MAX_WEIGHT_GRAMS: 20000,
 }))
-vi.mock('@/lib/delivery-settings', () => ({
+vi.mock('@/lib/shipping/delivery-settings', () => ({
   getDeliverySettings: vi.fn(),
   applyDeliveryRules: vi.fn(),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getBusinessValues: vi.fn(),
 }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   checkPincodeServiceability: vi.fn(),
   listDelhiveryPickupLocations: vi.fn(),
 }))
-vi.mock('@/lib/tenant-context', () => ({
+vi.mock('@/lib/tenancy/tenant-context', () => ({
   getCurrentTenantId: vi.fn(() => null),
   resolveTenantId: vi.fn(async () => null),
 }))
 vi.mock('@/lib/integrations/resolve', () => ({
   resolveDelhiveryToken: vi.fn(async () => 'test-delhivery-token'),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
@@ -39,11 +39,11 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 import { POST } from '@/app/api/shipping/rate/route'
-import { queryMany } from '@/lib/db'
-import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping'
-import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
-import { getBusinessValues } from '@/lib/site-controls'
-import { checkPincodeServiceability, listDelhiveryPickupLocations } from '@/lib/delhivery'
+import { queryMany } from '@/lib/shared/db'
+import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping/shipping'
+import { getDeliverySettings, applyDeliveryRules } from '@/lib/shipping/delivery-settings'
+import { getBusinessValues } from '@/lib/catalog/site-controls'
+import { checkPincodeServiceability, listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockPackIntoCartons = vi.mocked(packIntoCartons)

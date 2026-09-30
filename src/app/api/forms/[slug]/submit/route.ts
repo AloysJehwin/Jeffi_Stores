@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, withTransaction } from '@/lib/db'
-import { uploadGalleryImage } from '@/lib/s3'
+import { queryOne, withTransaction } from '@/lib/shared/db'
+import { uploadGalleryImage } from '@/lib/shared/s3'
 import { PoolClient } from 'pg'
 import nodemailer from 'nodemailer'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { currentBrandNameAsync } from '@/lib/brand'
-import { mailShell } from '@/lib/mail-template'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { mailShell } from '@/lib/shared/mail-template'
 
 interface CustomField {
   id: string

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/product-label'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
-import { withTransaction } from '@/lib/db'
+import { productLabel } from '@/lib/catalog/product-label'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { withTransaction } from '@/lib/shared/db'
 import {
   isInterState,
   calculateGST,
@@ -11,12 +11,12 @@ import {
   generateInvoiceNumber,
   getNextInvoiceSequence,
   round2,
-} from '@/lib/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
-import { deductOrderStock } from '@/lib/inventory-deduct'
+} from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { deductOrderStock } from '@/lib/orders/inventory-deduct'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
-import { parseBody, zUuid, zNonEmpty } from '@/lib/validate'
+import { parseBody, zUuid, zNonEmpty } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
 import { GET } from '@/app/api/coupons/nudge/route'
-import { queryMany } from '@/lib/db'
-import { authenticateAnyUser } from '@/lib/jwt'
+import { queryMany } from '@/lib/shared/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 

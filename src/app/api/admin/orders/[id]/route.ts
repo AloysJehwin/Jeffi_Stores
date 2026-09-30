@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { restoreOrderStock } from '@/lib/order-stock'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
-import { mailShell } from '@/lib/mail-template'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
+import { mailShell } from '@/lib/shared/mail-template'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const contactLine = await storeContactLine()
-  const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
+  const storeName = await (await import('@/lib/catalog/site-controls')).getStoreIdentity().then(i => i.name)
   const brand = await currentBrandNameAsync()
   try {
     const { id } = await params

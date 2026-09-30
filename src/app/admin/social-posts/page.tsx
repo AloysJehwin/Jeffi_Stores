@@ -1,8 +1,8 @@
 import { headers } from 'next/headers'
-import { hasScope } from '@/lib/scopes'
+import { hasScope } from '@/lib/auth/scopes'
 import SocialPostsClient from './SocialPostsClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'

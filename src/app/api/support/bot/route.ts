@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { fetchUserOrders, getBotPayload } from '@/lib/support-bot'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { fetchUserOrders, getBotPayload } from '@/lib/shared/support-bot'
 
 export async function GET(request: NextRequest) {
   const authUser = await authenticateAnyUser(request)

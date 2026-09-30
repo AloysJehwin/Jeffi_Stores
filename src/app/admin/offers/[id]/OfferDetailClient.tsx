@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
-import type { ProductOffer } from '@/lib/product-offers-shared'
+import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 function toDateInput(iso: string | null): string {
   if (!iso) return ''

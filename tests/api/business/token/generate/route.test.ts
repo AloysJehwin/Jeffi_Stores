@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateBusiness: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateBusiness: vi.fn() }))
 vi.mock('jose', () => ({
   SignJWT: class {
     setProtectedHeader() {
@@ -20,7 +20,7 @@ vi.mock('jose', () => ({
 }))
 
 import { POST } from '@/app/api/business/token/generate/route'
-import { authenticateBusiness } from '@/lib/jwt'
+import { authenticateBusiness } from '@/lib/auth/jwt'
 
 const USER = {
   userId: 'u1',

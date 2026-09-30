@@ -2,9 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies, headers } from 'next/headers'
-import { verifyBusinessToken } from '@/lib/jwt'
-import { bp } from '@/lib/business-path'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { verifyBusinessToken } from '@/lib/auth/jwt'
+import { bp } from '@/lib/shared/business-path'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export async function generateMetadata() {
   const storeName = (await getStoreIdentity()).name

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne } from '@/lib/db'
-import { generatePurchaseOrderPDF, POItem, POBusinessSettings } from '@/lib/po-pdf'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { generatePurchaseOrderPDF, POItem, POBusinessSettings } from '@/lib/documents/po-pdf'
 
 export const dynamic = 'force-dynamic'
 

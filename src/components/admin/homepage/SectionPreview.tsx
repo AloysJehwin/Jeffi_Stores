@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link2, Package } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import type { HomepageSection, PreviewItem } from '@/lib/homepage-sections'
+import type { HomepageSection, PreviewItem } from '@/lib/catalog/homepage-sections'
 
 type PreviewKind =
   'products' | 'categories' | 'brands' | 'hero' | 'offers' | 'about' | 'reviews' | 'links' | 'stats' | 'none'

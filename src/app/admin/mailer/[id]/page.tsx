@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { queryOne, queryMany, queryCount } from '@/lib/db'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import Pagination from '@/components/admin/Pagination'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

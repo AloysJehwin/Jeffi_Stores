@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   const authenticateAdmin = vi.fn()
   return {
     authenticateAdmin,
@@ -16,7 +16,7 @@ vi.mock('@/lib/jwt', async () => {
     },
   }
 })
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
@@ -25,24 +25,24 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
 }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { POST } from '@/app/api/orders/[id]/cancel-review/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }

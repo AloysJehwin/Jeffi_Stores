@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
-import { buildVarMap, substituteVars } from '@/lib/template-vars'
-import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
+import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
+import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
-  const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
+  const storeName = await (await import('@/lib/catalog/site-controls')).getStoreIdentity().then(i => i.name)
   const brand = await currentBrandNameAsync()
   const { id } = await params
   const admin = await authenticateAdmin(request)

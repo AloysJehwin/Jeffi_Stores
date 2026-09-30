@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
-import { uploadStoreLogo } from '@/lib/s3'
-import { invalidateSiteControlsCache } from '@/lib/site-controls'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { uploadStoreLogo } from '@/lib/shared/s3'
+import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
 
 export async function POST(request: NextRequest) {
   try {

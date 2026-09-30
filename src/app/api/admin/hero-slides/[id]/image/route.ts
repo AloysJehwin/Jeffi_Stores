@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { uploadGalleryImage } from '@/lib/s3'
-import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/homepage-draft'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { uploadGalleryImage } from '@/lib/shared/s3'
+import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 

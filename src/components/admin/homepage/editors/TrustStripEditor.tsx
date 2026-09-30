@@ -2,7 +2,7 @@
 
 import { Grid, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
-import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const KEYS = ['icon', 'label']
 

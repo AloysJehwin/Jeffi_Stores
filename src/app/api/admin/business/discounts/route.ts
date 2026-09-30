@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { query, queryMany } from '@/lib/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { query, queryMany } from '@/lib/shared/db'
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'business_customers:read')

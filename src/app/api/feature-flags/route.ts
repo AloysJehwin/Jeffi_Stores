@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

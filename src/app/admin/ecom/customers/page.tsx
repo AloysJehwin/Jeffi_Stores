@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, tenantSummary, planMix } from '@/lib/tenant-registry'
 import { EcomHero, PlanMixChart, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
 import PurgeCustomerButton from '@/components/admin/ecom/PurgeCustomerButton'

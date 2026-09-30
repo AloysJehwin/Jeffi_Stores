@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
@@ -32,7 +32,7 @@ import {
   getLastSyncStatus,
   sendSyncFailureEmail,
 } from '@/lib/merchant/sync'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as mapper from '@/lib/merchant/mapper'
 import * as client from '@/lib/merchant/client'
 

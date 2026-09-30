@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { mailShell } from '@/lib/mail-template'
-import { currentBrandNameAsync } from '@/lib/brand'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { mailShell } from '@/lib/shared/mail-template'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

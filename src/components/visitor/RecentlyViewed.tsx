@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
+import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
 
 interface RecentProduct {
   id: string

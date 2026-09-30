@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getProductAnalyticsData } from '@/lib/shared/admin-product-analytics'
 
 export const dynamic = 'force-dynamic'
 

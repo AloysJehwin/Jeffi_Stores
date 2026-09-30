@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
-import { offerHref, type ProductOffer } from '@/lib/product-offers-shared'
+import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 const PLACEHOLDER =
   'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'

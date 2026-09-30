@@ -1,4 +1,4 @@
-import { withTransaction } from '@/lib/db'
+import { withTransaction } from '@/lib/shared/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 import type { AgentAction, ActionResult } from './shared'
 

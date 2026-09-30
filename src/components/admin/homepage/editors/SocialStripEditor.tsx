@@ -1,6 +1,6 @@
 'use client'
 
-import { safeHref } from '@/lib/homepage-sections'
+import { safeHref } from '@/lib/catalog/homepage-sections'
 import { CtaFields, Grid, HeadingFields, Note, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 

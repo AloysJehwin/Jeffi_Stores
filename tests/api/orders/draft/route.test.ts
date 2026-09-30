@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   loadActiveCart: vi.fn(),
   cartSubtotal: vi.fn().mockReturnValue(500),
   cartTaxAmount: vi.fn().mockReturnValue(45),
@@ -18,26 +18,26 @@ vi.mock('@/lib/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
   quoteShipping: vi.fn().mockResolvedValue(0),
 }))
-vi.mock('@/lib/order-draft', () => ({
+vi.mock('@/lib/orders/order-draft', () => ({
   signDraftToken: vi.fn().mockResolvedValue('signed-draft-token'),
   hashCartItems: vi.fn().mockReturnValue('hash-abc'),
 }))
-vi.mock('@/lib/checkout-intent', () => ({
+vi.mock('@/lib/orders/checkout-intent', () => ({
   verifyIntent: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/business-discount', () => ({
+vi.mock('@/lib/catalog/business-discount', () => ({
   getBusinessDiscountMap: vi.fn().mockResolvedValue({}),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/orders/draft/route'
-import * as jwt from '@/lib/jwt'
-import * as orderCommit from '@/lib/order-commit'
-import * as orderDraft from '@/lib/order-draft'
-import * as checkoutIntent from '@/lib/checkout-intent'
+import * as jwt from '@/lib/auth/jwt'
+import * as orderCommit from '@/lib/orders/order-commit'
+import * as orderDraft from '@/lib/orders/order-draft'
+import * as checkoutIntent from '@/lib/orders/checkout-intent'
 
 const USER = { userId: 'user-1' }
 

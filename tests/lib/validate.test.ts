@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/validate'
+import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/shared/validate'
 
 // ---------------------------------------------------------------------------
 // zUuid

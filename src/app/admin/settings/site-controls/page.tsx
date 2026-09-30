@@ -1,11 +1,11 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { queryOne, queryMany, query } from '@/lib/db'
-import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache } from '@/lib/site-controls'
-import { getDeliverySettings } from '@/lib/delivery-settings'
-import { hasScope, isPlatformOwner } from '@/lib/scopes'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { getDeliverySettings } from '@/lib/shipping/delivery-settings'
+import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import {
   SectionCard,
   TextControl,
@@ -19,7 +19,7 @@ import LogoUploader from '@/components/admin/site-controls/LogoUploader'
 import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
-import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
+import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { subscribeAdminEvents, reconnectAdminEvents } from '@/lib/client/admin-events-client'
 
 const WARN_BEFORE_MS = 60_000

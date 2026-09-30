@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { getDeliverySettings, invalidateDeliverySettingsCache } from '@/lib/delivery-settings'
-import { queryMany } from '@/lib/db'
+import { getDeliverySettings, invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { queryMany } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 

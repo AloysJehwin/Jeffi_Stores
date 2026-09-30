@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { aiDenial } from '@/lib/ai-scope'
-import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/customer-conversations-ai'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { aiDenial } from '@/lib/auth/ai-scope'
+import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/shared/customer-conversations-ai'
 
 export const dynamic = 'force-dynamic'
 

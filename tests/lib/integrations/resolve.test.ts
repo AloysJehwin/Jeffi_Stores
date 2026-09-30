@@ -19,7 +19,7 @@ const ctx = {
   resolveTenant: vi.fn(async () => ctx.getCurrentTenant()),
   resolveTenantId: vi.fn(async () => ctx.getCurrentTenant()?.tenantId ?? null),
 }
-vi.mock('@/lib/tenant-context', () => ctx)
+vi.mock('@/lib/tenancy/tenant-context', () => ctx)
 
 const registry = { getIntegrationCredential: vi.fn() }
 vi.mock('@/lib/tenant-registry', () => registry)
@@ -30,7 +30,7 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
 }))
 
 const google = { loadGoogleServiceAccount: vi.fn() }
-vi.mock('@/lib/google-credentials', () => google)
+vi.mock('@/lib/shared/google-credentials', () => google)
 
 // A 'connected' credential row whose config_enc (after passthrough decrypt) is plain JSON.
 function credRow(config: Record<string, any>, status = 'connected') {

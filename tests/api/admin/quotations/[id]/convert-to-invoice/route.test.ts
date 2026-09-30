@@ -5,22 +5,22 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   generateInvoiceNumber: vi.fn(),
   getNextInvoiceSequence: vi.fn(),
@@ -28,11 +28,11 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', () => ({
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -40,15 +40,15 @@ vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendBusinessInvoiceGeneratedEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn().mockReturnValue({
     qrCode: {
       create: vi.fn().mockResolvedValue({
@@ -75,14 +75,14 @@ vi.mock('sharp', () => {
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/quotations/[id]/convert-to-invoice/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
-import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
-import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
-import { lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
+import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
+import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/catalog/gst'
+import { lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -380,7 +380,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   it('handles upi_qr QR creation failure gracefully (non-fatal)', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
-    const { getRazorpayInstance } = await import('@/lib/razorpay')
+    const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
     vi.mocked(getRazorpayInstance).mockReturnValue({
       qrCode: { create: vi.fn().mockRejectedValue(new Error('RZP down')) },
     } as any)

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useEffect } from 'react'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 import { AccountSearchProvider, useAccountSearch } from '@/contexts/AccountSearchContext'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 function PathnameClearer() {
   const pathname = usePathname()

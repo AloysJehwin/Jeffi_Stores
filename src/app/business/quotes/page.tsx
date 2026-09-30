@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 interface RFQ {
   id: string

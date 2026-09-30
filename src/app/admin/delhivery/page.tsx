@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { getSiteControls } from '@/lib/site-controls'
-import { ap } from '@/lib/admin-path'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { getSiteControls } from '@/lib/catalog/site-controls'
+import { ap } from '@/lib/shared/admin-path'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getTenant } from '@/lib/tenant-registry'
 import DelhiveryPageClient, { type DeliveryMode } from './DelhiveryPageClient'
 

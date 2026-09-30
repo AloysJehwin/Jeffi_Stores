@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Package, X } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
-import type { PickerProduct } from '@/lib/homepage-sections'
+import type { PickerProduct } from '@/lib/catalog/homepage-sections'
 import { INPUT_CLASS, LABEL_CLASS } from './fields'
 
 interface ProductPickerFieldProps {

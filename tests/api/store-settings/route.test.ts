@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn().mockResolvedValue(null),
 }))
 
 // ---------------------------------------------------------------------------
 
 import { GET } from '@/app/api/store-settings/route'
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)
 

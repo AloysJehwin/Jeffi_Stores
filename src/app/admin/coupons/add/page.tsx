@@ -1,5 +1,5 @@
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import Link from 'next/link'
 import CouponForm from '../CouponForm'
 import { createCoupon } from './actions'

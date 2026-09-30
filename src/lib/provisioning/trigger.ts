@@ -8,7 +8,7 @@ import {
   controlPlanePool,
   getDraft,
 } from '../tenant-registry'
-import { findLatestBackup } from '../tenant-backup-store'
+import { findLatestBackup } from '@/lib/tenancy/tenant-backup-store'
 import { SEED_PROFILES } from './seed-catalog'
 
 /** The tenant's onboarding category doubles as its starter-catalogue profile. */

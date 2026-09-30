@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // tests below can drive rows/spies. The pure helpers need no mock; the mock is inert for them.
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: any[]) => mockQueryOne(...args),
   query: (...args: any[]) => mockQuery(...args),
   queryMany: vi.fn(),
@@ -26,7 +26,7 @@ import {
   revokeAllForPrincipal,
   listActiveSessions,
   type StoredBinding,
-} from '@/lib/auth-sessions'
+} from '@/lib/auth/auth-sessions'
 
 // Device-binding fingerprint: browser family + OS family, versions DROPPED so routine
 // auto-updates never force a re-login, but a genuinely different browser/device does.
@@ -592,7 +592,7 @@ describe('listActiveSessions', () => {
   })
 
   it('returns session rows from queryMany', async () => {
-    const { queryMany } = await import('@/lib/db')
+    const { queryMany } = await import('@/lib/shared/db')
     vi.mocked(queryMany).mockResolvedValue([{ id: 'r1' }, { id: 'r2' }] as any)
     const rows = await listActiveSessions('customer', 'u1')
     expect(rows).toHaveLength(2)
@@ -600,7 +600,7 @@ describe('listActiveSessions', () => {
   })
 
   it('returns empty array when no active sessions', async () => {
-    const { queryMany } = await import('@/lib/db')
+    const { queryMany } = await import('@/lib/shared/db')
     vi.mocked(queryMany).mockResolvedValue([])
     expect(await listActiveSessions('admin', 'a1')).toEqual([])
   })

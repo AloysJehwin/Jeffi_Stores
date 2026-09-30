@@ -1,7 +1,7 @@
 import ProductCard from '@/components/visitor/ProductCard'
 import DealCountdown from './DealCountdown'
-import { productCardProps } from '@/lib/product-card-props'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { productCardProps } from '@/lib/catalog/product-card-props'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.deal_of_the_day
 

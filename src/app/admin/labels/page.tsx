@@ -1,13 +1,13 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { verifyToken } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import LabelsClient from './LabelsClient'
-import { LABEL_SIZES } from '@/lib/label-pdf'
+import { LABEL_SIZES } from '@/lib/documents/label-pdf'
 import { getAllCategories } from '@/lib/queries'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export const metadata = {
   title: 'Label Generator — Jeffi Admin',

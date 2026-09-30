@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-import { currentBrandNameAsync } from '@/lib/brand'
+import { query, queryOne } from '@/lib/shared/db'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

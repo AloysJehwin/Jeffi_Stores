@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany, queryOne } from '@/lib/db'
-import { getS3Url } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { getS3Url } from '@/lib/shared/s3'
 
 // Resolve a gallery image URL. Prefer the S3 key (which getS3Url prefixes with the
 // current env's S3_KEY_PREFIX, e.g. dev/) so dev + prod URLs match where the object

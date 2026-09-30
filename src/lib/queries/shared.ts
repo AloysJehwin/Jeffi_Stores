@@ -1,4 +1,4 @@
-import { queryOne, queryMany, queryCount } from '../db'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 
 export { queryOne, queryMany, queryCount }
 

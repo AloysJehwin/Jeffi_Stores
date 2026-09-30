@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { refundEstimateForAwbs } from '@/lib/wallet'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { refundEstimateForAwbs } from '@/lib/payments/wallet'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 

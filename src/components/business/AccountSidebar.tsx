@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 export const navItems = [
   {

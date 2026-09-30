@@ -1,9 +1,9 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
-import { getSubscription } from '@/lib/razorpay-subscriptions'
+import { getSubscription } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 import { CheckMark } from '@/app/ecom/Shapes'
 

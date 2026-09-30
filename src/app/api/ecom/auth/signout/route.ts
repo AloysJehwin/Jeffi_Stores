@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { OWNER_COOKIE, ownerCookieOptions } from '@/lib/owner-session'
+import { OWNER_COOKIE, ownerCookieOptions } from '@/lib/auth/owner-session'
 
 export async function POST() {
   const res = NextResponse.json({ message: 'Signed out' })

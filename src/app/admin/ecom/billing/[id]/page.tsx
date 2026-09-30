@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, getTenantBilling } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 import DnsResyncButton from './DnsResyncButton'

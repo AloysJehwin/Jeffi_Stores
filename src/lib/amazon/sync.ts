@@ -1,4 +1,4 @@
-import { queryOne, query } from '@/lib/db'
+import { queryOne, query } from '@/lib/shared/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
 import {
@@ -11,7 +11,7 @@ import {
   amazonConfigured,
   getMarketplaceId,
 } from './client'
-import { getBusinessValues } from '@/lib/site-controls'
+import { getBusinessValues } from '@/lib/catalog/site-controls'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we

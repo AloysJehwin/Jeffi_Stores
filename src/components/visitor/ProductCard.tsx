@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
-import { resolveEdd } from '@/lib/edd-cache'
+import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductCardProps {

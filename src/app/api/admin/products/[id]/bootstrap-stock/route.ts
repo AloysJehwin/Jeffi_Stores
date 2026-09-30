@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { getClient, queryOne, query } from '@/lib/db'
-import { syncPerishableStock, upsertShelfStock, syncCentralInventory } from '@/lib/shelf'
-import { logStockMovement } from '@/lib/inventory'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { resolveGrainUnit, serialSlotsForBaseQuantity } from '@/lib/selling-unit'
+import { getClient, queryOne, query } from '@/lib/shared/db'
+import { syncPerishableStock, upsertShelfStock, syncCentralInventory } from '@/lib/catalog/shelf'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { resolveGrainUnit, serialSlotsForBaseQuantity } from '@/lib/catalog/selling-unit'
 
 const assignmentSchema = z.object({
   variant_id: z.string().uuid().nullable().optional(),

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { getOwnerTenants } from '@/lib/tenant-registry'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 export const dynamic = 'force-dynamic'
 

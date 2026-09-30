@@ -16,7 +16,7 @@ import {
   Search,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from './AdminSelect'
 import CopySku from '@/components/ui/CopySku'
 

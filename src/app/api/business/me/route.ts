@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany } from '@/lib/db'
-import { authenticateBusiness } from '@/lib/jwt'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { authenticateBusiness } from '@/lib/auth/jwt'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 
 export async function GET(request: NextRequest) {

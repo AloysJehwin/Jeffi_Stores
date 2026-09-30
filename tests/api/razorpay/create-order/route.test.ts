@@ -1,39 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   resolveRequestTenant: vi.fn(async () => null),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   isRazorpayEnabled: vi.fn(),
   getRazorpayInstance: vi.fn(),
   getRazorpayInstanceFor: vi.fn(),
 }))
-vi.mock('@/lib/order-draft', () => ({
+vi.mock('@/lib/orders/order-draft', () => ({
   verifyDraftToken: vi.fn(),
   hashCartItems: vi.fn(),
 }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   loadActiveCart: vi.fn(),
   cartSubtotal: vi.fn(),
   cartItemsForHash: vi.fn(),
   validateCouponForUser: vi.fn(),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/razorpay/create-order/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
-import * as orderDraft from '@/lib/order-draft'
-import * as orderCommit from '@/lib/order-commit'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
+import * as orderDraft from '@/lib/orders/order-draft'
+import * as orderCommit from '@/lib/orders/order-commit'
 
 // ------------------------------------------------------------------ helpers
 

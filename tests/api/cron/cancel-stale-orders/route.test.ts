@@ -4,8 +4,8 @@ import { NextRequest } from 'next/server'
 const mockQueryMany = vi.fn()
 const mockCancelOrder = vi.fn()
 
-vi.mock('@/lib/db', () => ({ queryMany: mockQueryMany, query: vi.fn().mockResolvedValue({ rows: [] }) }))
-vi.mock('@/lib/orders', () => ({ cancelOrder: mockCancelOrder }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: mockQueryMany, query: vi.fn().mockResolvedValue({ rows: [] }) }))
+vi.mock('@/lib/orders/orders', () => ({ cancelOrder: mockCancelOrder }))
 
 function makeReq(secret = 'test-secret') {
   return new NextRequest('http://localhost/api/cron/cancel-stale-orders', {

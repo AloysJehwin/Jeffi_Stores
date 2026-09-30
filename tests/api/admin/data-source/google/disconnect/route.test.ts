@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ requireAdminScope: vi.fn() }))
-vi.mock('@/lib/admin-audit', () => ({ logAdminAudit: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
+vi.mock('@/lib/shared/admin-audit', () => ({ logAdminAudit: vi.fn() }))
 vi.mock('@/lib/import/jobs', () => ({
   PLATFORM_TENANT_ID: '00000000-0000-0000-0000-000000000000',
   resolveImportTenantId: vi.fn(),
@@ -11,15 +11,15 @@ vi.mock('@/lib/import/jobs', () => ({
 }))
 vi.mock('@/lib/import/sheet-links', () => ({ forgetSheetOwnership: vi.fn(), releaseSheetProducts: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ deleteIntegrationCredential: vi.fn(), lookupTenantContextById: vi.fn() }))
-vi.mock('@/lib/tenant-context', () => ({ runWithTenantContext: vi.fn((_ctx: unknown, fn: () => unknown) => fn()) }))
+vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: vi.fn((_ctx: unknown, fn: () => unknown) => fn()) }))
 
 import { POST } from '@/app/api/admin/data-source/google/disconnect/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { resolveImportTenantId, isSheetSyncRunning, cancelPendingSheetSyncs } from '@/lib/import/jobs'
 import { forgetSheetOwnership, releaseSheetProducts } from '@/lib/import/sheet-links'
 import { deleteIntegrationCredential, lookupTenantContextById } from '@/lib/tenant-registry'
-import { runWithTenantContext } from '@/lib/tenant-context'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 const PLATFORM = '00000000-0000-0000-0000-000000000000'
 const req = () => new NextRequest('http://localhost/api/admin/data-source/google/disconnect', { method: 'POST' })

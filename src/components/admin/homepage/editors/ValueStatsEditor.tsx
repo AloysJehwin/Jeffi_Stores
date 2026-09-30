@@ -1,6 +1,6 @@
 'use client'
 
-import { VALUE_STAT_METRICS, valueStatMetrics, type ValueStatMetric } from '@/lib/homepage-sections'
+import { VALUE_STAT_METRICS, valueStatMetrics, type ValueStatMetric } from '@/lib/catalog/homepage-sections'
 import { Grid, HeadingFields, LABEL_CLASS, Note, Text, useSectionBinding, type EditorProps } from './fields'
 
 export default function ValueStatsEditor(props: EditorProps) {

@@ -1,17 +1,17 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/template-vars', () => ({
+vi.mock('@/lib/shared/template-vars', () => ({
   buildVarMap: vi.fn(() => ({})),
   substituteVars: vi.fn((str: string) => str),
 }))
@@ -22,9 +22,9 @@ vi.mock('nodemailer', () => ({
   },
 }))
 
-import * as mailAudit from '@/lib/mail-audit'
-import * as db from '@/lib/db'
-import { renderCampaignEmail, sendCampaign, baseLayout, ctaButton } from '@/lib/email-campaigns'
+import * as mailAudit from '@/lib/shared/mail-audit'
+import * as db from '@/lib/shared/db'
+import { renderCampaignEmail, sendCampaign, baseLayout, ctaButton } from '@/lib/shared/email-campaigns'
 
 const mockSendAuditedMail = mailAudit.sendAuditedMail as ReturnType<typeof vi.fn>
 const mockQuery = db.query as ReturnType<typeof vi.fn>

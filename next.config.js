@@ -68,7 +68,7 @@ const nextConfig = {
   },
   webpack(config, { isServer }) {
     if (!isServer) {
-      const ioredisStub = require.resolve('./src/lib/ioredis-stub.js')
+      const ioredisStub = require.resolve('./src/lib/shared/ioredis-stub.js')
       if (!config.resolve) config.resolve = {}
       if (!config.resolve.alias) config.resolve.alias = {}
       config.resolve.alias['ioredis'] = ioredisStub

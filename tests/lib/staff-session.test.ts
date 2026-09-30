@@ -7,7 +7,7 @@ import {
   staffSessionFromRequest,
   setStaffCookie,
   STAFF_COOKIE,
-} from '@/lib/staff-session'
+} from '@/lib/auth/staff-session'
 import { NextResponse } from 'next/server'
 
 const claims = {

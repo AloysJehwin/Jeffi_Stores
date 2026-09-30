@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   getClient: vi.fn(),
   queryOne: vi.fn(),
   // resolveGrainUnit's pre-transaction validation pass queries via this module-level `query`
@@ -21,13 +21,13 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
   upsertShelfStock: vi.fn().mockResolvedValue(undefined),
   syncCentralInventory: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -36,11 +36,11 @@ vi.mock('@/lib/inventory', () => ({
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/products/[id]/bootstrap-stock/route'
-import { getClient, queryOne } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { syncPerishableStock, upsertShelfStock } from '@/lib/shelf'
-import { logStockMovement } from '@/lib/inventory'
+import { getClient, queryOne } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { syncPerishableStock, upsertShelfStock } from '@/lib/catalog/shelf'
+import { logStockMovement } from '@/lib/orders/inventory'
 
 const PRODUCT_ID = '111e4567-e89b-12d3-a456-426614174001'
 const VARIANT_ID = '222e4567-e89b-12d3-a456-426614174002'

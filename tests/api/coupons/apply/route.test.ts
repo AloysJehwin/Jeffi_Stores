@@ -6,13 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Access spies via vi.mocked() after the imports below.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
@@ -25,11 +25,11 @@ vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }))
 
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -37,8 +37,8 @@ vi.mock('@/lib/activity', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 import { POST } from '@/app/api/coupons/apply/route'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 const COUPON_ID = '550e8400-e29b-41d4-a716-446655440099'

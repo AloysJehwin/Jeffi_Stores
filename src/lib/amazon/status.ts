@@ -1,4 +1,4 @@
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { searchListingsItems } from './client'
 
 // Amazon listing-status snapshot — analog of src/lib/merchant/gmc-status.ts.

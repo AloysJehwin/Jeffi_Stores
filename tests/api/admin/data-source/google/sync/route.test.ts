@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ requireAdminScope: vi.fn() }))
-vi.mock('@/lib/admin-audit', () => ({ logAdminAudit: vi.fn() }))
-vi.mock('@/lib/s3', () => ({ uploadImportFile: vi.fn().mockResolvedValue('imports/x.xlsx') }))
+vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: vi.fn() }))
+vi.mock('@/lib/shared/admin-audit', () => ({ logAdminAudit: vi.fn() }))
+vi.mock('@/lib/shared/s3', () => ({ uploadImportFile: vi.fn().mockResolvedValue('imports/x.xlsx') }))
 vi.mock('@/lib/import/jobs', () => ({
   enqueueImportJob: vi.fn().mockResolvedValue({ id: 'job-1', status: 'queued' }),
   resolveImportTenantId: vi.fn().mockResolvedValue('tenant-1'),
@@ -12,14 +12,14 @@ vi.mock('@/lib/integrations/resolve', () => ({
   resolveGoogleSheetsCreds: vi.fn().mockResolvedValue({ accessToken: 'tok', spreadsheetId: 'sheet-1' }),
   IntegrationNotConnectedError: class extends Error {},
 }))
-vi.mock('@/lib/google-sheets', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/google-sheets')>('@/lib/google-sheets')
+vi.mock('@/lib/shared/google-sheets', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/shared/google-sheets')>('@/lib/shared/google-sheets')
   return { ...actual, listSheetTitles: vi.fn(), readSheetValues: vi.fn(), readSheetValuesBatch: vi.fn() }
 })
 
 import { POST } from '@/app/api/admin/data-source/google/sync/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { listSheetTitles, readSheetValues, readSheetValuesBatch } from '@/lib/google-sheets'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { listSheetTitles, readSheetValues, readSheetValuesBatch } from '@/lib/shared/google-sheets'
 import { enqueueImportJob } from '@/lib/import/jobs'
 
 const mockAuth = vi.mocked(requireAdminScope)

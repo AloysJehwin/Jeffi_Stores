@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 import { cookies } from 'next/headers'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { getUserIdForSession } from '@/lib/guest-user'
-import { recordImplicitSignal } from '@/lib/ai-feedback'
-import { logActivity } from '@/lib/activity'
-import { parseBody, zUuid } from '@/lib/validate'
-import { toSellingUnit, validatePurchaseQuantity } from '@/lib/selling-unit'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { getUserIdForSession } from '@/lib/shared/guest-user'
+import { recordImplicitSignal } from '@/lib/shared/ai-feedback'
+import { logActivity } from '@/lib/shared/activity'
+import { parseBody, zUuid } from '@/lib/shared/validate'
+import { toSellingUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
 
 const AddCartSchema = z
   .object({

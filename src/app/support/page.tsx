@@ -1,7 +1,7 @@
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies } from 'next/headers'
-import { verifyUserToken } from '@/lib/jwt'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { verifyUserToken } from '@/lib/auth/jwt'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {

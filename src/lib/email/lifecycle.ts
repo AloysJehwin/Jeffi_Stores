@@ -352,7 +352,7 @@ export async function sendOperationalReport(opts: {
   errors?: { sku: string; error: string }[]
   kind?: string
 }): Promise<void> {
-  const { sendAuditedMail } = await import('../mail-audit')
+  const { sendAuditedMail } = await import('@/lib/shared/mail-audit')
   const esc = (t: unknown) =>
     String(t ?? '')
       .replace(/&/g, '&amp;')
@@ -377,7 +377,7 @@ export async function sendOperationalReport(opts: {
     : `<p style="color:#059669;font-size:13px;margin:18px 0 0">No errors.</p>`
 
   await sendAuditedMail({
-    to: (await import('../brand')).platformAdminEmail(),
+    to: (await import('@/lib/catalog/brand')).platformAdminEmail(),
     from: adminMailFrom(),
     subject: `[${storeName()}] ${opts.title}${errs.length ? ` — ${errs.length} error(s)` : ''}`,
     kind: opts.kind ?? 'operational_report',

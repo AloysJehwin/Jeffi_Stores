@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireAdminScope } from '@/lib/jwt'
-import { resolveTenant } from '@/lib/tenant-context'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import {
   saveIntegrationCredential,
   listIntegrationCredentials,
   deleteIntegrationCredential,
 } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { parseServiceAccountJson } from '@/lib/google-credentials'
+import { parseServiceAccountJson } from '@/lib/shared/google-credentials'
 
 export const dynamic = 'force-dynamic'
 

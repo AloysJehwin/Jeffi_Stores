@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.about
 

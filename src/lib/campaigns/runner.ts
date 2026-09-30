@@ -1,5 +1,5 @@
-import { query } from '@/lib/db'
-import { getCampaign } from '@/lib/marketing'
+import { query } from '@/lib/shared/db'
+import { getCampaign } from '@/lib/shared/marketing'
 import type { AnyScenarioModule, ScenarioModule, SweepResult } from './types'
 import { resolveParams } from './types'
 

@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
@@ -18,8 +18,8 @@ vi.mock('@/lib/queries', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/customers/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getCustomers } from '@/lib/queries'
 
 const mockAuth = vi.mocked(authenticateAdmin)

@@ -2,11 +2,11 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { verifyToken } from '@/lib/jwt'
-import { revokeSession, revokeAllForPrincipal } from '@/lib/auth-sessions'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { verifyToken } from '@/lib/auth/jwt'
+import { revokeSession, revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export async function logoutAction() {
   const cookieStore = await cookies()

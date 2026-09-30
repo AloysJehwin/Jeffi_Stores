@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/product-affinity', () => ({ frequentlyBoughtWith: vi.fn(), alsoViewedWith: vi.fn() }))
-vi.mock('@/lib/product-cards', async () => {
-  const props = await vi.importActual<typeof import('@/lib/product-card-props')>('@/lib/product-card-props')
+vi.mock('@/lib/catalog/product-affinity', () => ({ frequentlyBoughtWith: vi.fn(), alsoViewedWith: vi.fn() }))
+vi.mock('@/lib/catalog/product-cards', async () => {
+  const props = await vi.importActual<typeof import('@/lib/catalog/product-card-props')>('@/lib/catalog/product-card-props')
   return { getProductCardsByIds: vi.fn(), cardPropsFor: props.cardPropsFor }
 })
-vi.mock('@/lib/site-controls', () => ({ getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }) }))
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }) }))
 
 import { GET } from '@/app/api/products/affinity/route'
-import { frequentlyBoughtWith, alsoViewedWith } from '@/lib/product-affinity'
-import { getProductCardsByIds } from '@/lib/product-cards'
+import { frequentlyBoughtWith, alsoViewedWith } from '@/lib/catalog/product-affinity'
+import { getProductCardsByIds } from '@/lib/catalog/product-cards'
 
 const A = '11111111-1111-1111-1111-111111111111'
 const B = '22222222-2222-2222-2222-222222222222'

@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const { mockQueryOne } = vi.hoisted(() => ({ mockQueryOne: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: mockQueryOne,
 }))
 
-import { resolveAdminByEmail, enforceCertGate } from '@/lib/admin-identity'
+import { resolveAdminByEmail, enforceCertGate } from '@/lib/auth/admin-identity'
 
 const ORIGINAL_ENV = process.env.NODE_ENV
 

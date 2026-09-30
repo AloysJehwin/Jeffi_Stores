@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { isInterState, calculateGST, round2 } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { isInterState, calculateGST, round2 } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
 
 export const dynamic = 'force-dynamic'
 

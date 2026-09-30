@@ -5,20 +5,20 @@ import { NextRequest } from 'next/server'
 // Mocks — declared before any import of the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
   generateInvoiceNumber: vi.fn(),
@@ -27,21 +27,21 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
 }))
@@ -50,11 +50,11 @@ vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', () => ({
   deleteBatchIfEmpty: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({}),
 }))
 
@@ -63,16 +63,16 @@ vi.mock('@/lib/site-controls', () => ({
 // ---------------------------------------------------------------------------
 
 import { PATCH } from '@/app/api/admin/invoices/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, withTransaction } from '@/lib/shared/db'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
-import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
-import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/catalog/shelf'
+import { deleteBatchIfEmpty } from '@/lib/orders/inventory-deduct'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -356,7 +356,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
   // --- IGST path ---
 
   it('uses IGST when buyer has GSTIN and is inter-state', async () => {
-    const { isInterState } = await import('@/lib/gst')
+    const { isInterState } = await import('@/lib/catalog/gst')
     vi.mocked(isInterState).mockReturnValue(true)
 
     const bodyIgst = { ...VALID_BODY, buyerGstin: '27AABCU9603R1ZM', state: 'Maharashtra' }

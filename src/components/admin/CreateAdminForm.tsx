@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ADMIN_SCOPES } from '@/lib/auth/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 
 export default function CreateAdminForm({

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
-import { getOrderItemsPolicy } from '@/lib/return-policy'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
+import { getOrderItemsPolicy } from '@/lib/catalog/return-policy'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

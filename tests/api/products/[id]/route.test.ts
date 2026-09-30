@@ -8,14 +8,14 @@ const { queryOneMock, queryMock, authenticateAdminMock } = vi.hoisted(() => ({
   authenticateAdminMock: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: queryMock,
   queryOne: queryOneMock,
   queryMany: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: authenticateAdminMock,
   authenticateUser: vi.fn().mockResolvedValue(null),
 }))

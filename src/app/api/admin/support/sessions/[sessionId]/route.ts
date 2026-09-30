@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
-import { logActivity } from '@/lib/activity'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
 
 // Admin-side close for stale sessions. Customers normally close their own
 // sessions, but many never do after an end-session request — so once a session

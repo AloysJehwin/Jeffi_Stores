@@ -5,9 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 
 const { authenticateAdminMock } = vi.hoisted(() => ({ authenticateAdminMock: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   return {
     authenticateAdmin: authenticateAdminMock,
     verifyToken: vi.fn().mockResolvedValue(null),
@@ -22,7 +22,7 @@ vi.mock('@/lib/jwt', async () => {
   }
 })
 
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadProductImage: vi.fn().mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
     thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
@@ -40,8 +40,8 @@ vi.mock('@/lib/s3', () => ({
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/upload/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { uploadProductImage } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { uploadProductImage } from '@/lib/shared/s3'
 
 const mockAuthenticateAdmin = vi.mocked(authenticateAdmin)
 const mockUploadProductImage = vi.mocked(uploadProductImage)

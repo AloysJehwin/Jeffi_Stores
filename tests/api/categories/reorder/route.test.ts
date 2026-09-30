@@ -1,15 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 const { authenticateAdminMock } = vi.hoisted(() => ({ authenticateAdminMock: vi.fn() }))
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   return {
     authenticateAdmin: authenticateAdminMock,
     authenticateAnyUser: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('@/lib/jwt', async () => {
 })
 
 import { PATCH } from '@/app/api/categories/reorder/route'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
 const mockAuth = authenticateAdminMock
 const mockQuery = vi.mocked(query)

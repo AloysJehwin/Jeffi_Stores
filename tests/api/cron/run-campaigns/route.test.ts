@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -10,14 +10,14 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/campaigns/runner', () => ({ runScenario: vi.fn() }))
 vi.mock('@/lib/campaigns/scenarios/_registry', () => ({ getScenario: vi.fn() }))
 vi.mock('@/lib/campaigns/custom-runner', () => ({ runCustomScenario: vi.fn() }))
-vi.mock('@/lib/marketing', () => ({ getCampaign: vi.fn() }))
+vi.mock('@/lib/shared/marketing', () => ({ getCampaign: vi.fn() }))
 
 import { GET } from '@/app/api/cron/run-campaigns/route'
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { runScenario } from '@/lib/campaigns/runner'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 import { runCustomScenario } from '@/lib/campaigns/custom-runner'
-import { getCampaign } from '@/lib/marketing'
+import { getCampaign } from '@/lib/shared/marketing'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)

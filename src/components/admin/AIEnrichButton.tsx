@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { RequireAi } from '@/contexts/AdminScopesContext'
-import type { AiActionScope } from '@/lib/ai-scope'
+import type { AiActionScope } from '@/lib/auth/ai-scope'
 
 interface Props {
   fieldLabel: string

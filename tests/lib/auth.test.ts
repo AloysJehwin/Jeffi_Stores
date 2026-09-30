@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock @/lib/db ─────────────────────────────────────────────────────────────
+// ── Mock @/lib/shared/db ─────────────────────────────────────────────────────────────
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: unknown[]) => mockQueryOne(...args),
   query: (...args: unknown[]) => mockQuery(...args),
 }))
@@ -21,7 +21,7 @@ vi.mock('bcrypt', () => ({
 }))
 
 // ── Import under test ─────────────────────────────────────────────────────────
-import { createAdminUser, hasAdminRole, isSessionValid } from '@/lib/auth'
+import { createAdminUser, hasAdminRole, isSessionValid } from '@/lib/auth/auth'
 
 // ─────────────────────────────────────────────────────────────────────────────
 

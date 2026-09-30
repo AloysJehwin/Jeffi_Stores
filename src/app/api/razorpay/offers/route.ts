@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPublicOffers } from '@/lib/razorpay-offers'
+import { getPublicOffers } from '@/lib/payments/razorpay-offers'
 
 export const dynamic = 'force-dynamic'
 

@@ -11,9 +11,9 @@ const { mockQuery, mockGetCaCert } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: mockQuery }) }))
-vi.mock('@/lib/tenant-ca', () => ({ getTenantCaCert: mockGetCaCert }))
+vi.mock('@/lib/tenancy/tenant-ca', () => ({ getTenantCaCert: mockGetCaCert }))
 
-import { verifyTenantClientCert, decodeClientCertHeader } from '@/lib/tenant-mtls'
+import { verifyTenantClientCert, decodeClientCertHeader } from '@/lib/tenancy/tenant-mtls'
 
 function makeCa(slug: string) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'ca-'))

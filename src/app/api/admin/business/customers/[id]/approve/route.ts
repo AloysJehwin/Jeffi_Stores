@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, query } from '@/lib/db'
-import { revokeAllForPrincipal } from '@/lib/auth-sessions'
-import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, query } from '@/lib/shared/db'
+import { revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
+import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/shared/email-business'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

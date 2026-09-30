@@ -6,9 +6,9 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
-import { bp } from '@/lib/business-path'
-import { resolveEdd } from '@/lib/edd-cache'
+import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
+import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductCardProps {

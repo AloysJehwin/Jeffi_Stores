@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { logAdminAudit } from '@/lib/admin-audit'
-import { publishHomepageDraft, type PublishResult } from '@/lib/homepage-draft'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { publishHomepageDraft, type PublishResult } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 

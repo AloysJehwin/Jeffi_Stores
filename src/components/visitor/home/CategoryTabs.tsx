@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
-import type { CardProps } from '@/lib/product-card-props'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import type { CardProps } from '@/lib/catalog/product-card-props'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.category_tabs
 

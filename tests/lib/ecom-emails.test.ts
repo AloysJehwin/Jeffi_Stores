@@ -31,17 +31,17 @@ describe('ecom-emails', () => {
 
   describe('per-tenant sender addresses', () => {
     it('builds the storefront noreply sender', async () => {
-      const { tenantNoReplyEmail } = await import('@/lib/ecom-emails')
+      const { tenantNoReplyEmail } = await import('@/lib/shared/ecom-emails')
       expect(tenantNoReplyEmail('acme')).toBe('"acme Store" <noreply-acme@jeffistores.in>')
     })
 
     it('builds the campaign sender (Pro+)', async () => {
-      const { tenantCampaignEmail } = await import('@/lib/ecom-emails')
+      const { tenantCampaignEmail } = await import('@/lib/shared/ecom-emails')
       expect(tenantCampaignEmail('acme')).toBe('"acme Store" <campaigns-acme@jeffistores.in>')
     })
 
     it('keeps both senders under the single jeffistores.in SES identity', async () => {
-      const { tenantNoReplyEmail, tenantCampaignEmail } = await import('@/lib/ecom-emails')
+      const { tenantNoReplyEmail, tenantCampaignEmail } = await import('@/lib/shared/ecom-emails')
       expect(tenantNoReplyEmail('x')).toContain('@jeffistores.in>')
       expect(tenantCampaignEmail('x')).toContain('@jeffistores.in>')
     })
@@ -49,7 +49,7 @@ describe('ecom-emails', () => {
 
   describe('sendKycSubmittedEmail', () => {
     it('emails the applicant and notifies the platform admin', async () => {
-      const { sendKycSubmittedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycSubmittedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycSubmittedEmail(OWNER)
       expect(sendMail).toHaveBeenCalledTimes(2)
       const recipients = sendMail.mock.calls.map((c: any[]) => c[0].to)
@@ -59,7 +59,7 @@ describe('ecom-emails', () => {
     })
 
     it('falls back to "there" when the owner has no name', async () => {
-      const { sendKycSubmittedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycSubmittedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycSubmittedEmail(OWNER_NO_NAME)
       expect(sendMail.mock.calls[0][0].html).toContain('Hi there')
     })
@@ -67,7 +67,7 @@ describe('ecom-emails', () => {
 
   describe('sendKycApprovedEmail', () => {
     it('includes the checkout link and the future store URL', async () => {
-      const { sendKycApprovedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycApprovedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycApprovedEmail(OWNER, { display_name: 'Acme Ltd', slug: 'acme' }, 'https://rzp.io/checkout/abc')
       const mail = lastMail()
       expect(mail.to).toBe('owner@example.com')
@@ -77,7 +77,7 @@ describe('ecom-emails', () => {
     })
 
     it('handles a missing owner name', async () => {
-      const { sendKycApprovedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycApprovedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycApprovedEmail(OWNER_NO_NAME, { display_name: 'Acme', slug: 'acme' }, 'https://x')
       expect(lastMail().html).toContain('Hi there')
     })
@@ -85,7 +85,7 @@ describe('ecom-emails', () => {
 
   describe('sendKycRejectedEmail', () => {
     it('states the reason and points at support', async () => {
-      const { sendKycRejectedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycRejectedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycRejectedEmail(OWNER, 'GST certificate unreadable')
       const mail = lastMail()
       expect(mail.html).toContain('GST certificate unreadable')
@@ -96,7 +96,7 @@ describe('ecom-emails', () => {
 
   describe('sendPaymentConfirmedEmail', () => {
     it('summarises store, plan and billing interval', async () => {
-      const { sendPaymentConfirmedEmail } = await import('@/lib/ecom-emails')
+      const { sendPaymentConfirmedEmail } = await import('@/lib/shared/ecom-emails')
       await sendPaymentConfirmedEmail(OWNER, {
         display_name: 'Acme Ltd',
         slug: 'acme',
@@ -110,7 +110,7 @@ describe('ecom-emails', () => {
     })
 
     it('defaults a null plan to Basic', async () => {
-      const { sendPaymentConfirmedEmail } = await import('@/lib/ecom-emails')
+      const { sendPaymentConfirmedEmail } = await import('@/lib/shared/ecom-emails')
       await sendPaymentConfirmedEmail(OWNER, {
         display_name: 'Acme',
         slug: 'acme',
@@ -123,7 +123,7 @@ describe('ecom-emails', () => {
 
   describe('sendStoreLiveEmail', () => {
     it('includes both the storefront and the tenant admin URL', async () => {
-      const { sendStoreLiveEmail } = await import('@/lib/ecom-emails')
+      const { sendStoreLiveEmail } = await import('@/lib/shared/ecom-emails')
       await sendStoreLiveEmail(OWNER, { display_name: 'Acme Ltd', slug: 'acme', plan: 'pro' })
       const mail = lastMail()
       expect(mail.html).toContain('https://acme.jeffistores.in')
@@ -132,7 +132,7 @@ describe('ecom-emails', () => {
     })
 
     it('defaults a null plan to Basic', async () => {
-      const { sendStoreLiveEmail } = await import('@/lib/ecom-emails')
+      const { sendStoreLiveEmail } = await import('@/lib/shared/ecom-emails')
       await sendStoreLiveEmail(OWNER, { display_name: 'Acme', slug: 'acme', plan: null })
       expect(lastMail().html).toContain('Basic')
     })
@@ -141,7 +141,7 @@ describe('ecom-emails', () => {
   describe('SMTP failures must never break the caller', () => {
     it('swallows a send failure rather than failing the KYC flow', async () => {
       sendMail.mockRejectedValue(new Error('SES throttled'))
-      const { sendKycApprovedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycApprovedEmail } = await import('@/lib/shared/ecom-emails')
       await expect(
         sendKycApprovedEmail(OWNER, { display_name: 'Acme', slug: 'acme' }, 'https://x')
       ).resolves.toBeUndefined()
@@ -149,7 +149,7 @@ describe('ecom-emails', () => {
 
     it('swallows a send failure in the store-live notification', async () => {
       sendMail.mockRejectedValue(new Error('connection reset'))
-      const { sendStoreLiveEmail } = await import('@/lib/ecom-emails')
+      const { sendStoreLiveEmail } = await import('@/lib/shared/ecom-emails')
       await expect(
         sendStoreLiveEmail(OWNER, { display_name: 'Acme', slug: 'acme', plan: 'basic' })
       ).resolves.toBeUndefined()
@@ -158,7 +158,7 @@ describe('ecom-emails', () => {
 
   describe('shared shell', () => {
     it('every email renders a complete HTML document from the platform sender', async () => {
-      const { sendKycRejectedEmail } = await import('@/lib/ecom-emails')
+      const { sendKycRejectedEmail } = await import('@/lib/shared/ecom-emails')
       await sendKycRejectedEmail(OWNER, 'reason')
       const mail = lastMail()
       expect(mail.html).toMatch(/^<!DOCTYPE html>/)

@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), query: vi.fn(), queryMany: vi.fn() }))
-vi.mock('@/lib/gst', () => ({ round2: (n: number) => Math.round(n * 100) / 100 }))
-vi.mock('@/lib/shipping', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), query: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/catalog/gst', () => ({ round2: (n: number) => Math.round(n * 100) / 100 }))
+vi.mock('@/lib/shipping/shipping', () => ({
   computeShipmentDims: vi.fn(() => ({ chargedWeightGrams: 500, breadth_cm: 10, height_cm: 5, length_cm: 15 })),
 }))
-vi.mock('@/lib/sms', () => ({ sendOrderShippedSMS: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/shared/sms', () => ({ sendOrderShippedSMS: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/catalog/site-controls', () => ({
   getBusinessValues: vi.fn().mockResolvedValue({
     delhiveryOriginPincode: '492001',
     pickupLocation: 'JeffiStores',
@@ -24,10 +24,10 @@ vi.mock('@/lib/site-controls', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/orders/[id]/create-shipment/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query, queryMany } from '@/lib/db'
-import { sendOrderShippedSMS } from '@/lib/sms'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query, queryMany } from '@/lib/shared/db'
+import { sendOrderShippedSMS } from '@/lib/shared/sms'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

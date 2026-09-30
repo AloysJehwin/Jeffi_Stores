@@ -3,8 +3,8 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/amazon/sync', () => ({
   syncAllProductsToAmazon: vi.fn(),
   syncProductToAmazon: vi.fn(),
@@ -16,8 +16,8 @@ vi.mock('@/lib/amazon/sync', () => ({
 // ── Imports ─────────────────────────────────────────────────────────────────────
 
 import { POST, GET } from '@/app/api/admin/merchant/amazon/sync/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import {
   syncAllProductsToAmazon,
   syncProductToAmazon,

@@ -1,11 +1,11 @@
-import { queryMany, query } from '@/lib/db'
+import { queryMany, query } from '@/lib/shared/db'
 import {
   fetchUserContext,
   fetchProductImageUrl,
   resolveCoupon,
   sendCampaignEmail,
   renderHeroProduct,
-} from '@/lib/automation-emails'
+} from '@/lib/shared/automation-emails'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {

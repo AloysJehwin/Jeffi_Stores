@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/format'
+import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/shared/format'
 
 export type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance'
 

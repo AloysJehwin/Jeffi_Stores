@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
 
 const BATCH_SIZE = 50 // emails per batch
 const BATCH_DELAY = 1000 // ms between batches — stays under SES rate limits
@@ -61,6 +61,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 // Background send — runs after the HTTP response is already returned
 async function sendInBackground(campaignId: string, batchSize: number, batchDelay: number) {
-  const { sendCampaign } = await import('@/lib/email-campaigns')
+  const { sendCampaign } = await import('@/lib/shared/email-campaigns')
   await sendCampaign(campaignId, { batchSize, batchDelay })
 }

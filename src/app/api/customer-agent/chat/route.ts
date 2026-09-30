@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
-import { aiChat, type AiToolDef, type AiChatMessage } from '@/lib/ai-client'
-import { storefrontAiGate } from '@/lib/storefront-ai'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { aiChat, type AiToolDef, type AiChatMessage } from '@/lib/shared/ai-client'
+import { storefrontAiGate } from '@/lib/shared/storefront-ai'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +63,7 @@ function buildToolsDef(): AiToolDef[] {
 }
 
 async function buildSystemPrompt(): Promise<string> {
-  const { storeDescriptorForPrompt } = await import('@/lib/brand')
+  const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
   return `You are the shopping assistant for ${await storeDescriptorForPrompt()}. The customer is already logged in.
 
 Rules:

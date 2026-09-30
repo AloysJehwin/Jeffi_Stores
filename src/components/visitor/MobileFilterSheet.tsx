@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { humanizeLabel } from '@/lib/format'
+import { humanizeLabel } from '@/lib/shared/format'
 
 type Category = { id: string; name: string; parent_category_id: string | null }
 type Brand = { id: string; name: string }

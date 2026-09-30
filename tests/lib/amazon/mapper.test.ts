@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/google-merchant-helpers', () => ({
+vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   buildProductHighlights: vi.fn(),
 }))
 
 import { productToAmazonListings, productToAmazonOfferListing, productLink } from '@/lib/amazon/mapper'
-import * as helpers from '@/lib/google-merchant-helpers'
+import * as helpers from '@/lib/shared/google-merchant-helpers'
 
 const mockBuildProductHighlights = vi.mocked(helpers.buildProductHighlights)
 

@@ -1,6 +1,6 @@
 import PortalShell from '@/components/portal/PortalShell'
 import PortalSignOutButton from '@/components/portal/PortalSignOutButton'
-import { CERT_PORTAL } from '@/lib/portal-config'
+import { CERT_PORTAL } from '@/lib/tenancy/portal-config'
 import CertList from './CertList'
 
 export const dynamic = 'force-dynamic'

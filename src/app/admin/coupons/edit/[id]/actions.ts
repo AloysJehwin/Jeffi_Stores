@@ -1,10 +1,10 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
 export async function updateCoupon(id: string, formData: FormData) {
   const code = (formData.get('code') as string).toUpperCase().trim()

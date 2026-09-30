@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { updateWarehouse, deleteWarehouse } from '@/lib/shelf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { updateWarehouse, deleteWarehouse } from '@/lib/catalog/shelf'
 
 export const dynamic = 'force-dynamic'
 

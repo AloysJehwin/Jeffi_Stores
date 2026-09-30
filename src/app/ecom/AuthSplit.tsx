@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OwnerAuthForm from './OwnerAuthForm'
 import { CheckMark } from './Shapes'
 

@@ -3,16 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendBusinessAccountApprovedEmail: vi.fn(),
   sendBusinessAccountRejectedEmail: vi.fn(),
 }))
@@ -20,9 +20,9 @@ vi.mock('@/lib/email-business', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/business/customers/[id]/approve/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
-import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
+import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/shared/email-business'
 
 const mockRequireScope = vi.mocked(requireAdminScope)
 const mockQuery = vi.mocked(query)

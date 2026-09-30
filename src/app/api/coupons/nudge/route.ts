@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryMany } from '@/lib/db'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { round2 } from '@/lib/gst'
-import { zCurrency } from '@/lib/validate'
+import { queryMany } from '@/lib/shared/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { round2 } from '@/lib/catalog/gst'
+import { zCurrency } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { Star } from 'lucide-react'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
-import type { Testimonial } from '@/lib/homepage-extras'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import type { Testimonial } from '@/lib/catalog/homepage-extras'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.testimonials
 

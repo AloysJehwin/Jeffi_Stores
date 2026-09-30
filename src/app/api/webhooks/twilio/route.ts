@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
-import { query, queryOne } from '@/lib/db'
-import { logMessage } from '@/lib/message-log'
-import { logActivity } from '@/lib/activity'
-import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/whatsapp'
-import { currentBrandNameAsync } from '@/lib/brand'
+import { query, queryOne } from '@/lib/shared/db'
+import { logMessage } from '@/lib/shared/message-log'
+import { logActivity } from '@/lib/shared/activity'
+import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/shared/whatsapp'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

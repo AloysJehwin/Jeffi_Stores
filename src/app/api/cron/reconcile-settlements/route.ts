@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { reconcileCapturedTransactions } from '@/lib/razorpay-route'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { reconcileCapturedTransactions } from '@/lib/payments/razorpay-route'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

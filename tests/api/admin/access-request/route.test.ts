@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
 
 vi.mock('@/lib/email', () => ({
   transporter: {
@@ -22,10 +22,10 @@ vi.mock('@/lib/email', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/access-request/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
 import { transporter } from '@/lib/email'
-import { sendAuditedMail } from '@/lib/mail-audit'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)

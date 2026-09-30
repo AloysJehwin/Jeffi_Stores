@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn((_search: string, _cols: string[], startIdx: number) => ({
     clause: 'TRUE',
     params: [],
@@ -21,7 +21,7 @@ vi.mock('@/lib/search', () => ({
   ),
 }))
 
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   getReceivablesAging,
   getPayables,
@@ -30,7 +30,7 @@ import {
   getCustomerCreditStatus,
   ReceivableRow,
   PayableRow,
-} from '@/lib/financial'
+} from '@/lib/payments/financial'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

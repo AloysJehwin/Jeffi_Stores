@@ -1,32 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAnyUser: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAnyUser: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
   resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn(),
 }))
-vi.mock('@/lib/razorpay-route', () => ({
+vi.mock('@/lib/payments/razorpay-route', () => ({
   reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
   recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
-vi.mock('@/lib/variant-change', () => ({ applyVariantChange: vi.fn() }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/variant-change', () => ({ applyVariantChange: vi.fn() }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 
 import { POST } from '@/app/api/orders/[id]/variant-change/confirm/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
-import * as vc from '@/lib/variant-change'
-import * as activity from '@/lib/activity'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
+import * as vc from '@/lib/orders/variant-change'
+import * as activity from '@/lib/shared/activity'
 
 const USER = { userId: 'user-1' }
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }

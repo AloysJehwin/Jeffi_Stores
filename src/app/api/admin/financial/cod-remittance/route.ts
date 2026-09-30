@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, query } from '@/lib/db'
-import { generateOrderInvoice } from '@/lib/invoice'
-import { resolveTenant } from '@/lib/tenant-context'
-import { recordCodSettlement } from '@/lib/razorpay-route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, query } from '@/lib/shared/db'
+import { generateOrderInvoice } from '@/lib/documents/invoice'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { recordCodSettlement } from '@/lib/payments/razorpay-route'
 
 export const dynamic = 'force-dynamic'
 

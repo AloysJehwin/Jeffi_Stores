@@ -8,7 +8,7 @@ import ThemeToggle from '@/components/ThemeToggle'
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 export default function BusinessHeader() {
   const { cartCount } = useCart()

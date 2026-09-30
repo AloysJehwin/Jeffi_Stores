@@ -3,16 +3,16 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/gst/itc/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

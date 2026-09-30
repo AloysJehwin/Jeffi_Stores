@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryCount } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { queryMany, queryCount } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 
 const PAGE_SIZE = 10
 

@@ -1,7 +1,7 @@
 import 'server-only'
 import nodemailer from 'nodemailer'
-import { queryMany } from '../db'
-import { sendAuditedMail } from '../mail-audit'
+import { queryMany } from '@/lib/shared/db'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import {
   customerMailFromAsync,
   adminMailFrom,
@@ -12,9 +12,9 @@ import {
   storeContactLine,
   storeAddressLine,
   storeBaseUrlAsync,
-} from '../brand'
-import { createAdminNotification } from '../admin-notify'
-import { mailShell } from '../mail-template'
+} from '@/lib/catalog/brand'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
+import { mailShell } from '@/lib/shared/mail-template'
 
 export { sendAuditedMail, mailShell, createAdminNotification }
 export {

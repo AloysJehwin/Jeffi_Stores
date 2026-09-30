@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCrmDashboardData } from '@/lib/admin-crm'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCrmDashboardData } from '@/lib/shared/admin-crm'
 
 export const dynamic = 'force-dynamic'
 

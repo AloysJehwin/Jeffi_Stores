@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ───────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
 
 // ── Imports after mocks ──────────────────────────────────────────────────────
 
 import { GET as GSTR1_GET } from '@/app/api/admin/gst/gstr1/route'
 import { GET as GSTR3B_GET } from '@/app/api/admin/gst/gstr3b/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)

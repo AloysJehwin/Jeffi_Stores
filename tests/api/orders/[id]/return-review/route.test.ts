@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   const authenticateAdmin = vi.fn()
   return {
     authenticateAdmin,
@@ -16,7 +16,7 @@ vi.mock('@/lib/jwt', async () => {
     },
   }
 })
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
   queryMany: vi.fn().mockResolvedValue([]),
@@ -27,42 +27,42 @@ vi.mock('@/lib/email', () => ({
   sendReturnStatusEmail: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
 }))
-vi.mock('@/lib/razorpay-route', () => ({
+vi.mock('@/lib/payments/razorpay-route', () => ({
   reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
   recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/order-stock', () => ({
+vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { POST } from '@/app/api/orders/[id]/return-review/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
-import * as razorpayRoute from '@/lib/razorpay-route'
-import * as inventory from '@/lib/inventory'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
+import * as razorpayRoute from '@/lib/payments/razorpay-route'
+import * as inventory from '@/lib/orders/inventory'
 import * as email from '@/lib/email'
-import * as activity from '@/lib/activity'
-import * as autoTasks from '@/lib/auto-tasks'
-import * as orderStock from '@/lib/order-stock'
+import * as activity from '@/lib/shared/activity'
+import * as autoTasks from '@/lib/shared/auto-tasks'
+import * as orderStock from '@/lib/orders/order-stock'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }

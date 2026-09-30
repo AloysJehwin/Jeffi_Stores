@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { attributeConversion } from '@/lib/marketing'
-import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { attributeConversion } from '@/lib/shared/marketing'
+import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
 import {
   loadActiveCart,
   cartSubtotal,
@@ -12,14 +12,14 @@ import {
   cartItemsForHash,
   validateCouponForUser,
   commitOrder,
-} from '@/lib/order-commit'
-import { createDraftInvoice } from '@/lib/invoice'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { settleVariantChangePayment } from '@/lib/variant-change'
-import { logActivity } from '@/lib/activity'
-import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
-import { getCurrentTenant } from '@/lib/tenant-context'
-import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlement } from '@/lib/razorpay-route'
+} from '@/lib/orders/order-commit'
+import { createDraftInvoice } from '@/lib/documents/invoice'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { settleVariantChangePayment } from '@/lib/orders/variant-change'
+import { logActivity } from '@/lib/shared/activity'
+import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
+import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
+import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlement } from '@/lib/payments/razorpay-route'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
@@ -192,7 +192,7 @@ async function handlePaymentCaptured(payment: any) {
     const tenantId = (payment.notes.tenant_id ?? '').toString().trim()
     const amountInr = (Number(payment.amount) || 0) / 100
     if (tenantId && amountInr > 0) {
-      const { rechargeWallet } = await import('@/lib/wallet')
+      const { rechargeWallet } = await import('@/lib/payments/wallet')
       await rechargeWallet({
         tenantId,
         amountInr,
@@ -482,7 +482,7 @@ async function handleTransferProcessed(transfer: any) {
     .then(r => r.rows[0])
     .catch(() => null)
   if (!owner) return
-  const { settleTenantTransaction } = await import('@/lib/razorpay-route')
+  const { settleTenantTransaction } = await import('@/lib/payments/razorpay-route')
   await settleTenantTransaction({ tenantId: owner.tenant_id, transferId }).catch(() => {})
 }
 

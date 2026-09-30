@@ -1,4 +1,4 @@
-import { BIND_ENDPOINT, PROOF_HEADER } from '@/lib/session-binding-shared'
+import { BIND_ENDPOINT, PROOF_HEADER } from '@/lib/auth/session-binding-shared'
 
 // Browser half of key-bound sessions (see src/lib/session-binding.ts). The signing key is created
 // non-extractable and kept in IndexedDB: page code and DevTools can use it to sign here, but

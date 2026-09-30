@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
 import { sendAdminContactEmail } from '@/lib/email'
-import { parseBody, zNonEmpty } from '@/lib/validate'
-import { buildVarMap, substituteVars } from '@/lib/template-vars'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
 
 const Schema = z.object({
   subject: zNonEmpty,

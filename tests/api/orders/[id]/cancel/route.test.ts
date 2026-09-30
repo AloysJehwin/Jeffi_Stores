@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/orders', () => ({
+vi.mock('@/lib/orders/orders', () => ({
   cancelOrder: vi.fn(),
 }))
 
 import { POST } from '@/app/api/orders/[id]/cancel/route'
-import * as jwt from '@/lib/jwt'
-import * as orders from '@/lib/orders'
+import * as jwt from '@/lib/auth/jwt'
+import * as orders from '@/lib/orders/orders'
 
 // ------------------------------------------------------------------ helpers
 

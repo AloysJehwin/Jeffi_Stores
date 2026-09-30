@@ -1,23 +1,23 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
   authenticateAdmin: vi.fn(),
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn() }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn() }))
 
 import { POST } from '@/app/api/products/[id]/view/route'
-import { query, queryOne } from '@/lib/db'
-import { authenticateAnyUser } from '@/lib/jwt'
+import { query, queryOne } from '@/lib/shared/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)

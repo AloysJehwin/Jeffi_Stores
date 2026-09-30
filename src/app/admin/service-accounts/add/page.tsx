@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ap } from '@/lib/shared/admin-path'
+import { ADMIN_SCOPES } from '@/lib/auth/scopes'
 
 interface Created {
   id: string

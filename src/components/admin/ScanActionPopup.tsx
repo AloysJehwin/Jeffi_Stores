@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { hasScope } from '@/lib/scopes'
-import { ap } from '@/lib/admin-path'
+import { hasScope } from '@/lib/auth/scopes'
+import { ap } from '@/lib/shared/admin-path'
 
 interface ScannedProduct {
   product_id: string

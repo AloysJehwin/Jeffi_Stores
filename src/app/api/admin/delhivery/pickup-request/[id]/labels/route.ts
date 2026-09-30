@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { buildMergedLabelsPDF, type LabelInput, type LabelItem } from '@/lib/shipping-label-pdf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { buildMergedLabelsPDF, type LabelInput, type LabelItem } from '@/lib/documents/shipping-label-pdf'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

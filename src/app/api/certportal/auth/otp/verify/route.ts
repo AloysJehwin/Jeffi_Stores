@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/otp'
-import { issuePortalToken, setPortalCookie } from '@/lib/portal-session'
+import { verifyOTP, deleteOTP } from '@/lib/auth/otp'
+import { issuePortalToken, setPortalCookie } from '@/lib/auth/portal-session'
 
 export const dynamic = 'force-dynamic'
 

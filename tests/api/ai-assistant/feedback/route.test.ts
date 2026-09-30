@@ -1,12 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock('@/lib/jwt', () => ({
 }))
 
 import { POST } from '@/app/api/ai-assistant/feedback/route'
-import { authenticateUser } from '@/lib/jwt'
-import { queryOne, query } from '@/lib/db'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { queryOne, query } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateUser)
 const mockQueryOne = vi.mocked(queryOne)

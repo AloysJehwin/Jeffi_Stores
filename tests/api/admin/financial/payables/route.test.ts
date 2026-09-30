@@ -3,23 +3,23 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/financial', () => ({
+vi.mock('@/lib/payments/financial', () => ({
   getPayables: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/financial/payables/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
-import { getPayables } from '@/lib/financial'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
+import { getPayables } from '@/lib/payments/financial'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

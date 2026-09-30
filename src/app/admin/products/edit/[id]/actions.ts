@@ -1,25 +1,25 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { publishProductDraft, openOrdersForProduct } from '@/lib/product-draft'
-import { generateVariantSku } from '@/lib/sku'
-import { round2 } from '@/lib/gst'
-import { getAdminSession } from '@/lib/admin-auth'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { publishProductDraft, openOrdersForProduct } from '@/lib/catalog/product-draft'
+import { generateVariantSku } from '@/lib/catalog/sku'
+import { round2 } from '@/lib/catalog/gst'
+import { getAdminSession } from '@/lib/auth/admin-auth'
 
 // Background AI enrichment after a save. Gated on catalog_enrichment:write, which the session
 // holds only when the admin's role AND the tenant's plan include it, so a plan without AI never
 // runs it. The descriptor is resolved here, inside the request, before the detached job starts.
 async function triggerEnrichment(productId: string) {
   const session = await getAdminSession()
-  const { hasScope } = await import('@/lib/scopes')
+  const { hasScope } = await import('@/lib/auth/scopes')
   if (!session || !hasScope(session.role, session.scopes, 'catalog_enrichment:write')) return
-  const { aiChat } = await import('@/lib/ai-client')
-  const { storeDescriptorForPrompt } = await import('@/lib/brand')
-  const { resolveTenantId } = await import('@/lib/tenant-context')
+  const { aiChat } = await import('@/lib/shared/ai-client')
+  const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
   const cacheNamespace = (await resolveTenantId()) ?? 'platform'
   const SYSTEM_PROMPT = `You write product intelligence data for ${await storeDescriptorForPrompt()}.
 Given a product name, category, brand, and description, produce ALL of the following fields:
@@ -855,7 +855,7 @@ export async function updateProduct(productId: string, formData: FormData) {
       const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
 
       if (imagesToDelete.length > 0) {
-        const { deleteProductImage } = await import('@/lib/s3')
+        const { deleteProductImage } = await import('@/lib/shared/s3')
         for (const img of imagesToDelete) {
           if (img.s3_key) await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
           await query('DELETE FROM product_images WHERE id = $1', [img.id])
@@ -893,7 +893,7 @@ export async function updateProduct(productId: string, formData: FormData) {
 
       const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
-        const { copyGalleryImageToProduct } = await import('@/lib/s3')
+        const { copyGalleryImageToProduct } = await import('@/lib/shared/s3')
         const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
           galleryImageRefs.map(r => r.id),
         ])
@@ -1120,7 +1120,7 @@ export async function updateProduct(productId: string, formData: FormData) {
       await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
     }
 
-    const { syncProductToSheet } = await import('@/lib/google-sheets')
+    const { syncProductToSheet } = await import('@/lib/shared/google-sheets')
     syncProductToSheet(productId).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(productId).catch(() => {})

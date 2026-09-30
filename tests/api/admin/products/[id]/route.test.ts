@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -17,11 +17,11 @@ vi.mock('@/lib/queries', () => ({
   getProduct: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: vi.fn() },
   zCurrency: { optional: vi.fn() },
@@ -35,11 +35,11 @@ vi.mock('next/cache', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, PATCH } from '@/app/api/admin/products/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query } from '@/lib/shared/db'
 import { getProduct } from '@/lib/queries'
-import { hasScope } from '@/lib/scopes'
-import { parseBody } from '@/lib/validate'
+import { hasScope } from '@/lib/auth/scopes'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockGetProduct = vi.mocked(getProduct)

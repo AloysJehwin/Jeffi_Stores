@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { queryOne, queryMany } from '@/lib/db'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
 

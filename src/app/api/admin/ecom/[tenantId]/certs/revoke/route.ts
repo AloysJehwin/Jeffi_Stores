@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { isPlatformAdmin } from '@/lib/scopes'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
+import { parseBody } from '@/lib/shared/validate'
 import { getTenant } from '@/lib/tenant-registry'
-import { revokeTenantAdminCert } from '@/lib/tenant-ca'
-import { revokePortalCerts } from '@/lib/portal-certs'
+import { revokeTenantAdminCert } from '@/lib/tenancy/tenant-ca'
+import { revokePortalCerts } from '@/lib/tenancy/portal-certs'
 
 export const dynamic = 'force-dynamic'
 

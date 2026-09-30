@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProduct } from '@/lib/queries'
-import { query, withTransaction } from '@/lib/db'
-import { deleteProductCascadeTx } from '@/lib/product-delete'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope, isPlatformOwner } from '@/lib/scopes'
+import { query, withTransaction } from '@/lib/shared/db'
+import { deleteProductCascadeTx } from '@/lib/catalog/product-delete'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/validate'
+import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/shared/validate'
 
 const patchSchema = z
   .object({
@@ -88,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await withTransaction(client => deleteProductCascadeTx(client, id))
 
     // Best-effort S3 cleanup (outside the txn — object store isn't transactional).
-    const { deleteProductImage } = await import('@/lib/s3')
+    const { deleteProductImage } = await import('@/lib/shared/s3')
     for (const img of [...imgs.rows, ...variantImgs.rows]) {
       if (img.s3_key && img.s3_thumbnail_key) {
         try {

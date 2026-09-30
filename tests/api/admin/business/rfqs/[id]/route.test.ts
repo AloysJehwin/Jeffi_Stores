@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -16,8 +16,8 @@ vi.mock('@/lib/db', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, PATCH } from '@/app/api/admin/business/rfqs/[id]/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 
 const mockRequireScope = vi.mocked(requireAdminScope)
 const mockQuery = vi.mocked(query)
