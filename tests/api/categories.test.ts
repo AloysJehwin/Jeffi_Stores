@@ -15,10 +15,22 @@ vi.mock('@/lib/db', () => ({
   queryCount: queryCountMock,
 }))
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: authenticateAdminMock,
-  authenticateUser: vi.fn().mockResolvedValue(null),
-}))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  return {
+    authenticateAdmin: authenticateAdminMock,
+    authenticateUser: vi.fn().mockResolvedValue(null),
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdminMock()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 
 // ── import handlers AFTER mocks ──────────────────────────────────────────────
 import { GET as listCategories, OPTIONS } from '@/app/api/categories/route'
@@ -32,7 +44,7 @@ function makeReq(method: string) {
   })
 }
 
-const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
+const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['categories:write'] }
 
 const sampleCategories = [
   { id: 'cat-1', name: 'Bolts', slug: 'bolts', parent_category_id: null, image_url: null, display_order: 1 },
@@ -114,6 +126,13 @@ describe('DELETE /api/categories/[id]', () => {
 
     const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when the admin lacks categories:write', async () => {
+    authenticateAdminMock.mockResolvedValue({ ...adminPayload, role: 'viewer', scopes: ['categories:read'] })
+
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
+    expect(res.status).toBe(403)
   })
 
   it('deletes category with no products or sub-categories', async () => {

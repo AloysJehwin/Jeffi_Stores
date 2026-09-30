@@ -6,19 +6,32 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: vi.fn(),
-  authenticateAnyUser: vi.fn(),
-  authenticateUser: vi.fn(),
-  verifyToken: vi.fn(),
-}))
+const { authenticateAdminMock } = vi.hoisted(() => ({ authenticateAdminMock: vi.fn() }))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  return {
+    authenticateAdmin: authenticateAdminMock,
+    authenticateAnyUser: vi.fn(),
+    authenticateUser: vi.fn(),
+    verifyToken: vi.fn(),
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdminMock()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 
 import { PATCH } from '@/app/api/categories/reorder/route'
-import { authenticateAdmin } from '@/lib/jwt'
 import { query } from '@/lib/db'
 
-const mockAuth = vi.mocked(authenticateAdmin)
+const mockAuth = authenticateAdminMock
 const mockQuery = vi.mocked(query)
+const ADMIN = { id: 'admin1', role: 'editor', scopes: ['categories:write'] }
 
 function makeRequest(body: object) {
   return new Request('http://localhost/api/categories/reorder', {
@@ -39,8 +52,14 @@ describe('PATCH /api/categories/reorder', () => {
     expect(res.status).toBe(401)
   })
 
+  it('returns 403 when the admin lacks categories:write', async () => {
+    mockAuth.mockResolvedValueOnce({ id: 'admin1', role: 'viewer', scopes: ['categories:read'] } as any)
+    const res = await PATCH(makeRequest({ updates: [] }) as any)
+    expect(res.status).toBe(403)
+  })
+
   it('returns 400 when updates is empty', async () => {
-    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockAuth.mockResolvedValueOnce(ADMIN as any)
     const res = await PATCH(makeRequest({ updates: [] }) as any)
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -48,13 +67,13 @@ describe('PATCH /api/categories/reorder', () => {
   })
 
   it('returns 400 when updates is not an array', async () => {
-    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockAuth.mockResolvedValueOnce(ADMIN as any)
     const res = await PATCH(makeRequest({ updates: 'bad' }) as any)
     expect(res.status).toBe(400)
   })
 
   it('runs update query and returns success', async () => {
-    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockAuth.mockResolvedValueOnce(ADMIN as any)
     mockQuery.mockResolvedValueOnce(undefined as any)
 
     const res = await PATCH(
@@ -72,7 +91,7 @@ describe('PATCH /api/categories/reorder', () => {
   })
 
   it('returns 500 on db error', async () => {
-    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockAuth.mockResolvedValueOnce(ADMIN as any)
     mockQuery.mockRejectedValueOnce(new Error('constraint violation'))
 
     const res = await PATCH(

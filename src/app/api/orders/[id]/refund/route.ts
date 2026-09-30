@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
 import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
@@ -12,10 +12,8 @@ import { computeRefundableAmount } from '@/lib/refund'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'orders:write')
+    if (admin instanceof NextResponse) return admin
 
     const orderId = id
 

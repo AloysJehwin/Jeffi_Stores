@@ -4,10 +4,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: vi.fn().mockResolvedValue(null),
-  verifyToken: vi.fn().mockResolvedValue(null),
-}))
+const { authenticateAdminMock } = vi.hoisted(() => ({ authenticateAdminMock: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  return {
+    authenticateAdmin: authenticateAdminMock,
+    verifyToken: vi.fn().mockResolvedValue(null),
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdminMock()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 
 vi.mock('@/lib/s3', () => ({
   uploadProductImage: vi.fn().mockResolvedValue({
@@ -37,7 +50,7 @@ const VALID_ADMIN = {
   adminId: 'admin-001',
   username: 'alice',
   role: 'super_admin',
-  scopes: [],
+  scopes: ['products:write'],
 }
 
 function makeUploadRequest(fields: Record<string, string | File>): Request {
@@ -76,6 +89,16 @@ describe('POST /api/upload', () => {
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
+  })
+
+  it('returns 403 when the admin lacks products:write', async () => {
+    mockAuthenticateAdmin.mockResolvedValueOnce({ ...VALID_ADMIN, role: 'viewer', scopes: ['products:read'] } as any)
+    const req = makeUploadRequest({
+      productId: 'prod-1',
+      file: new File(['data'], 'photo.jpg', { type: 'image/jpeg' }),
+    })
+    const res = await POST(req as any)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when file is missing', async () => {

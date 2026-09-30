@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, query, queryMany, withTransaction, resolveRequestTenant } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
@@ -14,10 +14,8 @@ import { getBusinessValues } from '@/lib/site-controls'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'orders:write')
+    if (admin instanceof NextResponse) return admin
 
     const orderId = id
     const body = await request.json()

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, query } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { restoreOrderStock } from '@/lib/order-stock'
@@ -9,10 +9,8 @@ import { logActivity } from '@/lib/activity'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'orders:write')
+    if (admin instanceof NextResponse) return admin
 
     const orderId = id
     const body = await request.json()
