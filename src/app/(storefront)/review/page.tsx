@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { useToast } from '@/contexts/ToastContext'
 
 const TAGS = [
   'Great quality',
@@ -23,6 +24,7 @@ interface ProductInfo {
 }
 
 export default function ReviewPage() {
+  const { showToast } = useToast()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   const ratingParam = parseInt(searchParams.get('rating') ?? '0', 10)
@@ -118,12 +120,12 @@ export default function ReviewPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to submit review')
+        showToast(data.error || 'Failed to submit review', 'error')
         return
       }
       setSuccess(true)
     } catch {
-      setError('Something went wrong. Please try again.')
+      showToast('Something went wrong. Please try again.', 'error')
     } finally {
       setIsSubmitting(false)
     }

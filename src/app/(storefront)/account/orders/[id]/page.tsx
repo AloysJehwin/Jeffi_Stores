@@ -6,6 +6,7 @@ import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { useToast } from '@/contexts/ToastContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
@@ -213,14 +214,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [isCancelling, setIsCancelling] = useState(false)
   const [isPayingNow, setIsPayingNow] = useState(false)
 
-  const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [vcrBusy, setVcrBusy] = useState(false)
-  const [vcrError, setVcrError] = useState('')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [isAutoCancelling, setIsAutoCancelling] = useState(false)
   const autoCancelTriggeredRef = useRef(false)
   const { refreshCart } = useCart()
+  const { showToast } = useToast()
 
   const [returnRequest, setReturnRequest] = useState<{
     id: string
@@ -253,7 +253,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [returnDescription, setReturnDescription] = useState('')
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false)
   const [returnError, setReturnError] = useState('')
-  const [returnSuccess, setReturnSuccess] = useState('')
   const [returnImages, setReturnImages] = useState<File[]>([])
   const [returnImagePreviews, setReturnImagePreviews] = useState<string[]>([])
   const [isUploadingImages, setIsUploadingImages] = useState(false)
@@ -381,7 +380,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       await refreshCart()
       setShowCancelConfirm(false)
     } catch (err: any) {
-      setError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setIsCancelling(false)
     }
@@ -408,7 +407,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleSubmitReturn = async () => {
     setIsSubmittingReturn(true)
     setReturnError('')
-    setReturnSuccess('')
     if (!returnReason) {
       setReturnError('Please select a reason.')
       setIsSubmittingReturn(false)
@@ -462,12 +460,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to submit return request')
-      setReturnSuccess('Your return request has been submitted. Our team will review it shortly.')
+      showToast('Your return request has been submitted. Our team will review it shortly.', 'success')
       setShowReturnForm(false)
       setReturnSelectedItems({})
       await fetchOrder()
     } catch (err: any) {
-      setReturnError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setIsSubmittingReturn(false)
     }
@@ -495,7 +493,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handlePayNow = async () => {
     if (!order) return
     setIsPayingNow(true)
-    setPaymentError('')
 
     try {
       await loadRazorpayScript()
@@ -535,8 +532,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             await fetchOrder()
             setIsPayingNow(false)
           } catch (err: any) {
-            setPaymentError(
-              err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.'
+            showToast(
+              err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.',
+              'error'
             )
             setIsPayingNow(false)
           }
@@ -556,12 +554,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
-        setPaymentError(`Payment failed: ${response.error.description}. Please try again.`)
+        showToast(`Payment failed: ${response.error.description}. Please try again.`, 'error')
         setIsPayingNow(false)
       })
       rzp.open()
     } catch (err: any) {
-      setPaymentError(err.message)
+      showToast(err.message, 'error')
       setIsPayingNow(false)
     }
   }
@@ -569,7 +567,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleConfirmVariantChange = async () => {
     if (!order) return
     setVcrBusy(true)
-    setVcrError('')
     try {
       const res = await fetch(`/api/orders/${order.id}/variant-change/confirm`, {
         method: 'POST',
@@ -607,8 +604,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               await fetchOrder()
               setVcrBusy(false)
             } catch (err: any) {
-              setVcrError(
-                err?.message || 'Payment received but confirmation failed. Contact support — your payment is safe.'
+              showToast(
+                err?.message || 'Payment received but confirmation failed. Contact support — your payment is safe.',
+                'error'
               )
               setVcrBusy(false)
             }
@@ -627,7 +625,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         }
         const rzp = new (window as any).Razorpay(options)
         rzp.on('payment.failed', function (r: any) {
-          setVcrError(`Payment failed: ${r.error?.description || ''}`)
+          showToast(`Payment failed: ${r.error?.description || ''}`, 'error')
           setVcrBusy(false)
         })
         rzp.open()
@@ -638,7 +636,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       await fetchOrder()
       setVcrBusy(false)
     } catch (err: any) {
-      setVcrError(err.message)
+      showToast(err.message, 'error')
       setVcrBusy(false)
     }
   }
@@ -646,7 +644,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleRejectVariantChange = async () => {
     if (!order) return
     setVcrBusy(true)
-    setVcrError('')
     try {
       const res = await fetch(`/api/orders/${order.id}/variant-change/reject`, {
         method: 'POST',
@@ -658,7 +655,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (!res.ok) throw new Error(data.error || 'Failed to decline change')
       await fetchOrder()
     } catch (err: any) {
-      setVcrError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setVcrBusy(false)
     }
@@ -1134,7 +1131,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         <>No change to your total.</>
                       )}
                     </p>
-                    {vcrError && <p className="text-sm text-red-600 mt-2">{vcrError}</p>}
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={handleConfirmVariantChange}
@@ -1161,12 +1157,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Return Status Banners */}
-            {returnSuccess && (
-              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <p className="text-green-800 dark:text-green-300 text-sm">{returnSuccess}</p>
-              </div>
-            )}
-
             {order.status === 'return_requested' && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
                 <div className="flex gap-3">
@@ -2013,28 +2003,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
               )}
-
-            {/* Payment Error */}
-            {paymentError && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex gap-3">
-                  <svg
-                    className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <p className="text-red-800 dark:text-red-300 text-sm">{paymentError}</p>
-                </div>
-              </div>
-            )}
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4">

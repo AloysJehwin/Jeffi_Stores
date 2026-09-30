@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
@@ -63,6 +64,7 @@ function getStatusColor(s: string) {
 
 export default function AccountPage() {
   const { user, isLoading, logout } = useAuth()
+  const { showToast } = useToast()
   const router = useRouter()
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -135,11 +137,11 @@ export default function AccountPage() {
         return
       }
 
-      setMessage('Profile updated successfully!')
+      showToast('Profile updated successfully!', 'success')
       setIsEditing(false)
       window.location.reload()
     } catch {
-      setMessage('Failed to update profile')
+      showToast('Failed to update profile', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -206,7 +208,7 @@ export default function AccountPage() {
       setCropSrc(null)
       document.body.style.overflow = ''
     } catch (err: any) {
-      setMessage(err.message || 'Failed to upload photo')
+      showToast(err.message || 'Failed to upload photo', 'error')
     } finally {
       setAvatarUploading(false)
     }
@@ -910,7 +912,7 @@ export default function AccountPage() {
           }}
           onCancel={() => {
             setShowPhoneVerify(false)
-            setMessage('Mobile number not verified. Your name was saved.')
+            showToast('Mobile number not verified. Your name was saved.', 'info')
           }}
         />
       )}
