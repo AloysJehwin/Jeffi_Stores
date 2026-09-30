@@ -65,12 +65,12 @@ export default function FinancialClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex border-b border-border-default gap-1">
+      <div className="flex border-b border-border-default gap-1 overflow-x-auto">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => handleTabChange(t.key as Tab)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === t.key
                 ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400'
                 : 'border-transparent text-foreground-secondary hover:text-foreground'
