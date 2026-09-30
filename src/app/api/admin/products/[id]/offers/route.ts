@@ -25,7 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        JOIN product_offers o ON o.id = i.offer_id
       WHERE i.product_id = $1
       ORDER BY o.display_order ASC, o.created_at ASC`,
-    [id],
+    [id]
   )
   return NextResponse.json({ offers })
 }
@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         `INSERT INTO product_offer_items (offer_id, product_id)
            SELECT oid, $1 FROM unnest($2::uuid[]) AS oid
          ON CONFLICT DO NOTHING`,
-        [id, offerIds],
+        [id, offerIds]
       )
     }
   })

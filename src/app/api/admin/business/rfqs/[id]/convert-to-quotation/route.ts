@@ -13,9 +13,18 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
-function parseAddress(raw: string | null): { addr1: string; addr2: string | null; city: string; state: string; pincode: string | null } {
+function parseAddress(raw: string | null): {
+  addr1: string
+  addr2: string | null
+  city: string
+  state: string
+  pincode: string | null
+} {
   if (!raw) return { addr1: '', addr2: null, city: '', state: 'Chhattisgarh', pincode: null }
-  const parts = raw.split(',').map(s => s.trim()).filter(Boolean)
+  const parts = raw
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
   let pincode: string | null = null
   if (parts.length > 0 && /^\d{6}$/.test(parts[parts.length - 1])) {
     pincode = parts.pop()!
@@ -147,9 +156,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // If the selling unit has a factor (e.g. box=50 pieces), the DB price is
     // per base unit — scale up so the rate shown on the quotation is per selling unit.
     const unitFactor = item.unit_factor != null ? Number(item.unit_factor) : 1
-    baseRateExGst = rawMrp > 0
-      ? (mrpIsAlreadyExGst ? rawMrp : rawMrp / (1 + gstRate / 100)) * unitFactor
-      : 0
+    baseRateExGst = rawMrp > 0 ? (mrpIsAlreadyExGst ? rawMrp : rawMrp / (1 + gstRate / 100)) * unitFactor : 0
 
     // Business price ex-GST: product discount + B2B category discount stacked
     const productDisc = Number(item.sv_discount_pct ?? item.variant_discount_pct ?? item.product_discount_pct ?? 0)
@@ -158,7 +165,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const businessPriceExGst = baseRateExGst > 0 ? applyDiscount(baseRateExGst, businessDiscPct) : 0
 
     // Use negotiated price if customer accepted a counter offer, else fall back to requested price
-    const effectivePriceInclGst = negotiatedPriceMap[item.id] ?? (item.requested_price ? Number(item.requested_price) : null)
+    const effectivePriceInclGst =
+      negotiatedPriceMap[item.id] ?? (item.requested_price ? Number(item.requested_price) : null)
 
     if (effectivePriceInclGst != null) {
       // Price is incl-GST — convert to ex-GST for quotation line item calculation.
@@ -181,8 +189,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const qty = Number(item.quantity)
     const amount = lineItemExGst(qty, baseRateExGst, discountPct)
-    const itemCgst = amount * (gstRate / 2) / 100
-    const itemSgst = amount * (gstRate / 2) / 100
+    const itemCgst = (amount * (gstRate / 2)) / 100
+    const itemSgst = (amount * (gstRate / 2)) / 100
 
     subtotal += amount
     cgst += itemCgst
@@ -203,8 +211,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       unit: item.unit_display_label || item.unit || 'Nos',
       buy_unit: item.unit || null,
       sold_unit_factor: unitFactor !== 1 ? unitFactor : null,
-      rate: baseRateExGst,       // pre-discount rate, so admin can see original and adjust
-      discount_pct: discountPct,  // business discount shown separately on the quotation
+      rate: baseRateExGst, // pre-discount rate, so admin can see original and adjust
+      discount_pct: discountPct, // business discount shown separately on the quotation
       amount,
       product_id: item.product_id || null,
       variant_id: item.variant_id || null,
@@ -251,14 +259,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `INSERT INTO quotation_items
          (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.buy_unit, li.sold_unit_factor, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
+      [
+        qt!.id,
+        idx,
+        li.description,
+        li.hsn_code,
+        li.gst_rate,
+        li.quantity,
+        li.unit,
+        li.buy_unit,
+        li.sold_unit_factor,
+        li.rate,
+        li.discount_pct,
+        li.amount,
+        li.product_id,
+        li.variant_id,
+        li.sub_variant_id,
+      ]
     )
   }
 
-  await query(
-    `UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`,
-    [qt!.id, id]
-  )
+  await query(`UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`, [
+    qt!.id,
+    id,
+  ])
 
   // Notify business user
   if (rfq.email && qt?.view_token) {
@@ -269,7 +293,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       rfq.rfq_number,
       qt.quote_number,
       Number(total.toFixed(2)),
-      viewUrl,
+      viewUrl
     ).catch(() => {})
   }
 

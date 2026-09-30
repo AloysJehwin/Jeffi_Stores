@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'crm:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'crm:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rangeParam = req.nextUrl.searchParams.get('range')
   const segmentParam = req.nextUrl.searchParams.get('segment')

@@ -25,8 +25,14 @@ const postSchema = z.object({
         unit_cost: z.coerce.number().min(0),
         purchase_unit_factor: z.coerce.number().positive().default(1),
         lot_number: z.string().nullish(),
-        manufacture_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
-        expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+        manufacture_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullish(),
+        expiry_date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullish(),
         location_id: zUuid.nullish(),
         serial_numbers: z.array(z.string().min(1)).nullish(),
       })
@@ -39,7 +45,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { received_date, notes } = body
@@ -72,10 +79,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const countRow = await queryOne<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM grns WHERE grn_number LIKE $1`,
-      [`GRN-${datePart}-%`]
-    )
+    const countRow = await queryOne<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM grns WHERE grn_number LIKE $1`, [
+      `GRN-${datePart}-%`,
+    ])
     const seq = String((countRow?.cnt || 0) + 1).padStart(4, '0')
     const grnNumber = `GRN-${datePart}-${seq}`
 
@@ -94,9 +100,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const grnRow = await client.query<{ id: string }>(
         `INSERT INTO grns (grn_number, po_id, supplier_id, received_date, notes)
          VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [grnNumber, id, po.supplier_id,
-         received_date || new Date().toISOString().slice(0, 10),
-         notes || null]
+        [grnNumber, id, po.supplier_id, received_date || new Date().toISOString().slice(0, 10), notes || null]
       )
       const grnId = grnRow.rows[0].id
       const batchTrackedProductIds = new Set<string>()
@@ -151,7 +155,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           if (serials.filter(Boolean).length !== expectedSerials) {
             throw new Error(
               `Product ${productId} is serialized — expected ${expectedSerials} serial number(s) ` +
-              `(${qtyReceived} base units ÷ ${qtyStep} qty_step), got ${serials.filter(Boolean).length}`
+                `(${qtyReceived} base units ÷ ${qtyStep} qty_step), got ${serials.filter(Boolean).length}`
             )
           }
           if (serials.length > 0) {
@@ -160,7 +164,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               [productId, serials]
             )
             if (dupeCheck.rows.length > 0) {
-              throw new Error(`Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`)
+              throw new Error(
+                `Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`
+              )
             }
           }
         }
@@ -186,7 +192,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9) RETURNING id`,
             [
-              productId, variantId, subVariantId, grnId,
+              productId,
+              variantId,
+              subVariantId,
+              grnId,
               item.lot_number || null,
               item.manufacture_date || null,
               item.expiry_date || null,
@@ -284,16 +293,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         `SELECT quantity, quantity_received FROM purchase_order_items WHERE po_id = $1`,
         [id]
       )
-      const allReceived = poItems.rows.every(
-        r => parseFloat(r.quantity_received) >= parseFloat(r.quantity)
-      )
+      const allReceived = poItems.rows.every(r => parseFloat(r.quantity_received) >= parseFloat(r.quantity))
       const anyReceived = poItems.rows.some(r => parseFloat(r.quantity_received) > 0)
       const newStatus = allReceived ? 'received' : anyReceived ? 'partial' : po.status
 
-      await client.query(
-        `UPDATE purchase_orders SET status = $1, updated_at = NOW() WHERE id = $2`,
-        [newStatus, id]
-      )
+      await client.query(`UPDATE purchase_orders SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, id])
 
       // If inventory_sync is ON, derive stock_status from the received quantities,
       // in-transaction (deduped per product). No-op when OFF. Covers the
@@ -333,12 +337,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               item.sub_variant_id || null,
               qtyReceived,
               `GRN receive — PO ${po.po_number}`,
-              admin.id,
+              admin.id
             )
           } else {
             // Non-perishable with no shelf location: inventory_quantity was bumped but
             // shelf_stock cannot be — flag so the divergence is visible, not silent.
-            shelfWarnings.push(`No shelf location for product ${item.product_id} — stock added but not placed on a shelf.`)
+            shelfWarnings.push(
+              `No shelf location for product ${item.product_id} — stock added but not placed on a shelf.`
+            )
           }
         } catch (err: any) {
           shelfWarnings.push(`Shelf update failed for product ${item.product_id}: ${err?.message || 'unknown error'}`)
@@ -357,10 +363,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             [grnId]
           )
           const receivedTax = taxResult.rows.reduce(
-            (s, r) => s + parseFloat(r.quantity_received) * parseFloat(r.unit_cost) * parseFloat(r.tax_rate) / 100, 0
+            (s, r) => s + (parseFloat(r.quantity_received) * parseFloat(r.unit_cost) * parseFloat(r.tax_rate)) / 100,
+            0
           )
           const expSeq = await expClient.query<{ count: string }>('SELECT COUNT(*)::int AS count FROM expenses')
-          const expenseNumber = `EXP-${String((parseInt(expSeq.rows[0]?.count || '0') + 1)).padStart(4, '0')}`
+          const expenseNumber = `EXP-${String(parseInt(expSeq.rows[0]?.count || '0') + 1).padStart(4, '0')}`
           const receiveDate = received_date || new Date().toISOString().slice(0, 10)
           await expClient.query(
             `INSERT INTO expenses (expense_number, supplier_name, description, amount, tax_amount, total_amount, expense_date, status, po_id, grn_id)
@@ -415,7 +422,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         } catch (_) {}
       }
 
-      return NextResponse.json({ success: true, grn_id: grnId, grn_number: grnNumber, batch_ids: createdBatchIds, serial_numbers: createdSerials, ...(shelfWarnings.length ? { warnings: shelfWarnings } : {}) })
+      return NextResponse.json({
+        success: true,
+        grn_id: grnId,
+        grn_number: grnNumber,
+        batch_ids: createdBatchIds,
+        serial_numbers: createdSerials,
+        ...(shelfWarnings.length ? { warnings: shelfWarnings } : {}),
+      })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err

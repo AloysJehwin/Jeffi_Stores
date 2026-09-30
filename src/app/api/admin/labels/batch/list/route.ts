@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
 
     const conditions: string[] = ['pb.quantity_remaining > 0', 'p.perishable = true']
     const params: any[] = []
-    if (productId) { params.push(productId); conditions.push(`pb.product_id = $${params.length}`) }
+    if (productId) {
+      params.push(productId)
+      conditions.push(`pb.product_id = $${params.length}`)
+    }
 
     let rank = ''
     if (q) {

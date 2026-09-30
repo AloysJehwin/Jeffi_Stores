@@ -47,8 +47,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     maxRecipientsPerSweep: 50,
   }
   const UNIVERSAL_SCHEMA = {
-    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
+    sendCooldownDays: {
+      type: 'integer',
+      min: 1,
+      max: 30,
+      label: 'Per-user cooldown (days)',
+      description: 'Skip users sent this campaign within N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
   }
 
   const builtin = getScenario(kind)
@@ -87,7 +99,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     }
   }
 
-  const campaigns = await queryMany<CampaignDetailRow>(`
+  const campaigns = await queryMany<CampaignDetailRow>(
+    `
     SELECT
       c.kind, c.name, c.description, c.enabled, c.delay_hours, c.discount_percent,
       c.parameters, c.last_run_at,
@@ -98,7 +111,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     FROM campaigns c
     WHERE c.scenario_kind = $1
     ORDER BY c.name
-  `, [kind])
+  `,
+    [kind]
+  )
 
   return NextResponse.json({
     scenario: scenarioPayload,
@@ -176,15 +191,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
     [kind]
   )
   if (parseInt(linkedCampaigns?.count || '0', 10) > 0) {
-    return NextResponse.json({ error: 'Cannot delete — campaigns still use this scenario. Delete or reassign them first.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Cannot delete — campaigns still use this scenario. Delete or reassign them first.' },
+      { status: 400 }
+    )
   }
 
   await query(`DELETE FROM scenarios WHERE kind = $1`, [kind])
 
-  await query(
-    `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action) VALUES ($1, $2, 'delete')`,
-    [admin.id, kind]
-  ).catch(() => {})
+  await query(`INSERT INTO scenario_audit_log (admin_id, scenario_kind, action) VALUES ($1, $2, 'delete')`, [
+    admin.id,
+    kind,
+  ]).catch(() => {})
 
   return NextResponse.json({ success: true })
 }

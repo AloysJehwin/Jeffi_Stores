@@ -14,14 +14,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'action must be "approve" or "reject"' }, { status: 400 })
   }
 
-  const profile = await queryOne<{ id: string }>(
-    'SELECT id FROM business_profiles WHERE user_id = $1',
-    [id]
-  )
+  const profile = await queryOne<{ id: string }>('SELECT id FROM business_profiles WHERE user_id = $1', [id])
   if (!profile) return NextResponse.json({ error: 'Business profile not found' }, { status: 404 })
 
   // Load user + company info for the email
-  const userInfo = await queryOne<{ email: string; first_name: string | null; last_name: string | null; company_name: string | null }>(
+  const userInfo = await queryOne<{
+    email: string
+    first_name: string | null
+    last_name: string | null
+    company_name: string | null
+  }>(
     `SELECT u.email, u.first_name, u.last_name, bp.company_name
      FROM users u JOIN business_profiles bp ON bp.user_id = u.id
      WHERE u.id = $1`,
@@ -44,7 +46,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
     if (userInfo?.email) {
       const name = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ') || userInfo.email
-      sendBusinessAccountRejectedEmail(userInfo.email, name, userInfo.company_name || '', rejectionNote || null).catch(() => {})
+      sendBusinessAccountRejectedEmail(userInfo.email, name, userInfo.company_name || '', rejectionNote || null).catch(
+        () => {}
+      )
     }
   }
 

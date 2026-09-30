@@ -17,10 +17,16 @@ export async function GET(request: NextRequest) {
   const params: any[] = []
   let i = 1
 
-  if (status) { conditions.push(`bp.approval_status = $${i++}`); params.push(status) }
+  if (status) {
+    conditions.push(`bp.approval_status = $${i++}`)
+    params.push(status)
+  }
   if (q) {
-    conditions.push(`(u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.email ILIKE $${i} OR bp.company_name ILIKE $${i} OR bp.gst_number ILIKE $${i})`)
-    params.push(`%${q}%`); i++
+    conditions.push(
+      `(u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.email ILIKE $${i} OR bp.company_name ILIKE $${i} OR bp.gst_number ILIKE $${i})`
+    )
+    params.push(`%${q}%`)
+    i++
   }
 
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
@@ -37,10 +43,7 @@ export async function GET(request: NextRequest) {
        LIMIT $${i} OFFSET $${i + 1}`,
       [...params, PAGE_SIZE, offset]
     ),
-    queryCount(
-      `SELECT COUNT(*) FROM users u JOIN business_profiles bp ON bp.user_id = u.id ${where}`,
-      params
-    ),
+    queryCount(`SELECT COUNT(*) FROM users u JOIN business_profiles bp ON bp.user_id = u.id ${where}`, params),
   ])
 
   return NextResponse.json({ customers, total, page, pageSize: PAGE_SIZE })

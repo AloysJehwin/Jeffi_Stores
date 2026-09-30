@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   for (const [key, column] of Object.entries(COLUMN_MAP)) {
     if (!(key in parsed.data)) continue
     const raw = (parsed.data as Record<string, unknown>)[key]
-    updates[column] = column === 'config' ? raw ?? {} : raw ?? null
+    updates[column] = column === 'config' ? (raw ?? {}) : (raw ?? null)
   }
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 

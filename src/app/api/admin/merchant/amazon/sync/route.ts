@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { syncAllProductsToAmazon, syncProductToAmazon, sendAmazonSyncFailureEmail, validateProductForAmazon, dryRunAmazonSync } from '@/lib/amazon/sync'
+import {
+  syncAllProductsToAmazon,
+  syncProductToAmazon,
+  sendAmazonSyncFailureEmail,
+  validateProductForAmazon,
+  dryRunAmazonSync,
+} from '@/lib/amazon/sync'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300
@@ -17,7 +23,9 @@ function isSameOriginRequest(request: NextRequest): boolean {
     try {
       const refUrl = new URL(referer)
       if (refUrl.host === host) return true
-    } catch { return false }
+    } catch {
+      return false
+    }
   }
   return false
 }
@@ -32,7 +40,8 @@ export async function POST(request: NextRequest) {
 
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'merchant_sync:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'merchant_sync:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json().catch(() => ({}))
   const productId: string | undefined = body.productId
@@ -77,7 +86,8 @@ export async function GET(request: NextRequest) {
   if (!isCron) {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'merchant_sync:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'merchant_sync:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   try {

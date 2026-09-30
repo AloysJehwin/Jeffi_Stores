@@ -15,7 +15,8 @@ const postSchema = z.object({
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:read'))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const warehouseId = request.nextUrl.searchParams.get('warehouse_id') || undefined
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const { warehouse_id, aisle_code, rack_code, shelf_code, bin_code, notes } = await request.json()

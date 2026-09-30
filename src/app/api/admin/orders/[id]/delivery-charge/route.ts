@@ -24,13 +24,15 @@ export const dynamic = 'force-dynamic'
  * dashboard uses, so the stored figure matches theirs exactly rather than being someone's
  * arithmetic.
  */
-const Schema = z.object({
-  chargedWeightKg: z.number().positive().max(1000).nullish(),
-  chargedAmount: z.number().nonnegative().max(1_000_000).nullish(),
-  proofNote: z.string().trim().max(500).nullish(),
-}).refine((v) => v.chargedWeightKg != null || v.chargedAmount != null, {
-  message: 'Give the charged weight, the charged amount, or both',
-})
+const Schema = z
+  .object({
+    chargedWeightKg: z.number().positive().max(1000).nullish(),
+    chargedAmount: z.number().nonnegative().max(1_000_000).nullish(),
+    proofNote: z.string().trim().max(500).nullish(),
+  })
+  .refine(v => v.chargedWeightKg != null || v.chargedAmount != null, {
+    message: 'Give the charged weight, the charged amount, or both',
+  })
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
@@ -80,7 +82,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!charges) {
       return NextResponse.json(
-        { error: 'Delhivery did not return a rate for this weight. Enter the charged amount instead, or check the server log.' },
+        {
+          error:
+            'Delhivery did not return a rate for this weight. Enter the charged amount instead, or check the server log.',
+        },
         { status: 502 }
       )
     }
@@ -135,7 +140,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        delhivery_extra_charge      = ROUND(($3 - COALESCE(shipping_amount, 0))::numeric, 2),
        updated_at                  = NOW()
      WHERE id = $1`,
-    [id, chargedWeightKg ?? null, total, charges?.freight ?? null, charges?.codCharge ?? null, charges?.oda ?? null, settled]
+    [
+      id,
+      chargedWeightKg ?? null,
+      total,
+      charges?.freight ?? null,
+      charges?.codCharge ?? null,
+      charges?.oda ?? null,
+      settled,
+    ]
   )
 
   const quoted = Number(order.shipping_amount ?? 0)
@@ -144,10 +157,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: 'update',
     entityType: 'order',
     entityId: id,
-    summary: `Delivery charge ${isCorrection ? 'corrected' : 'set'} to ₹${total} (quoted ₹${quoted})`
-      + (chargedAmount != null ? ' — entered' : ` — calculated at ${chargedWeightKg} kg`),
+    summary:
+      `Delivery charge ${isCorrection ? 'corrected' : 'set'} to ₹${total} (quoted ₹${quoted})` +
+      (chargedAmount != null ? ' — entered' : ` — calculated at ${chargedWeightKg} kg`),
     diff: {
-      delhivery_charged_weight_kg: { from: order.delhivery_charged_weight_kg, to: chargedWeightKg ?? order.delhivery_charged_weight_kg },
+      delhivery_charged_weight_kg: {
+        from: order.delhivery_charged_weight_kg,
+        to: chargedWeightKg ?? order.delhivery_charged_weight_kg,
+      },
       delhivery_billed_amount: { from: null, to: total },
     },
     metadata: {
@@ -155,7 +172,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       source: chargedAmount != null ? 'entered' : 'calculated',
       correction: isCorrection,
       proofNote: proofNote ?? null,
-      zone: charges?.zone ?? null, freight: charges?.freight ?? null, tax: charges?.tax ?? null,
+      zone: charges?.zone ?? null,
+      freight: charges?.freight ?? null,
+      tax: charges?.tax ?? null,
     },
     request,
   }).catch(() => {})

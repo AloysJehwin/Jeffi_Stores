@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
     holderName,
   })
   if (result.status === 'failed') {
-    return NextResponse.json({ status: result.status, verifiedName: null, reason: result.reason ?? null }, { status: 400 })
+    return NextResponse.json(
+      { status: result.status, verifiedName: null, reason: result.reason ?? null },
+      { status: 400 }
+    )
   }
 
   // Push to Route when the owner already has a linked account. Storing the correction locally
@@ -65,10 +68,13 @@ export async function POST(request: NextRequest) {
   }
 
   const ok = settlement ? settlement.ok : true
-  return NextResponse.json({
-    status: settlement ? (settlement.ok ? 'verified' : 'failed') : result.status,
-    verifiedName: result.verifiedName ?? null,
-    reason: settlement?.error ?? result.reason ?? null,
-    pushedToRoute: !!settlement,
-  }, { status: ok ? 200 : 400 })
+  return NextResponse.json(
+    {
+      status: settlement ? (settlement.ok ? 'verified' : 'failed') : result.status,
+      verifiedName: result.verifiedName ?? null,
+      reason: settlement?.error ?? result.reason ?? null,
+      pushedToRoute: !!settlement,
+    },
+    { status: ok ? 200 : 400 }
+  )
 }

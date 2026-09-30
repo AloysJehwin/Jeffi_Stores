@@ -3,10 +3,7 @@ import { authenticateUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import { getOrderItemsPolicy } from '@/lib/return-policy'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const authUser = await authenticateUser(request)
@@ -35,9 +32,7 @@ export async function GET(
     const computeEligibility = (kind: 'refund' | 'replacement') => {
       if (!isDelivered) return { allowed: false, reason: 'Order not delivered yet' }
       if (items.length === 0) return { allowed: false, reason: 'Order has no items' }
-      const blocked = items.find(p =>
-        kind === 'refund' ? !p.return_allowed : !p.replacement_allowed
-      )
+      const blocked = items.find(p => (kind === 'refund' ? !p.return_allowed : !p.replacement_allowed))
       if (blocked) {
         return {
           allowed: false,
@@ -48,9 +43,7 @@ export async function GET(
         }
       }
       const effectiveWindow = Math.min(
-        ...items.map(p =>
-          kind === 'refund' ? p.return_window_days : p.replacement_window_days
-        )
+        ...items.map(p => (kind === 'refund' ? p.return_window_days : p.replacement_window_days))
       )
       if (!deliveredAt) return { allowed: false, reason: 'Delivery date unknown' }
       const cutoff = new Date(new Date(deliveredAt).getTime() + effectiveWindow * 24 * 60 * 60 * 1000)

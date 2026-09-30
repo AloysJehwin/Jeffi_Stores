@@ -17,7 +17,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -40,14 +41,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        FROM order_items WHERE order_id = $1 ORDER BY id`,
       [id]
     )
-    const items: LabelItem[] = (itemRows || []).map((r) => ({
+    const items: LabelItem[] = (itemRows || []).map(r => ({
       name: [r.product_name, r.variant_name].filter(Boolean).join(' — '),
       qty: Number(r.quantity) || 1,
       price: Number(r.unit_price) || 0,
       total: Number(r.total_price) || 0,
     }))
 
-    const pdfSize = (request.nextUrl.searchParams.get('size') === '4R') ? '4R' : 'A4'
+    const pdfSize = request.nextUrl.searchParams.get('size') === '4R' ? '4R' : 'A4'
     const print = request.nextUrl.searchParams.get('print') === '1'
     const inline = request.nextUrl.searchParams.get('inline') === '1'
     const safeOrderNum = (order.order_number || id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
@@ -93,7 +94,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const pdfUrl: string | undefined = json?.packages?.[0]?.pdf_download_link
       if (!pdfUrl) return NextResponse.json({ error: 'No PDF link in Delhivery response' }, { status: 502 })
       const pdfRes = await fetch(pdfUrl)
-      if (!pdfRes.ok) return NextResponse.json({ error: `Failed to fetch PDF from S3: ${pdfRes.status}` }, { status: 502 })
+      if (!pdfRes.ok)
+        return NextResponse.json({ error: `Failed to fetch PDF from S3: ${pdfRes.status}` }, { status: 502 })
       buffer = await pdfRes.arrayBuffer()
     }
 

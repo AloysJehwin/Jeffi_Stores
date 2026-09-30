@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
-import {
-  resolveGrainUnit,
-  serialCountForBaseQuantity,
-  type SellingUnit,
-} from '@/lib/selling-unit'
+import { resolveGrainUnit, serialCountForBaseQuantity, type SellingUnit } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +32,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const orderId = request.nextUrl.searchParams.get('order_id')
     const productId = request.nextUrl.searchParams.get('product_id')
@@ -48,32 +45,43 @@ export async function GET(request: NextRequest) {
 
     // Direct product lookup (invoice create — no order yet)
     if (productId) {
-      const productRow = await queryOne<{ name: string; perishable: boolean; serialized: boolean }>(`SELECT name, perishable, serialized FROM products WHERE id = $1`, [productId])
-      if (!productRow?.perishable && !productRow?.serialized) return NextResponse.json({ items: [], serialized_items: [] })
+      const productRow = await queryOne<{ name: string; perishable: boolean; serialized: boolean }>(
+        `SELECT name, perishable, serialized FROM products WHERE id = $1`,
+        [productId]
+      )
+      if (!productRow?.perishable && !productRow?.serialized)
+        return NextResponse.json({ items: [], serialized_items: [] })
 
-      const variantRow = variantId ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [variantId]) : null
+      const variantRow = variantId
+        ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [
+            variantId,
+          ])
+        : null
 
       if (productRow?.serialized) {
         // `qty` arrives already in base units (callers fold in the factor).
         const unit = await unitForGrain(productId, variantId, subVariantId)
         return NextResponse.json({
           items: [],
-          serialized_items: [{
-            order_item_id: lineItemId,
-            product_name: productRow.name || '',
-            variant_name: variantRow?.variant_name || null,
-            required_qty: qty,
-            required_serials: serialCountForBaseQuantity(qty, unit),
-            qty_step: unit?.qty_step ?? 1,
-            already_assigned: false,
-            product_id: productId,
-            variant_id: variantId,
-            sub_variant_id: subVariantId,
-          }],
+          serialized_items: [
+            {
+              order_item_id: lineItemId,
+              product_name: productRow.name || '',
+              variant_name: variantRow?.variant_name || null,
+              required_qty: qty,
+              required_serials: serialCountForBaseQuantity(qty, unit),
+              qty_step: unit?.qty_step ?? 1,
+              already_assigned: false,
+              product_id: productId,
+              variant_id: variantId,
+              sub_variant_id: subVariantId,
+            },
+          ],
         })
       }
 
-      const batches = await queryMany<any>(`
+      const batches = await queryMany<any>(
+        `
         SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
                sl.display_code AS location
         FROM product_batches pb
@@ -83,27 +91,36 @@ export async function GET(request: NextRequest) {
           AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
           AND pb.quantity_remaining > 0
         ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
-      `, [productId, variantId, subVariantId])
+      `,
+        [productId, variantId, subVariantId]
+      )
 
       const batchUnit = await unitForGrain(productId, variantId, subVariantId)
-      return NextResponse.json({ items: [{
-        order_item_id: lineItemId,
-        product_name: productRow?.name || '',
-        variant_name: variantRow?.variant_name || null,
-        required_qty: qty,
-        qty_step: batchUnit?.qty_step ?? 1,
-        already_assigned: false,
-        batches,
-      }], serialized_items: [] })
+      return NextResponse.json({
+        items: [
+          {
+            order_item_id: lineItemId,
+            product_name: productRow?.name || '',
+            variant_name: variantRow?.variant_name || null,
+            required_qty: qty,
+            qty_step: batchUnit?.qty_step ?? 1,
+            already_assigned: false,
+            batches,
+          },
+        ],
+        serialized_items: [],
+      })
     }
 
     const quotationId = request.nextUrl.searchParams.get('quotation_id')
 
-    if (!orderId && !quotationId) return NextResponse.json({ error: 'order_id, quotation_id, or product_id required' }, { status: 400 })
+    if (!orderId && !quotationId)
+      return NextResponse.json({ error: 'order_id, quotation_id, or product_id required' }, { status: 400 })
 
     // Quotation items path — used before order is created (quotation → invoice conversion)
     if (quotationId) {
-      const qItems = await queryMany<any>(`
+      const qItems = await queryMany<any>(
+        `
         SELECT
           qi.id AS order_item_id,
           qi.product_id,
@@ -128,7 +145,9 @@ export async function GET(request: NextRequest) {
         LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id AND qi.buy_unit IS NOT NULL
         LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL AND qi.buy_unit IS NOT NULL AND puv.id IS NULL
         WHERE qi.quotation_id = $1 AND qi.product_id IS NOT NULL AND (p.perishable = true OR p.serialized = true)
-      `, [quotationId])
+      `,
+        [quotationId]
+      )
 
       if (!qItems.length) return NextResponse.json({ items: [], serialized_items: [] })
 
@@ -137,9 +156,12 @@ export async function GET(request: NextRequest) {
 
       for (const item of qItems) {
         const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
-        const requiredQty = soldFactor > 1
-          ? parseFloat(item.quantity) * soldFactor
-          : (item.base_quantity ? parseFloat(item.base_quantity) : parseFloat(item.quantity))
+        const requiredQty =
+          soldFactor > 1
+            ? parseFloat(item.quantity) * soldFactor
+            : item.base_quantity
+              ? parseFloat(item.base_quantity)
+              : parseFloat(item.quantity)
 
         if (item.serialized) {
           const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
@@ -156,7 +178,8 @@ export async function GET(request: NextRequest) {
             sub_variant_id: item.sub_variant_id || null,
           })
         } else {
-          const batches = await queryMany<any>(`
+          const batches = await queryMany<any>(
+            `
             SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
                    sl.display_code AS location
             FROM product_batches pb
@@ -166,7 +189,9 @@ export async function GET(request: NextRequest) {
               AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
               AND pb.quantity_remaining > 0
             ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
-          `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
+          `,
+            [item.product_id, item.variant_id || null, item.sub_variant_id || null]
+          )
 
           const qBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
           qResult.push({
@@ -185,7 +210,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get order items where the product is perishable
-    const items = await queryMany<any>(`
+    const items = await queryMany<any>(
+      `
       SELECT
         oi.id AS order_item_id,
         oi.product_id,
@@ -210,7 +236,9 @@ export async function GET(request: NextRequest) {
       LEFT JOIN product_units puv ON puv.unit = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
       LEFT JOIN product_units pup ON pup.unit = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL AND oi.buy_unit IS NOT NULL AND puv.id IS NULL
       WHERE oi.order_id = $1 AND (p.perishable = true OR p.serialized = true)
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     if (!items.length) return NextResponse.json({ items: [], serialized_items: [] })
 
@@ -219,9 +247,7 @@ export async function GET(request: NextRequest) {
 
     for (const item of items) {
       const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
-      const requiredQty = soldFactor > 1
-        ? parseFloat(item.quantity) * soldFactor
-        : parseFloat(item.base_quantity)
+      const requiredQty = soldFactor > 1 ? parseFloat(item.quantity) * soldFactor : parseFloat(item.base_quantity)
 
       if (item.serialized) {
         const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
@@ -239,7 +265,8 @@ export async function GET(request: NextRequest) {
         })
       } else {
         // Available batches for this product/variant, FIFO by expiry then created_at
-        const batches = await queryMany<any>(`
+        const batches = await queryMany<any>(
+          `
           SELECT
             pb.id,
             pb.lot_number,
@@ -254,7 +281,9 @@ export async function GET(request: NextRequest) {
             AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
             AND pb.quantity_remaining > 0
           ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
-        `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
+        `,
+          [item.product_id, item.variant_id || null, item.sub_variant_id || null]
+        )
 
         const oBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
         result.push({

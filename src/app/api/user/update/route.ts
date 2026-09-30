@@ -13,7 +13,11 @@ const UpdateUserSchema = z
     notificationChannel: z.enum(['email', 'sms', 'whatsapp']).optional(),
   })
   .refine(
-    (d) => d.firstName !== undefined || d.lastName !== undefined || d.phone !== undefined || d.notificationChannel !== undefined,
+    d =>
+      d.firstName !== undefined ||
+      d.lastName !== undefined ||
+      d.phone !== undefined ||
+      d.notificationChannel !== undefined,
     { message: 'At least one field must be provided' }
   )
 
@@ -30,7 +34,10 @@ export async function PATCH(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { firstName, lastName, phone, notificationChannel } = parsed.data
 
-    const existing = await queryOne('SELECT first_name, last_name, phone, notification_channel FROM users WHERE id = $1', [userId])
+    const existing = await queryOne(
+      'SELECT first_name, last_name, phone, notification_channel FROM users WHERE id = $1',
+      [userId]
+    )
     if (!existing) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -69,7 +76,9 @@ export async function PATCH(request: NextRequest) {
       userId,
       kind: 'profile_updated',
       summary: 'Updated profile',
-      metadata: { fields: ['firstName', 'lastName', 'phone', 'notificationChannel'].filter(f => body[f] !== undefined) },
+      metadata: {
+        fields: ['firstName', 'lastName', 'phone', 'notificationChannel'].filter(f => body[f] !== undefined),
+      },
     }).catch(() => {})
 
     const user = {

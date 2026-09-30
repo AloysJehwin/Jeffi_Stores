@@ -9,9 +9,9 @@ import sharp from 'sharp'
 export const dynamic = 'force-dynamic'
 
 // Razorpay QR poster is 674×1644. The QR code square sits at these proportional bounds.
-const RZP_QR_LEFT_RATIO  = 136 / 674
-const RZP_QR_TOP_RATIO   = 648 / 1644
-const RZP_QR_SIZE_RATIO  = 399 / 674
+const RZP_QR_LEFT_RATIO = 136 / 674
+const RZP_QR_TOP_RATIO = 648 / 1644
+const RZP_QR_SIZE_RATIO = 399 / 674
 
 async function cropRazorpayQr(imageUrl: string): Promise<string> {
   const imgRes = await fetch(imageUrl)
@@ -19,14 +19,10 @@ async function cropRazorpayQr(imageUrl: string): Promise<string> {
   const meta = await sharp(buf).metadata()
   const w = meta.width!
   const h = meta.height!
-  const left  = Math.round(w * RZP_QR_LEFT_RATIO)
-  const top   = Math.round(h * RZP_QR_TOP_RATIO)
-  const size  = Math.round(w * RZP_QR_SIZE_RATIO)
-  const cropped = await sharp(buf)
-    .extract({ left, top, width: size, height: size })
-    .resize(300, 300)
-    .png()
-    .toBuffer()
+  const left = Math.round(w * RZP_QR_LEFT_RATIO)
+  const top = Math.round(h * RZP_QR_TOP_RATIO)
+  const size = Math.round(w * RZP_QR_SIZE_RATIO)
+  const cropped = await sharp(buf).extract({ left, top, width: size, height: size }).resize(300, 300).png().toBuffer()
   return `data:image/png;base64,${cropped.toString('base64')}`
 }
 
@@ -34,12 +30,17 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { orderId, amountPaise, description } = await request.json()
-    if (!orderId || !amountPaise) return NextResponse.json({ error: 'orderId and amountPaise required' }, { status: 400 })
+    if (!orderId || !amountPaise)
+      return NextResponse.json({ error: 'orderId and amountPaise required' }, { status: 400 })
 
-    const order = await queryOne<{ id: string; order_number: string }>('SELECT id, order_number FROM orders WHERE id = $1', [orderId])
+    const order = await queryOne<{ id: string; order_number: string }>(
+      'SELECT id, order_number FROM orders WHERE id = $1',
+      [orderId]
+    )
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
     // Collect on the tenant's own Razorpay when they use one, else platform; notes carry the tenant

@@ -5,7 +5,9 @@ import { queryOne, withTransaction } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string; psId: string }> }
+interface Params {
+  params: Promise<{ id: string; psId: string }>
+}
 
 // Edit a product-supplier row. If the price changes we INSERT a new dated row
 // (preserving quote history) and deactivate the old one; metadata-only changes
@@ -35,12 +37,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const currency = body.currency != null ? String(body.currency).slice(0, 3) : existing.currency
   const gstInclusive = body.gst_inclusive != null ? !!body.gst_inclusive : existing.gst_inclusive
   const moq = body.moq !== undefined ? (Number.isFinite(Number(body.moq)) ? Number(body.moq) : null) : existing.moq
-  const leadTime = body.lead_time_days !== undefined ? (Number.isInteger(Number(body.lead_time_days)) ? Number(body.lead_time_days) : null) : existing.lead_time_days
+  const leadTime =
+    body.lead_time_days !== undefined
+      ? Number.isInteger(Number(body.lead_time_days))
+        ? Number(body.lead_time_days)
+        : null
+      : existing.lead_time_days
   const notes = body.notes !== undefined ? (body.notes ? String(body.notes).slice(0, 500) : null) : existing.notes
   const priceChanged = Number(existing.unit_cost) !== newCost
 
   try {
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       if (isPreferred) {
         // Clear preferred on other rows AT THE SAME LEAF as this row.
         await client.query(
@@ -62,7 +69,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
              (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, moq, lead_time_days, is_preferred, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            RETURNING id`,
-          [id, existing.variant_id, existing.sub_variant_id, existing.supplier_id, newCost, currency, gstInclusive, moq, leadTime, isPreferred, notes]
+          [
+            id,
+            existing.variant_id,
+            existing.sub_variant_id,
+            existing.supplier_id,
+            newCost,
+            currency,
+            gstInclusive,
+            moq,
+            leadTime,
+            isPreferred,
+            notes,
+          ]
         )
         return { id: res.rows[0].id, newRow: true }
       }

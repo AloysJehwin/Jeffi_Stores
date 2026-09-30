@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -40,7 +41,9 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
     let i = 1
 
-    if (!includeInactive) { conditions.push('s.is_active = TRUE') }
+    if (!includeInactive) {
+      conditions.push('s.is_active = TRUE')
+    }
     if (search) {
       const sc = buildSearchClause(search, ['s.name', 's.gstin', 's.contact_name'], i)
       conditions.push(sc.clause)
@@ -76,20 +79,45 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const raw = await request.json().catch(() => null)
     if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     const parsed = parseBody(PostSchema, raw)
     if (!parsed.ok) return parsed.response
-    const { name, gstin, contact_name, phone, email, address, payment_terms, notes, bank_name, account_number, ifsc, upi_id } = parsed.data
+    const {
+      name,
+      gstin,
+      contact_name,
+      phone,
+      email,
+      address,
+      payment_terms,
+      notes,
+      bank_name,
+      account_number,
+      ifsc,
+      upi_id,
+    } = parsed.data
 
     const inserted = await queryOne<{ id: string }>(
       `INSERT INTO suppliers (name, gstin, contact_name, phone, email, address, payment_terms, notes, bank_name, account_number, ifsc, upi_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-      [name, gstin || null, contact_name || null, phone || null, email || null,
-       address || null, parseInt(payment_terms || '30'), notes || null,
-       bank_name || null, account_number || null, ifsc || null, upi_id || null]
+      [
+        name,
+        gstin || null,
+        contact_name || null,
+        phone || null,
+        email || null,
+        address || null,
+        parseInt(payment_terms || '30'),
+        notes || null,
+        bank_name || null,
+        account_number || null,
+        ifsc || null,
+        upi_id || null,
+      ]
     )
 
     return NextResponse.json({ success: true, id: inserted?.id })

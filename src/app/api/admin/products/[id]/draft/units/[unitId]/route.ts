@@ -6,12 +6,12 @@ import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string; unitId: string }> }
+interface Params {
+  params: Promise<{ id: string; unitId: string }>
+}
 
 async function getDraftUnits(productId: string): Promise<any[]> {
-  const row = await queryOne<{ units: any[] }>(
-    `SELECT units FROM product_drafts WHERE product_id = $1`, [productId]
-  )
+  const row = await queryOne<{ units: any[] }>(`SELECT units FROM product_drafts WHERE product_id = $1`, [productId])
   return Array.isArray(row?.units) ? row!.units : []
 }
 
@@ -59,15 +59,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const patch = { ...body, override: undefined, ...(override ? { _reset_stock_on_publish: true } : {}) }
   let updated: any[]
   if (idx >= 0) {
-    updated = units.map((u: any) => u.id === unitId ? { ...u, ...patch } : u)
+    updated = units.map((u: any) => (u.id === unitId ? { ...u, ...patch } : u))
   } else {
     // Unit not in draft yet — add it with this id
     updated = [...units, { ...patch, id: unitId }]
   }
-  await query(
-    `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(updated)]
-  )
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(updated),
+  ])
   return NextResponse.json({ success: true, unit: updated.find((u: any) => u.id === unitId) })
 }
 
@@ -100,7 +100,12 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     if (live) {
       const reason = await assertUnitChangeAllowed(
         { query },
-        { productId: id, variantId: clearedVariantId, subVariantId: clearedSubVariantId, label: live.display_label || live.unit },
+        {
+          productId: id,
+          variantId: clearedVariantId,
+          subVariantId: clearedSubVariantId,
+          label: live.display_label || live.unit,
+        },
         { remove: true }
       )
       if (reason) return NextResponse.json({ error: reason, canOverride: true }, { status: 409 })
@@ -115,9 +120,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     sub_variant_id: clearedSubVariantId,
   })
 
-  await query(
-    `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(filtered)]
-  )
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    id,
+    JSON.stringify(filtered),
+  ])
   return NextResponse.json({ success: true })
 }

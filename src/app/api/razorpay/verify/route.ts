@@ -96,10 +96,19 @@ export async function POST(request: NextRequest) {
         const { instance: rzp } = await getRazorpayInstanceFor(tenant?.tenantId)
         const rzpOrder = await (rzp as any).orders.fetch(razorpay_order_id)
         amountPaise = Number(rzpOrder?.amount) || 0
-      } catch { /* fall back to 0 — settle records the payment regardless */ }
-      const result = await settleVariantChangePayment({ razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id, amountPaise })
+      } catch {
+        /* fall back to 0 — settle records the payment regardless */
+      }
+      const result = await settleVariantChangePayment({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        amountPaise,
+      })
       if (!result.applied && result.reason !== 'already_applied') {
-        return NextResponse.json({ error: `Payment received but change could not be applied: ${result.reason}. Contact support.` }, { status: 409 })
+        return NextResponse.json(
+          { error: `Payment received but change could not be applied: ${result.reason}. Contact support.` },
+          { status: 409 }
+        )
       }
       return NextResponse.json({ success: true, settlement: 'variant_change_applied' })
     }
@@ -119,7 +128,7 @@ async function fireRouteTransfer(opts: {
   isCod: boolean
 }) {
   const tenant = await resolveRequestTenant()
-  if (!tenant?.tenantId) return  // platform's own store — no tenant billing
+  if (!tenant?.tenantId) return // platform's own store — no tenant billing
 
   // Fetch linked account id from control plane
   const pool = controlPlanePool()
@@ -131,8 +140,9 @@ async function fireRouteTransfer(opts: {
   // be 'active' with a NULL razorpay_linked_account_id while the acc_xxx lives there. Billing
   // already resolves it via this same COALESCE; the transfer path must too, or the split silently
   // no-ops and the seller keeps the gross.
-  const row = await pool.query(
-    `SELECT COALESCE(
+  const row = await pool
+    .query(
+      `SELECT COALESCE(
               (SELECT b.linked_account_id FROM tenant_bank_accounts b
                  JOIN owner_tenants ot ON ot.owner_id = b.owner_id
                 WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
@@ -140,8 +150,10 @@ async function fireRouteTransfer(opts: {
               t.razorpay_linked_account_id
             ) AS razorpay_linked_account_id,
             t.daily_payout, t.own_razorpay
-       FROM tenants t WHERE t.id=$1 AND t.status='active'`, [tenant.tenantId]
-  ).catch(() => null)
+       FROM tenants t WHERE t.id=$1 AND t.status='active'`,
+      [tenant.tenantId]
+    )
+    .catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
   const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
@@ -153,7 +165,12 @@ async function fireRouteTransfer(opts: {
   const { isOwn } = await resolveRazorpayCreds(tenant.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
   const ownRazorpay = ownRazorpayFlag && isOwn
   if (ownRazorpayFlag !== isOwn) {
-    console.warn('[fireRouteTransfer] own_razorpay/creds mismatch', { tenantId: tenant.tenantId, orderRef: opts.orderRef, ownRazorpayFlag, isOwn })
+    console.warn('[fireRouteTransfer] own_razorpay/creds mismatch', {
+      tenantId: tenant.tenantId,
+      orderRef: opts.orderRef,
+      ownRazorpayFlag,
+      isOwn,
+    })
   }
 
   // A tenant on its own Razorpay account collects buyer payments directly — the platform never
@@ -230,7 +247,10 @@ async function commitDraft(args: {
     [args.razorpay_payment_id]
   )
   if (existing) {
-    return NextResponse.json({ success: true, order: { id: existing.id, orderNumber: existing.order_number, paymentStatus: 'paid' } })
+    return NextResponse.json({
+      success: true,
+      order: { id: existing.id, orderNumber: existing.order_number, paymentStatus: 'paid' },
+    })
   }
 
   const user = await queryOne<any>(`SELECT * FROM users WHERE id = $1`, [args.userId])
@@ -256,9 +276,12 @@ async function commitDraft(args: {
         priority: 'high',
         dueInDays: 0,
       }).catch(() => {})
-      return NextResponse.json({
-        error: 'Cart changed during payment. Payment captured — contact support to release.',
-      }, { status: 409 })
+      return NextResponse.json(
+        {
+          error: 'Cart changed during payment. Payment captured — contact support to release.',
+        },
+        { status: 409 }
+      )
     }
     subtotal = cartSubtotal(cartItems, gstEnabled)
     taxAmount = cartTaxAmount(cartItems, gstEnabled)
@@ -269,16 +292,20 @@ async function commitDraft(args: {
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     const variant = draft.buyNowItem.variantId
-      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [
+          draft.buyNowItem.variantId,
+        ])
       : null
     const subVariant = draft.buyNowItem.subVariantId
-      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [
+          draft.buyNowItem.subVariantId,
+        ])
       : null
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
     const gstRate = parseFloat(String(product.gst_percentage || '0'))
     // GST off ⇒ the draft price is already the ex-GST amount ⇒ no tax to strip.
-    taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
+    taxAmount = gstEnabled ? subtotal - subtotal / (1 + gstRate / 100) : 0
   } else {
     return NextResponse.json({ error: 'Invalid draft' }, { status: 400 })
   }
@@ -289,62 +316,65 @@ async function commitDraft(args: {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount + draft.codFeeAmount)) * 100)
+  const expectedAmountPaise = Math.round(
+    Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount + draft.codFeeAmount) *
+      100
+  )
 
-  const created = draft.mode === 'cart'
-    ? await commitOrder({
-        mode: 'cart',
-        userId: args.userId,
-        user,
-        addressId: draft.addressId,
-        notes: draft.notes,
-        couponId: draft.couponId,
-        shippingAmount: draft.shippingAmount,
-        codFeeAmount: draft.codFeeAmount,
-        cartItems,
-        subtotal,
-        taxAmount,
-        appliedDiscount,
-        businessDiscountAmount: draft.businessDiscountAmount,
-        paymentRecord: {
-          gatewayOrderId: args.razorpay_order_id,
-          paymentId: args.razorpay_payment_id,
-          signature: args.razorpay_signature,
-          amountPaise: expectedAmountPaise,
-        },
-      })
-    : await commitOrder({
-        mode: 'buyNow',
-        userId: args.userId,
-        user,
-        addressId: draft.addressId,
-        notes: draft.notes,
-        couponId: draft.couponId,
-        shippingAmount: draft.shippingAmount,
-        codFeeAmount: draft.codFeeAmount,
-        item: draft.buyNowItem!,
-        product: buyNowSnapshot!.product,
-        variant: buyNowSnapshot!.variant,
-        subVariant: buyNowSnapshot!.subVariant,
-        subtotal,
-        taxAmount,
-        appliedDiscount,
-        businessDiscountAmount: draft.businessDiscountAmount,
-        paymentRecord: {
-          gatewayOrderId: args.razorpay_order_id,
-          paymentId: args.razorpay_payment_id,
-          signature: args.razorpay_signature,
-          amountPaise: expectedAmountPaise,
-        },
-      })
+  const created =
+    draft.mode === 'cart'
+      ? await commitOrder({
+          mode: 'cart',
+          userId: args.userId,
+          user,
+          addressId: draft.addressId,
+          notes: draft.notes,
+          couponId: draft.couponId,
+          shippingAmount: draft.shippingAmount,
+          codFeeAmount: draft.codFeeAmount,
+          cartItems,
+          subtotal,
+          taxAmount,
+          appliedDiscount,
+          businessDiscountAmount: draft.businessDiscountAmount,
+          paymentRecord: {
+            gatewayOrderId: args.razorpay_order_id,
+            paymentId: args.razorpay_payment_id,
+            signature: args.razorpay_signature,
+            amountPaise: expectedAmountPaise,
+          },
+        })
+      : await commitOrder({
+          mode: 'buyNow',
+          userId: args.userId,
+          user,
+          addressId: draft.addressId,
+          notes: draft.notes,
+          couponId: draft.couponId,
+          shippingAmount: draft.shippingAmount,
+          codFeeAmount: draft.codFeeAmount,
+          item: draft.buyNowItem!,
+          product: buyNowSnapshot!.product,
+          variant: buyNowSnapshot!.variant,
+          subVariant: buyNowSnapshot!.subVariant,
+          subtotal,
+          taxAmount,
+          appliedDiscount,
+          businessDiscountAmount: draft.businessDiscountAmount,
+          paymentRecord: {
+            gatewayOrderId: args.razorpay_order_id,
+            paymentId: args.razorpay_payment_id,
+            signature: args.razorpay_signature,
+            amountPaise: expectedAmountPaise,
+          },
+        })
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
 
   // Mark intent committed — prevents webhook double-commit
-  query(
-    `UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND committed = false`,
-    [args.razorpay_order_id]
-  ).catch(() => {})
+  query(`UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND committed = false`, [
+    args.razorpay_order_id,
+  ]).catch(() => {})
 
   // Route transfer — split payment to tenant's linked account (fire-and-forget)
   fireRouteTransfer({
@@ -363,9 +393,20 @@ async function commitDraft(args: {
 
   sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
   sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
-  sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
+  sendPaymentStatusUpdate(
+    user.email,
+    userName,
+    created.order_number,
+    created.id,
+    'paid',
+    parseFloat(created.total_amount)
+  ).catch(() => {})
   if (user.notification_channel === 'sms' && user.phone) {
-    sendOrderConfirmedSMS({ phone: user.phone, orderNumber: created.order_number, total: parseFloat(created.total_amount) }).catch(() => {})
+    sendOrderConfirmedSMS({
+      phone: user.phone,
+      orderNumber: created.order_number,
+      total: parseFloat(created.total_amount),
+    }).catch(() => {})
   }
 
   logActivity({
@@ -377,7 +418,11 @@ async function commitDraft(args: {
     metadata: { orderNumber: created.order_number, total: created.total_amount, itemCount: orderItems?.length || 0 },
   }).catch(() => {})
 
-  recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+  recordImplicitSignalsForProducts(
+    args.userId,
+    (orderItems || []).map((i: any) => i.product_id),
+    'purchased'
+  ).catch(() => {})
 
   if (Number(created.total_amount) >= 50000) {
     createAutoTask({
@@ -421,10 +466,7 @@ async function markLegacyOrderPaid(args: {
       [args.orderId, args.userId, email, phone]
     )
   } else {
-    order = await queryOne<any>(
-      'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
-      [args.orderId, args.userId]
-    )
+    order = await queryOne<any>('SELECT * FROM orders WHERE id = $1 AND user_id = $2', [args.orderId, args.userId])
   }
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (order.payment_status === 'paid') {
@@ -434,7 +476,7 @@ async function markLegacyOrderPaid(args: {
     })
   }
 
-  await withTransaction(async (client) => {
+  await withTransaction(async client => {
     await client.query(
       `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
@@ -476,10 +518,9 @@ async function markLegacyOrderPaid(args: {
       )
     }
 
-    await client.query(
-      `DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE`,
-      [args.userId]
-    )
+    await client.query(`DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE`, [
+      args.userId,
+    ])
   })
 
   const [user, orderItems] = await Promise.all([
@@ -494,12 +535,27 @@ async function markLegacyOrderPaid(args: {
     const updatedOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [args.orderId])
     sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || []).catch(() => {})
     sendNewOrderNotification(updatedOrder || order, orderItems || [], user).catch(() => {})
-    sendPaymentStatusUpdate(user.email, userName, order.order_number, args.orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
+    sendPaymentStatusUpdate(
+      user.email,
+      userName,
+      order.order_number,
+      args.orderId,
+      'paid',
+      parseFloat(order.total_amount)
+    ).catch(() => {})
     if (user.notification_channel === 'sms' && user.phone) {
-      sendOrderConfirmedSMS({ phone: user.phone, orderNumber: order.order_number, total: parseFloat(order.total_amount) }).catch(() => {})
+      sendOrderConfirmedSMS({
+        phone: user.phone,
+        orderNumber: order.order_number,
+        total: parseFloat(order.total_amount),
+      }).catch(() => {})
     }
 
-    recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+    recordImplicitSignalsForProducts(
+      args.userId,
+      (orderItems || []).map((i: any) => i.product_id),
+      'purchased'
+    ).catch(() => {})
 
     // Route transfer for tenant storefront payments
     fireRouteTransfer({

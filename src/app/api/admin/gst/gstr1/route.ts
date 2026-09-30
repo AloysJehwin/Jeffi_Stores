@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'from and to date params required (YYYY-MM-DD)' }, { status: 400 })
     }
 
-    const rows = await queryMany(`
+    const rows = await queryMany(
+      `
       SELECT
         o.invoice_number,
         o.invoice_date,
@@ -62,7 +63,9 @@ export async function GET(request: NextRequest) {
         AND o.payment_status = 'paid'
       GROUP BY o.id, a.state
       ORDER BY o.invoice_date ASC
-    `, [from, to])
+    `,
+      [from, to]
+    )
 
     const b2b = rows.filter((r: any) => r.buyer_gstin)
     const b2c = rows.filter((r: any) => !r.buyer_gstin)
@@ -106,12 +109,22 @@ function sum(rows: any[], field: string): number {
 }
 
 function buildHsnSummary(rows: any[]) {
-  const map: Record<string, { hsnCode: string; gstRate: number; taxableVal: number; igst: number; cgst: number; sgst: number }> = {}
+  const map: Record<
+    string,
+    { hsnCode: string; gstRate: number; taxableVal: number; igst: number; cgst: number; sgst: number }
+  > = {}
   for (const row of rows) {
-    for (const item of (row.items || [])) {
+    for (const item of row.items || []) {
       const key = `${item.hsn_code}-${item.gst_rate}`
       if (!map[key]) {
-        map[key] = { hsnCode: item.hsn_code || '9999', gstRate: parseFloat(item.gst_rate || '18'), taxableVal: 0, igst: 0, cgst: 0, sgst: 0 }
+        map[key] = {
+          hsnCode: item.hsn_code || '9999',
+          gstRate: parseFloat(item.gst_rate || '18'),
+          taxableVal: 0,
+          igst: 0,
+          cgst: 0,
+          sgst: 0,
+        }
       }
       map[key].taxableVal += parseFloat(item.taxable_amount || '0')
       map[key].igst += parseFloat(item.igst_amount || '0')
@@ -132,27 +145,39 @@ function buildHsnSummary(rows: any[]) {
 
 function buildGSTR1CSV(rows: any[]): string {
   const headers = [
-    'Invoice No', 'Invoice Date', 'Customer Name', 'Buyer GSTIN',
-    'Invoice Type', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax', 'Invoice Value',
-    'IRN', 'IRN Ack No'
+    'Invoice No',
+    'Invoice Date',
+    'Customer Name',
+    'Buyer GSTIN',
+    'Invoice Type',
+    'Taxable Value',
+    'CGST',
+    'SGST',
+    'IGST',
+    'Total Tax',
+    'Invoice Value',
+    'IRN',
+    'IRN Ack No',
   ]
   const lines = [headers.join(',')]
   for (const r of rows) {
-    lines.push([
-      r.invoice_number,
-      r.invoice_date ? new Date(r.invoice_date).toLocaleDateString('en-IN') : '',
-      `"${r.customer_name}"`,
-      r.buyer_gstin || '',
-      r.buyer_gstin ? 'B2B' : 'B2C',
-      r.taxable_amount,
-      r.cgst_amount,
-      r.sgst_amount,
-      r.igst_amount,
-      (parseFloat(r.cgst_amount || 0) + parseFloat(r.sgst_amount || 0) + parseFloat(r.igst_amount || 0)).toFixed(2),
-      r.total_amount,
-      r.irn || '',
-      r.irn_ack_no || '',
-    ].join(','))
+    lines.push(
+      [
+        r.invoice_number,
+        r.invoice_date ? new Date(r.invoice_date).toLocaleDateString('en-IN') : '',
+        `"${r.customer_name}"`,
+        r.buyer_gstin || '',
+        r.buyer_gstin ? 'B2B' : 'B2C',
+        r.taxable_amount,
+        r.cgst_amount,
+        r.sgst_amount,
+        r.igst_amount,
+        (parseFloat(r.cgst_amount || 0) + parseFloat(r.sgst_amount || 0) + parseFloat(r.igst_amount || 0)).toFixed(2),
+        r.total_amount,
+        r.irn || '',
+        r.irn_ack_no || '',
+      ].join(',')
+    )
   }
   return lines.join('\n')
 }

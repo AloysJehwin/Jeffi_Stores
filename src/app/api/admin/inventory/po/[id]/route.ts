@@ -6,14 +6,15 @@ import { queryOne, queryMany, query } from '@/lib/db'
 import { sendPurchaseOrderEmail } from '@/lib/email'
 import { parseBody } from '@/lib/validate'
 
-const PatchSchema = z.object({
-  status: z.string().nullish(),
-  expected_date: z.string().nullish(),
-  notes: z.string().nullish(),
-}).refine(
-  (d) => d.status !== undefined || d.expected_date !== undefined || d.notes !== undefined,
-  { message: 'At least one field required' }
-)
+const PatchSchema = z
+  .object({
+    status: z.string().nullish(),
+    expected_date: z.string().nullish(),
+    notes: z.string().nullish(),
+  })
+  .refine(d => d.status !== undefined || d.expected_date !== undefined || d.notes !== undefined, {
+    message: 'At least one field required',
+  })
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const po = await queryOne<any>(
       `SELECT po.*, s.name AS supplier_name, s.gstin AS supplier_gstin,
@@ -86,7 +88,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const raw = await request.json().catch(() => null)
     if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -98,9 +101,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const values: any[] = []
     let i = 1
 
-    if (status !== undefined) { updates.push(`status = $${i++}`); values.push(status) }
-    if (expected_date !== undefined) { updates.push(`expected_date = $${i++}`); values.push(expected_date || null) }
-    if (notes !== undefined) { updates.push(`notes = $${i++}`); values.push(notes || null) }
+    if (status !== undefined) {
+      updates.push(`status = $${i++}`)
+      values.push(status)
+    }
+    if (expected_date !== undefined) {
+      updates.push(`expected_date = $${i++}`)
+      values.push(expected_date || null)
+    }
+    if (notes !== undefined) {
+      updates.push(`notes = $${i++}`)
+      values.push(notes || null)
+    }
 
     if (updates.length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 

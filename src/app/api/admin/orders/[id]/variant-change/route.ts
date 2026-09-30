@@ -22,7 +22,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id: orderId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // History mode: return this order's variant-change requests with status.
     if (request.nextUrl.searchParams.get('history')) {
@@ -56,7 +57,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        WHERE psv.product_id = $1 AND psv.is_active = true ORDER BY pv.variant_name, psv.sub_variant_name`,
       [productId]
     )
-    const withPrice = (r: any) => ({ ...r, effectivePrice: pickUnitPrice({ inclusive: r.price, exGst: r.price_ex_gst }, gstEnabled) })
+    const withPrice = (r: any) => ({
+      ...r,
+      effectivePrice: pickUnitPrice({ inclusive: r.price, exGst: r.price_ex_gst }, gstEnabled),
+    })
     return NextResponse.json({
       variants: variants.map(withPrice),
       subVariants: subVariants.map(withPrice),
@@ -67,13 +71,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-const bodySchema = z.object({
-  orderItemId: zUuid,
-  newVariantId: zUuid.nullish(),
-  newSubVariantId: zUuid.nullish(),
-  adminNotes: z.string().max(1000).optional(),
-  settlePayment: z.boolean().optional(),
-}).refine(d => d.newVariantId || d.newSubVariantId, { message: 'A replacement variant or sub-variant is required' })
+const bodySchema = z
+  .object({
+    orderItemId: zUuid,
+    newVariantId: zUuid.nullish(),
+    newSubVariantId: zUuid.nullish(),
+    adminNotes: z.string().max(1000).optional(),
+    settlePayment: z.boolean().optional(),
+  })
+  .refine(d => d.newVariantId || d.newSubVariantId, { message: 'A replacement variant or sub-variant is required' })
 
 // POST /api/admin/orders/[id]/variant-change — admin proposes a variant swap.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -81,7 +87,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id: orderId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const parsed = parseBody(bodySchema, await request.json())
     if (!parsed.ok) return parsed.response
@@ -98,7 +105,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     // Guard: only confirmed, pre-shipment orders.
     if (order.status !== 'confirmed' || order.awb_number) {
-      return NextResponse.json({ error: 'Variant change is only allowed on confirmed orders that have not shipped.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Variant change is only allowed on confirmed orders that have not shipped.' },
+        { status: 400 }
+      )
     }
 
     // No other active request on this order.
@@ -106,7 +116,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `SELECT id FROM variant_change_requests WHERE order_id = $1 AND status IN ('pending_customer','awaiting_payment') LIMIT 1`,
       [orderId]
     )
-    if (openReq) return NextResponse.json({ error: 'A variant change request is already pending on this order.' }, { status: 409 })
+    if (openReq)
+      return NextResponse.json({ error: 'A variant change request is already pending on this order.' }, { status: 409 })
 
     const item = await queryOne<any>(
       `SELECT id, product_id, variant_id, sub_variant_id, quantity, unit_price, variant_name FROM order_items WHERE id = $1 AND order_id = $2`,
@@ -134,9 +145,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Settlement type: COD orders adjust the total on delivery; online orders refund/collect.
     const isCod = order.payment_mode === 'cod' || order.payment_status?.startsWith('cod')
-    const settlementType = preview.settlementType === 'none'
-      ? 'none'
-      : (isCod ? 'cod_adjust' : preview.settlementType)
+    const settlementType = preview.settlementType === 'none' ? 'none' : isCod ? 'cod_adjust' : preview.settlementType
 
     const vcr = await queryOne<{ id: string }>(
       `INSERT INTO variant_change_requests
@@ -147,17 +156,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'pending_customer',$15)
        RETURNING id`,
       [
-        orderId, orderItemId, admin.adminId, item.variant_id, item.sub_variant_id,
-        newVariantId ?? null, newSubVariantId ?? null, item.variant_name ?? null, newV.name ?? null,
-        preview.oldUnitPrice, preview.newUnitPrice, qty, preview.priceDiff,
-        settlementType, adminNotes ?? null,
+        orderId,
+        orderItemId,
+        admin.adminId,
+        item.variant_id,
+        item.sub_variant_id,
+        newVariantId ?? null,
+        newSubVariantId ?? null,
+        item.variant_name ?? null,
+        newV.name ?? null,
+        preview.oldUnitPrice,
+        preview.newUnitPrice,
+        qty,
+        preview.priceDiff,
+        settlementType,
+        adminNotes ?? null,
       ]
     )
 
     // Notify the customer: email always + preferred SMS/WhatsApp with the order link.
     const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}`
     const custEmail = order.user_email || order.customer_email
-    const custName = order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : (order.customer_name || 'Customer')
+    const custName = order.first_name
+      ? `${order.first_name} ${order.last_name || ''}`.trim()
+      : order.customer_name || 'Customer'
     if (custEmail) {
       sendVariantChangeRequestedEmail({
         customerEmail: custEmail,
@@ -180,9 +202,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         kind: 'variant_change',
         referenceId: orderId,
         referenceType: 'orders',
-        summary: waivedDiff !== 0
-          ? `Variant change requested on #${order.order_number} (no payment — ₹${Math.abs(waivedDiff).toFixed(2)} difference waived)`
-          : `Variant change requested on #${order.order_number} (${settlementType}, ₹${Math.abs(preview.priceDiff).toFixed(2)})`,
+        summary:
+          waivedDiff !== 0
+            ? `Variant change requested on #${order.order_number} (no payment — ₹${Math.abs(waivedDiff).toFixed(2)} difference waived)`
+            : `Variant change requested on #${order.order_number} (${settlementType}, ₹${Math.abs(preview.priceDiff).toFixed(2)})`,
         metadata: { vcrId: vcr?.id, settlement: settlementType, priceDiff: preview.priceDiff, waivedDiff },
       }).catch(() => {})
     }

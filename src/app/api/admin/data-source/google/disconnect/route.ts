@@ -3,7 +3,12 @@ import { requireAdminScope } from '@/lib/jwt'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { deleteIntegrationCredential, lookupTenantContextById } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenant-context'
-import { resolveImportTenantId, isSheetSyncRunning, cancelPendingSheetSyncs, PLATFORM_TENANT_ID } from '@/lib/import/jobs'
+import {
+  resolveImportTenantId,
+  isSheetSyncRunning,
+  cancelPendingSheetSyncs,
+  PLATFORM_TENANT_ID,
+} from '@/lib/import/jobs'
 import { forgetSheetOwnership, releaseSheetProducts } from '@/lib/import/sheet-links'
 
 export const dynamic = 'force-dynamic'

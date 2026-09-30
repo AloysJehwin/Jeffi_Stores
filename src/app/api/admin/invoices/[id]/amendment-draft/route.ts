@@ -10,27 +10,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const original = await queryOne<any>(
       `SELECT * FROM orders WHERE id = $1 AND status NOT IN ('draft', 'cancelled')`,
       [id]
     )
-    if (!original) return NextResponse.json({ error: 'Invoice not found or not eligible for amendment' }, { status: 404 })
+    if (!original)
+      return NextResponse.json({ error: 'Invoice not found or not eligible for amendment' }, { status: 404 })
 
     if (!original.invoice_number) {
-      return NextResponse.json({ error: 'Invoice must be finalized (invoice_number required) before creating an amendment draft' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Invoice must be finalized (invoice_number required) before creating an amendment draft' },
+        { status: 400 }
+      )
     }
 
-    const existingDraft = await queryOne<any>(
-      `SELECT id FROM orders WHERE draft_of_id = $1`,
-      [id]
-    )
+    const existingDraft = await queryOne<any>(`SELECT id FROM orders WHERE draft_of_id = $1`, [id])
     if (existingDraft) {
-      return NextResponse.json({ error: 'An amendment draft already exists for this invoice', draftId: existingDraft.id }, { status: 409 })
+      return NextResponse.json(
+        { error: 'An amendment draft already exists for this invoice', draftId: existingDraft.id },
+        { status: 409 }
+      )
     }
 
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       const ts = Date.now()
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const orderNumber = `AMD-${ts}-${rand}`

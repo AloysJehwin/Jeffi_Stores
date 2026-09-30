@@ -24,25 +24,23 @@ function getS3Url(key: string) {
   return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fullKey}`
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const order = await queryOne(
-      `SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND status = 'delivered'`,
-      [id, authUser.userId]
-    )
+    const order = await queryOne(`SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND status = 'delivered'`, [
+      id,
+      authUser.userId,
+    ])
     if (!order) return NextResponse.json({ error: 'Order not found or not eligible' }, { status: 404 })
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    if (!ALLOWED_TYPES.includes(file.type)) return NextResponse.json({ error: 'Invalid file type. JPEG, PNG, WebP only.' }, { status: 400 })
+    if (!ALLOWED_TYPES.includes(file.type))
+      return NextResponse.json({ error: 'Invalid file type. JPEG, PNG, WebP only.' }, { status: 400 })
     if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File exceeds 5MB limit.' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
@@ -56,12 +54,14 @@ export async function POST(
       .jpeg({ quality: 85 })
       .toBuffer()
 
-    await s3Client.send(new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: `${KEY_PREFIX}${s3Key}`,
-      Body: resized,
-      ContentType: 'image/jpeg',
-    }))
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: `${KEY_PREFIX}${s3Key}`,
+        Body: resized,
+        ContentType: 'image/jpeg',
+      })
+    )
 
     return NextResponse.json({ url: getS3Url(s3Key) })
   } catch {

@@ -7,10 +7,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const rfq = await queryOne<any>(
-    `SELECT id FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [id, user.userId]
-  )
+  const rfq = await queryOne<any>(`SELECT id FROM business_rfqs WHERE id = $1 AND user_id = $2`, [id, user.userId])
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const messages = await queryMany<any>(
@@ -27,10 +24,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const rfq = await queryOne<any>(
-    `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [id, user.userId]
-  )
+  const rfq = await queryOne<any>(`SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`, [
+    id,
+    user.userId,
+  ])
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (['converted', 'rejected'].includes(rfq.status)) {
     return NextResponse.json({ error: 'Cannot message on a closed quote' }, { status: 400 })
@@ -45,7 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     for (const ci of counter_items) {
       if (!ci.rfq_item_id || ci.offered_price == null || Number(ci.offered_price) < 0) {
-        return NextResponse.json({ error: 'Each counter item needs rfq_item_id and a non-negative offered_price' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'Each counter item needs rfq_item_id and a non-negative offered_price' },
+          { status: 400 }
+        )
       }
     }
     const ids = counter_items.map((c: any) => c.rfq_item_id)
@@ -66,10 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Move to negotiating if still pending/reviewed
   if (['pending', 'reviewed'].includes(rfq.status)) {
-    await query(
-      `UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`,
-      [id]
-    )
+    await query(`UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`, [id])
   }
 
   return NextResponse.json({ message: msg })

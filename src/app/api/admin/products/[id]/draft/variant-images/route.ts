@@ -17,7 +17,9 @@ import { parseBody, zUuid } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 function getVariantId(request: NextRequest): string | null {
   return request.nextUrl.searchParams.get('variant_id')
@@ -34,16 +36,17 @@ const PatchSchema = z.object({
 
 async function getStage(productId: string): Promise<any[]> {
   const row = await queryOne<{ variant_images: any[] }>(
-    `SELECT variant_images FROM product_drafts WHERE product_id = $1`, [productId]
+    `SELECT variant_images FROM product_drafts WHERE product_id = $1`,
+    [productId]
   )
   return Array.isArray(row?.variant_images) ? row!.variant_images : []
 }
 
 async function saveStage(productId: string, stage: any[]): Promise<void> {
-  await query(
-    `UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [productId, JSON.stringify(stage)]
-  )
+  await query(`UPDATE product_drafts SET variant_images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    productId,
+    JSON.stringify(stage),
+  ])
 }
 
 function forVariant(stage: any[], variantId: string): any[] {
@@ -56,11 +59,11 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const stage = await getStage(id)
-  const images = forVariant(stage, variantId)
-    .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+  const images = forVariant(stage, variantId).sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
   return NextResponse.json({ images })
 }
 
@@ -70,7 +73,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
     const stage = await getStage(id)
@@ -96,10 +100,16 @@ export async function POST(request: NextRequest, { params }: Params) {
         variant_id: variantId,
         image_url: imageUrl,
         thumbnail_url: gimg.thumbnail_url || (gimg.s3_thumbnail_key ? await getS3Url(gimg.s3_thumbnail_key) : null),
-        s3_bucket: gimg.s3_bucket || await currentBucket(),
-        s3_key: gimg.s3_key, s3_thumbnail_key: gimg.s3_thumbnail_key,
-        file_name: gimg.custom_name || gimg.file_name, file_size: gimg.file_size, mime_type: gimg.mime_type,
-        width: gimg.width, height: gimg.height, display_order: existing.length, is_primary: isPrimary,
+        s3_bucket: gimg.s3_bucket || (await currentBucket()),
+        s3_key: gimg.s3_key,
+        s3_thumbnail_key: gimg.s3_thumbnail_key,
+        file_name: gimg.custom_name || gimg.file_name,
+        file_size: gimg.file_size,
+        mime_type: gimg.mime_type,
+        width: gimg.width,
+        height: gimg.height,
+        display_order: existing.length,
+        is_primary: isPrimary,
         _fromGallery: true,
       }
     } else {
@@ -110,11 +120,18 @@ export async function POST(request: NextRequest, { params }: Params) {
       staged = {
         id: `draft-vi-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         variant_id: variantId,
-        image_url: result.url, thumbnail_url: result.thumbnailUrl,
+        image_url: result.url,
+        thumbnail_url: result.thumbnailUrl,
         s3_bucket: result.s3Bucket,
-        s3_key: result.s3Key, s3_thumbnail_key: result.s3ThumbnailKey,
-        file_name: result.fileName, file_size: result.fileSize, mime_type: result.mimeType,
-        width: result.width, height: result.height, display_order: existing.length, is_primary: isPrimary,
+        s3_key: result.s3Key,
+        s3_thumbnail_key: result.s3ThumbnailKey,
+        file_name: result.fileName,
+        file_size: result.fileSize,
+        mime_type: result.mimeType,
+        width: result.width,
+        height: result.height,
+        display_order: existing.length,
+        is_primary: isPrimary,
         _staged: true, // freshly uploaded S3 file, not yet in live variant_images
       }
     }
@@ -131,7 +148,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -147,9 +165,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   let next = stage.filter((vi: any) => !(vi.id === imageId && vi.variant_id === variantId))
   // If we removed the primary, promote the first remaining image for this variant.
   if (removed?.is_primary) {
-    const rest = next.filter((vi: any) => vi.variant_id === variantId)
+    const rest = next
+      .filter((vi: any) => vi.variant_id === variantId)
       .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-    if (rest[0]) next = next.map((vi: any) => vi.id === rest[0].id ? { ...vi, is_primary: true } : vi)
+    if (rest[0]) next = next.map((vi: any) => (vi.id === rest[0].id ? { ...vi, is_primary: true } : vi))
   }
   await saveStage(id, next)
   return NextResponse.json({ success: true })
@@ -161,7 +180,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawPatch = await request.json().catch(() => null)
   if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

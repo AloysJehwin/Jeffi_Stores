@@ -38,9 +38,7 @@ export async function POST(request: NextRequest) {
       is_active: boolean
       generated_for_user_id: string | null
     }>(
-      lookupId
-        ? `SELECT * FROM coupons WHERE id = $1`
-        : `SELECT * FROM coupons WHERE code = $1`,
+      lookupId ? `SELECT * FROM coupons WHERE id = $1` : `SELECT * FROM coupons WHERE code = $1`,
       lookupId ? [lookupId] : [code!.toUpperCase().trim()]
     )
 
@@ -53,10 +51,10 @@ export async function POST(request: NextRequest) {
       [coupon.id]
     )
     if (eligibleCount && parseInt(eligibleCount.cnt) > 0) {
-      const isEligible = await queryOne(
-        `SELECT 1 FROM coupon_eligible_users WHERE coupon_id = $1 AND user_id = $2`,
-        [coupon.id, authUser.userId]
-      )
+      const isEligible = await queryOne(`SELECT 1 FROM coupon_eligible_users WHERE coupon_id = $1 AND user_id = $2`, [
+        coupon.id,
+        authUser.userId,
+      ])
       if (!isEligible) {
         return NextResponse.json({ error: 'This coupon is not valid for your account' }, { status: 400 })
       }
@@ -88,16 +86,22 @@ export async function POST(request: NextRequest) {
         [coupon.id, authUser.userId]
       )
       if (userUsage && parseInt(userUsage.cnt) >= coupon.usage_limit_per_user) {
-        return NextResponse.json({ error: 'You have already used this coupon the maximum number of times' }, { status: 400 })
+        return NextResponse.json(
+          { error: 'You have already used this coupon the maximum number of times' },
+          { status: 400 }
+        )
       }
     }
 
     const orderSubtotal = typeof subtotal === 'number' ? subtotal : 0
 
     if (coupon.min_purchase_amount !== null && orderSubtotal < coupon.min_purchase_amount) {
-      return NextResponse.json({
-        error: `Minimum purchase of ₹${Number(coupon.min_purchase_amount).toLocaleString('en-IN')} required for this coupon`,
-      }, { status: 400 })
+      return NextResponse.json(
+        {
+          error: `Minimum purchase of ₹${Number(coupon.min_purchase_amount).toLocaleString('en-IN')} required for this coupon`,
+        },
+        { status: 400 }
+      )
     }
 
     let discountAmount = 0

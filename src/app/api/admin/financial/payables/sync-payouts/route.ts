@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'financial:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'financial:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (!RZP_KEY || !RZP_SECRET) {
       return NextResponse.json({ synced: 0 })
@@ -40,10 +41,7 @@ export async function POST(request: NextRequest) {
         const data = await res.json()
         const newStatus: string = data.status
 
-        await query(
-          `UPDATE expense_payments SET payout_status = $1 WHERE payout_id = $2`,
-          [newStatus, row.payout_id]
-        )
+        await query(`UPDATE expense_payments SET payout_status = $1 WHERE payout_id = $2`, [newStatus, row.payout_id])
 
         if (TERMINAL_STATUSES.includes(newStatus)) {
           const paidRows = await queryMany<{ amount: string }>(
@@ -51,10 +49,9 @@ export async function POST(request: NextRequest) {
             [row.expense_id]
           )
           const paid = (paidRows || []).reduce((s, r) => s + parseFloat(r.amount), 0)
-          const expRow = await queryMany<{ total_amount: string }>(
-            `SELECT total_amount FROM expenses WHERE id = $1`,
-            [row.expense_id]
-          )
+          const expRow = await queryMany<{ total_amount: string }>(`SELECT total_amount FROM expenses WHERE id = $1`, [
+            row.expense_id,
+          ])
           const total = parseFloat(expRow?.[0]?.total_amount || '0')
           const expStatus = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial'
           await query(`UPDATE expenses SET status = $1, updated_at = NOW() WHERE id = $2`, [expStatus, row.expense_id])

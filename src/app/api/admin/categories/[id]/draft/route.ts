@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // POST — create a draft for this category
 export async function POST(req: NextRequest, { params }: Params) {
@@ -15,13 +17,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const category = await queryOne<{ id: string }>(
-    `SELECT id FROM categories WHERE id = $1`, [id]
-  )
+  const category = await queryOne<{ id: string }>(`SELECT id FROM categories WHERE id = $1`, [id])
   if (!category) return NextResponse.json({ error: 'Category not found' }, { status: 404 })
 
   const existing = await queryOne<{ category_id: string }>(
-    `SELECT category_id FROM category_drafts WHERE category_id = $1`, [id]
+    `SELECT category_id FROM category_drafts WHERE category_id = $1`,
+    [id]
   )
   if (existing) {
     return NextResponse.json({ error: 'Draft already exists', categoryId: id }, { status: 409 })

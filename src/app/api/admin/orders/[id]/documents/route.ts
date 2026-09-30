@@ -5,24 +5,22 @@ import { queryOne } from '@/lib/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const ALLOWED_DOC_TYPES = ['SIGNATURE_URL', 'RVP_QC_IMAGE', 'EPOD', 'SELLER_RETURN_IMAGE'] as const
-type DocType = typeof ALLOWED_DOC_TYPES[number]
+type DocType = (typeof ALLOWED_DOC_TYPES)[number]
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     const docType = request.nextUrl.searchParams.get('doc_type') as DocType | null
     if (!docType || !ALLOWED_DOC_TYPES.includes(docType)) {
-      return NextResponse.json(
-        { error: `doc_type must be one of: ${ALLOWED_DOC_TYPES.join(', ')}` },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: `doc_type must be one of: ${ALLOWED_DOC_TYPES.join(', ')}` }, { status: 400 })
     }
 
     const order = await queryOne<{ awb_number: string | null; order_number: string }>(
@@ -42,10 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
-      return NextResponse.json(
-        { error: `Delhivery API returned ${res.status}`, details: text },
-        { status: 502 }
-      )
+      return NextResponse.json({ error: `Delhivery API returned ${res.status}`, details: text }, { status: 502 })
     }
 
     const contentType = res.headers.get('content-type') || 'application/octet-stream'

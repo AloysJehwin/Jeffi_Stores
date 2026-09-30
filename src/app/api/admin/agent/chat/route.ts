@@ -30,26 +30,40 @@ interface ToolCallRecord {
 // schema to the model each turn is the dominant latency cost (26 schemas ≈ 26s/turn
 // on the local box). Niche/mutating groups are added only when the query implies them.
 const CORE_TOOLS = new Set([
-  'search_products', 'get_product', 'get_product_variants',
-  'search_customers', 'get_customer',
-  'get_recent_orders', 'get_order', 'find_customer_orders',
-  'get_low_stock_products', 'run_sql_readonly', 'list_admin_tools',
+  'search_products',
+  'get_product',
+  'get_product_variants',
+  'search_customers',
+  'get_customer',
+  'get_recent_orders',
+  'get_order',
+  'find_customer_orders',
+  'get_low_stock_products',
+  'run_sql_readonly',
+  'list_admin_tools',
 ])
 
 // Extra tool groups, gated by keywords in the user's message.
 const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
-  { test: /\b(email|campaign|mail|announce|newsletter|audience|subscriber|send|blast|promo)\b/i,
-    tools: ['get_campaign_stats', 'send_test_email', 'toggle_campaign_enabled', 'estimate_email_audience', 'propose_product_announcement_email', 'propose_order_delay_email'] },
-  { test: /\b(ship|shipped|dispatch|delivery|delivered|track|awb|fulfil)\b/i,
-    tools: ['mark_order_shipped'] },
-  { test: /\b(schema|table|column|sql|query|database|db)\b/i,
-    tools: ['describe_schema'] },
-  { test: /\b(file|repo|code|route|api|endpoint|source)\b/i,
-    tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'] },
-  { test: /\b(similar|recommend|like this|related)\b/i,
-    tools: ['find_similar_products'] },
-  { test: /\b(recent|latest|new)\b/i,
-    tools: ['get_recent_customers', 'get_recent_products'] },
+  {
+    test: /\b(email|campaign|mail|announce|newsletter|audience|subscriber|send|blast|promo)\b/i,
+    tools: [
+      'get_campaign_stats',
+      'send_test_email',
+      'toggle_campaign_enabled',
+      'estimate_email_audience',
+      'propose_product_announcement_email',
+      'propose_order_delay_email',
+    ],
+  },
+  { test: /\b(ship|shipped|dispatch|delivery|delivered|track|awb|fulfil)\b/i, tools: ['mark_order_shipped'] },
+  { test: /\b(schema|table|column|sql|query|database|db)\b/i, tools: ['describe_schema'] },
+  {
+    test: /\b(file|repo|code|route|api|endpoint|source)\b/i,
+    tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'],
+  },
+  { test: /\b(similar|recommend|like this|related)\b/i, tools: ['find_similar_products'] },
+  { test: /\b(recent|latest|new)\b/i, tools: ['get_recent_customers', 'get_recent_products'] },
 ]
 
 // Build the native tools array, selecting a query-relevant subset to keep the
@@ -64,16 +78,14 @@ function selectToolNames(userMessage: string): Set<string> {
 
 function buildToolsDef(userMessage?: string): AiToolDef[] {
   const allow = userMessage ? selectToolNames(userMessage) : null
-  return TOOLS
-    .filter(t => !allow || allow.has(t.name))
-    .map(t => ({
-      type: 'function' as const,
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.inputSchema as unknown as Record<string, unknown>,
-      },
-    }))
+  return TOOLS.filter(t => !allow || allow.has(t.name)).map(t => ({
+    type: 'function' as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema as unknown as Record<string, unknown>,
+    },
+  }))
 }
 
 async function buildSystemPromptWithDynamic(userMessage?: string): Promise<string> {
@@ -83,12 +95,11 @@ async function buildSystemPromptWithDynamic(userMessage?: string): Promise<strin
     try {
       const results = await findSimilar(userMessage, { limit: 12, minSimilarity: 0.3 })
       if (results.length > 0) {
-        ragContext = '\n\n## STORE DATA CONTEXT\n' +
+        ragContext =
+          '\n\n## STORE DATA CONTEXT\n' +
           'The following records from the store database are semantically relevant to this query. ' +
           'Use them to answer directly when the data is sufficient — only call a tool if you need fresher or more specific data.\n\n' +
-          results.map(r =>
-            `[${r.source_table}:${r.source_id}] ${r.content}`
-          ).join('\n')
+          results.map(r => `[${r.source_table}:${r.source_id}] ${r.content}`).join('\n')
       }
     } catch {
       // RAG unavailable — fall through to tool-only mode
@@ -174,7 +185,8 @@ const LIST_PREFIX_RE = /^\s*\d+[\.\)]?\s+/
 
 // Trailing qty+unit at end of line: "2 nos", "1 no.", "12 pkt", "50mtr each" etc.
 // Must be preceded by whitespace so "48mm" doesn't match as qty=48 unit=mm
-const TRAILING_QTY_RE = /\s+(\d+)\s*(?:no\.?s?|nos?\.?|pcs?\.?|pc\.?|units?|boxes?|box\.?|pkts?\.?|packets?|sets?|mtr\.?|m\.?|each|ea\.?)?\s*$/i
+const TRAILING_QTY_RE =
+  /\s+(\d+)\s*(?:no\.?s?|nos?\.?|pcs?\.?|pc\.?|units?|boxes?|box\.?|pkts?\.?|packets?|sets?|mtr\.?|m\.?|each|ea\.?)?\s*$/i
 
 function parseItemLine(raw: string): { requestedText: string; qty: number } | null {
   if (!LIST_PREFIX_RE.test(raw)) return null
@@ -190,7 +202,9 @@ function parseItemLine(raw: string): { requestedText: string; qty: number } | nu
   return { requestedText: text, qty }
 }
 
-function parseQuotationRequest(message: string): { customerEmail: string; lines: Array<{ requestedText: string; qty: number }> } | null {
+function parseQuotationRequest(
+  message: string
+): { customerEmail: string; lines: Array<{ requestedText: string; qty: number }> } | null {
   if (!QUOTATION_TRIGGER_RE.test(message)) return null
 
   const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
@@ -215,7 +229,9 @@ function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
       const parsed = JSON.parse(m[1])
       if (Array.isArray(parsed)) blocks = blocks.concat(parsed)
       else if (parsed && Array.isArray(parsed.blocks)) blocks = blocks.concat(parsed.blocks)
-    } catch { /* malformed ui_blocks JSON — skip */ }
+    } catch {
+      /* malformed ui_blocks JSON — skip */
+    }
   }
   const remainder = text.replace(re, '').trim()
   return { blocks, remainder }
@@ -237,10 +253,14 @@ async function invokeAdminApiInternal(
         Cookie: cookieHeader,
         'Content-Type': 'application/json',
       },
-      body: method === 'GET' || method === 'HEAD' ? undefined : (body || undefined),
+      body: method === 'GET' || method === 'HEAD' ? undefined : body || undefined,
     })
     let parsed: unknown
-    try { parsed = await res.json() } catch { parsed = await res.text().catch(() => null) }
+    try {
+      parsed = await res.json()
+    } catch {
+      parsed = await res.text().catch(() => null)
+    }
     return { ok: res.ok, status: res.status, body: parsed }
   } catch (err: any) {
     return { ok: false, status: 0, body: { error: String(err?.message || err) } }
@@ -270,8 +290,20 @@ export async function POST(req: NextRequest) {
   if (userMessage.startsWith('__quotation_confirm__')) {
     try {
       const itemsJson = userMessage.slice('__quotation_confirm__'.length)
-      const allItems: Array<{ productId?: string; quantity: number; variantId?: string; subVariantId?: string; skipped?: boolean; requestedText?: string }> = JSON.parse(itemsJson)
-      const items = allItems.filter(i => !i.skipped) as Array<{ productId: string; quantity: number; variantId?: string; subVariantId?: string }>
+      const allItems: Array<{
+        productId?: string
+        quantity: number
+        variantId?: string
+        subVariantId?: string
+        skipped?: boolean
+        requestedText?: string
+      }> = JSON.parse(itemsJson)
+      const items = allItems.filter(i => !i.skipped) as Array<{
+        productId: string
+        quantity: number
+        variantId?: string
+        subVariantId?: string
+      }>
       const skippedItems = allItems.filter(i => i.skipped)
 
       const priorMessages = await queryMany<{ role: string; content: string }>(
@@ -281,13 +313,17 @@ export async function POST(req: NextRequest) {
         [conversationId]
       )
       const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
-      const customerEmail = priorMessages
-        .map(m => emailRe.exec(m.content)?.[0])
-        .filter(Boolean)[0] ?? ''
+      const customerEmail = priorMessages.map(m => emailRe.exec(m.content)?.[0]).filter(Boolean)[0] ?? ''
 
       const proposeTool = getTool('propose_create_quotation')
       if (!proposeTool || !customerEmail || items.length === 0) {
-        const reason = !proposeTool ? 'tool not found' : !customerEmail ? 'customer email not found in conversation history' : skippedItems.length > 0 ? `all ${skippedItems.length} items were skipped — no products to quote` : 'no items'
+        const reason = !proposeTool
+          ? 'tool not found'
+          : !customerEmail
+            ? 'customer email not found in conversation history'
+            : skippedItems.length > 0
+              ? `all ${skippedItems.length} items were skipped — no products to quote`
+              : 'no items'
         await query(
           `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
            VALUES ($1, $2, 'assistant', $3, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)`,
@@ -305,8 +341,14 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      const proposeOut = await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }) as any
-      const toolCallRecords: ToolCallRecord[] = [{ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut }]
+      const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) })) as any
+      const toolCallRecords: ToolCallRecord[] = [
+        {
+          tool: 'propose_create_quotation',
+          input: { customerEmail, items: JSON.stringify(items) },
+          output: proposeOut,
+        },
+      ]
       const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
       const finalUiBlocks: any[] = []
 
@@ -317,7 +359,13 @@ export async function POST(req: NextRequest) {
         await query(
           `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
            VALUES ($1, $2, 'assistant', $3, $4::jsonb, '[]'::jsonb, '[]'::jsonb, $5::jsonb)`,
-          [admin.adminId, conversationId, pickerMsg, JSON.stringify(toolCallRecords), JSON.stringify([{ choice_kind: proposeOut.choice_kind, options: proposeOut.options, note: pickerNote }])]
+          [
+            admin.adminId,
+            conversationId,
+            pickerMsg,
+            JSON.stringify(toolCallRecords),
+            JSON.stringify([{ choice_kind: proposeOut.choice_kind, options: proposeOut.options, note: pickerNote }]),
+          ]
         )
         return NextResponse.json({
           conversationId,
@@ -339,19 +387,35 @@ export async function POST(req: NextRequest) {
           [admin.adminId, conversationId, proposeOut.kind, JSON.stringify(proposeOut.payload)]
         )
         if (inserted) {
-          proposedActions.push({ id: inserted.id, kind: proposeOut.kind, payload: proposeOut.payload, confirmation: proposeOut.confirmation })
+          proposedActions.push({
+            id: inserted.id,
+            kind: proposeOut.kind,
+            payload: proposeOut.payload,
+            confirmation: proposeOut.confirmation,
+          })
         }
         if (Array.isArray(proposeOut.ui_blocks)) finalUiBlocks.push(...proposeOut.ui_blocks)
       }
 
-      const skippedNote = skippedItems.length > 0
-        ? ` ${skippedItems.length} item${skippedItems.length > 1 ? 's' : ''} skipped: ${skippedItems.map(s => s.requestedText).join(', ')}.`
-        : ''
-      const finalText = proposeOut?.proposed === true ? `Quotation ready — review the proposal below.${skippedNote}` : (proposeOut?.summary || 'Could not create quotation.')
+      const skippedNote =
+        skippedItems.length > 0
+          ? ` ${skippedItems.length} item${skippedItems.length > 1 ? 's' : ''} skipped: ${skippedItems.map(s => s.requestedText).join(', ')}.`
+          : ''
+      const finalText =
+        proposeOut?.proposed === true
+          ? `Quotation ready — review the proposal below.${skippedNote}`
+          : proposeOut?.summary || 'Could not create quotation.'
       await query(
         `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
          VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, '[]'::jsonb)`,
-        [admin.adminId, conversationId, finalText, JSON.stringify(toolCallRecords), JSON.stringify(finalUiBlocks), JSON.stringify(proposedActions)]
+        [
+          admin.adminId,
+          conversationId,
+          finalText,
+          JSON.stringify(toolCallRecords),
+          JSON.stringify(finalUiBlocks),
+          JSON.stringify(proposedActions),
+        ]
       )
       return NextResponse.json({
         conversationId,
@@ -379,7 +443,7 @@ export async function POST(req: NextRequest) {
         const allLines: any[] = []
         for (let i = 0; i < lines.length; i += BATCH_SIZE) {
           const batch = lines.slice(i, i + BATCH_SIZE)
-          const batchOut = await matchTool.handler({ lines: JSON.stringify(batch) }) as any
+          const batchOut = (await matchTool.handler({ lines: JSON.stringify(batch) })) as any
           if (batchOut?.ok && Array.isArray(batchOut.data?.lines)) {
             allLines.push(...batchOut.data.lines)
           } else {
@@ -399,7 +463,13 @@ export async function POST(req: NextRequest) {
             counts,
           }
 
-          const toolCallRecords: ToolCallRecord[] = [{ tool: 'match_quotation_items', input: { lines: JSON.stringify(lines) }, output: { ok: true, data: { lines: allLines, counts } } }]
+          const toolCallRecords: ToolCallRecord[] = [
+            {
+              tool: 'match_quotation_items',
+              input: { lines: JSON.stringify(lines) },
+              output: { ok: true, data: { lines: allLines, counts } },
+            },
+          ]
           let finalUiBlocks: any[] = [resolverBlock]
           const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
           let finalText = ''
@@ -411,15 +481,25 @@ export async function POST(req: NextRequest) {
               const items = allLines
                 .filter((l: any) => l.status === 'matched' && l.candidates[0])
                 .map((l: any) => ({ productId: l.candidates[0].productId, quantity: l.qty }))
-              const proposeOut = await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }) as any
-              toolCallRecords.push({ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut })
+              const proposeOut = (await proposeTool.handler({ customerEmail, items: JSON.stringify(items) })) as any
+              toolCallRecords.push({
+                tool: 'propose_create_quotation',
+                input: { customerEmail, items: JSON.stringify(items) },
+                output: proposeOut,
+              })
               if (proposeOut?.proposed === true) {
                 const inserted = await queryOne<{ id: string }>(
                   `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
                    VALUES ($1, $2, $3, $4::jsonb, 'proposed') RETURNING id`,
                   [admin.adminId, conversationId, proposeOut.kind, JSON.stringify(proposeOut.payload)]
                 )
-                if (inserted) proposedActions.push({ id: inserted.id, kind: proposeOut.kind, payload: proposeOut.payload, confirmation: proposeOut.confirmation })
+                if (inserted)
+                  proposedActions.push({
+                    id: inserted.id,
+                    kind: proposeOut.kind,
+                    payload: proposeOut.payload,
+                    confirmation: proposeOut.confirmation,
+                  })
                 if (Array.isArray(proposeOut.ui_blocks)) finalUiBlocks = finalUiBlocks.concat(proposeOut.ui_blocks)
                 finalText = 'All items matched. Review the quotation proposal below.'
               }
@@ -429,15 +509,36 @@ export async function POST(req: NextRequest) {
             if (counts.matched > 0) parts.push(`${counts.matched} matched`)
             if (counts.ambiguous > 0) parts.push(`${counts.ambiguous} need review`)
             if (counts.unmatched > 0) parts.push(`${counts.unmatched} not found`)
-            finalText = parts.join(' · ') + '. ' + (counts.ambiguous > 0 ? 'Select the correct product for ambiguous items above.' : 'Some items could not be matched to catalog products.')
+            finalText =
+              parts.join(' · ') +
+              '. ' +
+              (counts.ambiguous > 0
+                ? 'Select the correct product for ambiguous items above.'
+                : 'Some items could not be matched to catalog products.')
           }
 
           await query(
             `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
              VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, '[]'::jsonb)`,
-            [admin.adminId, conversationId, finalText, JSON.stringify(toolCallRecords), JSON.stringify(finalUiBlocks), JSON.stringify(proposedActions)]
+            [
+              admin.adminId,
+              conversationId,
+              finalText,
+              JSON.stringify(toolCallRecords),
+              JSON.stringify(finalUiBlocks),
+              JSON.stringify(proposedActions),
+            ]
           )
-          return NextResponse.json({ conversationId, message: finalText, uiBlocks: finalUiBlocks, toolCalls: toolCallRecords, proposedActions, pickers: [], provider: '', model: '' })
+          return NextResponse.json({
+            conversationId,
+            message: finalText,
+            uiBlocks: finalUiBlocks,
+            toolCalls: toolCallRecords,
+            proposedActions,
+            pickers: [],
+            provider: '',
+            model: '',
+          })
         }
       } catch {
         // fall through to LLM path
@@ -454,9 +555,7 @@ export async function POST(req: NextRequest) {
   )
 
   const systemPrompt = await buildSystemPromptWithDynamic(userMessage)
-  const messages: AiChatMessage[] = [
-    { role: 'system', content: systemPrompt },
-  ]
+  const messages: AiChatMessage[] = [{ role: 'system', content: systemPrompt }]
   for (const h of history) {
     if (h.role === 'user' || h.role === 'assistant') {
       messages.push({ role: h.role, content: h.content })
@@ -466,7 +565,11 @@ export async function POST(req: NextRequest) {
   const toolsDef = buildToolsDef(userMessage)
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
-  const pickers: Array<{ choice_kind: string; options: Array<{ id: string; label: string; sublabel?: string }>; note?: string }> = []
+  const pickers: Array<{
+    choice_kind: string
+    options: Array<{ id: string; label: string; sublabel?: string }>
+    note?: string
+  }> = []
   let finalText = ''
   let finalUiBlocks: any[] = []
   let provider = ''
@@ -520,7 +623,12 @@ export async function POST(req: NextRequest) {
           if (out && typeof out === 'object' && (out as any).marker === '__call_admin_api_immediate__') {
             const o = out as any
             const apiOut = await invokeAdminApiInternal(o.method, o.path, null, req)
-            toolCallRecords[toolCallRecords.length - 1] = { tool: tc.name, input: parsed, output: apiOut, isError: !apiOut.ok }
+            toolCallRecords[toolCallRecords.length - 1] = {
+              tool: tc.name,
+              input: parsed,
+              output: apiOut,
+              isError: !apiOut.ok,
+            }
             messages.push({ role: 'tool', content: JSON.stringify(apiOut).slice(0, 8000) })
           } else if (tool.mutating && out && typeof out === 'object' && (out as any).proposed === true) {
             const o = out as any
@@ -572,24 +680,27 @@ export async function POST(req: NextRequest) {
             // Deterministic quotation advance: if match_quotation_items resolved all lines, auto-call propose_create_quotation
             if (
               tc.name === 'match_quotation_items' &&
-              out && typeof out === 'object' &&
+              out &&
+              typeof out === 'object' &&
               (out as any).ok === true &&
               (out as any).data?.counts?.ambiguous === 0 &&
               (out as any).data?.counts?.unmatched === 0 &&
               (out as any).data?.counts?.matched > 0
             ) {
-              const resolvedLines: Array<{ status: string; qty: number; candidates: Array<{ productId: string }> }> =
-                (out as any).data.lines
+              const resolvedLines: Array<{ status: string; qty: number; candidates: Array<{ productId: string }> }> = (
+                out as any
+              ).data.lines
               const items = resolvedLines
                 .filter(l => l.status === 'matched' && l.candidates[0])
                 .map(l => ({ productId: l.candidates[0].productId, quantity: l.qty }))
 
               // Extract customer email from any user message in this conversation
               const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
-              const customerEmail = messages
-                .filter(m => m.role === 'user')
-                .map(m => emailRe.exec(m.content)?.[0])
-                .filter(Boolean)[0] ?? ''
+              const customerEmail =
+                messages
+                  .filter(m => m.role === 'user')
+                  .map(m => emailRe.exec(m.content)?.[0])
+                  .filter(Boolean)[0] ?? ''
 
               const proposeTool = getTool('propose_create_quotation')
               if (proposeTool && customerEmail && items.length > 0) {
@@ -598,7 +709,11 @@ export async function POST(req: NextRequest) {
                     customerEmail,
                     items: JSON.stringify(items),
                   })
-                  toolCallRecords.push({ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut })
+                  toolCallRecords.push({
+                    tool: 'propose_create_quotation',
+                    input: { customerEmail, items: JSON.stringify(items) },
+                    output: proposeOut,
+                  })
                   if (proposeOut && typeof proposeOut === 'object' && (proposeOut as any).proposed === true) {
                     const o = proposeOut as any
                     const inserted = await queryOne<{ id: string }>(
@@ -608,7 +723,12 @@ export async function POST(req: NextRequest) {
                       [admin.adminId, conversationId, o.kind, JSON.stringify(o.payload)]
                     )
                     if (inserted) {
-                      proposedActions.push({ id: inserted.id, kind: o.kind, payload: o.payload, confirmation: o.confirmation })
+                      proposedActions.push({
+                        id: inserted.id,
+                        kind: o.kind,
+                        payload: o.payload,
+                        confirmation: o.confirmation,
+                      })
                     }
                     // Surface the quotation preview ui_blocks
                     if (Array.isArray(o.ui_blocks)) {
@@ -636,21 +756,31 @@ export async function POST(req: NextRequest) {
     const raw = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
     // Never surface provider/billing internals (e.g. OpenAI "no credits", Ollama
     // unreachable) to the admin — map those to a clean, generic message.
-    const unavailable = /no credits|unreachable|fallback disabled|billing|quota|rate limit|timeout|abort|ECONNREFUSED|fetch failed/i.test(raw)
-    const msg = unavailable
-      ? 'The assistant is temporarily unavailable. Please try again in a moment.'
-      : raw
+    const unavailable =
+      /no credits|unreachable|fallback disabled|billing|quota|rate limit|timeout|abort|ECONNREFUSED|fetch failed/i.test(
+        raw
+      )
+    const msg = unavailable ? 'The assistant is temporarily unavailable. Please try again in a moment.' : raw
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 
   if (!finalText && finalUiBlocks.length === 0 && !done) {
-    finalText = 'I ran into the iteration limit before reaching a final answer. Try a simpler question or break it into steps.'
+    finalText =
+      'I ran into the iteration limit before reaching a final answer. Try a simpler question or break it into steps.'
   }
 
   await query(
     `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
      VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb)`,
-    [admin.adminId, conversationId, finalText, JSON.stringify(toolCallRecords), JSON.stringify(finalUiBlocks), JSON.stringify(proposedActions), JSON.stringify(pickers)]
+    [
+      admin.adminId,
+      conversationId,
+      finalText,
+      JSON.stringify(toolCallRecords),
+      JSON.stringify(finalUiBlocks),
+      JSON.stringify(proposedActions),
+      JSON.stringify(pickers),
+    ]
   )
 
   return NextResponse.json({

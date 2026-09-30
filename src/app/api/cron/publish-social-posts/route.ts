@@ -31,5 +31,5 @@ export async function GET(request: NextRequest) {
     }
     results.push({ id: post.id, ok: r.ok, error: r.error })
   }
-  return NextResponse.json({ success: true, published: results.filter((r) => r.ok).length, total: due.length, results })
+  return NextResponse.json({ success: true, published: results.filter(r => r.ok).length, total: due.length, results })
 }

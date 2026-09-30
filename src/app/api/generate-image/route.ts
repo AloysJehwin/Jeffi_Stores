@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
 
   const modelMap: Record<string, `${string}/${string}` | `${string}/${string}:${string}`> = {
     schnell: 'black-forest-labs/flux-schnell',
-    dev:     'black-forest-labs/flux-dev',
-    pro:     'black-forest-labs/flux-pro',
+    dev: 'black-forest-labs/flux-dev',
+    pro: 'black-forest-labs/flux-pro',
   }
   const replicateModel = modelMap[model] ?? modelMap.schnell
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const output = await replicate.run(replicateModel, {
       input: {
         prompt: prompt.trim(),
-        width:  Math.min(Math.max(256, width), 1440),
+        width: Math.min(Math.max(256, width), 1440),
         height: Math.min(Math.max(256, height), 1440),
         num_outputs: 1,
       },

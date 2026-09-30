@@ -69,9 +69,10 @@ export async function POST(request: NextRequest) {
     if (!config.merchant_id) return NextResponse.json({ error: 'merchant_id is required' }, { status: 400 })
     let sa: any
     try {
-      sa = typeof config.service_account_json === 'string'
-        ? parseServiceAccountJson(config.service_account_json)
-        : { client_email: config.client_email, private_key: config.private_key }
+      sa =
+        typeof config.service_account_json === 'string'
+          ? parseServiceAccountJson(config.service_account_json)
+          : { client_email: config.client_email, private_key: config.private_key }
     } catch {
       return NextResponse.json({ error: 'Invalid service account JSON' }, { status: 400 })
     }
@@ -98,8 +99,10 @@ export async function POST(request: NextRequest) {
       if (!config[k]) return NextResponse.json({ error: `${k} is required` }, { status: 400 })
     }
     normalized = {
-      client_id: config.client_id, client_secret: config.client_secret,
-      refresh_token: config.refresh_token, seller_id: config.seller_id,
+      client_id: config.client_id,
+      client_secret: config.client_secret,
+      refresh_token: config.refresh_token,
+      seller_id: config.seller_id,
       marketplace_id: config.marketplace_id || 'A21TJRUUN4KGV',
     }
     meta = { seller_id: config.seller_id, marketplace_id: normalized.marketplace_id }

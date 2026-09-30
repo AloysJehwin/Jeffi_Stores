@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute, persistLinkedAccountToOwnerBank } from '@/lib/tenant-registry'
+import {
+  approveKyc,
+  getTenant,
+  listPlans,
+  getKyc,
+  getOwnerById,
+  getDraft,
+  saveSubscriptionId,
+  saveLinkedAccountId,
+  getOwnerBankAccount,
+  getOwnerBankWithRoute,
+  persistLinkedAccountToOwnerBank,
+} from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
-import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone, isValidCompanyPan } from '@/lib/razorpay-route'
+import {
+  createLinkedAccount,
+  createRouteStakeholder,
+  configureRouteSettlement,
+  mapBusinessType,
+  inferProfileCategory,
+  normalizeIndianPhone,
+  isValidCompanyPan,
+} from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/india-pincode-state'
@@ -66,10 +86,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // so prefer it; otherwise look for a 6-digit PIN anywhere in the address.
       const draftPin = String((draft?.data as any)?.wh?.originPincode ?? '').replace(/\D/g, '')
       const addressPin = (kyc.business_address ?? '').match(/\b(\d{6})\b/)?.[1]
-      const postalCode = /^\d{6}$/.test(draftPin) ? draftPin : (addressPin || '')
+      const postalCode = /^\d{6}$/.test(draftPin) ? draftPin : addressPin || ''
       if (!postalCode) {
         throw new Error(
-          'no usable 6-digit postal code — checked the onboarding draft (wh.originPincode) and the KYC business address',
+          'no usable 6-digit postal code — checked the onboarding draft (wh.originPincode) and the KYC business address'
         )
       }
 
@@ -81,7 +101,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const state = stateFromPincode(postalCode)
       if (!state) {
         throw new Error(
-          `cannot determine the state from pincode ${postalCode} — its postal circle spans more than one state, so it must be set on the KYC record`,
+          `cannot determine the state from pincode ${postalCode} — its postal circle spans more than one state, so it must be set on the KYC record`
         )
       }
       const businessType = mapBusinessType(kyc.business_type ?? 'other')
@@ -92,7 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (kyc.pan && !isValidCompanyPan(kyc.pan, businessType)) {
         process.stderr.write(
           `[route] company PAN not registered for ${tenantId}: PAN holder type '${kyc.pan.trim().toUpperCase()[3]}' ` +
-          `does not match business type ${businessType} — add it from the Razorpay dashboard\n`,
+            `does not match business type ${businessType} — add it from the Razorpay dashboard\n`
         )
       }
 
@@ -129,7 +149,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           pan: kyc.pan ?? undefined,
         })
       } catch (sErr: any) {
-        process.stderr.write(`[route] stakeholder creation failed for ${tenantId}: ${sErr?.error?.description ?? sErr?.message}\n`)
+        process.stderr.write(
+          `[route] stakeholder creation failed for ${tenantId}: ${sErr?.error?.description ?? sErr?.message}\n`
+        )
       }
       const bank = await getOwnerBankAccount(kyc.owner_id).catch(() => null)
       if (bank) {
@@ -161,11 +183,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           step: err?.error?.step ?? null,
           businessType: kyc.business_type ?? null,
         })
-      } catch { /* never mask the original failure */ }
+      } catch {
+        /* never mask the original failure */
+      }
       try {
         const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
         await alertProvisioningFailure(tenant.slug, 'razorpay_linked_account', reason, tenantId)
-      } catch { /* alerting must never mask the original failure */ }
+      } catch {
+        /* alerting must never mask the original failure */
+      }
     }
   }
 
@@ -197,7 +223,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // 2. Create Razorpay Subscription and return checkout URL.
   const plans = await listPlans()
-  const plan = plans.find((p) => p.slug === tenant.plan) ?? plans[0]
+  const plan = plans.find(p => p.slug === tenant.plan) ?? plans[0]
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
 
   try {
@@ -219,11 +245,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ).catch(() => {})
     return NextResponse.json({ ok: true, checkoutUrl: shortUrl, linkedAccountId })
   } catch (err: any) {
-    return NextResponse.json({
-      ok: false,
-      kycApproved: true,
-      linkedAccountId,
-      error: `KYC approved but Razorpay subscription failed: ${err?.message ?? err}`,
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        ok: false,
+        kycApproved: true,
+        linkedAccountId,
+        error: `KYC approved but Razorpay subscription failed: ${err?.message ?? err}`,
+      },
+      { status: 500 }
+    )
   }
 }

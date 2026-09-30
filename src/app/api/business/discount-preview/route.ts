@@ -27,8 +27,10 @@ export async function POST(req: NextRequest) {
       const catId = item.products.category_id
       const pct = catId ? (discountMap[catId] ?? 0) : 0
       if (pct > 0) {
-        const linePrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-        businessDiscountAmount += linePrice * Number(item.quantity) * pct / 100
+        const linePrice =
+          Number(item.price_at_addition) ||
+          Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        businessDiscountAmount += (linePrice * Number(item.quantity) * pct) / 100
       }
     }
   } else {
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (productRow?.category_id) {
       const pct = discountMap[productRow.category_id] ?? 0
       if (pct > 0) {
-        businessDiscountAmount = Number(price) * Number(qty) * pct / 100
+        businessDiscountAmount = (Number(price) * Number(qty) * pct) / 100
       }
     }
   }

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json().catch(() => ({} as { gitSha?: string }))
+  const body = await request.json().catch(() => ({}) as { gitSha?: string })
   const gitSha = body.gitSha || process.env.GIT_SHA || `manual-${Date.now()}`
 
   const result = await runMigrationFilesFanout(gitSha)

@@ -10,11 +10,15 @@ import { sendAddressChangeDecisionEmail } from '@/lib/address-change-email'
 
 export const dynamic = 'force-dynamic'
 
-const bodySchema = z.object({
-  requestId: zUuid,
-  action: z.enum(['approve', 'reject']),
-  adminNotes: z.string().max(1000).optional(),
-}).refine(d => d.action !== 'reject' || !!d.adminNotes?.trim(), { message: 'A reason is required to reject the request' })
+const bodySchema = z
+  .object({
+    requestId: zUuid,
+    action: z.enum(['approve', 'reject']),
+    adminNotes: z.string().max(1000).optional(),
+  })
+  .refine(d => d.action !== 'reject' || !!d.adminNotes?.trim(), {
+    message: 'A reason is required to reject the request',
+  })
 
 const FAILURE_STATUS: Record<string, number> = {
   not_found: 404,
@@ -24,7 +28,12 @@ const FAILURE_STATUS: Record<string, number> = {
   order_not_eligible: 400,
 }
 
-async function notifyCustomer(orderId: string, decision: 'approved' | 'rejected', newAddress: AddressSnapshot, adminNotes: string | null) {
+async function notifyCustomer(
+  orderId: string,
+  decision: 'approved' | 'rejected',
+  newAddress: AddressSnapshot,
+  adminNotes: string | null
+) {
   const order = await queryOne<any>(
     `SELECT o.order_number, o.user_id, o.customer_email, o.customer_name,
             u.email AS user_email, u.first_name, u.last_name
@@ -34,9 +43,17 @@ async function notifyCustomer(orderId: string, decision: 'approved' | 'rejected'
   if (!order) return null
   const customerEmail = order.user_email || order.customer_email
   if (customerEmail) {
-    const customerName = order.first_name ? `${order.first_name} ${order.last_name || ''}`.trim() : (order.customer_name || 'Customer')
+    const customerName = order.first_name
+      ? `${order.first_name} ${order.last_name || ''}`.trim()
+      : order.customer_name || 'Customer'
     sendAddressChangeDecisionEmail({
-      customerEmail, customerName, orderNumber: order.order_number, orderId, decision, newAddress, adminNotes,
+      customerEmail,
+      customerName,
+      orderNumber: order.order_number,
+      orderId,
+      decision,
+      newAddress,
+      adminNotes,
     }).catch(() => {})
   }
   return order as { order_number: string; user_id: string | null }
@@ -48,7 +65,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id: orderId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const parsed = parseBody(bodySchema, await request.json())
     if (!parsed.ok) return parsed.response
@@ -58,7 +76,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (action === 'approve') {
       const result = await applyAddressChange({ requestId, orderId, adminId: admin.adminId, adminNotes })
       if (!result.applied) {
-        return NextResponse.json({ error: result.message, reason: result.reason }, { status: FAILURE_STATUS[result.reason] ?? 400 })
+        return NextResponse.json(
+          { error: result.message, reason: result.reason },
+          { status: FAILURE_STATUS[result.reason] ?? 400 }
+        )
       }
       await notifyCustomer(orderId, 'approved', result.newAddress, adminNotes)
       if (result.userId) {

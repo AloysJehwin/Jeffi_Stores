@@ -4,10 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const brands = await queryMany(
-      'SELECT id, name, slug FROM brands WHERE is_active = true ORDER BY name ASC',
-      []
-    )
+    const brands = await queryMany('SELECT id, name, slug FROM brands WHERE is_active = true ORDER BY name ASC', [])
     return NextResponse.json({ brands: brands || [] })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch brands' }, { status: 500 })

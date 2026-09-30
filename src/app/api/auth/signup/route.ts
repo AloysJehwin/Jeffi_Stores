@@ -18,10 +18,7 @@ export async function POST(request: NextRequest) {
     const { email, firstName, lastName, phone, channel } = body
 
     if (!email || !firstName) {
-      return NextResponse.json(
-        { error: 'Email and first name are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Email and first name are required' }, { status: 400 })
     }
 
     if (!phone) {
@@ -30,10 +27,7 @@ export async function POST(request: NextRequest) {
 
     const otpValid = await isOTPVerified(email)
     if (!otpValid) {
-      return NextResponse.json(
-        { error: 'Please verify your OTP first' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Please verify your OTP first' }, { status: 400 })
     }
 
     let normalizedPhone = null
@@ -46,10 +40,9 @@ export async function POST(request: NextRequest) {
       normalizedPhone = cleaned
     }
 
-    const existingUser = await queryOne(
-      "SELECT id FROM users WHERE email = $1 AND user_type != 'business'",
-      [email.toLowerCase()]
-    )
+    const existingUser = await queryOne("SELECT id FROM users WHERE email = $1 AND user_type != 'business'", [
+      email.toLowerCase(),
+    ])
 
     if (existingUser) {
       await deleteOTP(email)

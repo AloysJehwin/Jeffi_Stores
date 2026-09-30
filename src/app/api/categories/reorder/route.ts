@@ -9,7 +9,7 @@ export async function PATCH(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const { updates } = await request.json() as {
+    const { updates } = (await request.json()) as {
       updates: { id: string; display_order: number; parent_category_id: string | null }[]
     }
 

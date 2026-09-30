@@ -52,10 +52,7 @@ export async function POST(request: NextRequest) {
     const base = d.slug && d.slug.trim() ? slugifyOffer(d.slug) : slugifyOffer(d.title)
     let slug = base
     for (let n = 2; ; n++) {
-      const clash = await client.query<{ id: string }>(
-        `SELECT id FROM product_offers WHERE slug = $1`,
-        [slug]
-      )
+      const clash = await client.query<{ id: string }>(`SELECT id FROM product_offers WHERE slug = $1`, [slug])
       if (clash.rows.length === 0) break
       slug = `${base}-${n}`
     }
@@ -67,8 +64,16 @@ export async function POST(request: NextRequest) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING id`,
       [
-        slug, d.title, d.subtitle ?? null, d.badgeText ?? null, d.badgeColor ?? null,
-        d.ctaLabel ?? null, d.startsAt ?? null, d.endsAt ?? null, nextOrder, d.isActive ?? true,
+        slug,
+        d.title,
+        d.subtitle ?? null,
+        d.badgeText ?? null,
+        d.badgeColor ?? null,
+        d.ctaLabel ?? null,
+        d.startsAt ?? null,
+        d.endsAt ?? null,
+        nextOrder,
+        d.isActive ?? true,
       ]
     )
     const id = inserted.rows[0]?.id

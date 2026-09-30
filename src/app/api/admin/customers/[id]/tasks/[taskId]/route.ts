@@ -6,14 +6,12 @@ import { logActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string; taskId: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; taskId: string }> }) {
   const { id, taskId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await req.json()
   const { title, description, due_date, priority, status, assigned_to } = body
@@ -60,10 +58,7 @@ export async function PATCH(
   }
 
   vals.push(taskId, id)
-  await query(
-    `UPDATE customer_tasks SET ${updates.join(', ')} WHERE id = $${i++} AND user_id = $${i++}`,
-    vals
-  )
+  await query(`UPDATE customer_tasks SET ${updates.join(', ')} WHERE id = $${i++} AND user_id = $${i++}`, vals)
 
   if (status === 'completed' && current.status !== 'completed') {
     logActivity({
@@ -79,14 +74,12 @@ export async function PATCH(
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string; taskId: string }> }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; taskId: string }> }) {
   const { id, taskId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   await query(`DELETE FROM customer_tasks WHERE id = $1 AND user_id = $2`, [taskId, id])
   return NextResponse.json({ success: true })

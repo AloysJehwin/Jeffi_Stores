@@ -39,15 +39,16 @@ export async function POST(request: NextRequest) {
 
   // Ownership check.
   const tenants = await getOwnerTenants(owner.id)
-  const tenant = tenants.find((t) => t.id === tenantId)
+  const tenant = tenants.find(t => t.id === tenantId)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   if (action === 'deprovision') {
     if (!tenant.razorpay_subscription_id) {
       return NextResponse.json({ error: 'No active subscription to cancel' }, { status: 400 })
     }
-    const result = await cancelSubscription(tenant.razorpay_subscription_id, { cancelAtCycleEnd: true })
-      .catch((e: any) => ({ error: e?.message } as any))
+    const result = await cancelSubscription(tenant.razorpay_subscription_id, { cancelAtCycleEnd: true }).catch(
+      (e: any) => ({ error: e?.message }) as any
+    )
     if ((result as any)?.error) {
       return NextResponse.json({ error: (result as any).error || 'Failed to cancel subscription' }, { status: 500 })
     }

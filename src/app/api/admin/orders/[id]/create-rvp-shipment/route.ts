@@ -13,7 +13,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const tenantId = (await resolveTenantId()) ?? undefined
     const TOKEN = await resolveDelhiveryToken(tenantId)
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const warehouses = await listDelhiveryPickupLocations(tenantId)
     const returnWarehouse = (requested && warehouses.find(w => w.name === requested)) || warehouses[0] || undefined
 
-    const order = await queryOne<any>(`
+    const order = await queryOne<any>(
+      `
       SELECT
         o.id, o.order_number, o.status, o.total_amount, o.created_at,
         sa.full_name, sa.address_line1, sa.address_line2, sa.landmark,
@@ -38,7 +40,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1
-    `, [id])
+    `,
+      [id]
+    )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
@@ -63,7 +67,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     if (returnRequest.rvp_awb_number) {
-      return NextResponse.json({ error: 'RVP shipment already created', awb: returnRequest.rvp_awb_number }, { status: 409 })
+      return NextResponse.json(
+        { error: 'RVP shipment already created', awb: returnRequest.rvp_awb_number },
+        { status: 409 }
+      )
     }
 
     // Platform-Delhivery tenants must hold the minimum wallet balance before an RVP is created —
@@ -81,7 +88,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const totalAmount = String(round2(Number(order.total_amount)))
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
 
-    const orderItems = await queryOne<{ total_weight: number; total_qty: number }>(`
+    const orderItems = await queryOne<{ total_weight: number; total_qty: number }>(
+      `
       SELECT
         COALESCE(SUM(COALESCE(pv.weight_grams, p.weight_grams, 500) * oi.quantity::numeric), 500) AS total_weight,
         COALESCE(SUM(oi.quantity::numeric), 1) AS total_qty
@@ -89,7 +97,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       WHERE oi.order_id = $1
-    `, [id])
+    `,
+      [id]
+    )
 
     const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 10) / 100)
     const quantity = Math.max(1, Math.round(orderItems?.total_qty || 1))
@@ -111,10 +121,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       returnWarehouse,
     })
 
-    await query(
-      `UPDATE return_requests SET rvp_awb_number = $1, rvp_created_at = NOW() WHERE id = $2`,
-      [awb, returnRequest.id]
-    )
+    await query(`UPDATE return_requests SET rvp_awb_number = $1, rvp_created_at = NOW() WHERE id = $2`, [
+      awb,
+      returnRequest.id,
+    ])
 
     return NextResponse.json({ awb, message: `RVP shipment created. AWB: ${awb}` })
   } catch (err: any) {

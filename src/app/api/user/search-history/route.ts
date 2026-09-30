@@ -33,10 +33,7 @@ export async function POST(request: NextRequest) {
     [auth.userId, term]
   )
 
-  await queryOne(
-    `INSERT INTO user_search_history (user_id, query) VALUES ($1, $2)`,
-    [auth.userId, term]
-  )
+  await queryOne(`INSERT INTO user_search_history (user_id, query) VALUES ($1, $2)`, [auth.userId, term])
 
   await queryOne(
     `DELETE FROM user_search_history

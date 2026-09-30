@@ -28,7 +28,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     const bv = await getBusinessValues()
     const ORIGIN_PIN = bv.delhiveryOriginPincode
     const PICKUP_LOCATION = bv.pickupLocation
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const SELLER_ADD = bv.sellerAddress
     const SELLER_PHONE = bv.sellerPhone
 
-    const order = await queryOne<any>(`
+    const order = await queryOne<any>(
+      `
       SELECT
         o.*,
         sa.full_name, sa.address_line1, sa.address_line2, sa.landmark,
@@ -46,16 +48,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1
-    `, [id])
+    `,
+      [id]
+    )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    if (order.awb_number) return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
+    if (order.awb_number)
+      return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
 
     // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
     // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
     // Delhivery bills them directly). Best-effort: a control-plane read failure must not wedge ops.
     const tenantId = (await resolveTenantId()) ?? undefined
-    if (tenantId && await walletBlocksShipment(tenantId).catch(() => false)) {
+    if (tenantId && (await walletBlocksShipment(tenantId).catch(() => false))) {
       return NextResponse.json(
         { error: 'Wallet balance is below the minimum. Recharge the wallet before creating shipments.' },
         { status: 402 }
@@ -97,7 +102,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const baseRef = order.order_number || order.id.slice(0, 12)
     const invoiceRef = `${baseRef}-${Date.now()}`
 
-    const orderItemRows = await queryMany<any>(`
+    const orderItemRows = await queryMany<any>(
+      `
       SELECT
         oi.quantity,
         oi.variant_id,
@@ -112,61 +118,71 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       LEFT JOIN product_sub_variants sv ON sv.id = oi.sub_variant_id
       WHERE oi.order_id = $1
-    `, [id])
+    `,
+      [id]
+    )
 
     const shipmentItems: ShipmentItem[] = (orderItemRows || []).map((row: any) => ({
       packageType: (row.package_type as PackageType) || null,
       weightGrams: parseFloat(row.weight_grams) || 500,
       quantity: parseInt(row.quantity) || 1,
       storedDims: {
-        length_cm:  row.length_cm  ? parseFloat(row.length_cm)  : null,
+        length_cm: row.length_cm ? parseFloat(row.length_cm) : null,
         breadth_cm: row.breadth_cm ? parseFloat(row.breadth_cm) : null,
-        height_cm:  row.height_cm  ? parseFloat(row.height_cm)  : null,
+        height_cm: row.height_cm ? parseFloat(row.height_cm) : null,
       },
       variantName: row.variant_name || undefined,
     }))
 
-    const dims = computeShipmentDims(shipmentItems.length > 0 ? shipmentItems : [{
-      packageType: 'flat_poly_auto',
-      weightGrams: 500,
-      quantity: 1,
-      storedDims: { length_cm: null, breadth_cm: null, height_cm: null },
-    }])
+    const dims = computeShipmentDims(
+      shipmentItems.length > 0
+        ? shipmentItems
+        : [
+            {
+              packageType: 'flat_poly_auto',
+              weightGrams: 500,
+              quantity: 1,
+              storedDims: { length_cm: null, breadth_cm: null, height_cm: null },
+            },
+          ]
+    )
 
     const weightKg = Math.max(0.1, Math.round(dims.chargedWeightGrams / 10) / 100)
 
     const shipmentPayload = {
-      shipments: [{
-        name: consigneeName,
-        add: address,
-        pin,
-        city: order.city || '',
-        state: order.state || '',
-        country: 'India',
-        phone: consigneePhone,
-        order: invoiceRef,
-        payment_mode: deliveryPaymentMode,
-        return_pin: ORIGIN_PIN,
-        return_city: 'Raipur',
-        return_phone: SELLER_PHONE,
-        return_add: SELLER_ADD,
-        return_state: 'Chhattisgarh',
-        return_country: 'India',
-        products_desc: productDesc,
-        hsn_code: '7318',
-        cod_amount: codAmount,
-        order_date: orderDate,
-        total_amount: totalAmount,
-        seller_add: SELLER_ADD,
-        seller_name: SELLER_NAME,
-        seller_inv: invoiceRef,
-        quantity: '1',
-        waybill: '',
-        shipment_width: String(dims.breadth_cm),
-        shipment_height: String(dims.height_cm),
-        shipment_length: String(dims.length_cm),
-        weight: String(weightKg),
-      }],
+      shipments: [
+        {
+          name: consigneeName,
+          add: address,
+          pin,
+          city: order.city || '',
+          state: order.state || '',
+          country: 'India',
+          phone: consigneePhone,
+          order: invoiceRef,
+          payment_mode: deliveryPaymentMode,
+          return_pin: ORIGIN_PIN,
+          return_city: 'Raipur',
+          return_phone: SELLER_PHONE,
+          return_add: SELLER_ADD,
+          return_state: 'Chhattisgarh',
+          return_country: 'India',
+          products_desc: productDesc,
+          hsn_code: '7318',
+          cod_amount: codAmount,
+          order_date: orderDate,
+          total_amount: totalAmount,
+          seller_add: SELLER_ADD,
+          seller_name: SELLER_NAME,
+          seller_inv: invoiceRef,
+          quantity: '1',
+          waybill: '',
+          shipment_width: String(dims.breadth_cm),
+          shipment_height: String(dims.height_cm),
+          shipment_length: String(dims.length_cm),
+          weight: String(weightKg),
+        },
+      ],
       pickup_location: { name: pickupLocationName },
     }
 
@@ -187,20 +203,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const data = await res.json()
 
     if (!res.ok || !data.packages || data.packages.length === 0) {
-      return NextResponse.json({
-        error: 'Delhivery API error',
-        details: data.rmk || 'Unknown error',
-      }, { status: 502 })
+      return NextResponse.json(
+        {
+          error: 'Delhivery API error',
+          details: data.rmk || 'Unknown error',
+        },
+        { status: 502 }
+      )
     }
 
     const pkg = data.packages[0]
 
     if (pkg.status === 'Fail' || pkg.err_code) {
-      return NextResponse.json({
-        error: 'Shipment creation failed',
-        code: pkg.err_code,
-        details: pkg.remarks?.join('; ') || 'Unknown error',
-      }, { status: 422 })
+      return NextResponse.json(
+        {
+          error: 'Shipment creation failed',
+          code: pkg.err_code,
+          details: pkg.remarks?.join('; ') || 'Unknown error',
+        },
+        { status: 422 }
+      )
     }
 
     const awb = pkg.waybill
@@ -255,7 +277,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [id]
     )
     if (smsCustomer?.notification_channel === 'sms' && smsCustomer.phone) {
-      sendOrderShippedSMS({ phone: smsCustomer.phone, orderNumber: order.order_number, trackingId: awb, courier: 'Delhivery' }).catch(() => {})
+      sendOrderShippedSMS({
+        phone: smsCustomer.phone,
+        orderNumber: order.order_number,
+        trackingId: awb,
+        courier: 'Delhivery',
+      }).catch(() => {})
     }
 
     return NextResponse.json({
@@ -263,7 +290,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       sortCode: pkg.sort_code,
       estimatedDeliveryDate,
       message: `Shipment created. AWB: ${awb}`,
-      walletWarning: walletCharge.ok ? undefined : (walletCharge.error || 'Delivery charge could not be applied to the wallet.'),
+      walletWarning: walletCharge.ok
+        ? undefined
+        : walletCharge.error || 'Delivery charge could not be applied to the wallet.',
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

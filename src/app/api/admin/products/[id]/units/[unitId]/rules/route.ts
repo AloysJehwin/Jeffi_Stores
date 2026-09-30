@@ -5,7 +5,9 @@ import { queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string; unitId: string }> }
+interface Params {
+  params: Promise<{ id: string; unitId: string }>
+}
 
 const SUPPORTED = ['tiered_price', 'bonus_qty'] as const
 

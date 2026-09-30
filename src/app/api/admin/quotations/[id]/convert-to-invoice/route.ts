@@ -15,15 +15,13 @@ import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const quotation = await queryOne<any>(
       `SELECT q.*, EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
@@ -38,10 +36,7 @@ export async function POST(
       return NextResponse.json({ error: 'This quotation has already been converted to an invoice' }, { status: 400 })
     }
 
-    const qItems = await queryMany<any>(
-      `SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`,
-      [id]
-    )
+    const qItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [id])
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
     }
@@ -49,7 +44,9 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
     const enableDelivery: boolean = !!body.enableDelivery
-    const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(body.batch_assignments)
+    const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(
+      body.batch_assignments
+    )
       ? body.batch_assignments
       : []
     const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(body.serial_assignments)
@@ -57,8 +54,8 @@ export async function POST(
       : []
 
     const isBuyerSame = quotation.buyer_same !== false
-    const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
-    const buyerGstin = isBuyerSame ? quotation.consignee_gstin : (quotation.buyer_gstin || quotation.consignee_gstin)
+    const buyerState = isBuyerSame ? quotation.consignee_state : quotation.buyer_state || quotation.consignee_state
+    const buyerGstin = isBuyerSame ? quotation.consignee_gstin : quotation.buyer_gstin || quotation.consignee_gstin
     const gstEnabled = (await getFeatureFlags()).gstEnabled
     // Basic-plan tenants have no inventory module (flag locked off). When off, skip
     // stock validation + deduction so the conversion is never blocked by unmanaged stock.
@@ -68,14 +65,14 @@ export async function POST(
 
     // When buyer_same=false the invoice is billed to the buyer, so use buyer contact details
     const customerName = isBuyerSame
-      ? (quotation.consignee_name || '')
-      : (quotation.buyer_name || quotation.consignee_name || '')
+      ? quotation.consignee_name || ''
+      : quotation.buyer_name || quotation.consignee_name || ''
     const customerPhone = isBuyerSame
-      ? (quotation.consignee_phone || quotation.buyer_phone || null)
-      : (quotation.buyer_phone || quotation.consignee_phone || null)
+      ? quotation.consignee_phone || quotation.buyer_phone || null
+      : quotation.buyer_phone || quotation.consignee_phone || null
     const customerEmail = isBuyerSame
-      ? (quotation.consignee_email || quotation.buyer_email || null)
-      : (quotation.buyer_email || quotation.consignee_email || null)
+      ? quotation.consignee_email || quotation.buyer_email || null
+      : quotation.buyer_email || quotation.consignee_email || null
 
     // Fetch unit factor for every quotation item (needed to compute effectiveQty = qty × factor for count-dimension units)
     // Uses sold_unit_factor when pre-computed (RFQ→quotation path), otherwise resolves from product_units by
@@ -143,9 +140,11 @@ export async function POST(
       const exGstLineTotal = lineItemExGst(baseQty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = gstEnabled ? parseFloat(item.gst_rate || '18') : 0
 
-      let cgst = 0, sgst = 0, igst = 0
+      let cgst = 0,
+        sgst = 0,
+        igst = 0
       if (gstEnabled && gstRate > 0) {
-        const lineTax = exGstLineTotal * gstRate / 100
+        const lineTax = (exGstLineTotal * gstRate) / 100
         if (orderIsIgst) {
           igst = lineTax
         } else {
@@ -200,7 +199,7 @@ export async function POST(
     const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer'
     const today = new Date().toISOString()
 
-    const result = await withTransaction(async (client) => {
+    const result = await withTransaction(async client => {
       const addrResult = await client.query(
         `INSERT INTO addresses (full_name, address_line1, address_line2, city, state, postal_code, phone, address_type)
          VALUES ($1, $2, $3, $4, $5, $6, $7, 'shipping')
@@ -220,7 +219,7 @@ export async function POST(
       // Check stock for all items first — if any are short, save as draft.
       // Skipped entirely on Basic (flag off): no inventory module → never demote to draft.
       const insufficientItems: string[] = []
-      for (const item of (inventoryValidationEnabled ? processedItems : [])) {
+      for (const item of inventoryValidationEnabled ? processedItems : []) {
         if (!item.product_id) continue
         // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
         const baseQty = item.base_qty
@@ -230,28 +229,35 @@ export async function POST(
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty) insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
+          if (stock < baseQty)
+            insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
+          if (stock < baseQty)
+            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         } else {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE',
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
+          if (stock < baseQty)
+            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         }
       }
 
       const saveAsDraft = insufficientItems.length > 0
       const orderStatus = saveAsDraft
-        ? (enableDelivery ? 'processing' : 'draft')
-        : (enableDelivery ? 'processing' : 'delivered')
+        ? enableDelivery
+          ? 'processing'
+          : 'draft'
+        : enableDelivery
+          ? 'processing'
+          : 'delivered'
 
       const orderResult = await client.query(
         `INSERT INTO orders (
@@ -301,10 +307,11 @@ export async function POST(
         const seq = await getNextInvoiceSequence(client, fy)
         invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
 
-        await client.query(
-          `UPDATE orders SET invoice_number = $1, invoice_date = $2 WHERE id = $3`,
-          [invoiceNumber, today, newOrder.id]
-        )
+        await client.query(`UPDATE orders SET invoice_number = $1, invoice_date = $2 WHERE id = $3`, [
+          invoiceNumber,
+          today,
+          newOrder.id,
+        ])
         await client.query(
           `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
           [newOrder.id, invoiceNumber, fy, seq]
@@ -324,12 +331,30 @@ export async function POST(
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
           RETURNING id`,
           [
-            newOrder.id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null, item.hsn_code, item.gst_rate,
-            item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
-            item.mrp, item.unit_price, item.total_price,
-            item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
-            item.sell_unit, item.unit_factor, item.base_qty,
+            newOrder.id,
+            item.product_id,
+            item.product_name,
+            item.product_sku,
+            item.variant_id,
+            item.sub_variant_id,
+            item.variant_name,
+            item.sub_variant_name ?? null,
+            item.hsn_code,
+            item.gst_rate,
+            item.quantity,
+            item.buy_unit || null,
+            item.buy_mode || 'unit',
+            item.mrp,
+            item.unit_price,
+            item.total_price,
+            item.taxable_amount,
+            item.cgst_amount,
+            item.sgst_amount,
+            item.igst_amount,
+            item.tax_amount,
+            item.sell_unit,
+            item.unit_factor,
+            item.base_qty,
           ]
         )
         if (item.id && oir.rows[0]?.id) itemIdMap.set(item.id, oir.rows[0].id)
@@ -339,10 +364,14 @@ export async function POST(
         // Assignments arrive keyed by quotation_item id (the picker preview runs before the
         // order exists); remap onto the freshly-inserted order_item ids so the shared helper
         // — which filters by order_item.id — matches them.
-        const remappedBatches = batchAssignments
-          .map(a => ({ ...a, order_item_id: itemIdMap.get(a.order_item_id) ?? a.order_item_id }))
-        const remappedSerials = serialAssignments
-          .map(a => ({ ...a, order_item_id: itemIdMap.get(a.order_item_id) ?? a.order_item_id }))
+        const remappedBatches = batchAssignments.map(a => ({
+          ...a,
+          order_item_id: itemIdMap.get(a.order_item_id) ?? a.order_item_id,
+        }))
+        const remappedSerials = serialAssignments.map(a => ({
+          ...a,
+          order_item_id: itemIdMap.get(a.order_item_id) ?? a.order_item_id,
+        }))
 
         await deductOrderStock(
           newOrder.id,
@@ -351,22 +380,27 @@ export async function POST(
         )
       }
 
-      await client.query(
-        `UPDATE quotations SET converted_order_id = $1, updated_at = NOW() WHERE id = $2`,
-        [newOrder.id, id]
-      )
+      await client.query(`UPDATE quotations SET converted_order_id = $1, updated_at = NOW() WHERE id = $2`, [
+        newOrder.id,
+        id,
+      ])
 
-      return { id: newOrder.id, order_number: newOrder.order_number, invoice_number: invoiceNumber, saveAsDraft, insufficientItems }
+      return {
+        id: newOrder.id,
+        order_number: newOrder.order_number,
+        invoice_number: invoiceNumber,
+        saveAsDraft,
+        insufficientItems,
+      }
     })
 
     if (!result.saveAsDraft && result.invoice_number) {
       if (customerEmail) {
         // Fetch the view_token so the invoice link is correct.
         // The middleware rewrites invoice.jeffistores.in/<token> → /invoice/<token>.
-        const orderRow = await queryOne<{ view_token: string }>(
-          `SELECT view_token FROM orders WHERE id = $1`,
-          [result.id]
-        )
+        const orderRow = await queryOne<{ view_token: string }>(`SELECT view_token FROM orders WHERE id = $1`, [
+          result.id,
+        ])
         const invoiceViewUrl = orderRow?.view_token
           ? `https://invoice.jeffistores.in/${orderRow.view_token}`
           : `https://jeffistores.in/account/orders`
@@ -413,7 +447,7 @@ export async function POST(
         })
         // Crop the QR code square out of Razorpay's branded 9:16 poster image
         const RZP_QR_LEFT_RATIO = 136 / 674
-        const RZP_QR_TOP_RATIO  = 648 / 1644
+        const RZP_QR_TOP_RATIO = 648 / 1644
         const RZP_QR_SIZE_RATIO = 399 / 674
         let fetchedImageUrl: string = qr.image_url
         try {
@@ -423,7 +457,12 @@ export async function POST(
           const w = meta.width!
           const h = meta.height!
           const cropped = await sharp(buf)
-            .extract({ left: Math.round(w * RZP_QR_LEFT_RATIO), top: Math.round(h * RZP_QR_TOP_RATIO), width: Math.round(w * RZP_QR_SIZE_RATIO), height: Math.round(w * RZP_QR_SIZE_RATIO) })
+            .extract({
+              left: Math.round(w * RZP_QR_LEFT_RATIO),
+              top: Math.round(h * RZP_QR_TOP_RATIO),
+              width: Math.round(w * RZP_QR_SIZE_RATIO),
+              height: Math.round(w * RZP_QR_SIZE_RATIO),
+            })
             .resize(300, 300)
             .png()
             .toBuffer()

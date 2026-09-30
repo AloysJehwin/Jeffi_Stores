@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
-import { createTenant, linkOwnerTenant, hasVerifiedBank, saveSubscriptionId,
-         listPlans, getOwnerTenants, saveKyc, markDraftSubmitted, getDraft, saveDraft,
-         saveIntegrationCredential, updateOwnerName } from '@/lib/tenant-registry'
+import {
+  createTenant,
+  linkOwnerTenant,
+  hasVerifiedBank,
+  saveSubscriptionId,
+  listPlans,
+  getOwnerTenants,
+  saveKyc,
+  markDraftSubmitted,
+  getDraft,
+  saveDraft,
+  saveIntegrationCredential,
+  updateOwnerName,
+} from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/ecom-emails'
 import { OnboardSchema } from '@/lib/onboard-schema'
 import { encryptToken } from '@/lib/crypto/token-cipher'
@@ -42,7 +53,10 @@ export async function POST(request: NextRequest) {
   // positive refusal blocks the submit; if Delhivery cannot be reached the token is accepted, and
   // the owner can replace it from the dashboard.
   if (d.ownDelhivery && d.delhiveryToken && (await verifyDelhiveryToken(d.delhiveryToken.trim())) === 'invalid') {
-    return NextResponse.json({ error: 'Delhivery did not accept this API token. Check it and try again.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Delhivery did not accept this API token. Check it and try again.' },
+      { status: 400 }
+    )
   }
 
   // 1. Create tenant with status='pending_approval' (NOT provisioning yet).
@@ -73,11 +87,13 @@ export async function POST(request: NextRequest) {
       tenantId: result.tenantId,
       provider: 'razorpay',
       label: 'Razorpay',
-      configEnc: encryptToken(JSON.stringify({
-        key_id: d.razorpayKeyId,
-        key_secret: d.razorpayKeySecret,
-        webhook_secret: d.razorpayWebhookSecret || undefined,
-      })),
+      configEnc: encryptToken(
+        JSON.stringify({
+          key_id: d.razorpayKeyId,
+          key_secret: d.razorpayKeySecret,
+          webhook_secret: d.razorpayWebhookSecret || undefined,
+        })
+      ),
       meta: { key_id: d.razorpayKeyId },
     })
   }

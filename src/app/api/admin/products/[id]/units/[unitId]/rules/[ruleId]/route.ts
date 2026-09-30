@@ -5,7 +5,9 @@ import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string; unitId: string; ruleId: string }> }
+interface Params {
+  params: Promise<{ id: string; unitId: string; ruleId: string }>
+}
 
 async function ensureRule(productId: string, unitId: string, ruleId: string) {
   const row = await queryOne<{ id: string }>(
@@ -34,9 +36,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const updates: string[] = []
   const vals: unknown[] = []
   let i = 1
-  if (body.config !== undefined) { updates.push(`config = $${i++}`); vals.push(JSON.stringify(body.config)) }
-  if (body.is_active !== undefined) { updates.push(`is_active = $${i++}`); vals.push(!!body.is_active) }
-  if (body.priority !== undefined) { updates.push(`priority = $${i++}`); vals.push(Number(body.priority)) }
+  if (body.config !== undefined) {
+    updates.push(`config = $${i++}`)
+    vals.push(JSON.stringify(body.config))
+  }
+  if (body.is_active !== undefined) {
+    updates.push(`is_active = $${i++}`)
+    vals.push(!!body.is_active)
+  }
+  if (body.priority !== undefined) {
+    updates.push(`priority = $${i++}`)
+    vals.push(Number(body.priority))
+  }
   if (updates.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   vals.push(ruleId)
   const updated = await queryOne(

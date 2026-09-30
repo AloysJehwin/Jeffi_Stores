@@ -9,24 +9,25 @@ import { parseBody, zUuid, zCurrency } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
-const poItemSchema = z.object({
-  product_id: zUuid,
-  variant_id: zUuid.nullish(),
-  sub_variant_id: zUuid.nullish(),
-  quantity: z.coerce.number().positive(),
-  unit_cost: zCurrency.optional(),
-  tax_rate: z.coerce.number().min(0).default(0),
-  product_name: z.string().nullish(),
-  sku: z.string().nullish(),
-  // purchase unit conversion (optional)
-  purchase_unit: z.string().max(50).nullish(),
-  purchase_unit_factor: z.coerce.number().positive().default(1),
-  line_total_incl_gst: zCurrency.nullish(),
-  gst_inclusive: z.boolean().default(true),
-}).refine(
-  d => d.unit_cost != null || d.line_total_incl_gst != null,
-  { message: 'Either unit_cost or line_total_incl_gst is required' }
-)
+const poItemSchema = z
+  .object({
+    product_id: zUuid,
+    variant_id: zUuid.nullish(),
+    sub_variant_id: zUuid.nullish(),
+    quantity: z.coerce.number().positive(),
+    unit_cost: zCurrency.optional(),
+    tax_rate: z.coerce.number().min(0).default(0),
+    product_name: z.string().nullish(),
+    sku: z.string().nullish(),
+    // purchase unit conversion (optional)
+    purchase_unit: z.string().max(50).nullish(),
+    purchase_unit_factor: z.coerce.number().positive().default(1),
+    line_total_incl_gst: zCurrency.nullish(),
+    gst_inclusive: z.boolean().default(true),
+  })
+  .refine(d => d.unit_cost != null || d.line_total_incl_gst != null, {
+    message: 'Either unit_cost or line_total_incl_gst is required',
+  })
 
 const createPOSchema = z.object({
   supplier_id: zUuid,
@@ -37,7 +38,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -51,8 +53,14 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
     let i = 1
 
-    if (status) { conditions.push(`po.status = $${i++}`); params.push(status) }
-    if (supplierId) { conditions.push(`po.supplier_id = $${i++}`); params.push(supplierId) }
+    if (status) {
+      conditions.push(`po.status = $${i++}`)
+      params.push(status)
+    }
+    if (supplierId) {
+      conditions.push(`po.supplier_id = $${i++}`)
+      params.push(supplierId)
+    }
     if (search) {
       const sc = buildSearchClause(search, ['po.po_number', 's.name'], i)
       conditions.push(sc.clause)
@@ -99,9 +107,29 @@ export async function GET(request: NextRequest) {
 // Also denormalizes the price's leaf supplier_id cache. Runs in the PO-create transaction.
 async function syncSupplierPriceFromPO(
   client: import('pg').PoolClient,
-  args: { productId: string; sku: string | null; variantIdFromLine: string | null; subVariantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string; purchaseUnit: string | null; purchaseUnitFactor: number }
+  args: {
+    productId: string
+    sku: string | null
+    variantIdFromLine: string | null
+    subVariantIdFromLine: string | null
+    supplierId: string
+    unitCost: number
+    poNumber: string
+    purchaseUnit: string | null
+    purchaseUnitFactor: number
+  }
 ) {
-  const { productId, sku, variantIdFromLine, subVariantIdFromLine, supplierId, unitCost, poNumber, purchaseUnit, purchaseUnitFactor } = args
+  const {
+    productId,
+    sku,
+    variantIdFromLine,
+    subVariantIdFromLine,
+    supplierId,
+    unitCost,
+    poNumber,
+    purchaseUnit,
+    purchaseUnitFactor,
+  } = args
   if (!productId || !supplierId) return
   if (!Number.isFinite(unitCost) || unitCost < 0) return
 
@@ -188,7 +216,8 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 
@@ -219,9 +248,7 @@ export async function POST(request: NextRequest) {
       let lineTotalInclGst: number | null = item.line_total_incl_gst ?? null
 
       if (lineTotalInclGst != null) {
-        const totalExGst = item.gst_inclusive
-          ? lineTotalInclGst / (1 + gstRate / 100)
-          : lineTotalInclGst
+        const totalExGst = item.gst_inclusive ? lineTotalInclGst / (1 + gstRate / 100) : lineTotalInclGst
         unitCost = totalExGst / baseQty
       } else {
         unitCost = item.unit_cost!
@@ -236,16 +263,21 @@ export async function POST(request: NextRequest) {
     })
     const totalAmount = subtotal + taxAmount
 
-    const po = await withTransaction(async (client) => {
+    const po = await withTransaction(async client => {
       const poRow = await client.query<{ id: string }>(
         `INSERT INTO purchase_orders (po_number, supplier_id, status, order_date, expected_date, notes, subtotal, tax_amount, total_amount)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-        [poNumber, supplier_id, status,
-         order_date || new Date().toISOString().slice(0, 10),
-         expected_date || null, notes || null,
-         round2(subtotal),
-         round2(taxAmount),
-         round2(totalAmount)]
+        [
+          poNumber,
+          supplier_id,
+          status,
+          order_date || new Date().toISOString().slice(0, 10),
+          expected_date || null,
+          notes || null,
+          round2(subtotal),
+          round2(taxAmount),
+          round2(totalAmount),
+        ]
       )
       const poId = poRow.rows[0]?.id
 
@@ -283,15 +315,22 @@ export async function POST(request: NextRequest) {
              (po_id, product_id, variant_id, sub_variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
               purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-          [poId, item.product_id, safeVariantId, safeSubVariantId,
-           item.product_name, item.sku || null,
-           baseQty,
-           Math.round(resolvedUnitCost * 1000000) / 1000000,
-           tax, total,
-           item.purchase_unit || null,
-           factor,
-           item.line_total_incl_gst ?? null,
-           item.gst_inclusive ?? true]
+          [
+            poId,
+            item.product_id,
+            safeVariantId,
+            safeSubVariantId,
+            item.product_name,
+            item.sku || null,
+            baseQty,
+            Math.round(resolvedUnitCost * 1000000) / 1000000,
+            tax,
+            total,
+            item.purchase_unit || null,
+            factor,
+            item.line_total_incl_gst ?? null,
+            item.gst_inclusive ?? true,
+          ]
         )
 
         // Auto-sync the supplier's quoted buy-price for this leaf from the PO line cost.

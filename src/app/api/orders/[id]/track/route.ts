@@ -4,10 +4,7 @@ import { queryOne, query } from '@/lib/db'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
     const authUser = await authenticateUser(request)
@@ -35,10 +32,10 @@ export async function GET(
         [id, authUser.userId, email, phone]
       )
     } else {
-      order = await queryOne(
-        `SELECT awb_number, status, shipment_status FROM orders WHERE id = $1 AND user_id = $2`,
-        [id, authUser.userId]
-      )
+      order = await queryOne(`SELECT awb_number, status, shipment_status FROM orders WHERE id = $1 AND user_id = $2`, [
+        id,
+        authUser.userId,
+      ])
     }
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -47,13 +44,10 @@ export async function GET(
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
-    const res = await fetch(
-      `https://track.delhivery.com/api/v1/packages/json/?waybill=${order.awb_number}`,
-      {
-        headers: { Authorization: `Token ${TOKEN}` },
-        next: { revalidate: 60 },
-      }
-    )
+    const res = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${order.awb_number}`, {
+      headers: { Authorization: `Token ${TOKEN}` },
+      next: { revalidate: 60 },
+    })
 
     if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
 
@@ -74,10 +68,10 @@ export async function GET(
     const newShipmentStatus = resolveShipmentStatus(rawStatusType, scans)
 
     if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
-      await query(
-        `UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`,
-        [id, newShipmentStatus]
-      ).catch(() => {})
+      await query(`UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`, [
+        id,
+        newShipmentStatus,
+      ]).catch(() => {})
     }
 
     return NextResponse.json({

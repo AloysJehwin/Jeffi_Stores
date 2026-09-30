@@ -29,14 +29,15 @@ export async function POST(request: NextRequest) {
 
   // Verify the owner owns this tenant.
   const tenants = await getOwnerTenants(owner.id)
-  const tenant = tenants.find((t) => t.id === tenantId)
+  const tenant = tenants.find(t => t.id === tenantId)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
-  if (!tenant.razorpay_subscription_id) return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
+  if (!tenant.razorpay_subscription_id)
+    return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
 
   // Determine upgrade vs downgrade by comparing plan tiers.
   const plans = await listPlans()
-  const currentPlan = plans.find((p) => p.slug === tenant.plan)
-  const newPlan = plans.find((p) => p.slug === planSlug)
+  const currentPlan = plans.find(p => p.slug === tenant.plan)
+  const newPlan = plans.find(p => p.slug === planSlug)
   if (!newPlan) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
 
   const currentTier = currentPlan?.tier ?? 1
@@ -48,7 +49,9 @@ export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
   const callbackUrl = `${baseUrl}/dashboard/billing?upgraded=1`
 
-  const isUpgrade = newTier > currentTier || (newTier === currentTier && billingInterval === 'yearly' && (tenant.billing_interval ?? 'monthly') === 'monthly')
+  const isUpgrade =
+    newTier > currentTier ||
+    (newTier === currentTier && billingInterval === 'yearly' && (tenant.billing_interval ?? 'monthly') === 'monthly')
 
   if (isUpgrade) {
     // Cancel old sub + create new sub immediately with prorated credit.
@@ -73,8 +76,12 @@ export async function POST(request: NextRequest) {
     // Re-apply DNS to match the new (higher) tier — adds the tier's extra subdomains.
     // DNS-only; never recreates infra. Non-fatal if it fails (drift sweep would catch it).
     await triggerProvisioning({
-      action: 'reprovision', tenantId, slug: tenant.slug, plan: planSlug,
-      ownerId: owner.id, reason: 'plan_change',
+      action: 'reprovision',
+      tenantId,
+      slug: tenant.slug,
+      plan: planSlug,
+      ownerId: owner.id,
+      reason: 'plan_change',
     }).catch(() => {})
 
     return NextResponse.json({
@@ -97,8 +104,12 @@ export async function POST(request: NextRequest) {
     // Re-apply DNS to match the new (lower) tier — removes the higher-tier subdomains now
     // (D1: immediate, single path for up- and downgrades). DNS-only; never touches infra.
     await triggerProvisioning({
-      action: 'reprovision', tenantId, slug: tenant.slug, plan: planSlug,
-      ownerId: owner.id, reason: 'plan_change',
+      action: 'reprovision',
+      tenantId,
+      slug: tenant.slug,
+      plan: planSlug,
+      ownerId: owner.id,
+      reason: 'plan_change',
     }).catch(() => {})
 
     return NextResponse.json({

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchRank } from '@/lib/search'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import {
+  VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
+  VARIANT_MIN_MRP_SQL,
+  VARIANT_STOCK_TOTAL_SQL,
+} from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/site-controls'
 
 const PAGE_SIZE = 21

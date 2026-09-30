@@ -16,7 +16,11 @@ function isSameOriginRequest(request: NextRequest): boolean {
   const expected = new Set([`https://${host}`, `http://${host}`])
   if (origin && expected.has(origin)) return true
   if (referer) {
-    try { return new URL(referer).host === host } catch { return false }
+    try {
+      return new URL(referer).host === host
+    } catch {
+      return false
+    }
   }
   return false
 }

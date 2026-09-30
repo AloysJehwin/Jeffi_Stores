@@ -7,7 +7,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const form = await queryOne('SELECT * FROM review_forms WHERE id = $1', [id])
   if (!form) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -18,10 +19,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const fields = ['title', 'slug', 'description', 'template_type', 'google_review_url', 'coupon_id', 'is_active', 'is_draft', 'custom_fields']
+  const fields = [
+    'title',
+    'slug',
+    'description',
+    'template_type',
+    'google_review_url',
+    'coupon_id',
+    'is_active',
+    'is_draft',
+    'custom_fields',
+  ]
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -47,7 +59,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   await queryOne('DELETE FROM review_forms WHERE id = $1', [id])
   return NextResponse.json({ success: true })

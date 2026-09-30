@@ -3,10 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { deleteGalleryImage } from '@/lib/s3'
 import { queryOne, query } from '@/lib/db'
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

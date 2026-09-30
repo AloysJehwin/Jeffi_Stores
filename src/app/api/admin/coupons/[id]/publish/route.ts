@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // POST — publish draft to live
 export async function POST(req: NextRequest, { params }: Params) {
@@ -15,7 +17,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const draft = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
-    `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`, [id]
+    `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
+    [id]
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
@@ -38,11 +41,17 @@ export async function POST(req: NextRequest, { params }: Params) {
        is_active = COALESCE($12::boolean, is_active)
      WHERE id = $1`,
     [
-      id, f.code || null, f.description ?? null, f.discount_type || null,
+      id,
+      f.code || null,
+      f.description ?? null,
+      f.discount_type || null,
       f.discount_value != null ? f.discount_value : null,
-      f.min_purchase_amount ?? null, f.max_discount_amount ?? null,
-      f.usage_limit ?? null, f.usage_limit_per_user ?? null,
-      f.valid_from || null, f.valid_until || null,
+      f.min_purchase_amount ?? null,
+      f.max_discount_amount ?? null,
+      f.usage_limit ?? null,
+      f.usage_limit_per_user ?? null,
+      f.valid_from || null,
+      f.valid_until || null,
       f.is_active != null ? f.is_active : null,
     ]
   )

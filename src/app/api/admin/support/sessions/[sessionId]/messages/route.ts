@@ -5,15 +5,13 @@ import { queryMany, queryOne } from '@/lib/db'
 import { sendAgentConnectedEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
     const { sessionId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const messages = await queryMany(
       `SELECT id, sender, message, created_at FROM support_messages
@@ -28,15 +26,13 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
     const { sessionId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const session = await queryOne<{ id: string; admin_name: string | null; user_id: string }>(
       `SELECT id, admin_name, user_id FROM support_sessions WHERE id = $1 AND status = 'open'`,
@@ -53,14 +49,13 @@ export async function POST(
 
     const isFirstAgentMessage = !session.admin_name
 
-    const adminDisplayName = (admin.first_name && admin.last_name)
-      ? `${admin.first_name} ${admin.last_name}`
-      : (admin.email || 'Support')
+    const adminDisplayName =
+      admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email || 'Support'
 
-    await queryOne(
-      `UPDATE support_sessions SET admin_name = COALESCE(admin_name, $1) WHERE id = $2`,
-      [adminDisplayName, sessionId]
-    )
+    await queryOne(`UPDATE support_sessions SET admin_name = COALESCE(admin_name, $1) WHERE id = $2`, [
+      adminDisplayName,
+      sessionId,
+    ])
 
     const msg = await queryOne(
       `INSERT INTO support_messages (session_id, sender, message)
@@ -90,7 +85,9 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ message: { ...msg, sender_name: adminDisplayName, is_closing: isClosingMessage || false } })
+    return NextResponse.json({
+      message: { ...msg, sender_name: adminDisplayName, is_closing: isClosingMessage || false },
+    })
   } catch (err) {
     console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
     const offsetIdx = queryParams.length
 
     const [orders, total] = await Promise.all([
-      queryMany(`
+      queryMany(
+        `
         SELECT
           o.id, o.order_number, o.created_at, o.status, o.payment_status, o.payment_mode,
           o.total_amount, o.subtotal, o.shipping_address_id,
@@ -87,7 +88,9 @@ export async function GET(request: NextRequest) {
         ${whereClause}
         ORDER BY o.created_at DESC
         LIMIT $${limitIdx} OFFSET $${offsetIdx}
-      `, queryParams),
+      `,
+        queryParams
+      ),
       queryCount(countClause, countParams),
     ])
 

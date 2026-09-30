@@ -8,10 +8,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const rfq = await queryOne<any>(
-      `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-      [id, user.userId]
-    )
+    const rfq = await queryOne<any>(`SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`, [
+      id,
+      user.userId,
+    ])
     if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!['negotiating', 'reviewed', 'pending'].includes(rfq.status)) {
       return NextResponse.json({ error: 'No active offer to respond to' }, { status: 400 })
@@ -29,7 +29,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
       for (const ci of counter_items) {
         if (!ci.rfq_item_id || ci.offered_price == null || Number(ci.offered_price) < 0) {
-          return NextResponse.json({ error: 'Each counter item needs rfq_item_id and a non-negative offered_price' }, { status: 400 })
+          return NextResponse.json(
+            { error: 'Each counter item needs rfq_item_id and a non-negative offered_price' },
+            { status: 400 }
+          )
         }
       }
       if (counter_items.length > 0) {
@@ -48,9 +51,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    const systemMessage = action === 'accept'
-      ? (message?.trim() || 'Offer accepted. Please proceed with the quotation.')
-      : (message?.trim() || (validatedCounter ? 'Sending a counter offer for your review.' : 'Offer declined. I would like to continue negotiating.'))
+    const systemMessage =
+      action === 'accept'
+        ? message?.trim() || 'Offer accepted. Please proceed with the quotation.'
+        : message?.trim() ||
+          (validatedCounter
+            ? 'Sending a counter offer for your review.'
+            : 'Offer declined. I would like to continue negotiating.')
 
     await query(
       `INSERT INTO rfq_messages (rfq_id, sender, message, counter_items)
@@ -58,10 +65,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [id, systemMessage, validatedCounter ? JSON.stringify(validatedCounter) : null]
     )
 
-    await query(
-      `UPDATE business_rfqs SET status = $1 WHERE id = $2`,
-      [action === 'accept' ? 'offer_accepted' : 'negotiating', id]
-    )
+    await query(`UPDATE business_rfqs SET status = $1 WHERE id = $2`, [
+      action === 'accept' ? 'offer_accepted' : 'negotiating',
+      id,
+    ])
 
     // When customer accepts, stamp the agreed prices onto the RFQ items
     if (action === 'accept') {
@@ -77,10 +84,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           : JSON.parse(latestOffer.counter_items)
         for (const entry of ci) {
           if (entry.rfq_item_id && entry.offered_price != null) {
-            await query(
-              `UPDATE business_rfq_items SET requested_price = $1 WHERE id = $2 AND rfq_id = $3`,
-              [Number(entry.offered_price), entry.rfq_item_id, id]
-            )
+            await query(`UPDATE business_rfq_items SET requested_price = $1 WHERE id = $2 AND rfq_id = $3`, [
+              Number(entry.offered_price),
+              entry.rfq_item_id,
+              id,
+            ])
           }
         }
       }

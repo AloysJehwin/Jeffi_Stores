@@ -6,7 +6,12 @@ import { storeDescriptorForPrompt } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
-interface CartLine { name?: string; category?: string | null; brand?: string | null; qty?: number }
+interface CartLine {
+  name?: string
+  category?: string | null
+  brand?: string | null
+  qty?: number
+}
 
 // Server-side (Ollama on the Razer box) fallback for the on-device checkout recap.
 // Used when the in-browser model is disabled/unsupported on the device (e.g. mobile).
@@ -18,7 +23,11 @@ export async function POST(request: NextRequest) {
   if (blocked) return blocked
 
   let body: { cart?: CartLine[]; total?: number | null; itemCount?: number | null }
-  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
   const cart = Array.isArray(body.cart) ? body.cart.slice(0, 12) : []
   if (cart.length === 0) return NextResponse.json({ error: 'cart required' }, { status: 400 })
@@ -32,7 +41,9 @@ export async function POST(request: NextRequest) {
   const summary = [
     body.itemCount != null ? `${body.itemCount} items` : null,
     body.total != null ? `total Rs.${Number(body.total).toFixed(2)}` : null,
-  ].filter(Boolean).join(', ')
+  ]
+    .filter(Boolean)
+    .join(', ')
 
   const prompt =
     `You are a friendly shopping assistant for ${await storeDescriptorForPrompt()}. ` +

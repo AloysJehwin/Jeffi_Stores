@@ -16,7 +16,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (user.approvalStatus !== 'approved') return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
+  if (user.approvalStatus !== 'approved')
+    return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
 
   const source = await queryOne<any>(
     `SELECT id, rfq_number, status, notes FROM business_rfqs WHERE id = $1 AND user_id = $2`,
@@ -42,7 +43,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const baseNote = `Resubmitted from ${source.rfq_number}`
   const combinedNotes = additionalNotes
     ? `${baseNote}\n\n${additionalNotes}`
-    : (source.notes ? `${baseNote}\n\n${source.notes}` : baseNote)
+    : source.notes
+      ? `${baseNote}\n\n${source.notes}`
+      : baseNote
 
   const now = new Date()
   const month = now.getMonth()
@@ -69,7 +72,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await query(
       `INSERT INTO business_rfq_items (rfq_id, product_id, variant_id, sub_variant_id, description, quantity, unit, requested_price, notes, position)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [newRfq!.id, it.product_id, it.variant_id, it.sub_variant_id, it.description, it.quantity, it.unit, it.requested_price, it.notes, idx]
+      [
+        newRfq!.id,
+        it.product_id,
+        it.variant_id,
+        it.sub_variant_id,
+        it.description,
+        it.quantity,
+        it.unit,
+        it.requested_price,
+        it.notes,
+        idx,
+      ]
     )
   }
 

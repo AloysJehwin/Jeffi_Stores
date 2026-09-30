@@ -7,7 +7,9 @@ import { publishProductDraft, openOrdersForProduct } from '@/lib/product-draft'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
@@ -26,9 +28,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!draft) {
       // Create-draft (is_draft=true, no product_drafts edit-draft): publish by flipping the flags
       // directly, mirroring brands/coupons. Open-order block still applies.
-      const createDraft = await queryOne<{ id: string }>(
-        `SELECT id FROM products WHERE id = $1 AND is_draft = true`, [id]
-      )
+      const createDraft = await queryOne<{ id: string }>(`SELECT id FROM products WHERE id = $1 AND is_draft = true`, [
+        id,
+      ])
       if (!createDraft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
       const blockingCd = await openOrdersForProduct(id)

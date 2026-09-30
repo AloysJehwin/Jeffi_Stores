@@ -7,21 +7,16 @@ import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem 
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { id } = await params
 
-    const sale = await queryOne<any>(
-      `SELECT * FROM cash_sales WHERE id = $1`,
-      [id]
-    )
+    const sale = await queryOne<any>(`SELECT * FROM cash_sales WHERE id = $1`, [id])
     if (!sale) return NextResponse.json({ error: 'Sale not found' }, { status: 404 })
 
     const [saleItems, settingsRows] = await Promise.all([
@@ -30,7 +25,7 @@ export async function GET(
     ])
 
     const settings: Record<string, string> = {}
-    for (const row of (settingsRows || [])) {
+    for (const row of settingsRows || []) {
       settings[row.key] = row.value || ''
     }
 

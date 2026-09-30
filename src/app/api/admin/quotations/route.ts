@@ -49,7 +49,7 @@ async function validateLineItemQty(
 function calcTotals(items: any[], gstEnabled: boolean = true) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
   // GST off ⇒ quotation shows no tax; total equals the ex-GST subtotal.
-  const cgst = gstEnabled ? items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0) : 0
+  const cgst = gstEnabled ? items.reduce((s: number, i: any) => s + (i.amount * i.gst_rate) / 200, 0) : 0
   const sgst = cgst
   const rawTotal = subtotal + cgst + sgst
   const total = round2(rawTotal)
@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || ''
@@ -106,24 +107,34 @@ export async function GET(request: NextRequest) {
 
     // Whitelisted server-side sort (columns/aliases available in the SELECT below).
     const SORT_COLS: Record<string, string> = {
-      quote_number: 'quote_number', quote_date: 'quote_date', consignee_name: 'consignee_name',
-      total_amount: 'total_amount', status: 'status',
+      quote_number: 'quote_number',
+      quote_date: 'quote_date',
+      consignee_name: 'consignee_name',
+      total_amount: 'total_amount',
+      status: 'status',
     }
     const sortCol = SORT_COLS[searchParams.get('sort') || ''] || null
     const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = sortCol
-      ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC`
-      : `ORDER BY created_at DESC`
+    const orderBy = sortCol ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC` : `ORDER BY created_at DESC`
 
-    if (status) { conditions.push(`status = $${i++}`); params.push(status) }
+    if (status) {
+      conditions.push(`status = $${i++}`)
+      params.push(status)
+    }
     if (q) {
       const sc = buildVectorSearchClause(q, 'search_vector', ['consignee_name'], ['quote_number'], i, 'simple')
       conditions.push(sc.clause)
       params.push(...sc.params)
       i = sc.nextIdx
     }
-    if (from) { conditions.push(`quote_date >= $${i++}`); params.push(from) }
-    if (to) { conditions.push(`quote_date <= $${i++}`); params.push(to) }
+    if (from) {
+      conditions.push(`quote_date >= $${i++}`)
+      params.push(from)
+    }
+    if (to) {
+      conditions.push(`quote_date <= $${i++}`)
+      params.push(to)
+    }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
 
@@ -161,7 +172,8 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 
@@ -174,7 +186,8 @@ export async function POST(request: NextRequest) {
 
     const computedItems = items.map((item: any) => ({
       ...item,
-      amount: Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
+      amount:
+        Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
     }))
     const { gstEnabled } = await getFeatureFlags()
     const totals = calcTotals(computedItems, gstEnabled)
@@ -242,20 +255,31 @@ export async function POST(request: NextRequest) {
         `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, base_quantity, rate, discount_pct, amount, product_id, variant_id, sub_variant_id, variant_name, sub_variant_name)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
         [
-          qt!.id, idx,
-          item.description, item.hsn_code || null, gstEnabled ? (Number(item.gst_rate) || 18) : 0,
-          Number(item.quantity), item.unit || 'PCS', item.buy_unit || null,
+          qt!.id,
+          idx,
+          item.description,
+          item.hsn_code || null,
+          gstEnabled ? Number(item.gst_rate) || 18 : 0,
+          Number(item.quantity),
+          item.unit || 'PCS',
+          item.buy_unit || null,
           item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
           item.sell_unit_factor && item.sell_unit_factor > 1 ? Number(item.quantity) * item.sell_unit_factor : null,
           Number(item.rate),
-          Number(item.discount_pct) || 0, item.amount,
-          item.product_id || null, item.variant_id || null, item.sub_variant_id || null,
-          item.variant_name || null, item.sub_variant_name || null,
+          Number(item.discount_pct) || 0,
+          item.amount,
+          item.product_id || null,
+          item.variant_id || null,
+          item.sub_variant_id || null,
+          item.variant_name || null,
+          item.sub_variant_name || null,
         ]
       )
     }
 
-    const savedItems = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [qt!.id])
+    const savedItems = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [
+      qt!.id,
+    ])
     return NextResponse.json({ quotation: qt, items: savedItems }, { status: 201 })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to create quotation' }, { status: 500 })

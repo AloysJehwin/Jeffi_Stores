@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // POST — publish draft to live
 export async function POST(req: NextRequest, { params }: Params) {
@@ -15,7 +17,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const draft = await queryOne<{ supplier_id: string; fields: Record<string, unknown> }>(
-    `SELECT supplier_id, fields FROM supplier_drafts WHERE supplier_id = $1`, [id]
+    `SELECT supplier_id, fields FROM supplier_drafts WHERE supplier_id = $1`,
+    [id]
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
   const f = draft.fields as any
@@ -26,10 +29,22 @@ export async function POST(req: NextRequest, { params }: Params) {
        is_active=COALESCE($13::boolean, is_active),
        updated_at=NOW()
      WHERE id=$14`,
-    [f.name, f.gstin || null, f.contact_name || null, f.phone || null, f.email || null,
-     f.address || null, f.payment_terms != null ? parseInt(f.payment_terms) : null,
-     f.notes || null, f.bank_name || null, f.account_number || null, f.ifsc || null, f.upi_id || null,
-     f.is_active != null ? f.is_active : null, id]
+    [
+      f.name,
+      f.gstin || null,
+      f.contact_name || null,
+      f.phone || null,
+      f.email || null,
+      f.address || null,
+      f.payment_terms != null ? parseInt(f.payment_terms) : null,
+      f.notes || null,
+      f.bank_name || null,
+      f.account_number || null,
+      f.ifsc || null,
+      f.upi_id || null,
+      f.is_active != null ? f.is_active : null,
+      id,
+    ]
   )
   await query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [id])
   return NextResponse.json({ success: true })

@@ -8,16 +8,18 @@ import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
   const brand = await currentBrandNameAsync()
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   // Writing to a customer by hand is the mailer module. The route lives under /orders/, which
   // every plan has, so without this check the plan restriction could be bypassed from here.
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
+    return NextResponse.json({ error: 'Custom customer emails are not included in your plan.' }, { status: 403 })
 
   const { subject, body } = await request.json().catch(() => ({}))
 

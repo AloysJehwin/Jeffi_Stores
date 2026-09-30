@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
   const appId = process.env.AMAZON_LWA_APP_CLIENT_ID
   if (!appId) return NextResponse.json({ error: 'Amazon OAuth not configured' }, { status: 503 })
 
-  const state = signAdminState({ tenantId: tenant.tenantId, provider: 'amazon_seller', nonce: crypto.randomBytes(8).toString('hex') })
+  const state = signAdminState({
+    tenantId: tenant.tenantId,
+    provider: 'amazon_seller',
+    nonce: crypto.randomBytes(8).toString('hex'),
+  })
 
   const url = new URL('https://sellercentral.amazon.com/apps/authorize/consent')
   url.searchParams.set('application_id', appId)

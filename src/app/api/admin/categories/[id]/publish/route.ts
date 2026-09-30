@@ -5,7 +5,9 @@ import { queryOne, query, withTransaction } from '@/lib/db'
 import type { PoolClient } from 'pg'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
@@ -16,19 +18,21 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const draft = await queryOne<{ category_id: string; fields: Record<string, unknown> }>(
-    `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`, [id]
+    `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`,
+    [id]
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 
   const f = draft.fields as any
-  const prevIsActive = await queryOne<{ is_active: boolean }>(
-    `SELECT is_active FROM categories WHERE id = $1`, [id]
-  )
+  const prevIsActive = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM categories WHERE id = $1`, [id])
 
   try {
     await withTransaction(async (client: PoolClient) => {
       const slug = f.name
-        ? f.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        ? f.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '')
         : null
 
       await client.query(
@@ -68,22 +72,16 @@ export async function POST(req: NextRequest, { params }: Params) {
 
       // Cascade is_active change to products and subcategories
       if (f.is_active != null && f.is_active !== prevIsActive?.is_active) {
-        await client.query(
-          `UPDATE products SET is_active = $1 WHERE category_id = $2`,
-          [f.is_active, id]
-        )
-        const subcats = await client.query<{ id: string }>(
-          `SELECT id FROM categories WHERE parent_category_id = $1`, [id]
-        )
+        await client.query(`UPDATE products SET is_active = $1 WHERE category_id = $2`, [f.is_active, id])
+        const subcats = await client.query<{ id: string }>(`SELECT id FROM categories WHERE parent_category_id = $1`, [
+          id,
+        ])
         for (const sub of subcats.rows) {
-          await client.query(
-            `UPDATE categories SET is_active = $1, updated_at = NOW() WHERE id = $2`,
-            [f.is_active, sub.id]
-          )
-          await client.query(
-            `UPDATE products SET is_active = $1 WHERE category_id = $2`,
-            [f.is_active, sub.id]
-          )
+          await client.query(`UPDATE categories SET is_active = $1, updated_at = NOW() WHERE id = $2`, [
+            f.is_active,
+            sub.id,
+          ])
+          await client.query(`UPDATE products SET is_active = $1 WHERE category_id = $2`, [f.is_active, sub.id])
         }
       }
 

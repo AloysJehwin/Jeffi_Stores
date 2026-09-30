@@ -12,7 +12,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.address_line2, a.city, a.state, a.postal_code
@@ -23,7 +24,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
-    const items = await queryMany<any>(`
+    const items = await queryMany<any>(
+      `
       SELECT oi.*,
         COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
       FROM order_items oi
@@ -32,7 +34,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       LEFT JOIN products p ON p.id = oi.product_id AND oi.variant_id IS NULL AND oi.sub_variant_id IS NULL
       WHERE oi.order_id = $1
       ORDER BY oi.created_at ASC
-    `, [id])
+    `,
+      [id]
+    )
 
     return NextResponse.json({ order, items })
   } catch (err: any) {
@@ -45,17 +49,28 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-    if (order.status !== 'draft') return NextResponse.json({ error: 'Only drafts can be updated this way' }, { status: 400 })
+    if (order.status !== 'draft')
+      return NextResponse.json({ error: 'Only drafts can be updated this way' }, { status: 400 })
 
     const body = await request.json()
     const {
-      customerName, customerPhone, customerEmail,
-      addressLine1, addressLine2, city, state, postalCode,
-      buyerGstin, paymentMode, notes, items,
+      customerName,
+      customerPhone,
+      customerEmail,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      buyerGstin,
+      paymentMode,
+      notes,
+      items,
     } = body
 
     if (!customerName) {
@@ -109,7 +124,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
     const totalAmount = round2(subtotal)
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       await client.query(
         `UPDATE orders SET
           customer_name = $1, customer_phone = $2, customer_email = $3,
@@ -120,12 +135,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           updated_at = NOW()
         WHERE id = $15`,
         [
-          customerName, customerPhone || null, customerEmail || null,
-          buyerGstin || null, orderIsIgst,
-          subtotal, taxAmount, round2(totalTaxable),
-          round2(totalCgst), round2(totalSgst), round2(totalIgst),
-          totalAmount, paymentMode === 'credit' ? 'unpaid' : 'paid',
-          notes || null, id,
+          customerName,
+          customerPhone || null,
+          customerEmail || null,
+          buyerGstin || null,
+          orderIsIgst,
+          subtotal,
+          taxAmount,
+          round2(totalTaxable),
+          round2(totalCgst),
+          round2(totalSgst),
+          round2(totalIgst),
+          totalAmount,
+          paymentMode === 'credit' ? 'unpaid' : 'paid',
+          notes || null,
+          id,
         ]
       )
 
@@ -147,11 +171,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
           [
-            id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.sub_variant_id, item.variant_name, item.sub_variant_name ?? null,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price, item.mrp,
-            item.tax_amount, item.total_price, item.taxable_amount,
-            item.cgst_amount, item.sgst_amount, item.igst_amount,
+            id,
+            item.product_id,
+            item.product_name,
+            item.product_sku,
+            item.variant_id,
+            item.sub_variant_id,
+            item.variant_name,
+            item.sub_variant_name ?? null,
+            item.hsn_code,
+            item.gst_rate,
+            item.quantity,
+            item.unit_price,
+            item.mrp,
+            item.tax_amount,
+            item.total_price,
+            item.taxable_amount,
+            item.cgst_amount,
+            item.sgst_amount,
+            item.igst_amount,
           ]
         )
       }
@@ -168,15 +206,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     if (order.status !== 'draft') return NextResponse.json({ error: 'Only drafts can be deleted' }, { status: 400 })
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
-      await client.query(`DELETE FROM addresses WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $1)`, [id])
+      await client.query(`DELETE FROM addresses WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $1)`, [
+        id,
+      ])
       await client.query(`DELETE FROM orders WHERE id = $1`, [id])
     })
 

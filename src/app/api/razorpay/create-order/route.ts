@@ -4,12 +4,7 @@ import { query, queryOne, resolveRequestTenant } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
-import {
-  loadActiveCart,
-  cartSubtotal,
-  cartItemsForHash,
-  validateCouponForUser,
-} from '@/lib/order-commit'
+import { loadActiveCart, cartSubtotal, cartItemsForHash, validateCouponForUser } from '@/lib/order-commit'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
@@ -61,7 +56,10 @@ async function handleDraftToken(token: string, userId: string) {
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     const hash = hashCartItems(cartItemsForHash(cart))
     if (draft.cartHash && draft.cartHash !== hash) {
-      return NextResponse.json({ error: 'Cart changed since checkout was started. Please review and try again.' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'Cart changed since checkout was started. Please review and try again.' },
+        { status: 409 }
+      )
     }
     subtotal = cartSubtotal(cart, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
@@ -76,7 +74,10 @@ async function handleDraftToken(token: string, userId: string) {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const total = Math.max(0, subtotal - appliedDiscount - (draft.businessDiscountAmount || 0) + (draft.shippingAmount || 0))
+  const total = Math.max(
+    0,
+    subtotal - appliedDiscount - (draft.businessDiscountAmount || 0) + (draft.shippingAmount || 0)
+  )
   const amountInPaise = Math.round(total * 100)
   if (amountInPaise <= 0) {
     return NextResponse.json({ error: 'Order total must be greater than zero' }, { status: 400 })
@@ -167,12 +168,7 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
      VALUES ($1, 'razorpay', 'razorpay', $2, $3, 'pending', $4)
      ON CONFLICT (transaction_id) DO NOTHING
      RETURNING id`,
-    [
-      order.id,
-      razorpayOrder.id,
-      order.total_amount,
-      JSON.stringify({ razorpay_order_id: razorpayOrder.id }),
-    ]
+    [order.id, razorpayOrder.id, order.total_amount, JSON.stringify({ razorpay_order_id: razorpayOrder.id })]
   )
 
   return NextResponse.json({

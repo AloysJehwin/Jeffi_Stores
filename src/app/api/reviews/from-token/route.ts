@@ -21,10 +21,10 @@ export async function GET(request: NextRequest) {
   )
   if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
 
-  const existing = await queryOne(
-    'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
-    [payload.productId, payload.userId]
-  )
+  const existing = await queryOne('SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2', [
+    payload.productId,
+    payload.userId,
+  ])
 
   return NextResponse.json({
     productId: product.id,
@@ -50,18 +50,18 @@ export async function POST(request: NextRequest) {
 
   const { orderId, productId, userId } = payload
 
-  const existing = await queryOne(
-    'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
-    [productId, userId]
-  )
+  const existing = await queryOne('SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2', [
+    productId,
+    userId,
+  ])
   if (existing) {
     return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
   }
 
-  const orderCheck = await queryOne(
-    `SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND status = 'delivered'`,
-    [orderId, userId]
-  )
+  const orderCheck = await queryOne(`SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND status = 'delivered'`, [
+    orderId,
+    userId,
+  ])
   if (!orderCheck) {
     return NextResponse.json({ error: 'Order not found or not delivered' }, { status: 400 })
   }

@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
     const [products, categories] = await Promise.all([
-      queryMany(`
+      queryMany(
+        `
         SELECT
           p.id, p.name, p.slug, p.base_price, p.price_ex_gst, p.has_variants,
           json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -42,13 +43,18 @@ export async function GET(request: NextRequest) {
           AND ${sc.clause}
         ORDER BY ${rk.rank}, p.name ASC
         LIMIT 6
-      `, [...sc.params, ...rk.params]),
-      queryMany(`
+      `,
+        [...sc.params, ...rk.params]
+      ),
+      queryMany(
+        `
         SELECT id, name, slug FROM categories
         WHERE ${catSc.clause}
         ORDER BY name ASC
         LIMIT 3
-      `, catSc.params),
+      `,
+        catSc.params
+      ),
     ])
 
     const productsArr = products || []
@@ -60,10 +66,12 @@ export async function GET(request: NextRequest) {
         const sessionId = cookieStore.get('session_id')?.value || null
         const authUser = await authenticateUser(request)
         const userId = authUser?.userId ?? null
-        await query(
-          `INSERT INTO search_logs (query, results_count, user_id, session_id) VALUES ($1, $2, $3, $4)`,
-          [q.slice(0, 200), productsArr.length + categoriesArr.length, userId, sessionId]
-        )
+        await query(`INSERT INTO search_logs (query, results_count, user_id, session_id) VALUES ($1, $2, $3, $4)`, [
+          q.slice(0, 200),
+          productsArr.length + categoriesArr.length,
+          userId,
+          sessionId,
+        ])
       } catch {}
     })()
 

@@ -33,13 +33,16 @@ function reschedule(tenantId: string, delayMs: number): void {
 /** Create the owner super_admin + mTLS cert in the freshly provisioned tenant DB. Idempotent;
  * safe to call once the job is done (tenant RDS now exists). No-op if already created. */
 async function fireOwnerAdmin(tenantId: string): Promise<void> {
-  const row = await controlPlanePool().query(
-    `SELECT o.email, o.name, t.slug
+  const row = await controlPlanePool()
+    .query(
+      `SELECT o.email, o.name, t.slug
      FROM owner_tenants ot
      JOIN owners o ON o.id = ot.owner_id
      JOIN tenants t ON t.id = ot.tenant_id
-     WHERE ot.tenant_id = $1 LIMIT 1`, [tenantId],
-  ).catch(() => null)
+     WHERE ot.tenant_id = $1 LIMIT 1`,
+      [tenantId]
+    )
+    .catch(() => null)
   const r = row?.rows[0]
   if (!r) return
   // Never silently: this is the step that creates the owner's admin account, issues their mTLS
@@ -59,7 +62,9 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
     try {
       const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'owner_admin_cert', res.error ?? 'unknown error')
-    } catch { /* alerting must never mask the original failure */ }
+    } catch {
+      /* alerting must never mask the original failure */
+    }
   }
 
   // The tenant CA now exists; refresh the fleet's client-CA bundle + reload nginx so this
@@ -75,7 +80,9 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
     try {
       const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
       await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
-    } catch { /* alerting must never mask the original failure */ }
+    } catch {
+      /* alerting must never mask the original failure */
+    }
   }
 }
 

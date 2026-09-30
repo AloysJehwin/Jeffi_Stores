@@ -6,11 +6,19 @@ import { hasScope } from '@/lib/scopes'
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'controls:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const logs = await queryMany<{
-    id: string; operation: string; product_count: number; applied_by: string | null
-    applied_at: string; rolled_back_at: string | null; is_rollback: boolean; value: any; snapshot: any
+    id: string
+    operation: string
+    product_count: number
+    applied_by: string | null
+    applied_at: string
+    rolled_back_at: string | null
+    is_rollback: boolean
+    value: any
+    snapshot: any
   }>(
     `SELECT id, operation, product_count, applied_by, applied_at, rolled_back_at, is_rollback, value, snapshot
      FROM controls_operation_log
@@ -26,20 +34,23 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'controls:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { log_id } = await request.json()
   if (!log_id) return NextResponse.json({ error: 'log_id required' }, { status: 400 })
 
   const logRes = await query<{
-    id: string; operation: string; snapshot: any; rolled_back_at: string | null; is_rollback: boolean
-  }>(
-    `SELECT id, operation, snapshot, rolled_back_at, is_rollback FROM controls_operation_log WHERE id = $1`,
-    [log_id]
-  )
+    id: string
+    operation: string
+    snapshot: any
+    rolled_back_at: string | null
+    is_rollback: boolean
+  }>(`SELECT id, operation, snapshot, rolled_back_at, is_rollback FROM controls_operation_log WHERE id = $1`, [log_id])
   const log = logRes.rows[0]
   if (!log) return NextResponse.json({ error: 'Log entry not found' }, { status: 404 })
-  if (log.rolled_back_at) return NextResponse.json({ error: 'This operation has already been rolled back' }, { status: 409 })
+  if (log.rolled_back_at)
+    return NextResponse.json({ error: 'This operation has already been rolled back' }, { status: 409 })
   if (log.is_rollback) return NextResponse.json({ error: 'Cannot roll back a rollback entry' }, { status: 409 })
 
   const raw = log.snapshot ?? null
@@ -72,18 +83,18 @@ export async function POST(request: NextRequest) {
   const operation: string = log.operation
 
   const SIMPLE_FIELD_MAP: Record<string, string[]> = {
-    set_tax_class:         ['tax_class'],
-    set_condition:         ['condition'],
-    set_shipping_class:    ['shipping_class'],
-    set_handling_days:     ['handling_days'],
-    set_warranty_months:   ['warranty_months'],
-    set_target_gender:     ['target_gender'],
-    set_grade:             ['grade'],
-    set_hsn_code:          ['hsn_code'],
+    set_tax_class: ['tax_class'],
+    set_condition: ['condition'],
+    set_shipping_class: ['shipping_class'],
+    set_handling_days: ['handling_days'],
+    set_warranty_months: ['warranty_months'],
+    set_target_gender: ['target_gender'],
+    set_grade: ['grade'],
+    set_hsn_code: ['hsn_code'],
     set_country_of_origin: ['country_of_origin'],
-    set_featured:          ['is_featured'],
-    set_searchable:        ['is_searchable'],
-    set_active:            ['is_active'],
+    set_featured: ['is_featured'],
+    set_searchable: ['is_searchable'],
+    set_active: ['is_active'],
   }
 
   let restored = 0
@@ -95,16 +106,16 @@ export async function POST(request: NextRequest) {
       const fields = Object.keys(b)
       if (!fields.length) continue
       const sets = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
-      await client.query(
-        `UPDATE ${table} SET ${sets}, updated_at = NOW() WHERE id = $1`,
-        [row.id, ...fields.map(f => b[f])]
-      )
+      await client.query(`UPDATE ${table} SET ${sets}, updated_at = NOW() WHERE id = $1`, [
+        row.id,
+        ...fields.map(f => b[f]),
+      ])
       restored++
     }
   }
 
   try {
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       if (['inflate_price', 'set_discount', 'set_mrp_ex_gst'].includes(operation)) {
         await restoreRows(client, 'products', products)
         await restoreRows(client, 'product_variants', variants)
@@ -136,16 +147,13 @@ export async function POST(request: NextRequest) {
           const b = vu.before
           // Restore the simple varchar on the variant row
           const variantUnit = (b as any)?.variant_unit ?? null
-          await client.query(
-            `UPDATE product_variants SET unit = $1, updated_at = NOW() WHERE id = $2`,
-            [variantUnit, vu.variant_id]
-          )
+          await client.query(`UPDATE product_variants SET unit = $1, updated_at = NOW() WHERE id = $2`, [
+            variantUnit,
+            vu.variant_id,
+          ])
           if (!b || (b as any).unit == null) {
             // There was no base unit row before — remove any the operation created
-            await client.query(
-              `DELETE FROM product_units WHERE variant_id = $1 AND is_base = true`,
-              [vu.variant_id]
-            )
+            await client.query(`DELETE FROM product_units WHERE variant_id = $1 AND is_base = true`, [vu.variant_id])
           } else {
             const ub = b as any
             await client.query(
@@ -153,7 +161,17 @@ export async function POST(request: NextRequest) {
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false)
                ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL
                DO UPDATE SET factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, is_base=true, updated_at=NOW()`,
-              [vu.product_id, vu.variant_id, ub.unit, ub.factor, ub.dimension, ub.display_label, ub.min_qty, ub.max_qty, ub.qty_step]
+              [
+                vu.product_id,
+                vu.variant_id,
+                ub.unit,
+                ub.factor,
+                ub.dimension,
+                ub.display_label,
+                ub.min_qty,
+                ub.max_qty,
+                ub.qty_step,
+              ]
             )
           }
           restored++
@@ -165,17 +183,32 @@ export async function POST(request: NextRequest) {
         // was never deleted, so it's still valid). Sibling images are untouched.
         for (const snap of productImages) {
           for (const r of snap.rows) {
-            await client.query(
-              `DELETE FROM product_images WHERE product_id = $1 AND display_order = $2`,
-              [snap.product_id, r.display_order]
-            )
+            await client.query(`DELETE FROM product_images WHERE product_id = $1 AND display_order = $2`, [
+              snap.product_id,
+              r.display_order,
+            ])
             await client.query(
               `INSERT INTO product_images (
                  id, product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
                  file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-              [r.id, r.product_id, r.image_url, r.thumbnail_url, r.s3_bucket, r.s3_key, r.s3_thumbnail_key,
-               r.file_name, r.file_size, r.mime_type, r.width, r.height, r.alt_text, r.display_order, r.is_primary]
+              [
+                r.id,
+                r.product_id,
+                r.image_url,
+                r.thumbnail_url,
+                r.s3_bucket,
+                r.s3_key,
+                r.s3_thumbnail_key,
+                r.file_name,
+                r.file_size,
+                r.mime_type,
+                r.width,
+                r.height,
+                r.alt_text,
+                r.display_order,
+                r.is_primary,
+              ]
             )
           }
           restored++
@@ -193,7 +226,15 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [operation, affectedIds, null, JSON.stringify(raw), admin.email ?? null, admin.adminId ?? null, affectedIds.length]
+        [
+          operation,
+          affectedIds,
+          null,
+          JSON.stringify(raw),
+          admin.email ?? null,
+          admin.adminId ?? null,
+          affectedIds.length,
+        ]
       )
     })
 

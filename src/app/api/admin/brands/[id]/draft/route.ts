@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // POST — create a draft from the live brand (regardless of is_active).
 export async function POST(req: NextRequest, { params }: Params) {
@@ -18,9 +20,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const brand = await queryOne<{ id: string }>(`SELECT id FROM brands WHERE id = $1`, [id])
   if (!brand) return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
 
-  const existing = await queryOne<{ brand_id: string }>(
-    `SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [id]
-  )
+  const existing = await queryOne<{ brand_id: string }>(`SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [id])
   if (existing) {
     return NextResponse.json({ error: 'A draft already exists for this brand', brandId: id }, { status: 409 })
   }

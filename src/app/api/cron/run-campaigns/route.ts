@@ -41,10 +41,9 @@ export async function GET(req: NextRequest) {
         results.push(await runScenario(builtin, t.campaignKind))
         continue
       }
-      const isCustom = await queryOne<{ enabled: boolean }>(
-        `SELECT enabled FROM custom_scenarios WHERE kind = $1`,
-        [t.scenarioKind]
-      )
+      const isCustom = await queryOne<{ enabled: boolean }>(`SELECT enabled FROM custom_scenarios WHERE kind = $1`, [
+        t.scenarioKind,
+      ])
       if (isCustom?.enabled) {
         const campaign = await getCampaign(t.campaignKind)
         if (campaign) {

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       const cookieStore = await cookies()
       const token = cookieStore.get('user_sid')?.value
       if (token) {
-        const payload = await verifyToken(token) as any
+        const payload = (await verifyToken(token)) as any
         userId = payload?.userId || null
       }
     } catch {}

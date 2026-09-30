@@ -11,14 +11,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id: orderId, vcrId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const vcr = await queryOne<{ id: string; status: string }>(
       `SELECT id, status FROM variant_change_requests WHERE id = $1 AND order_id = $2`,
       [vcrId, orderId]
     )
     if (!vcr) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
-    if (vcr.status === 'applied') return NextResponse.json({ error: 'This change has already been applied.' }, { status: 400 })
+    if (vcr.status === 'applied')
+      return NextResponse.json({ error: 'This change has already been applied.' }, { status: 400 })
     if (vcr.status === 'cancelled' || vcr.status === 'rejected') {
       return NextResponse.json({ success: true, alreadyClosed: true })
     }

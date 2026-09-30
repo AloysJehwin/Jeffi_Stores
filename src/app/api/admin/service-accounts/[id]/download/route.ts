@@ -5,10 +5,7 @@ import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'service_accounts:write')) {
@@ -27,10 +24,9 @@ export async function GET(
   }
 
   // Mark downloaded and clear stored p12 (one-time only)
-  await query(
-    `UPDATE service_accounts SET p12_downloaded = true, p12_data = NULL, p12_password = NULL WHERE id = $1`,
-    [id]
-  )
+  await query(`UPDATE service_accounts SET p12_downloaded = true, p12_data = NULL, p12_password = NULL WHERE id = $1`, [
+    id,
+  ])
 
   return new NextResponse(new Uint8Array(sa.p12_data), {
     headers: {

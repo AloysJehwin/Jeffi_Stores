@@ -13,7 +13,9 @@ import { parseBody, zUuid } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 const MAX_IMAGES = 5
 const GalleryPostSchema = z.object({ gallery_image_id: zUuid })
@@ -25,24 +27,23 @@ const PatchSchema = z.object({
 })
 
 async function getStage(productId: string): Promise<any[]> {
-  const row = await queryOne<{ images: any[] }>(
-    `SELECT images FROM product_drafts WHERE product_id = $1`, [productId]
-  )
+  const row = await queryOne<{ images: any[] }>(`SELECT images FROM product_drafts WHERE product_id = $1`, [productId])
   return Array.isArray(row?.images) ? row!.images : []
 }
 
 async function saveStage(productId: string, stage: any[]): Promise<void> {
-  await query(
-    `UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [productId, JSON.stringify(stage)]
-  )
+  await query(`UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+    productId,
+    JSON.stringify(stage),
+  ])
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const stage = await getStage(id)
   const images = [...stage].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
     const stage = await getStage(id)
@@ -75,12 +77,21 @@ export async function POST(request: NextRequest, { params }: Params) {
       const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, id)
       staged = {
         id: `draft-img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        image_url: copied.url, thumbnail_url: copied.thumbnailUrl,
+        image_url: copied.url,
+        thumbnail_url: copied.thumbnailUrl,
         s3_bucket: copied.s3Bucket,
-        s3_key: copied.s3Key, s3_thumbnail_key: copied.s3ThumbnailKey,
-        file_name: gimg.custom_name || gimg.file_name, file_size: gimg.file_size, mime_type: gimg.mime_type,
-        width: gimg.width, height: gimg.height, alt_text: '', display_order: stage.length, is_primary: isPrimary,
-        _staged: true, _fromGallery: true,
+        s3_key: copied.s3Key,
+        s3_thumbnail_key: copied.s3ThumbnailKey,
+        file_name: gimg.custom_name || gimg.file_name,
+        file_size: gimg.file_size,
+        mime_type: gimg.mime_type,
+        width: gimg.width,
+        height: gimg.height,
+        alt_text: '',
+        display_order: stage.length,
+        is_primary: isPrimary,
+        _staged: true,
+        _fromGallery: true,
       }
     } else {
       const formData = await request.formData()
@@ -89,11 +100,19 @@ export async function POST(request: NextRequest, { params }: Params) {
       const result = await uploadProductImage(file, id)
       staged = {
         id: `draft-img-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        image_url: result.url, thumbnail_url: result.thumbnailUrl,
+        image_url: result.url,
+        thumbnail_url: result.thumbnailUrl,
         s3_bucket: result.s3Bucket,
-        s3_key: result.s3Key, s3_thumbnail_key: result.s3ThumbnailKey,
-        file_name: result.fileName, file_size: result.fileSize, mime_type: result.mimeType,
-        width: result.width, height: result.height, alt_text: '', display_order: stage.length, is_primary: isPrimary,
+        s3_key: result.s3Key,
+        s3_thumbnail_key: result.s3ThumbnailKey,
+        file_name: result.fileName,
+        file_size: result.fileSize,
+        mime_type: result.mimeType,
+        width: result.width,
+        height: result.height,
+        alt_text: '',
+        display_order: stage.length,
+        is_primary: isPrimary,
         _staged: true,
       }
     }
@@ -108,7 +127,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawDel = await request.json().catch(() => null)
   if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -121,7 +141,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   let next = stage.filter((img: any) => img.id !== imageId)
   if (removed?.is_primary) {
     const rest = [...next].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-    if (rest[0]) next = next.map((img: any) => img.id === rest[0].id ? { ...img, is_primary: true } : img)
+    if (rest[0]) next = next.map((img: any) => (img.id === rest[0].id ? { ...img, is_primary: true } : img))
   }
   await saveStage(id, next)
   return NextResponse.json({ success: true })
@@ -131,7 +151,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rawPatch = await request.json().catch(() => null)
   if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

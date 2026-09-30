@@ -17,7 +17,8 @@ const createCouponSchema = z.object({
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'coupons:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
@@ -44,7 +45,11 @@ export async function GET(request: NextRequest) {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
   const [coupons, total] = await Promise.all([
-    queryMany(`SELECT * FROM coupons ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),
+    queryMany(`SELECT * FROM coupons ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`, [
+      ...params,
+      limit,
+      offset,
+    ]),
     queryCount(`SELECT COUNT(*) FROM coupons ${where}`, params),
   ])
 
@@ -54,14 +59,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'coupons:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
 
   const parsed = parseBody(createCouponSchema, body)
   if (!parsed.ok) return parsed.response
 
-  const { code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active } = body
+  const {
+    code,
+    description,
+    discount_type,
+    discount_value,
+    min_purchase_amount,
+    max_discount_amount,
+    usage_limit,
+    usage_limit_per_user,
+    valid_from,
+    valid_until,
+    is_active,
+  } = body
 
   if (!code || !discount_type || discount_value == null) {
     return NextResponse.json({ error: 'code, discount_type and discount_value are required' }, { status: 400 })
@@ -71,11 +89,24 @@ export async function POST(request: NextRequest) {
     const result = await queryMany(
       `INSERT INTO coupons (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-      [code.toUpperCase(), description || null, discount_type, discount_value, min_purchase_amount || null, max_discount_amount || null, usage_limit || null, usage_limit_per_user || null, valid_from || null, valid_until || null, is_active ?? true]
+      [
+        code.toUpperCase(),
+        description || null,
+        discount_type,
+        discount_value,
+        min_purchase_amount || null,
+        max_discount_amount || null,
+        usage_limit || null,
+        usage_limit_per_user || null,
+        valid_from || null,
+        valid_until || null,
+        is_active ?? true,
+      ]
     )
     return NextResponse.json({ coupon: result[0] }, { status: 201 })
   } catch (err: unknown) {
-    if ((err as { code?: string }).code === '23505') return NextResponse.json({ error: 'Coupon code already exists' }, { status: 409 })
+    if ((err as { code?: string }).code === '23505')
+      return NextResponse.json({ error: 'Coupon code already exists' }, { status: 409 })
     throw err
   }
 }

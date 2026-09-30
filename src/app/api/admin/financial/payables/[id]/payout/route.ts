@@ -7,7 +7,7 @@ import { parseBody, zCurrency } from '@/lib/validate'
 
 const PayoutSchema = z.object({
   mode: z.enum(['NEFT', 'RTGS', 'IMPS', 'UPI']),
-  amount: zCurrency.refine((v) => v > 0, { message: 'Must be greater than 0' }),
+  amount: zCurrency.refine(v => v > 0, { message: 'Must be greater than 0' }),
   notes: z.string().nullish(),
 })
 
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'financial:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'financial:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (!RZP_KEY || !RZP_SECRET || !RZP_ACCOUNT) {
       return NextResponse.json({ error: 'RazorpayX not configured' }, { status: 500 })
@@ -95,7 +96,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const rawNarration = notes || `Payment ${expense.expense_number}`
-    const narration = rawNarration.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 30).trim()
+    const narration = rawNarration
+      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .slice(0, 30)
+      .trim()
 
     const payout = await rzpPost('/payouts', {
       account_number: RZP_ACCOUNT,
@@ -113,8 +117,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await query(
       `INSERT INTO expense_payments (expense_id, amount, payment_date, payment_method, reference, notes, payout_id, payout_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, payAmount, payment_date, mode.toLowerCase(), payout.id,
-       notes || null, payout.id, payout.status]
+      [id, payAmount, payment_date, mode.toLowerCase(), payout.id, notes || null, payout.id, payout.status]
     )
 
     const paidResult = await queryOne<{ paid: string }>(

@@ -16,7 +16,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id } = await params
   const note = await getNote(id)
   if (!note) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (note.adminId !== session.adminId) return NextResponse.json({ error: 'You can only delete your own notes' }, { status: 403 })
+  if (note.adminId !== session.adminId)
+    return NextResponse.json({ error: 'You can only delete your own notes' }, { status: 403 })
   await deleteNote(note.id, note.userId)
   return NextResponse.json({ success: true })
 }

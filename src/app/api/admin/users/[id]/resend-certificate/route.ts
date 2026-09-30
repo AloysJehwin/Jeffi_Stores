@@ -38,9 +38,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     const result = portal
       ? await sendCertInviteEmail(row.email, row.username, row.role)
       : await sendAdminCertificateEmail(
-          row.email, row.username,
+          row.email,
+          row.username,
           Buffer.isBuffer(row.p12_data) ? row.p12_data : Buffer.from(row.p12_data),
-          row.p12_password, row.serial_number, new Date(row.expires_at).toISOString(), row.role
+          row.p12_password,
+          row.serial_number,
+          new Date(row.expires_at).toISOString(),
+          row.role
         )
 
     if (!result.success) {

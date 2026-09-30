@@ -7,10 +7,7 @@ export const runtime = 'nodejs'
 
 // One import job with its per-row results (for live progress + the drill-in view).
 // products:read gated; getImportJob is tenant-scoped so a job can't be read cross-tenant.
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdminScope(request, 'products:read')
   if (admin instanceof NextResponse) return admin
 

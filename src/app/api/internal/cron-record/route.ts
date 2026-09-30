@@ -33,8 +33,17 @@ export async function POST(request: NextRequest) {
   const logKey = `cron_log_${jobId}`
   const existing = await queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = $1`, [logKey])
   let entries: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }> = []
-  try { entries = existing ? JSON.parse(existing.value) : [] } catch { entries = [] }
-  entries.unshift({ t: now, ok: !!ok, err: !ok && errorMsg ? String(errorMsg).slice(0, 200) : undefined, ...(detail !== undefined ? { detail } : {}) })
+  try {
+    entries = existing ? JSON.parse(existing.value) : []
+  } catch {
+    entries = []
+  }
+  entries.unshift({
+    t: now,
+    ok: !!ok,
+    err: !ok && errorMsg ? String(errorMsg).slice(0, 200) : undefined,
+    ...(detail !== undefined ? { detail } : {}),
+  })
   if (entries.length > 50) entries = entries.slice(0, 50)
   await query(
     `INSERT INTO site_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
@@ -43,4 +52,3 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ ok: true })
 }
-

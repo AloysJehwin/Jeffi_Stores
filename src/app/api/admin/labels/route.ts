@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'labels:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'labels:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { product_ids, size, copies, sheet, showPrice, qrAction } = await request.json()
 
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
          WHERE p.id = ANY($1::uuid[])`,
         [productIds]
       )
-      for (const r of (rows || [])) {
+      for (const r of rows || []) {
         results.push({ ...r, id: `product:${r.id}` })
       }
     }
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
          WHERE pv.id = ANY($1::uuid[])`,
         [variantIds]
       )
-      for (const r of (rows || [])) results.push(r)
+      for (const r of rows || []) results.push(r)
     }
 
     if (subVariantIds.length > 0) {
@@ -98,16 +99,14 @@ export async function POST(request: NextRequest) {
          WHERE ps.id = ANY($1::uuid[])`,
         [subVariantIds]
       )
-      for (const r of (rows || [])) results.push(r)
+      for (const r of rows || []) results.push(r)
     }
 
     if (results.length === 0) {
       return NextResponse.json({ error: 'No products found' }, { status: 404 })
     }
 
-    const ordered = product_ids
-      .map(id => results.find(r => r.id === id))
-      .filter(Boolean) as LabelProduct[]
+    const ordered = product_ids.map(id => results.find(r => r.id === id)).filter(Boolean) as LabelProduct[]
 
     const host = await getHost()
     const orderedWithPrice = ordered.map(p => {

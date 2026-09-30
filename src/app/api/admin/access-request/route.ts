@@ -31,9 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const requesterName = admin.first_name && admin.last_name
-      ? `${admin.first_name} ${admin.last_name}`
-      : admin.email
+    const requesterName = admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email
     const toEmails = superAdmins.map(r => r.email).join(', ')
     const brand = await currentBrandNameAsync()
 

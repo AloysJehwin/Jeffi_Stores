@@ -9,10 +9,7 @@ import { logActivity } from '@/lib/activity'
 import { getReturnRequest } from '@/lib/queries'
 import { computeRefundableAmount } from '@/lib/refund'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -22,21 +19,27 @@ export async function POST(
 
     const orderId = id
 
-    const order = await queryOne(`
+    const order = await queryOne(
+      `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.user_id, o.original_order_id,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
     if (order.status !== 'cancelled' && order.status !== 'returned') {
-      return NextResponse.json({ error: 'Refund can only be initiated for cancelled or returned orders.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Refund can only be initiated for cancelled or returned orders.' },
+        { status: 400 }
+      )
     }
 
     if (order.payment_status !== 'paid') {
@@ -110,7 +113,7 @@ export async function POST(
         if (outcome.unrecoveredPaise > 0) {
           console.error(
             `[refund] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
-            `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`,
+              `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
           )
         }
         if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
@@ -124,30 +127,27 @@ export async function POST(
         }
       }
 
-      const existingResponse = typeof paymentRecord.gateway_response === 'string'
-        ? JSON.parse(paymentRecord.gateway_response)
-        : (paymentRecord.gateway_response || {})
+      const existingResponse =
+        typeof paymentRecord.gateway_response === 'string'
+          ? JSON.parse(paymentRecord.gateway_response)
+          : paymentRecord.gateway_response || {}
 
-      await query(
-        `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-        [JSON.stringify({ ...existingResponse, refund, ...(transferReversal ? { transferReversal } : {}) }), paymentRecord.id]
-      )
+      await query(`UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`, [
+        JSON.stringify({ ...existingResponse, refund, ...(transferReversal ? { transferReversal } : {}) }),
+        paymentRecord.id,
+      ])
     }
 
-    await query(
-      `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
-      [orderId]
-    )
+    await query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
 
     const user = order.users
     const userEmail = user?.email || order.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
 
     if (userEmail && userName) {
-      sendPaymentStatusUpdate(
-        userEmail, userName, order.order_number, orderId,
-        'refunded', totalRefunded
-      ).catch(() => {})
+      sendPaymentStatusUpdate(userEmail, userName, order.order_number, orderId, 'refunded', totalRefunded).catch(
+        () => {}
+      )
     }
 
     if (order.user_id) {

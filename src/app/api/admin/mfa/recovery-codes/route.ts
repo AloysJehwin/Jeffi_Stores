@@ -27,10 +27,7 @@ export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const row = await queryOne<{ mfa_enabled: boolean }>(
-    `SELECT mfa_enabled FROM admins WHERE id = $1`,
-    [admin.adminId]
-  )
+  const row = await queryOne<{ mfa_enabled: boolean }>(`SELECT mfa_enabled FROM admins WHERE id = $1`, [admin.adminId])
   if (!row?.mfa_enabled) {
     return NextResponse.json({ error: 'MFA is not enabled on this account' }, { status: 400 })
   }
@@ -38,10 +35,7 @@ export async function POST(request: NextRequest) {
   const codes = generateRecoveryCodes(10)
   await query(`DELETE FROM admin_mfa_recovery_codes WHERE admin_id = $1`, [admin.adminId])
   for (const c of codes) {
-    await query(
-      `INSERT INTO admin_mfa_recovery_codes (admin_id, code_hash) VALUES ($1, $2)`,
-      [admin.adminId, c.hash]
-    )
+    await query(`INSERT INTO admin_mfa_recovery_codes (admin_id, code_hash) VALUES ($1, $2)`, [admin.adminId, c.hash])
   }
   return NextResponse.json({ recovery_codes: codes.map(c => c.plain) })
 }

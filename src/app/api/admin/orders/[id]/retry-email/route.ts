@@ -8,7 +8,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const order = await queryOne<{
     id: string
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     order.customer_email,
     order.customer_name,
     order.order_number,
-    Number(order.total_amount),
+    Number(order.total_amount)
   )
 
   if (!result.success) {

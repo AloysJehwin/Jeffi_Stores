@@ -34,10 +34,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { url, blurhash } = await uploadGalleryImage(buffer, file.name)
     const hashField = field === 'image_url_mobile' ? 'blurhash_mobile' : 'blurhash'
 
-    await query(
-      `UPDATE product_offers SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`,
-      [url, blurhash, id],
-    )
+    await query(`UPDATE product_offers SET ${field} = $1, ${hashField} = $2, updated_at = NOW() WHERE id = $3`, [
+      url,
+      blurhash,
+      id,
+    ])
     return NextResponse.json({ url, field, blurhash })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to upload image' }, { status: 500 })

@@ -65,14 +65,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // matching order still get a minimal label so nothing is silently dropped.
     const labels: LabelInput[] = awbs.map(awb => {
       const order = orderByAwb.get(awb)
-      const pkg = order?.payment_mode && String(order.payment_mode).toLowerCase().includes('cod') && order.payment_status !== 'paid'
-        ? { cod: String(order.total_amount ?? '0') }
-        : {}
+      const pkg =
+        order?.payment_mode &&
+        String(order.payment_mode).toLowerCase().includes('cod') &&
+        order.payment_status !== 'paid'
+          ? { cod: String(order.total_amount ?? '0') }
+          : {}
       return {
         pkg,
         awb,
         orderRow: order || { awb_number: awb },
-        items: order ? (itemsByOrder.get(order.id) || []) : [],
+        items: order ? itemsByOrder.get(order.id) || [] : [],
       }
     })
 

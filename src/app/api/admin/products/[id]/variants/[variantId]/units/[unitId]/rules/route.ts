@@ -55,10 +55,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const ruleType = String(body.rule_type || '')
   if (!(SUPPORTED_RULE_TYPES as readonly string[]).includes(ruleType)) {
-    return NextResponse.json(
-      { error: `rule_type must be one of: ${SUPPORTED_RULE_TYPES.join(', ')}` },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: `rule_type must be one of: ${SUPPORTED_RULE_TYPES.join(', ')}` }, { status: 400 })
   }
   const validationError = validateConfig(ruleType, body.config)
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })

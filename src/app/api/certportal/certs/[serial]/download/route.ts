@@ -41,8 +41,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const row = existing.rows[0]
     if (!row) return NextResponse.json({ error: 'Certificate not found for this account' }, { status: 404 })
     if (row.revoked_at) return NextResponse.json({ error: 'This certificate has been revoked' }, { status: 410 })
-    if (new Date(row.expires_at).getTime() <= Date.now()) return NextResponse.json({ error: 'This certificate has expired' }, { status: 410 })
-    return NextResponse.json({ error: 'This certificate has already been downloaded. Ask an admin to re-issue it.' }, { status: 410 })
+    if (new Date(row.expires_at).getTime() <= Date.now())
+      return NextResponse.json({ error: 'This certificate has expired' }, { status: 410 })
+    return NextResponse.json(
+      { error: 'This certificate has already been downloaded. Ask an admin to re-issue it.' },
+      { status: 410 }
+    )
   }
 
   let p12: Buffer

@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'financial:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'financial:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const from = searchParams.get('from') || ''
@@ -24,10 +25,20 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
     let i = 1
 
-    if (from) { conditions.push(`txn_date >= $${i++}`); params.push(from) }
-    if (to) { conditions.push(`txn_date <= $${i++}`); params.push(to) }
-    if (type === 'inflow') { conditions.push(`direction = 'inflow'`) }
-    if (type === 'outflow') { conditions.push(`direction = 'outflow'`) }
+    if (from) {
+      conditions.push(`txn_date >= $${i++}`)
+      params.push(from)
+    }
+    if (to) {
+      conditions.push(`txn_date <= $${i++}`)
+      params.push(to)
+    }
+    if (type === 'inflow') {
+      conditions.push(`direction = 'inflow'`)
+    }
+    if (type === 'outflow') {
+      conditions.push(`direction = 'outflow'`)
+    }
     if (search) {
       conditions.push(`(party ILIKE $${i} OR reference ILIKE $${i} OR txn_ref ILIKE $${i})`)
       params.push(`%${search}%`)
@@ -109,25 +120,35 @@ export async function GET(request: NextRequest) {
     `
 
     const [countRow, rows, summaryRows] = await Promise.all([
-      queryMany<{ count: string }>(`
+      queryMany<{ count: string }>(
+        `
         SELECT COUNT(*)::text AS count FROM (${unionCte}) txn ${where}
-      `, params),
-      queryMany<any>(`
+      `,
+        params
+      ),
+      queryMany<any>(
+        `
         SELECT * FROM (${unionCte}) txn
         ${where}
         ORDER BY txn_date DESC, created_at DESC
         LIMIT ${PAGE_SIZE} OFFSET ${offset}
-      `, params),
-      queryMany<any>(`
+      `,
+        params
+      ),
+      queryMany<any>(
+        `
         SELECT direction, SUM(amount) AS total FROM (${unionCte}) txn ${where}
         GROUP BY direction
-      `, params),
+      `,
+        params
+      ),
     ])
 
     const total = parseInt((countRow as any[])?.[0]?.count ?? '0', 10)
 
-    let totalInflow = 0, totalOutflow = 0
-    for (const r of (summaryRows || [])) {
+    let totalInflow = 0,
+      totalOutflow = 0
+    for (const r of summaryRows || []) {
       if (r.direction === 'inflow') totalInflow = parseFloat(r.total)
       else totalOutflow = parseFloat(r.total)
     }

@@ -4,7 +4,9 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // POST — publish draft to live
 export async function POST(req: NextRequest, { params }: Params) {
@@ -15,7 +17,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const draft = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
-    `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`, [id]
+    `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`,
+    [id]
   )
   if (!draft) return NextResponse.json({ error: 'No draft to publish' }, { status: 404 })
 

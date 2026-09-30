@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryCount } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -15,10 +12,7 @@ export async function DELETE(
 
     const categoryId = id
 
-    const productCount = await queryCount(
-      'SELECT COUNT(*) FROM products WHERE category_id = $1',
-      [categoryId]
-    )
+    const productCount = await queryCount('SELECT COUNT(*) FROM products WHERE category_id = $1', [categoryId])
 
     if (productCount > 0) {
       return NextResponse.json(
@@ -27,10 +21,9 @@ export async function DELETE(
       )
     }
 
-    const subCategoryCount = await queryCount(
-      'SELECT COUNT(*) FROM categories WHERE parent_category_id = $1',
-      [categoryId]
-    )
+    const subCategoryCount = await queryCount('SELECT COUNT(*) FROM categories WHERE parent_category_id = $1', [
+      categoryId,
+    ])
 
     if (subCategoryCount > 0) {
       return NextResponse.json(
@@ -43,9 +36,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete category' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Failed to delete category' }, { status: 500 })
   }
 }

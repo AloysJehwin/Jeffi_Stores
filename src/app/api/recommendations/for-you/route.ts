@@ -11,13 +11,9 @@ export const dynamic = 'force-dynamic'
 function toCardProps(p: RecCard) {
   const primaryImage = p.product_images?.find(i => i.is_primary) || p.product_images?.[0] || null
   const hasVariants = p.has_variants
-  const displayPrice = hasVariants && p.variant_min_price != null
-    ? Number(p.variant_min_price)
-    : Number(p.base_price)
-  const effectiveStock = hasVariants
-    ? Number(p.variant_stock_total ?? 0)
-    : (p.stock_status !== 'Out of Stock' ? 1 : 0)
-  const mrp = p.mrp ? Number(p.mrp) : (p.variant_min_mrp ? Number(p.variant_min_mrp) : null)
+  const displayPrice = hasVariants && p.variant_min_price != null ? Number(p.variant_min_price) : Number(p.base_price)
+  const effectiveStock = hasVariants ? Number(p.variant_stock_total ?? 0) : p.stock_status !== 'Out of Stock' ? 1 : 0
+  const mrp = p.mrp ? Number(p.mrp) : p.variant_min_mrp ? Number(p.variant_min_mrp) : null
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
   return {
     id: p.id,
@@ -28,7 +24,9 @@ function toCardProps(p: RecCard) {
     mrp,
     mrpDiscount,
     effectiveStock,
-    primaryImage: primaryImage ? { image_url: primaryImage.image_url, thumbnail_url: primaryImage.thumbnail_url } : null,
+    primaryImage: primaryImage
+      ? { image_url: primaryImage.image_url, thumbnail_url: primaryImage.thumbnail_url }
+      : null,
     brandName: p.brands?.name || null,
     categoryName: p.categories?.name || null,
     discountPct: Number(p.discount_pct ?? 0),
@@ -44,7 +42,12 @@ export async function GET(req: NextRequest) {
     // Logged-out → best-sellers fallback (anonymous browsing isn't attributable).
     if (!user) {
       const cards = await getBestSellerCards(8)
-      return NextResponse.json({ products: cards.map(toCardProps), source: 'bestsellers', curated: false, fallback: true })
+      return NextResponse.json({
+        products: cards.map(toCardProps),
+        source: 'bestsellers',
+        curated: false,
+        fallback: true,
+      })
     }
 
     const result = await getFeaturedForUser(user.userId, 8)

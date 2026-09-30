@@ -14,9 +14,7 @@ function ampResponse(body: Record<string, unknown>, origin: string | null, statu
 }
 
 export async function OPTIONS(req: NextRequest) {
-  const origin = req.headers.get('amp-same-origin') === 'true'
-    ? req.headers.get('origin')
-    : null
+  const origin = req.headers.get('amp-same-origin') === 'true' ? req.headers.get('origin') : null
   return ampResponse({}, origin)
 }
 
@@ -32,12 +30,23 @@ export async function POST(req: NextRequest) {
   const ct = req.headers.get('content-type') || ''
   if (ct.includes('application/json')) {
     let body: { token?: string; rating?: number; comment?: string; title?: string; tags?: string[] }
-    try { body = await req.json() } catch { return ampResponse({ error: 'Invalid request' }, origin, 400) }
-    token = body.token; rating = body.rating ? Number(body.rating) : undefined
-    comment = body.comment; title = body.title; tags = body.tags
+    try {
+      body = await req.json()
+    } catch {
+      return ampResponse({ error: 'Invalid request' }, origin, 400)
+    }
+    token = body.token
+    rating = body.rating ? Number(body.rating) : undefined
+    comment = body.comment
+    title = body.title
+    tags = body.tags
   } else {
     let form: FormData
-    try { form = await req.formData() } catch { return ampResponse({ error: 'Invalid request' }, origin, 400) }
+    try {
+      form = await req.formData()
+    } catch {
+      return ampResponse({ error: 'Invalid request' }, origin, 400)
+    }
     token = form.get('token')?.toString()
     rating = form.get('rating') ? Number(form.get('rating')) : undefined
     comment = form.get('comment')?.toString()
@@ -55,10 +64,10 @@ export async function POST(req: NextRequest) {
 
   const { orderId, productId, userId } = payload
 
-  const existing = await queryOne(
-    `SELECT id FROM product_reviews WHERE user_id = $1 AND product_id = $2`,
-    [userId, productId]
-  )
+  const existing = await queryOne(`SELECT id FROM product_reviews WHERE user_id = $1 AND product_id = $2`, [
+    userId,
+    productId,
+  ])
   if (existing) return ampResponse({ error: 'Already reviewed' }, origin, 409)
 
   await queryOne(

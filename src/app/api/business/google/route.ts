@@ -61,11 +61,10 @@ async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleToken
 export async function POST(request: NextRequest) {
   try {
     const { idToken, accessToken, companyName, gstNumber, businessAddress, industry } = await request.json()
-    if (!idToken && !accessToken) return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
+    if (!idToken && !accessToken)
+      return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
 
-    const googlePayload = idToken
-      ? await verifyGoogleToken(idToken)
-      : await verifyGoogleAccessToken(accessToken)
+    const googlePayload = idToken ? await verifyGoogleToken(idToken) : await verifyGoogleAccessToken(accessToken)
     if (!googlePayload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const email = googlePayload.email.toLowerCase()
@@ -98,17 +97,32 @@ export async function POST(request: NextRequest) {
         `INSERT INTO business_profiles (user_id, company_name, gst_number, business_address, industry) VALUES ($1, $2, $3, $4, $5)`,
         [user.id, companyName.trim(), gstNumber.trim().toUpperCase(), businessAddress.trim(), industry.trim()]
       )
-      logActivity({ userId: user.id, kind: 'signup', summary: 'Business account created via Google', metadata: { provider: 'google' } }).catch(() => {})
+      logActivity({
+        userId: user.id,
+        kind: 'signup',
+        summary: 'Business account created via Google',
+        metadata: { provider: 'google' },
+      }).catch(() => {})
     } else {
       if (!user.is_active) return NextResponse.json({ error: 'Account is inactive' }, { status: 403 })
-      if (!user.google_id) await query('UPDATE users SET google_id=$1, auth_provider=$2 WHERE id=$3', [googleId, 'google', user.id])
+      if (!user.google_id)
+        await query('UPDATE users SET google_id=$1, auth_provider=$2 WHERE id=$3', [googleId, 'google', user.id])
       await query('UPDATE users SET last_login=NOW() WHERE id=$1', [user.id])
-      logActivity({ userId: user.id, kind: 'login', summary: 'Business login via Google', metadata: { provider: 'google' } }).catch(() => {})
+      logActivity({
+        userId: user.id,
+        kind: 'login',
+        summary: 'Business login via Google',
+        metadata: { provider: 'google' },
+      }).catch(() => {})
     }
 
     const approvalStatus = user.approval_status || 'pending'
     if (approvalStatus !== 'approved') {
-      return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
+      return NextResponse.json({
+        approvalStatus,
+        message:
+          approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.',
+      })
     }
 
     const signals = extractSessionSignals(request)
@@ -140,7 +154,13 @@ export async function POST(request: NextRequest) {
       message: 'Login successful',
       approvalStatus: 'approved',
       phone: user.phone || null,
-      user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, companyName: user.company_name },
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        companyName: user.company_name,
+      },
     })
   } catch (err: any) {
     return NextResponse.json({ error: 'Authentication failed', detail: err?.message }, { status: 500 })

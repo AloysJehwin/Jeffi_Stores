@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction, query } from '@/lib/db'
-import { assertUnitChangeAllowed, validateSerializedUnitStep, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
+import {
+  assertUnitChangeAllowed,
+  validateSerializedUnitStep,
+  changedUnitFields,
+  validateUnitQuantityBounds,
+} from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +16,18 @@ interface Params {
 }
 
 async function ensureUnitOwnership(unitId: string, subVariantId: string) {
-  return queryOne<{ id: string; unit: string; is_base: boolean; product_id: string; variant_id: string | null; factor: string; dimension: string; qty_step: string; min_qty: string; max_qty: string | null }>(
+  return queryOne<{
+    id: string
+    unit: string
+    is_base: boolean
+    product_id: string
+    variant_id: string | null
+    factor: string
+    dimension: string
+    qty_step: string
+    min_qty: string
+    max_qty: string | null
+  }>(
     `SELECT id, unit, is_base, product_id, variant_id, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
        FROM product_units WHERE id = $1 AND sub_variant_id = $2`,
     [unitId, subVariantId]
@@ -46,12 +62,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (body.unit !== undefined) {
     const u = String(body.unit).trim()
     if (!u) return NextResponse.json({ error: 'unit cannot be empty' }, { status: 400 })
-    updates.push(`unit = $${i++}`); vals.push(u)
+    updates.push(`unit = $${i++}`)
+    vals.push(u)
   }
   if (body.factor !== undefined) {
     const f = Number(body.factor)
     if (!Number.isFinite(f) || f <= 0) return NextResponse.json({ error: 'factor must be positive' }, { status: 400 })
-    updates.push(`factor = $${i++}`); vals.push(f)
+    updates.push(`factor = $${i++}`)
+    vals.push(f)
   }
   if (body.display_label !== undefined) {
     updates.push(`display_label = $${i++}`)
@@ -66,48 +84,60 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!allowed.includes(body.dimension)) {
       return NextResponse.json({ error: `dimension must be one of ${allowed.join(', ')}` }, { status: 400 })
     }
-    updates.push(`dimension = $${i++}`); vals.push(body.dimension)
+    updates.push(`dimension = $${i++}`)
+    vals.push(body.dimension)
   }
   if (body.conversion_meta !== undefined) {
     if (body.conversion_meta === null) {
       updates.push(`conversion_meta = NULL`)
     } else {
-      updates.push(`conversion_meta = $${i++}`); vals.push(JSON.stringify(body.conversion_meta))
+      updates.push(`conversion_meta = $${i++}`)
+      vals.push(JSON.stringify(body.conversion_meta))
     }
   }
   if (body.min_qty !== undefined) {
     const v = Number(body.min_qty)
     if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'min_qty must be positive' }, { status: 400 })
-    updates.push(`min_qty = $${i++}`); vals.push(v)
+    updates.push(`min_qty = $${i++}`)
+    vals.push(v)
   }
   if (body.max_qty !== undefined) {
     if (body.max_qty === null) updates.push(`max_qty = NULL`)
     else {
       const v = Number(body.max_qty)
-      if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'max_qty must be positive' }, { status: 400 })
-      updates.push(`max_qty = $${i++}`); vals.push(v)
+      if (!Number.isFinite(v) || v <= 0)
+        return NextResponse.json({ error: 'max_qty must be positive' }, { status: 400 })
+      updates.push(`max_qty = $${i++}`)
+      vals.push(v)
     }
   }
   if (body.qty_step !== undefined) {
     const v = Number(body.qty_step)
     if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'qty_step must be positive' }, { status: 400 })
-    const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [existing.product_id])
+    const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [
+      existing.product_id,
+    ])
     if (serialRow?.serialized) {
       const stepErr = validateSerializedUnitStep(v)
       if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
     }
-    updates.push(`qty_step = $${i++}`); vals.push(v)
+    updates.push(`qty_step = $${i++}`)
+    vals.push(v)
   }
-
 
   // Validate the MERGED result: a PATCH that moves only one of the three can
   // still leave min/max off the qty_step grid.
   {
     const mergedStep = body.qty_step !== undefined ? Number(body.qty_step) : parseFloat(existing.qty_step ?? '')
     const mergedMin = body.min_qty !== undefined ? Number(body.min_qty) : parseFloat(existing.min_qty ?? '')
-    const mergedMax = body.max_qty !== undefined
-      ? (body.max_qty === null ? null : Number(body.max_qty))
-      : (existing.max_qty == null ? null : parseFloat(existing.max_qty))
+    const mergedMax =
+      body.max_qty !== undefined
+        ? body.max_qty === null
+          ? null
+          : Number(body.max_qty)
+        : existing.max_qty == null
+          ? null
+          : parseFloat(existing.max_qty)
     if (Number.isFinite(mergedStep) && Number.isFinite(mergedMin)) {
       const boundsErr = validateUnitQuantityBounds({ qty_step: mergedStep, min_qty: mergedMin, max_qty: mergedMax })
       if (boundsErr) return NextResponse.json({ error: boundsErr }, { status: 400 })
@@ -117,7 +147,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const setBase = body.is_base === true
 
   try {
-    const updated = await withTransaction(async (client) => {
+    const updated = await withTransaction(async client => {
       if (setBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [subVariantId])
         updates.push(`is_base = TRUE`)
@@ -161,7 +191,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       [subVariantId, unitId]
     )
     if (sibling) {
-      return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Cannot delete the base unit. Make another unit the base first.' },
+        { status: 400 }
+      )
     }
   }
 

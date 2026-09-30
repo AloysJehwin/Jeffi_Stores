@@ -19,10 +19,9 @@ const AddCartSchema = z
     buyMode: z.string().max(40).nullish(),
     buyUnit: z.string().nullish(),
   })
-  .refine(
-    (d) => d.productId !== undefined || d.variantId !== undefined,
-    { message: 'productId or variantId is required' }
-  )
+  .refine(d => d.productId !== undefined || d.variantId !== undefined, {
+    message: 'productId or variantId is required',
+  })
 
 const UpdateCartSchema = z.object({
   cartItemId: zUuid,
@@ -50,7 +49,8 @@ export async function GET(request: NextRequest) {
     const savedOnly = url.searchParams.get('saved') === '1'
     const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
 
-    const cartItems = await queryMany(`
+    const cartItems = await queryMany(
+      `
       SELECT
         ci.*,
         json_build_object(
@@ -126,7 +126,9 @@ export async function GET(request: NextRequest) {
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
       WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = ${savedFilter}
-    `, [userId])
+    `,
+      [userId]
+    )
 
     return NextResponse.json({ items: cartItems || [] })
   } catch (err) {
@@ -166,7 +168,8 @@ export async function POST(request: NextRequest) {
         [subVariantId]
       )
       if (!subVariant) return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
-      if (subVariant.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
+      if (subVariant.stock_status === 'Out of Stock')
+        return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       if (variantId) {
         const variant = await queryOne(
           'SELECT id, price FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
@@ -183,10 +186,12 @@ export async function POST(request: NextRequest) {
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
-      if (variant.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
+      if (variant.stock_status === 'Out of Stock')
+        return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       priceAtAddition = variant.price ?? product.base_price
     } else {
-      if (product.stock_status === 'Out of Stock') return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
+      if (product.stock_status === 'Out of Stock')
+        return NextResponse.json({ error: 'This item is currently out of stock' }, { status: 409 })
       priceAtAddition = product.price_ex_gst || product.base_price
     }
 
@@ -221,7 +226,14 @@ export async function POST(request: NextRequest) {
     // Enforce the selling unit's min/max/qty_step server-side (previously UI-only).
     // Resolve the unit constraints for the chosen buyUnit; validate the quantity.
     const constraintRow = buyUnit
-      ? await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; min_qty: string; max_qty: string | null }>(
+      ? await queryOne<{
+          unit: string
+          factor: string
+          dimension: string
+          qty_step: string
+          min_qty: string
+          max_qty: string | null
+        }>(
           `SELECT unit, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
              FROM product_units
             WHERE product_id = $1 AND unit = $2
@@ -294,11 +306,14 @@ export async function PATCH(request: NextRequest) {
     const { userId, sessionId, authUserId } = await resolveUserId(request)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
-    const cartItem = await queryOne(`
+    const cartItem = await queryOne(
+      `
       SELECT ci.*
       FROM cart_items ci
       WHERE ci.id = $1 AND ci.user_id = $2
-    `, [cartItemId, userId])
+    `,
+      [cartItemId, userId]
+    )
 
     if (!cartItem) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
 

@@ -9,7 +9,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [id])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })

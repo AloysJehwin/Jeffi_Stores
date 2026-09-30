@@ -50,12 +50,13 @@ export async function GET(req: NextRequest) {
   </style>
 </head>
 <body>
-  ${result.ok
-    ? `<h1>You've been unsubscribed</h1>
+  ${
+    result.ok
+      ? `<h1>You've been unsubscribed</h1>
        <p>${result.email ? `<strong>${result.email}</strong>` : 'You'} will no longer receive marketing emails from ${brand}.</p>
        <p>You'll still get transactional emails (order confirmations, OTPs, etc.).</p>
        <p style="margin-top:24px;"><a href="/">Return to ${brand}</a></p>`
-    : `<h1>Link not recognised</h1>
+      : `<h1>Link not recognised</h1>
        <p>This unsubscribe link is invalid or expired. <a href="/account">Sign in</a> to manage email preferences.</p>`
   }
 </body>

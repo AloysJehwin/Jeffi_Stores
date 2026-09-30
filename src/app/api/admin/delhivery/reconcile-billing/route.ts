@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Billing reconciliation is per-tenant; no tenant in context.' }, { status: 400 })
   }
 
-  const body = await request.json().catch(() => null) as { period?: unknown; rows?: unknown } | null
+  const body = (await request.json().catch(() => null)) as { period?: unknown; rows?: unknown } | null
   const period = typeof body?.period === 'string' ? body.period.trim() : ''
   if (!period) {
     return NextResponse.json({ error: 'period is required (e.g. "2026-08").' }, { status: 400 })
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   const results = await reconcileDelhiveryBilling(rows, tenantId, period)
 
-  const billedByAwb = new Map(rows.map((r) => [r.awb, r.billedAmount]))
+  const billedByAwb = new Map(rows.map(r => [r.awb, r.billedAmount]))
   for (const res of results) {
     if (res.outcome !== 'adjusted') continue
     const billed = billedByAwb.get(res.awb)

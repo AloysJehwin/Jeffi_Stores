@@ -10,7 +10,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const admin = await authenticateAdmin(_req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const tags = await queryMany(
     `SELECT id, tag, created_at FROM customer_tags WHERE user_id = $1 ORDER BY created_at DESC`,
@@ -23,10 +24,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { tag } = await req.json()
-  const trimmed = String(tag || '').trim().toLowerCase().slice(0, 60)
+  const trimmed = String(tag || '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 60)
   if (!trimmed) return NextResponse.json({ error: 'Tag is required' }, { status: 400 })
 
   await query(
@@ -48,7 +53,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const tag = req.nextUrl.searchParams.get('tag')
   if (!tag) return NextResponse.json({ error: 'tag query param required' }, { status: 400 })

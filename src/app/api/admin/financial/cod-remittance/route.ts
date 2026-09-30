@@ -70,13 +70,18 @@ export async function GET(request: NextRequest) {
       .reduce((s, o) => s + parseFloat(o.total_amount), 0),
   }
 
-  return NextResponse.json({ orders, weeks: Object.values(weeks).sort((a, b) => b.weekStart.localeCompare(a.weekStart)), summary })
+  return NextResponse.json({
+    orders,
+    weeks: Object.values(weeks).sort((a, b) => b.weekStart.localeCompare(a.weekStart)),
+    summary,
+  })
 }
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'financial:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'financial:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { orderIds } = body
@@ -111,8 +116,10 @@ export async function POST(request: NextRequest) {
       .catch(() => null)
     const dailyPayout = cpRow?.rows[0]?.daily_payout === true
     const settledOrders = await queryMany<{
-      order_number: string; total_amount: string
-      delhivery_billed_amount: string | null; shipping_amount: string | null
+      order_number: string
+      total_amount: string
+      delhivery_billed_amount: string | null
+      shipping_amount: string | null
       delhivery_billed_at: string | null
     }>(
       `SELECT order_number, total_amount, delhivery_billed_amount, shipping_amount, delhivery_billed_at
@@ -120,9 +127,8 @@ export async function POST(request: NextRequest) {
       [remitted.rows.map(r => r.id)]
     ).catch(() => [])
     for (const o of settledOrders) {
-      const actualDelhivery = o.delhivery_billed_amount != null
-        ? parseFloat(o.delhivery_billed_amount)
-        : parseFloat(o.shipping_amount ?? '0')
+      const actualDelhivery =
+        o.delhivery_billed_amount != null ? parseFloat(o.delhivery_billed_amount) : parseFloat(o.shipping_amount ?? '0')
       // `delhivery_billed_at` is only stamped once the wallet debit is durable, so it is the
       // signal that shipping has already been charged. Deducting it here too billed the tenant
       // twice for the same AWB.

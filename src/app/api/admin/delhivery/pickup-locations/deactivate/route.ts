@@ -30,7 +30,8 @@ export async function POST(request: NextRequest) {
 
   const tenantId = (await resolveTenantId()) ?? undefined
   const result = await deactivateDelhiveryPickupLocation(name, tenantId)
-  if (!result.ok) return NextResponse.json({ error: result.error || 'Could not remove the warehouse.' }, { status: 502 })
+  if (!result.ok)
+    return NextResponse.json({ error: result.error || 'Could not remove the warehouse.' }, { status: 502 })
 
   return NextResponse.json({ ok: true, name })
 }

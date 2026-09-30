@@ -8,10 +8,7 @@ import { logActivity } from '@/lib/activity'
 // sessions, but many never do after an end-session request — so once a session
 // has had no activity for SUPPORT_STALE_CLOSE_MS (default 1h) the admin may
 // close it. Staleness is re-checked here so the client can't force an early close.
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ sessionId: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {
     const { sessionId } = await params
     const admin = await authenticateAdmin(request)
@@ -47,14 +44,8 @@ export async function PATCH(
       )
     }
 
-    await query(
-      `UPDATE support_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1`,
-      [sessionId]
-    )
-    await query(
-      `DELETE FROM websocket_connections WHERE session_id = $1`,
-      [sessionId]
-    )
+    await query(`UPDATE support_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1`, [sessionId])
+    await query(`DELETE FROM websocket_connections WHERE session_id = $1`, [sessionId])
 
     logActivity({
       userId: session.user_id,

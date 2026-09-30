@@ -6,10 +6,7 @@ import { query } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -24,10 +21,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -38,10 +32,10 @@ export async function PATCH(
     const { action, reason } = await request.json()
 
     if (action === 'flag') {
-      await query(
-        'UPDATE users SET is_flagged = true, is_active = false, flag_reason = $1 WHERE id = $2',
-        [reason || 'Flagged by admin', id]
-      )
+      await query('UPDATE users SET is_flagged = true, is_active = false, flag_reason = $1 WHERE id = $2', [
+        reason || 'Flagged by admin',
+        id,
+      ])
       logActivity({
         userId: id,
         actorId: admin.adminId,
@@ -67,10 +61,7 @@ export async function PATCH(
         summary: 'Account deactivated',
       }).catch(() => {})
     } else if (action === 'activate') {
-      await query(
-        'UPDATE users SET is_active = true, is_flagged = false, flag_reason = null WHERE id = $1',
-        [id]
-      )
+      await query('UPDATE users SET is_active = true, is_flagged = false, flag_reason = null WHERE id = $1', [id])
       logActivity({
         userId: id,
         actorId: admin.adminId,

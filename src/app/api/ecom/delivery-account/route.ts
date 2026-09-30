@@ -57,7 +57,10 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Delhivery did not accept this token. Check it and try again.' }, { status: 400 })
   }
   if (check === 'unverified') {
-    return NextResponse.json({ error: 'Could not reach Delhivery to verify the token. Your current token is unchanged; try again shortly.' }, { status: 502 })
+    return NextResponse.json(
+      { error: 'Could not reach Delhivery to verify the token. Your current token is unchanged; try again shortly.' },
+      { status: 502 }
+    )
   }
 
   await saveIntegrationCredential({

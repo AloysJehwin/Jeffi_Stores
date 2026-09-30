@@ -44,7 +44,7 @@ export async function PATCH(request: NextRequest) {
   // The offer must exist on the account — otherwise a typo silently creates a row that
   // controls nothing and looks like a working setting.
   const { offers: known } = await getOffersWithSettings()
-  const target = known.find((o) => o.id === offerId)
+  const target = known.find(o => o.id === offerId)
   if (!target) return NextResponse.json({ error: 'Unknown offer for this Razorpay account' }, { status: 404 })
 
   await query(
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest) {
       titleOverride?.trim() || null,
       displayOrder ?? target.displayOrder,
       admin.adminId,
-    ],
+    ]
   )
 
   await logAdminAudit({

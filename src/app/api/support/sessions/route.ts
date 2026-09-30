@@ -89,10 +89,7 @@ export async function POST(request: NextRequest) {
       summary: 'Started a support chat',
     }).catch(() => {})
 
-    const user = await queryOne(
-      `SELECT first_name, last_name, email FROM users WHERE id = $1`,
-      [authUser.userId]
-    )
+    const user = await queryOne(`SELECT first_name, last_name, email FROM users WHERE id = $1`, [authUser.userId])
 
     if (user) {
       const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'

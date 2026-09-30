@@ -8,7 +8,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 async function buildCard(id: string) {
-  const product = await queryOne<any>(`
+  const product = await queryOne<any>(
+    `
     SELECT
       p.id, p.name, p.slug, p.base_price, p.price_ex_gst,
       (SELECT pi.image_url FROM product_images pi
@@ -17,15 +18,17 @@ async function buildCard(id: string) {
        LIMIT 1) AS primary_image
     FROM products p
     WHERE p.id = $1
-  `, [id])
+  `,
+    [id]
+  )
 
   if (!product) return null
 
   const salePrice = product.price_ex_gst ? Number(product.price_ex_gst) : null
   const basePrice = product.base_price ? Number(product.base_price) : null
 
-  const displayPrice  = salePrice ?? basePrice ?? 0
-  const originalPrice = (salePrice && basePrice && basePrice > salePrice) ? basePrice : null
+  const displayPrice = salePrice ?? basePrice ?? 0
+  const originalPrice = salePrice && basePrice && basePrice > salePrice ? basePrice : null
 
   const brand = await currentBrandNameAsync()
   const brandUrl = (await storeBaseUrlAsync()).replace(/^https?:\/\//, '')
@@ -44,10 +47,7 @@ async function buildCard(id: string) {
   return { png, slug: product.slug as string }
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return new Response('Unauthorized', { status: 401 })
 
@@ -68,10 +68,7 @@ export async function GET(
  * Same card, but stored in S3 and returned as a URL. Meta fetches post images over the public
  * internet, so a social post cannot use the GET response above — it needs a hosted file.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction, query } from '@/lib/db'
-import { assertUnitChangeAllowed, validateSerializedUnitStep, changedUnitFields, validateUnitQuantityBounds } from '@/lib/selling-unit'
+import {
+  assertUnitChangeAllowed,
+  validateSerializedUnitStep,
+  changedUnitFields,
+  validateUnitQuantityBounds,
+} from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,15 +16,24 @@ interface Params {
 }
 
 async function ensureVariant(productId: string, variantId: string) {
-  const row = await queryOne<{ id: string }>(
-    `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
-    [variantId, productId]
-  )
+  const row = await queryOne<{ id: string }>(`SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`, [
+    variantId,
+    productId,
+  ])
   return !!row
 }
 
 async function ensureUnitOwnership(unitId: string, variantId: string) {
-  const row = await queryOne<{ id: string; unit: string; is_base: boolean; factor: string; dimension: string; qty_step: string; min_qty: string; max_qty: string | null }>(
+  const row = await queryOne<{
+    id: string
+    unit: string
+    is_base: boolean
+    factor: string
+    dimension: string
+    qty_step: string
+    min_qty: string
+    max_qty: string | null
+  }>(
     `SELECT id, unit, is_base, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
        FROM product_units WHERE id = $1 AND variant_id = $2 AND sub_variant_id IS NULL`,
     [unitId, variantId]
@@ -95,14 +109,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (body.min_qty !== undefined) {
     const v = Number(body.min_qty)
     if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'min_qty must be positive' }, { status: 400 })
-    updates.push(`min_qty = $${i++}`); vals.push(v)
+    updates.push(`min_qty = $${i++}`)
+    vals.push(v)
   }
   if (body.max_qty !== undefined) {
     if (body.max_qty === null) updates.push(`max_qty = NULL`)
     else {
       const v = Number(body.max_qty)
-      if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'max_qty must be positive' }, { status: 400 })
-      updates.push(`max_qty = $${i++}`); vals.push(v)
+      if (!Number.isFinite(v) || v <= 0)
+        return NextResponse.json({ error: 'max_qty must be positive' }, { status: 400 })
+      updates.push(`max_qty = $${i++}`)
+      vals.push(v)
     }
   }
   if (body.qty_step !== undefined) {
@@ -113,18 +130,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const stepErr = validateSerializedUnitStep(v)
       if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
     }
-    updates.push(`qty_step = $${i++}`); vals.push(v)
+    updates.push(`qty_step = $${i++}`)
+    vals.push(v)
   }
-
 
   // Validate the MERGED result: a PATCH that moves only one of the three can
   // still leave min/max off the qty_step grid.
   {
     const mergedStep = body.qty_step !== undefined ? Number(body.qty_step) : parseFloat(existing.qty_step ?? '')
     const mergedMin = body.min_qty !== undefined ? Number(body.min_qty) : parseFloat(existing.min_qty ?? '')
-    const mergedMax = body.max_qty !== undefined
-      ? (body.max_qty === null ? null : Number(body.max_qty))
-      : (existing.max_qty == null ? null : parseFloat(existing.max_qty))
+    const mergedMax =
+      body.max_qty !== undefined
+        ? body.max_qty === null
+          ? null
+          : Number(body.max_qty)
+        : existing.max_qty == null
+          ? null
+          : parseFloat(existing.max_qty)
     if (Number.isFinite(mergedStep) && Number.isFinite(mergedMin)) {
       const boundsErr = validateUnitQuantityBounds({ qty_step: mergedStep, min_qty: mergedMin, max_qty: mergedMax })
       if (boundsErr) return NextResponse.json({ error: boundsErr }, { status: 400 })
@@ -134,7 +156,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const setBase = body.is_base === true
 
   try {
-    const updated = await withTransaction(async (client) => {
+    const updated = await withTransaction(async client => {
       if (setBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [variantId])
         updates.push(`is_base = TRUE`)
@@ -151,10 +173,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       )
       const row = res.rows[0]
       if (setBase) {
-        await client.query(
-          `UPDATE product_variants SET sell_unit_id = $1 WHERE id = $2`,
-          [unitId, variantId]
-        )
+        await client.query(`UPDATE product_variants SET sell_unit_id = $1 WHERE id = $2`, [unitId, variantId])
       }
       return row
     })
@@ -190,7 +209,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       [variantId, unitId]
     )
     if (sibling) {
-      return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Cannot delete the base unit. Make another unit the base first.' },
+        { status: 400 }
+      )
     }
   }
 

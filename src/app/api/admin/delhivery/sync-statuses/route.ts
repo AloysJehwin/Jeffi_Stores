@@ -15,26 +15,51 @@ export const dynamic = 'force-dynamic'
 
 const CRON_SECRET = process.env.CRON_SECRET
 
-const STATUS_SYNC: Record<string, {
-  orderStatus: string
-  setShippedAt?: boolean
-  setDeliveredAt?: boolean
-  clearAwb?: boolean
-  onlyIfCurrent?: string[]
-}> = {
-  PU:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  RAD:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DISPATCHED:{ orderStatus: 'out_for_delivery', setShippedAt: true,  onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  RTO:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  RTRN:     { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-IT': { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-OT': { orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-OFD':{ orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-DL': { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
+const STATUS_SYNC: Record<
+  string,
+  {
+    orderStatus: string
+    setShippedAt?: boolean
+    setDeliveredAt?: boolean
+    clearAwb?: boolean
+    onlyIfCurrent?: string[]
+  }
+> = {
+  PU: { orderStatus: 'shipped', setShippedAt: true, onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT: { orderStatus: 'shipped', setShippedAt: true, onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  RAD: { orderStatus: 'shipped', setShippedAt: true, onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  OT: {
+    orderStatus: 'out_for_delivery',
+    setShippedAt: true,
+    onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'],
+  },
+  OD: {
+    orderStatus: 'out_for_delivery',
+    setShippedAt: true,
+    onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'],
+  },
+  DISPATCHED: {
+    orderStatus: 'out_for_delivery',
+    setShippedAt: true,
+    onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'],
+  },
+  DL: {
+    orderStatus: 'delivered',
+    setDeliveredAt: true,
+    onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'],
+  },
+  RTO: { orderStatus: 'shipped', onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  RTRN: { orderStatus: 'shipped', onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-IT': { orderStatus: 'shipped', onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-OT': {
+    orderStatus: 'out_for_delivery',
+    onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'],
+  },
+  'RTO-OFD': {
+    orderStatus: 'out_for_delivery',
+    onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'],
+  },
+  'RTO-DL': { orderStatus: 'returned', clearAwb: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
 export async function POST(request: NextRequest) {
@@ -44,12 +69,21 @@ export async function POST(request: NextRequest) {
   }
 
   const orders = await queryMany<{
-    id: string; awb_number: string; status: string; shipment_status: string | null
-    order_number: string; customer_name: string; customer_email: string
-    user_id: string | null; payment_mode: string | null
-    phone: string | null; notification_channel: string | null
-    shipping_amount: number | null; delhivery_quoted_weight_kg: number | null
-    delhivery_charged_weight_kg: number | null; delhivery_billed_at: string | null
+    id: string
+    awb_number: string
+    status: string
+    shipment_status: string | null
+    order_number: string
+    customer_name: string
+    customer_email: string
+    user_id: string | null
+    payment_mode: string | null
+    phone: string | null
+    notification_channel: string | null
+    shipping_amount: number | null
+    delhivery_quoted_weight_kg: number | null
+    delhivery_charged_weight_kg: number | null
+    delhivery_billed_at: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
             o.payment_mode, o.shipping_amount, o.delhivery_quoted_weight_kg,
@@ -137,31 +171,30 @@ export async function POST(request: NextRequest) {
 
         // Always advance shipment_status for every shipment we fetched
         if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
-          await query(
-            `UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`,
-            [order.id, newShipmentStatus]
-          ).catch(() => {})
+          await query(`UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`, [
+            order.id,
+            newShipmentStatus,
+          ]).catch(() => {})
         }
 
         // Always update EDD when Delhivery provides one — independent of status
         // transitions. COALESCE is intentionally NOT used here; Delhivery revises
         // EDD as the shipment moves, and we want the latest estimate reflected.
         if (delhiveryEdd) {
-          await query(
-            `UPDATE orders SET estimated_delivery_date = $2::date, updated_at = NOW() WHERE id = $1`,
-            [order.id, delhiveryEdd]
-          ).catch(() => {})
+          await query(`UPDATE orders SET estimated_delivery_date = $2::date, updated_at = NOW() WHERE id = $1`, [
+            order.id,
+            delhiveryEdd,
+          ]).catch(() => {})
         }
 
         // Persist charged weight and extra charge when Delhivery returns ChargedWeight.
-        const chargedWeightKg: number | null = shipment.ChargedWeight != null
-          ? Number(shipment.ChargedWeight) : null
+        const chargedWeightKg: number | null = shipment.ChargedWeight != null ? Number(shipment.ChargedWeight) : null
         if (chargedWeightKg != null && chargedWeightKg !== Number(order.delhivery_charged_weight_kg)) {
           let extraCharge: number | null = null
           if (order.delhivery_quoted_weight_kg != null && order.shipping_amount != null) {
             const quotedKg = Number(order.delhivery_quoted_weight_kg)
             if (chargedWeightKg > quotedKg && quotedKg > 0) {
-              extraCharge = Math.round(((chargedWeightKg / quotedKg) - 1) * Number(order.shipping_amount) * 100) / 100
+              extraCharge = Math.round((chargedWeightKg / quotedKg - 1) * Number(order.shipping_amount) * 100) / 100
             }
           }
           await query(
@@ -176,16 +209,14 @@ export async function POST(request: NextRequest) {
         const setClauses: string[] = [`status = '${syncRule.orderStatus}'`, `updated_at = NOW()`]
 
         if (syncRule.setShippedAt) {
-          setClauses.push(statusDateTime
-            ? `shipped_at = LEAST(COALESCE(shipped_at, $2::timestamptz), $2::timestamptz)`
-            : `shipped_at = COALESCE(shipped_at, NOW())`
+          setClauses.push(
+            statusDateTime
+              ? `shipped_at = LEAST(COALESCE(shipped_at, $2::timestamptz), $2::timestamptz)`
+              : `shipped_at = COALESCE(shipped_at, NOW())`
           )
         }
         if (syncRule.setDeliveredAt) {
-          setClauses.push(statusDateTime
-            ? `delivered_at = $2::timestamptz`
-            : `delivered_at = NOW()`
-          )
+          setClauses.push(statusDateTime ? `delivered_at = $2::timestamptz` : `delivered_at = NOW()`)
         }
         if (syncRule.clearAwb) {
           setClauses.push(`awb_number = NULL`)
@@ -196,10 +227,7 @@ export async function POST(request: NextRequest) {
           queryParams.push(statusDateTime)
         }
 
-        await query(
-          `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`,
-          queryParams
-        ).catch(() => {})
+        await query(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`, queryParams).catch(() => {})
 
         // COD orders: flip payment_status to cod_collected on delivery
         if (syncRule.orderStatus === 'delivered' && order.payment_mode === 'cod') {
@@ -217,7 +245,9 @@ export async function POST(request: NextRequest) {
           const grams = chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg, false)
           if (grams === 0) {
             console.warn('[delhivery] billing skipped — no trustworthy weight', {
-              awb, orderId: order.id, orderNumber: order.order_number,
+              awb,
+              orderId: order.id,
+              orderNumber: order.order_number,
             })
           } else {
             const invoiceCharges = await fetchDelhiveryInvoiceCharges({
@@ -233,14 +263,15 @@ export async function POST(request: NextRequest) {
               // Gate billed_at on a durable wallet debit: settle first, stamp billed_at only when the
               // charge is on the books (or no wallet applies). A transient failure leaves billed_at NULL
               // so the next sync retries rather than losing the charge.
-              const settled = tenantId && invoiceCharges.total > 0
-                ? await settleDelhiveryCostToWallet({
-                    tenantId,
-                    awb,
-                    orderRef: order.order_number,
-                    amountInr: invoiceCharges.total,
-                  }).catch(() => false)
-                : true
+              const settled =
+                tenantId && invoiceCharges.total > 0
+                  ? await settleDelhiveryCostToWallet({
+                      tenantId,
+                      awb,
+                      orderRef: order.order_number,
+                      amountInr: invoiceCharges.total,
+                    }).catch(() => false)
+                  : true
               await query(
                 `UPDATE orders SET
                   delhivery_billed_amount = $2,
@@ -251,7 +282,14 @@ export async function POST(request: NextRequest) {
                   delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
                   updated_at = NOW()
                  WHERE id = $1`,
-                [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
+                [
+                  order.id,
+                  invoiceCharges.total,
+                  invoiceCharges.freight,
+                  invoiceCharges.codCharge,
+                  invoiceCharges.oda,
+                  settled,
+                ]
               ).catch(() => {})
             }
           }
@@ -259,9 +297,12 @@ export async function POST(request: NextRequest) {
 
         if (order.customer_email && order.customer_name) {
           sendOrderStatusUpdate(
-            order.customer_email, order.customer_name,
-            order.order_number, order.id,
-            syncRule.orderStatus, order.status
+            order.customer_email,
+            order.customer_name,
+            order.order_number,
+            order.id,
+            syncRule.orderStatus,
+            order.status
           ).catch(() => {})
         }
 
@@ -310,8 +351,11 @@ export async function POST(request: NextRequest) {
   }
 
   const rvpRequests = await queryMany<{
-    id: string; rvp_awb_number: string; order_id: string;
-    user_id: string | null; order_number: string
+    id: string
+    rvp_awb_number: string
+    order_id: string
+    user_id: string | null
+    order_number: string
   }>(
     `SELECT rr.id, rr.rvp_awb_number, rr.order_id,
             o.user_id, o.order_number
@@ -321,7 +365,9 @@ export async function POST(request: NextRequest) {
        AND rr.status = 'approved'
        AND rr.received_at IS NULL`,
     []
-  ).catch(() => [] as { id: string; rvp_awb_number: string; order_id: string; user_id: string | null; order_number: string }[])
+  ).catch(
+    () => [] as { id: string; rvp_awb_number: string; order_id: string; user_id: string | null; order_number: string }[]
+  )
 
   const rvpResults: { returnRequestId: string; awb: string; receivedAt: boolean }[] = []
   const rvpErrors: { awb: string; error: string }[] = []
@@ -357,19 +403,16 @@ export async function POST(request: NextRequest) {
         const destReceiveDate: string | null = shipment.DestRecieveDate ?? null
         const returnedDate: string | null = shipment.ReturnedDate ?? null
 
-        const isReceivedAtWarehouse =
-          destReceiveDate !== null ||
-          returnedDate !== null ||
-          statusLabel === 'delivered'
+        const isReceivedAtWarehouse = destReceiveDate !== null || returnedDate !== null || statusLabel === 'delivered'
 
         if (!isReceivedAtWarehouse) continue
 
         const receivedAt = destReceiveDate ?? returnedDate ?? statusDateTime ?? new Date().toISOString()
 
-        await query(
-          `UPDATE return_requests SET received_at = $2, updated_at = NOW() WHERE id = $1`,
-          [rr.id, receivedAt]
-        ).catch(() => {})
+        await query(`UPDATE return_requests SET received_at = $2, updated_at = NOW() WHERE id = $1`, [
+          rr.id,
+          receivedAt,
+        ]).catch(() => {})
 
         if (rr.user_id) {
           completeAutoTask('schedule_pickup', rr.order_id).catch(() => {})

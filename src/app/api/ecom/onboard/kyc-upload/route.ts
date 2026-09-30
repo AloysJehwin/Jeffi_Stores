@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File too large (max 5 MB)' }, { status: 400 })
 
   const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
-  if (!allowed.includes(file.type)) return NextResponse.json({ error: 'Only PDF, JPG, PNG, or WebP allowed' }, { status: 400 })
+  if (!allowed.includes(file.type))
+    return NextResponse.json({ error: 'Only PDF, JPG, PNG, or WebP allowed' }, { status: 400 })
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const s3Key = await uploadKycDocument({

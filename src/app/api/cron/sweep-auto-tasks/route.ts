@@ -129,7 +129,7 @@ const RULES: SweepRule[] = [
     kind: 'vip_check_in',
     priority: 'medium',
     dueInDays: 3,
-    description: 'VIP customer (>₹50k LTV) hasn\'t ordered in 60+ days.',
+    description: "VIP customer (>₹50k LTV) hasn't ordered in 60+ days.",
     query: `
       SELECT u.id AS user_id, u.id::text AS ref_id,
              'Check in with VIP customer' AS title

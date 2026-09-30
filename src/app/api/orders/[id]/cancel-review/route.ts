@@ -6,10 +6,7 @@ import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { logActivity } from '@/lib/activity'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -29,14 +26,17 @@ export async function POST(
       return NextResponse.json({ error: 'A reason is required when rejecting a cancellation.' }, { status: 400 })
     }
 
-    const order = await queryOne(`
+    const order = await queryOne(
+      `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.user_id, o.awb_number,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1
-    `, [orderId])
+    `,
+      [orderId]
+    )
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -68,10 +68,7 @@ export async function POST(
       )
       const wasStockDeducted = !!saleRecord
 
-      await query(
-        `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-        [orderId]
-      )
+      await query(`UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [orderId])
 
       // Restore inventory via the shared helper: resets serials to in_stock,
       // reverses product_batches quantity_remaining, and syncs shelf_stock — the
@@ -118,9 +115,10 @@ export async function POST(
         kind: 'order_status',
         referenceId: orderId,
         referenceType: 'orders',
-        summary: newStatus === 'cancelled'
-          ? `Cancellation approved for #${order.order_number}`
-          : `Cancellation rejected for #${order.order_number}: ${note.trim()}`,
+        summary:
+          newStatus === 'cancelled'
+            ? `Cancellation approved for #${order.order_number}`
+            : `Cancellation rejected for #${order.order_number}: ${note.trim()}`,
         metadata: { order_status: newStatus, action, note: note?.trim() || null },
       }).catch(() => {})
     }

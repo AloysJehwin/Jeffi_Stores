@@ -40,15 +40,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     return runBuiltin(builtin, campaign, scenarioKind)
   }
 
-  const custom = await queryOne<{ kind: string; generated_sql: string; product_sql: string | null; enabled: boolean; description: string | null; ai_prompt: string | null }>(
-    `SELECT kind, generated_sql, product_sql, enabled, description, ai_prompt FROM custom_scenarios WHERE kind = $1`,
-    [scenarioKind]
-  )
+  const custom = await queryOne<{
+    kind: string
+    generated_sql: string
+    product_sql: string | null
+    enabled: boolean
+    description: string | null
+    ai_prompt: string | null
+  }>(`SELECT kind, generated_sql, product_sql, enabled, description, ai_prompt FROM custom_scenarios WHERE kind = $1`, [
+    scenarioKind,
+  ])
   if (custom) {
     return runCustom(custom, campaign, scenarioKind)
   }
 
-  return NextResponse.json({ eligible: [], total: 0, scenarioKind, note: 'No automation scenario module registered for this campaign — eligibility cannot be computed.' })
+  return NextResponse.json({
+    eligible: [],
+    total: 0,
+    scenarioKind,
+    note: 'No automation scenario module registered for this campaign — eligibility cannot be computed.',
+  })
 }
 
 async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
@@ -72,16 +83,31 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
   }
 
   const allUserIds = Array.from(new Set([...rows, ...suppressed].map(r => r.user_id || r.id).filter(Boolean)))
-  const users = allUserIds.length > 0
-    ? await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; marketing_opt_out: boolean }>(
-        `SELECT id::text, email, first_name, last_name, marketing_opt_out FROM users WHERE id = ANY($1::uuid[])`,
-        [allUserIds]
-      )
-    : []
+  const users =
+    allUserIds.length > 0
+      ? await queryMany<{
+          id: string
+          email: string
+          first_name: string | null
+          last_name: string | null
+          marketing_opt_out: boolean
+        }>(`SELECT id::text, email, first_name, last_name, marketing_opt_out FROM users WHERE id = ANY($1::uuid[])`, [
+          allUserIds,
+        ])
+      : []
   const userMap = new Map(users.map(u => [u.id, u]))
 
   if (rows.length === 0 && suppressed.length === 0) {
-    return NextResponse.json({ eligible: [], total: 0, suppressed: [], scenarioKind, params: resolvedParams, trigger: scenario.trigger, description: scenario.description, paramSchema: scenario.paramSchema })
+    return NextResponse.json({
+      eligible: [],
+      total: 0,
+      suppressed: [],
+      scenarioKind,
+      params: resolvedParams,
+      trigger: scenario.trigger,
+      description: scenario.description,
+      paramSchema: scenario.paramSchema,
+    })
   }
 
   const eligible: EligibleRecipient[] = rows.map((r, idx) => {
@@ -128,13 +154,25 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
 }
 
 async function runCustom(
-  custom: { kind: string; generated_sql: string; product_sql: string | null; enabled: boolean; description: string | null; ai_prompt: string | null },
+  custom: {
+    kind: string
+    generated_sql: string
+    product_sql: string | null
+    enabled: boolean
+    description: string | null
+    ai_prompt: string | null
+  },
   campaign: any,
   scenarioKind: string
 ) {
   const validation = validateScenarioSql(custom.generated_sql, 'audience')
   if (!validation.ok) {
-    return NextResponse.json({ eligible: [], total: 0, scenarioKind, error: `Saved SQL failed safety check: ${validation.reason}` })
+    return NextResponse.json({
+      eligible: [],
+      total: 0,
+      scenarioKind,
+      error: `Saved SQL failed safety check: ${validation.reason}`,
+    })
   }
 
   const params = (campaign as any).parameters || {}
@@ -152,19 +190,30 @@ async function runCustom(
     userIds = r.rows.map(x => x.id)
     await client.query('ROLLBACK')
   } catch (err: any) {
-    try { await client.query('ROLLBACK') } catch {}
-    return NextResponse.json({ eligible: [], total: 0, scenarioKind, error: err?.message || 'Preview query failed' }, { status: 500 })
+    try {
+      await client.query('ROLLBACK')
+    } catch {}
+    return NextResponse.json(
+      { eligible: [], total: 0, scenarioKind, error: err?.message || 'Preview query failed' },
+      { status: 500 }
+    )
   } finally {
     elapsedMs = Date.now() - start
     client.release()
   }
 
-  const users = userIds.length > 0
-    ? await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; marketing_opt_out: boolean }>(
-        `SELECT id::text, email, first_name, last_name, marketing_opt_out FROM users WHERE id = ANY($1::uuid[])`,
-        [userIds]
-      )
-    : []
+  const users =
+    userIds.length > 0
+      ? await queryMany<{
+          id: string
+          email: string
+          first_name: string | null
+          last_name: string | null
+          marketing_opt_out: boolean
+        }>(`SELECT id::text, email, first_name, last_name, marketing_opt_out FROM users WHERE id = ANY($1::uuid[])`, [
+          userIds,
+        ])
+      : []
   const userMap = new Map(users.map(u => [u.id, u]))
 
   const eligible: EligibleRecipient[] = userIds.map((uid, idx) => {

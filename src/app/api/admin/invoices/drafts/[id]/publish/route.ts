@@ -10,7 +10,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const draft = await queryOne<any>(
       `SELECT * FROM orders WHERE id = $1 AND status = 'draft' AND draft_of_id IS NOT NULL`,
@@ -18,15 +19,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
     if (!draft) return NextResponse.json({ error: 'Amendment draft not found' }, { status: 404 })
 
-    const original = await queryOne<any>(
-      `SELECT * FROM orders WHERE id = $1`,
-      [draft.draft_of_id]
-    )
+    const original = await queryOne<any>(`SELECT * FROM orders WHERE id = $1`, [draft.draft_of_id])
     if (!original) return NextResponse.json({ error: 'Original invoice not found' }, { status: 404 })
 
     const originalId = original.id
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       await client.query(
         `UPDATE orders SET
           total_amount          = $1,

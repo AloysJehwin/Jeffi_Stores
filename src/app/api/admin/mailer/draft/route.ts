@@ -10,7 +10,8 @@ import { query } from '@/lib/db'
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { draft_id, template_key, title, subject, template_data } = body
@@ -41,13 +42,7 @@ export async function POST(request: NextRequest) {
        (template_key, title, subject, template_data, audience_type, audience_filter, status, created_by)
      VALUES ($1, $2, $3, $4, 'all', '{}', 'draft', $5)
      RETURNING id`,
-    [
-      template_key || 'custom',
-      title || 'Draft',
-      subject || '',
-      JSON.stringify(template_data || {}),
-      admin.adminId,
-    ]
+    [template_key || 'custom', title || 'Draft', subject || '', JSON.stringify(template_data || {}), admin.adminId]
   )
 
   return NextResponse.json({ id: result.rows[0].id }, { status: 201 })

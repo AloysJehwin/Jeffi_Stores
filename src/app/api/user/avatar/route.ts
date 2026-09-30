@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    if (!ALLOWED.includes(file.type)) return NextResponse.json({ error: 'Only JPEG, PNG or WebP allowed' }, { status: 400 })
+    if (!ALLOWED.includes(file.type))
+      return NextResponse.json({ error: 'Only JPEG, PNG or WebP allowed' }, { status: 400 })
     if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File must be under 2 MB' }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())

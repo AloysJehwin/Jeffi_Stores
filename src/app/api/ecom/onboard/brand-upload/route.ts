@@ -20,12 +20,14 @@ export async function POST(request: NextRequest) {
   const file = formData.get('file')
   const kind = formData.get('kind')
   if (!file || typeof file === 'string') return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-  if (kind !== 'logo' && kind !== 'seal') return NextResponse.json({ error: 'kind must be logo or seal' }, { status: 400 })
+  if (kind !== 'logo' && kind !== 'seal')
+    return NextResponse.json({ error: 'kind must be logo or seal' }, { status: 400 })
 
   const MAX_SIZE = 3 * 1024 * 1024 // 3 MB
   if (file.size > MAX_SIZE) return NextResponse.json({ error: 'File too large (max 3 MB)' }, { status: 400 })
   const allowed = ['image/jpeg', 'image/png', 'image/webp']
-  if (!allowed.includes(file.type)) return NextResponse.json({ error: 'Only JPG, PNG, or WebP allowed' }, { status: 400 })
+  if (!allowed.includes(file.type))
+    return NextResponse.json({ error: 'Only JPG, PNG, or WebP allowed' }, { status: 400 })
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const { s3Key, url } = await uploadBrandingImage(buffer, owner.id, kind)

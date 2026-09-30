@@ -54,10 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Move to negotiating if not already there
     if (['pending', 'reviewed'].includes(rfq.status)) {
-      await query(
-        `UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`,
-        [id]
-      )
+      await query(`UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`, [id])
     }
 
     return NextResponse.json({ message: msg })

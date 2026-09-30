@@ -9,7 +9,11 @@ export const dynamic = 'force-dynamic'
 
 const querySchema = z.object({
   q: z.string().trim().max(100).optional(),
-  ids: z.string().optional().transform(s => (s ? s.split(',').filter(Boolean) : [])).pipe(z.array(z.guid()).max(50)),
+  ids: z
+    .string()
+    .optional()
+    .transform(s => (s ? s.split(',').filter(Boolean) : []))
+    .pipe(z.array(z.guid()).max(50)),
 })
 
 const SELECT = `
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
      WHERE p.is_active = true AND (p.name ILIKE $1 OR p.sku ILIKE $1)
      ORDER BY (p.name ILIKE $2) DESC, p.name ASC
      LIMIT 12`,
-    [`%${q.replace(/[\\%_]/g, m => `\\${m}`)}%`, `${q.replace(/[\\%_]/g, m => `\\${m}`)}%`],
+    [`%${q.replace(/[\\%_]/g, m => `\\${m}`)}%`, `${q.replace(/[\\%_]/g, m => `\\${m}`)}%`]
   )
   return NextResponse.json({ products })
 }

@@ -26,13 +26,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // Resolve the owner so the backup is keyed for restore-on-re-onboard.
-  const ownerRow = await controlPlanePool().query(
-    `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [id],
-  ).catch(() => null)
+  const ownerRow = await controlPlanePool()
+    .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [id])
+    .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
 
   const result = await triggerProvisioning({
-    action: 'deprovision', tenantId: id, slug: tenant.slug, plan: tenant.plan, ownerId, reason: 'operator',
+    action: 'deprovision',
+    tenantId: id,
+    slug: tenant.slug,
+    plan: tenant.plan,
+    ownerId,
+    reason: 'operator',
   })
 
   if (!result.ok) {

@@ -8,12 +8,13 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const q = new URL(request.url).searchParams.get('q')?.trim() || ''
     if (q.length < 2) return NextResponse.json({ results: [] })
 
-    const sc = buildSearchClause(q, ['u.first_name || \' \' || u.last_name', 'u.email', 'u.phone', 'cp.company_name'], 1)
+    const sc = buildSearchClause(q, ["u.first_name || ' ' || u.last_name", 'u.email', 'u.phone', 'cp.company_name'], 1)
 
     const rows = await queryMany<any>(
       `SELECT DISTINCT ON (u.id)

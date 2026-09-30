@@ -14,10 +14,16 @@ export async function GET(request: NextRequest) {
     const hostname = request.nextUrl.hostname || request.headers.get('host') || ''
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:')
     const certVerified = !!(request.headers.get('x-client-cert-cn') || request.headers.get('x-client-cert-serial'))
-    const certStatus = certVerified ? 'valid' : (isLocalhost ? 'development' : 'missing')
+    const certStatus = certVerified ? 'valid' : isLocalhost ? 'development' : 'missing'
 
     const deny = () => {
-      const res = NextResponse.json({ authenticated: false, expiresAt: null, deadlineAt: null, serverNow: Date.now(), certStatus })
+      const res = NextResponse.json({
+        authenticated: false,
+        expiresAt: null,
+        deadlineAt: null,
+        serverNow: Date.now(),
+        certStatus,
+      })
       res.headers.set('x-cert-status', certStatus)
       return res
     }

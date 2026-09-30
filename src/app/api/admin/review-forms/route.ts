@@ -7,7 +7,8 @@ import { buildSearchClause } from '@/lib/search'
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:read'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
@@ -45,7 +46,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:write'))
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { title, slug, description, template_type, google_review_url, coupon_id, custom_fields } = body
@@ -63,11 +65,20 @@ export async function POST(request: NextRequest) {
     const result = await queryMany(
       `INSERT INTO review_forms (title, slug, description, template_type, google_review_url, coupon_id, is_active, is_draft, custom_fields)
        VALUES ($1,$2,$3,$4,$5,$6,false,true,$7) RETURNING *`,
-      [title, slug.toLowerCase().trim(), description || null, template_type || 'google_review', google_review_url || '', coupon_id || null, JSON.stringify(custom_fields || [])]
+      [
+        title,
+        slug.toLowerCase().trim(),
+        description || null,
+        template_type || 'google_review',
+        google_review_url || '',
+        coupon_id || null,
+        JSON.stringify(custom_fields || []),
+      ]
     )
     return NextResponse.json({ form: result[0] }, { status: 201 })
   } catch (err: unknown) {
-    if ((err as { code?: string }).code === '23505') return NextResponse.json({ error: 'Slug already exists' }, { status: 409 })
+    if ((err as { code?: string }).code === '23505')
+      return NextResponse.json({ error: 'Slug already exists' }, { status: 409 })
     throw err
   }
 }

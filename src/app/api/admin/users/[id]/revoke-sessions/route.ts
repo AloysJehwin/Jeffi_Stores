@@ -6,7 +6,9 @@ import { revokeAllForPrincipal, type PrincipalType } from '@/lib/auth-sessions'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-interface Params { params: Promise<{ id: string }> }
+interface Params {
+  params: Promise<{ id: string }>
+}
 
 // Admin force-logout of another account. The [id] is the target user's id.
 // Audience is selected via ?type=customer|business (default 'customer') and

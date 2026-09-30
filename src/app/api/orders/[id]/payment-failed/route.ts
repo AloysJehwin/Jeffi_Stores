@@ -5,10 +5,7 @@ import { sendPaymentStatusUpdate, sendPaymentFailedAdminNotification } from '@/l
 import { createAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const authUser = await authenticateUser(request)
@@ -20,14 +17,17 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const errorDescription = body?.errorDescription || ''
 
-    const order = await queryOne(`
+    const order = await queryOne(
+      `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.customer_phone,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = $1 AND o.user_id = $2
-    `, [orderId, authUser.userId])
+    `,
+      [orderId, authUser.userId]
+    )
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })

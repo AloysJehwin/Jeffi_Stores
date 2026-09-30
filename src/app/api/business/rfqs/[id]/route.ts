@@ -73,10 +73,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const rfq = await queryOne<any>(
-    `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [id, user.userId]
-  )
+  const rfq = await queryOne<any>(`SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`, [
+    id,
+    user.userId,
+  ])
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!['pending', 'reviewed', 'negotiating'].includes(rfq.status)) {
     return NextResponse.json({ error: 'Cannot edit this quote' }, { status: 400 })
@@ -110,4 +110,3 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   return NextResponse.json({ ok: true })
 }
-

@@ -125,7 +125,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 502 })
   }
 
-  let parsed: { name?: string; kind?: string; description?: string; sql?: string; product_sql?: string; explanation?: string }
+  let parsed: {
+    name?: string
+    kind?: string
+    description?: string
+    sql?: string
+    product_sql?: string
+    explanation?: string
+  }
   try {
     parsed = JSON.parse(aiText)
   } catch (err) {
@@ -143,10 +150,8 @@ export async function POST(req: NextRequest) {
 
   const validation = validateScenarioSql(parsed.sql, 'audience')
 
-  const productSqlRaw = (typeof parsed.product_sql === 'string' ? parsed.product_sql.trim() : '')
-  const productValidation = productSqlRaw
-    ? validateScenarioSql(productSqlRaw, 'products')
-    : null
+  const productSqlRaw = typeof parsed.product_sql === 'string' ? parsed.product_sql.trim() : ''
+  const productValidation = productSqlRaw ? validateScenarioSql(productSqlRaw, 'products') : null
 
   const proposedName = typeof parsed.name === 'string' ? parsed.name.trim().slice(0, 128) : ''
   const rawKind = typeof parsed.kind === 'string' ? parsed.kind.trim() : ''
@@ -160,7 +165,14 @@ export async function POST(req: NextRequest) {
   await query(
     `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, generated_sql, validation, result)
      VALUES ($1, 'ai_generate', $2, $3, $4, $5::jsonb, $6::jsonb)`,
-    [admin.id, userPrompt, aiText, parsed.sql, JSON.stringify({ audience: validation, products: productValidation }), JSON.stringify({ provider, model, latencyMs, fallbackUsed })]
+    [
+      admin.id,
+      userPrompt,
+      aiText,
+      parsed.sql,
+      JSON.stringify({ audience: validation, products: productValidation }),
+      JSON.stringify({ provider, model, latencyMs, fallbackUsed }),
+    ]
   ).catch(() => {})
 
   return NextResponse.json({

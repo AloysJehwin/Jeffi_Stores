@@ -7,7 +7,8 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'reviews:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'reviews:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'pending'
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (q) {
-      conditions.push(`(p.name ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.email ILIKE $${i})`)
+      conditions.push(
+        `(p.name ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.email ILIKE $${i})`
+      )
       params.push(`%${q}%`)
       i++
     }
@@ -72,7 +75,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'reviews:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'reviews:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { reviewId, action } = body
@@ -82,10 +86,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'approve') {
-      await query(
-        'UPDATE product_reviews SET is_approved = true, updated_at = NOW() WHERE id = $1',
-        [reviewId]
-      )
+      await query('UPDATE product_reviews SET is_approved = true, updated_at = NOW() WHERE id = $1', [reviewId])
       return NextResponse.json({ message: 'Review approved successfully' })
     } else if (action === 'reject') {
       await query('DELETE FROM product_reviews WHERE id = $1', [reviewId])

@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'name must be 2–80 characters' }, { status: 400 })
   }
   if (!/^[a-z0-9-_]+$/.test(name)) {
-    return NextResponse.json({ error: 'name may only contain lowercase letters, digits, hyphens and underscores' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'name may only contain lowercase letters, digits, hyphens and underscores' },
+      { status: 400 }
+    )
   }
 
   const allowedScopes: string[] = Array.isArray(body.allowed_scopes) ? body.allowed_scopes : []
@@ -71,7 +74,12 @@ export async function POST(request: NextRequest) {
   try {
     const tenant = await resolveTenant().catch(() => null)
     if (tenant?.tenantId) {
-      const c = await issueTenantAdminCert({ tenantId: tenant.tenantId, slug: tenant.slug, commonName: cn, issuedTo: cn })
+      const c = await issueTenantAdminCert({
+        tenantId: tenant.tenantId,
+        slug: tenant.slug,
+        commonName: cn,
+        issuedTo: cn,
+      })
       cert = { serialNumber: c.serial, p12Buffer: c.p12Buffer, p12Password: c.p12Password }
     } else {
       cert = await generateClientCertificate(cn, 'service-account')
@@ -85,25 +93,20 @@ export async function POST(request: NextRequest) {
        (name, serial_number, common_name, allowed_scopes, p12_data, p12_password, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id, name, common_name, allowed_scopes, created_at`,
-    [
-      name,
-      cert.serialNumber,
-      cn,
-      allowedScopes,
-      cert.p12Buffer,
-      cert.p12Password,
-      admin.adminId,
-    ]
+    [name, cert.serialNumber, cn, allowedScopes, cert.p12Buffer, cert.p12Password, admin.adminId]
   )
 
   const created = rows[0]
-  return NextResponse.json({
-    id: created.id,
-    name: created.name,
-    common_name: created.common_name,
-    allowed_scopes: created.allowed_scopes,
-    created_at: created.created_at,
-    p12_password: cert.p12Password,
-    download_url: `/api/admin/service-accounts/${created.id}/download`,
-  }, { status: 201 })
+  return NextResponse.json(
+    {
+      id: created.id,
+      name: created.name,
+      common_name: created.common_name,
+      allowed_scopes: created.allowed_scopes,
+      created_at: created.created_at,
+      p12_password: cert.p12Password,
+      download_url: `/api/admin/service-accounts/${created.id}/download`,
+    },
+    { status: 201 }
+  )
 }

@@ -32,17 +32,13 @@ export async function POST(request: NextRequest) {
     const payoutId: string = payout.id
     const payoutStatus: string = payout.status
 
-    if (['payout.processed', 'payout.failed', 'payout.reversed', 'payout.queued', 'payout.initiated'].includes(eventType)) {
-      await query(
-        `UPDATE expense_payments SET payout_status = $1 WHERE payout_id = $2`,
-        [payoutStatus, payoutId]
-      )
+    if (
+      ['payout.processed', 'payout.failed', 'payout.reversed', 'payout.queued', 'payout.initiated'].includes(eventType)
+    ) {
+      await query(`UPDATE expense_payments SET payout_status = $1 WHERE payout_id = $2`, [payoutStatus, payoutId])
 
       if (payoutStatus === 'failed' || payoutStatus === 'reversed') {
-        const row = await query(
-          `SELECT expense_id FROM expense_payments WHERE payout_id = $1 LIMIT 1`,
-          [payoutId]
-        )
+        const row = await query(`SELECT expense_id FROM expense_payments WHERE payout_id = $1 LIMIT 1`, [payoutId])
         const expenseId = (row as any)?.[0]?.expense_id
         if (expenseId) {
           const paidResult = await query(
@@ -50,10 +46,7 @@ export async function POST(request: NextRequest) {
             [expenseId]
           )
           const paid = parseFloat((paidResult as any)?.[0]?.paid || '0')
-          const totalResult = await query(
-            `SELECT total_amount FROM expenses WHERE id = $1`,
-            [expenseId]
-          )
+          const totalResult = await query(`SELECT total_amount FROM expenses WHERE id = $1`, [expenseId])
           const total = parseFloat((totalResult as any)?.[0]?.total_amount || '0')
           const newStatus = paid <= 0 ? 'unpaid' : paid >= total ? 'paid' : 'partial'
           await query(`UPDATE expenses SET status = $1, updated_at = NOW() WHERE id = $2`, [newStatus, expenseId])

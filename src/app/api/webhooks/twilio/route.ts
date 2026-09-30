@@ -93,10 +93,7 @@ export async function POST(request: NextRequest) {
 
     if (STOP_CMDS.has(cmd)) {
       if (userId) {
-        await query(
-          'UPDATE users SET marketing_opt_out = TRUE, marketing_opt_out_at = NOW() WHERE id = $1',
-          [userId]
-        )
+        await query('UPDATE users SET marketing_opt_out = TRUE, marketing_opt_out_at = NOW() WHERE id = $1', [userId])
       }
       if (channel === 'whatsapp') {
         // SMS STOP is auto-handled by Twilio; only reply on WhatsApp.
@@ -110,10 +107,7 @@ export async function POST(request: NextRequest) {
 
     if (START_CMDS.has(cmd)) {
       if (userId) {
-        await query(
-          'UPDATE users SET marketing_opt_out = FALSE, marketing_opt_out_at = NULL WHERE id = $1',
-          [userId]
-        )
+        await query('UPDATE users SET marketing_opt_out = FALSE, marketing_opt_out_at = NULL WHERE id = $1', [userId])
       }
       if (channel === 'whatsapp') {
         await sendFreeTextWhatsApp({

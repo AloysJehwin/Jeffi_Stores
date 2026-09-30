@@ -3,18 +3,19 @@ import https from 'https'
 
 function httpsGet(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    https.get(url, { rejectUnauthorized: false }, (res) => {
-      let data = ''
-      res.on('data', (chunk) => { data += chunk })
-      res.on('end', () => resolve(data))
-    }).on('error', reject)
+    https
+      .get(url, { rejectUnauthorized: false }, res => {
+        let data = ''
+        res.on('data', chunk => {
+          data += chunk
+        })
+        res.on('end', () => resolve(data))
+      })
+      .on('error', reject)
   })
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ pin: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ pin: string }> }) {
   const { pin } = await params
 
   if (!/^\d{6}$/.test(pin)) {

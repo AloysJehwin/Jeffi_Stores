@@ -4,10 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -38,7 +35,7 @@ export async function POST(
       return NextResponse.json({ error: 'Valuation already completed' }, { status: 409 })
     }
 
-    await withTransaction(async (client) => {
+    await withTransaction(async client => {
       await client.query(
         `UPDATE return_requests
          SET valuation_status = 'approved',

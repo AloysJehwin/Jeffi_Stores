@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
     if (!rl.allowed) {
       return NextResponse.json(
         { error: `Please wait ${rl.retryAfter}s before requesting another OTP.`, retryAfter: rl.retryAfter },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } })
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      )
     }
     const otp = generateOTP()
     await storeOTP(email, otp)

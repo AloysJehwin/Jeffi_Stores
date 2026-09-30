@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     const [transactions, total] = await Promise.all([
-      queryMany(`
+      queryMany(
+        `
         SELECT
           p.id, p.transaction_id, p.payment_method, p.payment_gateway,
           p.amount, p.status, p.created_at, p.updated_at,
@@ -28,7 +29,9 @@ export async function GET(request: NextRequest) {
         WHERE o.user_id = $1
         ORDER BY p.created_at DESC
         LIMIT $2 OFFSET $3
-      `, [userId, limit, offset]),
+      `,
+        [userId, limit, offset]
+      ),
       queryCount(`SELECT COUNT(*) FROM payments p JOIN orders o ON p.order_id = o.id WHERE o.user_id = $1`, [userId]),
     ])
 

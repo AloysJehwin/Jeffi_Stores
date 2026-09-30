@@ -13,7 +13,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const TOKEN = await resolveDelhiveryToken()
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -47,10 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const cancelledAwb = order.awb_number
-    await query(
-      `UPDATE orders SET awb_number = NULL, updated_at = NOW() WHERE id = $1`,
-      [id]
-    )
+    await query(`UPDATE orders SET awb_number = NULL, updated_at = NOW() WHERE id = $1`, [id])
 
     // The AWB is cancelled, so refund any pickup estimate held for it (platform-Delhivery tenants;
     // own_delhivery never had a debit → no-op). Reconciliation at delivery can no longer fire for a

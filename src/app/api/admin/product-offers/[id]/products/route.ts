@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `SELECT id, name, sku FROM products
         WHERE is_active = true AND (name ILIKE $1 OR sku ILIKE $1)
         ORDER BY name ASC LIMIT 10`,
-      [`%${q}%`],
+      [`%${q}%`]
     )
     return NextResponse.json({ items: rows.map(r => ({ id: r.id, label: r.name, sublabel: r.sku })) })
   }
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
        JOIN products p ON p.id = i.product_id
       WHERE i.offer_id = $1
       ORDER BY p.name ASC`,
-    [id],
+    [id]
   )
   return NextResponse.json({ products })
 }
@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         `INSERT INTO product_offer_items (offer_id, product_id)
            SELECT $1, pid FROM unnest($2::uuid[]) AS pid
          ON CONFLICT DO NOTHING`,
-        [id, productIds],
+        [id, productIds]
       )
     }
   })
@@ -76,13 +76,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // Brand ids include seeded non-RFC uuids, so these accept any Postgres uuid shape.
-const bulkSchema = z.object({
-  action: z.enum(['add', 'remove']),
-  categoryId: z.guid().optional(),
-  brandId: z.guid().optional(),
-}).refine(b => Boolean(b.categoryId) !== Boolean(b.brandId), {
-  message: 'Provide exactly one of categoryId or brandId',
-})
+const bulkSchema = z
+  .object({
+    action: z.enum(['add', 'remove']),
+    categoryId: z.guid().optional(),
+    brandId: z.guid().optional(),
+  })
+  .refine(b => Boolean(b.categoryId) !== Boolean(b.brandId), {
+    message: 'Provide exactly one of categoryId or brandId',
+  })
 
 const CATEGORY_TREE = `WITH RECURSIVE tree AS (
     SELECT id FROM categories WHERE id = $2
@@ -109,17 +111,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const tree = categoryId ? CATEGORY_TREE : ''
   const match = categoryId ? 'p.category_id IN (SELECT id FROM tree)' : 'p.brand_id = $2'
-  const sql = action === 'add'
-    ? `${tree} INSERT INTO product_offer_items (offer_id, product_id)
+  const sql =
+    action === 'add'
+      ? `${tree} INSERT INTO product_offer_items (offer_id, product_id)
          SELECT $1, p.id FROM products p WHERE p.is_active = true AND ${match}
        ON CONFLICT DO NOTHING`
-    : `${tree} DELETE FROM product_offer_items i USING products p
+      : `${tree} DELETE FROM product_offer_items i USING products p
         WHERE i.offer_id = $1 AND i.product_id = p.id AND ${match}`
 
   const result = await query(sql, [id, categoryId ?? brandId])
   const total = await queryOne<{ n: number }>(
     `SELECT count(*)::int AS n FROM product_offer_items WHERE offer_id = $1`,
-    [id],
+    [id]
   )
   return NextResponse.json({ changed: result.rowCount ?? 0, total: total?.n ?? 0 })
 }
