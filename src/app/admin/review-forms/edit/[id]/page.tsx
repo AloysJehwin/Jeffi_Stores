@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { discardReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,12 +103,7 @@ export default async function EditReviewFormPage({
               Changes are saved to draft. The live form stays unchanged until you publish.
             </p>
           </div>
-          <form
-            action={async () => {
-              'use server'
-              await query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
-            }}
-          >
+          <form action={discardReviewFormDraft.bind(null, id)}>
             <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
               Discard draft
             </button>
