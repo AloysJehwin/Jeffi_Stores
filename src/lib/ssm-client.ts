@@ -1,7 +1,4 @@
-import { SignatureV4 } from '@smithy/signature-v4'
-import { HttpRequest } from '@smithy/protocol-http'
-import { defaultProvider } from '@aws-sdk/credential-provider-node'
-import { Sha256 } from '@aws-crypto/sha256-js'
+import { signedAwsFetch } from '@/lib/aws-signing'
 
 /**
  * Minimal SSM client (SigV4-signed AWS-JSON-1.1) — mirrors ec2-client.ts. Avoids adding
@@ -13,9 +10,10 @@ const SSM_HOST = 'ssm.us-east-1.amazonaws.com'
 
 async function ssm(target: string, payload: Record<string, unknown>): Promise<any> {
   const body = JSON.stringify(payload)
-  const request = new HttpRequest({
+  const res = await signedAwsFetch({
+    service: 'ssm',
+    region: 'us-east-1',
     method: 'POST',
-    protocol: 'https:',
     hostname: SSM_HOST,
     path: '/',
     headers: {
@@ -25,14 +23,6 @@ async function ssm(target: string, payload: Record<string, unknown>): Promise<an
     },
     body,
   })
-  const signer = new SignatureV4({
-    service: 'ssm',
-    region: 'us-east-1',
-    credentials: defaultProvider(),
-    sha256: Sha256,
-  })
-  const signed = await signer.sign(request)
-  const res = await fetch(`https://${SSM_HOST}/`, { method: 'POST', headers: signed.headers as any, body })
   const text = await res.text()
   if (!res.ok) throw new Error(`SSM ${target} failed (${res.status}): ${text.slice(0, 400)}`)
   return text ? JSON.parse(text) : {}
