@@ -24,7 +24,7 @@ vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstanceFor: vi.fn(),
 }))
 
-import { POST } from '@/app/api/razorpay/payment-link/route'
+import { POST } from '@/app/api/(public)/razorpay/payment-link/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

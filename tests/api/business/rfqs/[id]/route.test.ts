@@ -24,7 +24,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { GET, PATCH } from '@/app/api/business/rfqs/[id]/route'
+import { GET, PATCH } from '@/app/api/(public)/business/rfqs/[id]/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const AUTH_USER = { userId: 'biz-1', email: 'biz@example.com', isBusiness: true, approvalStatus: 'approved' }

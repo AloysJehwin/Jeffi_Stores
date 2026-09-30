@@ -74,7 +74,7 @@ vi.mock('sharp', () => {
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/quotations/[id]/convert-to-invoice/route'
+import { POST } from '@/app/api/(admin)/admin/quotations/[id]/convert-to-invoice/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'

@@ -16,7 +16,7 @@ vi.mock('@/lib/catalog/shelf', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/shelving/stock/route'
+import { GET, POST } from '@/app/api/(admin)/admin/shelving/stock/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

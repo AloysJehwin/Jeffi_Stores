@@ -8,8 +8,8 @@ vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
 
 // ── Imports after mocks ──────────────────────────────────────────────────────
 
-import { GET as GSTR1_GET } from '@/app/api/admin/gst/gstr1/route'
-import { GET as GSTR3B_GET } from '@/app/api/admin/gst/gstr3b/route'
+import { GET as GSTR1_GET } from '@/app/api/(admin)/admin/gst/gstr1/route'
+import { GET as GSTR3B_GET } from '@/app/api/(admin)/admin/gst/gstr3b/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

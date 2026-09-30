@@ -9,7 +9,7 @@ vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/ai-enrich-field/route'
+import { POST } from '@/app/api/(admin)/admin/ai-enrich-field/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { aiChat } from '@/lib/shared/ai-client'
 import { storeDescriptorForPrompt } from '@/lib/catalog/brand'

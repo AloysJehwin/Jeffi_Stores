@@ -20,7 +20,7 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { PATCH } from '@/app/api/support/sessions/[sessionId]/route'
+import { PATCH } from '@/app/api/(public)/support/sessions/[sessionId]/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makePatch(sessionId: string) {

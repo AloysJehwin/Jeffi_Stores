@@ -18,7 +18,7 @@ vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { POST } from '@/app/api/orders/[id]/payment-failed/route'
+import { POST } from '@/app/api/(public)/orders/[id]/payment-failed/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

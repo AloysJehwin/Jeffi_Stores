@@ -9,7 +9,7 @@ vi.mock('@/lib/shared/customer-conversations-ai', () => ({
   aiProfileConfigured: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/admin/customers/[id]/ai-summary/route'
+import { GET, POST } from '@/app/api/(admin)/admin/customers/[id]/ai-summary/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/shared/customer-conversations-ai'

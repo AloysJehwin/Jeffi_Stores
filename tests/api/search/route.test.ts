@@ -62,7 +62,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 
 // ── import handler AFTER mocks ───────────────────────────────────────────────
-import { GET } from '@/app/api/search/route'
+import { GET } from '@/app/api/(public)/search/route'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function makeReq(q?: string) {

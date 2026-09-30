@@ -21,7 +21,7 @@ vi.stubGlobal('fetch', mockFetch)
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/ewaybill/route'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/ewaybill/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

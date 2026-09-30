@@ -28,7 +28,7 @@ vi.mock('@/lib/catalog/search', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET } from '@/app/api/admin/labels/products/route'
+import { GET } from '@/app/api/(admin)/admin/labels/products/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

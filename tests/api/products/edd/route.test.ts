@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { NextRequest } from 'next/server'
 
-import { GET } from '@/app/api/products/edd/route'
+import { GET } from '@/app/api/(public)/products/edd/route'
 
 function makeReq(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/products/edd')

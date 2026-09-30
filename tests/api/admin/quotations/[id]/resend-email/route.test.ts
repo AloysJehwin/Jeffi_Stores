@@ -6,7 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendQuotationFinalizedEmail: vi.fn() }))
 
-import { POST } from '@/app/api/admin/quotations/[id]/resend-email/route'
+import { POST } from '@/app/api/(admin)/admin/quotations/[id]/resend-email/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

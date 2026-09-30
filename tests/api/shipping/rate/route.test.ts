@@ -38,7 +38,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { POST } from '@/app/api/shipping/rate/route'
+import { POST } from '@/app/api/(public)/shipping/rate/route'
 import { queryMany } from '@/lib/shared/db'
 import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/shipping/delivery-settings'

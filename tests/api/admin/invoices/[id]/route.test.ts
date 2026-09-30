@@ -62,7 +62,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { PATCH } from '@/app/api/admin/invoices/[id]/route'
+import { PATCH } from '@/app/api/(admin)/admin/invoices/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'

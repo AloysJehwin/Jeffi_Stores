@@ -8,7 +8,7 @@ vi.mock('@/lib/catalog/product-cards', async () => {
 })
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }) }))
 
-import { GET } from '@/app/api/products/affinity/route'
+import { GET } from '@/app/api/(public)/products/affinity/route'
 import { frequentlyBoughtWith, alsoViewedWith } from '@/lib/catalog/product-affinity'
 import { getProductCardsByIds } from '@/lib/catalog/product-cards'
 

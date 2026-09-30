@@ -30,7 +30,7 @@ vi.mock('@/lib/shared/email-business', () => ({
   sendRfqSubmittedEmail: mockSendRfqSubmittedEmail,
 }))
 
-import { GET, POST } from '@/app/api/business/rfqs/route'
+import { GET, POST } from '@/app/api/(public)/business/rfqs/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const APPROVED_USER = {

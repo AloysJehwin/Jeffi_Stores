@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-import { GET } from '@/app/api/orders/[id]/track/route'
+import { GET } from '@/app/api/(public)/orders/[id]/track/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 

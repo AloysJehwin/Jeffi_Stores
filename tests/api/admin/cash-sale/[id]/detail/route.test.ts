@@ -25,7 +25,7 @@ vi.mock('@/lib/catalog/shelf', () => ({
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { GET, PATCH } from '@/app/api/admin/cash-sale/[id]/detail/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/cash-sale/[id]/detail/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'

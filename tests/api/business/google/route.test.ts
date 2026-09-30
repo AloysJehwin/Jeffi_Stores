@@ -40,7 +40,7 @@ vi.mock('@/lib/auth/cookie-domain', () => ({
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { POST } from '@/app/api/business/google/route'
+import { POST } from '@/app/api/(public)/business/google/route'
 import { cookies } from 'next/headers'
 
 // ── helpers ───────────────────────────────────────────────────────────────────

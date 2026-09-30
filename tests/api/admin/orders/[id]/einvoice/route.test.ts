@@ -17,7 +17,7 @@ vi.mock('@/lib/shipping/einvoice', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST, DELETE } from '@/app/api/admin/orders/[id]/einvoice/route'
+import { POST, DELETE } from '@/app/api/(admin)/admin/orders/[id]/einvoice/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

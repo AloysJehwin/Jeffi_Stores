@@ -12,7 +12,7 @@ vi.mock('@/lib/catalog/shelf', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { PATCH, DELETE } from '@/app/api/admin/shelving/locations/[id]/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/shelving/locations/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateLocation, deleteLocation } from '@/lib/catalog/shelf'

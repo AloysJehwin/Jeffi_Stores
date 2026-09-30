@@ -9,7 +9,7 @@ vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), query
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/financial/transactions/route'
+import { GET } from '@/app/api/(admin)/admin/financial/transactions/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

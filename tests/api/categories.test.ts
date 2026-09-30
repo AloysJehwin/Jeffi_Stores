@@ -33,8 +33,8 @@ vi.mock('@/lib/auth/jwt', async () => {
 })
 
 // ── import handlers AFTER mocks ──────────────────────────────────────────────
-import { GET as listCategories, OPTIONS } from '@/app/api/categories/route'
-import { DELETE as deleteCategory } from '@/app/api/categories/[id]/route'
+import { GET as listCategories, OPTIONS } from '@/app/api/(public)/categories/route'
+import { DELETE as deleteCategory } from '@/app/api/(public)/categories/[id]/route'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function makeReq(method: string) {

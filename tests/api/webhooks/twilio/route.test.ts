@@ -23,7 +23,7 @@ vi.mock('@/lib/shared/whatsapp', () => ({
   sendSupportAckWhatsApp: vi.fn().mockResolvedValue(true),
 }))
 
-import { POST } from '@/app/api/webhooks/twilio/route'
+import { POST } from '@/app/api/(public)/webhooks/twilio/route'
 import { query, queryOne } from '@/lib/shared/db'
 import { logMessage } from '@/lib/shared/message-log'
 import { logActivity } from '@/lib/shared/activity'

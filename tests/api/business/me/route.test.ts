@@ -26,7 +26,7 @@ vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: '2026-06-14',
 }))
 
-import { GET } from '@/app/api/business/me/route'
+import { GET } from '@/app/api/(public)/business/me/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makeGet() {

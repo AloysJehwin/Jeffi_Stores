@@ -9,7 +9,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { POST } from '@/app/api/reviews/generate/route'
+import { POST } from '@/app/api/(public)/reviews/generate/route'
 import { aiChat } from '@/lib/shared/ai-client'
 
 const mockAiChat = vi.mocked(aiChat)

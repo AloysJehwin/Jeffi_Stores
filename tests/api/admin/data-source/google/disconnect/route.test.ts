@@ -13,7 +13,7 @@ vi.mock('@/lib/import/sheet-links', () => ({ forgetSheetOwnership: vi.fn(), rele
 vi.mock('@/lib/tenant-registry', () => ({ deleteIntegrationCredential: vi.fn(), lookupTenantContextById: vi.fn() }))
 vi.mock('@/lib/tenancy/tenant-context', () => ({ runWithTenantContext: vi.fn((_ctx: unknown, fn: () => unknown) => fn()) }))
 
-import { POST } from '@/app/api/admin/data-source/google/disconnect/route'
+import { POST } from '@/app/api/(admin)/admin/data-source/google/disconnect/route'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { resolveImportTenantId, isSheetSyncRunning, cancelPendingSheetSyncs } from '@/lib/import/jobs'

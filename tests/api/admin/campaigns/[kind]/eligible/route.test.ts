@@ -39,7 +39,7 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET } from '@/app/api/admin/campaigns/[kind]/eligible/route'
+import { GET } from '@/app/api/(admin)/admin/campaigns/[kind]/eligible/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCampaign } from '@/lib/shared/marketing'

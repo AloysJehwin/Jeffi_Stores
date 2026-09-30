@@ -14,7 +14,7 @@ vi.mock('@/lib/queries', () => ({
   getBrochureProductsByBrands: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/brochure/products/route'
+import { GET } from '@/app/api/(admin)/admin/brochure/products/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getBrochureProductsByCategories, getBrochureProductsByBrands } from '@/lib/queries'

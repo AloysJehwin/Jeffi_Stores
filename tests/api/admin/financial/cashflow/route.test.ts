@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/payments/financial', () => ({ getCashflow: vi.fn() }))
 
-import { GET } from '@/app/api/admin/financial/cashflow/route'
+import { GET } from '@/app/api/(admin)/admin/financial/cashflow/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCashflow } from '@/lib/payments/financial'

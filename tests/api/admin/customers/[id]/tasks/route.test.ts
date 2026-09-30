@@ -22,7 +22,7 @@ vi.mock('@/lib/shared/activity', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/customers/[id]/tasks/route'
+import { GET, POST } from '@/app/api/(admin)/admin/customers/[id]/tasks/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany } from '@/lib/shared/db'

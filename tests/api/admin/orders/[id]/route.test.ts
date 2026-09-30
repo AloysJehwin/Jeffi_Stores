@@ -33,7 +33,7 @@ vi.mock('@/lib/payments/razorpay', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, PATCH } from '@/app/api/admin/orders/[id]/route'
+import { GET, PATCH } from '@/app/api/(admin)/admin/orders/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { hasScope } from '@/lib/auth/scopes'

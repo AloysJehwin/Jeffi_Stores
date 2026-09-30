@@ -5,8 +5,8 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { GET as getNextSeq } from '@/app/api/admin/inventory/serials/next-seq/route'
-import { GET as getAvailable } from '@/app/api/admin/inventory/serials/available/route'
+import { GET as getNextSeq } from '@/app/api/(admin)/admin/inventory/serials/next-seq/route'
+import { GET as getAvailable } from '@/app/api/(admin)/admin/inventory/serials/available/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

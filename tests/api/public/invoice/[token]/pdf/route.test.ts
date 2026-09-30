@@ -13,7 +13,7 @@ vi.mock('@/lib/documents/receipt-pdf', () => ({
   generateReceiptPDF: vi.fn(),
 }))
 
-import { GET } from '@/app/api/public/invoice/[token]/pdf/route'
+import { GET } from '@/app/api/(public)/public/invoice/[token]/pdf/route'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { generateInvoicePDF } from '@/lib/documents/invoice-pdf'
 import { generateReceiptPDF } from '@/lib/documents/receipt-pdf'

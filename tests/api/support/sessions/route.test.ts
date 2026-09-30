@@ -31,7 +31,7 @@ vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 
-import { GET, POST } from '@/app/api/support/sessions/route'
+import { GET, POST } from '@/app/api/(public)/support/sessions/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makeGet() {

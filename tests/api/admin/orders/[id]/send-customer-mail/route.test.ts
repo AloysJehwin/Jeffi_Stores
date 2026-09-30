@@ -24,7 +24,7 @@ vi.mock('@/lib/shared/template-vars', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/send-customer-mail/route'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

@@ -26,7 +26,7 @@ vi.mock('@/lib/auth/jwt', async () => {
   }
 })
 
-import { PATCH } from '@/app/api/categories/reorder/route'
+import { PATCH } from '@/app/api/(public)/categories/reorder/route'
 import { query } from '@/lib/shared/db'
 
 const mockAuth = authenticateAdminMock

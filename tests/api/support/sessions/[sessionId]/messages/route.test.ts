@@ -25,7 +25,7 @@ vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 
-import { GET, POST } from '@/app/api/support/sessions/[sessionId]/messages/route'
+import { GET, POST } from '@/app/api/(public)/support/sessions/[sessionId]/messages/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const SESSION_ID = 'sess-abc'

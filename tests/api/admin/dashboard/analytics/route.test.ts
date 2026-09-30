@@ -5,7 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/queries', () => ({ getDashboardAnalytics: vi.fn() }))
 
-import { GET } from '@/app/api/admin/dashboard/analytics/route'
+import { GET } from '@/app/api/(admin)/admin/dashboard/analytics/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getDashboardAnalytics } from '@/lib/queries'

@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
-import { PATCH, DELETE } from '@/app/api/admin/products/[id]/draft/units/[unitId]/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/products/[id]/draft/units/[unitId]/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

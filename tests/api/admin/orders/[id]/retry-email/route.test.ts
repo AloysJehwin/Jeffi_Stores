@@ -21,7 +21,7 @@ vi.mock('@/lib/email', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/retry-email/route'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/retry-email/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/validate', () => ({
   zIndianPin: { optional: () => ({}) },
 }))
 
-import { PATCH, DELETE } from '@/app/api/user/addresses/[id]/route'
+import { PATCH, DELETE } from '@/app/api/(public)/user/addresses/[id]/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as validate from '@/lib/shared/validate'

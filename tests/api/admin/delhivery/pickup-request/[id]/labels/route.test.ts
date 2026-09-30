@@ -8,7 +8,7 @@ vi.mock('@/lib/documents/shipping-label-pdf', () => ({
   buildMergedLabelsPDF: vi.fn().mockResolvedValue(Buffer.from('%PDF-merged')),
 }))
 
-import { GET } from '@/app/api/admin/delhivery/pickup-request/[id]/labels/route'
+import { GET } from '@/app/api/(admin)/admin/delhivery/pickup-request/[id]/labels/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'

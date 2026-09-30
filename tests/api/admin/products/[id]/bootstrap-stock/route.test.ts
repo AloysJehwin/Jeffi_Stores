@@ -26,7 +26,7 @@ vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { POST } from '@/app/api/admin/products/[id]/bootstrap-stock/route'
+import { POST } from '@/app/api/(admin)/admin/products/[id]/bootstrap-stock/route'
 import { getClient, queryOne } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'

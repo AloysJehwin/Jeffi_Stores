@@ -21,8 +21,8 @@ vi.stubGlobal('fetch', mockFetch)
 
 // ── Imports after mocks ──────────────────────────────────────────────────────
 
-import { POST as INFLATION_POST } from '@/app/api/admin/inflation/route'
-import { GET as PICKUP_GET } from '@/app/api/admin/delhivery/pickup-request/route'
+import { POST as INFLATION_POST } from '@/app/api/(admin)/admin/inflation/route'
+import { GET as PICKUP_GET } from '@/app/api/(admin)/admin/delhivery/pickup-request/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'

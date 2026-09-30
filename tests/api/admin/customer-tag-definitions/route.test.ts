@@ -12,7 +12,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { GET, POST, DELETE } from '@/app/api/admin/customer-tag-definitions/route'
+import { GET, POST, DELETE } from '@/app/api/(admin)/admin/customer-tag-definitions/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany } from '@/lib/shared/db'

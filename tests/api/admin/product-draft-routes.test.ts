@@ -21,7 +21,7 @@ import {
   POST as prodDraftPost,
   PATCH as prodDraftPatch,
   DELETE as prodDraftDelete,
-} from '@/app/api/admin/products/[id]/draft/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/route'
 
 // Products draft sub-variants
 import {
@@ -29,14 +29,14 @@ import {
   POST as svPost,
   DELETE as svDelete,
   PATCH as svPatch,
-} from '@/app/api/admin/products/[id]/draft/sub-variants/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/sub-variants/route'
 
 // Products draft units
 import {
   GET as unitsGet,
   POST as unitsPost,
   DELETE as unitsDelete,
-} from '@/app/api/admin/products/[id]/draft/units/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/units/route'
 
 // Review forms draft
 import {
@@ -44,7 +44,7 @@ import {
   PATCH as rfPatch,
   POST as rfPublish,
   DELETE as rfDelete,
-} from '@/app/api/admin/review-forms/[id]/draft/route'
+} from '@/app/api/(admin)/admin/review-forms/[id]/draft/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

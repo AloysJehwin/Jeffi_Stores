@@ -17,7 +17,7 @@ vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST, GET } from '@/app/api/admin/replication/log/route'
+import { POST, GET } from '@/app/api/(admin)/admin/replication/log/route'
 import { verifyToken, authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany } from '@/lib/shared/db'

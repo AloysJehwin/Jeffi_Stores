@@ -34,8 +34,8 @@ vi.mock('@/lib/auth/jwt', async () => {
 })
 
 // ── import handlers AFTER mocks ──────────────────────────────────────────────
-import { GET as listBrands, POST as createBrand } from '@/app/api/brands/route'
-import { GET as getBrand, PATCH as patchBrand, DELETE as deleteBrand } from '@/app/api/brands/[id]/route'
+import { GET as listBrands, POST as createBrand } from '@/app/api/(public)/brands/route'
+import { GET as getBrand, PATCH as patchBrand, DELETE as deleteBrand } from '@/app/api/(public)/brands/[id]/route'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function makeReq(method: string, body?: Record<string, unknown>) {

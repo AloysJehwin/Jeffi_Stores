@@ -21,7 +21,7 @@ vi.mock('@/lib/shared/ai-client', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/campaigns/generate/route'
+import { POST } from '@/app/api/(admin)/admin/campaigns/generate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { aiChat, AiClientError } from '@/lib/shared/ai-client'

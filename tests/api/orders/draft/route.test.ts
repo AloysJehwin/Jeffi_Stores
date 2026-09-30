@@ -33,7 +33,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { POST } from '@/app/api/orders/draft/route'
+import { POST } from '@/app/api/(public)/orders/draft/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as orderCommit from '@/lib/orders/order-commit'
 import * as orderDraft from '@/lib/orders/order-draft'

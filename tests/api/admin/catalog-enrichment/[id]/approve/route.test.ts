@@ -17,7 +17,7 @@ vi.mock('pg', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/catalog-enrichment/[id]/approve/route'
+import { POST } from '@/app/api/(admin)/admin/catalog-enrichment/[id]/approve/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

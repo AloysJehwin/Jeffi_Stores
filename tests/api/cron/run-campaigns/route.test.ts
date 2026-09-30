@@ -12,7 +12,7 @@ vi.mock('@/lib/campaigns/scenarios/_registry', () => ({ getScenario: vi.fn() }))
 vi.mock('@/lib/campaigns/custom-runner', () => ({ runCustomScenario: vi.fn() }))
 vi.mock('@/lib/shared/marketing', () => ({ getCampaign: vi.fn() }))
 
-import { GET } from '@/app/api/cron/run-campaigns/route'
+import { GET } from '@/app/api/(internal)/cron/run-campaigns/route'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { runScenario } from '@/lib/campaigns/runner'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'

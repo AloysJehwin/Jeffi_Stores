@@ -21,7 +21,7 @@ vi.mock('@/lib/auth/jwt', () => ({
 }))
 
 // ── import handler AFTER mocks ───────────────────────────────────────────────
-import { PATCH, DELETE } from '@/app/api/products/[id]/route'
+import { PATCH, DELETE } from '@/app/api/(public)/products/[id]/route'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function makeReq(method: string, body?: Record<string, unknown>) {

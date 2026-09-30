@@ -33,7 +33,7 @@ vi.mock('@/lib/catalog/pricing', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET, PATCH, DELETE } from '@/app/api/admin/invoices/drafts/[id]/route'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/invoices/drafts/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'

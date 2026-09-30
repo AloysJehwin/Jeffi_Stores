@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 
-import { POST } from '@/app/api/notify-back-in-stock/route'
+import { POST } from '@/app/api/(public)/notify-back-in-stock/route'
 import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)

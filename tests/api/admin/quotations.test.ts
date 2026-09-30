@@ -53,12 +53,12 @@ vi.mock('@/lib/shared/validate', () => {
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as quotationsGET, POST as quotationsPOST } from '@/app/api/admin/quotations/route'
+import { GET as quotationsGET, POST as quotationsPOST } from '@/app/api/(admin)/admin/quotations/route'
 import {
   GET as quotationByIdGET,
   PATCH as quotationByIdPATCH,
   DELETE as quotationByIdDELETE,
-} from '@/app/api/admin/quotations/[id]/route'
+} from '@/app/api/(admin)/admin/quotations/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query } from '@/lib/shared/db'

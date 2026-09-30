@@ -27,7 +27,7 @@ vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn().mockResolve
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/agent/actions/[id]/approve/route'
+import { POST } from '@/app/api/(admin)/admin/agent/actions/[id]/approve/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne, withTransaction, getClient } from '@/lib/shared/db'

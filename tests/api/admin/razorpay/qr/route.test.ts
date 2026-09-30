@@ -19,7 +19,7 @@ vi.mock('sharp', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/razorpay/qr/route'
+import { POST } from '@/app/api/(admin)/admin/razorpay/qr/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne } from '@/lib/shared/db'

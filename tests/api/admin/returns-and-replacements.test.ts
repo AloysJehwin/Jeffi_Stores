@@ -5,8 +5,8 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { GET as getReturns } from '@/app/api/admin/returns/route'
-import { GET as getReplacements } from '@/app/api/admin/replacements/route'
+import { GET as getReturns } from '@/app/api/(admin)/admin/returns/route'
+import { GET as getReplacements } from '@/app/api/(admin)/admin/replacements/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

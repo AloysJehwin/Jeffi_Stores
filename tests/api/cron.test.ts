@@ -29,8 +29,8 @@ vi.mock('@/lib/shared/auto-tasks', () => ({
 
 // ---------------------------------------------------------------------------
 
-import { GET as cancelStaleGET } from '@/app/api/cron/cancel-stale-orders/route'
-import { GET as computeHealthGET } from '@/app/api/cron/compute-health/route'
+import { GET as cancelStaleGET } from '@/app/api/(internal)/cron/cancel-stale-orders/route'
+import { GET as computeHealthGET } from '@/app/api/(internal)/cron/compute-health/route'
 
 const CRON_SECRET = 'super-secret-cron-token'
 

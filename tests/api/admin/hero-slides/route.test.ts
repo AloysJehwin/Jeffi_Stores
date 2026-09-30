@@ -23,10 +23,10 @@ vi.mock('@/lib/shared/db', () => ({
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { GET, POST, PATCH } from '@/app/api/admin/hero-slides/route'
-import { PATCH as PATCH_ONE, DELETE } from '@/app/api/admin/hero-slides/[id]/route'
-import { POST as UPLOAD } from '@/app/api/admin/hero-slides/[id]/image/route'
-import { POST as GENERATE } from '@/app/api/admin/hero-slides/[id]/generate-image/route'
+import { GET, POST, PATCH } from '@/app/api/(admin)/admin/hero-slides/route'
+import { PATCH as PATCH_ONE, DELETE } from '@/app/api/(admin)/admin/hero-slides/[id]/route'
+import { POST as UPLOAD } from '@/app/api/(admin)/admin/hero-slides/[id]/image/route'
+import { POST as GENERATE } from '@/app/api/(admin)/admin/hero-slides/[id]/generate-image/route'
 
 const ADMIN_ID = '22222222-2222-4222-8222-222222222222'
 const admin = { adminId: ADMIN_ID, role: 'super_admin', scopes: [] }

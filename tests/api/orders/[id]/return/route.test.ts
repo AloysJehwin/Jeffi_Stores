@@ -25,7 +25,7 @@ vi.mock('@/lib/catalog/return-policy', () => ({
   checkReturnEligibility: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/orders/[id]/return/route'
+import { GET, POST } from '@/app/api/(public)/orders/[id]/return/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as returnPolicy from '@/lib/catalog/return-policy'

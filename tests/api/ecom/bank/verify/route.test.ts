@@ -19,7 +19,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 }))
 vi.mock('@/lib/payments/razorpay-route', () => ({ configureRouteSettlement: mockSettle }))
 
-import { POST } from '@/app/api/ecom/bank/verify/route'
+import { POST } from '@/app/api/(ecom)/ecom/bank/verify/route'
 
 function req(body: Record<string, unknown>) {
   return new NextRequest('https://ecom.jeffistores.in/api/ecom/bank/verify', {

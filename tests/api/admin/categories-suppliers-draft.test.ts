@@ -13,14 +13,14 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
-import { POST, PATCH, DELETE } from '@/app/api/admin/categories/[id]/draft/route'
-import { POST as catPublish } from '@/app/api/admin/categories/[id]/publish/route'
+import { POST, PATCH, DELETE } from '@/app/api/(admin)/admin/categories/[id]/draft/route'
+import { POST as catPublish } from '@/app/api/(admin)/admin/categories/[id]/publish/route'
 import {
   GET as suppGet,
   PATCH as suppPatch,
   POST as suppPost,
   DELETE as suppDelete,
-} from '@/app/api/admin/suppliers/[id]/draft/route'
+} from '@/app/api/(admin)/admin/suppliers/[id]/draft/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 

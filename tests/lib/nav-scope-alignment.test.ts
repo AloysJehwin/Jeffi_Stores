@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { getScopeForPath, ADMIN_SCOPES } from '@/lib/auth/scopes'
 
-const LAYOUT = path.join(process.cwd(), 'src/app/admin/layout.tsx')
+const LAYOUT = path.join(process.cwd(), 'src/app/(admin)/admin/layout.tsx')
 
 function navLinks(): { href: string; scope: string }[] {
   const src = fs.readFileSync(LAYOUT, 'utf8')

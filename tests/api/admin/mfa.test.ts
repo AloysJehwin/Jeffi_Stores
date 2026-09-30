@@ -39,9 +39,9 @@ vi.mock('next/headers', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST as enrollStart } from '@/app/api/admin/mfa/enroll-start/route'
-import { POST as enrollConfirm } from '@/app/api/admin/mfa/enroll-confirm/route'
-import { POST as mfaVerify } from '@/app/api/admin/mfa/verify/route'
+import { POST as enrollStart } from '@/app/api/(admin)/admin/mfa/enroll-start/route'
+import { POST as enrollConfirm } from '@/app/api/(admin)/admin/mfa/enroll-confirm/route'
+import { POST as mfaVerify } from '@/app/api/(admin)/admin/mfa/verify/route'
 import {
   verifyMfaTicket,
   generateTotpSecret,

@@ -75,7 +75,7 @@ vi.mock('@/lib/shipping/delhivery', () => ({
   checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
 
-import { POST } from '@/app/api/orders/create-direct/route'
+import { POST } from '@/app/api/(public)/orders/create-direct/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as orderCommit from '@/lib/orders/order-commit'

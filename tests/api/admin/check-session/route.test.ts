@@ -15,7 +15,7 @@ vi.mock('next/headers', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/check-session/route'
+import { GET } from '@/app/api/(admin)/admin/check-session/route'
 import { resolveSession } from '@/lib/auth/auth-sessions'
 import { cookies } from 'next/headers'
 

@@ -42,9 +42,9 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { GET, PATCH, DELETE } from '@/app/api/admin/campaigns/[kind]/draft/route'
-import { POST as publishPost } from '@/app/api/admin/campaigns/[kind]/publish/route'
-import { GET as eligibleGet } from '@/app/api/admin/campaigns/[kind]/eligible/route'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/campaigns/[kind]/draft/route'
+import { POST as publishPost } from '@/app/api/(admin)/admin/campaigns/[kind]/publish/route'
+import { GET as eligibleGet } from '@/app/api/(admin)/admin/campaigns/[kind]/eligible/route'
 
 const mockAdmin = { id: 'admin-1', role: 'super_admin', scopes: [] }
 

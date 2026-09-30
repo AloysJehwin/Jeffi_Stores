@@ -64,7 +64,7 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
-  const files = glob.sync('src/app/api/admin/**/route.ts', { cwd: process.cwd() })
+  const files = glob.sync('src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() })
   const offenders: string[] = []
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
@@ -74,7 +74,7 @@ function mutatingRoutesWithoutWriteScope(): string[] {
     if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)/.test(src)) continue
     if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
     if (/CRON_SECRET|verifyCronRequest|authenticateServiceAccount/.test(src)) continue
-    const route = f.replace('src/app/api/admin/', '').replace('/route.ts', '')
+    const route = f.replace('src/app/api/(admin)/admin/', '').replace('/route.ts', '')
     if (ALLOWED_WITHOUT_WRITE_SCOPE.has(route)) continue
     offenders.push(route)
   }
@@ -86,24 +86,24 @@ function mutatingRoutesWithoutWriteScope(): string[] {
 // with a valid admin session could reach the write unless it also gates on a :write scope.
 // Each glob is a mutating handler that must carry the same :write check the /api/admin tree uses.
 const ADMIN_ONLY_OUTSIDE_ADMIN = [
-  'src/app/api/brands/route.ts',
-  'src/app/api/brands/[id]/route.ts',
-  'src/app/api/categories/[id]/route.ts',
-  'src/app/api/categories/reorder/route.ts',
-  'src/app/api/upload/route.ts',
-  'src/app/api/gallery/upload/route.ts',
-  'src/app/api/generate-image/route.ts',
-  'src/app/api/orders/[id]/refund/route.ts',
-  'src/app/api/orders/[id]/cancel-review/route.ts',
-  'src/app/api/orders/[id]/return-review/route.ts',
-  'src/app/api/orders/[id]/route.ts',
-  'src/app/api/razorpay/payment-link/route.ts',
-  'src/app/api/products/[id]/route.ts',
+  'src/app/api/(public)/brands/route.ts',
+  'src/app/api/(public)/brands/[id]/route.ts',
+  'src/app/api/(public)/categories/[id]/route.ts',
+  'src/app/api/(public)/categories/reorder/route.ts',
+  'src/app/api/(public)/upload/route.ts',
+  'src/app/api/(public)/gallery/upload/route.ts',
+  'src/app/api/(public)/generate-image/route.ts',
+  'src/app/api/(public)/orders/[id]/refund/route.ts',
+  'src/app/api/(public)/orders/[id]/cancel-review/route.ts',
+  'src/app/api/(public)/orders/[id]/return-review/route.ts',
+  'src/app/api/(public)/orders/[id]/route.ts',
+  'src/app/api/(public)/razorpay/payment-link/route.ts',
+  'src/app/api/(public)/products/[id]/route.ts',
 ]
 
 // products/[id] DELETE is a hard 405 that mutates nothing, so it needs no scope; the file's
 // PATCH is what carries products:write.
-const MUTATING_WITHOUT_SCOPE_OK = new Set(['src/app/api/products/[id]/route.ts'])
+const MUTATING_WITHOUT_SCOPE_OK = new Set(['src/app/api/(public)/products/[id]/route.ts'])
 
 function adminOnlyRoutesWithoutWriteScope(): string[] {
   const offenders: string[] = []
@@ -136,6 +136,6 @@ describe('an admin action is never reachable with read-only access', () => {
   })
 
   it('reads a meaningful number of routes (guards the glob)', () => {
-    expect(glob.sync('src/app/api/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
+    expect(glob.sync('src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
   })
 })

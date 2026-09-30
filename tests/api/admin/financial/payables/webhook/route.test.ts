@@ -12,7 +12,7 @@ vi.mock('@/lib/shared/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/financial/payables/webhook/route'
+import { POST } from '@/app/api/(admin)/admin/financial/payables/webhook/route'
 import { query } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────

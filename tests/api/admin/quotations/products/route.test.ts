@@ -21,7 +21,7 @@ vi.mock('@/lib/catalog/search', () => ({
   buildProductSearchRank: vi.fn().mockReturnValue({ rank: '(0+0)', params: [], nextIdx: 3 }),
 }))
 
-import { GET } from '@/app/api/admin/quotations/products/route'
+import { GET } from '@/app/api/(admin)/admin/quotations/products/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

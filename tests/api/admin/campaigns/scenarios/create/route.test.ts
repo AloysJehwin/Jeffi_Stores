@@ -10,7 +10,7 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({ validateScenarioSql: vi.fn() }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/campaigns/scenarios/create/route'
+import { POST } from '@/app/api/(admin)/admin/campaigns/scenarios/create/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'

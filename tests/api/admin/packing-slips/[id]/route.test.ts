@@ -9,7 +9,7 @@ vi.mock('@/lib/documents/packing-slip-pdf', () => ({
   loadStoreSettings: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/packing-slips/[id]/route'
+import { GET } from '@/app/api/(admin)/admin/packing-slips/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'

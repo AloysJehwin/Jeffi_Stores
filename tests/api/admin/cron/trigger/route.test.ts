@@ -15,7 +15,7 @@ vi.mock('@/lib/auth/scopes', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/cron/trigger/route'
+import { POST } from '@/app/api/(admin)/admin/cron/trigger/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 

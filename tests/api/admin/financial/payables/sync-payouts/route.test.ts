@@ -38,7 +38,7 @@ let POST: (req: NextRequest) => Promise<Response>
 
 beforeAll(async () => {
   // Import after env vars are set so module-level RZP_KEY/SECRET constants are captured
-  const mod = await import('@/app/api/admin/financial/payables/sync-payouts/route')
+  const mod = await import('@/app/api/(admin)/admin/financial/payables/sync-payouts/route')
   POST = mod.POST
 })
 

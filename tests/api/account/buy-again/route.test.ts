@@ -16,7 +16,7 @@ vi.mock('@/lib/catalog/product-cards', async importOriginal => ({
   getProductCardsByIds: vi.fn(),
 }))
 
-import { GET } from '@/app/api/account/buy-again/route'
+import { GET } from '@/app/api/(public)/account/buy-again/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { queryMany } from '@/lib/shared/db'
 import { getProductCardsByIds } from '@/lib/catalog/product-cards'

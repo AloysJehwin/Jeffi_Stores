@@ -941,11 +941,11 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'list_repo_files',
     description:
-      'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+      'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/(admin)/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
     inputSchema: {
       type: 'object',
       properties: {
-        dir: { type: 'string', description: 'Project-relative directory, e.g. "src/lib" or "src/app/api/admin"' },
+        dir: { type: 'string', description: 'Project-relative directory, e.g. "src/lib" or "src/app/api/(admin)/admin"' },
         pattern: { type: 'string', description: 'Optional substring filter on file names' },
       },
       required: ['dir'],
@@ -1068,7 +1068,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ pathContains }) => {
       const fs = await import('node:fs/promises')
       const path = await import('node:path')
-      const root = path.resolve(process.cwd(), 'src/app/api/admin')
+      const root = path.resolve(process.cwd(), 'src/app/api/(admin)/admin')
       const filter = String(pathContains || '').toLowerCase()
       const FORBIDDEN_PATH_RE = /^\/api\/admin\/(agent\/|team\b|admins\b|auth\b|settings\/admins)/
 

@@ -13,7 +13,7 @@ vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: vi.fn(),
 }))
 
-import { GET } from '@/app/api/gallery/route'
+import { GET } from '@/app/api/(public)/gallery/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryMany, queryOne } from '@/lib/shared/db'
 

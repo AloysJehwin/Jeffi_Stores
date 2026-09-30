@@ -38,7 +38,7 @@ vi.mock('@/lib/shared/ai-client', () => ({
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/campaigns/scenarios/generate/route'
+import { POST } from '@/app/api/(admin)/admin/campaigns/scenarios/generate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'

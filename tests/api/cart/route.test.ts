@@ -39,7 +39,7 @@ vi.mock('@/lib/shared/guest-user', () => ({
 // ---------------------------------------------------------------------------
 // Import route handlers AFTER mocks are registered
 // ---------------------------------------------------------------------------
-import { GET, POST, PATCH, DELETE } from '@/app/api/cart/route'
+import { GET, POST, PATCH, DELETE } from '@/app/api/(public)/cart/route'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { cookies } from 'next/headers'
 import { query, queryOne, queryMany } from '@/lib/shared/db'

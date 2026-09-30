@@ -19,8 +19,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
-import { GET, DELETE } from '@/app/api/admin/homepage-draft/route'
-import { POST as PUBLISH } from '@/app/api/admin/homepage-draft/publish/route'
+import { GET, DELETE } from '@/app/api/(admin)/admin/homepage-draft/route'
+import { POST as PUBLISH } from '@/app/api/(admin)/admin/homepage-draft/publish/route'
 
 const ADMIN_ID = '33333333-3333-4333-8333-333333333333'
 const admin = { adminId: ADMIN_ID, role: 'super_admin', scopes: [] }

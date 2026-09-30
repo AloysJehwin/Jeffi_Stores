@@ -18,7 +18,7 @@ vi.mock('@/lib/shared/customer-health', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/customers/[id]/health/route'
+import { GET, POST } from '@/app/api/(admin)/admin/customers/[id]/health/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getHealth, recomputeHealth } from '@/lib/shared/customer-health'

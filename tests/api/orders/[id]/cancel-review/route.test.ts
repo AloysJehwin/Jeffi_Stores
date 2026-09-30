@@ -39,7 +39,7 @@ vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { POST } from '@/app/api/orders/[id]/cancel-review/route'
+import { POST } from '@/app/api/(public)/orders/[id]/cancel-review/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

@@ -8,7 +8,7 @@ vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 1 }),
 }))
 
-import { GET } from '@/app/api/admin/customers/search/route'
+import { GET } from '@/app/api/(admin)/admin/customers/search/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'

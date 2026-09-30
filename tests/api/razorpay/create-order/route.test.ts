@@ -28,7 +28,7 @@ vi.mock('@/lib/shared/validate', async importOriginal => {
   return { ...actual }
 })
 
-import { POST } from '@/app/api/razorpay/create-order/route'
+import { POST } from '@/app/api/(public)/razorpay/create-order/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'

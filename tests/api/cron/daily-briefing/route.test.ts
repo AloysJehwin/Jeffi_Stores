@@ -19,7 +19,7 @@ vi.mock('@/lib/shared/daily-briefing', () => ({
   briefingFromAsync: vi.fn(async () => 'briefing@example.com'),
 }))
 
-import { GET } from '@/app/api/cron/daily-briefing/route'
+import { GET } from '@/app/api/(internal)/cron/daily-briefing/route'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { transporter } from '@/lib/email'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'

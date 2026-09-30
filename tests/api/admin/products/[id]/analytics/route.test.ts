@@ -13,7 +13,7 @@ vi.mock('@/lib/shared/admin-product-analytics', () => ({
   getProductAnalyticsData: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/products/[id]/analytics/route'
+import { GET } from '@/app/api/(admin)/admin/products/[id]/analytics/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getProductAnalyticsData } from '@/lib/shared/admin-product-analytics'
