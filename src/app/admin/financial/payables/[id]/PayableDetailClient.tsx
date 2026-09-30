@@ -5,15 +5,9 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 import { ap } from '@/lib/admin-path'
+import { formatINR as formatINRBase, formatDate } from '@/lib/format'
 
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+const formatINR = (n: number) => formatINRBase(n, 0)
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',

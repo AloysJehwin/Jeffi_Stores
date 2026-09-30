@@ -1,5 +1,6 @@
 import 'server-only'
 import path from 'path'
+import { numberToWords } from '@/lib/format'
 const PDFDocument = eval('require')('pdfkit')
 
 export interface QuotationBusiness {
@@ -51,52 +52,6 @@ export interface QuotationData {
   cgst_amount?: number | string | null
   sgst_amount?: number | string | null
   total_amount?: number | string | null
-}
-
-function numberToWords(num: number): string {
-  if (num === 0) return 'Zero'
-  const ones = [
-    '',
-    'One',
-    'Two',
-    'Three',
-    'Four',
-    'Five',
-    'Six',
-    'Seven',
-    'Eight',
-    'Nine',
-    'Ten',
-    'Eleven',
-    'Twelve',
-    'Thirteen',
-    'Fourteen',
-    'Fifteen',
-    'Sixteen',
-    'Seventeen',
-    'Eighteen',
-    'Nineteen',
-  ]
-  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
-  function grp(n: number): string {
-    if (n === 0) return ''
-    if (n < 20) return ones[n]
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '')
-    return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' and ' + grp(n % 100) : '')
-  }
-  const crore = Math.floor(num / 10000000)
-  const lakh = Math.floor((num % 10000000) / 100000)
-  const thou = Math.floor((num % 100000) / 1000)
-  const rem = Math.floor(num % 1000)
-  const paise = Math.round((num - Math.floor(num)) * 100)
-  let r = ''
-  if (crore) r += grp(crore) + ' Crore '
-  if (lakh) r += grp(lakh) + ' Lakh '
-  if (thou) r += grp(thou) + ' Thousand '
-  if (rem) r += grp(rem)
-  r = r.trim()
-  if (paise) r += ' and ' + grp(paise) + ' paise'
-  return r
 }
 
 function fmt4(n: number): string {

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
+import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/format'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
@@ -34,14 +35,8 @@ const PAYOUT_MODE_OPTIONS = [
   { value: 'UPI', label: 'UPI' },
 ]
 
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return ''
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+const formatINR = (n: number) => formatINRBase(n, 0)
+const formatDate = (s: string) => formatDateBase(s, '')
 
 function agingBadge(bucket: string) {
   if (bucket === '0-30')

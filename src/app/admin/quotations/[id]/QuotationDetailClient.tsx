@@ -6,15 +6,7 @@ import { ChevronLeft, Pencil } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+import { formatINR, formatDate } from '@/lib/format'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-surface-secondary text-foreground-secondary',

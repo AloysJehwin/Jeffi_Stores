@@ -12,6 +12,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
+import { formatINR as formatINRBase, formatDate } from '@/lib/format'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/selling-unit'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
@@ -37,14 +38,7 @@ const PAGE_SIZE = 20
 const STOCK_PAGE_SIZE = 50
 const VALUATION_PAGE_SIZE = 50
 
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+const formatINR = (n: number) => formatINRBase(n, 0)
 
 function fmtINR2(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

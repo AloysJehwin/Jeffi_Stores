@@ -10,15 +10,7 @@ import { ap } from '@/lib/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+import { formatINR, formatDate } from '@/lib/format'
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',

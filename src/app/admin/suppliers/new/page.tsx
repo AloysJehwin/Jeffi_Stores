@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
+import { ADMIN_INPUT_CLASS } from '@/lib/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
-const inputCls =
-  'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
+const inputCls = ADMIN_INPUT_CLASS
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary =
   'control-md border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'

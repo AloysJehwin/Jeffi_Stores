@@ -10,6 +10,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
+import { formatINR as formatINRBase } from '@/lib/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const PURCHASE_UNITS = [
@@ -126,9 +127,7 @@ function fmtINR2(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function formatINR(n: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
-}
+const formatINR = (n: number) => formatINRBase(n, 0)
 
 export default function NewPOPage() {
   const router = useRouter()
