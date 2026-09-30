@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadProductImage } from '@/lib/s3'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'products:write')
+    if (admin instanceof NextResponse) return admin
 
     const formData = await request.formData()
     const file = formData.get('file') as File

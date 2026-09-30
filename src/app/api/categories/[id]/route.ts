@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryCount } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'categories:write')
+    if (admin instanceof NextResponse) return admin
 
     const categoryId = id
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,10 +13,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'brands:write')
+    if (admin instanceof NextResponse) return admin
 
     const body = await request.json()
     const { name, slug, description, website, logo_url, is_active } = body

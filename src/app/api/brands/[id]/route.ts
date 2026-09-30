@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryCount } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin, requireAdminScope } from '@/lib/jwt'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,10 +24,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'brands:write')
+    if (admin instanceof NextResponse) return admin
 
     const body = await request.json()
     const { name, slug, description, website, logo_url, is_active } = body
@@ -58,10 +56,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'brands:write')
+    if (admin instanceof NextResponse) return admin
 
     const brandId = id
 

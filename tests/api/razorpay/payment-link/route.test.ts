@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: vi.fn(),
-}))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const authenticateAdmin = vi.fn()
+  return {
+    authenticateAdmin,
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdmin()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   resolveRequestTenant: vi.fn().mockResolvedValue(null),
@@ -20,7 +33,7 @@ function rzpMock(impl: Record<string, unknown>) {
   vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { paymentLink: impl } } as any)
 }
 
-const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
+const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 
 const MOCK_ORDER = {
   id: 'order-123',
@@ -56,6 +69,12 @@ describe('POST /api/razorpay/payment-link', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
     const res = await POST(makeRequest() as any)
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when the admin lacks orders:write', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue({ ...ADMIN, role: 'viewer', scopes: ['orders:read'] } as any)
+    const res = await POST(makeRequest() as any)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when orderId missing', async () => {

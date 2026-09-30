@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/product-label'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser, requireAdminScope } from '@/lib/jwt'
 import { listSharedNotesForOrder } from '@/lib/customer-notes'
 import { addressChangeBlockReason, hasPendingAddressChange } from '@/lib/address-change'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
@@ -303,10 +303,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const admin = await requireAdminScope(request, 'orders:write')
+    if (admin instanceof NextResponse) return admin
 
     const orderId = id
     const body = await request.json()

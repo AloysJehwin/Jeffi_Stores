@@ -16,10 +16,22 @@ vi.mock('@/lib/db', () => ({
   queryCount: queryCountMock,
 }))
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: authenticateAdminMock,
-  authenticateUser: vi.fn().mockResolvedValue(null),
-}))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  return {
+    authenticateAdmin: authenticateAdminMock,
+    authenticateUser: vi.fn().mockResolvedValue(null),
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdminMock()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 
 // ── import handlers AFTER mocks ──────────────────────────────────────────────
 import { GET as listBrands, POST as createBrand } from '@/app/api/brands/route'
@@ -34,7 +46,7 @@ function makeReq(method: string, body?: Record<string, unknown>) {
   })
 }
 
-const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
+const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['brands:write'] }
 const sampleBrand = { id: 'brand-1', name: 'Unbrako', slug: 'unbrako', is_active: true }
 const sampleBrandList = [sampleBrand, { id: 'brand-2', name: 'Fischer', slug: 'fischer', is_active: true }]
 
@@ -92,6 +104,13 @@ describe('POST /api/brands', () => {
 
     const res = await createBrand(makeReq('POST', { name: 'New Brand', slug: 'new-brand' }) as any)
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when the admin lacks brands:write', async () => {
+    authenticateAdminMock.mockResolvedValue({ ...adminPayload, role: 'viewer', scopes: ['brands:read'] })
+
+    const res = await createBrand(makeReq('POST', { name: 'New Brand', slug: 'new-brand' }) as any)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when name or slug is missing', async () => {

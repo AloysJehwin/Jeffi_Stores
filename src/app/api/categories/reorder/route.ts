@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
+import { requireAdminScope } from '@/lib/jwt'
 import { query } from '@/lib/db'
 
 // PATCH /api/categories/reorder
 // Body: { updates: Array<{ id: string, display_order: number, parent_category_id: string | null }> }
 export async function PATCH(request: NextRequest) {
-  const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const admin = await requireAdminScope(request, 'categories:write')
+  if (admin instanceof NextResponse) return admin
 
   try {
     const { updates } = (await request.json()) as {

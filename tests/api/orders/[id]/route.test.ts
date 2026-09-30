@@ -6,10 +6,23 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
-  authenticateAnyUser: vi.fn(),
-  authenticateAdmin: vi.fn(),
-}))
+vi.mock('@/lib/jwt', async () => {
+  const { NextResponse } = await import('next/server')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const authenticateAdmin = vi.fn()
+  return {
+    authenticateAnyUser: vi.fn(),
+    authenticateAdmin,
+    requireAdminScope: async (_req: unknown, scope: string | null) => {
+      const admin = await authenticateAdmin()
+      if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      return admin
+    },
+  }
+})
 vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
@@ -57,7 +70,7 @@ import * as inventoryDeduct from '@/lib/inventory-deduct'
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
 const USER = { userId: 'user-1', isBusiness: false }
 const BIZ_USER = { userId: 'biz-1', isBusiness: true }
-const ADMIN = { adminId: 'admin-1', username: 'root', role: 'super_admin', scopes: [] }
+const ADMIN = { adminId: 'admin-1', username: 'root', role: 'super_admin', scopes: ['orders:write'] }
 
 function makeReq(method: string, body?: any, headers: Record<string, string> = {}) {
   const init: any = {
@@ -204,6 +217,12 @@ describe('PATCH /api/orders/[id]', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
     const res = await PATCH(makeReq('PATCH', {}) as any, PARAMS)
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when the admin lacks orders:write', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue({ ...ADMIN, role: 'viewer', scopes: ['orders:read'] } as any)
+    const res = await PATCH(makeReq('PATCH', { status: 'confirmed' }) as any, PARAMS)
+    expect(res.status).toBe(403)
   })
 
   it('returns 404 when order missing', async () => {
