@@ -12,6 +12,7 @@ import UnitsManager from '@/components/admin/UnitsManager'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 import { formatINR, formatDate } from '@/lib/shared/format'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
@@ -681,13 +682,12 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   const canWriteProducts = useCanWrite('products')
   const canEnrich = useHasScope('catalog_enrichment:read')
   const canShelving = useHasScope('shelving:read')
+  const { showToast } = useToast()
   const [statusOverrides, setStatusOverrides] = useState<Record<string, boolean>>({})
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
-  const [statusError, setStatusError] = useState<string | null>(null)
 
   const toggleStatus = async (rowId: string, url: string, next: boolean) => {
     setStatusBusy(rowId)
-    setStatusError(null)
     setStatusOverrides(prev => ({ ...prev, [rowId]: next }))
     try {
       const res = await fetch(url, {
@@ -702,7 +702,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
       }
     } catch (err: any) {
       setStatusOverrides(prev => ({ ...prev, [rowId]: !next }))
-      setStatusError(err.message)
+      showToast(err.message, 'error')
     } finally {
       setStatusBusy(null)
     }
@@ -1351,7 +1351,6 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="px-4 py-3 border-b border-border-default">
             <p className="text-sm font-semibold text-foreground">Variants ({variants.length})</p>
-            {statusError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{statusError}</p>}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

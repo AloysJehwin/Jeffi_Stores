@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Props {
   productId: string
@@ -14,22 +15,20 @@ interface Props {
 export default function FeaturedToggleButton({ productId, isFeatured, featuredCount }: Props) {
   const [loading, setLoading] = useState(false)
   const [optimistic, setOptimistic] = useState(isFeatured)
-  const [error, setError] = useState('')
   const router = useRouter()
+  const { showToast } = useToast()
 
   const toggle = async () => {
     if (loading) return
     const next = !optimistic
 
     if (next && featuredCount >= 6) {
-      setError('Max 6 featured products. Unfeature one first.')
-      setTimeout(() => setError(''), 3000)
+      showToast('Max 6 featured products. Unfeature one first.', 'warning')
       return
     }
 
     setLoading(true)
     setOptimistic(next)
-    setError('')
 
     const res = await fetch(`/api/products/${productId}`, {
       method: 'PATCH',
@@ -40,8 +39,7 @@ export default function FeaturedToggleButton({ productId, isFeatured, featuredCo
     if (!res.ok) {
       const data = await res.json()
       setOptimistic(!next) // revert
-      setError(data.error || 'Failed to update')
-      setTimeout(() => setError(''), 3000)
+      showToast(data.error || 'Failed to update', 'error')
     } else {
       router.refresh()
     }
@@ -66,11 +64,6 @@ export default function FeaturedToggleButton({ productId, isFeatured, featuredCo
           <Star className={`w-3 h-3 ${optimistic ? 'fill-current' : ''}`} />
           <span>{optimistic ? 'Featured' : 'Feature'}</span>
         </button>
-        {error && (
-          <div className="absolute top-full mt-1 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
-            {error}
-          </div>
-        )}
       </div>
     </RequireWrite>
   )
