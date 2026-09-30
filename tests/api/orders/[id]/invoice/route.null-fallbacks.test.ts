@@ -160,12 +160,10 @@ describe('GET /api/orders/[id]/invoice — fallback branch coverage', () => {
   it('handles settings row with null value by falling back to empty string', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(BASE)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE).mockResolvedValueOnce(null)
     // Return settings rows where some values are null
     vi.mocked(db.queryMany)
-      .mockResolvedValueOnce([])  // order items
+      .mockResolvedValueOnce([]) // order items
       .mockResolvedValueOnce([
         { key: 'business_gstin', value: null },
         { key: 'business_legal_name', value: 'Jeffi' },
@@ -186,8 +184,9 @@ describe('GET /api/orders/[id]/invoice — fallback branch coverage', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...BASE, billing_address_id: 'addr-2' })
-      .mockResolvedValueOnce(null)  // no cached pdf
-      .mockResolvedValueOnce({      // billing address with null fields
+      .mockResolvedValueOnce(null) // no cached pdf
+      .mockResolvedValueOnce({
+        // billing address with null fields
         full_name: null,
         address_line1: null,
         address_line2: null,
@@ -214,11 +213,9 @@ describe('GET /api/orders/[id]/invoice — fallback branch coverage', () => {
   it('handles null orderItems gracefully', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(BASE)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany)
-      .mockResolvedValueOnce(null as any)   // null orderItems
+      .mockResolvedValueOnce(null as any) // null orderItems
       .mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 

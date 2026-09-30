@@ -14,19 +14,29 @@ vi.mock('pdfkit', () => {
         dataCb?.(Buffer.from('mock-quotation-pdf'))
         endCb?.()
       }),
-      font: vi.fn().mockReturnThis(), fontSize: vi.fn().mockReturnThis(),
-      fillColor: vi.fn().mockReturnThis(), strokeColor: vi.fn().mockReturnThis(),
-      lineWidth: vi.fn().mockReturnThis(), text: vi.fn().mockReturnThis(),
-      moveDown: vi.fn().mockReturnThis(), moveTo: vi.fn().mockReturnThis(),
-      lineTo: vi.fn().mockReturnThis(), stroke: vi.fn().mockReturnThis(),
-      fill: vi.fn().mockReturnThis(), rect: vi.fn().mockReturnThis(),
-      image: vi.fn().mockReturnThis(), opacity: vi.fn().mockReturnThis(),
-      addPage: vi.fn().mockReturnThis(), switchToPage: vi.fn().mockReturnThis(),
-      save: vi.fn().mockReturnThis(), restore: vi.fn().mockReturnThis(),
+      font: vi.fn().mockReturnThis(),
+      fontSize: vi.fn().mockReturnThis(),
+      fillColor: vi.fn().mockReturnThis(),
+      strokeColor: vi.fn().mockReturnThis(),
+      lineWidth: vi.fn().mockReturnThis(),
+      text: vi.fn().mockReturnThis(),
+      moveDown: vi.fn().mockReturnThis(),
+      moveTo: vi.fn().mockReturnThis(),
+      lineTo: vi.fn().mockReturnThis(),
+      stroke: vi.fn().mockReturnThis(),
+      fill: vi.fn().mockReturnThis(),
+      rect: vi.fn().mockReturnThis(),
+      image: vi.fn().mockReturnThis(),
+      opacity: vi.fn().mockReturnThis(),
+      addPage: vi.fn().mockReturnThis(),
+      switchToPage: vi.fn().mockReturnThis(),
+      save: vi.fn().mockReturnThis(),
+      restore: vi.fn().mockReturnThis(),
       bufferedPageRange: vi.fn().mockReturnValue({ start: 0, count: 1 }),
       heightOfString: vi.fn().mockReturnValue(20),
       widthOfString: vi.fn().mockReturnValue(100),
-      x: 50, y: 100,
+      x: 50,
+      y: 100,
       page: { width: 595.28, height: 841.89, margins: { top: 0, bottom: 0, left: 0, right: 0 } },
     }
     return doc
@@ -155,9 +165,7 @@ describe('quotation-pdf', () => {
     })
 
     it('handles item with discount', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], discount_pct: 10, amount: 900 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], discount_pct: 10, amount: 900 }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
@@ -165,9 +173,7 @@ describe('quotation-pdf', () => {
     it('triggers round-off row when total needs rounding', async () => {
       // gst_rate 18% on amount 100 => cgst = sgst = 9 each, rawTotal = 118, total = 118, roundOff = 0
       // Use an amount that produces a non-integer rawTotal to trigger hasRound
-      const items: QuotationItem[] = [
-        { ...mockItems[0], amount: 101, gst_rate: 18 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], amount: 101, gst_rate: 18 }]
       // rawTotal = 101 + 101*18/200 + 101*18/200 = 101 + 9.09 + 9.09 = 119.18
       // total = Math.round(119.18) = 119, roundOff = 119 - 119.18 = -0.18 => hasRound = true
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
@@ -208,25 +214,19 @@ describe('quotation-pdf', () => {
     })
 
     it('handles integer quantity in fmtQty', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], quantity: 10 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], quantity: 10 }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
 
     it('handles fractional quantity in fmtQty', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], quantity: 2.5 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], quantity: 2.5 }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
 
     it('handles item with null hsn_code (falls back to N/A in HSN map)', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], hsn_code: null },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], hsn_code: null }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
@@ -234,24 +234,21 @@ describe('quotation-pdf', () => {
     it('handles long business address that wraps across lines', async () => {
       const biz: QuotationBusiness = {
         ...mockBusiness,
-        address: 'Very Long Street Name Part One, Very Long Street Name Part Two, Very Long Area Name, Very Long City Name, State Name, PIN 492001',
+        address:
+          'Very Long Street Name Part One, Very Long Street Name Part Two, Very Long Area Name, Very Long City Name, State Name, PIN 492001',
       }
       const result = await generateQuotationPDF(mockData, mockItems, biz)
       expect(result).toBeInstanceOf(Buffer)
     })
 
     it('handles zero total (numberToWords zero path)', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], amount: 0, gst_rate: 0 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], amount: 0, gst_rate: 0 }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
 
     it('handles large total triggering crore/lakh/thousand in numberToWords', async () => {
-      const items: QuotationItem[] = [
-        { ...mockItems[0], amount: 15000000, gst_rate: 18 },
-      ]
+      const items: QuotationItem[] = [{ ...mockItems[0], amount: 15000000, gst_rate: 18 }]
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })

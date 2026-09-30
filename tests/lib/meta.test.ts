@@ -98,9 +98,16 @@ describe('meta OAuth', () => {
   })
 
   it('exchangeCodeForToken tolerates non-JSON body (json() throws → {})', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false, status: 502, json: async () => { throw new Error('not json') },
-    } as unknown as Response))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new Error('not json')
+        },
+      } as unknown as Response)
+    )
     const { exchangeCodeForToken } = await import('@/lib/meta')
     await expect(exchangeCodeForToken('code1', 'https://app/cb')).rejects.toThrow(/502/)
   })
@@ -124,19 +131,32 @@ describe('meta OAuth', () => {
 
 describe('getPageAndIgAccounts', () => {
   it('returns the first page with its IG business account', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, {
-      data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok', instagram_business_account: { id: 'IG1' } }],
-    })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        res(200, {
+          data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok', instagram_business_account: { id: 'IG1' } }],
+        })
+      )
+    )
     const { getPageAndIgAccounts } = await import('@/lib/meta')
     await expect(getPageAndIgAccounts('user_tok')).resolves.toEqual({
-      pageId: 'P1', pageName: 'Acme', pageAccessToken: 'page_tok', igUserId: 'IG1',
+      pageId: 'P1',
+      pageName: 'Acme',
+      pageAccessToken: 'page_tok',
+      igUserId: 'IG1',
     })
   })
 
   it('returns igUserId null when no IG connected', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, {
-      data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok' }],
-    })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        res(200, {
+          data: [{ id: 'P1', name: 'Acme', access_token: 'page_tok' }],
+        })
+      )
+    )
     const { getPageAndIgAccounts } = await import('@/lib/meta')
     const r = await getPageAndIgAccounts('user_tok')
     expect(r.igUserId).toBeNull()
@@ -162,7 +182,12 @@ describe('publishFacebookPost', () => {
     const fetchMock = vi.fn().mockResolvedValue(res(200, { post_id: 'PG_1' }))
     vi.stubGlobal('fetch', fetchMock)
     const { publishFacebookPost } = await import('@/lib/meta')
-    const r = await publishFacebookPost({ pageId: 'P1', message: 'hi', imageUrl: 'https://cdn/x.png', accessToken: 't' })
+    const r = await publishFacebookPost({
+      pageId: 'P1',
+      message: 'hi',
+      imageUrl: 'https://cdn/x.png',
+      accessToken: 't',
+    })
     expect(r).toEqual({ id: 'PG_1' })
     expect(fetchMock.mock.calls[0][0]).toContain('/P1/photos')
   })
@@ -170,7 +195,12 @@ describe('publishFacebookPost', () => {
   it('photo post falls back to id when post_id absent', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, { id: 'ID_1' })))
     const { publishFacebookPost } = await import('@/lib/meta')
-    const r = await publishFacebookPost({ pageId: 'P1', message: 'hi', imageUrl: 'https://cdn/x.png', accessToken: 't' })
+    const r = await publishFacebookPost({
+      pageId: 'P1',
+      message: 'hi',
+      imageUrl: 'https://cdn/x.png',
+      accessToken: 't',
+    })
     expect(r).toEqual({ id: 'ID_1' })
   })
 
@@ -194,12 +224,18 @@ describe('publishFacebookPost', () => {
 
 describe('publishInstagramImage', () => {
   it('creates container then publishes it', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(res(200, { id: 'CONT_1' }))   // media create
-      .mockResolvedValueOnce(res(200, { id: 'PUB_1' }))    // media_publish
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(res(200, { id: 'CONT_1' })) // media create
+      .mockResolvedValueOnce(res(200, { id: 'PUB_1' })) // media_publish
     vi.stubGlobal('fetch', fetchMock)
     const { publishInstagramImage } = await import('@/lib/meta')
-    const r = await publishInstagramImage({ igUserId: 'IG1', imageUrl: 'https://cdn/x.png', caption: 'c', accessToken: 't' })
+    const r = await publishInstagramImage({
+      igUserId: 'IG1',
+      imageUrl: 'https://cdn/x.png',
+      caption: 'c',
+      accessToken: 't',
+    })
     expect(r).toEqual({ id: 'PUB_1' })
     expect(fetchMock.mock.calls[0][0]).toContain('/IG1/media')
     expect(fetchMock.mock.calls[1][0]).toContain('/IG1/media_publish')
@@ -208,8 +244,9 @@ describe('publishInstagramImage', () => {
   it('propagates error from container create', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(400, { error: { message: 'bad image' } })))
     const { publishInstagramImage } = await import('@/lib/meta')
-    await expect(publishInstagramImage({ igUserId: 'IG1', imageUrl: 'x', caption: 'c', accessToken: 't' }))
-      .rejects.toThrow(/bad image/)
+    await expect(
+      publishInstagramImage({ igUserId: 'IG1', imageUrl: 'x', caption: 'c', accessToken: 't' })
+    ).rejects.toThrow(/bad image/)
   })
 })
 
@@ -218,19 +255,22 @@ describe('publishInstagramImage', () => {
 describe('publishInstagramCarousel', () => {
   it('rejects fewer than 2 images', async () => {
     const { publishInstagramCarousel } = await import('@/lib/meta')
-    await expect(publishInstagramCarousel({ igUserId: 'IG1', imageUrls: ['a'], caption: 'c', accessToken: 't' }))
-      .rejects.toThrow(/2–10 images/)
+    await expect(
+      publishInstagramCarousel({ igUserId: 'IG1', imageUrls: ['a'], caption: 'c', accessToken: 't' })
+    ).rejects.toThrow(/2–10 images/)
   })
 
   it('rejects more than 10 images', async () => {
     const { publishInstagramCarousel } = await import('@/lib/meta')
     const urls = Array.from({ length: 11 }, (_, i) => `u${i}`)
-    await expect(publishInstagramCarousel({ igUserId: 'IG1', imageUrls: urls, caption: 'c', accessToken: 't' }))
-      .rejects.toThrow(/2–10 images/)
+    await expect(
+      publishInstagramCarousel({ igUserId: 'IG1', imageUrls: urls, caption: 'c', accessToken: 't' })
+    ).rejects.toThrow(/2–10 images/)
   })
 
   it('creates child containers, a parent, then publishes', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(res(200, { id: 'CHILD_1' }))
       .mockResolvedValueOnce(res(200, { id: 'CHILD_2' }))
       .mockResolvedValueOnce(res(200, { id: 'PARENT_1' }))
@@ -238,7 +278,10 @@ describe('publishInstagramCarousel', () => {
     vi.stubGlobal('fetch', fetchMock)
     const { publishInstagramCarousel } = await import('@/lib/meta')
     const r = await publishInstagramCarousel({
-      igUserId: 'IG1', imageUrls: ['https://a', 'https://b'], caption: 'c', accessToken: 't',
+      igUserId: 'IG1',
+      imageUrls: ['https://a', 'https://b'],
+      caption: 'c',
+      accessToken: 't',
     })
     expect(r).toEqual({ id: 'PUB_1' })
     // parent create body carries the joined children ids
@@ -250,21 +293,27 @@ describe('publishInstagramCarousel', () => {
 
 describe('publishInstagramReel', () => {
   it('creates a REELS container, waits FINISHED, publishes (with cover)', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(res(200, { id: 'CONT_R' }))                  // media create
-      .mockResolvedValueOnce(res(200, { status_code: 'FINISHED' }))       // poll
-      .mockResolvedValueOnce(res(200, { id: 'PUB_R' }))                   // publish
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(res(200, { id: 'CONT_R' })) // media create
+      .mockResolvedValueOnce(res(200, { status_code: 'FINISHED' })) // poll
+      .mockResolvedValueOnce(res(200, { id: 'PUB_R' })) // publish
     vi.stubGlobal('fetch', fetchMock)
     const { publishInstagramReel } = await import('@/lib/meta')
     const r = await publishInstagramReel({
-      igUserId: 'IG1', videoUrl: 'https://v.mp4', caption: 'c', accessToken: 't', coverUrl: 'https://cover.png',
+      igUserId: 'IG1',
+      videoUrl: 'https://v.mp4',
+      caption: 'c',
+      accessToken: 't',
+      coverUrl: 'https://cover.png',
     })
     expect(r).toEqual({ id: 'PUB_R' })
     expect(fetchMock.mock.calls[0][1].body).toContain('cover_url')
   })
 
   it('works without a cover url', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(res(200, { id: 'CONT_R' }))
       .mockResolvedValueOnce(res(200, { status_code: 'FINISHED' }))
       .mockResolvedValueOnce(res(200, { id: 'PUB_R' }))
@@ -276,19 +325,22 @@ describe('publishInstagramReel', () => {
   })
 
   it('throws when container reaches ERROR', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(res(200, { id: 'CONT_R' }))
       .mockResolvedValueOnce(res(200, { status_code: 'ERROR' }))
     vi.stubGlobal('fetch', fetchMock)
     const { publishInstagramReel } = await import('@/lib/meta')
-    await expect(publishInstagramReel({ igUserId: 'IG1', videoUrl: 'v', caption: 'c', accessToken: 't' }))
-      .rejects.toThrow(/ERROR/)
+    await expect(
+      publishInstagramReel({ igUserId: 'IG1', videoUrl: 'v', caption: 'c', accessToken: 't' })
+    ).rejects.toThrow(/ERROR/)
   })
 
   it('times out when container never reaches FINISHED', async () => {
     vi.useFakeTimers()
     // Container create then always-IN_PROGRESS polls.
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(res(200, { id: 'CONT_R' }))
       .mockResolvedValue(res(200, { status_code: 'IN_PROGRESS' }))
     vi.stubGlobal('fetch', fetchMock)
@@ -305,8 +357,9 @@ describe('publishInstagramReel', () => {
 
 describe('searchHashtagReach', () => {
   it('returns 1 when hashtag resolves to an id', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(res(200, { data: [{ id: 'HT1' }] }))  // search
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(res(200, { data: [{ id: 'HT1' }] })) // search
       .mockResolvedValueOnce(res(200, { id: 'HT1', name: 'bolts' })) // info
     vi.stubGlobal('fetch', fetchMock)
     const { searchHashtagReach } = await import('@/lib/meta')
@@ -320,9 +373,10 @@ describe('searchHashtagReach', () => {
   })
 
   it('returns 0 when info has no id', async () => {
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(res(200, { data: [{ id: 'HT1' }] }))
-      .mockResolvedValueOnce(res(200, { name: 'bolts' }))  // no id
+      .mockResolvedValueOnce(res(200, { name: 'bolts' })) // no id
     vi.stubGlobal('fetch', fetchMock)
     const { searchHashtagReach } = await import('@/lib/meta')
     await expect(searchHashtagReach('IG1', 'bolts', 't')).resolves.toBe(0)

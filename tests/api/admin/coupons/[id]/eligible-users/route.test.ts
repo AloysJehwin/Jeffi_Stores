@@ -58,10 +58,7 @@ describe('POST /api/admin/coupons/[id]/eligible-users', () => {
     const res = await POST(makeReq({ user_id: 'u1' }), { params })
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
-    expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('coupon_eligible_users'),
-      ['coupon-1', 'u1'],
-    )
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('coupon_eligible_users'), ['coupon-1', 'u1'])
   })
 
   it('returns 500 on db error', async () => {
@@ -101,10 +98,7 @@ describe('DELETE /api/admin/coupons/[id]/eligible-users', () => {
     const res = await DELETE(makeDeleteReq({ user_id: 'u1' }), { params })
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
-    expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM coupon_eligible_users'),
-      ['coupon-1', 'u1'],
-    )
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM coupon_eligible_users'), ['coupon-1', 'u1'])
   })
 
   it('returns 500 on db error', async () => {

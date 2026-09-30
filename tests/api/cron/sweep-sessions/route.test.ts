@@ -7,9 +7,13 @@ import { GET } from '@/app/api/cron/sweep-sessions/route'
 import { sweepExpiredAdminSessions } from '@/lib/auth-sessions'
 
 const mockSweep = vi.mocked(sweepExpiredAdminSessions)
-const req = (auth?: string) => new NextRequest('http://localhost/api/cron/sweep-sessions', { headers: auth ? { authorization: auth } : {} })
+const req = (auth?: string) =>
+  new NextRequest('http://localhost/api/cron/sweep-sessions', { headers: auth ? { authorization: auth } : {} })
 
-beforeEach(() => { vi.clearAllMocks(); process.env.CRON_SECRET = 'secret' })
+beforeEach(() => {
+  vi.clearAllMocks()
+  process.env.CRON_SECRET = 'secret'
+})
 
 describe('GET /api/cron/sweep-sessions', () => {
   it('401 without the cron bearer', async () => {

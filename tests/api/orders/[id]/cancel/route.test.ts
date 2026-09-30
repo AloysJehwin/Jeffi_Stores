@@ -96,10 +96,7 @@ describe('POST /api/orders/[id]/cancel', () => {
 
     await POST(makeRequest({ restoreToCart: true }) as any, PARAMS)
 
-    expect(orders.cancelOrder).toHaveBeenCalledWith(
-      'order-123',
-      expect.objectContaining({ restoreToCart: true })
-    )
+    expect(orders.cancelOrder).toHaveBeenCalledWith('order-123', expect.objectContaining({ restoreToCart: true }))
   })
 
   it('returns 500 when cancelOrder throws', async () => {

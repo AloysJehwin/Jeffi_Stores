@@ -18,9 +18,18 @@ const C = '33333333-3333-3333-3333-333333333333'
 const req = (qs: string) => new NextRequest(`http://localhost/api/products/affinity?${qs}`)
 
 const row = (id: string) => ({
-  id, name: `P ${id.slice(0, 2)}`, slug: id, has_variants: false, base_price: 100, mrp: 150, stock_status: 'In Stock',
-  cost_price: 40, supplier_id: 'secret',
-  product_images: [{ image_url: 'https://cdn/x.png', thumbnail_url: 'https://cdn/t.png', s3_key: 'k', is_primary: true }],
+  id,
+  name: `P ${id.slice(0, 2)}`,
+  slug: id,
+  has_variants: false,
+  base_price: 100,
+  mrp: 150,
+  stock_status: 'In Stock',
+  cost_price: 40,
+  supplier_id: 'secret',
+  product_images: [
+    { image_url: 'https://cdn/x.png', thumbnail_url: 'https://cdn/t.png', s3_key: 'k', is_primary: true },
+  ],
 })
 
 beforeEach(() => vi.clearAllMocks())
@@ -41,7 +50,11 @@ describe('GET /api/products/affinity', () => {
     expect(card).toMatchObject({ id: B, displayPrice: 100, mrp: 150 })
     expect(card).not.toHaveProperty('cost_price')
     expect(card).not.toHaveProperty('supplier_id')
-    expect(card.primaryImage).toEqual({ image_url: 'https://cdn/x.png', thumbnail_url: 'https://cdn/t.png', blurhash: null })
+    expect(card.primaryImage).toEqual({
+      image_url: 'https://cdn/x.png',
+      thumbnail_url: 'https://cdn/t.png',
+      blurhash: null,
+    })
   })
 
   it('drops excluded products and still fills the limit', async () => {

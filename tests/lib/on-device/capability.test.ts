@@ -131,7 +131,7 @@ describe('on-device/capability', () => {
     setNavigator(
       makeGoodNavigator({
         gpu: { requestAdapter: vi.fn().mockResolvedValue(null) },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.reason).toBe('no-adapter')
@@ -167,7 +167,7 @@ describe('on-device/capability', () => {
             info: { vendor: 'amd' },
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.reason).toBe('gpu-limits-too-small')
@@ -186,7 +186,7 @@ describe('on-device/capability', () => {
             info: { vendor: 'intel' },
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.reason).toBe('gpu-limits-too-small')
@@ -209,7 +209,7 @@ describe('on-device/capability', () => {
       isMobile: false,
     })
     // Desktop path passes powerPreference: high-performance
-    expect((nav.gpu.requestAdapter as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith({
+    expect(nav.gpu.requestAdapter as ReturnType<typeof vi.fn>).toHaveBeenCalledWith({
       powerPreference: 'high-performance',
     })
   })
@@ -220,7 +220,7 @@ describe('on-device/capability', () => {
         gpu: {
           requestAdapter: vi.fn().mockResolvedValue({ info: { vendor: 'v' } }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.maxBufferSizeMB).toBeNull()
@@ -233,7 +233,7 @@ describe('on-device/capability', () => {
         gpu: {
           requestAdapter: vi.fn().mockRejectedValue(new Error('boom')),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.reason).toBe('error')
@@ -263,7 +263,7 @@ describe('on-device/capability', () => {
     expect(v.reason).toBe('ok')
     expect(v.capable).toBe(true)
     // Mobile passes undefined opts to requestAdapter
-    expect((nav.gpu.requestAdapter as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(undefined)
+    expect(nav.gpu.requestAdapter as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(undefined)
   })
 
   it('blocks a budget mobile with known deviceMemory < 3 GB', async () => {
@@ -271,7 +271,7 @@ describe('on-device/capability', () => {
       makeGoodNavigator({
         userAgent: 'Android Mobile',
         deviceMemory: 2,
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.isMobile).toBe(true)
@@ -312,7 +312,7 @@ describe('on-device/capability', () => {
             info: { vendor: 'arm' },
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.reason).toBe('gpu-limits-too-small')
@@ -332,7 +332,7 @@ describe('on-device/capability', () => {
             requestAdapterInfo: vi.fn().mockResolvedValue({ vendor: 'qualcomm' }),
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.gpuVendor).toBe('qualcomm')
@@ -351,7 +351,7 @@ describe('on-device/capability', () => {
             requestAdapterInfo: vi.fn().mockResolvedValue({}),
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.gpuVendor).toBeNull()
@@ -370,7 +370,7 @@ describe('on-device/capability', () => {
             requestAdapterInfo: vi.fn().mockRejectedValue(new Error('nope')),
           }),
         },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.gpuVendor).toBeNull()
@@ -389,7 +389,7 @@ describe('on-device/capability', () => {
     setNavigator(
       makeGoodNavigator({
         storage: { estimate: vi.fn().mockRejectedValue(new Error('fail')) },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.storageQuotaMB).toBeNull()
@@ -399,7 +399,7 @@ describe('on-device/capability', () => {
     setNavigator(
       makeGoodNavigator({
         storage: { estimate: vi.fn().mockResolvedValue({ quota: 0 }) },
-      }),
+      })
     )
     const v = await detectOnDeviceCapability()
     expect(v.details.storageQuotaMB).toBeNull()

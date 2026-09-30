@@ -59,7 +59,15 @@ const sampleOrders = [
 ]
 
 const sampleHistory = [
-  { id: 'ph-1', pickup_id: 'PU001', pickup_date: '2024-01-15', awb_count: 2, awbs: ['AWB1', 'AWB2'], pickup_status: 'pending', created_at: '2024-01-15' },
+  {
+    id: 'ph-1',
+    pickup_id: 'PU001',
+    pickup_date: '2024-01-15',
+    awb_count: 2,
+    awbs: ['AWB1', 'AWB2'],
+    pickup_status: 'pending',
+    created_at: '2024-01-15',
+  },
 ]
 
 // ── GET ───────────────────────────────────────────────────────────────────────
@@ -69,9 +77,7 @@ describe('GET /api/admin/delhivery/pickup-request', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleOrders as any)
-      .mockResolvedValueOnce(sampleHistory as any)
+    mockQueryMany.mockResolvedValueOnce(sampleOrders as any).mockResolvedValueOnce(sampleHistory as any)
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -169,14 +175,17 @@ describe('GET /api/admin/delhivery/pickup-request?poll=<id>', () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
-        ShipmentData: [{
-          Shipment: {
-            Status: { StatusType: 'PU' },
-            Scans: [],
-          },
-        }],
-      }),
+      json: () =>
+        Promise.resolve({
+          ShipmentData: [
+            {
+              Shipment: {
+                Status: { StatusType: 'PU' },
+                Scans: [],
+              },
+            },
+          ],
+        }),
     })
     mockQuery.mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeGet({ poll: 'ph-1' }))
@@ -184,24 +193,24 @@ describe('GET /api/admin/delhivery/pickup-request?poll=<id>', () => {
     const body = await res.json()
     expect(body.pickup_status).toBe('picked_up')
     expect(body.updated).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("pickup_status = 'picked_up'"),
-      ['ph-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("pickup_status = 'picked_up'"), ['ph-1'])
   })
 
   it('does NOT update DB when status is already picked_up even if shipment shows PU', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'picked_up' } as any)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
-        ShipmentData: [{
-          Shipment: {
-            Status: { StatusType: 'PU' },
-            Scans: [],
-          },
-        }],
-      }),
+      json: () =>
+        Promise.resolve({
+          ShipmentData: [
+            {
+              Shipment: {
+                Status: { StatusType: 'PU' },
+                Scans: [],
+              },
+            },
+          ],
+        }),
     })
     const res = await GET(makeGet({ poll: 'ph-1' }))
     expect(res.status).toBe(200)
@@ -215,16 +224,17 @@ describe('GET /api/admin/delhivery/pickup-request?poll=<id>', () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
-        ShipmentData: [{
-          Shipment: {
-            Status: { StatusType: 'PP' },
-            Scans: [
-              { ScanDetail: { ScanType: null, Scan: 'shipment picked up from shipper' } },
-            ],
-          },
-        }],
-      }),
+      json: () =>
+        Promise.resolve({
+          ShipmentData: [
+            {
+              Shipment: {
+                Status: { StatusType: 'PP' },
+                Scans: [{ ScanDetail: { ScanType: null, Scan: 'shipment picked up from shipper' } }],
+              },
+            },
+          ],
+        }),
     })
     mockQuery.mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeGet({ poll: 'ph-1' }))
@@ -273,10 +283,7 @@ describe('PATCH /api/admin/delhivery/pickup-request', () => {
     const res = await PATCH(makePatch({ id: 'ph-1', pickup_status: 'pending' }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('pickup_status'),
-      ['pending', 'ph-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('pickup_status'), ['pending', 'ph-1'])
   })
 
   it('updates pickup_status to picked_up', async () => {

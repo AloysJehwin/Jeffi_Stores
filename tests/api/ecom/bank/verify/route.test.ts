@@ -23,7 +23,9 @@ import { POST } from '@/app/api/ecom/bank/verify/route'
 
 function req(body: Record<string, unknown>) {
   return new NextRequest('https://ecom.jeffistores.in/api/ecom/bank/verify', {
-    method: 'POST', body: JSON.stringify(body), headers: new Headers({ 'Content-Type': 'application/json' }),
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: new Headers({ 'Content-Type': 'application/json' }),
   })
 }
 
@@ -44,7 +46,9 @@ describe('correcting a bank account reaches the Route settlement config', () => 
     const body = await res.json()
     expect(res.status).toBe(200)
     expect(mockSettle).toHaveBeenCalledWith('acc_1', {
-      accountNumber: GOOD.accountNumber, ifsc: 'SBIN0071256', beneficiaryName: 'Aloys Jehwin',
+      accountNumber: GOOD.accountNumber,
+      ifsc: 'SBIN0071256',
+      beneficiaryName: 'Aloys Jehwin',
     })
     expect(body.pushedToRoute).toBe(true)
     expect(body.status).toBe('verified')

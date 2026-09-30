@@ -74,11 +74,7 @@ function makeRequest(body: unknown) {
 
 // Helper: configure queryOne call sequence for the coupon apply path.
 // Call order: 1) coupon lookup, 2) eligible_count, 3) per-user usage (optional)
-function setupCouponMocks(
-  coupon: ReturnType<typeof makeCoupon> | null,
-  eligibleCount = '0',
-  perUserUsageCount = '0',
-) {
+function setupCouponMocks(coupon: ReturnType<typeof makeCoupon> | null, eligibleCount = '0', perUserUsageCount = '0') {
   vi.mocked(queryOne)
     .mockResolvedValueOnce(coupon as any)
     .mockResolvedValueOnce({ cnt: eligibleCount } as any)
@@ -120,9 +116,7 @@ describe('POST /api/coupons/apply — valid coupon', () => {
   })
 
   it('applies a flat discount coupon', async () => {
-    setupCouponMocks(
-      makeCoupon({ discount_type: 'flat', discount_value: 50, code: 'FLAT50' }),
-    )
+    setupCouponMocks(makeCoupon({ discount_type: 'flat', discount_value: 50, code: 'FLAT50' }))
     const req = makeRequest({ code: 'FLAT50', subtotal: 500 })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
@@ -137,7 +131,7 @@ describe('POST /api/coupons/apply — valid coupon', () => {
         discount_type: 'percentage',
         discount_value: 20,
         max_discount_amount: 80,
-      }),
+      })
     )
     const req = makeRequest({ code: 'SAVE20', subtotal: 1000 })
     const res = await POST(req as any)
@@ -148,9 +142,7 @@ describe('POST /api/coupons/apply — valid coupon', () => {
   })
 
   it('caps discount so it does not exceed the subtotal', async () => {
-    setupCouponMocks(
-      makeCoupon({ discount_type: 'flat', discount_value: 9999 }),
-    )
+    setupCouponMocks(makeCoupon({ discount_type: 'flat', discount_value: 9999 }))
     const req = makeRequest({ code: 'BIG', subtotal: 100 })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
@@ -195,9 +187,7 @@ describe('POST /api/coupons/apply — invalid coupon', () => {
   })
 
   it('returns 400 when usage limit is reached', async () => {
-    setupCouponMocks(
-      makeCoupon({ usage_limit: 100, times_used: 100 }),
-    )
+    setupCouponMocks(makeCoupon({ usage_limit: 100, times_used: 100 }))
     const req = makeRequest({ code: 'MAXED', subtotal: 500 })
     const res = await POST(req as any)
     expect(res.status).toBe(400)

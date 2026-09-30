@@ -106,7 +106,7 @@ describe('POST /api/admin/cron/trigger', () => {
     expect(body.status).toBe(200)
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/cron/cancel-stale-orders'),
-      expect.objectContaining({ method: 'GET' }),
+      expect.objectContaining({ method: 'GET' })
     )
   })
 
@@ -131,7 +131,7 @@ describe('POST /api/admin/cron/trigger', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/admin/delhivery/sync-statuses'),
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({ method: 'POST' })
     )
   })
 })

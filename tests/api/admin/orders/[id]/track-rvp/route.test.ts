@@ -36,43 +36,48 @@ const mockHasScope = vi.mocked(hasScope)
 const mockQueryOne = vi.mocked(queryOne)
 
 const SHIPMENT_DATA = {
-  ShipmentData: [{
-    Shipment: {
-      AWB: 'RVP12345',
-      Status: {
-        Status: 'In Transit',
-        StatusType: 'IT',
-        StatusDateTime: '2026-06-01T10:00:00',
-        Instructions: 'Leave at door',
-      },
-      PickUpDate: '2026-05-31',
-      ExpectedDeliveryDate: '2026-06-03',
-      Origin: 'Mumbai',
-      Destination: 'Delhi',
-      OrderType: 'RVP',
-      ReverseInTransit: true,
-      DestRecieveDate: null,
-      ReturnedDate: null,
-      Scans: [
-        {
-          ScanDetail: {
-            ScanDateTime: '2026-06-01T10:00:00',
-            ScannedLocation: 'Mumbai Hub',
-            Scan: 'Picked Up',
-            Instructions: '',
-          },
+  ShipmentData: [
+    {
+      Shipment: {
+        AWB: 'RVP12345',
+        Status: {
+          Status: 'In Transit',
+          StatusType: 'IT',
+          StatusDateTime: '2026-06-01T10:00:00',
+          Instructions: 'Leave at door',
         },
-      ],
+        PickUpDate: '2026-05-31',
+        ExpectedDeliveryDate: '2026-06-03',
+        Origin: 'Mumbai',
+        Destination: 'Delhi',
+        OrderType: 'RVP',
+        ReverseInTransit: true,
+        DestRecieveDate: null,
+        ReturnedDate: null,
+        Scans: [
+          {
+            ScanDetail: {
+              ScanDateTime: '2026-06-01T10:00:00',
+              ScannedLocation: 'Mumbai Hub',
+              Scan: 'Picked Up',
+              Instructions: '',
+            },
+          },
+        ],
+      },
     },
-  }],
+  ],
 }
 
 function mockFetch(body: object, ok = true, status = 200) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+    })
+  )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────

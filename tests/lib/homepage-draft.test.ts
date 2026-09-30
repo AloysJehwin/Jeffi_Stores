@@ -18,22 +18,61 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import {
-  applyDraftOrder, applyDraftPatch, discardHomepageDraft, endsBeforeStart, getEditableHomepage,
-  getHomepageDraftSummary, nextDisplayOrder, publishHomepageDraft, withHomepageDraft,
+  applyDraftOrder,
+  applyDraftPatch,
+  discardHomepageDraft,
+  endsBeforeStart,
+  getEditableHomepage,
+  getHomepageDraftSummary,
+  nextDisplayOrder,
+  publishHomepageDraft,
+  withHomepageDraft,
 } from '@/lib/homepage-draft'
 
 const ADMIN_ID = '44444444-4444-4444-8444-444444444444'
 const T0 = '2026-09-01T00:00:00.000Z'
 const section = (id: string, display_order: number, extra: Record<string, unknown> = {}) => ({
-  id, type: 'promo_banner', title: id, subtitle: null, eyebrow: null, cta_label: null, cta_url: null,
-  config: {}, display_order, is_active: true, starts_at: null, ends_at: null, created_at: T0, updated_at: T0, ...extra,
+  id,
+  type: 'promo_banner',
+  title: id,
+  subtitle: null,
+  eyebrow: null,
+  cta_label: null,
+  cta_url: null,
+  config: {},
+  display_order,
+  is_active: true,
+  starts_at: null,
+  ends_at: null,
+  created_at: T0,
+  updated_at: T0,
+  ...extra,
 })
 const slide = (id: string, display_order: number, extra: Record<string, unknown> = {}) => ({
-  id, title: id, subtitle: null, badge_text: null, badge_color: 'bg-primary-500', image_url: null,
-  image_url_mobile: null, blurhash: null, blurhash_mobile: null, cta_label: null, cta_url: null,
-  filter_category: null, filter_brand: null, filter_grade: null, filter_material: null,
-  filter_min_price: null, filter_max_price: null, filter_in_stock: false, filter_on_sale: false,
-  display_order, is_active: true, created_at: T0, updated_at: T0, ...extra,
+  id,
+  title: id,
+  subtitle: null,
+  badge_text: null,
+  badge_color: 'bg-primary-500',
+  image_url: null,
+  image_url_mobile: null,
+  blurhash: null,
+  blurhash_mobile: null,
+  cta_label: null,
+  cta_url: null,
+  filter_category: null,
+  filter_brand: null,
+  filter_grade: null,
+  filter_material: null,
+  filter_min_price: null,
+  filter_max_price: null,
+  filter_in_stock: false,
+  filter_on_sale: false,
+  display_order,
+  is_active: true,
+  created_at: T0,
+  updated_at: T0,
+  ...extra,
 })
 
 function lockReturns(...rows: unknown[][]) {
@@ -65,7 +104,9 @@ describe('withHomepageDraft', () => {
 
     const [ensureSql, ensureParams] = mockClientQuery.mock.calls[0]
     expect(ensureSql).toContain('INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by)')
-    expect(ensureSql).toContain('jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at) FROM homepage_sections t')
+    expect(ensureSql).toContain(
+      'jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at) FROM homepage_sections t'
+    )
     expect(ensureSql).toContain('jsonb_agg(to_jsonb(t) ORDER BY t.display_order, t.created_at) FROM hero_slides t')
     expect(ensureSql).toContain('ON CONFLICT (id) DO NOTHING')
     expect(ensureParams).toEqual([ADMIN_ID])
@@ -76,7 +117,9 @@ describe('withHomepageDraft', () => {
     expect(JSON.parse(writeParams[0])[0].title).toBe('Changed')
     expect(JSON.parse(writeParams[1])).toEqual([slide('s', 0)])
     expect(writeParams[2]).toBe(ADMIN_ID)
-    expect(sqlCalls().some(s => /^(INSERT INTO|UPDATE|DELETE FROM) (homepage_sections|hero_slides)\b/.test(s))).toBe(false)
+    expect(sqlCalls().some(s => /^(INSERT INTO|UPDATE|DELETE FROM) (homepage_sections|hero_slides)\b/.test(s))).toBe(
+      false
+    )
   })
 
   it('rolls back without writing when the mutation changes nothing', async () => {
@@ -89,14 +132,18 @@ describe('withHomepageDraft', () => {
 
   it('re-copies live and retries when a concurrent publish deleted the draft', async () => {
     lockReturns([], [{ sections: [], hero_slides: [] }])
-    await withHomepageDraft(ADMIN_ID, draft => { draft.sections.push(section('n', 0) as any) })
+    await withHomepageDraft(ADMIN_ID, draft => {
+      draft.sections.push(section('n', 0) as any)
+    })
     expect(sqlCalls().filter(s => s.startsWith('INSERT INTO homepage_drafts'))).toHaveLength(2)
     expect(sqlCalls().filter(s => s.startsWith('UPDATE homepage_drafts'))).toHaveLength(1)
   })
 
   it('records a null editor for a non-uuid admin id', async () => {
     lockReturns([{ sections: [], hero_slides: [] }])
-    await withHomepageDraft('not-a-uuid', draft => { draft.sections.push(section('n', 0) as any) })
+    await withHomepageDraft('not-a-uuid', draft => {
+      draft.sections.push(section('n', 0) as any)
+    })
     expect(mockClientQuery.mock.calls[0][1]).toEqual([null])
     expect(mockClientQuery.mock.calls[2][1][2]).toBeNull()
   })
@@ -118,7 +165,9 @@ describe('getEditableHomepage', () => {
   })
 
   it('falls back to the live rows when there is no draft', async () => {
-    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ sections: [section('a', 0)], hero_slides: [slide('s', 0)] })
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ sections: [section('a', 0)], hero_slides: [slide('s', 0)] })
     const editable = await getEditableHomepage()
     expect(editable).toEqual({ sections: [section('a', 0)], heroSlides: [slide('s', 0)], draft: null })
     expect(mockQueryOne.mock.calls[1][0]).toContain('FROM homepage_sections t')
@@ -143,8 +192,10 @@ describe('publishHomepageDraft', () => {
     const draftSections = [section('a', 0), section('n', 1)]
     const draftSlides = [slide('s', 0)]
     mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.includes('FOR UPDATE')) return { rows: [{ sections: draftSections, hero_slides: draftSlides }], rowCount: 1 }
-      if (sql.startsWith('INSERT INTO homepage_sections')) return { rows: [{ inserted: false }, { inserted: true }], rowCount: 2 }
+      if (sql.includes('FOR UPDATE'))
+        return { rows: [{ sections: draftSections, hero_slides: draftSlides }], rowCount: 1 }
+      if (sql.startsWith('INSERT INTO homepage_sections'))
+        return { rows: [{ inserted: false }, { inserted: true }], rowCount: 2 }
       if (sql.startsWith('INSERT INTO hero_slides')) return { rows: [], rowCount: 0 }
       if (sql.startsWith('DELETE FROM homepage_sections')) return { rows: [], rowCount: 2 }
       return { rows: [], rowCount: 0 }
@@ -231,9 +282,14 @@ describe('getHomepageDraftSummary', () => {
   it('ignores representation-only differences', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        sections: [section('a', 5, {
-          starts_at: '2026-10-01T00:00:00.000Z', config: { b: 1, a: [1, 2] }, subtitle: '', updated_at: '2026-09-20T00:00:00Z',
-        })],
+        sections: [
+          section('a', 5, {
+            starts_at: '2026-10-01T00:00:00.000Z',
+            config: { b: 1, a: [1, 2] },
+            subtitle: '',
+            updated_at: '2026-09-20T00:00:00Z',
+          }),
+        ],
         hero_slides: [slide('s', 0, { filter_min_price: 10 })],
         updated_at: '2026-09-26T10:00:00Z',
         updated_by_name: 'Aloys Jehwin',
@@ -253,7 +309,11 @@ describe('draft row helpers', () => {
   it('applyDraftOrder re-numbers listed ids, ignores unknown ones and bumps only moved rows', () => {
     const rows = [section('a', 0), section('b', 1), section('c', 2)]
     const ordered = applyDraftOrder(rows, ['c', 'ghost', 'a', 'b'])
-    expect(ordered.map(r => [r.id, r.display_order])).toEqual([['c', 0], ['a', 2], ['b', 3]])
+    expect(ordered.map(r => [r.id, r.display_order])).toEqual([
+      ['c', 0],
+      ['a', 2],
+      ['b', 3],
+    ])
     expect(ordered.every(r => r.updated_at !== T0)).toBe(true)
     const same = applyDraftOrder([section('x', 0)], ['x'])
     expect(same[0].updated_at).toBe(T0)

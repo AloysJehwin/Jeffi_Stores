@@ -27,7 +27,9 @@ function makeRequest(body: object) {
 }
 
 describe('POST /api/admin/campaigns/[kind]/test', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

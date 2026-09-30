@@ -103,9 +103,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
   it('skips payout when RZP fetch fails', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany.mockResolvedValueOnce([
-      { id: 'ep-1', payout_id: 'pout_bad', expense_id: 'exp-1' },
-    ])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'ep-1', payout_id: 'pout_bad', expense_id: 'exp-1' }])
     mockFetch.mockResolvedValue({ ok: false } as any)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
@@ -116,9 +114,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
   it('handles non-terminal status without updating expense', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany.mockResolvedValueOnce([
-      { id: 'ep-1', payout_id: 'pout_1', expense_id: 'exp-1' },
-    ])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'ep-1', payout_id: 'pout_1', expense_id: 'exp-1' }])
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockFetch.mockResolvedValue({
       ok: true,
@@ -146,10 +142,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
     } as any)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE expenses'),
-      expect.arrayContaining(['paid'])
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE expenses'), expect.arrayContaining(['paid']))
   })
 
   it('marks expense as partial when partially paid', async () => {

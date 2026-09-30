@@ -37,7 +37,9 @@ function makePostReq(body: unknown) {
   })
 }
 
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rules', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -110,10 +112,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' })
-    const res = await POST(makePostReq({
-      rule_type: 'tiered_price',
-      config: { tiers: [{ min_qty: 0, price: 100 }] },
-    }), { params })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 0, price: 100 }] },
+      }),
+      { params }
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/min_qty/)
@@ -123,10 +128,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' })
-    const res = await POST(makePostReq({
-      rule_type: 'tiered_price',
-      config: { tiers: [{ min_qty: 5, price: -100 }] },
-    }), { params })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 5, price: -100 }] },
+      }),
+      { params }
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/price/)
@@ -136,10 +144,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' })
-    const res = await POST(makePostReq({
-      rule_type: 'bonus_qty',
-      config: { buy: 0, get_extra: 1 },
-    }), { params })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'bonus_qty',
+        config: { buy: 0, get_extra: 1 },
+      }),
+      { params }
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/buy/)
@@ -149,10 +160,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' })
-    const res = await POST(makePostReq({
-      rule_type: 'bonus_qty',
-      config: { buy: 2, get_extra: 0 },
-    }), { params })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'bonus_qty',
+        config: { buy: 2, get_extra: 0 },
+      }),
+      { params }
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/get_extra/)
@@ -161,14 +175,21 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
   it('inserts tiered_price rule on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const rule = { id: 'rule-1', rule_type: 'tiered_price', config: { tiers: [{ min_qty: 5, price: 100 }] }, is_active: true, priority: 100 }
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'unit-1' })
-      .mockResolvedValueOnce(rule)
-    const res = await POST(makePostReq({
+    const rule = {
+      id: 'rule-1',
       rule_type: 'tiered_price',
       config: { tiers: [{ min_qty: 5, price: 100 }] },
-    }), { params })
+      is_active: true,
+      priority: 100,
+    }
+    mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' }).mockResolvedValueOnce(rule)
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 5, price: 100 }] },
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.rule.rule_type).toBe('tiered_price')
@@ -177,14 +198,21 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
   it('inserts bonus_qty rule on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const rule = { id: 'rule-2', rule_type: 'bonus_qty', config: { buy: 3, get_extra: 1 }, is_active: true, priority: 100 }
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'unit-1' })
-      .mockResolvedValueOnce(rule)
-    const res = await POST(makePostReq({
+    const rule = {
+      id: 'rule-2',
       rule_type: 'bonus_qty',
       config: { buy: 3, get_extra: 1 },
-    }), { params })
+      is_active: true,
+      priority: 100,
+    }
+    mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' }).mockResolvedValueOnce(rule)
+    const res = await POST(
+      makePostReq({
+        rule_type: 'bonus_qty',
+        config: { buy: 3, get_extra: 1 },
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.rule.rule_type).toBe('bonus_qty')
@@ -193,41 +221,44 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
   it('uses priority 100 when not provided', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'unit-1' })
-      .mockResolvedValueOnce({ id: 'rule-3', priority: 100 })
-    const res = await POST(makePostReq({
-      rule_type: 'tiered_price',
-      config: { tiers: [{ min_qty: 1, price: 50 }] },
-    }), { params })
+    mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' }).mockResolvedValueOnce({ id: 'rule-3', priority: 100 })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 1, price: 50 }] },
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
   })
 
   it('respects custom priority', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'unit-1' })
-      .mockResolvedValueOnce({ id: 'rule-4', priority: 25 })
-    const res = await POST(makePostReq({
-      rule_type: 'bonus_qty',
-      config: { buy: 2, get_extra: 1 },
-      priority: 25,
-    }), { params })
+    mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' }).mockResolvedValueOnce({ id: 'rule-4', priority: 25 })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'bonus_qty',
+        config: { buy: 2, get_extra: 1 },
+        priority: 25,
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
   })
 
   it('respects is_active=false', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'unit-1' })
-      .mockResolvedValueOnce({ id: 'rule-5', is_active: false })
-    const res = await POST(makePostReq({
-      rule_type: 'tiered_price',
-      config: { tiers: [{ min_qty: 1, price: 50 }] },
-      is_active: false,
-    }), { params })
+    mockQueryOne.mockResolvedValueOnce({ id: 'unit-1' }).mockResolvedValueOnce({ id: 'rule-5', is_active: false })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 1, price: 50 }] },
+        is_active: false,
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
   })
 
@@ -237,10 +268,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units/[unitId]/rule
     mockQueryOne
       .mockResolvedValueOnce({ id: 'unit-1' })
       .mockResolvedValueOnce({ id: 'rule-6', rule_type: 'tiered_price' })
-    const res = await POST(makePostReq({
-      rule_type: 'tiered_price',
-      config: { tiers: [{ min_qty: 100, price: 0 }] },
-    }), { params })
+    const res = await POST(
+      makePostReq({
+        rule_type: 'tiered_price',
+        config: { tiers: [{ min_qty: 100, price: 0 }] },
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
   })
 })

@@ -73,8 +73,8 @@ describe('GET /api/products/search', () => {
     const ilikeRow = [PRODUCTS[0]]
     const semanticRows = [PRODUCTS[1], PRODUCTS[2]]
     mockQueryMany
-      .mockResolvedValueOnce(ilikeRow as any)       // ILIKE query
-      .mockResolvedValueOnce(semanticRows as any)   // semantic product fetch
+      .mockResolvedValueOnce(ilikeRow as any) // ILIKE query
+      .mockResolvedValueOnce(semanticRows as any) // semantic product fetch
     mockEmbed.mockResolvedValueOnce([0.1, 0.2] as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({
       rows: [
@@ -109,20 +109,14 @@ describe('GET /api/products/search', () => {
     const body = await res.json()
     expect(body).toHaveLength(3)
     // categoryId path passes 4 params
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('UNION ALL'),
-      expect.arrayContaining(['cat-1'])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('UNION ALL'), expect.arrayContaining(['cat-1']))
   })
 
   it('uses excludeId when provided', async () => {
     mockQueryMany.mockResolvedValueOnce(PRODUCTS as any)
     const res = await GET(makeReq({ q: 'widget', excludeId: 'p1' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['p1'])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['p1']))
   })
 
   it('caps limit at 20', async () => {
@@ -141,9 +135,9 @@ describe('GET /api/products/search', () => {
     const productRows = [PRODUCTS[1]]
 
     mockQueryMany
-      .mockResolvedValueOnce(ilikeRow)       // ILIKE
+      .mockResolvedValueOnce(ilikeRow) // ILIKE
       .mockResolvedValueOnce(variantProducts as any) // variant → product lookup
-      .mockResolvedValueOnce(productRows as any)     // final product fetch
+      .mockResolvedValueOnce(productRows as any) // final product fetch
 
     mockEmbed.mockResolvedValueOnce([0.5] as any)
     mockRunWithHnswTuning.mockResolvedValueOnce({

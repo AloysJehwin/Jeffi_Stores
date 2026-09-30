@@ -114,18 +114,13 @@ describe('POST /api/admin/shelving/labels', () => {
   it('generates PDF from DB rows and returns it', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany.mockResolvedValue([
-      { display_code: 'A-01-01', warehouse_name: 'Main WH' },
-    ] as any)
+    mockQueryMany.mockResolvedValue([{ display_code: 'A-01-01', warehouse_name: 'Main WH' }] as any)
     mockGeneratePDF.mockResolvedValue(fakePdfBuffer as any)
     const res = await POST(makeRequest({ location_ids: ['loc-1'] }))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('application/pdf')
     expect(res.headers.get('content-disposition')).toMatch(/shelf-labels/)
-    expect(mockGeneratePDF).toHaveBeenCalledWith(
-      [{ displayCode: 'A-01-01', warehouseName: 'Main WH' }],
-      1
-    )
+    expect(mockGeneratePDF).toHaveBeenCalledWith([{ displayCode: 'A-01-01', warehouseName: 'Main WH' }], 1)
   })
 
   it('uses direct items when provided instead of DB query', async () => {

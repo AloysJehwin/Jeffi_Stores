@@ -116,10 +116,7 @@ describe('PATCH /api/user/update', () => {
 
     const res = await PATCH(makePatch({ phone: '9123456789' }) as any)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenLastCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['9123456789'])
-    )
+    expect(db.queryOne).toHaveBeenLastCalledWith(expect.any(String), expect.arrayContaining(['9123456789']))
   })
 
   it('strips 91 prefix from 12-digit phone', async () => {
@@ -134,10 +131,7 @@ describe('PATCH /api/user/update', () => {
 
     const res = await PATCH(makePatch({ phone: '919876543210' }) as any)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenLastCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['9876543210'])
-    )
+    expect(db.queryOne).toHaveBeenLastCalledWith(expect.any(String), expect.arrayContaining(['9876543210']))
   })
 
   it('returns 400 for invalid phone length', async () => {

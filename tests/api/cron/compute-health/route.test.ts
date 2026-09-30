@@ -100,9 +100,11 @@ describe('GET /api/cron/compute-health', () => {
     const res = await GET(makeRequest('Bearer test-cron-secret') as any)
     const json = await res.json()
     expect(json.dropTasksCreated).toBe(1)
-    expect(mockCreateAutoTask).toHaveBeenCalledWith(expect.objectContaining({
-      title: expect.stringContaining('dropped 25 points'),
-    }))
+    expect(mockCreateAutoTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('dropped 25 points'),
+      })
+    )
   })
 
   it('creates task for score crossing below 40', async () => {

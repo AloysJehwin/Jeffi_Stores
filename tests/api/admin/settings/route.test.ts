@@ -28,7 +28,9 @@ function makeRequest(body: object) {
 }
 
 describe('PATCH /api/admin/settings', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -61,10 +63,10 @@ describe('PATCH /api/admin/settings', () => {
     const res = await PATCH(makeRequest({ key: 'min_order_amount', value: 500 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO site_settings'),
-      ['min_order_amount', '500']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO site_settings'), [
+      'min_order_amount',
+      '500',
+    ])
   })
 
   it('invalidates delivery cache for delivery_ keys', async () => {

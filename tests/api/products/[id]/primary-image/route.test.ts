@@ -21,14 +21,16 @@ function makeRequest(variantId?: string) {
 const params = { params: Promise.resolve({ id: 'prod1' }) }
 
 describe('GET /api/products/[id]/primary-image', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns product image when no variantId', async () => {
     // Promise.all: variantImage=Promise.resolve(null), productImage=queryOne, product=queryOne, variant=Promise.resolve(null)
     // So only 2 queryOne calls: productImage then product
     mockQueryOne
-      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' })  // productImage
-      .mockResolvedValueOnce({ name: 'Bolt' })                           // product name
+      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' }) // productImage
+      .mockResolvedValueOnce({ name: 'Bolt' }) // product name
 
     const res = await GET(makeRequest(), params as any)
     expect(res.status).toBe(200)
@@ -41,10 +43,10 @@ describe('GET /api/products/[id]/primary-image', () => {
   it('returns variant image when variantId provided', async () => {
     // Promise.all: variantImage=queryOne, productImage=queryOne, product=queryOne, variant=queryOne
     mockQueryOne
-      .mockResolvedValueOnce({ image_url: 'https://cdn/variant.jpg' })  // variantImage
-      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' })  // productImage
-      .mockResolvedValueOnce({ name: 'Bolt' })                          // product
-      .mockResolvedValueOnce({ variant_name: 'M6x20' })                 // variant
+      .mockResolvedValueOnce({ image_url: 'https://cdn/variant.jpg' }) // variantImage
+      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' }) // productImage
+      .mockResolvedValueOnce({ name: 'Bolt' }) // product
+      .mockResolvedValueOnce({ variant_name: 'M6x20' }) // variant
 
     const res = await GET(makeRequest('v1'), params as any)
     const json = await res.json()
@@ -54,10 +56,10 @@ describe('GET /api/products/[id]/primary-image', () => {
 
   it('falls back to product image when variant image is null', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(null)                                       // variantImage = null
-      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' })  // productImage
-      .mockResolvedValueOnce({ name: 'Bolt' })                          // product
-      .mockResolvedValueOnce({ variant_name: 'M6x20' })                 // variant
+      .mockResolvedValueOnce(null) // variantImage = null
+      .mockResolvedValueOnce({ image_url: 'https://cdn/product.jpg' }) // productImage
+      .mockResolvedValueOnce({ name: 'Bolt' }) // product
+      .mockResolvedValueOnce({ variant_name: 'M6x20' }) // variant
 
     const res = await GET(makeRequest('v1'), params as any)
     const json = await res.json()
@@ -67,8 +69,8 @@ describe('GET /api/products/[id]/primary-image', () => {
   it('returns null imageUrl when no images found', async () => {
     // No variantId → 2 queryOne calls both null
     mockQueryOne
-      .mockResolvedValueOnce(null)  // productImage
-      .mockResolvedValueOnce(null)  // product
+      .mockResolvedValueOnce(null) // productImage
+      .mockResolvedValueOnce(null) // product
 
     const res = await GET(makeRequest(), params as any)
     const json = await res.json()

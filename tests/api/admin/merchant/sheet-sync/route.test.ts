@@ -33,7 +33,9 @@ function makeRequestInvalidJson() {
 }
 
 describe('POST /api/admin/merchant/sheet-sync', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

@@ -24,7 +24,13 @@ const mockLogActivity = vi.mocked(logActivity)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', username: 'testadmin', id: 'admin-uuid-1', role: 'super_admin', scopes: ['customers'] }
+const admin = {
+  adminId: 'admin-1',
+  username: 'testadmin',
+  id: 'admin-uuid-1',
+  role: 'super_admin',
+  scopes: ['customers'],
+}
 
 function makePatch(customerId: string, taskId: string, body: unknown) {
   return new NextRequest(`http://localhost/api/admin/customers/${customerId}/tasks/${taskId}`, {
@@ -66,7 +72,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await PATCH(makePatch('c1', 't999', { title: 'New' }), { params: Promise.resolve({ id: 'c1', taskId: 't999' }) })
+    const res = await PATCH(makePatch('c1', 't999', { title: 'New' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't999' }),
+    })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toMatch(/not found/i)
   })
@@ -77,7 +85,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { title: 'Updated title' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    const res = await PATCH(makePatch('c1', 't1', { title: 'Updated title' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
@@ -93,7 +103,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQuery.mockResolvedValue(undefined as any)
 
     const longDesc = 'x'.repeat(2500)
-    const res = await PATCH(makePatch('c1', 't1', { description: longDesc }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    const res = await PATCH(makePatch('c1', 't1', { description: longDesc }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     expect(res.status).toBe(200)
     const queryArgs = mockQuery.mock.calls[0][1] as any[]
     const descArg = queryArgs.find((a: any) => typeof a === 'string' && a.length === 2000)
@@ -117,12 +129,11 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { priority: 'high' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    const res = await PATCH(makePatch('c1', 't1', { priority: 'high' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('priority'),
-      expect.arrayContaining(['high'])
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('priority'), expect.arrayContaining(['high']))
   })
 
   it('ignores invalid priority values', async () => {
@@ -131,7 +142,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { priority: 'invalid_priority' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    await PATCH(makePatch('c1', 't1', { priority: 'invalid_priority' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).not.toContain('priority')
   })
@@ -143,7 +156,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQuery.mockResolvedValue(undefined as any)
     mockLogActivity.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { status: 'completed' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    const res = await PATCH(makePatch('c1', 't1', { status: 'completed' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     expect(res.status).toBe(200)
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('completed_at = NOW()')
@@ -161,11 +176,13 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
 
     // logActivity is fire-and-forget — give microtask queue a tick
     await new Promise(r => setTimeout(r, 0))
-    expect(mockLogActivity).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'task_completed',
-      userId: 'c1',
-      referenceId: 't1',
-    }))
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'task_completed',
+        userId: 'c1',
+        referenceId: 't1',
+      })
+    )
   })
 
   it('clears completed_at when re-opening a completed task', async () => {
@@ -174,7 +191,9 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue({ status: 'completed', title: 'Old task' })
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { status: 'in_progress' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
+    await PATCH(makePatch('c1', 't1', { status: 'in_progress' }), {
+      params: Promise.resolve({ id: 'c1', taskId: 't1' }),
+    })
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('completed_at = NULL')
   })
@@ -228,9 +247,6 @@ describe('DELETE /api/admin/customers/[id]/tasks/[taskId]', () => {
     const res = await DELETE(makeDelete('c1', 't1'), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM customer_tasks'),
-      ['t1', 'c1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM customer_tasks'), ['t1', 'c1'])
   })
 })

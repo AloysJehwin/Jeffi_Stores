@@ -372,7 +372,7 @@ describe('generateIRN – additional branches', () => {
     await generateIRN(MOCK_PAYLOAD)
 
     const authCall = mockFetch.mock.calls[0]
-    expect((authCall[0] as string)).toContain('https://custom-irp.example.com')
+    expect(authCall[0] as string).toContain('https://custom-irp.example.com')
     delete process.env.EINVOICE_BASE_URL
   })
 })

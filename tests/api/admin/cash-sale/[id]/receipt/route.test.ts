@@ -144,9 +144,7 @@ describe('GET /api/admin/cash-sale/[id]/receipt', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(sampleSale)
-    mockQueryMany
-      .mockResolvedValueOnce(sampleItems as any)
-      .mockResolvedValueOnce(sampleSettings as any)
+    mockQueryMany.mockResolvedValueOnce(sampleItems as any).mockResolvedValueOnce(sampleSettings as any)
     mockGeneratePDF.mockResolvedValue(fakePdfBuffer as any)
 
     await GET(makeRequest(SALE_ID), { params: Promise.resolve({ id: SALE_ID }) })
@@ -162,9 +160,7 @@ describe('GET /api/admin/cash-sale/[id]/receipt', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...sampleSale, invoice_number: null })
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
     mockGeneratePDF.mockResolvedValue(fakePdfBuffer as any)
 
     const res = await GET(makeRequest(SALE_ID), { params: Promise.resolve({ id: SALE_ID }) })
@@ -176,9 +172,7 @@ describe('GET /api/admin/cash-sale/[id]/receipt', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(sampleSale)
-    mockQueryMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([]) // no settings rows
+    mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]) // no settings rows
     mockGeneratePDF.mockResolvedValue(fakePdfBuffer as any)
 
     const res = await GET(makeRequest(SALE_ID), { params: Promise.resolve({ id: SALE_ID }) })

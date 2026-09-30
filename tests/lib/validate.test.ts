@@ -1,15 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import {
-  zUuid,
-  zEmail,
-  zIndianPin,
-  zPositiveInt,
-  zNonEmpty,
-  zCurrency,
-  zPhone,
-  parseBody,
-} from '@/lib/validate'
+import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/validate'
 
 // ---------------------------------------------------------------------------
 // zUuid
@@ -286,9 +277,7 @@ describe('parseBody', () => {
   })
 
   it('does not throw when context is provided', () => {
-    expect(() =>
-      parseBody(schema, { bad: true }, 'test-context')
-    ).not.toThrow()
+    expect(() => parseBody(schema, { bad: true }, 'test-context')).not.toThrow()
   })
 
   it('works with a simple string schema', () => {

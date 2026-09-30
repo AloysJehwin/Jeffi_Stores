@@ -30,7 +30,9 @@ function makePost(body: object, headers: Record<string, string> = {}) {
 }
 
 const ADMIN = {
-  id: 'admin-1', user_id: 'user-1', google_id: 'google-sub-123',
+  id: 'admin-1',
+  user_id: 'user-1',
+  google_id: 'google-sub-123',
   mfa_enabled: true,
 }
 
@@ -98,7 +100,12 @@ describe('POST /api/admin/auth/google', () => {
   it('403 when admin not resolved', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce(null)
     const res = await POST(makePost({ idToken: 't' }) as any)
@@ -108,7 +115,12 @@ describe('POST /api/admin/auth/google', () => {
   it('403 when admin google_id mismatch', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'other-sub', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'other-sub',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce(ADMIN)
     const res = await POST(makePost({ idToken: 't' }) as any)
@@ -118,7 +130,12 @@ describe('POST /api/admin/auth/google', () => {
   it('cert gate failure returns gate status', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce(ADMIN)
     mockEnforceCertGate.mockResolvedValueOnce({ ok: false, error: 'cert required', status: 428 })
@@ -130,7 +147,12 @@ describe('POST /api/admin/auth/google', () => {
   it('verify path (mfa enabled) returns mfa_required', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce(ADMIN)
     const res = await POST(makePost({ idToken: 't' }) as any)
@@ -143,7 +165,12 @@ describe('POST /api/admin/auth/google', () => {
   it('enroll path (mfa disabled) returns enroll_required and backfills google_id', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     // admin with no google_id triggers backfill query
     mockResolveAdminByEmail.mockResolvedValueOnce({ ...ADMIN, google_id: null, mfa_enabled: false })
@@ -151,10 +178,10 @@ describe('POST /api/admin/auth/google', () => {
     const data = await res.json()
     expect(res.status).toBe(200)
     expect(data.enroll_required).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE users SET google_id/),
-      ['google-sub-123', 'user-1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE users SET google_id/), [
+      'google-sub-123',
+      'user-1',
+    ])
   })
 
   it('accessToken path: 401 when userinfo not ok', async () => {
@@ -199,7 +226,12 @@ describe('POST /api/admin/auth/google', () => {
   it('backfill google_id catch callback runs when query rejects', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce({ ...ADMIN, google_id: null })
     mockQuery.mockRejectedValueOnce(new Error('update fail')) // backfill rejects -> .catch(()=>{})
@@ -210,7 +242,12 @@ describe('POST /api/admin/auth/google', () => {
   it('logActivity catch callback runs when logActivity rejects', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockResolvedValueOnce(ADMIN)
     mockLogActivity.mockRejectedValueOnce(new Error('log fail')) // -> .catch(()=>{})
@@ -221,7 +258,12 @@ describe('POST /api/admin/auth/google', () => {
   it('500 on unexpected error inside handler', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ sub: 'google-sub-123', email: 'a@b.com', aud: ['test-google-client-id'], email_verified: 'true' }),
+      json: async () => ({
+        sub: 'google-sub-123',
+        email: 'a@b.com',
+        aud: ['test-google-client-id'],
+        email_verified: 'true',
+      }),
     })
     mockResolveAdminByEmail.mockRejectedValueOnce(new Error('db down'))
     const res = await POST(makePost({ idToken: 't' }) as any)

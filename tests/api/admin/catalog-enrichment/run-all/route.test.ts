@@ -18,7 +18,7 @@ vi.mock('@/lib/scopes', () => ({
 
 vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn() }))
 vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
-vi.mock('@/lib/tenant-context', async (importOriginal) => ({
+vi.mock('@/lib/tenant-context', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
@@ -41,9 +41,12 @@ function aiReply(content: string) {
 }
 
 const admin = {
-  adminId: 'a1', username: 'admin', role: 'super_admin',
+  adminId: 'a1',
+  username: 'admin',
+  role: 'super_admin',
   scopes: ['catalog_enrichment'],
-  first_name: 'Test', last_name: 'Admin',
+  first_name: 'Test',
+  last_name: 'Admin',
 }
 
 function makeReq() {
@@ -66,11 +69,24 @@ const VALID_ENRICHMENT = JSON.stringify({
 
 // A single product candidate
 const ONE_CANDIDATE = [
-  { id: 'p1', name: 'Bolt M6', description: null, sku: 'B1', material: 'steel', size: 'M6', category_name: 'Fasteners', brand_name: 'Unbrako' },
+  {
+    id: 'p1',
+    name: 'Bolt M6',
+    description: null,
+    sku: 'B1',
+    material: 'steel',
+    size: 'M6',
+    category_name: 'Fasteners',
+    brand_name: 'Unbrako',
+  },
 ]
 
-beforeEach(() => { vi.clearAllMocks() })
-afterEach(() => { vi.useRealTimers() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('POST /api/admin/catalog-enrichment/run-all', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -101,8 +117,26 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const candidates = [
-      { id: 'p1', name: 'Bolt M6', description: null, sku: 'B1', material: null, size: null, category_name: 'Fasteners', brand_name: null },
-      { id: 'p2', name: 'Screw', description: 'plain', sku: 'S1', material: 'steel', size: '3mm', category_name: null, brand_name: 'Unbrako' },
+      {
+        id: 'p1',
+        name: 'Bolt M6',
+        description: null,
+        sku: 'B1',
+        material: null,
+        size: null,
+        category_name: 'Fasteners',
+        brand_name: null,
+      },
+      {
+        id: 'p2',
+        name: 'Screw',
+        description: 'plain',
+        sku: 'S1',
+        material: 'steel',
+        size: '3mm',
+        category_name: null,
+        brand_name: 'Unbrako',
+      },
     ]
     mockQueryMany.mockResolvedValue(candidates)
     mockAiChat.mockRejectedValue(new Error('AI gateway HTTP 500'))
@@ -192,7 +226,7 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
     mockQueryMany.mockResolvedValue(ONE_CANDIDATE)
 
     const shortDesc = JSON.stringify({
-      ai_description: 'Too short.',  // < 20 chars
+      ai_description: 'Too short.', // < 20 chars
       ai_use_cases: ['use one', 'use two'],
       ai_keywords: [],
       ai_who_uses_it: '',
@@ -217,7 +251,7 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
 
     const fewUseCases = JSON.stringify({
       ai_description: 'A well-described product that is long enough to pass validation.',
-      ai_use_cases: ['only one use case'],  // length < 2
+      ai_use_cases: ['only one use case'], // length < 2
       ai_keywords: [],
       ai_who_uses_it: '',
       ai_application: '',
@@ -262,7 +296,7 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
     const withDuplicates = JSON.stringify({
       ai_description: 'A high-strength M6 hex bolt used in structural applications.',
       ai_use_cases: ['fasten panels', 'join metal', 'machine assembly'],
-      ai_keywords: ['bolt', 'bolt', 'hex bolt', 'a'.repeat(51)],  // dup + too-long item
+      ai_keywords: ['bolt', 'bolt', 'hex bolt', 'a'.repeat(51)], // dup + too-long item
       ai_who_uses_it: 'engineers',
       ai_application: 'Used in heavy machinery assembly.',
       ai_product_type: 'Hex Bolt',
@@ -285,7 +319,7 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
     expect(keywords).toContain('bolt')
     expect(keywords).toContain('hex bolt')
     expect(keywords.filter(k => k === 'bolt')).toHaveLength(1) // deduped
-    expect(keywords.every(k => k.length <= 50)).toBe(true)     // long item excluded
+    expect(keywords.every(k => k.length <= 50)).toBe(true) // long item excluded
   })
 
   it('cleanArr returns empty array when input is not an array (non-array use_cases)', async () => {

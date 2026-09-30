@@ -32,7 +32,9 @@ function makeReq(qs: string) {
   return new NextRequest(`http://localhost/api/admin/brochure/products?${qs}`)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/brochure/products', () => {
   it('returns 401 when unauthenticated', async () => {

@@ -68,8 +68,13 @@ const params = { params: Promise.resolve({ id: ACTION_ID }) }
 
 function action(kind: string, payload: any, over: any = {}) {
   return {
-    id: ACTION_ID, admin_id: 'admin-1', conversation_id: 'conv-1',
-    kind, payload, status: 'proposed', ...over,
+    id: ACTION_ID,
+    admin_id: 'admin-1',
+    conversation_id: 'conv-1',
+    kind,
+    payload,
+    status: 'proposed',
+    ...over,
   }
 }
 
@@ -94,8 +99,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── mark_invoice_paid ─────────────────────────────────────────────────────
 
   it('mark_invoice_paid success', async () => {
-    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }),
-      { id: 'o1', invoice_number: 'INV-1', payment_status: 'paid', invoice_date: null })
+    primeAction(action('mark_invoice_paid', { orderId: 'o1', paymentMode: 'cash', paidAt: null }), {
+      id: 'o1',
+      invoice_number: 'INV-1',
+      payment_status: 'paid',
+      invoice_date: null,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -109,15 +118,21 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── update_order_status ───────────────────────────────────────────────────
 
   it('update_order_status invalid status', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('update_order_status', { orderId: 'o1', newStatus: 'bad', awbNumber: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('update_order_status', { orderId: 'o1', newStatus: 'bad', awbNumber: null })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/invalid status/i)
   })
 
   it('update_order_status shipped with awb success', async () => {
-    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB1' }),
-      { id: 'o1', order_number: 'ORD-1', status: 'shipped', awb_number: 'AWB1' })
+    primeAction(action('update_order_status', { orderId: 'o1', newStatus: 'shipped', awbNumber: 'AWB1' }), {
+      id: 'o1',
+      order_number: 'ORD-1',
+      status: 'shipped',
+      awb_number: 'AWB1',
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -138,14 +153,26 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_coupon success', async () => {
-    primeAction(action('create_coupon', { code: 'SAVE10', discountType: 'percentage', discountValue: 10, validUntil: null, minPurchaseAmount: null, usageLimit: null, description: null }),
-      { id: 'c1', code: 'SAVE10' })
+    primeAction(
+      action('create_coupon', {
+        code: 'SAVE10',
+        discountType: 'percentage',
+        discountValue: 10,
+        validUntil: null,
+        minPurchaseAmount: null,
+        usageLimit: null,
+        description: null,
+      }),
+      { id: 'c1', code: 'SAVE10' }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_coupon duplicate (23505)', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('create_coupon', { code: 'DUP', discountType: 'percentage', discountValue: 5 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('create_coupon', { code: 'DUP', discountType: 'percentage', discountValue: 5 })
+    )
     mockQueryOne.mockRejectedValueOnce({ code: '23505' })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -170,21 +197,27 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── update_campaign_template ──────────────────────────────────────────────
 
   it('update_campaign_template missing campaignKind', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('update_campaign_template', { campaignKind: '', newSubject: 'S', newBody: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('update_campaign_template', { campaignKind: '', newSubject: 'S', newBody: null })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('update_campaign_template no fields', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('update_campaign_template', { campaignKind: 'welcome', newSubject: null, newBody: null }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('update_campaign_template', { campaignKind: 'welcome', newSubject: null, newBody: null })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/no fields/i)
   })
 
   it('update_campaign_template success both fields', async () => {
-    primeAction(action('update_campaign_template', { campaignKind: 'welcome', newSubject: 'S', newBody: 'B' }),
-      { kind: 'welcome', name: 'Welcome' })
+    primeAction(action('update_campaign_template', { campaignKind: 'welcome', newSubject: 'S', newBody: 'B' }), {
+      kind: 'welcome',
+      name: 'Welcome',
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -198,21 +231,37 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── send_mailer_broadcast ─────────────────────────────────────────────────
 
   it('send_mailer_broadcast subject/body required', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast', { audience: 'test_only', subject: '', body: '' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', { audience: 'test_only', subject: '', body: '' })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('send_mailer_broadcast test_only missing testEmail', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast',
-      { audience: 'test_only', testEmail: null, subject: 'S', body: 'B', fromName: 'Jeffi' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', {
+        audience: 'test_only',
+        testEmail: null,
+        subject: 'S',
+        body: 'B',
+        fromName: 'Jeffi',
+      })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('send_mailer_broadcast test_only success with template replace', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast',
-      { audience: 'test_only', testEmail: 't@b.com', subject: 'S', body: 'Hi {firstName} <b>bold</b>', fromName: 'Jeffi "Stores"' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', {
+        audience: 'test_only',
+        testEmail: 't@b.com',
+        subject: 'S',
+        body: 'Hi {firstName} <b>bold</b>',
+        fromName: 'Jeffi "Stores"',
+      })
+    )
     mockSendMail.mockResolvedValue({} as any)
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
@@ -220,8 +269,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_mailer_broadcast all_opted_in all fail', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast',
-      { audience: 'all_opted_in', testEmail: null, subject: 'S', body: 'B', fromName: 'Jeffi' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', {
+        audience: 'all_opted_in',
+        testEmail: null,
+        subject: 'S',
+        body: 'B',
+        fromName: 'Jeffi',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([{ email: 'a@b.com', name: 'Al Pha' }])
     mockSendMail.mockRejectedValue(new Error('smtp'))
     const res = await POST(makeReq(), params)
@@ -230,8 +286,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_mailer_broadcast recent_buyers success', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast',
-      { audience: 'recent_buyers', testEmail: null, subject: 'S', body: 'B', fromName: '' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', {
+        audience: 'recent_buyers',
+        testEmail: null,
+        subject: 'S',
+        body: 'B',
+        fromName: '',
+      })
+    )
     mockQueryMany.mockResolvedValueOnce([{ email: 'a@b.com', name: '' }])
     mockSendMail.mockResolvedValue({} as any)
     const res = await POST(makeReq(), params)
@@ -239,8 +302,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('send_mailer_broadcast unknown audience', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('send_mailer_broadcast',
-      { audience: 'weird', testEmail: null, subject: 'S', body: 'B', fromName: 'X' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('send_mailer_broadcast', { audience: 'weird', testEmail: null, subject: 'S', body: 'B', fromName: 'X' })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/unknown audience/i)
@@ -249,31 +313,60 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── generate_personalized_coupon ──────────────────────────────────────────
 
   it('generate_personalized_coupon missing fields', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('generate_personalized_coupon', { userId: '', discountType: '', discountValue: 0 }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('generate_personalized_coupon', { userId: '', discountType: '', discountValue: 0 })
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
 
   it('generate_personalized_coupon success', async () => {
-    primeAction(action('generate_personalized_coupon',
-      { userId: 'u1', customerEmail: 'c@b.com', discountType: 'percentage', discountValue: 10, daysValid: 30, campaign: 'winback!', validUntil: '2026-12-31' }),
-      { id: 'c1', code: 'WINBACK-ABC123' })
+    primeAction(
+      action('generate_personalized_coupon', {
+        userId: 'u1',
+        customerEmail: 'c@b.com',
+        discountType: 'percentage',
+        discountValue: 10,
+        daysValid: 30,
+        campaign: 'winback!',
+        validUntil: '2026-12-31',
+      }),
+      { id: 'c1', code: 'WINBACK-ABC123' }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('generate_personalized_coupon empty campaign → OFFER prefix, insert null', async () => {
-    primeAction(action('generate_personalized_coupon',
-      { userId: 'u1', customerEmail: 'c@b.com', discountType: 'flat', discountValue: 5, daysValid: 7, campaign: '', validUntil: '2026-12-31' }),
-      null)
+    primeAction(
+      action('generate_personalized_coupon', {
+        userId: 'u1',
+        customerEmail: 'c@b.com',
+        discountType: 'flat',
+        discountValue: 5,
+        daysValid: 7,
+        campaign: '',
+        validUntil: '2026-12-31',
+      }),
+      null
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/no row/i)
   })
 
   it('generate_personalized_coupon collision (23505)', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('generate_personalized_coupon',
-      { userId: 'u1', customerEmail: 'c@b.com', discountType: 'flat', discountValue: 5, daysValid: 7, campaign: 'X', validUntil: '2026-12-31' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('generate_personalized_coupon', {
+        userId: 'u1',
+        customerEmail: 'c@b.com',
+        discountType: 'flat',
+        discountValue: 5,
+        daysValid: 7,
+        campaign: 'X',
+        validUntil: '2026-12-31',
+      })
+    )
     mockQueryOne.mockRejectedValueOnce({ code: '23505' })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -281,8 +374,17 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('generate_personalized_coupon insert throws', async () => {
-    mockQueryOne.mockResolvedValueOnce(action('generate_personalized_coupon',
-      { userId: 'u1', customerEmail: 'c@b.com', discountType: 'flat', discountValue: 5, daysValid: 7, campaign: 'X', validUntil: '2026-12-31' }))
+    mockQueryOne.mockResolvedValueOnce(
+      action('generate_personalized_coupon', {
+        userId: 'u1',
+        customerEmail: 'c@b.com',
+        discountType: 'flat',
+        discountValue: 5,
+        daysValid: 7,
+        campaign: 'X',
+        validUntil: '2026-12-31',
+      })
+    )
     mockQueryOne.mockRejectedValueOnce(new Error('boom'))
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
@@ -299,24 +401,61 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_product duplicate sku', async () => {
-    primeAction(action('create_product', { name: 'N', sku: 'S1', slug: 's1', basePrice: 10, brandId: null, categoryId: null, shortDescription: null, weightGrams: 500, gstPercentage: 18 }),
-      { id: 'existing' })
+    primeAction(
+      action('create_product', {
+        name: 'N',
+        sku: 'S1',
+        slug: 's1',
+        basePrice: 10,
+        brandId: null,
+        categoryId: null,
+        shortDescription: null,
+        weightGrams: 500,
+        gstPercentage: 18,
+      }),
+      { id: 'existing' }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already exists/i)
   })
 
   it('create_product success', async () => {
-    primeAction(action('create_product', { name: 'N', sku: 'S1', slug: 's1', basePrice: 10, brandId: 'b1', categoryId: 'cat1', shortDescription: 'd', weightGrams: 500, gstPercentage: 18 }),
+    primeAction(
+      action('create_product', {
+        name: 'N',
+        sku: 'S1',
+        slug: 's1',
+        basePrice: 10,
+        brandId: 'b1',
+        categoryId: 'cat1',
+        shortDescription: 'd',
+        weightGrams: 500,
+        gstPercentage: 18,
+      }),
       null, // dup check → none
-      { id: 'p1', name: 'N', sku: 'S1' }) // insert
+      { id: 'p1', name: 'N', sku: 'S1' }
+    ) // insert
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_product insert fails', async () => {
-    primeAction(action('create_product', { name: 'N', sku: 'S1', slug: 's1', basePrice: 10, brandId: null, categoryId: null, shortDescription: null, weightGrams: 500, gstPercentage: 18 }),
-      null, null)
+    primeAction(
+      action('create_product', {
+        name: 'N',
+        sku: 'S1',
+        slug: 's1',
+        basePrice: 10,
+        brandId: null,
+        categoryId: null,
+        shortDescription: null,
+        weightGrams: 500,
+        gstPercentage: 18,
+      }),
+      null,
+      null
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/insert failed/i)
@@ -332,8 +471,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('update_product success with brand_id and empty string', async () => {
-    primeAction(action('update_product', { productId: 'p1', changes: { name: 'New', brand_id: 'b2', base_price: '' } }),
-      { id: 'p1', name: 'New', is_active: true, is_featured: false })
+    primeAction(
+      action('update_product', { productId: 'p1', changes: { name: 'New', brand_id: 'b2', base_price: '' } }),
+      { id: 'p1', name: 'New', is_active: true, is_featured: false }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })

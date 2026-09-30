@@ -82,8 +82,8 @@ describe('POST /api/reviews/amp (JSON)', () => {
 
   it('submits review via JSON', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)   // no existing review
-      .mockResolvedValueOnce(null as any)   // INSERT (returns null but ignored)
+      .mockResolvedValueOnce(null as any) // no existing review
+      .mockResolvedValueOnce(null as any) // INSERT (returns null but ignored)
     const res = await POST(makeJsonReq({ token: 't', rating: 4, comment: 'Good product', title: 'Nice' }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)

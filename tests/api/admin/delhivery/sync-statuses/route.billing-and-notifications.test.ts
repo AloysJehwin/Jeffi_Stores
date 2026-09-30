@@ -81,28 +81,35 @@ function makeReq(opts: { auth?: string } = {}) {
 }
 
 const ORDER = {
-  id: 'ord-1', awb_number: 'AWB001', status: 'shipped',
-  order_number: 'ORD-001', customer_name: 'John Doe',
-  customer_email: 'john@example.com', user_id: 'user-1',
-  delhivery_quoted_weight_kg: 1, delhivery_charged_weight_kg: null,
+  id: 'ord-1',
+  awb_number: 'AWB001',
+  status: 'shipped',
+  order_number: 'ORD-001',
+  customer_name: 'John Doe',
+  customer_email: 'john@example.com',
+  user_id: 'user-1',
+  delhivery_quoted_weight_kg: 1,
+  delhivery_charged_weight_kg: null,
 }
 
 function makeShipmentData(awb: string, statusType: string, extra: Record<string, any> = {}) {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: extra.status ?? '',
-          StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: extra.status ?? '',
+            StatusDateTime: extra.statusDateTime ?? '2024-06-01T12:00:00',
+          },
+          Scans: extra.scans ?? [],
+          DestRecieveDate: extra.destReceiveDate ?? null,
+          ReturnedDate: extra.returnedDate ?? null,
+          ...extra.shipmentExtra,
         },
-        Scans: extra.scans ?? [],
-        DestRecieveDate: extra.destReceiveDate ?? null,
-        ReturnedDate: extra.returnedDate ?? null,
-        ...extra.shipmentExtra,
       },
-    }],
+    ],
   }
 }
 
@@ -130,44 +137,44 @@ afterEach(() => {
 
 describe('POST — EDD, charged weight and delivery billing', () => {
   it('updates estimated_delivery_date when Delhivery returns an EDD', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'processing' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'IT', {
-        shipmentExtra: { ExpectedDeliveryDate: '2024-06-15' },
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'IT', {
+          shipmentExtra: { ExpectedDeliveryDate: '2024-06-15' },
+        }),
     } as any)
 
     await POST(makeReq())
-    const eddUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('estimated_delivery_date')
-    )
+    const eddUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('estimated_delivery_date'))
     expect(eddUpdate).toBeDefined()
   })
 
   it('computes delhivery_extra_charge when charged weight exceeds quoted weight', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([{
-        ...ORDER, status: 'shipped',
-        shipping_amount: 100, delhivery_quoted_weight_kg: 1,
-        delhivery_charged_weight_kg: null,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          ...ORDER,
+          status: 'shipped',
+          shipping_amount: 100,
+          delhivery_quoted_weight_kg: 1,
+          delhivery_charged_weight_kg: null,
+        },
+      ] as any)
       .mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'IT', {
-        shipmentExtra: { ChargedWeight: 2 },
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'IT', {
+          shipmentExtra: { ChargedWeight: 2 },
+        }),
     } as any)
 
     await POST(makeReq())
-    const wtUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delhivery_charged_weight_kg = $2')
-    )
+    const wtUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delhivery_charged_weight_kg = $2'))
     expect(wtUpdate).toBeDefined()
     // extra = ((2/1)-1)*100 = 100
     expect((wtUpdate![1] as any[])[2]).toBe(100)
@@ -175,24 +182,27 @@ describe('POST — EDD, charged weight and delivery billing', () => {
 
   it('leaves extra charge null when charged weight not above quoted', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([{
-        ...ORDER, status: 'shipped',
-        shipping_amount: 100, delhivery_quoted_weight_kg: 5,
-        delhivery_charged_weight_kg: null,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          ...ORDER,
+          status: 'shipped',
+          shipping_amount: 100,
+          delhivery_quoted_weight_kg: 5,
+          delhivery_charged_weight_kg: null,
+        },
+      ] as any)
       .mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => makeShipmentData('AWB001', 'IT', {
-        shipmentExtra: { ChargedWeight: 2 },
-      }),
+      json: async () =>
+        makeShipmentData('AWB001', 'IT', {
+          shipmentExtra: { ChargedWeight: 2 },
+        }),
     } as any)
 
     await POST(makeReq())
-    const wtUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delhivery_charged_weight_kg = $2')
-    )
+    const wtUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delhivery_charged_weight_kg = $2'))
     expect((wtUpdate![1] as any[])[2]).toBeNull()
   })
 
@@ -207,9 +217,7 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     } as any)
 
     await POST(makeReq())
-    const codUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('cod_collected')
-    )
+    const codUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('cod_collected'))
     expect(codUpdate).toBeDefined()
   })
 
@@ -227,16 +235,16 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     await POST(makeReq())
     // The charges endpoint rejects a bare waybill — md/ss/cgm/o_pin/d_pin are all mandatory,
     // which is why this sync silently returned nothing in production.
-    expect(mockInvoiceCharges).toHaveBeenCalledWith(expect.objectContaining({
-      awb: 'AWB001',
-      settledStatus: 'Delivered',
-      originPin: '492001',
-    }))
+    expect(mockInvoiceCharges).toHaveBeenCalledWith(
+      expect.objectContaining({
+        awb: 'AWB001',
+        settledStatus: 'Delivered',
+        originPin: '492001',
+      })
+    )
     const chargeArg = mockInvoiceCharges.mock.calls[0][0] as any
     expect(chargeArg.chargedWeightG).toBeGreaterThan(0)
-    const billUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delhivery_billed_amount')
-    )
+    const billUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delhivery_billed_amount'))
     expect(billUpdate).toBeDefined()
     expect((billUpdate![1] as any[])[1]).toBe(120)
   })
@@ -267,18 +275,21 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     } as any)
 
     await POST(makeReq())
-    const billUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delhivery_billed_amount')
-    )
+    const billUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delhivery_billed_amount'))
     expect(billUpdate).toBeUndefined()
   })
 
   it('skips billing when the order has no trustworthy weight', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([{
-        ...ORDER, status: 'out_for_delivery', delhivery_billed_at: null,
-        delhivery_quoted_weight_kg: null, delhivery_charged_weight_kg: null,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          ...ORDER,
+          status: 'out_for_delivery',
+          delhivery_billed_at: null,
+          delhivery_quoted_weight_kg: null,
+          delhivery_charged_weight_kg: null,
+        },
+      ] as any)
       .mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -289,9 +300,7 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     await POST(makeReq())
     // No weight → no 500 g floor in the wallet path → billing is deferred, not floored.
     expect(mockInvoiceCharges).not.toHaveBeenCalled()
-    const billUpdate = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('delhivery_billed_amount')
-    )
+    const billUpdate = mockQuery.mock.calls.find(([sql]) => (sql as string).includes('delhivery_billed_amount'))
     expect(billUpdate).toBeUndefined()
   })
 })
@@ -301,7 +310,9 @@ describe('POST — EDD, charged weight and delivery billing', () => {
 describe('POST — SMS notifications', () => {
   it('sends delivered SMS when notification_channel is sms on delivery', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery', notification_channel: 'sms', phone: '9876543210' }] as any)
+      .mockResolvedValueOnce([
+        { ...ORDER, status: 'out_for_delivery', notification_channel: 'sms', phone: '9876543210' },
+      ] as any)
       .mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -329,7 +340,9 @@ describe('POST — SMS notifications', () => {
 
   it('does not send SMS when notification_channel is not sms', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'out_for_delivery', notification_channel: 'email', phone: '9876543210' }] as any)
+      .mockResolvedValueOnce([
+        { ...ORDER, status: 'out_for_delivery', notification_channel: 'email', phone: '9876543210' },
+      ] as any)
       .mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
@@ -347,9 +360,7 @@ describe('POST — SMS notifications', () => {
 
 describe('POST — restoreOrderStock on returned', () => {
   it('calls restoreOrderStock when order syncs to returned (RTO-DL)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any)
-      .mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([{ ...ORDER, status: 'shipped' }] as any).mockResolvedValueOnce([])
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

@@ -16,7 +16,13 @@ vi.mock('@/lib/queries', () => ({
 vi.mock('@/lib/brochure-pdf', () => ({
   generateBrochurePDF: vi.fn().mockResolvedValue(Buffer.from('pdf-bytes')),
   loadBrochureStore: vi.fn().mockResolvedValue({
-    name: 'JEFFI STORES', address: '', city: '', phone: '', email: '', gstin: '', web: 'jeffistores.in',
+    name: 'JEFFI STORES',
+    address: '',
+    city: '',
+    phone: '',
+    email: '',
+    gstin: '',
+    web: 'jeffistores.in',
   }),
 }))
 
@@ -44,7 +50,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/brochure', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -87,7 +95,19 @@ describe('POST /api/admin/brochure', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     mockGetByIds.mockResolvedValue([
-      { id: P1, name: 'Bolt', slug: 'bolt', sku: 'B1', short_description: null, mrp: 10, base_price: 8, discount_pct: 0, brand_name: 'Unbrako', category_name: 'Bolts', thumbnail_url: null },
+      {
+        id: P1,
+        name: 'Bolt',
+        slug: 'bolt',
+        sku: 'B1',
+        short_description: null,
+        mrp: 10,
+        base_price: 8,
+        discount_pct: 0,
+        brand_name: 'Unbrako',
+        category_name: 'Bolts',
+        thumbnail_url: null,
+      },
     ] as any)
     const res = await POST(makeReq({ productIds: [P1, P2], showPrices: true, title: 'My Brochure' }))
     expect(res.status).toBe(200)

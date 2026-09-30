@@ -23,8 +23,12 @@ vi.mock('@/lib/whatsapp', () => ({
 }))
 
 import {
-  notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
-  notifyOrderCancelled, notifyOutForDelivery, notifyPaymentFailed,
+  notifyOrderConfirmed,
+  notifyOrderShipped,
+  notifyOrderDelivered,
+  notifyOrderCancelled,
+  notifyOutForDelivery,
+  notifyPaymentFailed,
 } from '@/lib/notify'
 import { queryOne } from '@/lib/db'
 import * as sms from '@/lib/sms'
@@ -113,7 +117,9 @@ describe('other notify fns route by channel', () => {
     mockQueryOne.mockResolvedValue(recipient('sms'))
     await notifyOrderShipped('u1', 'O', 'Delhivery', 'TRK')
     await flush()
-    expect(sms.sendOrderShippedSMS).toHaveBeenCalledWith(expect.objectContaining({ courier: 'Delhivery', trackingId: 'TRK' }))
+    expect(sms.sendOrderShippedSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ courier: 'Delhivery', trackingId: 'TRK' })
+    )
   })
 
   it('notifyOrderDelivered', async () => {

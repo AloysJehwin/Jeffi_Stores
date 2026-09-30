@@ -77,7 +77,7 @@ describe('GET /api/admin/coupons/user-pool', () => {
 
   it.each(['b2b', 'vip', 'loyal', 'repeat', 'new', 'at_risk', 'dormant', 'one_time', 'lead'])(
     'returns users for segment=%s',
-    async (seg) => {
+    async seg => {
       const res = await GET(makeReq({ mode: 'segment', segment: seg }))
       expect(res.status).toBe(200)
       const body = await res.json()

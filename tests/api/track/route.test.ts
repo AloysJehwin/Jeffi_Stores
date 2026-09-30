@@ -82,10 +82,7 @@ describe('POST /api/track', () => {
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
     await POST(makePost({ ...VALID_BODY, referrer: 'https://google.com' }) as any)
-    expect(db.query).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['https://google.com'])
-    )
+    expect(db.query).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['https://google.com']))
   })
 
   it('returns 500 when db insert throws', async () => {

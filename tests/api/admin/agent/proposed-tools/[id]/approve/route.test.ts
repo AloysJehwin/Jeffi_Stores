@@ -132,7 +132,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
     expect(body.status).toBe('approved')
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("status = 'approved'"),
-      expect.arrayContaining(['admin-super', 'tool-1']),
+      expect.arrayContaining(['admin-super', 'tool-1'])
     )
   })
 })

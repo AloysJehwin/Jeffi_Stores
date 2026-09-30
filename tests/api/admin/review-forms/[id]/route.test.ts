@@ -94,10 +94,7 @@ describe('GET /api/admin/review-forms/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(sampleForm)
     await GET(makeGet('form-abc'), { params: Promise.resolve({ id: 'form-abc' }) })
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('review_forms'),
-      ['form-abc']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('review_forms'), ['form-abc'])
   })
 })
 
@@ -122,7 +119,9 @@ describe('PATCH /api/admin/review-forms/[id]', () => {
   it('returns 400 when no recognized fields in body', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const res = await PATCH(makePatch('form-1', { unknown_field: 'value' }), { params: Promise.resolve({ id: 'form-1' }) })
+    const res = await PATCH(makePatch('form-1', { unknown_field: 'value' }), {
+      params: Promise.resolve({ id: 'form-1' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/no fields to update/i)
   })
@@ -132,7 +131,9 @@ describe('PATCH /api/admin/review-forms/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([{ ...sampleForm, title: 'Updated Title' }] as any)
 
-    const res = await PATCH(makePatch('form-1', { title: 'Updated Title' }), { params: Promise.resolve({ id: 'form-1' }) })
+    const res = await PATCH(makePatch('form-1', { title: 'Updated Title' }), {
+      params: Promise.resolve({ id: 'form-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.form.title).toBe('Updated Title')
@@ -166,7 +167,9 @@ describe('PATCH /api/admin/review-forms/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([sampleForm] as any)
 
-    await PATCH(makePatch('form-1', { title: 'T', is_active: false, description: 'D' }), { params: Promise.resolve({ id: 'form-1' }) })
+    await PATCH(makePatch('form-1', { title: 'T', is_active: false, description: 'D' }), {
+      params: Promise.resolve({ id: 'form-1' }),
+    })
     const sql = mockQueryMany.mock.calls[0][0] as string
     expect(sql).toContain('title =')
     expect(sql).toContain('is_active =')
@@ -198,7 +201,9 @@ describe('PATCH /api/admin/review-forms/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([sampleForm] as any)
 
-    await PATCH(makePatch('form-1', { google_review_url: 'https://g.co/review' }), { params: Promise.resolve({ id: 'form-1' }) })
+    await PATCH(makePatch('form-1', { google_review_url: 'https://g.co/review' }), {
+      params: Promise.resolve({ id: 'form-1' }),
+    })
     const sql = mockQueryMany.mock.calls[0][0] as string
     expect(sql).toContain('google_review_url =')
   })
@@ -230,9 +235,6 @@ describe('DELETE /api/admin/review-forms/[id]', () => {
     const res = await DELETE(makeDelete('form-1'), { params: Promise.resolve({ id: 'form-1' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE FROM review_forms'),
-      ['form-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM review_forms'), ['form-1'])
   })
 })

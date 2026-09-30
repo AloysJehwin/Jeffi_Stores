@@ -59,7 +59,9 @@ function makeSharpChain() {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('POST /api/admin/razorpay/qr', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -112,9 +114,12 @@ describe('POST /api/admin/razorpay/qr', () => {
     vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: mockRzp } as any)
 
     // Mock fetch for downloading QR image
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      arrayBuffer: async () => Buffer.from('fake-image').buffer,
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        arrayBuffer: async () => Buffer.from('fake-image').buffer,
+      })
+    )
 
     const sharpChain = makeSharpChain()
     vi.mocked(sharp as any).mockReturnValue(sharpChain)
@@ -127,16 +132,19 @@ describe('POST /api/admin/razorpay/qr', () => {
     expect(body.qrId).toBe('qr_abc123')
     expect(body.qrImageUrl).toContain('data:image/png;base64,')
 
-    expect(mockRzp.qrCode.create).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'upi_qr',
-      payment_amount: 118000,
-      fixed_amount: true,
-    }))
-
-    expect(vi.mocked(query)).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE orders'),
-      ['qr_abc123', expect.any(String), 'order-1']
+    expect(mockRzp.qrCode.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'upi_qr',
+        payment_amount: 118000,
+        fixed_amount: true,
+      })
     )
+
+    expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining('UPDATE orders'), [
+      'qr_abc123',
+      expect.any(String),
+      'order-1',
+    ])
   })
 
   it('uses default description when not provided', async () => {
@@ -147,17 +155,22 @@ describe('POST /api/admin/razorpay/qr', () => {
     const mockQr = { id: 'qr_xyz', image_url: 'https://rzp.io/qr/xyz.png' }
     const mockRzp = { qrCode: { create: vi.fn().mockResolvedValue(mockQr) } }
     vi.mocked(getRazorpayInstanceFor).mockResolvedValue({ instance: mockRzp } as any)
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      arrayBuffer: async () => Buffer.from('img').buffer,
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        arrayBuffer: async () => Buffer.from('img').buffer,
+      })
+    )
     const sharpChain = makeSharpChain()
     vi.mocked(sharp as any).mockReturnValue(sharpChain)
     vi.mocked(query).mockResolvedValue(undefined as any)
 
     await POST(makePost({ orderId: 'order-1', amountPaise: 5000 }))
-    expect(mockRzp.qrCode.create).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Invoice Payment',
-    }))
+    expect(mockRzp.qrCode.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Invoice Payment',
+      })
+    )
   })
 
   it('returns 500 on razorpay error', async () => {

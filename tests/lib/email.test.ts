@@ -62,9 +62,7 @@ const mockOrder = {
   shipping_address: '123 Main St, Raipur',
 }
 
-const mockOrderItems = [
-  { product_name: 'Widget A', quantity: 2, unit_price: '500', total_price: '1000', sku: 'WGT-A' },
-]
+const mockOrderItems = [{ product_name: 'Widget A', quantity: 2, unit_price: '500', total_price: '1000', sku: 'WGT-A' }]
 
 describe('email.ts', () => {
   beforeEach(() => {
@@ -159,14 +157,30 @@ describe('email.ts', () => {
     })
 
     it('shows GSTIN when taxable_amount > 0', async () => {
-      const order = { ...mockOrder, taxable_amount: 1000, is_igst: false, igst_amount: 0, cgst_amount: 90, sgst_amount: 90, created_at: new Date().toISOString() }
+      const order = {
+        ...mockOrder,
+        taxable_amount: 1000,
+        is_igst: false,
+        igst_amount: 0,
+        cgst_amount: 90,
+        sgst_amount: 90,
+        created_at: new Date().toISOString(),
+      }
       await sendOrderConfirmationEmail('cust@example.com', order, mockOrderItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('GSTIN')
     })
 
     it('shows IGST line when is_igst is true', async () => {
-      const order = { ...mockOrder, taxable_amount: 1000, is_igst: true, igst_amount: 180, cgst_amount: 0, sgst_amount: 0, created_at: new Date().toISOString() }
+      const order = {
+        ...mockOrder,
+        taxable_amount: 1000,
+        is_igst: true,
+        igst_amount: 180,
+        cgst_amount: 0,
+        sgst_amount: 0,
+        created_at: new Date().toISOString(),
+      }
       await sendOrderConfirmationEmail('cust@example.com', order, mockOrderItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('IGST')
@@ -174,7 +188,15 @@ describe('email.ts', () => {
     })
 
     it('shows CGST/SGST lines when is_igst is false', async () => {
-      const order = { ...mockOrder, taxable_amount: 1000, is_igst: false, igst_amount: 0, cgst_amount: 90, sgst_amount: 90, created_at: new Date().toISOString() }
+      const order = {
+        ...mockOrder,
+        taxable_amount: 1000,
+        is_igst: false,
+        igst_amount: 0,
+        cgst_amount: 90,
+        sgst_amount: 90,
+        created_at: new Date().toISOString(),
+      }
       await sendOrderConfirmationEmail('cust@example.com', order, mockOrderItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('CGST')
@@ -282,7 +304,17 @@ describe('email.ts', () => {
     })
 
     it('formats weight buy_mode items in admin notification', async () => {
-      const items = [{ product_name: 'Wire', product_sku: 'W1', quantity: 1.5, unit_price: 100, total_price: 150, buy_mode: 'weight', buy_unit: 'kg' }]
+      const items = [
+        {
+          product_name: 'Wire',
+          product_sku: 'W1',
+          quantity: 1.5,
+          unit_price: 100,
+          total_price: 150,
+          buy_mode: 'weight',
+          buy_unit: 'kg',
+        },
+      ]
       await sendNewOrderNotification(mockOrder, items, {})
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('1.500')
@@ -365,7 +397,16 @@ describe('email.ts', () => {
     })
 
     it('includes cancellation note when provided', async () => {
-      await sendOrderStatusUpdate('cust@example.com', 'Alice', 'ORD-001', 'id-1', 'cancelled', undefined, null, 'Out of stock')
+      await sendOrderStatusUpdate(
+        'cust@example.com',
+        'Alice',
+        'ORD-001',
+        'id-1',
+        'cancelled',
+        undefined,
+        null,
+        'Out of stock'
+      )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('Out of stock')
     })
@@ -447,8 +488,13 @@ describe('email.ts', () => {
   describe('sendAdminCertificateEmail', () => {
     it('sends certificate email with attachment', async () => {
       await sendAdminCertificateEmail(
-        'admin@example.com', 'admin_user', Buffer.from('p12data'),
-        'pass123', 'SN001', '2027-01-01', 'admin'
+        'admin@example.com',
+        'admin_user',
+        Buffer.from('p12data'),
+        'pass123',
+        'SN001',
+        '2027-01-01',
+        'admin'
       )
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       const opts = mockSendAuditedMail.mock.calls[0][0]
@@ -457,16 +503,26 @@ describe('email.ts', () => {
 
     it('includes serial number in html', async () => {
       await sendAdminCertificateEmail(
-        'admin@example.com', 'admin_user', Buffer.from('p12data'),
-        'pass123', 'SN-UNIQUE-001', '2027-01-01', 'admin'
+        'admin@example.com',
+        'admin_user',
+        Buffer.from('p12data'),
+        'pass123',
+        'SN-UNIQUE-001',
+        '2027-01-01',
+        'admin'
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('SN-UNIQUE-001')
     })
 
     it('returns success result', async () => {
       const result = await sendAdminCertificateEmail(
-        'admin@example.com', 'admin_user', Buffer.from('p12'),
-        'pw', 'SN1', '2027-01-01', 'admin'
+        'admin@example.com',
+        'admin_user',
+        Buffer.from('p12'),
+        'pw',
+        'SN1',
+        '2027-01-01',
+        'admin'
       )
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
@@ -474,15 +530,28 @@ describe('email.ts', () => {
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendAdminCertificateEmail(
-        'admin@example.com', 'admin_user', Buffer.from('p12'),
-        'pw', 'SN1', '2027-01-01', 'admin'
+        'admin@example.com',
+        'admin_user',
+        Buffer.from('p12'),
+        'pw',
+        'SN1',
+        '2027-01-01',
+        'admin'
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
 
     it('default (both) mode: the attachment mail also carries the certificate portal link', async () => {
       delete process.env.CERT_PORTAL_DELIVERY
-      await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'pw', 'SN1', '2027-01-01', 'admin')
+      await sendAdminCertificateEmail(
+        'admin@example.com',
+        'admin_user',
+        Buffer.from('p12'),
+        'pw',
+        'SN1',
+        '2027-01-01',
+        'admin'
+      )
       const opts = mockSendAuditedMail.mock.calls[0][0]
       expect(opts.attachments?.length).toBeGreaterThan(0)
       expect(opts.html).toContain('https://certificate.jeffistores.in')
@@ -492,24 +561,44 @@ describe('email.ts', () => {
     it('email mode: attachment only, no portal link', async () => {
       process.env.CERT_PORTAL_DELIVERY = 'email'
       try {
-        await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'pw', 'SN1', '2027-01-01', 'admin')
+        await sendAdminCertificateEmail(
+          'admin@example.com',
+          'admin_user',
+          Buffer.from('p12'),
+          'pw',
+          'SN1',
+          '2027-01-01',
+          'admin'
+        )
         const opts = mockSendAuditedMail.mock.calls[0][0]
         expect(opts.attachments?.length).toBeGreaterThan(0)
         expect(opts.html).not.toContain('certificate.jeffistores.in')
-      } finally { delete process.env.CERT_PORTAL_DELIVERY }
+      } finally {
+        delete process.env.CERT_PORTAL_DELIVERY
+      }
     })
 
     it('portal mode: sends the invite instead, with no attachment', async () => {
       process.env.CERT_PORTAL_DELIVERY = 'portal'
       try {
-        await sendAdminCertificateEmail('admin@example.com', 'admin_user', Buffer.from('p12'), 'Plain-Text-Pass-9Q', 'SN1', '2027-01-01', 'admin')
+        await sendAdminCertificateEmail(
+          'admin@example.com',
+          'admin_user',
+          Buffer.from('p12'),
+          'Plain-Text-Pass-9Q',
+          'SN1',
+          '2027-01-01',
+          'admin'
+        )
         expect(mockSendAuditedMail).toHaveBeenCalledOnce()
         const opts = mockSendAuditedMail.mock.calls[0][0]
         expect(opts.templateName).toBe('admin_cert_invite')
         expect(opts.attachments).toEqual([])
         expect(opts.html).toContain('https://certificate.jeffistores.in')
         expect(opts.html).not.toContain('Plain-Text-Pass-9Q')
-      } finally { delete process.env.CERT_PORTAL_DELIVERY }
+      } finally {
+        delete process.env.CERT_PORTAL_DELIVERY
+      }
     })
   })
 
@@ -596,7 +685,13 @@ describe('email.ts', () => {
 
     it('includes error description when provided', async () => {
       await sendPaymentFailedAdminNotification(
-        { order_number: 'ORD-003', id: 'id-3', customer_name: 'Eve', customer_email: 'eve@example.com', total_amount: '500' },
+        {
+          order_number: 'ORD-003',
+          id: 'id-3',
+          customer_name: 'Eve',
+          customer_email: 'eve@example.com',
+          total_amount: '500',
+        },
         'Card declined'
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Card declined')
@@ -604,8 +699,11 @@ describe('email.ts', () => {
 
     it('omits error description when not provided', async () => {
       await sendPaymentFailedAdminNotification({
-        order_number: 'ORD-005', id: 'id-5', customer_name: 'George',
-        customer_email: 'george@example.com', total_amount: '300',
+        order_number: 'ORD-005',
+        id: 'id-5',
+        customer_name: 'George',
+        customer_email: 'george@example.com',
+        total_amount: '300',
       })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('Reason:')
@@ -613,8 +711,12 @@ describe('email.ts', () => {
 
     it('shows phone when customer_phone is provided', async () => {
       await sendPaymentFailedAdminNotification({
-        order_number: 'ORD-006', id: 'id-6', customer_name: 'Hana',
-        customer_email: 'hana@example.com', total_amount: '800', customer_phone: '9876543210',
+        order_number: 'ORD-006',
+        id: 'id-6',
+        customer_name: 'Hana',
+        customer_email: 'hana@example.com',
+        total_amount: '800',
+        customer_phone: '9876543210',
       })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('9876543210')
@@ -622,8 +724,11 @@ describe('email.ts', () => {
 
     it('omits phone when customer_phone is not provided', async () => {
       await sendPaymentFailedAdminNotification({
-        order_number: 'ORD-007', id: 'id-7', customer_name: 'Ivan',
-        customer_email: 'ivan@example.com', total_amount: '200',
+        order_number: 'ORD-007',
+        id: 'id-7',
+        customer_name: 'Ivan',
+        customer_email: 'ivan@example.com',
+        total_amount: '200',
       })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('Phone:')
@@ -631,8 +736,11 @@ describe('email.ts', () => {
 
     it('returns success result', async () => {
       const result = await sendPaymentFailedAdminNotification({
-        order_number: 'ORD-004', id: 'id-4', customer_name: 'Frank',
-        customer_email: 'frank@example.com', total_amount: '100',
+        order_number: 'ORD-004',
+        id: 'id-4',
+        customer_name: 'Frank',
+        customer_email: 'frank@example.com',
+        total_amount: '100',
       })
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
@@ -640,8 +748,11 @@ describe('email.ts', () => {
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendPaymentFailedAdminNotification({
-        order_number: 'ORD-008', id: 'id-8', customer_name: 'Jane',
-        customer_email: 'jane@example.com', total_amount: '50',
+        order_number: 'ORD-008',
+        id: 'id-8',
+        customer_name: 'Jane',
+        customer_email: 'jane@example.com',
+        total_amount: '50',
       })
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
@@ -694,9 +805,9 @@ describe('email.ts', () => {
 
   describe('sendSupportEscalationEmail', () => {
     it('sends escalation to specified admin emails', async () => {
-      const result = await sendSupportEscalationEmail(
-        'Alice', 'alice@example.com', 'cust-1', 'sess-1', ['support@example.com']
-      )
+      const result = await sendSupportEscalationEmail('Alice', 'alice@example.com', 'cust-1', 'sess-1', [
+        'support@example.com',
+      ])
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result.success).toBe(true)
     })
@@ -736,27 +847,23 @@ describe('email.ts', () => {
 
   describe('sendReturnStatusEmail', () => {
     it('sends return requested_admin notification', async () => {
-      const result = await sendReturnStatusEmail(
-        'admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin'
-      )
+      const result = await sendReturnStatusEmail('admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin')
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result.success).toBe(true)
     })
 
     it('shows returnType and reason in requested_admin body', async () => {
-      await sendReturnStatusEmail(
-        'admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin',
-        { returnType: 'replacement', reason: 'Defective item' }
-      )
+      await sendReturnStatusEmail('admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin', {
+        returnType: 'replacement',
+        reason: 'Defective item',
+      })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('replacement')
       expect(html).toContain('Defective item')
     })
 
     it('omits Hi greeting for requested_admin event', async () => {
-      await sendReturnStatusEmail(
-        'admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin'
-      )
+      await sendReturnStatusEmail('admin@example.com', 'Admin', 'ORD-010', 'id-10', 'requested_admin')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('Hi Admin')
     })
@@ -767,61 +874,50 @@ describe('email.ts', () => {
     })
 
     it('uses replacement wording in approved body when returnType is replacement', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved',
-        { returnType: 'replacement' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved', {
+        returnType: 'replacement',
+      })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('replacement shipment')
     })
 
     it('uses refund wording in approved body when returnType is not replacement', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved',
-        { returnType: 'refund' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved', { returnType: 'refund' })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('refund')
     })
 
     it('shows admin notes in rejected body when provided', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'rejected',
-        { adminNotes: 'Policy violation' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'rejected', {
+        adminNotes: 'Policy violation',
+      })
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Policy violation')
     })
 
     it('omits admin notes block in rejected body when absent', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'rejected'
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'rejected')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('Reason:')
     })
 
     it('uses replacement wording in received body when returnType is replacement', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'received',
-        { returnType: 'replacement' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'received', {
+        returnType: 'replacement',
+      })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('replacement shipment')
     })
 
     it('shows replacement order number in replacement_created body', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created',
-        { replacementOrderNumber: 'ORD-099' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created', {
+        replacementOrderNumber: 'ORD-099',
+      })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('ORD-099')
     })
 
     it('omits replacement order number paragraph when absent', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created'
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('new order number')
     })
@@ -833,10 +929,9 @@ describe('email.ts', () => {
     })
 
     it('uses extra.appUrl when provided', async () => {
-      await sendReturnStatusEmail(
-        'cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved',
-        { appUrl: 'https://custom.example.com' }
-      )
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved', {
+        appUrl: 'https://custom.example.com',
+      })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('custom.example.com')
     })
@@ -897,7 +992,14 @@ describe('email.ts', () => {
     })
 
     it('shows View Invoice button when viewUrl is provided', async () => {
-      await sendInvoiceFinalizedEmail('cust@example.com', 'Alice', 'INV-005', 500, undefined, 'https://example.com/invoice/1')
+      await sendInvoiceFinalizedEmail(
+        'cust@example.com',
+        'Alice',
+        'INV-005',
+        500,
+        undefined,
+        'https://example.com/invoice/1'
+      )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('View Invoice')
     })
@@ -916,13 +1018,16 @@ describe('email.ts', () => {
   })
 
   describe('sendPurchaseOrderEmail', () => {
-    const poItems = [
-      { product_name: 'Bolt Set', variant_name: '10mm', quantity: 50, unit_cost: 12.5 },
-    ]
+    const poItems = [{ product_name: 'Bolt Set', variant_name: '10mm', quantity: 50, unit_cost: 12.5 }]
 
     it('sends purchase order email', async () => {
       const result = await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier Co', 'PO-001', 625, poItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier Co',
+        'PO-001',
+        625,
+        poItems
       )
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       const opts = mockSendAuditedMail.mock.calls[0][0]
@@ -931,25 +1036,19 @@ describe('email.ts', () => {
     })
 
     it('renders item rows in html', async () => {
-      await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-002', 100, poItems
-      )
+      await sendPurchaseOrderEmail('supplier@example.com', 'Vendor', 'Supplier', 'PO-002', 100, poItems)
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Bolt Set')
     })
 
     it('appends variant_name to product name when present', async () => {
-      await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-003', 100, poItems
-      )
+      await sendPurchaseOrderEmail('supplier@example.com', 'Vendor', 'Supplier', 'PO-003', 100, poItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('10mm')
     })
 
     it('omits variant separator when variant_name is null', async () => {
       const itemsNoVariant = [{ product_name: 'Nut', variant_name: null, quantity: 10, unit_cost: 5 }]
-      await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-004', 50, itemsNoVariant
-      )
+      await sendPurchaseOrderEmail('supplier@example.com', 'Vendor', 'Supplier', 'PO-004', 50, itemsNoVariant)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('Nut')
       expect(html).not.toContain('Nut /')
@@ -957,45 +1056,49 @@ describe('email.ts', () => {
 
     it('shows View Purchase Order button when viewUrl is provided', async () => {
       await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-005', 100, poItems, 'https://example.com/po/1'
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-005',
+        100,
+        poItems,
+        'https://example.com/po/1'
       )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('View Purchase Order')
     })
 
     it('omits View Purchase Order button when viewUrl is absent', async () => {
-      await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-006', 100, poItems
-      )
+      await sendPurchaseOrderEmail('supplier@example.com', 'Vendor', 'Supplier', 'PO-006', 100, poItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('View Purchase Order')
     })
 
     it('uses supplierName in greeting when contactName is empty', async () => {
-      await sendPurchaseOrderEmail(
-        'supplier@example.com', '', 'ACME Corp', 'PO-007', 100, poItems
-      )
+      await sendPurchaseOrderEmail('supplier@example.com', '', 'ACME Corp', 'PO-007', 100, poItems)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('ACME Corp')
     })
 
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
-      const result = await sendPurchaseOrderEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-008', 100, poItems
-      )
+      const result = await sendPurchaseOrderEmail('supplier@example.com', 'Vendor', 'Supplier', 'PO-008', 100, poItems)
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
   })
 
   describe('sendPOReceiveNotificationEmail', () => {
-    const receiveItems = [
-      { product_name: 'Nut Set', variant_name: null, quantity_received: 20, unit_cost: 5 },
-    ]
+    const receiveItems = [{ product_name: 'Nut Set', variant_name: null, quantity_received: 20, unit_cost: 5 }]
 
     it('sends PO receive notification', async () => {
       const result = await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-001', 'GRN-001', 'received', receiveItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-001',
+        'GRN-001',
+        'received',
+        receiveItems
       )
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
@@ -1003,14 +1106,26 @@ describe('email.ts', () => {
 
     it('shows Fully Received label for received status', async () => {
       await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-001', 'GRN-001', 'received', receiveItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-001',
+        'GRN-001',
+        'received',
+        receiveItems
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Fully Received')
     })
 
     it('shows Partially Received label for partial status', async () => {
       await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-001', 'GRN-001', 'partial', receiveItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-001',
+        'GRN-001',
+        'partial',
+        receiveItems
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Partially Received')
     })
@@ -1018,14 +1133,26 @@ describe('email.ts', () => {
     it('appends variant_name when present', async () => {
       const itemsWithVariant = [{ product_name: 'Bolt', variant_name: 'M6', quantity_received: 5, unit_cost: 2 }]
       await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-002', 'GRN-002', 'partial', itemsWithVariant
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-002',
+        'GRN-002',
+        'partial',
+        itemsWithVariant
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Bolt / M6')
     })
 
     it('omits variant separator when variant_name is null', async () => {
       await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-003', 'GRN-003', 'partial', receiveItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-003',
+        'GRN-003',
+        'partial',
+        receiveItems
       )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('Nut Set')
@@ -1035,7 +1162,13 @@ describe('email.ts', () => {
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendPOReceiveNotificationEmail(
-        'supplier@example.com', 'Vendor', 'Supplier', 'PO-004', 'GRN-004', 'received', receiveItems
+        'supplier@example.com',
+        'Vendor',
+        'Supplier',
+        'PO-004',
+        'GRN-004',
+        'received',
+        receiveItems
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
@@ -1044,7 +1177,11 @@ describe('email.ts', () => {
   describe('sendQuotationFinalizedEmail', () => {
     it('sends quotation finalized email', async () => {
       const result = await sendQuotationFinalizedEmail(
-        'buyer@example.com', 'Alice', 'QT-001', 5000, 'https://example.com/qt/1'
+        'buyer@example.com',
+        'Alice',
+        'QT-001',
+        5000,
+        'https://example.com/qt/1'
       )
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       const opts = mockSendAuditedMail.mock.calls[0][0]
@@ -1053,16 +1190,18 @@ describe('email.ts', () => {
     })
 
     it('includes formatted total in html', async () => {
-      await sendQuotationFinalizedEmail(
-        'buyer@example.com', 'Alice', 'QT-002', 12500, 'https://example.com'
-      )
+      await sendQuotationFinalizedEmail('buyer@example.com', 'Alice', 'QT-002', 12500, 'https://example.com')
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('12,500.00')
     })
 
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendQuotationFinalizedEmail(
-        'buyer@example.com', 'Alice', 'QT-003', 1000, 'https://example.com'
+        'buyer@example.com',
+        'Alice',
+        'QT-003',
+        1000,
+        'https://example.com'
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
@@ -1071,7 +1210,13 @@ describe('email.ts', () => {
   describe('sendOrderAutoCancelledEmail', () => {
     it('sends auto-cancelled email for direct order', async () => {
       const result = await sendOrderAutoCancelledEmail(
-        'cust@example.com', 'Alice', 'ORD-050', 'id-50', 'direct', 1000, '/products/slug'
+        'cust@example.com',
+        'Alice',
+        'ORD-050',
+        'id-50',
+        'direct',
+        1000,
+        '/products/slug'
       )
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
@@ -1079,22 +1224,32 @@ describe('email.ts', () => {
 
     it('uses Place Order Again CTA for direct order type', async () => {
       await sendOrderAutoCancelledEmail(
-        'cust@example.com', 'Alice', 'ORD-050', 'id-50', 'direct', 1000, '/products/slug'
+        'cust@example.com',
+        'Alice',
+        'ORD-050',
+        'id-50',
+        'direct',
+        1000,
+        '/products/slug'
       )
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Place Order Again')
     })
 
     it('uses Return to Cart CTA for non-direct order type', async () => {
-      await sendOrderAutoCancelledEmail(
-        'cust@example.com', 'Alice', 'ORD-051', 'id-51', 'cart', 1000, '/cart'
-      )
+      await sendOrderAutoCancelledEmail('cust@example.com', 'Alice', 'ORD-051', 'id-51', 'cart', 1000, '/cart')
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Return to Cart')
     })
 
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendOrderAutoCancelledEmail(
-        'cust@example.com', 'Alice', 'ORD-052', 'id-52', 'direct', 500, '/products/slug'
+        'cust@example.com',
+        'Alice',
+        'ORD-052',
+        'id-52',
+        'direct',
+        500,
+        '/products/slug'
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })

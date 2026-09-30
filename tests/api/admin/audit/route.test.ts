@@ -325,9 +325,7 @@ describe('GET /api/admin/audit response contract', () => {
     })
   }
 
-  const sampleRows = [
-    { id: 'log-1', action: 'create', entity_type: 'product', summary: 'Created product' },
-  ]
+  const sampleRows = [{ id: 'log-1', action: 'create', entity_type: 'product', summary: 'Created product' }]
 
   beforeEach(() => vi.clearAllMocks())
 

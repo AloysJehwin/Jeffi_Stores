@@ -76,10 +76,13 @@ describe('PATCH /api/admin/shelving/warehouses/[id]', () => {
 
   it('trims name and code fields', async () => {
     await PATCH(makePatch({ name: '  Warehouse A  ', code: '  WHA  ' }), PARAMS)
-    expect(mockUpdateWarehouse).toHaveBeenCalledWith(WH_ID, expect.objectContaining({
-      name: 'Warehouse A',
-      code: 'WHA',
-    }))
+    expect(mockUpdateWarehouse).toHaveBeenCalledWith(
+      WH_ID,
+      expect.objectContaining({
+        name: 'Warehouse A',
+        code: 'WHA',
+      })
+    )
   })
 
   it('sets address to null when empty string provided', async () => {

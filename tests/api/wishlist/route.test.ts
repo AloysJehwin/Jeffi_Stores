@@ -104,11 +104,22 @@ describe('GET /api/wishlist', () => {
 
   it('returns the snapshot and the current stock on the snapshot basis, not the raw row', async () => {
     vi.mocked(queryMany).mockResolvedValue([
-      { id: 'wi-1', product_id: PRODUCT_ID, snapshot_price: '500.00', snapshot_in_stock: false, inventory_in_stock: true, products: { id: PRODUCT_ID } },
+      {
+        id: 'wi-1',
+        product_id: PRODUCT_ID,
+        snapshot_price: '500.00',
+        snapshot_in_stock: false,
+        inventory_in_stock: true,
+        products: { id: PRODUCT_ID },
+      },
     ])
     const res = await GET(makeRequest('GET', 'http://localhost/api/wishlist') as any)
     const body = await res.json()
-    expect(body.items[0]).toMatchObject({ snapshot_price: '500.00', snapshot_in_stock: false, inventory_in_stock: true })
+    expect(body.items[0]).toMatchObject({
+      snapshot_price: '500.00',
+      snapshot_in_stock: false,
+      inventory_in_stock: true,
+    })
 
     const [sql, params] = vi.mocked(queryMany).mock.calls[0]
     expect(sql).toContain('wi.snapshot_price')
@@ -177,10 +188,7 @@ describe('DELETE /api/wishlist', () => {
   })
 
   it('removes item and returns 200 "Item removed from wishlist"', async () => {
-    const req = makeRequest(
-      'DELETE',
-      `http://localhost/api/wishlist?productId=${PRODUCT_ID}`,
-    )
+    const req = makeRequest('DELETE', `http://localhost/api/wishlist?productId=${PRODUCT_ID}`)
     const res = await DELETE(req as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -188,10 +196,7 @@ describe('DELETE /api/wishlist', () => {
   })
 
   it('also accepts product_id query param (snake_case)', async () => {
-    const req = makeRequest(
-      'DELETE',
-      `http://localhost/api/wishlist?product_id=${PRODUCT_ID}`,
-    )
+    const req = makeRequest('DELETE', `http://localhost/api/wishlist?product_id=${PRODUCT_ID}`)
     const res = await DELETE(req as any)
     expect(res.status).toBe(200)
     const body = await res.json()

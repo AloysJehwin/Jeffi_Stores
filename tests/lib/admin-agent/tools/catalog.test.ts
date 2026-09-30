@@ -44,10 +44,8 @@ describe('admin-agent/tools/catalog', () => {
   // list_featured_products returns ok({ ... }) via the tool-envelope helper
   describe('list_featured_products', () => {
     it('returns featured products', async () => {
-      mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Widget', is_featured: true },
-      ])
-      const result = await getTool('list_featured_products').handler({}) as any
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', is_featured: true }])
+      const result = (await getTool('list_featured_products').handler({})) as any
       // ok() wraps with { ok: true, ... }
       expect(result.ok).toBe(true)
     })
@@ -60,7 +58,7 @@ describe('admin-agent/tools/catalog', () => {
         { id: 'b1', name: 'Acme', slug: 'acme' },
         { id: 'b2', name: 'Beta', slug: 'beta' },
       ])
-      const result = await getTool('list_brands').handler({}) as any
+      const result = (await getTool('list_brands').handler({})) as any
       expect(Array.isArray(result.brands)).toBe(true)
       expect(result.count).toBe(2)
     })
@@ -71,14 +69,14 @@ describe('admin-agent/tools/catalog', () => {
   describe('get_brand', () => {
     it('returns brand by id', async () => {
       mockQueryOne.mockResolvedValueOnce({ id: 'b1', name: 'Acme' })
-      const result = await getTool('get_brand').handler({ id: 'b1' }) as any
+      const result = (await getTool('get_brand').handler({ id: 'b1' })) as any
       expect(result).toHaveProperty('id', 'b1')
       expect(result).toHaveProperty('name', 'Acme')
     })
 
     it('returns error object when brand not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const result = await getTool('get_brand').handler({ id: 'bad' }) as any
+      const result = (await getTool('get_brand').handler({ id: 'bad' })) as any
       expect(result).toHaveProperty('error')
     })
   })
@@ -87,7 +85,7 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_categories', () => {
     it('returns categories list', async () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'c1', name: 'Tools' }])
-      const result = await getTool('list_categories').handler({}) as any
+      const result = (await getTool('list_categories').handler({})) as any
       expect(Array.isArray(result.categories)).toBe(true)
       expect(result.count).toBe(1)
     })
@@ -100,16 +98,16 @@ describe('admin-agent/tools/catalog', () => {
     it('returns category by id', async () => {
       mockQueryOne
         .mockResolvedValueOnce({ id: 'c1', name: 'Tools', slug: 'tools' }) // category row
-        .mockResolvedValueOnce({ n: 5 })                                   // product count
-      mockQueryMany.mockResolvedValueOnce([])                              // subcategories
-      const result = await getTool('get_category').handler({ id: 'c1' }) as any
+        .mockResolvedValueOnce({ n: 5 }) // product count
+      mockQueryMany.mockResolvedValueOnce([]) // subcategories
+      const result = (await getTool('get_category').handler({ id: 'c1' })) as any
       expect(result).toHaveProperty('id', 'c1')
       expect(result).toHaveProperty('name', 'Tools')
     })
 
     it('returns error object when not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const result = await getTool('get_category').handler({ id: 'bad' }) as any
+      const result = (await getTool('get_category').handler({ id: 'bad' })) as any
       expect(result).toHaveProperty('error')
     })
   })
@@ -117,17 +115,15 @@ describe('admin-agent/tools/catalog', () => {
   // list_inventory_low returns { products, threshold, count, truncated } — no ok wrapper
   describe('list_inventory_low', () => {
     it('returns low stock products', async () => {
-      mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Widget', stock: 2 },
-      ])
-      const result = await getTool('list_inventory_low').handler({}) as any
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', stock: 2 }])
+      const result = (await getTool('list_inventory_low').handler({})) as any
       expect(Array.isArray(result.products)).toBe(true)
       expect(result.count).toBe(1)
     })
 
     it('accepts threshold parameter', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_inventory_low').handler({ threshold: 5 }) as any
+      const result = (await getTool('list_inventory_low').handler({ threshold: 5 })) as any
       expect(Array.isArray(result.products)).toBe(true)
       expect(result.threshold).toBe(5)
     })
@@ -145,8 +141,8 @@ describe('admin-agent/tools/catalog', () => {
       })
       // variants (no variant ids → subVariants skipped), images
       mockQueryMany
-        .mockResolvedValueOnce([])  // variants — empty so subVariants query is skipped
-        .mockResolvedValueOnce([])  // images
+        .mockResolvedValueOnce([]) // variants — empty so subVariants query is skipped
+        .mockResolvedValueOnce([]) // images
       const result = await getTool('get_product_full').handler({ id: 'p1' })
       expect(result).toHaveProperty('id', 'p1')
       expect(result).toHaveProperty('name', 'Widget')
@@ -165,9 +161,9 @@ describe('admin-agent/tools/catalog', () => {
   describe('propose_create_product', () => {
     it('proposes product creation', async () => {
       mockQueryOne
-        .mockResolvedValueOnce(null)                      // existing SKU check → not found (good)
-        .mockResolvedValueOnce({ name: 'Acme' })          // brand lookup
-        .mockResolvedValueOnce({ name: 'Tools' })         // category lookup
+        .mockResolvedValueOnce(null) // existing SKU check → not found (good)
+        .mockResolvedValueOnce({ name: 'Acme' }) // brand lookup
+        .mockResolvedValueOnce({ name: 'Tools' }) // category lookup
 
       const result = await getTool('propose_create_product').handler({
         name: 'New Widget',
@@ -219,7 +215,13 @@ describe('admin-agent/tools/catalog', () => {
   // throws on not-found — no ok wrapper on success
   describe('propose_adjust_inventory', () => {
     it('proposes inventory adjustment', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', sku: 'W-001', inventory_quantity: 10, has_variants: false })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Widget',
+        sku: 'W-001',
+        inventory_quantity: 10,
+        has_variants: false,
+      })
       const result = await getTool('propose_adjust_inventory').handler({
         productId: 'p1',
         delta: 5,
@@ -242,7 +244,13 @@ describe('admin-agent/tools/catalog', () => {
 
     // Line 449: newStock < 0 — negative stock callout
     it('includes negative-stock error callout when delta would make stock negative', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', sku: 'W-001', inventory_quantity: 3, has_variants: false })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Widget',
+        sku: 'W-001',
+        inventory_quantity: 3,
+        has_variants: false,
+      })
       const result = await getTool('propose_adjust_inventory').handler({
         productId: 'p1',
         delta: -10,
@@ -257,7 +265,13 @@ describe('admin-agent/tools/catalog', () => {
 
     // Line 448: p.has_variants — variants info callout
     it('includes has-variants info callout when product has variants', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Multi', sku: 'M-001', inventory_quantity: 20, has_variants: true })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Multi',
+        sku: 'M-001',
+        inventory_quantity: 20,
+        has_variants: true,
+      })
       const result = await getTool('propose_adjust_inventory').handler({
         productId: 'p1',
         delta: 5,
@@ -395,7 +409,7 @@ describe('admin-agent/tools/catalog', () => {
       // source param is 'parentId' (camelCase), not 'parent_category_id'
       mockQueryOne
         .mockResolvedValueOnce({ id: 'c1', name: 'Tools', parent_name: null }) // parent lookup
-        .mockResolvedValueOnce(null)                                            // slug conflict → none
+        .mockResolvedValueOnce(null) // slug conflict → none
       const result = await getTool('propose_create_category').handler({
         name: 'Drills',
         parentId: 'c1',
@@ -449,7 +463,7 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_featured_products — edge cases', () => {
     it('returns empty summary when no featured products', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_featured_products').handler({}) as any
+      const result = (await getTool('list_featured_products').handler({})) as any
       expect(result.ok).toBe(true)
       expect(result.summary).toMatch(/no products/i)
       expect(result.count).toBe(0)
@@ -460,14 +474,14 @@ describe('admin-agent/tools/catalog', () => {
         { id: 'p1', name: 'Widget A', stock: 5 },
         { id: 'p2', name: 'Widget B', stock: 0 },
       ])
-      const result = await getTool('list_featured_products').handler({}) as any
+      const result = (await getTool('list_featured_products').handler({})) as any
       expect(result.ok).toBe(true)
       expect(result.summary).toContain('1 out')
     })
 
     it('respects activeOnly=false parameter', async () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Inactive Widget', stock: 3 }])
-      const result = await getTool('list_featured_products').handler({ activeOnly: false }) as any
+      const result = (await getTool('list_featured_products').handler({ activeOnly: false })) as any
       expect(result.ok).toBe(true)
       expect(result.count).toBe(1)
     })
@@ -477,21 +491,21 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_brands — edge cases', () => {
     it('returns empty brands array', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_brands').handler({}) as any
+      const result = (await getTool('list_brands').handler({})) as any
       expect(result.brands).toEqual([])
       expect(result.count).toBe(0)
     })
 
     it('respects activeOnly=false', async () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'b1', name: 'Old Brand', is_active: false }])
-      const result = await getTool('list_brands').handler({ activeOnly: false }) as any
+      const result = (await getTool('list_brands').handler({ activeOnly: false })) as any
       expect(result.count).toBe(1)
     })
 
     it('sets truncated=true when count equals limit', async () => {
       const rows = Array.from({ length: 50 }, (_, i) => ({ id: `b${i}` }))
       mockQueryMany.mockResolvedValueOnce(rows)
-      const result = await getTool('list_brands').handler({ limit: 50 }) as any
+      const result = (await getTool('list_brands').handler({ limit: 50 })) as any
       expect(result.truncated).toBe(true)
     })
   })
@@ -500,21 +514,21 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_categories — edge cases', () => {
     it('returns empty categories array', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_categories').handler({}) as any
+      const result = (await getTool('list_categories').handler({})) as any
       expect(result.categories).toEqual([])
       expect(result.count).toBe(0)
     })
 
     it('applies parentOnly=true filter', async () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'c1', name: 'Top Level' }])
-      const result = await getTool('list_categories').handler({ parentOnly: true }) as any
+      const result = (await getTool('list_categories').handler({ parentOnly: true })) as any
       expect(result.count).toBe(1)
     })
 
     it('sets truncated=true when count equals limit', async () => {
       const rows = Array.from({ length: 100 }, (_, i) => ({ id: `c${i}` }))
       mockQueryMany.mockResolvedValueOnce(rows)
-      const result = await getTool('list_categories').handler({ limit: 100 }) as any
+      const result = (await getTool('list_categories').handler({ limit: 100 })) as any
       expect(result.truncated).toBe(true)
     })
   })
@@ -527,7 +541,7 @@ describe('admin-agent/tools/catalog', () => {
         .mockResolvedValueOnce([{ id: 'v1', variant_name: 'Red' }])
         .mockResolvedValueOnce([{ id: 'sv1', sub_variant_name: 'S' }])
         .mockResolvedValueOnce([{ id: 'img1', image_url: 'http://img.com/a.jpg' }])
-      const result = await getTool('get_product_full').handler({ id: 'p1' }) as any
+      const result = (await getTool('get_product_full').handler({ id: 'p1' })) as any
       expect(result.variants).toHaveLength(1)
       expect(result.sub_variants).toHaveLength(1)
       expect(result.images).toHaveLength(1)
@@ -538,27 +552,27 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_inventory_low — edge cases', () => {
     it('returns empty products when nothing is low-stock', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_inventory_low').handler({ threshold: 0 }) as any
+      const result = (await getTool('list_inventory_low').handler({ threshold: 0 })) as any
       expect(result.products).toEqual([])
       expect(result.threshold).toBe(0)
     })
 
     it('clamps threshold to 0 minimum', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_inventory_low').handler({ threshold: -5 }) as any
+      const result = (await getTool('list_inventory_low').handler({ threshold: -5 })) as any
       expect(result.threshold).toBe(0)
     })
 
     it('clamps threshold to 1000 maximum', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_inventory_low').handler({ threshold: 9999 }) as any
+      const result = (await getTool('list_inventory_low').handler({ threshold: 9999 })) as any
       expect(result.threshold).toBe(1000)
     })
 
     it('sets truncated=true when count equals limit', async () => {
       const rows = Array.from({ length: 50 }, (_, i) => ({ id: `p${i}`, stock: 0 }))
       mockQueryMany.mockResolvedValueOnce(rows)
-      const result = await getTool('list_inventory_low').handler({ limit: 50 }) as any
+      const result = (await getTool('list_inventory_low').handler({ limit: 50 })) as any
       expect(result.truncated).toBe(true)
     })
   })
@@ -591,28 +605,41 @@ describe('admin-agent/tools/catalog', () => {
 
     it('throws when brandId does not exist', async () => {
       mockQueryOne
-        .mockResolvedValueOnce(null)  // existing SKU check
-        .mockResolvedValueOnce(null)  // brand not found
+        .mockResolvedValueOnce(null) // existing SKU check
+        .mockResolvedValueOnce(null) // brand not found
       await expect(
-        getTool('propose_create_product').handler({ name: 'Widget', sku: 'W-001', basePrice: 100, brandId: 'bad-brand' })
+        getTool('propose_create_product').handler({
+          name: 'Widget',
+          sku: 'W-001',
+          basePrice: 100,
+          brandId: 'bad-brand',
+        })
       ).rejects.toThrow(/brand not found/i)
     })
 
     it('throws when categoryId does not exist', async () => {
       mockQueryOne
-        .mockResolvedValueOnce(null)              // existing SKU check
+        .mockResolvedValueOnce(null) // existing SKU check
         .mockResolvedValueOnce({ name: 'Acme' }) // brand found
-        .mockResolvedValueOnce(null)              // category not found
+        .mockResolvedValueOnce(null) // category not found
       await expect(
-        getTool('propose_create_product').handler({ name: 'Widget', sku: 'W-001', basePrice: 100, brandId: 'b1', categoryId: 'bad-cat' })
+        getTool('propose_create_product').handler({
+          name: 'Widget',
+          sku: 'W-001',
+          basePrice: 100,
+          brandId: 'b1',
+          categoryId: 'bad-cat',
+        })
       ).rejects.toThrow(/category not found/i)
     })
 
     it('adds SKU-already-exists warn callout when SKU is a duplicate', async () => {
       mockQueryOne.mockResolvedValueOnce({ id: 'existing-p', name: 'Old Widget' })
-      const result = await getTool('propose_create_product').handler({
-        name: 'New Widget', sku: 'DUP-001', basePrice: 99,
-      }) as any
+      const result = (await getTool('propose_create_product').handler({
+        name: 'New Widget',
+        sku: 'DUP-001',
+        basePrice: 99,
+      })) as any
       expect(result.proposed).toBe(true)
       const warnBlock = result.ui_blocks.find((b: any) => b.tone === 'warn')
       expect(warnBlock).toBeDefined()
@@ -623,7 +650,13 @@ describe('admin-agent/tools/catalog', () => {
   // ---- propose_update_product: field validation branches ----
   describe('propose_update_product — field validation branches', () => {
     it('throws when name is set to empty string', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', base_price: '100', is_active: true, is_featured: false })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Widget',
+        base_price: '100',
+        is_active: true,
+        is_featured: false,
+      })
       await expect(
         getTool('propose_update_product').handler({ productId: 'p1', fields: { name: '' } })
       ).rejects.toThrow(/name/i)
@@ -645,7 +678,17 @@ describe('admin-agent/tools/catalog', () => {
 
     it('throws when brand_id is invalid', async () => {
       mockQueryOne
-        .mockResolvedValueOnce({ id: 'p1', name: 'Widget', brand_id: null, category_id: null, gst_percentage: '18', base_price: '100', is_active: true, is_featured: false, short_description: null })
+        .mockResolvedValueOnce({
+          id: 'p1',
+          name: 'Widget',
+          brand_id: null,
+          category_id: null,
+          gst_percentage: '18',
+          base_price: '100',
+          is_active: true,
+          is_featured: false,
+          short_description: null,
+        })
         .mockResolvedValueOnce(null) // brand not found
       await expect(
         getTool('propose_update_product').handler({ productId: 'p1', fields: { brand_id: 'bad-brand-uuid' } })
@@ -654,7 +697,17 @@ describe('admin-agent/tools/catalog', () => {
 
     it('throws when category_id is invalid', async () => {
       mockQueryOne
-        .mockResolvedValueOnce({ id: 'p1', name: 'Widget', brand_id: null, category_id: null, gst_percentage: '18', base_price: '100', is_active: true, is_featured: false, short_description: null })
+        .mockResolvedValueOnce({
+          id: 'p1',
+          name: 'Widget',
+          brand_id: null,
+          category_id: null,
+          gst_percentage: '18',
+          base_price: '100',
+          is_active: true,
+          is_featured: false,
+          short_description: null,
+        })
         .mockResolvedValueOnce(null) // category not found
       await expect(
         getTool('propose_update_product').handler({ productId: 'p1', fields: { category_id: 'bad-cat-uuid' } })
@@ -662,10 +715,21 @@ describe('admin-agent/tools/catalog', () => {
     })
 
     it('adds is_active=false warning callout', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', base_price: '100', is_active: true, is_featured: false, brand_id: null, category_id: null, gst_percentage: '18', short_description: null })
-      const result = await getTool('propose_update_product').handler({
-        productId: 'p1', fields: { is_active: false },
-      }) as any
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Widget',
+        base_price: '100',
+        is_active: true,
+        is_featured: false,
+        brand_id: null,
+        category_id: null,
+        gst_percentage: '18',
+        short_description: null,
+      })
+      const result = (await getTool('propose_update_product').handler({
+        productId: 'p1',
+        fields: { is_active: false },
+      })) as any
       expect(result.proposed).toBe(true)
       const warnBlock = result.ui_blocks.find((b: any) => b.tone === 'warn')
       expect(warnBlock).toBeDefined()
@@ -673,7 +737,13 @@ describe('admin-agent/tools/catalog', () => {
     })
 
     it('throws when short_description exceeds 500 chars', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', base_price: '100', is_active: true, short_description: null })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1',
+        name: 'Widget',
+        base_price: '100',
+        is_active: true,
+        short_description: null,
+      })
       await expect(
         getTool('propose_update_product').handler({ productId: 'p1', fields: { short_description: 'X'.repeat(501) } })
       ).rejects.toThrow(/short_description/i)
@@ -725,9 +795,10 @@ describe('admin-agent/tools/catalog', () => {
 
     it('accepts valid https logoUrl', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const result = await getTool('propose_create_brand').handler({
-        name: 'Good Brand', logoUrl: 'https://cdn.example.com/logo.png',
-      }) as any
+      const result = (await getTool('propose_create_brand').handler({
+        name: 'Good Brand',
+        logoUrl: 'https://cdn.example.com/logo.png',
+      })) as any
       expect(result.proposed).toBe(true)
       expect(result.payload.logoUrl).toBe('https://cdn.example.com/logo.png')
     })

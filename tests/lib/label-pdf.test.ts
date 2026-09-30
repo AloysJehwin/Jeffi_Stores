@@ -257,7 +257,7 @@ describe('generateShelfLabelPDF', () => {
 
   it('handles displayCode with non-ASCII characters gracefully', async () => {
     const item: ShelfLabelItem = {
-      displayCode: 'A-01–B',  // contains en-dash
+      displayCode: 'A-01–B', // contains en-dash
       warehouseName: 'Main',
     }
     const result = await generateShelfLabelPDF([item], 1)

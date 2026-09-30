@@ -20,11 +20,7 @@ vi.mock('@/lib/merchant/client', () => ({
   listProductStatuses: mockListProductStatuses,
 }))
 
-import {
-  refreshGmcStatusSnapshot,
-  getGmcSummary,
-  getGmcStatusPage,
-} from '@/lib/merchant/gmc-status'
+import { refreshGmcStatusSnapshot, getGmcSummary, getGmcStatusPage } from '@/lib/merchant/gmc-status'
 
 beforeEach(() => {
   vi.clearAllMocks()

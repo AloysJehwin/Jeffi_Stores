@@ -86,10 +86,7 @@ describe('GET /api/orders', () => {
     vi.mocked(db.queryCount).mockResolvedValueOnce(1)
     const res = await GET(makeRequest() as any)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT email, phone FROM users'),
-      ['biz-user-1']
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT email, phone FROM users'), ['biz-user-1'])
   })
 
   it('uses business query when x-auth-portal header is business', async () => {

@@ -28,7 +28,7 @@ vi.mock('@/lib/checkout-intent', () => ({
 vi.mock('@/lib/business-discount', () => ({
   getBusinessDiscountMap: vi.fn().mockResolvedValue({}),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -151,11 +151,13 @@ describe('POST /api/orders/draft', () => {
       ok: true,
       item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
     } as any)
-    const res = await POST(makeRequest({
-      ...VALID_BODY,
-      mode: 'buyNow',
-      item: { productId: '550e8400-e29b-41d4-a716-446655440001', qty: 1 },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        mode: 'buyNow',
+        item: { productId: '550e8400-e29b-41d4-a716-446655440001', qty: 1 },
+      }) as any
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.draftToken).toBe('signed-draft-token')
@@ -167,11 +169,13 @@ describe('POST /api/orders/draft', () => {
       ok: false,
       error: 'Product not available',
     } as any)
-    const res = await POST(makeRequest({
-      ...VALID_BODY,
-      mode: 'buyNow',
-      item: { productId: '550e8400-e29b-41d4-a716-446655440001', qty: 1 },
-    }) as any)
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        mode: 'buyNow',
+        item: { productId: '550e8400-e29b-41d4-a716-446655440001', qty: 1 },
+      }) as any
+    )
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toBe('Product not available')

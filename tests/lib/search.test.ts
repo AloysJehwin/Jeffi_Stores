@@ -381,7 +381,7 @@ describe('buildProductSearchRank – empty tsq fallback', () => {
   const NAME = 'p.name'
   const VEC = 'p.search_vector'
 
-  it("uses \"''\" as tsq when a word strips to empty (pure punctuation word)", () => {
+  it('uses "\'\'" as tsq when a word strips to empty (pure punctuation word)', () => {
     // '!!!' → tsQuery strips all non-word chars per word then filters empties → ''
     // (falsy), so the `tsq || "''"` fallback fires and params[2] === "''".
     const result = buildProductSearchRank('!!!', NAME, VEC, 1)
@@ -389,7 +389,7 @@ describe('buildProductSearchRank – empty tsq fallback', () => {
     expect(result.nextIdx).toBe(5)
   })
 
-  it("rank uses \"''\" when tsq resolves to empty (simulated by passing empty after trim)", () => {
+  it('rank uses "\'\'" when tsq resolves to empty (simulated by passing empty after trim)', () => {
     // buildProductSearchRank trims q; if q becomes '' the early return fires
     const result = buildProductSearchRank('   ', NAME, VEC, 3)
     expect(result).toEqual({ rank: '0', params: [], nextIdx: 3 })

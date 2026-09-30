@@ -6,14 +6,13 @@ process.env.MFA_ENCRYPTION_KEY = 'a'.repeat(64) // 64-char hex string → 32 byt
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Hoist mock functions so vi.mock factories can reference them ──────────────
-const { mockMfaSign, mockMfaJwtVerify, mockGenerateSecret, mockGenerateURI, mockOtpVerify } =
-  vi.hoisted(() => ({
-    mockMfaSign: vi.fn(),
-    mockMfaJwtVerify: vi.fn(),
-    mockGenerateSecret: vi.fn(),
-    mockGenerateURI: vi.fn(),
-    mockOtpVerify: vi.fn(),
-  }))
+const { mockMfaSign, mockMfaJwtVerify, mockGenerateSecret, mockGenerateURI, mockOtpVerify } = vi.hoisted(() => ({
+  mockMfaSign: vi.fn(),
+  mockMfaJwtVerify: vi.fn(),
+  mockGenerateSecret: vi.fn(),
+  mockGenerateURI: vi.fn(),
+  mockOtpVerify: vi.fn(),
+}))
 
 vi.mock('jose', () => {
   class SignJWT {
@@ -21,10 +20,18 @@ vi.mock('jose', () => {
     constructor(payload: Record<string, unknown>) {
       this.payload = payload
     }
-    setProtectedHeader() { return this }
-    setIssuedAt() { return this }
-    setExpirationTime() { return this }
-    async sign() { return mockMfaSign(this.payload) }
+    setProtectedHeader() {
+      return this
+    }
+    setIssuedAt() {
+      return this
+    }
+    setExpirationTime() {
+      return this
+    }
+    async sign() {
+      return mockMfaSign(this.payload)
+    }
   }
   return { SignJWT, jwtVerify: mockMfaJwtVerify }
 })
@@ -61,9 +68,7 @@ describe('issueMfaTicket', () => {
   it('calls sign with correct payload including purpose', async () => {
     mockMfaSign.mockResolvedValueOnce('token')
     await issueMfaTicket({ adminId: 'a1', username: 'alice', purpose: 'verify' })
-    expect(mockMfaSign).toHaveBeenCalledWith(
-      expect.objectContaining({ adminId: 'a1', purpose: 'verify' })
-    )
+    expect(mockMfaSign).toHaveBeenCalledWith(expect.objectContaining({ adminId: 'a1', purpose: 'verify' }))
   })
 })
 
@@ -180,9 +185,7 @@ describe('buildOtpauthUrl', () => {
     mockGenerateURI.mockReturnValueOnce(uri)
     const result = await buildOtpauthUrl('alice', 'ABC')
     expect(result).toBe(uri)
-    expect(mockGenerateURI).toHaveBeenCalledWith(
-      expect.objectContaining({ secret: 'ABC', label: 'alice' })
-    )
+    expect(mockGenerateURI).toHaveBeenCalledWith(expect.objectContaining({ secret: 'ABC', label: 'alice' }))
   })
 })
 
@@ -230,7 +233,9 @@ describe('verifyTotp', () => {
   })
 
   it('returns false when otplib throws', async () => {
-    mockOtpVerify.mockImplementationOnce(() => { throw new Error('otp error') })
+    mockOtpVerify.mockImplementationOnce(() => {
+      throw new Error('otp error')
+    })
     const result = await verifyTotp('SECRET', '123456')
     expect(result).toBe(false)
   })

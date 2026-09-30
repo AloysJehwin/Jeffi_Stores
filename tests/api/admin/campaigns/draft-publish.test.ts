@@ -323,7 +323,12 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: {} })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT', product_sql: null, enabled: true, description: null, ai_prompt: null,
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT',
+      product_sql: null,
+      enabled: true,
+      description: null,
+      ai_prompt: null,
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: false, reason: 'unsafe' })
     const res = await eligibleGet(eligibleReq(), { params })
@@ -335,11 +340,17 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: { sendCooldownDays: 3 } })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: false, description: 'd', ai_prompt: 'prompt',
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: false,
+      description: 'd',
+      ai_prompt: 'prompt',
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: true, normalized: 'SELECT id FROM users' })
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({}) // statement_timeout
         .mockResolvedValueOnce({}) // lock_timeout
@@ -363,11 +374,17 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: {} })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT id', product_sql: null, enabled: true, description: null, ai_prompt: null,
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT id',
+      product_sql: null,
+      enabled: true,
+      description: null,
+      ai_prompt: null,
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: true, normalized: 'SELECT id' })
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({}) // statement_timeout
         .mockResolvedValueOnce({}) // lock_timeout

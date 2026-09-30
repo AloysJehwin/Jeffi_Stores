@@ -157,10 +157,7 @@ describe('POST /api/admin/business/discounts', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.deleted).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('DELETE'),
-      ['u1', 'c1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('DELETE'), ['u1', 'c1'])
   })
 
   it('upserts discount and returns success', async () => {
@@ -171,9 +168,6 @@ describe('POST /api/admin/business/discounts', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.deleted).toBeUndefined()
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT'),
-      ['u1', 'c1', 15]
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), ['u1', 'c1', 15])
   })
 })

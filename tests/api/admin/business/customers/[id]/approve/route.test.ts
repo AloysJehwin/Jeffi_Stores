@@ -83,9 +83,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
 
   it('approves the business profile and sends email', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'bp-1' })
-      .mockResolvedValueOnce(userInfo)
+    mockQueryOne.mockResolvedValueOnce({ id: 'bp-1' }).mockResolvedValueOnce(userInfo)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendApproved.mockResolvedValue(undefined as any)
 
@@ -94,30 +92,24 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.action).toBe('approve')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("approval_status='approved'"),
-      expect.any(Array),
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("approval_status='approved'"), expect.any(Array))
   })
 
   it('rejects the business profile and sends rejection email', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'bp-1' })
-      .mockResolvedValueOnce(userInfo)
+    mockQueryOne.mockResolvedValueOnce({ id: 'bp-1' }).mockResolvedValueOnce(userInfo)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendRejected.mockResolvedValue(undefined as any)
 
-    const res = await POST(
-      makeRequest({ action: 'reject', rejectionNote: 'Incomplete docs' }),
-      { params: Promise.resolve({ id: 'user-1' }) },
-    )
+    const res = await POST(makeRequest({ action: 'reject', rejectionNote: 'Incomplete docs' }), {
+      params: Promise.resolve({ id: 'user-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.action).toBe('reject')
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining("approval_status='rejected'"),
-      expect.arrayContaining(['Incomplete docs']),
+      expect.arrayContaining(['Incomplete docs'])
     )
   })
 
@@ -135,19 +127,13 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
 
   it('uses full name when both first and last names are present', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'bp-1' })
-      .mockResolvedValueOnce(userInfo)
+    mockQueryOne.mockResolvedValueOnce({ id: 'bp-1' }).mockResolvedValueOnce(userInfo)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendApproved.mockResolvedValue(undefined as any)
 
     await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
 
-    expect(mockSendApproved).toHaveBeenCalledWith(
-      'customer@example.com',
-      'Jane Doe',
-      'Acme Corp',
-    )
+    expect(mockSendApproved).toHaveBeenCalledWith('customer@example.com', 'Jane Doe', 'Acme Corp')
   })
 })
 
@@ -193,10 +179,11 @@ describe('POST business/customers approve — name/company/note fallbacks', () =
     const res = await POST(makeRequest({ action: 'reject' }), params)
     expect(res.status).toBe(200)
     // rejectionNote → null in UPDATE, name → email, company → ''
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("approval_status='rejected'"),
-      ['admin-1', null, 'user-1'],
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("approval_status='rejected'"), [
+      'admin-1',
+      null,
+      'user-1',
+    ])
     expect(mockSendRejected).toHaveBeenCalledWith('c@example.com', 'c@example.com', '', null)
   })
 
@@ -213,9 +200,7 @@ describe('POST business/customers approve — name/company/note fallbacks', () =
 
   it('reject skips email send when userInfo row is null entirely', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'bp-1' })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ id: 'bp-1' }).mockResolvedValueOnce(null)
 
     const res = await POST(makeRequest({ action: 'reject', rejectionNote: 'bad' }), params)
     expect(res.status).toBe(200)

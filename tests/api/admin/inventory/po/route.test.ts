@@ -22,8 +22,14 @@ vi.mock('@/lib/email', () => ({
 
 vi.mock('@/lib/validate', () => ({
   parseBody: vi.fn(),
-  zUuid: (() => { const { z } = require('zod'); return z.string().uuid() })(),
-  zCurrency: (() => { const { z } = require('zod'); return z.coerce.number().min(0) })(),
+  zUuid: (() => {
+    const { z } = require('zod')
+    return z.string().uuid()
+  })(),
+  zCurrency: (() => {
+    const { z } = require('zod')
+    return z.coerce.number().min(0)
+  })(),
 }))
 
 vi.mock('@/lib/search', () => ({
@@ -50,8 +56,8 @@ const mockBuildSearchClause = vi.mocked(buildSearchClause)
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inventory'] }
 
 const SUPPLIER_UUID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
-const PRODUCT_UUID  = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
-const VARIANT_UUID  = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
+const PRODUCT_UUID = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+const VARIANT_UUID = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
 
 function makeGetReq(id: string) {
   return new NextRequest(`http://localhost/api/admin/inventory/po/${id}`)
@@ -74,7 +80,9 @@ function makePostReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 // ---------------------------------------------------------------------------
 // GET /api/admin/inventory/po  (list route)
@@ -130,7 +138,7 @@ describe('GET /api/admin/inventory/po', () => {
 
   it('applies search filter via buildSearchClause', async () => {
     mockBuildSearchClause.mockReturnValue({
-      clause: "(po.po_number ILIKE $1 OR s.name ILIKE $1)",
+      clause: '(po.po_number ILIKE $1 OR s.name ILIKE $1)',
       params: ['%bolt%'],
       nextIdx: 2,
     })
@@ -192,7 +200,7 @@ describe('POST /api/admin/inventory/po', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ cnt: 0 } as any)
     // withTransaction: execute the callback with a fake client
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ id: 'po-new' }], rowCount: 1 }),
       }
@@ -243,15 +251,17 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          unit_cost: undefined,
-          line_total_incl_gst: 1180, // 1000 ex-GST + 18% = 1180
-          tax_rate: 18,
-          gst_inclusive: true,
-          quantity: 10,
-          purchase_unit_factor: 1,
-        }],
+        items: [
+          {
+            ...baseItem,
+            unit_cost: undefined,
+            line_total_incl_gst: 1180, // 1000 ex-GST + 18% = 1180
+            tax_rate: 18,
+            gst_inclusive: true,
+            quantity: 10,
+            purchase_unit_factor: 1,
+          },
+        ],
       },
     })
 
@@ -266,15 +276,17 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          unit_cost: undefined,
-          line_total_incl_gst: 1000, // already ex-GST
-          tax_rate: 18,
-          gst_inclusive: false,
-          quantity: 10,
-          purchase_unit_factor: 1,
-        }],
+        items: [
+          {
+            ...baseItem,
+            unit_cost: undefined,
+            line_total_incl_gst: 1000, // already ex-GST
+            tax_rate: 18,
+            gst_inclusive: false,
+            quantity: 10,
+            purchase_unit_factor: 1,
+          },
+        ],
       },
     })
 
@@ -286,7 +298,7 @@ describe('POST /api/admin/inventory/po', () => {
 
   it('resolves variant via product_variants when safeVariantId is provided', async () => {
     let clientQueryCallCount = 0
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           clientQueryCallCount++
@@ -315,14 +327,16 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          variant_id: VARIANT_UUID,
-          sub_variant_id: null,
-          unit_cost: 100,
-          line_total_incl_gst: null,
-          sku: null,
-        }],
+        items: [
+          {
+            ...baseItem,
+            variant_id: VARIANT_UUID,
+            sub_variant_id: null,
+            unit_cost: 100,
+            line_total_incl_gst: null,
+            sku: null,
+          },
+        ],
       },
     })
 
@@ -331,7 +345,7 @@ describe('POST /api/admin/inventory/po', () => {
   })
 
   it('nullifies variant_id when product_variants check fails (stale id)', async () => {
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('SELECT id FROM product_variants WHERE id')) {
@@ -359,14 +373,16 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          variant_id: VARIANT_UUID,
-          sub_variant_id: null,
-          unit_cost: 100,
-          line_total_incl_gst: null,
-          sku: null,
-        }],
+        items: [
+          {
+            ...baseItem,
+            variant_id: VARIANT_UUID,
+            sub_variant_id: null,
+            unit_cost: 100,
+            line_total_incl_gst: null,
+            sku: null,
+          },
+        ],
       },
     })
 
@@ -378,7 +394,7 @@ describe('POST /api/admin/inventory/po', () => {
   it('resolves sub_variant_id and pins parent variant when sub_variant check passes', async () => {
     const SUB_VARIANT_UUID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'
 
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('SELECT id FROM product_variants WHERE id')) {
@@ -406,14 +422,16 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          variant_id: null,
-          sub_variant_id: SUB_VARIANT_UUID,
-          unit_cost: 100,
-          line_total_incl_gst: null,
-          sku: null,
-        }],
+        items: [
+          {
+            ...baseItem,
+            variant_id: null,
+            sub_variant_id: SUB_VARIANT_UUID,
+            unit_cost: 100,
+            line_total_incl_gst: null,
+            sku: null,
+          },
+        ],
       },
     })
 
@@ -424,7 +442,7 @@ describe('POST /api/admin/inventory/po', () => {
   it('nullifies sub_variant_id when product_sub_variants check fails', async () => {
     const SUB_VARIANT_UUID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'
 
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('SELECT id FROM product_variants WHERE id')) {
@@ -452,14 +470,16 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          variant_id: null,
-          sub_variant_id: SUB_VARIANT_UUID,
-          unit_cost: 100,
-          line_total_incl_gst: null,
-          sku: null,
-        }],
+        items: [
+          {
+            ...baseItem,
+            variant_id: null,
+            sub_variant_id: SUB_VARIANT_UUID,
+            unit_cost: 100,
+            line_total_incl_gst: null,
+            sku: null,
+          },
+        ],
       },
     })
 
@@ -468,7 +488,7 @@ describe('POST /api/admin/inventory/po', () => {
   })
 
   it('syncs supplier price when existing price differs (update path)', async () => {
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('SELECT id FROM product_variants WHERE id')) {
@@ -497,14 +517,16 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{
-          ...baseItem,
-          variant_id: null,
-          sub_variant_id: null,
-          unit_cost: 100, // different from stored 50
-          line_total_incl_gst: null,
-          sku: null,
-        }],
+        items: [
+          {
+            ...baseItem,
+            variant_id: null,
+            sub_variant_id: null,
+            unit_cost: 100, // different from stored 50
+            line_total_incl_gst: null,
+            sku: null,
+          },
+        ],
       },
     })
 
@@ -518,10 +540,12 @@ describe('POST /api/admin/inventory/po', () => {
       ok: true,
       data: {
         supplier_id: SUPPLIER_UUID,
-        items: [{ ...baseItem, unit_cost: 100, line_total_incl_gst: null, sku: null, variant_id: null, sub_variant_id: null }],
+        items: [
+          { ...baseItem, unit_cost: 100, line_total_incl_gst: null, sku: null, variant_id: null, sub_variant_id: null },
+        ],
       },
     })
-    mockWithTransaction.mockImplementation(async (cb) => {
+    mockWithTransaction.mockImplementation(async cb => {
       const fakeClient = {
         query: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('SELECT id, unit_cost FROM product_suppliers')) return { rows: [] }

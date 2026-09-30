@@ -94,7 +94,10 @@ describe('PATCH /api/admin/brands/[id]', () => {
   it('returns parseBody validation error when schema fails', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const errorResponse = { ok: false as const, response: NextResponse.json({ error: 'Validation failed' }, { status: 400 }) }
+    const errorResponse = {
+      ok: false as const,
+      response: NextResponse.json({ error: 'Validation failed' }, { status: 400 }),
+    }
     mockParseBody.mockReturnValue(errorResponse)
 
     const res = await PATCH(makeRequest({ name: 'Nike', slug: '' }), { params: Promise.resolve({ id: 'brand-1' }) })
@@ -108,17 +111,13 @@ describe('PATCH /api/admin/brands/[id]', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryOne.mockResolvedValue(updatedBrand)
 
-    const res = await PATCH(
-      makeRequest({ name: 'Nike', slug: 'nike', is_active: true }),
-      { params: Promise.resolve({ id: 'brand-1' }) },
-    )
+    const res = await PATCH(makeRequest({ name: 'Nike', slug: 'nike', is_active: true }), {
+      params: Promise.resolve({ id: 'brand-1' }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.name).toBe('Nike')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE brands'),
-      expect.any(Array),
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE brands'), expect.any(Array))
   })
 
   it('auto-generates slug from name when slug not provided', async () => {

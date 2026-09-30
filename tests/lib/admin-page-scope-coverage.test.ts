@@ -11,14 +11,20 @@ import { getScopeForPath } from '@/lib/scopes'
  * and ecom/store-status.
  */
 const SPECIAL_CASED = new Set([
-  '/admin',        // getScopeForPath returns dashboard:read explicitly
-  '/admin/login',  // pre-auth, deliberately null
-  '/admin/team',   // owner-only: the page redirects on !isPlatformOwner, which no scope expresses
+  '/admin', // getScopeForPath returns dashboard:read explicitly
+  '/admin/login', // pre-auth, deliberately null
+  '/admin/team', // owner-only: the page redirects on !isPlatformOwner, which no scope expresses
 ])
 
 function adminPages(): string[] {
-  return glob.sync('src/app/admin/**/page.tsx', { cwd: process.cwd() })
-    .map(f => '/' + f.replace('src/app/', '').replace(/\/page\.tsx$/, '').replace(/\/\([^)]*\)/g, ''))
+  return glob.sync('src/app/admin/**/page.tsx', { cwd: process.cwd() }).map(
+    f =>
+      '/' +
+      f
+        .replace('src/app/', '')
+        .replace(/\/page\.tsx$/, '')
+        .replace(/\/\([^)]*\)/g, '')
+  )
 }
 
 describe('every admin page resolves to a scope middleware can enforce', () => {

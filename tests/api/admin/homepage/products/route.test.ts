@@ -30,7 +30,10 @@ describe('GET /api/admin/homepage/products', () => {
   })
 
   it('resolves saved picks in the saved order', async () => {
-    vi.mocked(queryMany).mockResolvedValue([{ id: A, name: 'A' }, { id: B, name: 'B' }] as any)
+    vi.mocked(queryMany).mockResolvedValue([
+      { id: A, name: 'A' },
+      { id: B, name: 'B' },
+    ] as any)
     const body = await (await GET(req(`ids=${B},${A}`))).json()
     expect(body.products.map((p: { id: string }) => p.id)).toEqual([B, A])
   })

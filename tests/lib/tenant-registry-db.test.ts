@@ -35,7 +35,7 @@ vi.mock('fs', () => {
 function queueRows(...results: Array<{ rows?: any[]; rowCount?: number }>) {
   poolQuery.mockReset()
   for (const r of results) {
-    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? (r.rows?.length ?? 0) })
+    poolQuery.mockResolvedValueOnce({ rows: r.rows ?? [], rowCount: r.rowCount ?? r.rows?.length ?? 0 })
   }
   poolQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 }
@@ -100,7 +100,8 @@ describe('tenant-registry (database layer)', () => {
       const { controlPlanePool } = await importRegistry()
       controlPlanePool()
       expect(capturedConfigs[0].connectionString).toContain('/jeffi_control_plane')
-      if (saved) process.env.DATABASE_URL = saved; else delete process.env.DATABASE_URL
+      if (saved) process.env.DATABASE_URL = saved
+      else delete process.env.DATABASE_URL
     })
 
     it('builds an IAM-auth config when CONTROL_PLANE_IAM_AUTH=true', async () => {
@@ -146,14 +147,18 @@ describe('tenant-registry (database layer)', () => {
   describe('addCustomDomain validation', () => {
     it('rejects a malformed domain before touching the database', async () => {
       const mod = await importRegistry()
-      await expect(mod.addCustomDomain('t-1', 'not a domain'))
-        .resolves.toEqual({ ok: false, error: 'Invalid domain format' })
+      await expect(mod.addCustomDomain('t-1', 'not a domain')).resolves.toEqual({
+        ok: false,
+        error: 'Invalid domain format',
+      })
     })
 
     it('rejects a jeffistores.in subdomain', async () => {
       const mod = await importRegistry()
-      await expect(mod.addCustomDomain('t-1', 'acme.jeffistores.in'))
-        .resolves.toEqual({ ok: false, error: 'Cannot use a jeffistores.in subdomain as a custom domain' })
+      await expect(mod.addCustomDomain('t-1', 'acme.jeffistores.in')).resolves.toEqual({
+        ok: false,
+        error: 'Cannot use a jeffistores.in subdomain as a custom domain',
+      })
     })
 
     it('strips scheme and path before validating', async () => {
@@ -166,8 +171,10 @@ describe('tenant-registry (database layer)', () => {
     it('refuses when the plan allows no custom domains', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ max: 0, used: 0 }] })
-      await expect(mod.addCustomDomain('t-1', 'shop.acme.com'))
-        .resolves.toEqual({ ok: false, error: 'Custom domains are available on Pro plan and above' })
+      await expect(mod.addCustomDomain('t-1', 'shop.acme.com')).resolves.toEqual({
+        ok: false,
+        error: 'Custom domains are available on Pro plan and above',
+      })
     })
 
     it('refuses once the plan quota is used up', async () => {
@@ -181,13 +188,19 @@ describe('tenant-registry (database layer)', () => {
     it('refuses a domain that is already registered', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ max: 5, used: 1 }] }, { rows: [{ exists: 1 }] })
-      await expect(mod.addCustomDomain('t-1', 'shop.acme.com'))
-        .resolves.toEqual({ ok: false, error: 'This domain is already registered' })
+      await expect(mod.addCustomDomain('t-1', 'shop.acme.com')).resolves.toEqual({
+        ok: false,
+        error: 'This domain is already registered',
+      })
     })
 
     it('inserts with a verification token on success', async () => {
       const mod = await importRegistry()
-      queueRows({ rows: [{ max: 5, used: 0 }] }, { rows: [] }, { rows: [{ id: 'd-1', domain: 'shop.acme.com', status: 'pending' }] })
+      queueRows(
+        { rows: [{ max: 5, used: 0 }] },
+        { rows: [] },
+        { rows: [{ id: 'd-1', domain: 'shop.acme.com', status: 'pending' }] }
+      )
       const out: any = await mod.addCustomDomain('t-1', 'shop.acme.com')
       expect(out.ok).toBe(true)
       const insertArgs = poolQuery.mock.calls[2][1]
@@ -392,4 +405,3 @@ describe('tenant-registry (database layer)', () => {
     })
   })
 })
-

@@ -19,7 +19,9 @@ vi.mock('@smithy/signature-v4', () => ({
   }),
 }))
 vi.mock('@smithy/protocol-http', () => ({
-  HttpRequest: vi.fn().mockImplementation(function (this: any, opts: any) { Object.assign(this, opts) }),
+  HttpRequest: vi.fn().mockImplementation(function (this: any, opts: any) {
+    Object.assign(this, opts)
+  }),
 }))
 vi.mock('@aws-sdk/credential-provider-node', () => ({ defaultProvider: vi.fn(() => vi.fn()) }))
 vi.mock('@aws-crypto/sha256-js', () => ({ Sha256: vi.fn() }))
@@ -44,7 +46,10 @@ describe('ec2-client', () => {
     vi.clearAllMocks()
     vi.useRealTimers()
     // Speed up the poll loop's setTimeout so tests don't wait 8s.
-    vi.stubGlobal('setTimeout', ((fn: any) => { fn(); return 0 as any }) as any)
+    vi.stubGlobal('setTimeout', ((fn: any) => {
+      fn()
+      return 0 as any
+    }) as any)
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -71,7 +76,7 @@ describe('ec2-client', () => {
       await describeInstance('i-abc')
       expect(fetchMock).toHaveBeenCalledWith(
         'https://ec2.us-east-1.amazonaws.com/',
-        expect.objectContaining({ method: 'POST' }),
+        expect.objectContaining({ method: 'POST' })
       )
       const [, init] = fetchMock.mock.calls[0]
       expect(init.headers.authorization).toBe('AWS4-signed')
@@ -128,7 +133,8 @@ describe('ec2-client', () => {
   // ── waitForState — the poll loop ───────────────────────────────────────────
   describe('waitForState', () => {
     it('returns once the instance reaches the wanted state', async () => {
-      const fetchMock = vi.fn()
+      const fetchMock = vi
+        .fn()
         .mockResolvedValueOnce(res(200, describeXml({ state: 'pending' })))
         .mockResolvedValueOnce(res(200, describeXml({ state: 'pending' })))
         .mockResolvedValueOnce(res(200, describeXml({ state: 'running' })))
@@ -150,7 +156,9 @@ describe('ec2-client', () => {
   describe('runInstance', () => {
     it('throws when TENANT_APP_AMI_ID is not set (no billable launch)', async () => {
       const { runInstance } = await import('@/lib/ec2-client')
-      await expect(runInstance({ instanceType: 't4g.small', name: 'x' })).rejects.toThrow(/TENANT_APP_AMI_ID is not set/)
+      await expect(runInstance({ instanceType: 't4g.small', name: 'x' })).rejects.toThrow(
+        /TENANT_APP_AMI_ID is not set/
+      )
     })
 
     it('returns the parsed instanceId and includes only the configured optional params', async () => {
@@ -159,7 +167,9 @@ describe('ec2-client', () => {
       process.env.TENANT_APP_SUBNET_ID = 'subnet-1'
       process.env.TENANT_APP_IAM_PROFILE = 'role-1'
       process.env.TENANT_APP_KEY_NAME = 'key-1'
-      const fetchMock = vi.fn().mockResolvedValue(res(200, '<RunInstancesResponse><instanceId>i-new</instanceId></RunInstancesResponse>'))
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(res(200, '<RunInstancesResponse><instanceId>i-new</instanceId></RunInstancesResponse>'))
       vi.stubGlobal('fetch', fetchMock)
       const { runInstance } = await import('@/lib/ec2-client')
       const out = await runInstance({ instanceType: 't4g.small', name: 'jeffi-tenant-acme', userData: 'echo hi' })

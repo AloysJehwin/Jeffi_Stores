@@ -220,9 +220,7 @@ describe('getBotPayload — payment / invoice', () => {
   })
 
   it('payment with order number in history → skips prompt', () => {
-    const history: HistoryMessage[] = [
-      { sender: 'user', message: 'I need details for ORD-001' },
-    ]
+    const history: HistoryMessage[] = [{ sender: 'user', message: 'I need details for ORD-001' }]
     const p = getBotPayload('paid status', TWO_ORDERS, history)
     expect(p.type).toBe('order_detail')
   })
@@ -575,9 +573,7 @@ describe('getBotPayload — fallback', () => {
 
 describe('getBotPayload — history context', () => {
   it('uses history to resolve order when processing a cancel request', () => {
-    const history: HistoryMessage[] = [
-      { sender: 'user', message: 'I want to cancel ORD-002' },
-    ]
+    const history: HistoryMessage[] = [{ sender: 'user', message: 'I want to cancel ORD-002' }]
     // "cancel" branch: no selectedOrder in message, but history resolves ORD-002
     // contextOrder = extractOrderFromHistory → ORD-002
     // Since no specific order in message, falls to "filter cancellable" path
@@ -591,9 +587,7 @@ describe('getBotPayload — history context', () => {
   })
 
   it('message-level order wins over history order', () => {
-    const history: HistoryMessage[] = [
-      { sender: 'user', message: 'ORD-002 is late' },
-    ]
+    const history: HistoryMessage[] = [{ sender: 'user', message: 'ORD-002 is late' }]
     // Message names ORD-001 explicitly → selectedOrder = ORD-001 wins
     const p = getBotPayload('track order #ORD-001', TWO_ORDERS, history)
     expect(p.type).toBe('order_detail')
@@ -603,9 +597,7 @@ describe('getBotPayload — history context', () => {
   })
 
   it('history context resolves order for payment branch with multiple orders', () => {
-    const history: HistoryMessage[] = [
-      { sender: 'user', message: 'I need invoice for ORD-002' },
-    ]
+    const history: HistoryMessage[] = [{ sender: 'user', message: 'I need invoice for ORD-002' }]
     // "payment" branch: no selected, multiple orders, but history has ORD-002
     // → skips the order-list prompt and shows order_detail
     const p = getBotPayload('show invoice', TWO_ORDERS, history)

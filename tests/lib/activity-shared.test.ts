@@ -15,7 +15,8 @@ describe('categoryFor', () => {
   it('returns orders for product_viewed', () => expect(categoryFor('product_viewed')).toBe('orders'))
 
   it('returns support for support_message', () => expect(categoryFor('support_message')).toBe('support'))
-  it('returns support for support_session_started', () => expect(categoryFor('support_session_started')).toBe('support'))
+  it('returns support for support_session_started', () =>
+    expect(categoryFor('support_session_started')).toBe('support'))
 
   it('returns account for address_added', () => expect(categoryFor('address_added')).toBe('account'))
   it('returns account for profile_updated', () => expect(categoryFor('profile_updated')).toBe('account'))

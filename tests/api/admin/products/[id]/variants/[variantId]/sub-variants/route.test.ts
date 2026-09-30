@@ -23,10 +23,7 @@ vi.mock('@/lib/validate', () => {
       if (result.success) return { ok: true, data: result.data }
       return {
         ok: false,
-        response: Response.json(
-          { error: result.error.issues[0]?.message ?? 'Validation error' },
-          { status: 400 }
-        ),
+        response: Response.json({ error: result.error.issues[0]?.message ?? 'Validation error' }, { status: 400 }),
       }
     },
   }
@@ -48,8 +45,8 @@ const mockQueryMany = vi.mocked(queryMany)
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const PROD_ID = '6b19a420-b19c-4d7c-8b22-93bcbc2fc2cd'
-const VAR_ID  = 'b49444be-0c82-4710-a891-49eb8c3166bf'
-const SV_ID   = 'be35ce54-870f-4167-9e05-c7c3c863ac9d'
+const VAR_ID = 'b49444be-0c82-4710-a891-49eb8c3166bf'
+const SV_ID = 'be35ce54-870f-4167-9e05-c7c3c863ac9d'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['products'] }
 const PARAMS = { params: Promise.resolve({ id: PROD_ID, variantId: VAR_ID }) }
@@ -133,7 +130,6 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
     expect(res.status).toBe(403)
   })
 
-
   it('returns 404 when variant not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
     const res = await POST(makeReq('POST', { sub_variant_name: 'Red' }), PARAMS)
@@ -160,9 +156,9 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
 
   it('creates sub-variant successfully', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any)   // variant check
-      .mockResolvedValueOnce({ sku: 'PRD' } as any)                  // product sku
-      .mockResolvedValueOnce(sampleSubVariant as any)                 // insert returning
+      .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any) // variant check
+      .mockResolvedValueOnce({ sku: 'PRD' } as any) // product sku
+      .mockResolvedValueOnce(sampleSubVariant as any) // insert returning
     const res = await POST(
       makeReq('POST', { sub_variant_name: 'Red', price: 100, mrp: 120, stock_status: 'In Stock' }),
       PARAMS
@@ -177,10 +173,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
       .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any)
       .mockResolvedValueOnce({ sku: 'PRD' } as any)
       .mockResolvedValueOnce({ ...sampleSubVariant, sku: 'CUSTOM-SKU' } as any)
-    const res = await POST(
-      makeReq('POST', { sub_variant_name: 'Red', sku: 'CUSTOM-SKU' }),
-      PARAMS
-    )
+    const res = await POST(makeReq('POST', { sub_variant_name: 'Red', sku: 'CUSTOM-SKU' }), PARAMS)
     expect(res.status).toBe(201)
   })
 })
@@ -204,24 +197,18 @@ describe('PUT /api/admin/products/[id]/variants/[variantId]/sub-variants', () =>
     // sub_variant_name present → sku gen attempted, variant lookup returns null
     // then update returning also returns null → 404
     mockQueryOne
-      .mockResolvedValueOnce({ sku: 'PRD' } as any)  // variant sku found
-      .mockResolvedValueOnce(null)                    // update returning → not found
-    const res = await PUT(
-      makeReq('PUT', { id: SV_ID, sub_variant_name: 'Blue' }),
-      PARAMS
-    )
+      .mockResolvedValueOnce({ sku: 'PRD' } as any) // variant sku found
+      .mockResolvedValueOnce(null) // update returning → not found
+    const res = await PUT(makeReq('PUT', { id: SV_ID, sub_variant_name: 'Blue' }), PARAMS)
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Not found')
   })
 
   it('updates sub-variant successfully', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ sku: 'PRD' } as any)        // variant sku
-      .mockResolvedValueOnce(sampleSubVariant as any)       // update returning
-    const res = await PUT(
-      makeReq('PUT', { id: SV_ID, sub_variant_name: 'Red', price: 110 }),
-      PARAMS
-    )
+      .mockResolvedValueOnce({ sku: 'PRD' } as any) // variant sku
+      .mockResolvedValueOnce(sampleSubVariant as any) // update returning
+    const res = await PUT(makeReq('PUT', { id: SV_ID, sub_variant_name: 'Red', price: 110 }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.sub_variant).toBeDefined()
@@ -230,10 +217,7 @@ describe('PUT /api/admin/products/[id]/variants/[variantId]/sub-variants', () =>
   it('updates is_active flag', async () => {
     // no sub_variant_name → sku gen skipped → only one queryOne for update
     mockQueryOne.mockResolvedValueOnce(sampleSubVariant as any)
-    const res = await PUT(
-      makeReq('PUT', { id: SV_ID, is_active: false }),
-      PARAMS
-    )
+    const res = await PUT(makeReq('PUT', { id: SV_ID, is_active: false }), PARAMS)
     expect(res.status).toBe(200)
   })
 

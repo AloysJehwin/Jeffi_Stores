@@ -52,12 +52,24 @@ describe('GET /api/admin/gst/gstr1 — CSV + HSN branch coverage', () => {
         irn_ack_no: 'ACK-999',
         irn_ack_dt: '2024-05-10',
         items: [
-          { product_name: 'Widget', hsn_code: '8481', gst_rate: 18, quantity: 5, taxable_amount: '2000', cgst_amount: '0', sgst_amount: '0', igst_amount: '360', total_price: '2360' },
+          {
+            product_name: 'Widget',
+            hsn_code: '8481',
+            gst_rate: 18,
+            quantity: 5,
+            taxable_amount: '2000',
+            cgst_amount: '0',
+            sgst_amount: '0',
+            igst_amount: '360',
+            total_price: '2360',
+          },
         ],
       },
     ] as any)
 
-    const res = await GSTR1_GET(makeReq('http://localhost/api/admin/gst/gstr1?from=2024-05-01&to=2024-05-31&format=csv'))
+    const res = await GSTR1_GET(
+      makeReq('http://localhost/api/admin/gst/gstr1?from=2024-05-01&to=2024-05-31&format=csv')
+    )
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toContain('text/csv')
     const csv = await res.text()
@@ -95,7 +107,9 @@ describe('GET /api/admin/gst/gstr1 — CSV + HSN branch coverage', () => {
       },
     ] as any)
 
-    const res = await GSTR1_GET(makeReq('http://localhost/api/admin/gst/gstr1?from=2024-05-01&to=2024-05-31&format=csv'))
+    const res = await GSTR1_GET(
+      makeReq('http://localhost/api/admin/gst/gstr1?from=2024-05-01&to=2024-05-31&format=csv')
+    )
     expect(res.status).toBe(200)
     const csv = await res.text()
     expect(csv).toContain('INV-CSV-2')
@@ -124,7 +138,17 @@ describe('GET /api/admin/gst/gstr1 — CSV + HSN branch coverage', () => {
         irn_ack_dt: null,
         items: [
           // hsn_code / gst_rate absent → COALESCE-equivalent fallbacks in code path
-          { product_name: 'Unclassified', hsn_code: null, gst_rate: null, quantity: 1, taxable_amount: '1000', cgst_amount: '90', sgst_amount: '90', igst_amount: '0', total_price: '1180' },
+          {
+            product_name: 'Unclassified',
+            hsn_code: null,
+            gst_rate: null,
+            quantity: 1,
+            taxable_amount: '1000',
+            cgst_amount: '90',
+            sgst_amount: '90',
+            igst_amount: '0',
+            total_price: '1180',
+          },
         ],
       },
     ] as any)
@@ -160,8 +184,28 @@ describe('GET /api/admin/gst/gstr1 — CSV + HSN branch coverage', () => {
         irn_ack_no: null,
         irn_ack_dt: null,
         items: [
-          { product_name: 'A', hsn_code: '7318', gst_rate: 18, quantity: 1, taxable_amount: '100', cgst_amount: '9', sgst_amount: '9', igst_amount: '0', total_price: '118' },
-          { product_name: 'B', hsn_code: '7318', gst_rate: 18, quantity: 1, taxable_amount: '200', cgst_amount: '18', sgst_amount: '18', igst_amount: '0', total_price: '236' },
+          {
+            product_name: 'A',
+            hsn_code: '7318',
+            gst_rate: 18,
+            quantity: 1,
+            taxable_amount: '100',
+            cgst_amount: '9',
+            sgst_amount: '9',
+            igst_amount: '0',
+            total_price: '118',
+          },
+          {
+            product_name: 'B',
+            hsn_code: '7318',
+            gst_rate: 18,
+            quantity: 1,
+            taxable_amount: '200',
+            cgst_amount: '18',
+            sgst_amount: '18',
+            igst_amount: '0',
+            total_price: '236',
+          },
         ],
       },
     ] as any)
@@ -192,7 +236,11 @@ describe('GET /api/admin/gst/gstr3b — table 3.2 inter-state filter', () => {
 
   it('populates table32 for inter-state supplies to unregistered persons', async () => {
     mockQueryOne.mockResolvedValue({
-      total_taxable: '5000', total_cgst: '0', total_sgst: '0', total_igst: '900', invoice_count: 2,
+      total_taxable: '5000',
+      total_cgst: '0',
+      total_sgst: '0',
+      total_igst: '900',
+      invoice_count: 2,
     } as any)
     // byRate rows, then site_settings rows
     mockQueryMany
@@ -200,7 +248,15 @@ describe('GET /api/admin/gst/gstr3b — table 3.2 inter-state filter', () => {
         // is_igst true + no buyer_gstin → included in table32 (line 84 truthy branch)
         { gst_rate: '18', is_igst: true, buyer_gstin: null, taxable: '5000', cgst: '0', sgst: '0', igst: '900' },
         // is_igst true but has buyer_gstin → excluded
-        { gst_rate: '12', is_igst: true, buyer_gstin: '27AAAAA0000A1Z5', taxable: '1000', cgst: '0', sgst: '0', igst: '120' },
+        {
+          gst_rate: '12',
+          is_igst: true,
+          buyer_gstin: '27AAAAA0000A1Z5',
+          taxable: '1000',
+          cgst: '0',
+          sgst: '0',
+          igst: '120',
+        },
         // intra-state → excluded
         { gst_rate: '18', is_igst: false, buyer_gstin: null, taxable: '2000', cgst: '180', sgst: '180', igst: '0' },
       ] as any)
@@ -220,7 +276,11 @@ describe('GET /api/admin/gst/gstr3b — table 3.2 inter-state filter', () => {
 
   it('emits CSV including the by-rate breakup section', async () => {
     mockQueryOne.mockResolvedValue({
-      total_taxable: '5000', total_cgst: '0', total_sgst: '0', total_igst: '900', invoice_count: 1,
+      total_taxable: '5000',
+      total_cgst: '0',
+      total_sgst: '0',
+      total_igst: '900',
+      invoice_count: 1,
     } as any)
     mockQueryMany
       .mockResolvedValueOnce([
@@ -228,7 +288,9 @@ describe('GET /api/admin/gst/gstr3b — table 3.2 inter-state filter', () => {
       ] as any)
       .mockResolvedValueOnce([] as any) // no site_settings → empty gstin/legalName branch
 
-    const res = await GSTR3B_GET(makeReq('http://localhost/api/admin/gst/gstr3b?from=2024-05-01&to=2024-05-31&format=csv'))
+    const res = await GSTR3B_GET(
+      makeReq('http://localhost/api/admin/gst/gstr3b?from=2024-05-01&to=2024-05-31&format=csv')
+    )
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toContain('text/csv')
     const csv = await res.text()

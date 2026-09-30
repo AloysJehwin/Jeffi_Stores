@@ -7,8 +7,9 @@ const LAYOUT = path.join(process.cwd(), 'src/app/admin/layout.tsx')
 
 function navLinks(): { href: string; scope: string }[] {
   const src = fs.readFileSync(LAYOUT, 'utf8')
-  return [...src.matchAll(/\{ href: '(\/admin\/[^']*)', label: '[^']*', scope: '([a-z0-9_]+:(?:read|write))'/g)]
-    .map(m => ({ href: m[1], scope: m[2] }))
+  return [...src.matchAll(/\{ href: '(\/admin\/[^']*)', label: '[^']*', scope: '([a-z0-9_]+:(?:read|write))'/g)].map(
+    m => ({ href: m[1], scope: m[2] })
+  )
 }
 
 /**
@@ -24,9 +25,13 @@ describe('a nav link is gated on the same scope as the page it points at', () =>
   it('never gates a link on a different scope than its own route', () => {
     const mismatched = navLinks()
       .map(l => ({ ...l, pageScope: getScopeForPath(l.href) }))
-      .filter(l => l.pageScope && l.pageScope !== l.scope
-        // A write-scoped link over a read-scoped page is a deliberate tightening.
-        && l.scope !== l.pageScope.replace(':read', ':write'))
+      .filter(
+        l =>
+          l.pageScope &&
+          l.pageScope !== l.scope &&
+          // A write-scoped link over a read-scoped page is a deliberate tightening.
+          l.scope !== l.pageScope.replace(':read', ':write')
+      )
     expect(mismatched).toEqual([])
   })
 

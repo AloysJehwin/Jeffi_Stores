@@ -73,7 +73,7 @@ describe('signIntent + verifyIntent (buyNow)', () => {
       variantId: null,
       subVariantId: null,
       qty: 2,
-      buyMode: '',   // falsy → should fall back to 'unit'
+      buyMode: '', // falsy → should fall back to 'unit'
       buyUnit: null,
     }
     const token = await signIntent(payload)
@@ -99,11 +99,7 @@ describe('verifyIntent edge cases', () => {
     // We cannot easily produce a JWT with a non-string userId via signIntent,
     // so construct the token manually with jose
     const { SignJWT } = await import('jose')
-    const SECRET = new TextEncoder().encode(
-      process.env.CHECKOUT_INTENT_SECRET ||
-      process.env.JWT_SECRET ||
-      'fallback'
-    )
+    const SECRET = new TextEncoder().encode(process.env.CHECKOUT_INTENT_SECRET || process.env.JWT_SECRET || 'fallback')
     const token = await new SignJWT({ mode: 'cart', userId: 12345 })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -116,11 +112,7 @@ describe('verifyIntent edge cases', () => {
 
   it('returns null for buyNow mode when productId is not a string', async () => {
     const { SignJWT } = await import('jose')
-    const SECRET = new TextEncoder().encode(
-      process.env.CHECKOUT_INTENT_SECRET ||
-      process.env.JWT_SECRET ||
-      'fallback'
-    )
+    const SECRET = new TextEncoder().encode(process.env.CHECKOUT_INTENT_SECRET || process.env.JWT_SECRET || 'fallback')
     const token = await new SignJWT({ mode: 'buyNow', productId: 9999, qty: 1, buyMode: 'unit' })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -133,11 +125,7 @@ describe('verifyIntent edge cases', () => {
 
   it('buyNow: variantId falls back to null when absent', async () => {
     const { SignJWT } = await import('jose')
-    const SECRET = new TextEncoder().encode(
-      process.env.CHECKOUT_INTENT_SECRET ||
-      process.env.JWT_SECRET ||
-      'fallback'
-    )
+    const SECRET = new TextEncoder().encode(process.env.CHECKOUT_INTENT_SECRET || process.env.JWT_SECRET || 'fallback')
     // No variantId or subVariantId in payload
     const token = await new SignJWT({ mode: 'buyNow', productId: 'prod-x', qty: 1, buyMode: 'unit' })
       .setProtectedHeader({ alg: 'HS256' })

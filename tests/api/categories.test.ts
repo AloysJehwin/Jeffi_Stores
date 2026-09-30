@@ -118,8 +118,8 @@ describe('DELETE /api/categories/[id]', () => {
 
   it('deletes category with no products or sub-categories', async () => {
     queryCountMock
-      .mockResolvedValueOnce(0)  // products count
-      .mockResolvedValueOnce(0)  // sub-categories count
+      .mockResolvedValueOnce(0) // products count
+      .mockResolvedValueOnce(0) // sub-categories count
     queryMock.mockResolvedValue({ rows: [], rowCount: 1 })
 
     const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-2' }) })
@@ -142,8 +142,8 @@ describe('DELETE /api/categories/[id]', () => {
 
   it('returns 400 when category has sub-categories', async () => {
     queryCountMock
-      .mockResolvedValueOnce(0)  // products = 0
-      .mockResolvedValueOnce(2)  // sub-categories = 2
+      .mockResolvedValueOnce(0) // products = 0
+      .mockResolvedValueOnce(2) // sub-categories = 2
 
     const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(400)

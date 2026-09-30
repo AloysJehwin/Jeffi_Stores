@@ -123,9 +123,9 @@ describe('POST /api/support/sessions', () => {
     const newSession = { id: 'sess-new', status: 'open', created_at: new Date().toISOString() }
     // Call sequence: existing check → null, insert → session, user lookup → user, admin emails → []
     mockQueryOne
-      .mockResolvedValueOnce(null)         // no existing
-      .mockResolvedValueOnce(newSession)   // inserted session
-      .mockResolvedValueOnce(DB_USER)      // user lookup
+      .mockResolvedValueOnce(null) // no existing
+      .mockResolvedValueOnce(newSession) // inserted session
+      .mockResolvedValueOnce(DB_USER) // user lookup
     mockQueryMany.mockResolvedValue([{ email: 'admin@example.com' }])
     const res = await POST(makePost() as any)
     expect(res.status).toBe(200)
@@ -137,10 +137,7 @@ describe('POST /api/support/sessions', () => {
   it('creates session with productId (optional uuid field)', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     const newSession = { id: 'sess-2', status: 'open', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(newSession)
-      .mockResolvedValueOnce(DB_USER)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(newSession).mockResolvedValueOnce(DB_USER)
     mockQueryMany.mockResolvedValue([])
     const res = await POST(makePost({ productId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' }) as any)
     expect(res.status).toBe(200)
@@ -157,10 +154,7 @@ describe('POST /api/support/sessions', () => {
   it('handles case where user lookup returns null (skips email)', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     const newSession = { id: 'sess-3', status: 'open', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(newSession)
-      .mockResolvedValueOnce(null)         // user not found
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(newSession).mockResolvedValueOnce(null) // user not found
     const res = await POST(makePost() as any)
     expect(res.status).toBe(200)
     expect(mockSendSupportEscalationEmail).not.toHaveBeenCalled()
@@ -170,10 +164,7 @@ describe('POST /api/support/sessions', () => {
     process.env.ADMIN_EMAIL = 'fallback@admin.com'
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     const newSession = { id: 'sess-4', status: 'open', created_at: new Date().toISOString() }
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(newSession)
-      .mockResolvedValueOnce(DB_USER)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(newSession).mockResolvedValueOnce(DB_USER)
     mockQueryMany.mockResolvedValue([]) // no admin emails from DB
     const res = await POST(makePost() as any)
     expect(res.status).toBe(200)

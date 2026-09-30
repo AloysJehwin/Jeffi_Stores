@@ -26,7 +26,9 @@ function makeReq(id: string) {
   return new NextRequest(`http://localhost/api/admin/business/customers/${id}`)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/business/customers/[id]', () => {
   it('returns 401 when requireAdminScope returns NextResponse', async () => {

@@ -9,11 +9,7 @@ vi.mock('@/lib/amazon/client', () => ({
   searchListingsItems: vi.fn(),
 }))
 
-import {
-  refreshAmazonStatusSnapshot,
-  getAmazonSummary,
-  getAmazonStatusPage,
-} from '@/lib/amazon/status'
+import { refreshAmazonStatusSnapshot, getAmazonSummary, getAmazonStatusPage } from '@/lib/amazon/status'
 import * as db from '@/lib/db'
 import * as client from '@/lib/amazon/client'
 
@@ -49,7 +45,11 @@ describe('amazon/status', () => {
           // approved: BUYABLE, no error/warning
           { sku: 'A1', summaries: [{ itemName: 'Item A', asin: 'B0A', status: ['BUYABLE'] }], issues: [] },
           // disapproved: ERROR issue
-          { sku: 'A2', summaries: [{ itemName: 'Item B', asin: 'B0B', status: ['DISCOVERABLE'] }], issues: [{ severity: 'ERROR', code: 'E', message: 'm' }] },
+          {
+            sku: 'A2',
+            summaries: [{ itemName: 'Item B', asin: 'B0B', status: ['DISCOVERABLE'] }],
+            issues: [{ severity: 'ERROR', code: 'E', message: 'm' }],
+          },
           // pending: WARNING issue
           { sku: 'A3', summaries: [{ status: 'DISCOVERABLE' }], issues: [{ severity: 'WARNING' }] },
           // item without sku skipped
@@ -74,8 +74,14 @@ describe('amazon/status', () => {
         .mockResolvedValueOnce({ last_refreshed_at: 'now', total: 2, approved: 2, pending: 0, disapproved: 0 })
 
       mockSearch
-        .mockResolvedValueOnce({ items: [{ sku: 'P1', summaries: [{ status: ['BUYABLE'] }], issues: [] }], pagination: { nextToken: 'tok2' } } as any)
-        .mockResolvedValueOnce({ items: [{ sku: 'P2', summaries: [{ status: ['BUYABLE'] }], issues: [] }], pagination: {} } as any)
+        .mockResolvedValueOnce({
+          items: [{ sku: 'P1', summaries: [{ status: ['BUYABLE'] }], issues: [] }],
+          pagination: { nextToken: 'tok2' },
+        } as any)
+        .mockResolvedValueOnce({
+          items: [{ sku: 'P2', summaries: [{ status: ['BUYABLE'] }], issues: [] }],
+          pagination: {},
+        } as any)
 
       await refreshAmazonStatusSnapshot()
       expect(mockSearch).toHaveBeenCalledTimes(2)
@@ -113,7 +119,10 @@ describe('amazon/status', () => {
         .mockResolvedValueOnce({ acquired: true })
         .mockResolvedValueOnce(null) // counts null -> ?? 0 branches
         .mockResolvedValueOnce({ last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 })
-      mockSearch.mockResolvedValueOnce({ items: [{ sku: 'X', summaries: [{ status: ['BUYABLE'] }], issues: [] }], pagination: {} } as any)
+      mockSearch.mockResolvedValueOnce({
+        items: [{ sku: 'X', summaries: [{ status: ['BUYABLE'] }], issues: [] }],
+        pagination: {},
+      } as any)
 
       const r = await refreshAmazonStatusSnapshot()
       expect(r).toBeDefined()

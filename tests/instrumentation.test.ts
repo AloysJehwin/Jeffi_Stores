@@ -79,9 +79,7 @@ describe('register', () => {
     await vi.advanceTimersByTimeAsync(31_000)
     // At least one fetch should use the NEXT_PUBLIC_APP_URL base
     const calls = vi.mocked(global.fetch).mock.calls
-    const hasPubUrl = calls.some(([url]) =>
-      typeof url === 'string' && url.startsWith('http://app.example.com')
-    )
+    const hasPubUrl = calls.some(([url]) => typeof url === 'string' && url.startsWith('http://app.example.com'))
     expect(hasPubUrl).toBe(true)
   })
 
@@ -120,9 +118,7 @@ describe('register', () => {
     // Advance past the 30s initial delay for delhivery_sync
     await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
-    const delhiveryCall = calls.find(([url]) =>
-      typeof url === 'string' && url.includes('delhivery/sync-statuses')
-    )
+    const delhiveryCall = calls.find(([url]) => typeof url === 'string' && url.includes('delhivery/sync-statuses'))
     expect(delhiveryCall).toBeDefined()
   })
 
@@ -140,9 +136,7 @@ describe('register', () => {
 
     await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
-    const cronCall = calls.find(([url]) =>
-      typeof url === 'string' && url.includes('localhost:3000/api')
-    )
+    const cronCall = calls.find(([url]) => typeof url === 'string' && url.includes('localhost:3000/api'))
     expect(cronCall).toBeDefined()
     const opts = cronCall![1] as RequestInit
     expect((opts.headers as Record<string, string>)['Authorization']).toBe('Bearer my-secret')
@@ -163,9 +157,7 @@ describe('register', () => {
 
     const calls = vi.mocked(global.fetch).mock.calls
     // Second call should be the recordRun call
-    const recordCall = calls.find(([url]) =>
-      typeof url === 'string' && url.includes('cron-record')
-    )
+    const recordCall = calls.find(([url]) => typeof url === 'string' && url.includes('cron-record'))
     if (recordCall) {
       const body = JSON.parse((recordCall[1] as RequestInit).body as string)
       expect(body.ok).toBe(false)
@@ -192,9 +184,7 @@ describe('register', () => {
 
     await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
-    const recordCall = calls.find(([url]) =>
-      typeof url === 'string' && url.includes('cron-record')
-    )
+    const recordCall = calls.find(([url]) => typeof url === 'string' && url.includes('cron-record'))
     if (recordCall) {
       const body = JSON.parse((recordCall[1] as RequestInit).body as string)
       expect(body.ok).toBe(false)

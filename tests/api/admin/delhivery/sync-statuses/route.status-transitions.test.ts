@@ -33,9 +33,7 @@ const mockCreateAutoTask = vi.mocked(createAutoTask)
 const mockCompleteAutoTask = vi.mocked(completeAutoTask)
 
 function makeReq(overrides: { auth?: string } = {}) {
-  const auth = overrides.auth !== undefined
-    ? overrides.auth
-    : `Bearer ${process.env.CRON_SECRET}`
+  const auth = overrides.auth !== undefined ? overrides.auth : `Bearer ${process.env.CRON_SECRET}`
   return new NextRequest('http://localhost/api/admin/delhivery/sync-statuses', {
     method: 'POST',
     headers: auth ? { authorization: auth } : {},
@@ -54,19 +52,21 @@ const sampleOrder = {
 
 function makeShipmentResponse(awb: string, statusType: string, statusLabel = 'In Transit') {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: awb,
-        Status: {
-          StatusType: statusType,
-          Status: statusLabel,
-          StatusDateTime: '2024-01-15T10:00:00',
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: awb,
+          Status: {
+            StatusType: statusType,
+            Status: statusLabel,
+            StatusDateTime: '2024-01-15T10:00:00',
+          },
+          Scans: [],
+          DestRecieveDate: null,
+          ReturnedDate: null,
         },
-        Scans: [],
-        DestRecieveDate: null,
-        ReturnedDate: null,
       },
-    }],
+    ],
   }
 }
 
@@ -119,10 +119,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   // ── Successful sync ──────────────────────────────────────────────────────
 
   it('syncs shipped → out_for_delivery status (OD)', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'OD', 'Out for Delivery'),
@@ -134,18 +133,14 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     const body = await res.json()
     expect(body.synced).toBe(1)
     expect(body.results[0].syncedTo).toBe('out_for_delivery')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE orders'),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE orders'), expect.any(Array))
   })
 
   it('syncs to delivered status (DL)', async () => {
     const order = { ...sampleOrder, status: 'out_for_delivery' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'DL', 'Delivered'),
@@ -159,10 +154,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
 
   it('syncs processing → shipped status (PU)', async () => {
     const order = { ...sampleOrder, status: 'processing' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'PU', 'Picked Up'),
@@ -175,10 +169,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   })
 
   it('sends email notification on status change', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'OD', 'Out for Delivery'),
@@ -201,10 +194,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     // DL requires onlyIfCurrent: out_for_delivery/shipped/processing/confirmed
     // Order is already 'delivered' so skip
     const order = { ...sampleOrder, status: 'delivered' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'DL', 'Delivered'),
@@ -215,16 +207,13 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     const body = await res.json()
     expect(body.synced).toBe(0)
     // shipment_status write may still fire; assert STATUS_SYNC status write did not
-    expect(mockQuery).not.toHaveBeenCalledWith(
-      expect.stringContaining("status = 'delivered'"), expect.any(Array)
-    )
+    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining("status = 'delivered'"), expect.any(Array))
   })
 
   it('skips unknown status types', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'XX', 'Unknown'),
@@ -237,10 +226,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   })
 
   it('skips shipment whose AWB does not match any order in batch', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB999', 'OD', 'Out for Delivery'),
@@ -255,10 +243,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
   // ── RTO handling ─────────────────────────────────────────────────────────
 
   it('creates auto task when RTO status is received and user_id is set', async () => {
-    mockQueryMany
-      .mockResolvedValueOnce([sampleOrder])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([sampleOrder]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'RTO', 'Returned'),
@@ -274,10 +261,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
 
   it('does not create auto task for RTO when user_id is null', async () => {
     const order = { ...sampleOrder, user_id: null }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'RTO', 'Returned'),
@@ -291,10 +277,9 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
 
   it('clears AWB on RTO-DL (returned to origin)', async () => {
     const order = { ...sampleOrder, status: 'shipped' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => makeShipmentResponse('AWB111', 'RTO-DL', 'Returned'),
@@ -304,30 +289,28 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.results[0].syncedTo).toBe('returned')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('awb_number = NULL'),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('awb_number = NULL'), expect.any(Array))
   })
 
   // ── Exception type resolution ─────────────────────────────────────────────
 
   it('resolves UD exception type to DL when status label is "delivered"', async () => {
     const order = { ...sampleOrder, status: 'out_for_delivery' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'AWB111',
-              Status: { StatusType: 'UD', Status: 'Delivered', StatusDateTime: null },
-              Scans: [],
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'AWB111',
+                Status: { StatusType: 'UD', Status: 'Delivered', StatusDateTime: null },
+                Scans: [],
+              },
             },
-          }],
+          ],
         }),
       } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
@@ -339,20 +322,21 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
 
   it('resolves NDR exception to OD when status label is "out for delivery"', async () => {
     const order = { ...sampleOrder, status: 'shipped' }
-    mockQueryMany
-      .mockResolvedValueOnce([order])
-      .mockResolvedValueOnce([])
-    global.fetch = vi.fn()
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          ShipmentData: [{
-            Shipment: {
-              AWB: 'AWB111',
-              Status: { StatusType: 'NDR', Status: 'Out for Delivery', StatusDateTime: null },
-              Scans: [],
+          ShipmentData: [
+            {
+              Shipment: {
+                AWB: 'AWB111',
+                Status: { StatusType: 'NDR', Status: 'Out for Delivery', StatusDateTime: null },
+                Scans: [],
+              },
             },
-          }],
+          ],
         }),
       } as any)
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)

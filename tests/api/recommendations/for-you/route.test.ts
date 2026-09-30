@@ -152,15 +152,22 @@ describe('GET /api/recommendations/for-you', () => {
     expect(res.status).toBe(200)
     expect(body.curated).toBe(false)
     const args = mockQuery.mock.calls[0][1] as any[]
-    expect(args[5]).toBe('rec:fallback')      // model fallback
+    expect(args[5]).toBe('rec:fallback') // model fallback
     expect(args[9]).toMatch(/uncurated \(fallback\)/) // error column filled
   })
 
   it('analytics logging failure does not break the response (catch)', async () => {
     mockAuth.mockResolvedValue({ userId: 'u1' } as any)
     mockFeatured.mockResolvedValue({
-      products: [cardWithVariants], source: 'ai', curated: true, seedQuery: 's',
-      candidateCount: 1, responseMs: 1, model: 'm', promptTokens: 1, completionTokens: 1,
+      products: [cardWithVariants],
+      source: 'ai',
+      curated: true,
+      seedQuery: 's',
+      candidateCount: 1,
+      responseMs: 1,
+      model: 'm',
+      promptTokens: 1,
+      completionTokens: 1,
     } as any)
     mockQuery.mockRejectedValue(new Error('insert failed'))
 
@@ -183,11 +190,13 @@ describe('GET /api/recommendations/for-you', () => {
 
   it('best-seller card with no images and zero mrp discount', async () => {
     mockAuth.mockResolvedValue(null as any)
-    mockBestSellers.mockResolvedValue([{
-      ...cardSimple,
-      mrp: '40', // mrp < displayPrice(50) → no discount
-      product_images: undefined,
-    }] as any)
+    mockBestSellers.mockResolvedValue([
+      {
+        ...cardSimple,
+        mrp: '40', // mrp < displayPrice(50) → no discount
+        product_images: undefined,
+      },
+    ] as any)
 
     const res = await GET(makeReq())
     const body = await res.json()

@@ -20,7 +20,9 @@ function makeRequest(body: object = {}) {
 const params = { params: Promise.resolve({ id: 'prod1' }) }
 
 describe('POST /api/products/[id]/buy-now-quote', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 when resolve fails', async () => {
     mockResolve.mockResolvedValueOnce({ ok: false, error: 'Product not found' } as any)
@@ -55,7 +57,15 @@ describe('POST /api/products/[id]/buy-now-quote', () => {
   it('defaults qty to 1 when not provided', async () => {
     mockResolve.mockResolvedValueOnce({
       ok: true,
-      item: { productId: 'prod1', variantId: null, subVariantId: null, qty: 1, buyMode: 'retail', buyUnit: 'pc', price: 100 },
+      item: {
+        productId: 'prod1',
+        variantId: null,
+        subVariantId: null,
+        qty: 1,
+        buyMode: 'retail',
+        buyUnit: 'pc',
+        price: 100,
+      },
     } as any)
 
     await POST(makeRequest({}) as any, params as any)

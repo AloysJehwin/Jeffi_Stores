@@ -104,9 +104,7 @@ describe('POST /api/orders/[id]/cancel-review', () => {
 
   it('approves cancellation for unpaid order', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null) // no sale record
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER).mockResolvedValueOnce(null) // no sale record
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()

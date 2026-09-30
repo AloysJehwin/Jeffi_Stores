@@ -13,7 +13,9 @@ const mockPoolInstance = vi.hoisted(() => ({
   end: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('pg', () => ({
-  Pool: vi.fn(function () { return mockPoolInstance }),
+  Pool: vi.fn(function () {
+    return mockPoolInstance
+  }),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -150,13 +152,10 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     expect(body.processed).toBe(2)
     expect(body.action).toBe('approved')
     // Should have approved in log
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("status = 'approved'"),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'approved'"), expect.any(Array))
     // Should have updated products for each row
-    const productUpdateCalls = mockQuery.mock.calls.filter(c =>
-      typeof c[0] === 'string' && (c[0] as string).includes('UPDATE products')
+    const productUpdateCalls = mockQuery.mock.calls.filter(
+      c => typeof c[0] === 'string' && (c[0] as string).includes('UPDATE products')
     )
     expect(productUpdateCalls.length).toBe(2)
   })
@@ -253,10 +252,18 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     const { queryOne } = await import('@/lib/db')
     const { embed } = await import('@/lib/rag')
     vi.mocked(queryOne).mockResolvedValue({
-      id: 'prod-1', name: 'Bolt', sku: 'B1', description: 'desc',
-      ai_description: null, ai_product_type: null, ai_application: null,
-      ai_who_uses_it: null, ai_use_cases: [], ai_keywords: [],
-      ai_features: [], ai_search_tags: [],
+      id: 'prod-1',
+      name: 'Bolt',
+      sku: 'B1',
+      description: 'desc',
+      ai_description: null,
+      ai_product_type: null,
+      ai_application: null,
+      ai_who_uses_it: null,
+      ai_use_cases: [],
+      ai_keywords: [],
+      ai_features: [],
+      ai_search_tags: [],
     })
     vi.mocked(embed).mockRejectedValue(new Error('embed failed'))
 

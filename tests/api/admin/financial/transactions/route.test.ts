@@ -31,9 +31,9 @@ function makeGet(params: Record<string, string> = {}) {
 // The route runs 3 parallel queryMany calls: count, rows, summary
 function setupQueryMany(count: string, rows: any[], summaryRows: any[]) {
   mockQueryMany
-    .mockResolvedValueOnce([{ count }] as any)     // count query
-    .mockResolvedValueOnce(rows as any)              // rows query
-    .mockResolvedValueOnce(summaryRows as any)       // summary query
+    .mockResolvedValueOnce([{ count }] as any) // count query
+    .mockResolvedValueOnce(rows as any) // rows query
+    .mockResolvedValueOnce(summaryRows as any) // summary query
 }
 
 const sampleRow = {
@@ -68,10 +68,14 @@ describe('GET /api/admin/financial/transactions', () => {
   it('returns transactions with summary on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    setupQueryMany('1', [sampleRow], [
-      { direction: 'inflow', total: '5000.00' },
-      { direction: 'outflow', total: '2000.00' },
-    ])
+    setupQueryMany(
+      '1',
+      [sampleRow],
+      [
+        { direction: 'inflow', total: '5000.00' },
+        { direction: 'outflow', total: '2000.00' },
+      ]
+    )
 
     const res = await GET(makeGet())
     expect(res.status).toBe(200)
@@ -157,7 +161,7 @@ describe('GET /api/admin/financial/transactions', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryMany
-      .mockResolvedValueOnce([] as any)     // count returns empty array
+      .mockResolvedValueOnce([] as any) // count returns empty array
       .mockResolvedValueOnce([] as any)
       .mockResolvedValueOnce([] as any)
 

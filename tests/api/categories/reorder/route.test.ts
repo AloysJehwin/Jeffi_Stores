@@ -29,7 +29,9 @@ function makeRequest(body: object) {
 }
 
 describe('PATCH /api/categories/reorder', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not admin', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -55,12 +57,14 @@ describe('PATCH /api/categories/reorder', () => {
     mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
     mockQuery.mockResolvedValueOnce(undefined as any)
 
-    const res = await PATCH(makeRequest({
-      updates: [
-        { id: 'cat1', display_order: 1, parent_category_id: null },
-        { id: 'cat2', display_order: 2, parent_category_id: 'cat1' },
-      ],
-    }) as any)
+    const res = await PATCH(
+      makeRequest({
+        updates: [
+          { id: 'cat1', display_order: 1, parent_category_id: null },
+          { id: 'cat2', display_order: 2, parent_category_id: 'cat1' },
+        ],
+      }) as any
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -71,9 +75,11 @@ describe('PATCH /api/categories/reorder', () => {
     mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
     mockQuery.mockRejectedValueOnce(new Error('constraint violation'))
 
-    const res = await PATCH(makeRequest({
-      updates: [{ id: 'cat1', display_order: 1, parent_category_id: null }],
-    }) as any)
+    const res = await PATCH(
+      makeRequest({
+        updates: [{ id: 'cat1', display_order: 1, parent_category_id: null }],
+      }) as any
+    )
     expect(res.status).toBe(500)
     const json = await res.json()
     expect(json.error).toBe('constraint violation')

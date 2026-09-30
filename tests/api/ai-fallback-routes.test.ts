@@ -116,7 +116,13 @@ describe('POST /api/ai-affirmation', () => {
     expect(res.status).toBe(400)
   })
   it('502 when the model returns unparseable content', async () => {
-    mockAiChat.mockResolvedValueOnce({ content: 'not json at all', provider: 'ollama', model: 'm', latencyMs: 1, fallbackUsed: false } as any)
+    mockAiChat.mockResolvedValueOnce({
+      content: 'not json at all',
+      provider: 'ollama',
+      model: 'm',
+      latencyMs: 1,
+      fallbackUsed: false,
+    } as any)
     const res = await affirmPOST(req('http://localhost/api/ai-affirmation', { itemNames: ['X'] }))
     expect(res.status).toBe(502)
   })

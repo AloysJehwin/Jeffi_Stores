@@ -83,9 +83,9 @@ describe('POST /api/admin/product-offers', () => {
 
   it('creates offer, generating slug from title when none clashes', async () => {
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ next: 0 }] })          // max order
-      .mockResolvedValueOnce({ rows: [] })                     // slug clash check -> none
-      .mockResolvedValueOnce({ rows: [{ id: 'new-id' }] })     // insert returning id
+      .mockResolvedValueOnce({ rows: [{ next: 0 }] }) // max order
+      .mockResolvedValueOnce({ rows: [] }) // slug clash check -> none
+      .mockResolvedValueOnce({ rows: [{ id: 'new-id' }] }) // insert returning id
       .mockResolvedValueOnce({ rows: [{ id: 'new-id', slug: 'diwali-dhamaka', title: 'Diwali Dhamaka' }] }) // select
     const res = await POST(req('POST', { title: 'Diwali Dhamaka' }))
     const data = await res.json()
@@ -97,10 +97,10 @@ describe('POST /api/admin/product-offers', () => {
 
   it('appends -2 to slug on a conflict', async () => {
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ next: 1 }] })          // max order
-      .mockResolvedValueOnce({ rows: [{ id: 'existing' }] })   // base slug taken
-      .mockResolvedValueOnce({ rows: [] })                     // -2 free
-      .mockResolvedValueOnce({ rows: [{ id: 'nid' }] })        // insert
+      .mockResolvedValueOnce({ rows: [{ next: 1 }] }) // max order
+      .mockResolvedValueOnce({ rows: [{ id: 'existing' }] }) // base slug taken
+      .mockResolvedValueOnce({ rows: [] }) // -2 free
+      .mockResolvedValueOnce({ rows: [{ id: 'nid' }] }) // insert
       .mockResolvedValueOnce({ rows: [{ id: 'nid', slug: 'diwali-2' }] }) // select
     const res = await POST(req('POST', { title: 'Diwali' }))
     const data = await res.json()

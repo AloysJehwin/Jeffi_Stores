@@ -56,9 +56,7 @@ import { POST } from '@/app/api/admin/orders/create/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { withTransaction } from '@/lib/db'
-import {
-  isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence,
-} from '@/lib/gst'
+import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
@@ -145,9 +143,11 @@ function buildMockTxClient(overrides: Record<string, any> = {}) {
       if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
       if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-1234-ABCDE' }] }
       if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '100' }] }
-      if (sql.includes('SELECT inventory_quantity FROM product_variants')) return { rows: [{ inventory_quantity: '50' }] }
-      if (sql.includes('SELECT inventory_quantity FROM product_sub_variants')) return { rows: [{ inventory_quantity: '20' }] }
-      if (sql.includes("SELECT value FROM site_settings")) return { rows: [{ value: 'JS' }] }
+      if (sql.includes('SELECT inventory_quantity FROM product_variants'))
+        return { rows: [{ inventory_quantity: '50' }] }
+      if (sql.includes('SELECT inventory_quantity FROM product_sub_variants'))
+        return { rows: [{ inventory_quantity: '20' }] }
+      if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
       return { rows: [] }
     }),
     ...overrides,
@@ -162,13 +162,16 @@ describe('POST /api/admin/orders/create', () => {
     mockLogStock.mockResolvedValue(undefined as any)
     mockSendInvoice.mockResolvedValue(undefined as any)
     // resetAllMocks wipes factory implementations — re-establish site-controls
-    vi.mocked(getFeatureFlags).mockImplementation(async () => ({
-      razorpayEnabled: false,
-      gstEnabled: process.env.ENABLE_GST === 'true',
-      inventoryValidationEnabled: true,
-      ondeviceSummaryEnabled: false,
-      ondeviceFinetuneEnabled: false,
-    }) as any)
+    vi.mocked(getFeatureFlags).mockImplementation(
+      async () =>
+        ({
+          razorpayEnabled: false,
+          gstEnabled: process.env.ENABLE_GST === 'true',
+          inventoryValidationEnabled: true,
+          ondeviceSummaryEnabled: false,
+          ondeviceFinetuneEnabled: false,
+        }) as any
+    )
     vi.mocked(getBusinessValues).mockResolvedValue({ businessStateCode: '22' } as any)
   })
 
@@ -264,12 +267,14 @@ describe('POST /api/admin/orders/create', () => {
   it('creates order with sub-variant item', async () => {
     const bodyWithSub = {
       ...parsedOrderData,
-      items: [{
-        ...parsedOrderData.items[0],
-        variant_id: 'var-1',
-        sub_variant_id: 'sv-1',
-        variant_name: 'Small',
-      }],
+      items: [
+        {
+          ...parsedOrderData.items[0],
+          variant_id: 'var-1',
+          sub_variant_id: 'sv-1',
+          variant_name: 'Small',
+        },
+      ],
     }
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
@@ -406,9 +411,7 @@ describe('POST /api/admin/orders/create', () => {
     const res = await POST(makePost(validOrderBody))
     expect(res.status).toBe(200)
     // Verify payment_status was set to 'unpaid'
-    const insertOrderCall = client.query.mock.calls.find(
-      (c: any) => c[0].includes('INSERT INTO orders')
-    )
+    const insertOrderCall = client.query.mock.calls.find((c: any) => c[0].includes('INSERT INTO orders'))
     expect(insertOrderCall).toBeDefined()
     expect(insertOrderCall![1]).toContain('unpaid')
   })
@@ -429,14 +432,16 @@ describe('POST /api/admin/orders/create', () => {
   it('handles items without product_id (custom line items)', async () => {
     const bodyCustomItem = {
       ...parsedOrderData,
-      items: [{
-        product_id: null,
-        product_name: 'Custom Item',
-        product_sku: 'CUSTOM-1',
-        gst_rate: 18,
-        unit_price: 200,
-        quantity: 1,
-      }],
+      items: [
+        {
+          product_id: null,
+          product_name: 'Custom Item',
+          product_sku: 'CUSTOM-1',
+          gst_rate: 18,
+          unit_price: 200,
+          quantity: 1,
+        },
+      ],
     }
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
@@ -551,8 +556,9 @@ describe('POST /api/admin/orders/create', () => {
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-BATCH' }] }
         if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
         if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
-        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '20' }] }
-        if (sql.includes("SELECT value FROM site_settings")) return { rows: [{ value: 'JS' }] }
+        if (sql.includes('SELECT quantity_remaining FROM product_batches'))
+          return { rows: [{ quantity_remaining: '20' }] }
+        if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
         return { rows: [] }
       }),
     })
@@ -582,7 +588,8 @@ describe('POST /api/admin/orders/create', () => {
         if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-2' }] }
         if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
         // batch has only 3, taking 10 → avail(3) < qty(10) → shortfall
-        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '3' }] }
+        if (sql.includes('SELECT quantity_remaining FROM product_batches'))
+          return { rows: [{ quantity_remaining: '3' }] }
         return { rows: [] }
       }),
     })
@@ -613,7 +620,8 @@ describe('POST /api/admin/orders/create', () => {
         if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-3' }] }
         if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
         // per-batch ok (20 avail, taking 7), but totalBatchQty(7) < baseQty(10)
-        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '20' }] }
+        if (sql.includes('SELECT quantity_remaining FROM product_batches'))
+          return { rows: [{ quantity_remaining: '20' }] }
         return { rows: [] }
       }),
     })
@@ -640,7 +648,7 @@ describe('POST /api/admin/orders/create', () => {
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-UNIT' }] }
         if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
         if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '100' }] }
-        if (sql.includes("SELECT value FROM site_settings")) return { rows: [{ value: 'JS' }] }
+        if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
         return { rows: [] }
       }),
     })
@@ -703,9 +711,7 @@ describe('POST /api/admin/orders/create', () => {
     const client = buildMockTxClient()
     mockWithTx.mockImplementation(async (fn: any) => fn(client))
     await POST(makePost(validOrderBody))
-    const insertOrderCall = client.query.mock.calls.find(
-      (c: any) => c[0].includes('INSERT INTO orders')
-    )
+    const insertOrderCall = client.query.mock.calls.find((c: any) => c[0].includes('INSERT INTO orders'))
     expect(insertOrderCall![1]).toContain('paid')
   })
 })

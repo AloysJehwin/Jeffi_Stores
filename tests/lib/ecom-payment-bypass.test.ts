@@ -9,7 +9,9 @@ afterEach(() => {
 })
 
 describe('payment bypass allow-list (TEMPORARY)', () => {
-  beforeEach(() => { delete process.env.ECOM_PAYMENT_BYPASS_EMAILS })
+  beforeEach(() => {
+    delete process.env.ECOM_PAYMENT_BYPASS_EMAILS
+  })
 
   it('bypasses only the default internal address', () => {
     expect(isPaymentBypassed('aloysjehwin@gmail.com')).toBe(true)

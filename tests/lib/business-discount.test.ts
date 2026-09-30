@@ -43,10 +43,7 @@ describe('getBusinessDiscountPct', () => {
     const result = await getBusinessDiscountPct('user-1', 'cat-1')
     expect(result).toBe(15.5)
     expect(mockQueryOne).toHaveBeenCalledOnce()
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('business_discounts'),
-      ['user-1', 'cat-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('business_discounts'), ['user-1', 'cat-1'])
   })
 
   it('returns 0 when no row found (null)', async () => {
@@ -101,10 +98,7 @@ describe('getBusinessDiscountMap', () => {
   it('passes userId to query', async () => {
     mockQueryMany.mockResolvedValueOnce([])
     await getBusinessDiscountMap('u-xyz')
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('business_discounts'),
-      ['u-xyz']
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('business_discounts'), ['u-xyz'])
   })
 
   it('handles multiple categories with various decimal values', async () => {

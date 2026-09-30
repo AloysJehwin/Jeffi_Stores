@@ -170,10 +170,10 @@ describe('POST /api/admin/orders/[id]/create-rvp-shipment', () => {
     const body = await res.json()
     expect(body.awb).toBe('AWB-NEW123')
     expect(body.message).toContain('AWB-NEW123')
-    expect(vi.mocked(query)).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE return_requests'),
-      ['AWB-NEW123', 'ret-1']
-    )
+    expect(vi.mocked(query)).toHaveBeenCalledWith(expect.stringContaining('UPDATE return_requests'), [
+      'AWB-NEW123',
+      'ret-1',
+    ])
   })
 
   it('strips country code from 12-digit phone', async () => {

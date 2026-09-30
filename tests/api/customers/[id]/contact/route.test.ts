@@ -96,12 +96,7 @@ describe('POST /api/customers/[id]/contact', () => {
 
     const res = await POST(makePost({ subject: 'Hi', message: 'Hello' }) as any, PARAMS)
     expect(res.status).toBe(200)
-    expect(email.sendAdminContactEmail).toHaveBeenCalledWith(
-      'c@example.com',
-      'Customer',
-      'Hi',
-      'Hello'
-    )
+    expect(email.sendAdminContactEmail).toHaveBeenCalledWith('c@example.com', 'Customer', 'Hi', 'Hello')
   })
 
   it('returns 500 when email send throws', async () => {

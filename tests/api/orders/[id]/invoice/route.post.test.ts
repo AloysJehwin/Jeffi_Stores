@@ -94,7 +94,12 @@ describe('POST /api/orders/[id]/invoice', () => {
 
   it('returns existing invoice number if already invoiced', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'order-123', invoice_number: 'INV-001', payment_status: 'paid', status: 'confirmed' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-123',
+      invoice_number: 'INV-001',
+      payment_status: 'paid',
+      status: 'confirmed',
+    })
     const res = await POST(makeRequest('POST') as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -103,7 +108,12 @@ describe('POST /api/orders/[id]/invoice', () => {
 
   it('returns 400 when payment not completed', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'order-123', invoice_number: null, payment_status: 'unpaid', status: 'confirmed' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-123',
+      invoice_number: null,
+      payment_status: 'unpaid',
+      status: 'confirmed',
+    })
     const res = await POST(makeRequest('POST') as any, PARAMS)
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -112,21 +122,36 @@ describe('POST /api/orders/[id]/invoice', () => {
 
   it('returns 400 for pending orders', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'order-123', invoice_number: null, payment_status: 'paid', status: 'pending' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-123',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'pending',
+    })
     const res = await POST(makeRequest('POST') as any, PARAMS)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 for cancelled orders', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'order-123', invoice_number: null, payment_status: 'paid', status: 'cancelled' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-123',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'cancelled',
+    })
     const res = await POST(makeRequest('POST') as any, PARAMS)
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when generateOrderInvoice returns null', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'order-123', invoice_number: null, payment_status: 'paid', status: 'confirmed' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-123',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'confirmed',
+    })
     vi.mocked(invoiceLib.generateOrderInvoice).mockResolvedValueOnce(null as any)
     const res = await POST(makeRequest('POST') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -178,7 +203,10 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   it('returns existing invoice when already exists', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', invoice_number: 'INV-EXISTING', payment_status: 'paid', status: 'confirmed',
+      id: 'order-1',
+      invoice_number: 'INV-EXISTING',
+      payment_status: 'paid',
+      status: 'confirmed',
     })
     const res = await POST(makeReq('POST') as any, PARAMS)
     expect(res.status).toBe(200)
@@ -189,7 +217,10 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   it('returns 400 when payment not completed', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', invoice_number: null, payment_status: 'unpaid', status: 'confirmed',
+      id: 'order-1',
+      invoice_number: null,
+      payment_status: 'unpaid',
+      status: 'confirmed',
     })
     const res = await POST(makeReq('POST') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -200,7 +231,10 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   it('returns 400 when status is pending', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'pending',
+      id: 'order-1',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'pending',
     })
     const res = await POST(makeReq('POST') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -211,7 +245,10 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   it('returns 400 when status is cancelled', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
-      id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'cancelled',
+      id: 'order-1',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'cancelled',
     })
     const res = await POST(makeReq('POST') as any, PARAMS)
     expect(res.status).toBe(400)
@@ -223,8 +260,12 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
     const invoiceMod = await import('@/lib/invoice')
     vi.mocked(invoiceMod.generateOrderInvoice).mockResolvedValueOnce(null)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'confirmed' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1',
+      invoice_number: null,
+      payment_status: 'paid',
+      status: 'confirmed',
+    })
     const res = await POST(makeReq('POST') as any, PARAMS)
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/generation failed/i)

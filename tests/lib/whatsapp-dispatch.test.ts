@@ -13,11 +13,7 @@ vi.mock('@/lib/whatsapp', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import {
-  sendCampaignWhatsApp,
-  campaignSupportsWhatsApp,
-  CAMPAIGN_WA_KINDS,
-} from '@/lib/campaigns/whatsapp-dispatch'
+import { sendCampaignWhatsApp, campaignSupportsWhatsApp, CAMPAIGN_WA_KINDS } from '@/lib/campaigns/whatsapp-dispatch'
 import { queryOne } from '@/lib/db'
 import { canSendMarketing } from '@/lib/marketing'
 import {

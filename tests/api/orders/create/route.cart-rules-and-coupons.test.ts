@@ -44,7 +44,7 @@ vi.mock('@/lib/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(u
 vi.mock('@/lib/delhivery', () => ({
   checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -153,7 +153,11 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(bizDiscount.getBusinessDiscountMap).mockResolvedValue({})
     vi.mocked(gstLib.isInterState).mockReturnValue(false)
     vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 0, codFee: 0 })
-    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' } as any)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'not_found',
+    } as any)
   })
 
   it('returns 422 when cart contains inactive product', async () => {
@@ -188,9 +192,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('allows COD when all items allow it (payment_mode = cod, status cod_pending)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null) // min order
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // min order
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     let capturedPaymentMode: string | null = null
@@ -218,9 +220,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('applies business discount when category is in discount map', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
     vi.mocked(bizDiscount.getBusinessDiscountMap).mockResolvedValue({ 'cat-1': 10 })
 
@@ -246,9 +246,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('does not apply coupon when validity window has not started', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     // Coupon validation is delegated to validateCouponForUser; a not-yet-valid
@@ -279,9 +277,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('does not apply coupon when min_purchase_amount not met', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()]) // subtotal 200
 
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
@@ -310,9 +306,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('caps percentage coupon discount at max_discount_amount', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()]) // subtotal 200
 
     // 50% of 200 = 100, capped at 30 by max_discount_amount — validateCouponForUser
@@ -342,9 +336,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('inactive coupon leaves discount at 0', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
@@ -372,9 +364,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('coupon not found — order proceeds with no discount', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_USER)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({

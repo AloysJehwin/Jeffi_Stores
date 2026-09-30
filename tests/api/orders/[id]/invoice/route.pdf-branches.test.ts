@@ -106,8 +106,9 @@ describe('GET /api/orders/[id]/invoice — extra branch coverage', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...BASE, billing_address_id: 'addr-2' })
-      .mockResolvedValueOnce(null)          // no cached pdf
-      .mockResolvedValueOnce({              // billing address lookup
+      .mockResolvedValueOnce(null) // no cached pdf
+      .mockResolvedValueOnce({
+        // billing address lookup
         full_name: 'Billing',
         address_line1: '2 Bill Rd',
         city: 'Delhi',
@@ -160,9 +161,7 @@ describe('GET /api/orders/[id]/invoice — extra branch coverage', () => {
   it('uploads and caches PDF for non-voided web order', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(BASE)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
@@ -220,9 +219,7 @@ describe('GET /api/orders/[id]/invoice — extra branch coverage', () => {
   it('maps order items to invoice items and passes them to the PDF generator', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(BASE)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([
         {
@@ -382,27 +379,27 @@ describe('GET /api/orders/[id]/invoice — auth branches', () => {
   it('maps item with null mrp and null sold_unit_factor correctly', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(BASE)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany)
-      .mockResolvedValueOnce([{
-        product_name: 'Bolt',
-        hsn_code: null,
-        gst_rate: null,
-        quantity: 1,
-        unit_price: '100',
-        total_price: '100',
-        discount_amount: null,
-        mrp: null,
-        sold_unit_factor: null,
-        taxable_amount: null,
-        cgst_amount: null,
-        sgst_amount: null,
-        igst_amount: null,
-        buy_mode: null,
-        buy_unit: null,
-      }])
+      .mockResolvedValueOnce([
+        {
+          product_name: 'Bolt',
+          hsn_code: null,
+          gst_rate: null,
+          quantity: 1,
+          unit_price: '100',
+          total_price: '100',
+          discount_amount: null,
+          mrp: null,
+          sold_unit_factor: null,
+          taxable_amount: null,
+          cgst_amount: null,
+          sgst_amount: null,
+          igst_amount: null,
+          buy_mode: null,
+          buy_unit: null,
+        },
+      ])
       .mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeReq() as any, PARAMS)
@@ -435,9 +432,7 @@ describe('GET /api/orders/[id]/invoice — auth branches', () => {
     // address_line2 is omitted entirely (undefined) rather than null
     const orderNoLine2 = { ...BASE }
     delete (orderNoLine2 as any).address_line2
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(orderNoLine2)
-      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(orderNoLine2).mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
     const res = await GET(makeReq() as any, PARAMS)

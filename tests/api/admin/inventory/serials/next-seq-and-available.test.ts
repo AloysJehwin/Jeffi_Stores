@@ -92,7 +92,9 @@ describe('GET /api/admin/inventory/serials/available', () => {
 
   it('passes variant_id and sub_variant_id to query', async () => {
     vi.mocked(queryMany).mockResolvedValue([] as any)
-    const res = await getAvailable(makeReq('http://localhost/api/admin/inventory/serials/available?product_id=p1&variant_id=v1&sub_variant_id=sv1'))
+    const res = await getAvailable(
+      makeReq('http://localhost/api/admin/inventory/serials/available?product_id=p1&variant_id=v1&sub_variant_id=sv1')
+    )
     expect(res.status).toBe(200)
     expect(queryMany).toHaveBeenCalledWith(expect.any(String), ['p1', 'v1', 'sv1'])
   })

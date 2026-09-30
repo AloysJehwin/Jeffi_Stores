@@ -21,11 +21,7 @@ vi.mock('bcrypt', () => ({
 }))
 
 // ── Import under test ─────────────────────────────────────────────────────────
-import {
-  createAdminUser,
-  hasAdminRole,
-  isSessionValid,
-} from '@/lib/auth'
+import { createAdminUser, hasAdminRole, isSessionValid } from '@/lib/auth'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -66,9 +62,9 @@ describe('createAdminUser', () => {
     const updatedUser = { ...existingUser, first_name: 'New' }
     const newAdmin = { id: 'admin-50', user_id: 'user-50' }
 
-    mockQueryOne.mockResolvedValueOnce(existingUser)   // existing user found
-    mockQueryOne.mockResolvedValueOnce(updatedUser)    // update returns updated user
-    mockQueryOne.mockResolvedValueOnce(newAdmin)       // insert admin
+    mockQueryOne.mockResolvedValueOnce(existingUser) // existing user found
+    mockQueryOne.mockResolvedValueOnce(updatedUser) // update returns updated user
+    mockQueryOne.mockResolvedValueOnce(newAdmin) // insert admin
 
     const result = await createAdminUser(userData)
     expect(result.success).toBe(true)
@@ -88,8 +84,8 @@ describe('createAdminUser', () => {
   })
 
   it('returns failure when user creation fails', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)  // no existing user
-    mockQueryOne.mockResolvedValueOnce(null)  // insert returns null
+    mockQueryOne.mockResolvedValueOnce(null) // no existing user
+    mockQueryOne.mockResolvedValueOnce(null) // insert returns null
 
     const result = await createAdminUser(userData)
     expect(result.success).toBe(false)
@@ -99,7 +95,7 @@ describe('createAdminUser', () => {
   it('returns failure when admin creation fails', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
     mockQueryOne.mockResolvedValueOnce({ id: 'u1' })
-    mockQueryOne.mockResolvedValueOnce(null)  // admin insert returns null
+    mockQueryOne.mockResolvedValueOnce(null) // admin insert returns null
 
     const result = await createAdminUser(userData)
     expect(result.success).toBe(false)

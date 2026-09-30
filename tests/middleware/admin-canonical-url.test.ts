@@ -7,7 +7,9 @@ const { mockResolveTenant, mockVerifyToken } = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/jwt', () => ({
-  verifyToken: mockVerifyToken, verifyBusinessToken: vi.fn(), authenticateAdmin: vi.fn(),
+  verifyToken: mockVerifyToken,
+  verifyBusinessToken: vi.fn(),
+  authenticateAdmin: vi.fn(),
 }))
 vi.mock('@/lib/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/scopes', () => ({
@@ -30,8 +32,19 @@ import { adminCookieNameForHost } from '@/lib/admin-cookie'
 import { ap } from '@/lib/admin-path'
 
 const ACTIVE = {
-  tenantId: 't-1', slug: 'acme', displayName: 'Acme', plan: 'basic',
-  infra: { rdsEndpoint: 'ep', rdsDb: 'jeffi_stores', rdsPort: 5432, dbSecretRef: null, iamAuth: true, s3Bucket: 'b', region: 'us-east-1' },
+  tenantId: 't-1',
+  slug: 'acme',
+  displayName: 'Acme',
+  plan: 'basic',
+  infra: {
+    rdsEndpoint: 'ep',
+    rdsDb: 'jeffi_stores',
+    rdsPort: 5432,
+    dbSecretRef: null,
+    iamAuth: true,
+    s3Bucket: 'b',
+    region: 'us-east-1',
+  },
 }
 
 function req(url: string, host: string, opts: { admin?: boolean } = {}) {
@@ -51,11 +64,9 @@ describe('an admin host serves the panel at the root, never under /admin', () =>
   })
 
   it('redirects /admin/ecom/customers to /ecom/customers, query intact', async () => {
-    const res = await middleware(req(
-      'https://admin.jeffistores.in/admin/ecom/customers/abc?tab=overview',
-      'admin.jeffistores.in',
-      { admin: true },
-    ))
+    const res = await middleware(
+      req('https://admin.jeffistores.in/admin/ecom/customers/abc?tab=overview', 'admin.jeffistores.in', { admin: true })
+    )
     expect(res.status).toBe(308)
     expect(res.headers.get('location')).toBe('https://admin.jeffistores.in/ecom/customers/abc?tab=overview')
   })
@@ -68,12 +79,16 @@ describe('an admin host serves the panel at the root, never under /admin', () =>
   })
 
   it('leaves /api/admin/* alone', async () => {
-    const res = await middleware(req('https://admin.jeffistores.in/api/admin/products', 'admin.jeffistores.in', { admin: true }))
+    const res = await middleware(
+      req('https://admin.jeffistores.in/api/admin/products', 'admin.jeffistores.in', { admin: true })
+    )
     expect(res.status).not.toBe(308)
   })
 
   it('does not touch a path merely starting with the letters admin', async () => {
-    const res = await middleware(req('https://admin.jeffistores.in/administrators', 'admin.jeffistores.in', { admin: true }))
+    const res = await middleware(
+      req('https://admin.jeffistores.in/administrators', 'admin.jeffistores.in', { admin: true })
+    )
     expect(res.status).not.toBe(308)
   })
 })

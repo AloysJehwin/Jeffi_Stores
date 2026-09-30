@@ -41,7 +41,14 @@ describe('GET /api/admin/controls/jobs/[id]', () => {
 
   it('returns the job status', async () => {
     vi.mocked(queryOne).mockResolvedValue({
-      id: 'job1', status: 'running', operation: 'set_images', total: 5, done: 2, skipped: 1, log_id: null, error: null,
+      id: 'job1',
+      status: 'running',
+      operation: 'set_images',
+      total: 5,
+      done: 2,
+      skipped: 1,
+      log_id: null,
+      error: null,
     } as any)
     const res = await GET(req(), { params })
     expect(res.status).toBe(200)

@@ -44,7 +44,9 @@ const SALE_ROWS = [
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('GET /api/admin/cash-sale', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -98,7 +100,11 @@ describe('GET /api/admin/cash-sale', () => {
   it('uses buildVectorSearchClause when search param present', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(buildVectorSearchClause).mockReturnValue({ clause: 'cs.search_vector @@ to_tsquery($1)', params: ['test'], nextIdx: 2 } as any)
+    vi.mocked(buildVectorSearchClause).mockReturnValue({
+      clause: 'cs.search_vector @@ to_tsquery($1)',
+      params: ['test'],
+      nextIdx: 2,
+    } as any)
     vi.mocked(queryMany).mockResolvedValue([])
     vi.mocked(queryOne).mockResolvedValue({ count: '0' } as any)
     await GET(makeGet('?search=test'))

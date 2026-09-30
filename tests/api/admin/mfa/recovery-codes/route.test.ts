@@ -76,9 +76,7 @@ describe('GET /api/admin/mfa/recovery-codes', () => {
 
   it('returns mfa_enabled false when row is null', async () => {
     mockAuth.mockResolvedValue(adminPayload)
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ remaining: '0' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ remaining: '0' })
 
     const res = await GET(makeGetRequest())
     const body = await res.json()
@@ -88,9 +86,7 @@ describe('GET /api/admin/mfa/recovery-codes', () => {
 
   it('returns 0 remaining when codes row is null', async () => {
     mockAuth.mockResolvedValue(adminPayload)
-    mockQueryOne
-      .mockResolvedValueOnce({ mfa_enabled: false, mfa_enrolled_at: null })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ mfa_enabled: false, mfa_enrolled_at: null }).mockResolvedValueOnce(null)
 
     const res = await GET(makeGetRequest())
     const body = await res.json()

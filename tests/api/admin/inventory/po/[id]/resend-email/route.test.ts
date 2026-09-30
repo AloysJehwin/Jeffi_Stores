@@ -58,9 +58,7 @@ const samplePO = {
   supplier_email: 'supplier@example.com',
 }
 
-const sampleItems = [
-  { product_name: 'Widget', variant_name: null, quantity: '10', unit_cost: '500.00' },
-]
+const sampleItems = [{ product_name: 'Widget', variant_name: null, quantity: '10', unit_cost: '500.00' }]
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -118,7 +116,7 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
       'PO-001',
       5000,
       expect.any(Array),
-      expect.stringContaining('token-abc'),
+      expect.stringContaining('token-abc')
     )
   })
 

@@ -15,7 +15,12 @@ vi.mock('@/lib/db', () => ({
 import { authenticateAdmin } from '@/lib/jwt'
 import { POST, PATCH, DELETE } from '@/app/api/admin/categories/[id]/draft/route'
 import { POST as catPublish } from '@/app/api/admin/categories/[id]/publish/route'
-import { GET as suppGet, PATCH as suppPatch, POST as suppPost, DELETE as suppDelete } from '@/app/api/admin/suppliers/[id]/draft/route'
+import {
+  GET as suppGet,
+  PATCH as suppPatch,
+  POST as suppPost,
+  DELETE as suppDelete,
+} from '@/app/api/admin/suppliers/[id]/draft/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 
@@ -37,9 +42,9 @@ describe('categories draft route', () => {
   })
 
   it('POST creates draft', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'cat-1' })    // category exists
-    mockQueryOne.mockResolvedValueOnce(null)               // no existing draft
-    mockQuery.mockResolvedValueOnce({})                    // INSERT
+    mockQueryOne.mockResolvedValueOnce({ id: 'cat-1' }) // category exists
+    mockQueryOne.mockResolvedValueOnce(null) // no existing draft
+    mockQuery.mockResolvedValueOnce({}) // INSERT
     const res = await POST(req('POST'), { params: catParams })
     const data = await res.json()
     expect(data.success).toBe(true)
@@ -87,7 +92,7 @@ describe('categories publish route', () => {
 
   it('publishes draft', async () => {
     mockQueryOne.mockResolvedValueOnce({ category_id: 'cat-1', fields: { name: 'Updated', is_active: true } })
-    mockQueryOne.mockResolvedValueOnce({ is_active: true })  // prevIsActive
+    mockQueryOne.mockResolvedValueOnce({ is_active: true }) // prevIsActive
     const { withTransaction } = await import('@/lib/db')
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn({ query: mockQuery }))
     mockQuery.mockResolvedValue({ rows: [] })

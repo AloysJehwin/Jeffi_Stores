@@ -33,7 +33,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/refresh', { method: 'POST' })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/refresh', () => {
   it('returns 401 when unauthenticated', async () => {

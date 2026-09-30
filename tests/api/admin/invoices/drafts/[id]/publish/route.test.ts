@@ -94,9 +94,7 @@ describe('POST /api/admin/invoices/drafts/[id]/publish', () => {
       notes: 'amended',
     }
     const original = { id: 'orig-1' }
-    mockQueryOne
-      .mockResolvedValueOnce(draft as any)
-      .mockResolvedValueOnce(original as any)
+    mockQueryOne.mockResolvedValueOnce(draft as any).mockResolvedValueOnce(original as any)
 
     const clientQuery = vi.fn().mockResolvedValue({ rows: [], rowCount: 1 })
     mockWithTransaction.mockImplementation(async (cb: any) => cb({ query: clientQuery }))
@@ -112,13 +110,11 @@ describe('POST /api/admin/invoices/drafts/[id]/publish', () => {
     expect(clientQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('UPDATE orders SET'),
-      expect.arrayContaining([100, 'orig-1']),
+      expect.arrayContaining([100, 'orig-1'])
     )
-    expect(clientQuery).toHaveBeenNthCalledWith(
-      4,
-      expect.stringContaining('DELETE FROM orders WHERE id = $1'),
-      ['draft-1'],
-    )
+    expect(clientQuery).toHaveBeenNthCalledWith(4, expect.stringContaining('DELETE FROM orders WHERE id = $1'), [
+      'draft-1',
+    ])
   })
 
   it('returns 500 with the error message when the transaction throws', async () => {

@@ -42,7 +42,14 @@ describe('GET /api/gallery', () => {
   it('returns paginated images', async () => {
     mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
     mockQueryMany.mockResolvedValueOnce([
-      { id: 'img1', s3_key: 'gallery/img1.jpg', image_url: null, s3_thumbnail_key: null, thumbnail_url: null, category_name: 'Cat' },
+      {
+        id: 'img1',
+        s3_key: 'gallery/img1.jpg',
+        image_url: null,
+        s3_thumbnail_key: null,
+        thumbnail_url: null,
+        category_name: 'Cat',
+      },
     ])
     mockQueryOne.mockResolvedValueOnce({ total: '1' })
 
@@ -77,10 +84,7 @@ describe('GET /api/gallery', () => {
 
     const res = await GET(makeRequest({ search: 'bolt' }) as any)
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('ILIKE'),
-      expect.arrayContaining(['%bolt%'])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('ILIKE'), expect.arrayContaining(['%bolt%']))
   })
 
   it('composes category + search filters', async () => {

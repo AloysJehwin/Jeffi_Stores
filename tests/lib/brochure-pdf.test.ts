@@ -29,7 +29,10 @@ vi.mock('pdfkit', () => {
         dataCb?.(Buffer.from('mock-pdf-data'))
         endCb?.()
       }),
-      addPage: vi.fn(function () { pageCount++; return doc }),
+      addPage: vi.fn(function () {
+        pageCount++
+        return doc
+      }),
       switchToPage: vi.fn().mockReturnThis(),
       bufferedPageRange: vi.fn(() => ({ start: 0, count: pageCount })),
       font: vi.fn().mockReturnThis(),
@@ -83,7 +86,7 @@ import {
 } from '@/lib/brochure-pdf'
 import { queryMany } from '@/lib/db'
 
-const p = (id: string, name: string) => ({ id, name, sku: id, slug: id } as any)
+const p = (id: string, name: string) => ({ id, name, sku: id, slug: id }) as any
 
 const store: BrochureStore = {
   name: 'Jeffi Stores',
@@ -113,12 +116,10 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 describe('familyKey — strips size tokens anywhere in the name', () => {
   it('strips embedded fraction sizes so BSW sizes share a key', () => {
-    expect(familyKey('BSW 1/2" SS 202 Allen Cap Screw'))
-      .toBe(familyKey('BSW 3/16" SS 202 Allen Cap Screw'))
+    expect(familyKey('BSW 1/2" SS 202 Allen Cap Screw')).toBe(familyKey('BSW 3/16" SS 202 Allen Cap Screw'))
   })
   it('strips embedded M-sizes', () => {
-    expect(familyKey('GMF SS 304 M10 Allen Cap Screw'))
-      .toBe(familyKey('GMF SS 304 M12 Allen Cap Screw'))
+    expect(familyKey('GMF SS 304 M10 Allen Cap Screw')).toBe(familyKey('GMF SS 304 M12 Allen Cap Screw'))
   })
   it('strips mm/inch and NxM tokens', () => {
     expect(familyKey('Rod 25mm Steel')).toBe(familyKey('Rod 40mm Steel'))
@@ -266,9 +267,7 @@ describe('loadBrochureStore', () => {
   })
 
   it('falls back to legal name then to JEFFI STORES', async () => {
-    vi.mocked(queryMany).mockResolvedValue([
-      { key: 'business_legal_name', value: 'Jeffi Legal Pvt Ltd' },
-    ] as any)
+    vi.mocked(queryMany).mockResolvedValue([{ key: 'business_legal_name', value: 'Jeffi Legal Pvt Ltd' }] as any)
     const s1 = await loadBrochureStore()
     expect(s1.name).toBe('Jeffi Legal Pvt Ltd')
 
@@ -283,9 +282,7 @@ describe('loadBrochureStore', () => {
     const s = await loadBrochureStore()
     expect(s.name).toBe('JEFFI STORES')
 
-    vi.mocked(queryMany).mockResolvedValue([
-      { key: 'business_trade_name', value: null },
-    ] as any)
+    vi.mocked(queryMany).mockResolvedValue([{ key: 'business_trade_name', value: null }] as any)
     const s2 = await loadBrochureStore()
     // null value coerces to '' → falls through to JEFFI STORES
     expect(s2.name).toBe('JEFFI STORES')
@@ -307,32 +304,54 @@ describe('generateBrochurePDF', () => {
 
   it('renders representatives + rest with prices, QR, images, MRP strike & discount', async () => {
     // fetch always succeeds → image buffers non-null → image() draw path.
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => okPng.buffer.slice(okPng.byteOffset, okPng.byteOffset + okPng.byteLength),
-    } as any))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => okPng.buffer.slice(okPng.byteOffset, okPng.byteOffset + okPng.byteLength),
+      } as any)
+    )
 
     const products: BrochureProductInput[] = [
       {
-        id: 'a', name: 'BSW 1/2" SS 202 Allen Cap Screw', slug: 'a', sku: 'A1',
-        short_description: 'A strong screw', mrp: 100, base_price: 80,
-        brand_name: 'Unbrako', category_name: 'Fasteners', thumbnail_url: 'https://img/a.png',
+        id: 'a',
+        name: 'BSW 1/2" SS 202 Allen Cap Screw',
+        slug: 'a',
+        sku: 'A1',
+        short_description: 'A strong screw',
+        mrp: 100,
+        base_price: 80,
+        brand_name: 'Unbrako',
+        category_name: 'Fasteners',
+        thumbnail_url: 'https://img/a.png',
       },
       {
-        id: 'b', name: 'BSW 3/8" SS 202 Allen Cap Screw', slug: 'b', sku: 'B1',
-        short_description: 'Another size', mrp: 50, base_price: 50, // no strike, no discount
-        brand_name: 'Unbrako', category_name: 'Fasteners', thumbnail_url: 'https://img/b.png',
+        id: 'b',
+        name: 'BSW 3/8" SS 202 Allen Cap Screw',
+        slug: 'b',
+        sku: 'B1',
+        short_description: 'Another size',
+        mrp: 50,
+        base_price: 50, // no strike, no discount
+        brand_name: 'Unbrako',
+        category_name: 'Fasteners',
+        thumbnail_url: 'https://img/b.png',
       },
       {
-        id: 'c', name: 'Plain Washer', slug: 'c', sku: 'C1',
-        mrp: null, base_price: 20, thumbnail_url: 'https://img/c.png',
+        id: 'c',
+        name: 'Plain Washer',
+        slug: 'c',
+        sku: 'C1',
+        mrp: null,
+        base_price: 20,
+        thumbnail_url: 'https://img/c.png',
       },
     ]
     const buf = await generateBrochurePDF(products, baseOpts)
     expect(Buffer.isBuffer(buf)).toBe(true)
     expect(buf.length).toBeGreaterThan(0)
     // Image fetch is called once per product with a thumbnail_url (3 here).
-    expect((fetch as any)).toHaveBeenCalledTimes(3)
+    expect(fetch as any).toHaveBeenCalledTimes(3)
   })
 
   it('handles failed image fetches (null buffer → placeholder branch)', async () => {
@@ -370,11 +389,25 @@ describe('generateBrochurePDF', () => {
     const products: BrochureProductInput[] = []
     // 20 unique families → 3 matrix pages (9/page).
     for (let i = 0; i < 20; i++) {
-      products.push({ id: `rep${i}`, name: `Product Number ${i}`, slug: `rep${i}`, sku: `S${i}`, mrp: 100, base_price: 80 })
+      products.push({
+        id: `rep${i}`,
+        name: `Product Number ${i}`,
+        slug: `rep${i}`,
+        sku: `S${i}`,
+        mrp: 100,
+        base_price: 80,
+      })
     }
     // 40 rest rows → forces list pagination (bottomLimit overflow → new page).
     for (let i = 0; i < 40; i++) {
-      products.push({ id: `alt${i}`, name: `Product Number ${i % 20} M${i}`, slug: `alt${i}`, sku: `A${i}`, mrp: 60, base_price: 45 })
+      products.push({
+        id: `alt${i}`,
+        name: `Product Number ${i % 20} M${i}`,
+        slug: `alt${i}`,
+        sku: `A${i}`,
+        mrp: 60,
+        base_price: 45,
+      })
     }
     const buf = await generateBrochurePDF(products, baseOpts)
     expect(buf.length).toBeGreaterThan(0)
@@ -387,7 +420,12 @@ describe('generateBrochurePDF', () => {
     ]
     const b1 = await generateBrochurePDF(products, { store, showPrices: true, title: '   ', promo: '   ' })
     expect(b1.length).toBeGreaterThan(0)
-    const b2 = await generateBrochurePDF(products, { store, showPrices: true, title: 'Summer Sale', promo: 'Up to 50% off' })
+    const b2 = await generateBrochurePDF(products, {
+      store,
+      showPrices: true,
+      title: 'Summer Sale',
+      promo: 'Up to 50% off',
+    })
     expect(b2.length).toBeGreaterThan(0)
   })
 

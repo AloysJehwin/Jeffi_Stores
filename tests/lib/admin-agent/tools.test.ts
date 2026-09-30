@@ -27,7 +27,7 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   getClient: vi.fn(),
 }))
-vi.mock('@/lib/tenant-context', async (importOriginal) => ({
+vi.mock('@/lib/tenant-context', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
@@ -119,8 +119,26 @@ describe('admin-agent/tools', () => {
         ])
         // product details query
         .mockResolvedValueOnce([
-          { id: 'p1', name: 'Widget A', slug: 'widget-a', sku: 'WA1', price: 100, stock: 5, brand: 'BrandX', category: 'Cat1' },
-          { id: 'p2', name: 'Widget B', slug: 'widget-b', sku: 'WB1', price: 200, stock: 10, brand: 'BrandX', category: 'Cat1' },
+          {
+            id: 'p1',
+            name: 'Widget A',
+            slug: 'widget-a',
+            sku: 'WA1',
+            price: 100,
+            stock: 5,
+            brand: 'BrandX',
+            category: 'Cat1',
+          },
+          {
+            id: 'p2',
+            name: 'Widget B',
+            slug: 'widget-b',
+            sku: 'WB1',
+            price: 200,
+            stock: 10,
+            brand: 'BrandX',
+            category: 'Cat1',
+          },
         ])
       const result = await tool().handler({ query: 'widget', limit: 10 })
       expect((result as any).ok).toBe(true)
@@ -131,9 +149,7 @@ describe('admin-agent/tools', () => {
       mockEmbed.mockResolvedValueOnce([0.1, 0.2])
       // embedding search returns variant rows
       mockQueryMany
-        .mockResolvedValueOnce([
-          { source_table: 'product_variants', source_id: 'v1', sim: 0.85 },
-        ])
+        .mockResolvedValueOnce([{ source_table: 'product_variants', source_id: 'v1', sim: 0.85 }])
         // variant -> product lookup
         .mockResolvedValueOnce([{ product_id: 'p3' }])
         // product details
@@ -183,8 +199,26 @@ describe('admin-agent/tools', () => {
 
     it('returns variants for a product', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'v1', variant_name: 'Red/M', sku: 'P1-R-M', price: '299', mrp: '350', stock_status: 'in_stock', inventory_quantity: 10, is_active: true },
-        { id: 'v2', variant_name: 'Blue/L', sku: 'P1-B-L', price: '299', mrp: '350', stock_status: 'in_stock', inventory_quantity: 3, is_active: true },
+        {
+          id: 'v1',
+          variant_name: 'Red/M',
+          sku: 'P1-R-M',
+          price: '299',
+          mrp: '350',
+          stock_status: 'in_stock',
+          inventory_quantity: 10,
+          is_active: true,
+        },
+        {
+          id: 'v2',
+          variant_name: 'Blue/L',
+          sku: 'P1-B-L',
+          price: '299',
+          mrp: '350',
+          stock_status: 'in_stock',
+          inventory_quantity: 3,
+          is_active: true,
+        },
       ])
       const result = await tool().handler({ productId: 'p1' })
       expect((result as any).variants).toHaveLength(2)
@@ -209,8 +243,7 @@ describe('admin-agent/tools', () => {
 
     it('returns empty products when no similar ids found', async () => {
       mockQueryOne.mockResolvedValueOnce({ embedding: '[0.1,0.2,0.3]' })
-      mockQueryMany
-        .mockResolvedValueOnce([]) // no similar rows
+      mockQueryMany.mockResolvedValueOnce([]) // no similar rows
       const result = await tool().handler({ productId: 'p1' })
       expect((result as any).products).toHaveLength(0)
     })
@@ -236,7 +269,7 @@ describe('admin-agent/tools', () => {
 
     it('returns empty customers when no semantic or sql matches', async () => {
       mockFindSimilarCustomers.mockResolvedValueOnce([]) // no semantic hits
-      mockQueryMany.mockResolvedValueOnce([])     // no SQL fallback hits
+      mockQueryMany.mockResolvedValueOnce([]) // no SQL fallback hits
       const result = await tool().handler({ query: 'nobody' })
       expect((result as any).customers).toHaveLength(0)
     })
@@ -247,8 +280,26 @@ describe('admin-agent/tools', () => {
         { source_id: 'u2', source_table: 'users', content: 'Alex', similarity: 0.8, metadata: {} },
       ])
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'u1', email: 'alice@test.com', first_name: 'Alice', last_name: 'Smith', phone: null, created_at: '2024-01-01', paid_orders: 3, lifetime_value: '1500' },
-        { id: 'u2', email: 'alex@test.com', first_name: 'Alex', last_name: 'Jones', phone: null, created_at: '2024-02-01', paid_orders: 1, lifetime_value: '500' },
+        {
+          id: 'u1',
+          email: 'alice@test.com',
+          first_name: 'Alice',
+          last_name: 'Smith',
+          phone: null,
+          created_at: '2024-01-01',
+          paid_orders: 3,
+          lifetime_value: '1500',
+        },
+        {
+          id: 'u2',
+          email: 'alex@test.com',
+          first_name: 'Alex',
+          last_name: 'Jones',
+          phone: null,
+          created_at: '2024-02-01',
+          paid_orders: 1,
+          lifetime_value: '500',
+        },
       ])
       const result = await tool().handler({ query: 'alice', limit: 10 })
       expect((result as any).customers).toHaveLength(2)
@@ -258,7 +309,16 @@ describe('admin-agent/tools', () => {
     it('falls back to SQL ILIKE when semantic search returns empty', async () => {
       mockFindSimilarCustomers.mockResolvedValueOnce([])
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'u3', email: 'bob@test.com', first_name: 'Bob', last_name: 'Brown', phone: null, created_at: '2024-03-01', paid_orders: 0, lifetime_value: '0' },
+        {
+          id: 'u3',
+          email: 'bob@test.com',
+          first_name: 'Bob',
+          last_name: 'Brown',
+          phone: null,
+          created_at: '2024-03-01',
+          paid_orders: 0,
+          lifetime_value: '0',
+        },
       ])
       const result = await tool().handler({ query: 'bob' })
       expect((result as any).customers).toHaveLength(1)
@@ -268,7 +328,16 @@ describe('admin-agent/tools', () => {
     it('falls back to SQL when findSimilarCustomers throws', async () => {
       mockFindSimilarCustomers.mockRejectedValueOnce(new Error('replica unreachable'))
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'u4', email: 'carol@test.com', first_name: 'Carol', last_name: 'White', phone: null, created_at: '2024-04-01', paid_orders: 1, lifetime_value: '300' },
+        {
+          id: 'u4',
+          email: 'carol@test.com',
+          first_name: 'Carol',
+          last_name: 'White',
+          phone: null,
+          created_at: '2024-04-01',
+          paid_orders: 1,
+          lifetime_value: '300',
+        },
       ])
       const result = await tool().handler({ query: 'carol' })
       expect((result as any).customers).toHaveLength(1)
@@ -279,7 +348,16 @@ describe('admin-agent/tools', () => {
       const { resolveTenantId } = await import('@/lib/tenant-context')
       vi.mocked(resolveTenantId).mockResolvedValueOnce('tenant-1')
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'u9', email: 'dan@test.com', first_name: 'Dan', last_name: 'Grey', phone: null, created_at: '2024-05-01', paid_orders: 0, lifetime_value: '0' },
+        {
+          id: 'u9',
+          email: 'dan@test.com',
+          first_name: 'Dan',
+          last_name: 'Grey',
+          phone: null,
+          created_at: '2024-05-01',
+          paid_orders: 0,
+          lifetime_value: '0',
+        },
       ])
       const result = await tool().handler({ query: 'dan' })
       expect(mockFindSimilarCustomers).not.toHaveBeenCalled()
@@ -297,8 +375,12 @@ describe('admin-agent/tools', () => {
 
     it('returns customer when found by id', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'u1', email: 'alice@test.com', first_name: 'Alice', last_name: 'Smith',
-        paid_orders: 2, lifetime_value: '800',
+        id: 'u1',
+        email: 'alice@test.com',
+        first_name: 'Alice',
+        last_name: 'Smith',
+        paid_orders: 2,
+        lifetime_value: '800',
       })
       const result = await tool().handler({ id: 'u1' })
       expect((result as any).id).toBe('u1')
@@ -306,8 +388,12 @@ describe('admin-agent/tools', () => {
 
     it('returns customer when found by email', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'u1', email: 'alice@test.com', first_name: 'Alice', last_name: 'Smith',
-        paid_orders: 2, lifetime_value: '800',
+        id: 'u1',
+        email: 'alice@test.com',
+        first_name: 'Alice',
+        last_name: 'Smith',
+        paid_orders: 2,
+        lifetime_value: '800',
       })
       const result = await tool().handler({ email: 'alice@test.com' })
       expect((result as any).email).toBe('alice@test.com')
@@ -325,7 +411,16 @@ describe('admin-agent/tools', () => {
 
     it('returns orders with default params', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-001', status: 'delivered', payment_status: 'paid', total_amount: '500', created_at: '2024-01-10', customer_email: 'a@b.com', customer_name: 'Alice Smith' },
+        {
+          id: 'o1',
+          order_number: 'ORD-001',
+          status: 'delivered',
+          payment_status: 'paid',
+          total_amount: '500',
+          created_at: '2024-01-10',
+          customer_email: 'a@b.com',
+          customer_name: 'Alice Smith',
+        },
       ])
       const result = await tool().handler({})
       expect((result as any).orders).toHaveLength(1)
@@ -368,11 +463,24 @@ describe('admin-agent/tools', () => {
 
     it('returns order with line items when found', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'o1', order_number: 'ORD-001', status: 'delivered', payment_status: 'paid',
-        subtotal: '400', total_amount: '450', customer_email: 'a@b.com', customer_name: 'Alice Smith',
+        id: 'o1',
+        order_number: 'ORD-001',
+        status: 'delivered',
+        payment_status: 'paid',
+        subtotal: '400',
+        total_amount: '450',
+        customer_email: 'a@b.com',
+        customer_name: 'Alice Smith',
       })
       mockQueryMany.mockResolvedValueOnce([
-        { product_name: 'Widget', product_sku: 'W1', variant_name: null, quantity: '2', unit_price: '200', total_price: '400' },
+        {
+          product_name: 'Widget',
+          product_sku: 'W1',
+          variant_name: null,
+          quantity: '2',
+          unit_price: '200',
+          total_price: '400',
+        },
       ])
       const result = await tool().handler({ orderNumber: 'ORD-001' })
       expect((result as any).id).toBe('o1')
@@ -381,8 +489,14 @@ describe('admin-agent/tools', () => {
 
     it('returns order by id', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'o2', order_number: 'ORD-002', status: 'processing', payment_status: 'paid',
-        subtotal: '200', total_amount: '220', customer_email: 'b@c.com', customer_name: 'Bob Jones',
+        id: 'o2',
+        order_number: 'ORD-002',
+        status: 'processing',
+        payment_status: 'paid',
+        subtotal: '200',
+        total_amount: '220',
+        customer_email: 'b@c.com',
+        customer_name: 'Bob Jones',
       })
       mockQueryMany.mockResolvedValueOnce([])
       const result = await tool().handler({ id: 'o2' })
@@ -410,7 +524,15 @@ describe('admin-agent/tools', () => {
     })
 
     it('sets truncated flag when result equals limit', async () => {
-      const rows = Array.from({ length: 50 }, (_, i) => ({ id: `p${i}`, name: `P${i}`, sku: `S${i}`, stock: 0, price: '10', brand: null, sold_30d: 0 }))
+      const rows = Array.from({ length: 50 }, (_, i) => ({
+        id: `p${i}`,
+        name: `P${i}`,
+        sku: `S${i}`,
+        stock: 0,
+        price: '10',
+        brand: null,
+        sold_30d: 0,
+      }))
       mockQueryMany.mockResolvedValueOnce(rows)
       const result = await tool().handler({ limit: 50 })
       expect((result as any).truncated).toBe(true)
@@ -454,7 +576,9 @@ describe('admin-agent/tools', () => {
 
     it('throws when campaign not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      await expect(tool().handler({ campaignKind: 'ghost_campaign', toEmail: 'a@b.com' })).rejects.toThrow(/Unknown campaign/)
+      await expect(tool().handler({ campaignKind: 'ghost_campaign', toEmail: 'a@b.com' })).rejects.toThrow(
+        /Unknown campaign/
+      )
     })
 
     it('returns proposal when campaign exists and email is valid', async () => {
@@ -737,7 +861,9 @@ describe('admin-agent/tools', () => {
     const tool = () => getTool('call_admin_api')!
 
     it('blocks /api/admin/agent/ paths', async () => {
-      await expect(tool().handler({ path: '/api/admin/agent/actions', method: 'GET' })).rejects.toThrow(/forbidden|not accessible/i)
+      await expect(tool().handler({ path: '/api/admin/agent/actions', method: 'GET' })).rejects.toThrow(
+        /forbidden|not accessible/i
+      )
     })
 
     it('blocks /api/admin/admins paths', async () => {
@@ -753,7 +879,9 @@ describe('admin-agent/tools', () => {
     })
 
     it('throws for unsupported HTTP method', async () => {
-      await expect(tool().handler({ path: '/api/admin/orders', method: 'CONNECT' })).rejects.toThrow(/Unsupported method/)
+      await expect(tool().handler({ path: '/api/admin/orders', method: 'CONNECT' })).rejects.toThrow(
+        /Unsupported method/
+      )
     })
 
     it('throws when path does not start with /api/admin/', async () => {
@@ -766,11 +894,15 @@ describe('admin-agent/tools', () => {
 
     it('throws for body too large', async () => {
       const bigBody = JSON.stringify({ data: 'x'.repeat(17 * 1024) })
-      await expect(tool().handler({ path: '/api/admin/products/draft', method: 'POST', body: bigBody })).rejects.toThrow(/too large/)
+      await expect(
+        tool().handler({ path: '/api/admin/products/draft', method: 'POST', body: bigBody })
+      ).rejects.toThrow(/too large/)
     })
 
     it('throws for invalid JSON body', async () => {
-      await expect(tool().handler({ path: '/api/admin/products/draft', method: 'POST', body: '{invalid json' })).rejects.toThrow(/valid JSON/)
+      await expect(
+        tool().handler({ path: '/api/admin/products/draft', method: 'POST', body: '{invalid json' })
+      ).rejects.toThrow(/valid JSON/)
     })
 
     it('executes allowed GET request and returns immediate marker', async () => {
@@ -786,7 +918,11 @@ describe('admin-agent/tools', () => {
     })
 
     it('includes queryString in path when provided', async () => {
-      const result = await tool().handler({ path: '/api/admin/orders', method: 'GET', queryString: 'status=pending&limit=5' })
+      const result = await tool().handler({
+        path: '/api/admin/orders',
+        method: 'GET',
+        queryString: 'status=pending&limit=5',
+      })
       expect((result as any).path).toBe('/api/admin/orders?status=pending&limit=5')
     })
 
@@ -837,7 +973,14 @@ describe('admin-agent/tools', () => {
       mockQueryMany
         .mockResolvedValueOnce([{ id: 'u1', email: 'alice@test.com', first_name: 'Alice', last_name: 'Smith' }])
         .mockResolvedValueOnce([
-          { id: 'o1', order_number: 'ORD-001', status: 'delivered', payment_status: 'paid', total_amount: '500', created_at: '2024-01-01' },
+          {
+            id: 'o1',
+            order_number: 'ORD-001',
+            status: 'delivered',
+            payment_status: 'paid',
+            total_amount: '500',
+            created_at: '2024-01-01',
+          },
         ])
 
       const result = await tool().handler({ customerQuery: 'alice@test.com' })
@@ -864,17 +1007,31 @@ describe('admin-agent/tools', () => {
     })
 
     it('throws when neither orderId nor orderNumber provided', async () => {
-      await expect(tool().handler({ reason: 'test reason', delayDays: 3 })).rejects.toThrow(/Provide orderId or orderNumber/)
+      await expect(tool().handler({ reason: 'test reason', delayDays: 3 })).rejects.toThrow(
+        /Provide orderId or orderNumber/
+      )
     })
 
     it('rejects when order is delivered', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-001', status: 'delivered', customer_email: 'a@b.com', customer_name: 'Alice' })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'o1',
+        order_number: 'ORD-001',
+        status: 'delivered',
+        customer_email: 'a@b.com',
+        customer_name: 'Alice',
+      })
       const result = await tool().handler({ orderId: 'o1', reason: 'warehouse issue', delayDays: 7 })
       expect((result as any).proposed).toBe(false)
     })
 
     it('rejects when order is cancelled', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'o1', order_number: 'ORD-001', status: 'cancelled', customer_email: 'a@b.com', customer_name: 'Alice' })
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'o1',
+        order_number: 'ORD-001',
+        status: 'cancelled',
+        customer_email: 'a@b.com',
+        customer_name: 'Alice',
+      })
       const result = await tool().handler({ orderId: 'o1', reason: 'out of stock', delayDays: 7 })
       expect((result as any).proposed).toBe(false)
     })
@@ -894,8 +1051,11 @@ describe('admin-agent/tools', () => {
 
     it('proposes with singular day in confirmation for delayDays=1', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'o1', order_number: 'ORD-001', status: 'confirmed',
-        customer_email: 'c@d.com', customer_name: 'Carol',
+        id: 'o1',
+        order_number: 'ORD-001',
+        status: 'confirmed',
+        customer_email: 'c@d.com',
+        customer_name: 'Carol',
       })
       const result = await tool().handler({ orderId: 'o1', reason: 'delay', delayDays: 1 })
       expect((result as any).confirmation).toMatch(/1 day[^s]/)
@@ -903,15 +1063,22 @@ describe('admin-agent/tools', () => {
 
     it('throws when order not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      await expect(tool().handler({ orderId: 'nonexistent', reason: 'test', delayDays: 7 })).rejects.toThrow('Order not found')
+      await expect(tool().handler({ orderId: 'nonexistent', reason: 'test', delayDays: 7 })).rejects.toThrow(
+        'Order not found'
+      )
     })
 
     it('throws when order has no customer email', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'o1', order_number: 'ORD-001', status: 'processing',
-        customer_email: null, customer_name: 'Ghost',
+        id: 'o1',
+        order_number: 'ORD-001',
+        status: 'processing',
+        customer_email: null,
+        customer_name: 'Ghost',
       })
-      await expect(tool().handler({ orderId: 'o1', reason: 'delay', delayDays: 3 })).rejects.toThrow(/no customer email/)
+      await expect(tool().handler({ orderId: 'o1', reason: 'delay', delayDays: 3 })).rejects.toThrow(
+        /no customer email/
+      )
     })
   })
 
@@ -920,7 +1087,18 @@ describe('admin-agent/tools', () => {
 
     it('returns recently added products', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'New Product', slug: 'new-product', sku: 'NP1', price: '299', short_description: null, stock: 10, brand: 'BrandX', category: 'Cat1', created_at: '2024-06-01' },
+        {
+          id: 'p1',
+          name: 'New Product',
+          slug: 'new-product',
+          sku: 'NP1',
+          price: '299',
+          short_description: null,
+          stock: 10,
+          brand: 'BrandX',
+          category: 'Cat1',
+          created_at: '2024-06-01',
+        },
       ])
       const result = await tool().handler({})
       expect((result as any).products).toHaveLength(1)
@@ -939,7 +1117,17 @@ describe('admin-agent/tools', () => {
 
     it('returns featured products', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Featured', slug: 'featured', sku: 'F1', price: 499, stock: 20, image_url: null, brand: null, category: null },
+        {
+          id: 'p1',
+          name: 'Featured',
+          slug: 'featured',
+          sku: 'F1',
+          price: 499,
+          stock: 20,
+          image_url: null,
+          brand: null,
+          category: null,
+        },
       ])
       const result = await tool().handler({})
       expect((result as any).data.products).toHaveLength(1)
@@ -957,75 +1145,91 @@ describe('admin-agent/tools', () => {
     const tool = () => getTool('propose_product_announcement_email')!
 
     it('rejects intro with HTML tags', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: '<a href="https://example.com">Buy now!</a>',
-        subject: 'New product',
-      })).rejects.toThrow()
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: '<a href="https://example.com">Buy now!</a>',
+          subject: 'New product',
+        })
+      ).rejects.toThrow()
     })
 
     it('rejects intro with markdown links', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'Check [this](http://example.com) out',
-        subject: 'New product',
-      })).rejects.toThrow()
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'Check [this](http://example.com) out',
+          subject: 'New product',
+        })
+      ).rejects.toThrow()
     })
 
     it('rejects intro with markdown images', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'See ![img](http://example.com/img.png)',
-        subject: 'New product',
-      })).rejects.toThrow()
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'See ![img](http://example.com/img.png)',
+          subject: 'New product',
+        })
+      ).rejects.toThrow()
     })
 
     it('rejects when productIds is empty', async () => {
-      await expect(tool().handler({
-        productIds: [],
-        audience: 'all_opted_in',
-        intro: 'Great new products.',
-        subject: 'New Arrivals',
-      })).rejects.toThrow(/1-10 productIds/)
+      await expect(
+        tool().handler({
+          productIds: [],
+          audience: 'all_opted_in',
+          intro: 'Great new products.',
+          subject: 'New Arrivals',
+        })
+      ).rejects.toThrow(/1-10 productIds/)
     })
 
     it('rejects when productIds has more than 10', async () => {
-      await expect(tool().handler({
-        productIds: Array.from({ length: 11 }, (_, i) => `p${i}`),
-        audience: 'all_opted_in',
-        intro: 'Great new products.',
-        subject: 'New Arrivals',
-      })).rejects.toThrow(/1-10 productIds/)
+      await expect(
+        tool().handler({
+          productIds: Array.from({ length: 11 }, (_, i) => `p${i}`),
+          audience: 'all_opted_in',
+          intro: 'Great new products.',
+          subject: 'New Arrivals',
+        })
+      ).rejects.toThrow(/1-10 productIds/)
     })
 
     it('rejects invalid audience value', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'mystery_list',
-        intro: 'Great new products.',
-        subject: 'New Arrivals',
-      })).rejects.toThrow(/audience must be/)
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'mystery_list',
+          intro: 'Great new products.',
+          subject: 'New Arrivals',
+        })
+      ).rejects.toThrow(/audience must be/)
     })
 
     it('rejects subject that is too long', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'Short intro.',
-        subject: 'x'.repeat(81),
-      })).rejects.toThrow(/subject/)
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'Short intro.',
+          subject: 'x'.repeat(81),
+        })
+      ).rejects.toThrow(/subject/)
     })
 
     it('rejects intro that is too long', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'x'.repeat(241),
-        subject: 'New Arrivals',
-      })).rejects.toThrow(/intro/)
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'x'.repeat(241),
+          subject: 'New Arrivals',
+        })
+      ).rejects.toThrow(/intro/)
     })
 
     it('returns not-proposed when some productIds do not resolve', async () => {
@@ -1040,13 +1244,15 @@ describe('admin-agent/tools', () => {
     })
 
     it('proposes email for clean intro with all_opted_in audience', async () => {
-      mockQueryMany.mockResolvedValueOnce([{
-        id: 'p1',
-        name: 'Test Product',
-        slug: 'test-product',
-        price: '499',
-        short_description: null,
-      }])
+      mockQueryMany.mockResolvedValueOnce([
+        {
+          id: 'p1',
+          name: 'Test Product',
+          slug: 'test-product',
+          price: '499',
+          short_description: null,
+        },
+      ])
       mockQueryOne.mockResolvedValueOnce({ n: 100 })
       const result = await tool().handler({
         productIds: ['p1'],
@@ -1059,7 +1265,9 @@ describe('admin-agent/tools', () => {
     })
 
     it('proposes email with recent_buyers audience', async () => {
-      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null }])
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null },
+      ])
       mockQueryOne.mockResolvedValueOnce({ n: 45 })
       const result = await tool().handler({
         productIds: ['p1'],
@@ -1072,7 +1280,9 @@ describe('admin-agent/tools', () => {
     })
 
     it('proposes email with test_only audience', async () => {
-      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null }])
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null },
+      ])
       const result = await tool().handler({
         productIds: ['p1'],
         audience: 'test_only',
@@ -1086,32 +1296,40 @@ describe('admin-agent/tools', () => {
     })
 
     it('throws when test_only audience lacks valid testEmail', async () => {
-      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null }])
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'test_only',
-        testEmail: 'notanemail',
-        intro: 'Testing.',
-        subject: 'Test',
-      })).rejects.toThrow(/testEmail required/)
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'p1', name: 'Widget', slug: 'widget', price: '199', short_description: null },
+      ])
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'test_only',
+          testEmail: 'notanemail',
+          intro: 'Testing.',
+          subject: 'Test',
+        })
+      ).rejects.toThrow(/testEmail required/)
     })
 
     it('rejects intro with <img> HTML tag', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'Check out <img src="x.jpg"> this product.',
-        subject: 'New product',
-      })).rejects.toThrow()
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'Check out <img src="x.jpg"> this product.',
+          subject: 'New product',
+        })
+      ).rejects.toThrow()
     })
 
     it('rejects intro with <a href= HTML tag', async () => {
-      await expect(tool().handler({
-        productIds: ['p1'],
-        audience: 'all_opted_in',
-        intro: 'Visit us at <a href="https://example.com">here</a>.',
-        subject: 'New product',
-      })).rejects.toThrow()
+      await expect(
+        tool().handler({
+          productIds: ['p1'],
+          audience: 'all_opted_in',
+          intro: 'Visit us at <a href="https://example.com">here</a>.',
+          subject: 'New product',
+        })
+      ).rejects.toThrow()
     })
   })
 
@@ -1132,7 +1350,15 @@ describe('admin-agent/tools', () => {
 
     it('returns customers joined in the last 7 days by default', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'u1', email: 'new@test.com', first_name: 'New', last_name: 'User', phone: null, created_at: '2026-06-25', paid_orders: 0 },
+        {
+          id: 'u1',
+          email: 'new@test.com',
+          first_name: 'New',
+          last_name: 'User',
+          phone: null,
+          created_at: '2026-06-25',
+          paid_orders: 0,
+        },
       ])
       const result = await tool().handler({})
       expect((result as any).customers).toHaveLength(1)
@@ -1189,11 +1415,8 @@ describe('admin-agent/tools', () => {
         isDirectory: () => isDir,
         isFile: () => !isDir,
       })
-      mockFs.readdir
-        .mockResolvedValueOnce([fakeEnt('queries.ts', false), fakeEnt('utils.ts', false)])
-      mockFs.stat
-        .mockResolvedValueOnce({ size: 1024 })
-        .mockResolvedValueOnce({ size: 512 })
+      mockFs.readdir.mockResolvedValueOnce([fakeEnt('queries.ts', false), fakeEnt('utils.ts', false)])
+      mockFs.stat.mockResolvedValueOnce({ size: 1024 }).mockResolvedValueOnce({ size: 512 })
       const result = await tool().handler({ dir: 'src/lib' })
       expect((result as any).files).toBeDefined()
       expect((result as any).count).toBeGreaterThanOrEqual(0)

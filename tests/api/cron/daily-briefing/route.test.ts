@@ -67,7 +67,11 @@ describe('GET /api/cron/daily-briefing', () => {
   })
 
   it('skips check when force=1', async () => {
-    mockCollect.mockResolvedValueOnce({ yesterday: { revenue: 100, count: 5 }, stuck_shipments: [], low_stock: [] } as any)
+    mockCollect.mockResolvedValueOnce({
+      yesterday: { revenue: 100, count: 5 },
+      stuck_shipments: [],
+      low_stock: [],
+    } as any)
     mockNarrate.mockResolvedValueOnce('narration')
     mockRender.mockReturnValueOnce({ subject: 'Brief', html: '<p>hi</p>' })
     mockQueryMany.mockResolvedValueOnce([{ username: 'admin', email: 'admin@example.com' }])
@@ -92,7 +96,11 @@ describe('GET /api/cron/daily-briefing', () => {
 
   it('returns 500 when no active admins with email', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    mockCollect.mockResolvedValueOnce({ yesterday: { revenue: 0, count: 0 }, stuck_shipments: [], low_stock: [] } as any)
+    mockCollect.mockResolvedValueOnce({
+      yesterday: { revenue: 0, count: 0 },
+      stuck_shipments: [],
+      low_stock: [],
+    } as any)
     mockNarrate.mockResolvedValueOnce('')
     mockRender.mockReturnValueOnce({ subject: 'Brief', html: '<p>hi</p>' })
     mockQueryMany.mockResolvedValueOnce([])
@@ -106,7 +114,11 @@ describe('GET /api/cron/daily-briefing', () => {
 
   it('sends emails to all admins and returns success', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    mockCollect.mockResolvedValueOnce({ yesterday: { revenue: 500, count: 3 }, stuck_shipments: [], low_stock: [] } as any)
+    mockCollect.mockResolvedValueOnce({
+      yesterday: { revenue: 500, count: 3 },
+      stuck_shipments: [],
+      low_stock: [],
+    } as any)
     mockNarrate.mockResolvedValueOnce('some narration')
     mockRender.mockReturnValueOnce({ subject: 'Daily Brief', html: '<p>brief</p>' })
     mockQueryMany.mockResolvedValueOnce([
@@ -126,7 +138,11 @@ describe('GET /api/cron/daily-briefing', () => {
 
   it('counts failed email sends', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    mockCollect.mockResolvedValueOnce({ yesterday: { revenue: 0, count: 0 }, stuck_shipments: [], low_stock: [] } as any)
+    mockCollect.mockResolvedValueOnce({
+      yesterday: { revenue: 0, count: 0 },
+      stuck_shipments: [],
+      low_stock: [],
+    } as any)
     mockNarrate.mockResolvedValueOnce('')
     mockRender.mockReturnValueOnce({ subject: 'Brief', html: '<p>hi</p>' })
     mockQueryMany.mockResolvedValueOnce([{ username: 'admin', email: 'a@example.com' }])
@@ -141,7 +157,11 @@ describe('GET /api/cron/daily-briefing', () => {
 
   it('filters out admins with no valid email', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    mockCollect.mockResolvedValueOnce({ yesterday: { revenue: 0, count: 0 }, stuck_shipments: [], low_stock: [] } as any)
+    mockCollect.mockResolvedValueOnce({
+      yesterday: { revenue: 0, count: 0 },
+      stuck_shipments: [],
+      low_stock: [],
+    } as any)
     mockNarrate.mockResolvedValueOnce('')
     mockRender.mockReturnValueOnce({ subject: 'Brief', html: '' })
     mockQueryMany.mockResolvedValueOnce([

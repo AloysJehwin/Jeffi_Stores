@@ -95,12 +95,23 @@ describe('GET /api/admin/inventory/batches/available', () => {
 
   it('returns batches for perishable order items', async () => {
     vi.mocked(queryMany)
-      .mockResolvedValueOnce([{
-        order_item_id: 'oi-1', product_id: 'p1', variant_id: null, sub_variant_id: null,
-        product_name: 'Bolt', variant_name: null, quantity: '5', buy_unit: null,
-        batch_id: null, sold_unit_factor: null, base_quantity: '5',
-        perishable: true, serialized: false,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          order_item_id: 'oi-1',
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          product_name: 'Bolt',
+          variant_name: null,
+          quantity: '5',
+          buy_unit: null,
+          batch_id: null,
+          sold_unit_factor: null,
+          base_quantity: '5',
+          perishable: true,
+          serialized: false,
+        },
+      ] as any)
       .mockResolvedValueOnce(BATCHES as any)
     const res = await GET(makeReq({ order_id: 'ord-1' }))
     expect(res.status).toBe(200)
@@ -110,12 +121,23 @@ describe('GET /api/admin/inventory/batches/available', () => {
   })
 
   it('returns serialized_items for serialized order items', async () => {
-    vi.mocked(queryMany).mockResolvedValueOnce([{
-      order_item_id: 'oi-2', product_id: 'p2', variant_id: 'v1', sub_variant_id: null,
-      product_name: 'Serial', variant_name: 'V1', quantity: '1', buy_unit: null,
-      batch_id: 'b-assigned', sold_unit_factor: null, base_quantity: '1',
-      perishable: false, serialized: true,
-    }] as any)
+    vi.mocked(queryMany).mockResolvedValueOnce([
+      {
+        order_item_id: 'oi-2',
+        product_id: 'p2',
+        variant_id: 'v1',
+        sub_variant_id: null,
+        product_name: 'Serial',
+        variant_name: 'V1',
+        quantity: '1',
+        buy_unit: null,
+        batch_id: 'b-assigned',
+        sold_unit_factor: null,
+        base_quantity: '1',
+        perishable: false,
+        serialized: true,
+      },
+    ] as any)
     const res = await GET(makeReq({ order_id: 'ord-1' }))
     const body = await res.json()
     expect(body.serialized_items).toHaveLength(1)
@@ -124,12 +146,23 @@ describe('GET /api/admin/inventory/batches/available', () => {
 
   it('applies sold_unit_factor when > 1', async () => {
     vi.mocked(queryMany)
-      .mockResolvedValueOnce([{
-        order_item_id: 'oi-3', product_id: 'p3', variant_id: null, sub_variant_id: null,
-        product_name: 'P', variant_name: null, quantity: '2', buy_unit: 'box',
-        batch_id: null, sold_unit_factor: '12', base_quantity: '2',
-        perishable: true, serialized: false,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          order_item_id: 'oi-3',
+          product_id: 'p3',
+          variant_id: null,
+          sub_variant_id: null,
+          product_name: 'P',
+          variant_name: null,
+          quantity: '2',
+          buy_unit: 'box',
+          batch_id: null,
+          sold_unit_factor: '12',
+          base_quantity: '2',
+          perishable: true,
+          serialized: false,
+        },
+      ] as any)
       .mockResolvedValueOnce([] as any)
     const res = await GET(makeReq({ order_id: 'ord-1' }))
     const body = await res.json()
@@ -148,11 +181,21 @@ describe('GET /api/admin/inventory/batches/available', () => {
 
   it('returns batches for perishable quotation items', async () => {
     vi.mocked(queryMany)
-      .mockResolvedValueOnce([{
-        order_item_id: 'qi-1', product_id: 'p1', variant_id: null, sub_variant_id: null,
-        product_name: 'Bolt', variant_name: null, quantity: '3',
-        sold_unit_factor: null, base_quantity: '3', perishable: true, serialized: false,
-      }] as any)
+      .mockResolvedValueOnce([
+        {
+          order_item_id: 'qi-1',
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          product_name: 'Bolt',
+          variant_name: null,
+          quantity: '3',
+          sold_unit_factor: null,
+          base_quantity: '3',
+          perishable: true,
+          serialized: false,
+        },
+      ] as any)
       .mockResolvedValueOnce(BATCHES as any)
     const res = await GET(makeReq({ quotation_id: 'q-1' }))
     expect(res.status).toBe(200)
@@ -161,11 +204,21 @@ describe('GET /api/admin/inventory/batches/available', () => {
   })
 
   it('returns serialized_items for serialized quotation items', async () => {
-    vi.mocked(queryMany).mockResolvedValueOnce([{
-      order_item_id: 'qi-2', product_id: 'p2', variant_id: 'v1', sub_variant_id: null,
-      product_name: 'Serial', variant_name: null, quantity: '1',
-      sold_unit_factor: null, base_quantity: '1', perishable: false, serialized: true,
-    }] as any)
+    vi.mocked(queryMany).mockResolvedValueOnce([
+      {
+        order_item_id: 'qi-2',
+        product_id: 'p2',
+        variant_id: 'v1',
+        sub_variant_id: null,
+        product_name: 'Serial',
+        variant_name: null,
+        quantity: '1',
+        sold_unit_factor: null,
+        base_quantity: '1',
+        perishable: false,
+        serialized: true,
+      },
+    ] as any)
     const res = await GET(makeReq({ quotation_id: 'q-1' }))
     const body = await res.json()
     expect(body.serialized_items).toHaveLength(1)

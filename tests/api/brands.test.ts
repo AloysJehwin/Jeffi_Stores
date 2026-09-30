@@ -36,10 +36,7 @@ function makeReq(method: string, body?: Record<string, unknown>) {
 
 const adminPayload = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
 const sampleBrand = { id: 'brand-1', name: 'Unbrako', slug: 'unbrako', is_active: true }
-const sampleBrandList = [
-  sampleBrand,
-  { id: 'brand-2', name: 'Fischer', slug: 'fischer', is_active: true },
-]
+const sampleBrandList = [sampleBrand, { id: 'brand-2', name: 'Fischer', slug: 'fischer', is_active: true }]
 
 describe('GET /api/brands', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -165,10 +162,9 @@ describe('PATCH /api/brands/[id]', () => {
   it('updates brand successfully', async () => {
     queryOneMock.mockResolvedValue({ id: 'brand-1' })
 
-    const res = await patchBrand(
-      makeReq('PATCH', { name: 'Updated', slug: 'updated' }) as any,
-      { params: Promise.resolve({ id: 'brand-1' }) }
-    )
+    const res = await patchBrand(makeReq('PATCH', { name: 'Updated', slug: 'updated' }) as any, {
+      params: Promise.resolve({ id: 'brand-1' }),
+    })
     expect(res.status).toBe(200)
 
     const body = await res.json()
@@ -178,18 +174,16 @@ describe('PATCH /api/brands/[id]', () => {
   it('returns 404 when brand not found during update', async () => {
     queryOneMock.mockResolvedValue(null)
 
-    const res = await patchBrand(
-      makeReq('PATCH', { name: 'X', slug: 'x' }) as any,
-      { params: Promise.resolve({ id: 'nope' }) }
-    )
+    const res = await patchBrand(makeReq('PATCH', { name: 'X', slug: 'x' }) as any, {
+      params: Promise.resolve({ id: 'nope' }),
+    })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when name or slug is missing', async () => {
-    const res = await patchBrand(
-      makeReq('PATCH', { name: 'Only Name' }) as any,
-      { params: Promise.resolve({ id: 'brand-1' }) }
-    )
+    const res = await patchBrand(makeReq('PATCH', { name: 'Only Name' }) as any, {
+      params: Promise.resolve({ id: 'brand-1' }),
+    })
     expect(res.status).toBe(400)
   })
 })

@@ -175,7 +175,13 @@ describe('POST /api/webhooks/razorpay', () => {
 
   it('handles payment_link.paid — processes with user', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ payment_status: 'unpaid', id: 'ord1', user_id: 'u1', total_amount: '200', order_number: '#2' })
+      .mockResolvedValueOnce({
+        payment_status: 'unpaid',
+        id: 'ord1',
+        user_id: 'u1',
+        total_amount: '200',
+        order_number: '#2',
+      })
       .mockResolvedValueOnce({ id: 'u1', email: 'u@e.com', first_name: 'A', last_name: 'B' })
       .mockResolvedValueOnce({ id: 'ord1' })
     mockQueryMany.mockResolvedValueOnce([])

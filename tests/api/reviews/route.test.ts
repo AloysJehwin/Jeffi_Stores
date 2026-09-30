@@ -24,7 +24,7 @@ vi.mock('@/lib/activity', () => ({
 vi.mock('@/lib/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -60,7 +60,9 @@ function makeFormRequest(fields: Record<string, string | File>, method = 'POST')
 }
 
 describe('GET /api/reviews', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 when productId is missing', async () => {
     const res = await GET(makeGetRequest() as any)
@@ -94,7 +96,9 @@ describe('GET /api/reviews', () => {
 })
 
 describe('PATCH /api/reviews', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -124,7 +128,7 @@ describe('PATCH /api/reviews', () => {
   it('updates review and returns message', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'r1' })   // existing check
+      .mockResolvedValueOnce({ id: 'r1' }) // existing check
       .mockResolvedValueOnce({ id: 'r1', rating: 4, comment: 'ok' }) // updated
 
     const res = await PATCH(makeFormRequest({ reviewId: 'r1', rating: '4', comment: 'ok' }, 'PATCH') as any)
@@ -136,7 +140,7 @@ describe('PATCH /api/reviews', () => {
   it('uploads new image files during PATCH and returns updated review', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'r1' })   // existing check
+      .mockResolvedValueOnce({ id: 'r1' }) // existing check
       .mockResolvedValueOnce({ id: 'r1', rating: 5, comment: 'good', image_urls: ['https://cdn/new.jpg'] }) // updated
 
     mockUpload.mockResolvedValueOnce({ url: 'https://cdn/new.jpg', thumbnailUrl: 'https://cdn/thumb_new.jpg' } as any)
@@ -148,7 +152,7 @@ describe('PATCH /api/reviews', () => {
     fd.append('images', new File(['imgdata'], 'review.png', { type: 'image/png' }))
 
     const req = new Request('http://localhost/api/reviews', { method: 'PATCH', body: fd })
-    const res = await req.clone ? await PATCH(req as any) : await PATCH(req as any)
+    const res = (await req.clone) ? await PATCH(req as any) : await PATCH(req as any)
     expect(res.status).toBe(200)
     expect(mockUpload).toHaveBeenCalledOnce()
   })
@@ -163,7 +167,9 @@ describe('PATCH /api/reviews', () => {
 })
 
 describe('POST /api/reviews', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -173,10 +179,11 @@ describe('POST /api/reviews', () => {
 
   it('returns 400 when user already reviewed', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'existing-review' }) // existing review check
+    mockQueryOne.mockResolvedValueOnce({ id: 'existing-review' }) // existing review check
 
-    const res = await POST(makeFormRequest({ productId: PRODUCT_ID, rating: '5', comment: 'Great product already!' }) as any)
+    const res = await POST(
+      makeFormRequest({ productId: PRODUCT_ID, rating: '5', comment: 'Great product already!' }) as any
+    )
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toContain('already reviewed')
@@ -185,16 +192,18 @@ describe('POST /api/reviews', () => {
   it('creates review, sends notification, returns 200', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing review
-      .mockResolvedValueOnce(null)   // no purchase
+      .mockResolvedValueOnce(null) // no existing review
+      .mockResolvedValueOnce(null) // no purchase
       .mockResolvedValueOnce({ id: 'r-new', rating: 4, comment: 'Good product!' }) // inserted review
-      .mockResolvedValueOnce({ name: 'Hex Bolt' })  // reviewedProduct
+      .mockResolvedValueOnce({ name: 'Hex Bolt' }) // reviewedProduct
       .mockResolvedValueOnce({ first_name: 'John', last_name: 'D', email: 'j@example.com' }) // userDetails
       .mockResolvedValueOnce({ name: 'Hex Bolt', slug: 'hex-bolt' }) // product for notification
 
     mockSendNotif.mockResolvedValueOnce(undefined as any)
 
-    const res = await POST(makeFormRequest({ productId: PRODUCT_ID, rating: '4', comment: 'Good product here!' }) as any)
+    const res = await POST(
+      makeFormRequest({ productId: PRODUCT_ID, rating: '4', comment: 'Good product here!' }) as any
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.message).toContain('submitted')
@@ -203,8 +212,8 @@ describe('POST /api/reviews', () => {
   it('creates auto task for low rating (<=2)', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing review
-      .mockResolvedValueOnce(null)   // no purchase
+      .mockResolvedValueOnce(null) // no existing review
+      .mockResolvedValueOnce(null) // no purchase
       .mockResolvedValueOnce({ id: 'r-new', rating: 1 }) // inserted review
       .mockResolvedValueOnce({ name: 'Bolt' })
       .mockResolvedValueOnce({ first_name: 'J', last_name: 'D', email: 'j@e.com' })
@@ -213,7 +222,9 @@ describe('POST /api/reviews', () => {
     mockSendNotif.mockResolvedValueOnce(undefined as any)
     mockCreateTask.mockResolvedValueOnce(undefined as any)
 
-    await POST(makeFormRequest({ productId: PRODUCT_ID, rating: '1', comment: 'Terrible product experience here' }) as any)
+    await POST(
+      makeFormRequest({ productId: PRODUCT_ID, rating: '1', comment: 'Terrible product experience here' }) as any
+    )
     // createAutoTask is called fire-and-forget; we just ensure no crash
     expect(mockAuth).toHaveBeenCalled()
   })
@@ -221,8 +232,8 @@ describe('POST /api/reviews', () => {
   it('marks is_verified_purchase=true when user has delivered order', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing review
-      .mockResolvedValueOnce({ id: 'oi1' })  // has purchase!
+      .mockResolvedValueOnce(null) // no existing review
+      .mockResolvedValueOnce({ id: 'oi1' }) // has purchase!
       .mockResolvedValueOnce({ id: 'r-new', rating: 5, is_verified_purchase: true })
       .mockResolvedValueOnce({ name: 'Bolt' })
       .mockResolvedValueOnce({ first_name: 'J', last_name: 'D', email: 'j@e.com' })
@@ -230,11 +241,13 @@ describe('POST /api/reviews', () => {
 
     mockSendNotif.mockResolvedValueOnce(undefined as any)
 
-    const res = await POST(makeFormRequest({ productId: PRODUCT_ID, rating: '5', comment: 'Verified purchase review here!' }) as any)
+    const res = await POST(
+      makeFormRequest({ productId: PRODUCT_ID, rating: '5', comment: 'Verified purchase review here!' }) as any
+    )
     expect(res.status).toBe(200)
     // is_verified_purchase=true should be passed to queryOne insert
-    const insertCall = mockQueryOne.mock.calls.find(c =>
-      typeof c[0] === 'string' && c[0].includes('INSERT INTO product_reviews')
+    const insertCall = mockQueryOne.mock.calls.find(
+      c => typeof c[0] === 'string' && c[0].includes('INSERT INTO product_reviews')
     )
     expect(insertCall).toBeDefined()
     expect(insertCall![1]).toContain(true)
@@ -243,8 +256,8 @@ describe('POST /api/reviews', () => {
   it('uploads review images and calls query UPDATE after inserting review', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne
-      .mockResolvedValueOnce(null)   // no existing review
-      .mockResolvedValueOnce(null)   // no purchase
+      .mockResolvedValueOnce(null) // no existing review
+      .mockResolvedValueOnce(null) // no purchase
       .mockResolvedValueOnce({ id: 'r-img', rating: 4, comment: 'With image review' })
       .mockResolvedValueOnce({ name: 'Hex Bolt' })
       .mockResolvedValueOnce({ first_name: 'Jane', last_name: 'D', email: 'jane@example.com' })

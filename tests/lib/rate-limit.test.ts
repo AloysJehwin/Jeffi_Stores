@@ -22,11 +22,7 @@ import { NextRequest } from 'next/server'
 
 function makeRequest(
   pathname: string,
-  {
-    ip = '1.2.3.4',
-    xForwardedFor,
-    xRealIp,
-  }: { ip?: string; xForwardedFor?: string; xRealIp?: string } = {}
+  { ip = '1.2.3.4', xForwardedFor, xRealIp }: { ip?: string; xForwardedFor?: string; xRealIp?: string } = {}
 ): NextRequest {
   const url = `https://example.com${pathname}`
   const headers = new Headers()
@@ -73,17 +69,14 @@ describe('TIER pattern matching', () => {
     ['/api/misc/other', 60],
   ]
 
-  it.each(tierCases)(
-    'path %s is rate-limited (config found)',
-    async (path, _expectedMax) => {
-      const { applyRateLimit } = await import('@/lib/rate-limit')
-      // First call should never be over limit (count = 1)
-      const req = makeRequest(path)
-      const result = await applyRateLimit(req)
-      // Under the limit on first call → null
-      expect(result).toBeNull()
-    }
-  )
+  it.each(tierCases)('path %s is rate-limited (config found)', async (path, _expectedMax) => {
+    const { applyRateLimit } = await import('@/lib/rate-limit')
+    // First call should never be over limit (count = 1)
+    const req = makeRequest(path)
+    const result = await applyRateLimit(req)
+    // Under the limit on first call → null
+    expect(result).toBeNull()
+  })
 
   it('returns null for a path that does not match any tier', async () => {
     const { applyRateLimit } = await import('@/lib/rate-limit')
@@ -210,10 +203,13 @@ describe('Redis path — fetch error falls back to mem-store', () => {
   })
 
   it('falls back to mem-store when JSON has no result field', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [{ result: 'not-a-number' }],
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ result: 'not-a-number' }],
+      })
+    )
     const { applyRateLimit } = await import('@/lib/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     expect(res).toBeNull()

@@ -42,7 +42,16 @@ vi.mock('next/headers', () => ({
 import { POST as enrollStart } from '@/app/api/admin/mfa/enroll-start/route'
 import { POST as enrollConfirm } from '@/app/api/admin/mfa/enroll-confirm/route'
 import { POST as mfaVerify } from '@/app/api/admin/mfa/verify/route'
-import { verifyMfaTicket, generateTotpSecret, buildOtpauthUrl, encryptSecret, generateRecoveryCodes, verifyTotp, decryptSecret, hashRecoveryCode } from '@/lib/mfa'
+import {
+  verifyMfaTicket,
+  generateTotpSecret,
+  buildOtpauthUrl,
+  encryptSecret,
+  generateRecoveryCodes,
+  verifyTotp,
+  decryptSecret,
+  hashRecoveryCode,
+} from '@/lib/mfa'
 import { queryOne, query } from '@/lib/db'
 import { issueAdminSession } from '@/lib/admin-session'
 import { NextResponse } from 'next/server'
@@ -162,7 +171,9 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
   it('returns 401 for invalid ticket', async () => {
     mockVerifyTicket.mockResolvedValue(null)
     const req = makePostRequest('http://localhost/api/admin/mfa/enroll-confirm', {
-      ticket: 'bad', secret: 'SEC', code: '123456',
+      ticket: 'bad',
+      secret: 'SEC',
+      code: '123456',
     })
     const res = await enrollConfirm(req)
     expect(res.status).toBe(401)
@@ -172,7 +183,9 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
     mockVerifyTicket.mockResolvedValue(validTicketPayload)
     mockVerifyTotp.mockResolvedValue(false)
     const req = makePostRequest('http://localhost/api/admin/mfa/enroll-confirm', {
-      ticket: 'valid', secret: 'SEC', code: '000000',
+      ticket: 'valid',
+      secret: 'SEC',
+      code: '000000',
     })
     const res = await enrollConfirm(req)
     expect(res.status).toBe(401)
@@ -185,7 +198,9 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
     mockVerifyTotp.mockResolvedValue(true)
     mockQueryOne.mockResolvedValue(null)
     const req = makePostRequest('http://localhost/api/admin/mfa/enroll-confirm', {
-      ticket: 'valid', secret: 'SEC', code: '123456',
+      ticket: 'valid',
+      secret: 'SEC',
+      code: '123456',
     })
     const res = await enrollConfirm(req)
     expect(res.status).toBe(404)
@@ -196,7 +211,9 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
     mockVerifyTotp.mockResolvedValue(true)
     mockQueryOne.mockResolvedValue({ ...adminRow, mfa_enabled: true })
     const req = makePostRequest('http://localhost/api/admin/mfa/enroll-confirm', {
-      ticket: 'valid', secret: 'SEC', code: '123456',
+      ticket: 'valid',
+      secret: 'SEC',
+      code: '123456',
     })
     const res = await enrollConfirm(req)
     expect(res.status).toBe(400)
@@ -223,7 +240,9 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
 
     const req = makePostRequest('http://localhost/api/admin/mfa/enroll-confirm', {
-      ticket: 'valid', secret: 'SEC', code: '123456',
+      ticket: 'valid',
+      secret: 'SEC',
+      code: '123456',
     })
     const res = await enrollConfirm(req)
     expect(res.status).toBe(200)
@@ -250,7 +269,8 @@ describe('POST /api/admin/mfa/verify', () => {
   it('returns 401 for invalid ticket', async () => {
     mockVerifyTicket.mockResolvedValue(null)
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
-      ticket: 'bad', code: '123456',
+      ticket: 'bad',
+      code: '123456',
     })
     const res = await mfaVerify(req)
     expect(res.status).toBe(401)
@@ -260,7 +280,8 @@ describe('POST /api/admin/mfa/verify', () => {
     mockVerifyTicket.mockResolvedValue(validVerifyTicketPayload)
     mockQueryOne.mockResolvedValue(null)
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
-      ticket: 'valid', code: '123456',
+      ticket: 'valid',
+      code: '123456',
     })
     const res = await mfaVerify(req)
     expect(res.status).toBe(400)
@@ -275,7 +296,8 @@ describe('POST /api/admin/mfa/verify', () => {
     mockVerifyTotp.mockResolvedValue(false)
 
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
-      ticket: 'valid', code: '000000',
+      ticket: 'valid',
+      code: '000000',
     })
     const res = await mfaVerify(req)
     expect(res.status).toBe(401)
@@ -289,11 +311,15 @@ describe('POST /api/admin/mfa/verify', () => {
     mockDecryptSecret.mockReturnValue('PLAIN_SECRET')
     mockVerifyTotp.mockResolvedValue(true)
 
-    const sessionResponse = NextResponse.json({ success: true, admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' } })
+    const sessionResponse = NextResponse.json({
+      success: true,
+      admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' },
+    })
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
 
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
-      ticket: 'valid', code: '123456',
+      ticket: 'valid',
+      code: '123456',
     })
     const res = await mfaVerify(req)
     expect(res.status).toBe(200)
@@ -305,24 +331,25 @@ describe('POST /api/admin/mfa/verify', () => {
     mockVerifyTicket.mockResolvedValue(validVerifyTicketPayload)
     const adminWithMfa = { ...adminRow, mfa_enabled: true, mfa_secret_enc: 'encrypted' }
     mockQueryOne
-      .mockResolvedValueOnce(adminWithMfa)      // admin fetch
+      .mockResolvedValueOnce(adminWithMfa) // admin fetch
       .mockResolvedValueOnce({ id: 'rcode-1' }) // recovery code lookup
 
     mockHashRecoveryCode.mockReturnValue('code-hash-abc')
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const sessionResponse = NextResponse.json({ success: true, admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' } })
+    const sessionResponse = NextResponse.json({
+      success: true,
+      admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' },
+    })
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
 
     // Recovery code format: AAAAA-BBBBB (not 6 digits)
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
-      ticket: 'valid', code: 'AAAAA-BBBBB',
+      ticket: 'valid',
+      code: 'AAAAA-BBBBB',
     })
     const res = await mfaVerify(req)
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('used_at'),
-      expect.arrayContaining(['rcode-1']),
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('used_at'), expect.arrayContaining(['rcode-1']))
   })
 })

@@ -31,8 +31,13 @@ beforeEach(() => {
 })
 
 const subOpts = {
-  planSlug: 'basic', planName: 'Basic', interval: 'monthly' as const,
-  ownerEmail: 'o@acme.in', ownerName: 'Owner', tenantId: 't-1', tenantSlug: 'acme',
+  planSlug: 'basic',
+  planName: 'Basic',
+  interval: 'monthly' as const,
+  ownerEmail: 'o@acme.in',
+  ownerName: 'Owner',
+  tenantId: 't-1',
+  tenantSlug: 'acme',
   callbackUrl: 'https://acme.jeffistores.in/cb',
 }
 
@@ -89,8 +94,9 @@ describe('createRazorpaySubscription', () => {
 
   it('throws for an unknown plan slug (no pinned env, zero amount)', async () => {
     const { createRazorpaySubscription } = await import('@/lib/razorpay-subscriptions')
-    await expect(createRazorpaySubscription({ ...subOpts, planSlug: 'mystery' }))
-      .rejects.toThrow(/Unknown plan slug: mystery/)
+    await expect(createRazorpaySubscription({ ...subOpts, planSlug: 'mystery' })).rejects.toThrow(
+      /Unknown plan slug: mystery/
+    )
     expect(rz.plans.create).not.toHaveBeenCalled()
   })
 
@@ -108,16 +114,23 @@ describe('createRazorpaySubscription', () => {
 // ── upgradeSubscription — proration ─────────────────────────────────────────
 describe('upgradeSubscription', () => {
   const upOpts = {
-    oldSubscriptionId: 'sub_old', newPlanSlug: 'growth', newPlanName: 'Growth',
-    newInterval: 'monthly' as const, ownerEmail: 'o@acme.in', ownerName: 'Owner',
-    tenantId: 't-1', tenantSlug: 'acme', callbackUrl: 'u',
+    oldSubscriptionId: 'sub_old',
+    newPlanSlug: 'growth',
+    newPlanName: 'Growth',
+    newInterval: 'monthly' as const,
+    ownerEmail: 'o@acme.in',
+    ownerName: 'Owner',
+    tenantId: 't-1',
+    tenantSlug: 'acme',
+    callbackUrl: 'u',
   }
 
   it('cancels the old sub, prorates the unused half-cycle into a negative addon', async () => {
     const now = Math.floor(Date.now() / 1000)
     // Half the cycle remains → half the ₹4999 (499900 paise) old plan = 249950 credit.
     rz.subscriptions.fetch.mockResolvedValue({
-      current_start: now - 15 * 86400, current_end: now + 15 * 86400,
+      current_start: now - 15 * 86400,
+      current_end: now + 15 * 86400,
       plan: { item: { amount: 499900 } },
     })
     rz.subscriptions.cancel.mockResolvedValue({})
@@ -138,7 +151,9 @@ describe('upgradeSubscription', () => {
   it('adds no addon when there is no remaining credit (cycle already ended)', async () => {
     const now = Math.floor(Date.now() / 1000)
     rz.subscriptions.fetch.mockResolvedValue({
-      current_start: now - 30 * 86400, current_end: now - 1, plan: { item: { amount: 499900 } },
+      current_start: now - 30 * 86400,
+      current_end: now - 1,
+      plan: { item: { amount: 499900 } },
     })
     rz.subscriptions.cancel.mockResolvedValue({})
     rz.plans.create.mockResolvedValue({ id: 'plan_growth' })
@@ -163,7 +178,9 @@ describe('upgradeSubscription', () => {
     process.env.RAZORPAY_YEARLY_OFFER_ID = 'offer_up_yr'
     const now = Math.floor(Date.now() / 1000)
     rz.subscriptions.fetch.mockResolvedValue({
-      current_start: now - 10, current_end: now - 1, plan: { item: { amount: 0 } },
+      current_start: now - 10,
+      current_end: now - 1,
+      plan: { item: { amount: 0 } },
     })
     rz.subscriptions.cancel.mockResolvedValue({})
     rz.plans.create.mockResolvedValue({ id: 'plan_growth_yr' })
@@ -182,11 +199,19 @@ describe('downgradeSubscription', () => {
     rz.subscriptions.fetch.mockResolvedValue({ current_end: 1700000000 })
     const { downgradeSubscription } = await import('@/lib/razorpay-subscriptions')
     const out = await downgradeSubscription({
-      subscriptionId: 'sub_1', newPlanSlug: 'basic', newPlanName: 'Basic', newInterval: 'monthly',
+      subscriptionId: 'sub_1',
+      newPlanSlug: 'basic',
+      newPlanName: 'Basic',
+      newInterval: 'monthly',
     })
-    expect(rz.subscriptions.update).toHaveBeenCalledWith('sub_1', expect.objectContaining({
-      plan_id: 'plan_basic', schedule_change_at: 'cycle_end', quantity: 1,
-    }))
+    expect(rz.subscriptions.update).toHaveBeenCalledWith(
+      'sub_1',
+      expect.objectContaining({
+        plan_id: 'plan_basic',
+        schedule_change_at: 'cycle_end',
+        quantity: 1,
+      })
+    )
     expect(out).toEqual({ scheduledAt: 1700000000 })
   })
 
@@ -196,7 +221,10 @@ describe('downgradeSubscription', () => {
     rz.subscriptions.fetch.mockResolvedValue({})
     const { downgradeSubscription } = await import('@/lib/razorpay-subscriptions')
     const out = await downgradeSubscription({
-      subscriptionId: 'sub_1', newPlanSlug: 'basic', newPlanName: 'Basic', newInterval: 'monthly',
+      subscriptionId: 'sub_1',
+      newPlanSlug: 'basic',
+      newPlanName: 'Basic',
+      newInterval: 'monthly',
     })
     expect(out.scheduledAt).toBe(0)
   })

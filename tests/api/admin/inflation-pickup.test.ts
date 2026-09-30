@@ -36,7 +36,14 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockWithTx = vi.mocked(withTransaction)
 const mockParseBody = vi.mocked(parseBody)
 
-const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation', 'orders'], first_name: 'Test', last_name: 'Admin' }
+const ADMIN = {
+  adminId: 'a1',
+  username: 'admin',
+  role: 'super_admin',
+  scopes: ['inflation', 'orders'],
+  first_name: 'Test',
+  last_name: 'Admin',
+}
 
 function makePost(body: unknown) {
   return new NextRequest('http://localhost/api/admin/inflation', {
@@ -69,7 +76,17 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
     mockParseBody.mockReturnValue({ ok: true, data: { percentage: 5, categoryId: 'cat-1' } } as any)
     // product with mrp_ex_gst = 0 → hits the else branch at line 174
     mockQueryMany.mockResolvedValue([
-      { id: 'p-zero', name: 'No Price Product', has_variants: false, mrp_ex_gst: '0', mrp: '0', price_ex_gst: '0', base_price: '0', discount_pct: '0', gst_percentage: '18' },
+      {
+        id: 'p-zero',
+        name: 'No Price Product',
+        has_variants: false,
+        mrp_ex_gst: '0',
+        mrp: '0',
+        price_ex_gst: '0',
+        base_price: '0',
+        discount_pct: '0',
+        gst_percentage: '18',
+      },
     ] as any)
 
     const insertCalls: any[] = []
@@ -88,7 +105,9 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
     expect(data.success).toBe(true)
     expect(data.product_count).toBe(1)
     // No UPDATE products call should have fired for the zero-price product
-    const updateCalls = mockClient.query.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('UPDATE products SET'))
+    const updateCalls = mockClient.query.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE products SET')
+    )
     expect(updateCalls).toHaveLength(0)
     // snapshot in the log insert has before === after for the zero product
     const snapshotJson = JSON.parse(insertCalls[0][7])
@@ -101,7 +120,17 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
     mockParseBody.mockReturnValue({ ok: true, data: { percentage: 5, categoryId: 'cat-1' } } as any)
     // valid product so it updates, but its variant has zero mrp_ex_gst → line 213 else
     mockQueryMany.mockResolvedValue([
-      { id: 'p1', name: 'Bolt', has_variants: true, mrp_ex_gst: '100', mrp: '118', price_ex_gst: '80', base_price: '94.40', discount_pct: '20', gst_percentage: '18' },
+      {
+        id: 'p1',
+        name: 'Bolt',
+        has_variants: true,
+        mrp_ex_gst: '100',
+        mrp: '118',
+        price_ex_gst: '80',
+        base_price: '94.40',
+        discount_pct: '20',
+        gst_percentage: '18',
+      },
     ] as any)
 
     let insertParams: any[] | undefined
@@ -110,7 +139,17 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
         if (sql.includes('product_variants pv')) {
           return {
             rows: [
-              { id: 'v-zero', product_id: 'p1', variant_name: 'Broken', mrp_ex_gst: '0', mrp: '0', price_ex_gst: '0', price: '0', discount_pct: '20', gst_percentage: '18' },
+              {
+                id: 'v-zero',
+                product_id: 'p1',
+                variant_name: 'Broken',
+                mrp_ex_gst: '0',
+                mrp: '0',
+                price_ex_gst: '0',
+                price: '0',
+                discount_pct: '20',
+                gst_percentage: '18',
+              },
             ],
           }
         }
@@ -124,7 +163,9 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
     const res = await INFLATION_POST(makePost(validBody))
     expect(res.status).toBe(200)
     // no UPDATE product_variants for the zero-price variant
-    const variantUpdates = mockClient.query.mock.calls.filter(([sql]) => typeof sql === 'string' && sql.includes('UPDATE product_variants SET'))
+    const variantUpdates = mockClient.query.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && sql.includes('UPDATE product_variants SET')
+    )
     expect(variantUpdates).toHaveLength(0)
     const snapshot = JSON.parse(insertParams![7])
     const variantSnap = snapshot[0].variants[0]
@@ -133,11 +174,26 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
   })
 
   it('falls back to email in snapshot log when admin has no first/last name', async () => {
-    mockAuth.mockResolvedValue({ adminId: 'a2', email: 'noname@jeffistores.in', role: 'super_admin', scopes: ['inflation'] } as any)
+    mockAuth.mockResolvedValue({
+      adminId: 'a2',
+      email: 'noname@jeffistores.in',
+      role: 'super_admin',
+      scopes: ['inflation'],
+    } as any)
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true, data: { percentage: 5, categoryId: 'cat-1' } } as any)
     mockQueryMany.mockResolvedValue([
-      { id: 'p1', name: 'Bolt', has_variants: false, mrp_ex_gst: '100', mrp: '118', price_ex_gst: '80', base_price: '94.40', discount_pct: '20', gst_percentage: '18' },
+      {
+        id: 'p1',
+        name: 'Bolt',
+        has_variants: false,
+        mrp_ex_gst: '100',
+        mrp: '118',
+        price_ex_gst: '80',
+        base_price: '94.40',
+        discount_pct: '20',
+        gst_percentage: '18',
+      },
     ] as any)
 
     let appliedBy: string | undefined
@@ -178,14 +234,17 @@ describe('GET /api/admin/delhivery/pickup-request?poll — scan activity resolut
     mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB1'], pickup_status: 'pending' } as any)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({
-        ShipmentData: [{
-          Shipment: {
-            Status: { StatusType: statusType },
-            Scans: [{ ScanDetail: { ScanType: null, Scan: activity } }],
-          },
-        }],
-      }),
+      json: () =>
+        Promise.resolve({
+          ShipmentData: [
+            {
+              Shipment: {
+                Status: { StatusType: statusType },
+                Scans: [{ ScanDetail: { ScanType: null, Scan: activity } }],
+              },
+            },
+          ],
+        }),
     })
     mockQuery.mockResolvedValue({ rows: [] } as any)
   }

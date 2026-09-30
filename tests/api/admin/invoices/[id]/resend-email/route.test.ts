@@ -119,7 +119,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
       'INV-2024-001',
       1200,
       'ORD-001',
-      expect.stringContaining('view-token-abc'),
+      expect.stringContaining('view-token-abc')
     )
   })
 

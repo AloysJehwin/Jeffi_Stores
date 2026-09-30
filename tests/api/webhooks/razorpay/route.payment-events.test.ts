@@ -9,9 +9,9 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-  withTransaction: vi.fn().mockImplementation(async (fn: any) =>
-    fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })
-  ),
+  withTransaction: vi
+    .fn()
+    .mockImplementation(async (fn: any) => fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })),
 }))
 
 vi.mock('@/lib/email', () => ({
@@ -214,7 +214,13 @@ describe('payment.captured', () => {
 
   it('unpaid record with user_id → runs transaction, deletes cart, sends emails (email failures swallowed by .catch)', async () => {
     queryOne
-      .mockResolvedValueOnce({ order_id: 'o1', payment_status: 'unpaid', user_id: 'u1', order_number: 'N1', total_amount: '100' }) // paymentRecord
+      .mockResolvedValueOnce({
+        order_id: 'o1',
+        payment_status: 'unpaid',
+        user_id: 'u1',
+        order_number: 'N1',
+        total_amount: '100',
+      }) // paymentRecord
       .mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'Jo', last_name: 'Do' }) // user
       .mockResolvedValueOnce({ id: 'o1', order_number: 'N1', total_amount: '100' }) // order
     queryMany.mockResolvedValueOnce([{ product_id: 'pr1' }]) // orderItems
@@ -225,7 +231,7 @@ describe('payment.captured', () => {
     ;(marketing.attributeConversion as any).mockRejectedValueOnce(new Error('attr down'))
     const res = await POST(signedRequest(paymentCaptured({ id: 'pay_3', order_id: 'order_3', amount: 10000 })))
     // Let the microtask queue drain so the rejected promises hit their .catch handlers.
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(res.status).toBe(200)
     expect(withTransaction).toHaveBeenCalled()
     expect(email.sendOrderConfirmationEmail).toHaveBeenCalledWith('a@b.com', expect.anything(), expect.anything())
@@ -271,9 +277,11 @@ describe('payment.failed', () => {
       .mockResolvedValueOnce({ user_id: 'u1', order_number: 'N1', total_amount: '250' }) // orderRow
     ;(createAutoTask as any).mockRejectedValueOnce(new Error('task fail'))
     const res = await POST(signedRequest(paymentFailed({ id: 'p', order_id: 'order_y' })))
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(res.status).toBe(200)
-    expect(createAutoTask).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: 'contact_failed_payment', userId: 'u1' }))
+    expect(createAutoTask).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKind: 'contact_failed_payment', userId: 'u1' })
+    )
   })
 
   it('record found but order has no user_id → no task', async () => {
@@ -309,7 +317,13 @@ describe('payment_link.paid', () => {
 
   it('unpaid order with user_id + payments array → transaction, emails (failures swallowed)', async () => {
     queryOne
-      .mockResolvedValueOnce({ id: 'o1', payment_status: 'unpaid', user_id: 'u1', order_number: 'N1', total_amount: '300' }) // order
+      .mockResolvedValueOnce({
+        id: 'o1',
+        payment_status: 'unpaid',
+        user_id: 'u1',
+        order_number: 'N1',
+        total_amount: '300',
+      }) // order
       .mockResolvedValueOnce({ id: 'u1', email: 'x@y.com', first_name: 'A', last_name: 'B' }) // user
       .mockResolvedValueOnce({ id: 'o1', order_number: 'N1', total_amount: '300' }) // fullOrder
     queryMany.mockResolvedValueOnce([])
@@ -317,14 +331,20 @@ describe('payment_link.paid', () => {
     ;(email.sendNewOrderNotification as any).mockRejectedValueOnce(new Error('x'))
     ;(email.sendPaymentStatusUpdate as any).mockRejectedValueOnce(new Error('x'))
     const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_3', payments: [{ payment_id: 'pl_pay_1' }] })))
-    await new Promise((r) => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     expect(res.status).toBe(200)
     expect(withTransaction).toHaveBeenCalled()
     expect(email.sendPaymentStatusUpdate).toHaveBeenCalled()
   })
 
   it('unpaid order without user_id (uses fallback link id for txn) → no emails', async () => {
-    queryOne.mockResolvedValueOnce({ id: 'o2', payment_status: 'unpaid', user_id: null, order_number: 'N2', total_amount: '50' })
+    queryOne.mockResolvedValueOnce({
+      id: 'o2',
+      payment_status: 'unpaid',
+      user_id: null,
+      order_number: 'N2',
+      total_amount: '50',
+    })
     const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_4' })))
     expect(res.status).toBe(200)
     expect(withTransaction).toHaveBeenCalled()
@@ -333,7 +353,13 @@ describe('payment_link.paid', () => {
 
   it('unpaid order with user_id but user/fullOrder missing → no emails', async () => {
     queryOne
-      .mockResolvedValueOnce({ id: 'o3', payment_status: 'unpaid', user_id: 'u3', order_number: 'N3', total_amount: '99' })
+      .mockResolvedValueOnce({
+        id: 'o3',
+        payment_status: 'unpaid',
+        user_id: 'u3',
+        order_number: 'N3',
+        total_amount: '99',
+      })
       .mockResolvedValueOnce(null) // user
       .mockResolvedValueOnce(null) // fullOrder
     queryMany.mockResolvedValueOnce([])

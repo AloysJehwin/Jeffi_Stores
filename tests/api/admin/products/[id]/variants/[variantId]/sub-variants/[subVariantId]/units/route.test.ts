@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { GET, POST } from '@/app/api/admin/products/[id]/variants/[variantId]/sub-variants/[subVariantId]/units/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction, query as dbQuery} from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query as dbQuery } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -178,9 +178,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'sv-1' })
     const newUnit = { id: 'u1', unit: 'pc', factor: 1, sub_variant_id: 'sv-1' }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'pc', factor: 1 }), { params })
     expect(res.status).toBe(201)
     const body = await res.json()
@@ -192,8 +194,9 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'sv-1' })
     const newUnit = { id: 'u1', unit: 'pc', factor: 1, is_base: true }
-    const clientQuery = vi.fn()
-      .mockResolvedValueOnce({ rows: [] })     // UPDATE SET is_base=FALSE
+    const clientQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE SET is_base=FALSE
       .mockResolvedValueOnce({ rows: [newUnit] }) // INSERT
     mockWithTx.mockImplementation(async (fn: any) => fn({ query: clientQuery }))
     const res = await POST(makePostReq({ unit: 'pc', factor: 1, is_base: true }), { params })
@@ -206,9 +209,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'sv-1' })
     const newUnit = { id: 'u1', unit: 'kg', factor: 1, dimension: 'count' }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'kg', factor: 1, dimension: 'invalid' }), { params })
     expect(res.status).toBe(201)
   })
@@ -220,9 +225,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
       mockAuth.mockResolvedValue(admin)
       mockHasScope.mockReturnValue(true)
       mockQueryOne.mockResolvedValue({ id: 'sv-1' })
-      mockWithTx.mockImplementation(async (fn: any) => fn({
-        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', dimension: dim }] }),
-      }))
+      mockWithTx.mockImplementation(async (fn: any) =>
+        fn({
+          query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', dimension: dim }] }),
+        })
+      )
       const res = await POST(makePostReq({ unit: 'u', factor: 1, dimension: dim }), { params })
       expect(res.status).toBe(201)
     }
@@ -232,9 +239,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'sv-1' })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', min_qty: 1 }] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', min_qty: 1 }] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'pc', factor: 1, min_qty: -5 }), { params })
     expect(res.status).toBe(201)
   })
@@ -243,9 +252,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ id: 'sv-1' })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', conversion_meta: { ratio: 12 } }] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'u1', conversion_meta: { ratio: 12 } }] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'dozen', factor: 12, conversion_meta: { ratio: 12 } }), { params })
     expect(res.status).toBe(201)
   })

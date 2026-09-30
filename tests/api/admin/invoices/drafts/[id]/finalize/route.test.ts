@@ -19,7 +19,10 @@ vi.mock('@/lib/gst', () => ({
 }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn(), recomputeStockStatusForProduct: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))
-vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn(), assignInvoiceNumber: vi.fn().mockResolvedValue('JS/2024-25/0001') }))
+vi.mock('@/lib/invoice', () => ({
+  generateOrderInvoice: vi.fn(),
+  assignInvoiceNumber: vi.fn().mockResolvedValue('JS/2024-25/0001'),
+}))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
@@ -63,12 +66,7 @@ const confirmedOrder = { ...draftOrder, status: 'confirmed', source: 'online' }
 // itemsRows: the rows returned for SELECT * FROM order_items
 // stockQty: inventory_quantity returned for any stock lookup
 // hasSubs: whether variant has sub-variants
-function makeTxClient({
-  itemsRows = [] as any[],
-  stockQty = 100,
-  hasSubs = false,
-  hasInvoicePrefix = true,
-} = {}) {
+function makeTxClient({ itemsRows = [] as any[], stockQty = 100, hasSubs = false, hasInvoicePrefix = true } = {}) {
   return {
     query: vi.fn().mockImplementation((sql: string) => {
       // FOR UPDATE lock on orders
@@ -201,10 +199,16 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1',
-        quantity: '2', product_name: 'Widget', variant_name: 'Red',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: 'sv1',
+          quantity: '2',
+          product_name: 'Widget',
+          variant_name: 'Red',
+        },
+      ],
       stockQty: 10,
     })
     setupTx(client)
@@ -218,10 +222,16 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1',
-        quantity: '50', product_name: 'Widget', variant_name: 'Red',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: 'sv1',
+          quantity: '50',
+          product_name: 'Widget',
+          variant_name: 'Red',
+        },
+      ],
       stockQty: 2,
     })
     setupTx(client)
@@ -237,10 +247,16 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: null,
-        quantity: '3', product_name: 'Widget', variant_name: 'Blue',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: null,
+          quantity: '3',
+          product_name: 'Widget',
+          variant_name: 'Blue',
+        },
+      ],
       stockQty: 20,
       hasSubs: false,
     })
@@ -255,10 +271,16 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: null,
-        quantity: '30', product_name: 'Widget', variant_name: 'Blue',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: null,
+          quantity: '30',
+          product_name: 'Widget',
+          variant_name: 'Blue',
+        },
+      ],
       stockQty: 5,
       hasSubs: false,
     })
@@ -275,11 +297,17 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: null,
-        quantity: '3', product_name: 'Widget', variant_name: null,
-        product_sku: 'SKU-01',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: null,
+          quantity: '3',
+          product_name: 'Widget',
+          variant_name: null,
+          product_sku: 'SKU-01',
+        },
+      ],
       stockQty: 20,
       hasSubs: true,
     })
@@ -293,11 +321,17 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: 'v1', sub_variant_id: null,
-        quantity: '25', product_name: 'Widget', variant_name: null,
-        product_sku: 'SKU-01',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: 'v1',
+          sub_variant_id: null,
+          quantity: '25',
+          product_name: 'Widget',
+          variant_name: null,
+          product_sku: 'SKU-01',
+        },
+      ],
       stockQty: 3,
       hasSubs: true,
     })
@@ -314,10 +348,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Simple Product',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Simple Product',
+        },
+      ],
       stockQty: 10,
     })
     setupTx(client)
@@ -331,10 +370,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '20', product_name: 'Simple Product',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '20',
+          product_name: 'Simple Product',
+        },
+      ],
       stockQty: 1,
     })
     setupTx(client)
@@ -351,10 +395,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ ...draftOrder, customer_email: null })
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
@@ -372,19 +421,22 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
     mockSendEmail.mockResolvedValueOnce(undefined as any)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
-    expect(mockSendEmail).toHaveBeenCalledWith(
-      'alice@example.com', 'Alice', 'JS/2024-25/0001', 1200, 'ORD-001'
-    )
+    expect(mockSendEmail).toHaveBeenCalledWith('alice@example.com', 'Alice', 'JS/2024-25/0001', 1200, 'ORD-001')
   })
 
   it('does not propagate email errors (draft+GST)', async () => {
@@ -393,10 +445,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
@@ -414,10 +471,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(confirmedOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
@@ -435,10 +497,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(confirmedOrder)
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
@@ -454,10 +521,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ ...confirmedOrder, customer_email: null })
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
     })
     setupTx(client)
@@ -475,10 +547,15 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ ...draftOrder, customer_email: null })
     const client = makeTxClient({
-      itemsRows: [{
-        product_id: 'p1', variant_id: null, sub_variant_id: null,
-        quantity: '1', product_name: 'Item A',
-      }],
+      itemsRows: [
+        {
+          product_id: 'p1',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '1',
+          product_name: 'Item A',
+        },
+      ],
       stockQty: 50,
       hasInvoicePrefix: false,
     })

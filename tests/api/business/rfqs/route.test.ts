@@ -56,9 +56,7 @@ function makePost(body: object) {
   })
 }
 
-const SAMPLE_ITEMS = [
-  { productId: null, variantId: null, description: 'Item A', quantity: 2, unit: 'Nos' },
-]
+const SAMPLE_ITEMS = [{ productId: null, variantId: null, description: 'Item A', quantity: 2, unit: 'Nos' }]
 
 const NEW_RFQ = { id: 'rfq-1', rfq_number: 'RFQ/25-26/JAN/1', user_id: 'biz-1', notes: null }
 
@@ -160,8 +158,8 @@ describe('POST /api/business/rfqs', () => {
   it('creates RFQ with items and returns 201', async () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne
-      .mockResolvedValueOnce({ max_seq: '5' })       // max seq lookup
-      .mockResolvedValueOnce(NEW_RFQ)                 // rfq insert
+      .mockResolvedValueOnce({ max_seq: '5' }) // max seq lookup
+      .mockResolvedValueOnce(NEW_RFQ) // rfq insert
       .mockResolvedValueOnce({ first_name: 'Biz', last_name: 'Owner' }) // user profile
     const res = await POST(makePost({ items: SAMPLE_ITEMS }) as any)
     expect(res.status).toBe(201)
@@ -173,9 +171,9 @@ describe('POST /api/business/rfqs', () => {
   it('starts RFQ sequence at 1 when no existing RFQs in this period', async () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne
-      .mockResolvedValueOnce({ max_seq: null })        // no existing RFQs
+      .mockResolvedValueOnce({ max_seq: null }) // no existing RFQs
       .mockResolvedValueOnce(NEW_RFQ)
-      .mockResolvedValueOnce(null)                     // user profile not found
+      .mockResolvedValueOnce(null) // user profile not found
     const res = await POST(makePost({ items: SAMPLE_ITEMS, notes: 'Test notes' }) as any)
     expect(res.status).toBe(201)
     // rfq_number should have /1 suffix when no prior exists
@@ -196,8 +194,8 @@ describe('POST /api/business/rfqs', () => {
     const res = await POST(makePost({ items }) as any)
     expect(res.status).toBe(201)
     // 2 item inserts + any other queries
-    const itemInserts = mockQuery.mock.calls.filter((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('business_rfq_items')
+    const itemInserts = mockQuery.mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('business_rfq_items')
     )
     expect(itemInserts).toHaveLength(2)
   })

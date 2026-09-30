@@ -66,11 +66,13 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    const res = await POST(makeRequest({
-      template_key: 'welcome',
-      template_data: { body: 'Hello {{name}}' },
-      subject: 'Hi there',
-    }))
+    const res = await POST(
+      makeRequest({
+        template_key: 'welcome',
+        template_data: { body: 'Hello {{name}}' },
+        subject: 'Hi there',
+      })
+    )
 
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -92,11 +94,13 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    await POST(makeRequest({
-      template_key: 'promo',
-      template_data: { headline: 'Big {{sale}}' },
-      subject: 'Sale for {{name}}',
-    }))
+    await POST(
+      makeRequest({
+        template_key: 'promo',
+        template_data: { headline: 'Big {{sale}}' },
+        subject: 'Sale for {{name}}',
+      })
+    )
 
     expect(mockSubstituteVars).toHaveBeenCalled()
   })
@@ -105,10 +109,12 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    const res = await POST(makeRequest({
-      template_key: 'promo',
-      template_data: { count: 5 },
-    }))
+    const res = await POST(
+      makeRequest({
+        template_key: 'promo',
+        template_data: { count: 5 },
+      })
+    )
     expect(res.status).toBe(200)
   })
 })

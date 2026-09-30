@@ -47,9 +47,7 @@ function makePost(body: unknown) {
   })
 }
 
-const sampleSuppliers = [
-  { id: 'sup-1', name: 'Acme Supplies', gstin: 'GST123', po_count: 5 },
-]
+const sampleSuppliers = [{ id: 'sup-1', name: 'Acme Supplies', gstin: 'GST123', po_count: 5 }]
 
 const validSupplierBody = {
   name: 'New Supplier',
@@ -209,9 +207,17 @@ describe('POST /api/admin/inventory/suppliers', () => {
       ok: true,
       data: {
         name: 'New Supplier',
-        gstin: null, contact_name: null, phone: null, email: null,
-        address: null, payment_terms: '30', notes: null,
-        bank_name: null, account_number: null, ifsc: null, upi_id: null,
+        gstin: null,
+        contact_name: null,
+        phone: null,
+        email: null,
+        address: null,
+        payment_terms: '30',
+        notes: null,
+        bank_name: null,
+        account_number: null,
+        ifsc: null,
+        upi_id: null,
       },
     } as any)
     mockQueryOne.mockResolvedValue({ id: 'sup-new-1' })
@@ -221,10 +227,7 @@ describe('POST /api/admin/inventory/suppliers', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.id).toBe('sup-new-1')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO suppliers'),
-      expect.any(Array)
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO suppliers'), expect.any(Array))
   })
 
   it('returns 500 on DB insert error', async () => {

@@ -47,9 +47,7 @@ describe('serializeSignals — cart section', () => {
   })
 
   it('appends brand and category meta joined by comma', () => {
-    const cart: CartLine[] = [
-      { name: 'Hex Bolt M8', qty: 2, brand: 'Unbrako', category: 'Fasteners' },
-    ]
+    const cart: CartLine[] = [{ name: 'Hex Bolt M8', qty: 2, brand: 'Unbrako', category: 'Fasteners' }]
     const out = serializeSignals({ cart })
     expect(out).toContain('- 2x Hex Bolt M8 (Unbrako, Fasteners)')
   })
@@ -248,7 +246,7 @@ describe('buildProductPitchPrompt', () => {
       'Impact Driver',
       'Bosch',
       'Power Tools',
-      profile({ topCategories: ['Tools', 'Fasteners', 'X', 'Y'], topBrands: ['Bosch', 'A', 'B', 'C'] }),
+      profile({ topCategories: ['Tools', 'Fasteners', 'X', 'Y'], topBrands: ['Bosch', 'A', 'B', 'C'] })
     )
     expect(out).toContain('### Product\nImpact Driver (Bosch) — Power Tools')
     expect(out).toContain('### Profile')
@@ -285,7 +283,7 @@ describe('buildAffirmationPrompt', () => {
     const out = buildAffirmationPrompt(
       ['Bolt', 'Nut', 'Washer'],
       500,
-      profile({ topCategories: ['Fasteners', 'Tools', 'Glue', 'Extra'] }),
+      profile({ topCategories: ['Fasteners', 'Tools', 'Glue', 'Extra'] })
     )
     expect(out).toContain('### Purchased\n- Bolt\n- Nut\n- Washer')
     expect(out).toContain('### Profile\nFrequent: Fasteners, Tools, Glue')

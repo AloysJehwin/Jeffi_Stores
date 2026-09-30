@@ -49,7 +49,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/labels', () => {
   it('returns 401 when unauthenticated', async () => {

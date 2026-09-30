@@ -93,7 +93,12 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
   })
 
   it('returns 400 when product is neither perishable nor serialized', async () => {
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: false, inventory_quantity: '10' } as any)
+    vi.mocked(queryOne).mockResolvedValueOnce({
+      id: PRODUCT_ID,
+      perishable: false,
+      serialized: false,
+      inventory_quantity: '10',
+    } as any)
     const res = await POST(makeReq({}), makeParams())
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/neither perishable nor serialized/)
@@ -101,7 +106,12 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
 
   it('returns 400 when perishable grain has quantity but no location_id', async () => {
     // Location is now required per grain, validated before any write.
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '0' } as any)
+    vi.mocked(queryOne).mockResolvedValueOnce({
+      id: PRODUCT_ID,
+      perishable: true,
+      serialized: false,
+      inventory_quantity: '0',
+    } as any)
     const res = await POST(makeReq({ assignments: [{ quantity: 5, expiry_date: '2025-12-31' }] }), makeParams())
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/shelf location is required/)
@@ -109,7 +119,12 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
 
   it('returns 400 when perishable grain missing expiry_date', async () => {
     // Location present, but perishable requires expiry_date up-front.
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' } as any)
+    vi.mocked(queryOne).mockResolvedValueOnce({
+      id: PRODUCT_ID,
+      perishable: true,
+      serialized: false,
+      inventory_quantity: '5',
+    } as any)
     const client = makeMockClient()
     vi.mocked(getClient).mockResolvedValue(client as any)
     const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID }] }), makeParams())
@@ -119,10 +134,18 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
 
   it('returns 400 when serialized grain has wrong serial count', async () => {
     // Explicit quantity 3 but only 2 serials → count mismatch caught up-front.
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '3' } as any)
+    vi.mocked(queryOne).mockResolvedValueOnce({
+      id: PRODUCT_ID,
+      perishable: false,
+      serialized: true,
+      inventory_quantity: '3',
+    } as any)
     const client = makeMockClient()
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['SN1', 'SN2'] }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['SN1', 'SN2'] }] }),
+      makeParams()
+    )
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/needs 3 serial/)
   })
@@ -132,7 +155,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '1' } as any)
       .mockResolvedValueOnce({ serial_number: 'SN1' } as any) // clash
-    const res = await POST(makeReq({ assignments: [{ quantity: 1, location_id: LOCATION_ID, serial_numbers: ['SN1'] }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 1, location_id: LOCATION_ID, serial_numbers: ['SN1'] }] }),
+      makeParams()
+    )
     expect(res.status).toBe(409)
     expect((await res.json()).error).toMatch(/already exists in stock/)
   })
@@ -144,7 +170,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       .mockResolvedValueOnce({ total: 1 } as any) // existing active stock
     const client = makeMockClient()
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }),
+      makeParams()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
@@ -157,12 +186,17 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' } as any)
       .mockResolvedValueOnce({ total: 0 } as any) // existing stock
     const client = makeMockClient({
-      0: { rows: [] },              // BEGIN
+      0: { rows: [] }, // BEGIN
       1: { rows: [{ id: 'batch-1' }] }, // INSERT batch
-      2: { rows: [] },              // COMMIT
+      2: { rows: [] }, // COMMIT
     })
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31', lot_number: 'LOT1' }] }), makeParams())
+    const res = await POST(
+      makeReq({
+        assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31', lot_number: 'LOT1' }],
+      }),
+      makeParams()
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(syncPerishableStock).toHaveBeenCalledWith(client, PRODUCT_ID, null, null)
@@ -174,11 +208,14 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       .mockResolvedValueOnce(null as any) // no serial clash
       .mockResolvedValueOnce({ total: 0 } as any) // existing stock
     const client = makeMockClient({
-      0: { rows: [] },                   // BEGIN
-      1: { rows: [{ id: 'batch-1' }] },  // INSERT batch
+      0: { rows: [] }, // BEGIN
+      1: { rows: [{ id: 'batch-1' }] }, // INSERT batch
     })
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 2, location_id: LOCATION_ID, serial_numbers: ['SN1', 'SN2'] }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 2, location_id: LOCATION_ID, serial_numbers: ['SN1', 'SN2'] }] }),
+      makeParams()
+    )
     expect(res.status).toBe(200)
     expect(logStockMovement).toHaveBeenCalled()
   })
@@ -189,22 +226,28 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       .mockResolvedValueOnce(null as any) // no serial clash
       .mockResolvedValueOnce({ total: 0 } as any) // existing stock
     const client = makeMockClient({
-      0: { rows: [] },                   // BEGIN
-      1: { rows: [{ id: 'batch-1' }] },  // INSERT batch
+      0: { rows: [] }, // BEGIN
+      1: { rows: [{ id: 'batch-1' }] }, // INSERT batch
     })
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 1, serial_numbers: ['SN1'], location_id: LOCATION_ID }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 1, serial_numbers: ['SN1'], location_id: LOCATION_ID }] }),
+      makeParams()
+    )
     expect(res.status).toBe(200)
   })
 
   it('skips a grain that is no longer a leaf after publish', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' } as any)
-      .mockResolvedValueOnce({ total: 0 } as any)       // existing stock
+      .mockResolvedValueOnce({ total: 0 } as any) // existing stock
       .mockResolvedValueOnce({ is_leaf: false } as any) // product now has active variants
     const client = makeMockClient()
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }),
+      makeParams()
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.skipped).toEqual(['product'])
@@ -221,7 +264,10 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       release: vi.fn(),
     }
     vi.mocked(getClient).mockResolvedValue(client as any)
-    const res = await POST(makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }), makeParams())
+    const res = await POST(
+      makeReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }),
+      makeParams()
+    )
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/connection reset/)
   })
@@ -237,8 +283,12 @@ function makePositionalClient(responses: Record<number, any> = {}) {
 
 describe('POST bootstrap-stock — legacy, serialized and conflict paths', () => {
   beforeEach(() => {
-    vi.mocked(queryOne).mockReset().mockResolvedValue(null as any)
-    vi.mocked(getClient).mockReset().mockResolvedValue(makePositionalClient() as any)
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValue(null as any)
+    vi.mocked(getClient)
+      .mockReset()
+      .mockResolvedValue(makePositionalClient() as any)
   })
 
   describe('POST bootstrap-stock — auth/scope', () => {
@@ -274,7 +324,7 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '0' } as any)
         .mockResolvedValueOnce({ inventory_quantity: '7' } as any) // variant lookup
-        .mockResolvedValueOnce({ total: 0 } as any)                // existing stock
+        .mockResolvedValueOnce({ total: 0 } as any) // existing stock
       const client = makePositionalClient({ 0: { rows: [] }, 1: { rows: [{ id: 'batch-v' }] } })
       vi.mocked(getClient).mockResolvedValue(client as any)
       const res = await POST(
@@ -289,11 +339,20 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '0' } as any)
         .mockResolvedValueOnce({ inventory_quantity: '3' } as any) // sub-variant lookup
-        .mockResolvedValueOnce({ total: 0 } as any)                // existing stock
+        .mockResolvedValueOnce({ total: 0 } as any) // existing stock
       const client = makePositionalClient({ 0: { rows: [] }, 1: { rows: [{ id: 'batch-sv' }] } })
       vi.mocked(getClient).mockResolvedValue(client as any)
       const res = await POST(
-        makeReq({ assignments: [{ variant_id: VARIANT_ID, sub_variant_id: SUB_VARIANT_ID, location_id: LOCATION_ID, expiry_date: '2025-12-31' }] }),
+        makeReq({
+          assignments: [
+            {
+              variant_id: VARIANT_ID,
+              sub_variant_id: SUB_VARIANT_ID,
+              location_id: LOCATION_ID,
+              expiry_date: '2025-12-31',
+            },
+          ],
+        }),
         makeParams()
       )
       expect(res.status).toBe(200)
@@ -301,9 +360,13 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
     })
 
     it('legacy grain with zero live inventory is skipped (no batch, still 200)', async () => {
-      vi.mocked(queryOne)
-        .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '0' } as any)
-        // no variant/sub-variant → product fallback = 0 → skipped, existing-stock query never runs
+      vi.mocked(queryOne).mockResolvedValueOnce({
+        id: PRODUCT_ID,
+        perishable: true,
+        serialized: false,
+        inventory_quantity: '0',
+      } as any)
+      // no variant/sub-variant → product fallback = 0 → skipped, existing-stock query never runs
       const client = makePositionalClient({ 0: { rows: [] } }) // BEGIN then COMMIT
       vi.mocked(getClient).mockResolvedValue(client as any)
       const res = await POST(makeReq({ location_id: LOCATION_ID, expiry_date: '2025-12-31' }), makeParams())
@@ -313,8 +376,12 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
     })
 
     it('explicit quantity of 0 is skipped up-front (no writes)', async () => {
-      vi.mocked(queryOne)
-        .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' } as any)
+      vi.mocked(queryOne).mockResolvedValueOnce({
+        id: PRODUCT_ID,
+        perishable: true,
+        serialized: false,
+        inventory_quantity: '5',
+      } as any)
       const client = makePositionalClient({ 0: { rows: [] } })
       vi.mocked(getClient).mockResolvedValue(client as any)
       // quantity 0 → up-front validation `continue`s past location/expiry requirement,
@@ -329,7 +396,7 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
     it('serialized-only writes shelf row and syncs central inventory', async () => {
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '2' } as any)
-        .mockResolvedValueOnce(null as any)        // no serial clash
+        .mockResolvedValueOnce(null as any) // no serial clash
         .mockResolvedValueOnce({ total: 0 } as any) // existing stock
       // client.query order for a serialized grain: BEGIN(0) -> resolveGrainUnit SELECT(1)
       // -> INSERT INTO product_batches(2). No product_units row configured -> resolveGrainUnit
@@ -351,7 +418,7 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
     it('serialized-only already-bootstrapped: skips shelf add but still syncs central', async () => {
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '1' } as any)
-        .mockResolvedValueOnce(null as any)        // no serial clash
+        .mockResolvedValueOnce(null as any) // no serial clash
         .mockResolvedValueOnce({ total: 1 } as any) // existing stock > 0 → alreadyBootstrapped
       const client = makePositionalClient()
       vi.mocked(getClient).mockResolvedValue(client as any)
@@ -367,13 +434,19 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
 
   describe('POST bootstrap-stock — duplicate serials within request', () => {
     it('returns 400 when a serial repeats across grains', async () => {
-      vi.mocked(queryOne)
-        .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '2' } as any)
+      vi.mocked(queryOne).mockResolvedValueOnce({
+        id: PRODUCT_ID,
+        perishable: false,
+        serialized: true,
+        inventory_quantity: '2',
+      } as any)
       const res = await POST(
-        makeReq({ assignments: [
-          { quantity: 1, location_id: LOCATION_ID, serial_numbers: ['DUP'] },
-          { quantity: 1, location_id: LOCATION_ID, serial_numbers: ['DUP'] },
-        ] }),
+        makeReq({
+          assignments: [
+            { quantity: 1, location_id: LOCATION_ID, serial_numbers: ['DUP'] },
+            { quantity: 1, location_id: LOCATION_ID, serial_numbers: ['DUP'] },
+          ],
+        }),
         makeParams()
       )
       expect(res.status).toBe(400)
@@ -385,16 +458,17 @@ describe('POST bootstrap-stock — legacy, serialized and conflict paths', () =>
     it('maps a Postgres 23505 raised mid-transaction to a clean 409', async () => {
       vi.mocked(queryOne)
         .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '1' } as any)
-        .mockResolvedValueOnce(null as any)        // no serial clash pre-check
+        .mockResolvedValueOnce(null as any) // no serial clash pre-check
         .mockResolvedValueOnce({ total: 0 } as any) // existing stock
       const err: any = new Error('duplicate key value violates unique constraint')
       err.code = '23505'
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })            // BEGIN
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [] }) // BEGIN
           .mockResolvedValueOnce({ rows: [{ id: 'b' }] }) // INSERT batch
-          .mockRejectedValueOnce(err)                     // INSERT serial → 23505
-          .mockResolvedValue({ rows: [] }),               // ROLLBACK
+          .mockRejectedValueOnce(err) // INSERT serial → 23505
+          .mockResolvedValue({ rows: [] }), // ROLLBACK
         release: vi.fn(),
       }
       vi.mocked(getClient).mockResolvedValue(client as any)

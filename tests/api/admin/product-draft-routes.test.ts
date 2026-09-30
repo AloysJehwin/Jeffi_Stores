@@ -250,7 +250,10 @@ describe('review-forms draft route', () => {
   })
 
   it('POST publishes draft', async () => {
-    mockQueryOne.mockResolvedValueOnce({ form_id: 'f-1', fields: { title: 'Rev', slug: 'rev', template_type: 'google_review', google_review_url: 'http://g.co' } })
+    mockQueryOne.mockResolvedValueOnce({
+      form_id: 'f-1',
+      fields: { title: 'Rev', slug: 'rev', template_type: 'google_review', google_review_url: 'http://g.co' },
+    })
     mockQuery.mockResolvedValueOnce({})
     mockQuery.mockResolvedValueOnce({})
     const res = await rfPublish(req('POST'), { params: idParams })

@@ -44,7 +44,7 @@ vi.mock('@/lib/marketing', () => ({
 vi.mock('@/lib/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -148,7 +148,7 @@ describe('GET /api/orders/[id]', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ userId: 'biz-1', isBusiness: false } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: 'biz@x.com', phone: '9999' }) // biz user lookup
-      .mockResolvedValueOnce({ ...BASE_ORDER, id: 'order-1' })      // biz order query
+      .mockResolvedValueOnce({ ...BASE_ORDER, id: 'order-1' }) // biz order query
     vi.mocked(db.queryMany).mockResolvedValueOnce([])
     const res = await GET(makeReq('GET', undefined, { 'x-auth-portal': 'business' }) as any, PARAMS)
     expect(res.status).toBe(200)
@@ -275,8 +275,16 @@ describe('PATCH /api/orders/[id]', () => {
       })
       .mockResolvedValueOnce(null) // unitRow (no product_units row)
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '10',
-        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 3 },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '10',
+        buy_unit: null,
+        product_name: 'P',
+        variant_name: null,
+        inventory_quantity: 3,
+      },
     ])
 
     const res = await PATCH(makeReq('PATCH', { status: 'processing' }) as any, PARAMS)
@@ -330,9 +338,7 @@ describe('PATCH /api/orders/[id]', () => {
     await new Promise(r => setTimeout(r, 10))
     // Refunding is now an explicit admin step via /api/orders/[id]/refund —
     // cancel must NOT create a process_refund task nor flip payment_status.
-    expect(vi.mocked(createAutoTask).mock.calls.some(
-      c => (c[0] as any)?.sourceKind === 'process_refund'
-    )).toBe(false)
+    expect(vi.mocked(createAutoTask).mock.calls.some(c => (c[0] as any)?.sourceKind === 'process_refund')).toBe(false)
     const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
     expect(sqls.some(s => /UPDATE orders SET payment_status = 'refunded'/.test(s))).toBe(false)
   })
@@ -349,9 +355,9 @@ describe('PATCH /api/orders/[id]', () => {
     const res = await PATCH(makeReq('PATCH', { payment_status: 'failed' }) as any, PARAMS)
     expect(res.status).toBe(200)
     await new Promise(r => setTimeout(r, 10))
-    expect(vi.mocked(createAutoTask).mock.calls.some(
-      c => (c[0] as any)?.sourceKind === 'contact_failed_payment'
-    )).toBe(true)
+    expect(vi.mocked(createAutoTask).mock.calls.some(c => (c[0] as any)?.sourceKind === 'contact_failed_payment')).toBe(
+      true
+    )
   })
 
   it('completes process_refund auto-task when payment_status → refunded', async () => {
@@ -367,9 +373,7 @@ describe('PATCH /api/orders/[id]', () => {
     const res = await PATCH(makeReq('PATCH', { payment_status: 'refunded' }) as any, PARAMS)
     expect(res.status).toBe(200)
     await new Promise(r => setTimeout(r, 10))
-    expect(vi.mocked(completeAutoTask).mock.calls.some(
-      c => c[0] === 'process_refund'
-    )).toBe(true)
+    expect(vi.mocked(completeAutoTask).mock.calls.some(c => c[0] === 'process_refund')).toBe(true)
   })
 
   it('delegates deduction to the shared helper on transition to processing', async () => {
@@ -382,17 +386,34 @@ describe('PATCH /api/orders/[id]', () => {
       })
       .mockResolvedValueOnce(null) // pre-flight unitRow → passthrough qty
     vi.mocked(db.queryMany).mockResolvedValueOnce([
-      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '2',
-        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
+      {
+        product_id: 'p1',
+        variant_id: null,
+        sub_variant_id: null,
+        quantity: '2',
+        buy_unit: null,
+        product_name: 'P',
+        variant_name: null,
+        inventory_quantity: 100,
+      },
     ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
       fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) } as any)
     )
 
-    const batch_assignments = [{ order_item_id: '22222222-2222-4222-8222-222222222222', batch_id: '11111111-1111-4111-8111-111111111111', qty: 2 }]
+    const batch_assignments = [
+      {
+        order_item_id: '22222222-2222-4222-8222-222222222222',
+        batch_id: '11111111-1111-4111-8111-111111111111',
+        qty: 2,
+      },
+    ]
     const serial_assignments = [{ order_item_id: '22222222-2222-4222-8222-222222222222', serial_number: 'SN-1' }]
-    const res = await PATCH(makeReq('PATCH', { status: 'processing', batch_assignments, serial_assignments }) as any, PARAMS)
+    const res = await PATCH(
+      makeReq('PATCH', { status: 'processing', batch_assignments, serial_assignments }) as any,
+      PARAMS
+    )
     expect(res.status).toBe(200)
     expect(vi.mocked(db.withTransaction)).toHaveBeenCalled()
     // Deduction is delegated to the shared helper (one -1 ledger row per serial,

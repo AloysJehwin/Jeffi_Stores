@@ -37,10 +37,7 @@ describe('GET /api/email-events/click', () => {
   it('updates DB when id is provided', async () => {
     mockQuery.mockResolvedValueOnce(undefined as any)
     await GET(makeRequest({ id: 'sent-123', url: 'https://jeffistores.com' }) as any)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('clicked_at'),
-      ['sent-123']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('clicked_at'), ['sent-123'])
   })
 
   it('does not call DB when id is absent', async () => {

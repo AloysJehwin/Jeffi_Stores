@@ -88,7 +88,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     vi.mocked(logActivity).mockResolvedValue(undefined as any)
     // default fetch: return a 200 empty response so any un-mocked call doesn't hit real network
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({}), text: async () => '',
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => '',
     }) as any
   })
 
@@ -109,10 +112,17 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('exports GSTR-1 as csv', async () => {
     mockQueryOne.mockResolvedValueOnce(
-      proposed('export_gstr1', { month: 'JAN', from: '2099-01-01', to: '2099-01-31', format: 'csv', rowCount: 3 }) as any
+      proposed('export_gstr1', {
+        month: 'JAN',
+        from: '2099-01-01',
+        to: '2099-01-31',
+        format: 'csv',
+        rowCount: 3,
+      }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200,
+      ok: true,
+      status: 200,
       text: async () => 'col1,col2\nA,B\n',
     }) as any
     const res = await POST(makeReq(), params())
@@ -124,10 +134,17 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('exports GSTR-1 as json', async () => {
     mockQueryOne.mockResolvedValueOnce(
-      proposed('export_gstr1', { month: 'JAN', from: '2099-01-01', to: '2099-01-31', format: 'json', rowCount: 5 }) as any
+      proposed('export_gstr1', {
+        month: 'JAN',
+        from: '2099-01-01',
+        to: '2099-01-31',
+        format: 'json',
+        rowCount: 5,
+      }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200,
+      ok: true,
+      status: 200,
       json: async () => ({ summary: { total: 100 }, b2b: [{}], b2c: [{}, {}], hsnSummary: [] }),
     }) as any
     const res = await POST(makeReq(), params())
@@ -140,10 +157,18 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when export_gstr1 upstream fails', async () => {
     mockQueryOne.mockResolvedValueOnce(
-      proposed('export_gstr1', { month: 'JAN', from: '2099-01-01', to: '2099-01-31', format: 'json', rowCount: 0 }) as any
+      proposed('export_gstr1', {
+        month: 'JAN',
+        from: '2099-01-01',
+        to: '2099-01-31',
+        format: 'json',
+        rowCount: 0,
+      }) as any
     )
     global.fetch = vi.fn().mockResolvedValue({
-      ok: false, status: 500, json: async () => ({ error: 'gst service down' }),
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'gst service down' }),
     }) as any
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
@@ -153,9 +178,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── create_quotation ──────────────────────────────────────────────────
 
   it('returns 500 when create_quotation missing items', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('create_quotation', { items: [] }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('create_quotation', { items: [] }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/items missing/)
@@ -164,9 +187,23 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when create_quotation transaction throws', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_quotation', {
-        consignee_email: 'c@x.com', consignee_name: 'C', consignee_addr1: 'a1',
-        consignee_city: 'city', consignee_state: 'CG',
-        items: [{ description: 'X', quantity: 1, rate: 100, discount_pct: 0, gst_rate: 18, unit: 'PCS', product_id: 'p1', amount: 100 }],
+        consignee_email: 'c@x.com',
+        consignee_name: 'C',
+        consignee_addr1: 'a1',
+        consignee_city: 'city',
+        consignee_state: 'CG',
+        items: [
+          {
+            description: 'X',
+            quantity: 1,
+            rate: 100,
+            discount_pct: 0,
+            gst_rate: 18,
+            unit: 'PCS',
+            product_id: 'p1',
+            amount: 100,
+          },
+        ],
         buyer_same: true,
       }) as any
     )
@@ -179,9 +216,23 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes create_quotation successfully', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_quotation', {
-        consignee_email: 'c@x.com', consignee_name: 'C', consignee_addr1: 'a1',
-        consignee_city: 'city', consignee_state: 'CG',
-        items: [{ description: 'X', quantity: 2, rate: 100, discount_pct: 0, gst_rate: 18, unit: 'PCS', product_id: 'p1', amount: 200 }],
+        consignee_email: 'c@x.com',
+        consignee_name: 'C',
+        consignee_addr1: 'a1',
+        consignee_city: 'city',
+        consignee_state: 'CG',
+        items: [
+          {
+            description: 'X',
+            quantity: 2,
+            rate: 100,
+            discount_pct: 0,
+            gst_rate: 18,
+            unit: 'PCS',
+            product_id: 'p1',
+            amount: 200,
+          },
+        ],
         buyer_same: true,
       }) as any
     )
@@ -198,7 +249,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when send_quotation_email throws', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('send_quotation_email', {
-        quoteNumber: 'QT/1', toEmail: 'x@y.com', consigneeName: 'A', totalAmount: 100, viewToken: 't',
+        quoteNumber: 'QT/1',
+        toEmail: 'x@y.com',
+        consigneeName: 'A',
+        totalAmount: 100,
+        viewToken: 't',
       }) as any
     )
     vi.mocked(sendQuotationFinalizedEmail).mockRejectedValueOnce(new Error('smtp fail'))

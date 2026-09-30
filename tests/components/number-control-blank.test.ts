@@ -9,17 +9,37 @@ function makeControl(initial: number) {
   const patched: number[] = []
 
   return {
-    get shown() { return value },
-    get patched() { return patched },
-    type(next: string) { value = next; dirty = true },
+    get shown() {
+      return value
+    },
+    get patched() {
+      return patched
+    },
+    type(next: string) {
+      value = next
+      dirty = true
+    },
     blur(ok = true) {
-      if (value.trim() === '') { value = saved; dirty = false; return }
+      if (value.trim() === '') {
+        value = saved
+        dirty = false
+        return
+      }
       if (!dirty) return
       const parsed = parseFloat(value)
-      if (!Number.isFinite(parsed)) { value = saved; dirty = false; return }
+      if (!Number.isFinite(parsed)) {
+        value = saved
+        dirty = false
+        return
+      }
       patched.push(parsed)
       dirty = false
-      if (ok) { value = String(parsed); saved = String(parsed) } else { value = saved }
+      if (ok) {
+        value = String(parsed)
+        saved = String(parsed)
+      } else {
+        value = saved
+      }
     },
   }
 }

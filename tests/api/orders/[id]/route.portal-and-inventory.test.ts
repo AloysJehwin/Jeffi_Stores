@@ -46,7 +46,7 @@ vi.mock('@/lib/auto-tasks', () => ({
 vi.mock('@/lib/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async (importOriginal) => {
+vi.mock('@/lib/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
@@ -214,14 +214,16 @@ describe('PATCH /api/orders/[id]', () => {
 })
 
 describe('GET /api/orders/[id] (business portal)', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns order for a business user (isBusiness=true)', async () => {
     const bizUser = { userId: 'user-456', email: 'biz@example.com', isBusiness: true }
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(bizUser as any)
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ email: 'biz@example.com', phone: '9999' })  // bizUser lookup
-      .mockResolvedValueOnce(MOCK_ORDER)                                    // order lookup
+      .mockResolvedValueOnce({ email: 'biz@example.com', phone: '9999' }) // bizUser lookup
+      .mockResolvedValueOnce(MOCK_ORDER) // order lookup
     vi.mocked(db.queryMany).mockResolvedValue(MOCK_ORDER_ITEMS)
 
     const res = await GET(makeGetRequest({ 'x-auth-portal': 'business' }) as any, PARAMS)
@@ -238,10 +240,7 @@ describe('GET /api/orders/[id] (business portal)', () => {
       .mockResolvedValueOnce(MOCK_ORDER)
     vi.mocked(db.queryMany).mockResolvedValue([])
 
-    const res = await GET(
-      makeGetRequest({ 'x-auth-portal': 'business' }) as any,
-      PARAMS
-    )
+    const res = await GET(makeGetRequest({ 'x-auth-portal': 'business' }) as any, PARAMS)
     expect(res.status).toBe(200)
   })
 
@@ -255,7 +254,9 @@ describe('GET /api/orders/[id] (business portal)', () => {
 })
 
 describe('PATCH /api/orders/[id] (extended)', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 400 when order is in a terminal status', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN_USER as any)
@@ -395,13 +396,15 @@ describe('PATCH /api/orders/[id] (extended)', () => {
   it('creates refund auto-task when cancelling a paid order', async () => {
     const { createAutoTask } = await import('@/lib/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN_USER as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({
-      ...MOCK_ORDER,
-      status: 'confirmed',
-      payment_status: 'paid',
-      user_id: 'user-456',
-      users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
-    }).mockResolvedValue(null) // sale-check + any later reads → null (no sale, no payment record)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        ...MOCK_ORDER,
+        status: 'confirmed',
+        payment_status: 'paid',
+        user_id: 'user-456',
+        users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
+      })
+      .mockResolvedValue(null) // sale-check + any later reads → null (no sale, no payment record)
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
     const res = await PATCH(makePatchRequest({ status: 'cancelled' }) as any, PARAMS)

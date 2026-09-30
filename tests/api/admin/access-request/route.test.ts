@@ -49,9 +49,7 @@ function makeRequest(body: Record<string, unknown> = {}) {
   })
 }
 
-const superAdmins = [
-  { email: 'super@example.com', first_name: 'Super' },
-]
+const superAdmins = [{ email: 'super@example.com', first_name: 'Super' }]
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 

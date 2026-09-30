@@ -8,10 +8,12 @@ vi.mock('@/lib/product-delete', () => ({ retireProduct: vi.fn() }))
 import { forgetSheetOwnership, releaseSheetProducts } from '@/lib/import/sheet-links'
 import { query } from '@/lib/db'
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('forgetSheetOwnership', () => {
-  it("clears pending removals and drops every sheet link, scoped to the tenant", async () => {
+  it('clears pending removals and drops every sheet link, scoped to the tenant', async () => {
     cp.query.mockResolvedValueOnce({ rowCount: 2 }).mockResolvedValueOnce({ rowCount: 5 })
     expect(await forgetSheetOwnership('t1')).toBe(5)
 

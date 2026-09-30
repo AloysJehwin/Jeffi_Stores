@@ -88,30 +88,21 @@ describe('createWarehouse', () => {
     mockQueryOne.mockResolvedValue(wh)
     const result = await createWarehouse('New Wh', 'nw')
     expect(result).toEqual(wh)
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['NW'])
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['NW']))
   })
 
   it('passes address when provided', async () => {
     const wh = { id: 'wh-2', name: 'WH2', code: 'WH2', address: '123 St', is_active: true, created_at: '' }
     mockQueryOne.mockResolvedValue(wh)
     await createWarehouse('WH2', 'wh2', '123 St')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['123 St'])
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['123 St']))
   })
 
   it('passes null address when omitted', async () => {
     const wh = { id: 'wh-3', name: 'WH3', code: 'WH3', address: null, is_active: true, created_at: '' }
     mockQueryOne.mockResolvedValue(wh)
     await createWarehouse('WH3', 'wh3')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([null])
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([null]))
   })
 
   it('throws when insert returns null', async () => {
@@ -141,10 +132,7 @@ describe('updateWarehouse', () => {
   it('uppercases code in update', async () => {
     mockQueryOne.mockResolvedValue({ id: 'wh-1', code: 'NEW' } as any)
     await updateWarehouse('wh-1', { code: 'new' })
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['NEW'])
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['NEW']))
   })
 
   it('updates address field', async () => {
@@ -257,43 +245,32 @@ describe('createLocation', () => {
 
   it('creates location with display code (aisle+shelf uppercased)', async () => {
     const loc = { id: 'loc-new', display_code: 'WH-A-01-1' } as any
-    mockQueryOne
-      .mockResolvedValueOnce({ code: 'WH' })
-      .mockResolvedValueOnce(loc)
+    mockQueryOne.mockResolvedValueOnce({ code: 'WH' }).mockResolvedValueOnce(loc)
     const result = await createLocation('wh-1', 'a', '01', '1')
     expect(result.id).toBe('loc-new')
     // display_code should contain uppercase aisle/shelf
     expect(mockQueryOne).toHaveBeenCalledWith(
       expect.any(String),
-      expect.arrayContaining(['A', '1'])  // aisle and shelf uppercased
+      expect.arrayContaining(['A', '1']) // aisle and shelf uppercased
     )
   })
 
   it('creates location with bin code', async () => {
     const loc = { id: 'loc-bin', display_code: 'WH-A-01-1-B1' } as any
-    mockQueryOne
-      .mockResolvedValueOnce({ code: 'WH' })
-      .mockResolvedValueOnce(loc)
+    mockQueryOne.mockResolvedValueOnce({ code: 'WH' }).mockResolvedValueOnce(loc)
     const result = await createLocation('wh-1', 'a', '01', '1', 'B1', 'Near door')
     expect(result.id).toBe('loc-bin')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['B1', 'Near door'])
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['B1', 'Near door']))
   })
 
   it('throws when insert returns null', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ code: 'WH' })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ code: 'WH' }).mockResolvedValueOnce(null)
     await expect(createLocation('wh-1', 'A', '01', '1')).rejects.toThrow('Insert failed')
   })
 
   it('creates location without optional bin and notes', async () => {
     const loc = { id: 'loc-simple' } as any
-    mockQueryOne
-      .mockResolvedValueOnce({ code: 'WH' })
-      .mockResolvedValueOnce(loc)
+    mockQueryOne.mockResolvedValueOnce({ code: 'WH' }).mockResolvedValueOnce(loc)
     const result = await createLocation('wh-1', 'B', '02', '3')
     expect(result.id).toBe('loc-simple')
   })
@@ -328,35 +305,29 @@ describe('updateLocation', () => {
   it('updates notes field', async () => {
     const updated = { ...existingLoc, notes: 'new note' }
     mockQueryOne
-      .mockResolvedValueOnce(existingLoc)  // getLocation
-      .mockResolvedValueOnce(updated)       // update result
+      .mockResolvedValueOnce(existingLoc) // getLocation
+      .mockResolvedValueOnce(updated) // update result
     const result = await updateLocation('loc-1', { notes: 'new note' })
     expect(result.notes).toBe('new note')
   })
 
   it('updates is_active field', async () => {
     const updated = { ...existingLoc, is_active: false }
-    mockQueryOne
-      .mockResolvedValueOnce(existingLoc)
-      .mockResolvedValueOnce(updated)
+    mockQueryOne.mockResolvedValueOnce(existingLoc).mockResolvedValueOnce(updated)
     const result = await updateLocation('loc-1', { is_active: false })
     expect(result.is_active).toBe(false)
   })
 
   it('updates aisle_code and recomputes display_code', async () => {
     const updated = { ...existingLoc, aisle_code: 'B', display_code: 'WH-B-01-1' }
-    mockQueryOne
-      .mockResolvedValueOnce(existingLoc)
-      .mockResolvedValueOnce(updated)
+    mockQueryOne.mockResolvedValueOnce(existingLoc).mockResolvedValueOnce(updated)
     const result = await updateLocation('loc-1', { aisle_code: 'b' })
     expect(result.aisle_code).toBe('B')
   })
 
   it('updates bin_code to a value', async () => {
     const updated = { ...existingLoc, bin_code: 'B1', display_code: 'WH-A-01-1-B1' }
-    mockQueryOne
-      .mockResolvedValueOnce(existingLoc)
-      .mockResolvedValueOnce(updated)
+    mockQueryOne.mockResolvedValueOnce(existingLoc).mockResolvedValueOnce(updated)
     const result = await updateLocation('loc-1', { bin_code: 'B1' })
     expect(result.bin_code).toBe('B1')
   })
@@ -364,17 +335,13 @@ describe('updateLocation', () => {
   it('updates bin_code to null', async () => {
     const locWithBin = { ...existingLoc, bin_code: 'B1' }
     const updated = { ...existingLoc, bin_code: null }
-    mockQueryOne
-      .mockResolvedValueOnce(locWithBin)
-      .mockResolvedValueOnce(updated)
+    mockQueryOne.mockResolvedValueOnce(locWithBin).mockResolvedValueOnce(updated)
     const result = await updateLocation('loc-1', { bin_code: null })
     expect(result.bin_code).toBeNull()
   })
 
   it('throws when update returns null', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(existingLoc)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(existingLoc).mockResolvedValueOnce(null)
     await expect(updateLocation('loc-1', { notes: 'x' })).rejects.toThrow('Location not found')
   })
 })
@@ -466,13 +433,13 @@ describe('adjustStock', () => {
 
   it('inserts new stock row when no existing stock and quantityChange > 0', async () => {
     const client = makeMockClient([
-      { rows: [] },                              // BEGIN
-      { rows: [] },                              // existing stock query — empty
-      { rows: [{ id: 'ss-new' }] },              // INSERT shelf_stock RETURNING *
-      { rows: [] },                              // INSERT shelf_stock_transactions (transaction log)
-      { rows: [{ total: 5 }] },                  // syncCentralInventory — SUM query
-      { rows: [] },                              // UPDATE products (syncCentralInventory)
-      { rows: [] },                              // COMMIT
+      { rows: [] }, // BEGIN
+      { rows: [] }, // existing stock query — empty
+      { rows: [{ id: 'ss-new' }] }, // INSERT shelf_stock RETURNING *
+      { rows: [] }, // INSERT shelf_stock_transactions (transaction log)
+      { rows: [{ total: 5 }] }, // syncCentralInventory — SUM query
+      { rows: [] }, // UPDATE products (syncCentralInventory)
+      { rows: [] }, // COMMIT
     ])
     mockGetClient.mockResolvedValue(client as any)
 
@@ -492,14 +459,15 @@ describe('adjustStock', () => {
 
   it('updates existing stock row when found', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                     // BEGIN
-        .mockResolvedValueOnce({ rows: [{ id: 'ss-1', quantity: 10 }] })        // existing
-        .mockResolvedValueOnce({ rows: [] })                                     // UPDATE shelf_stock
-        .mockResolvedValueOnce({ rows: [] })                                     // INSERT transaction log
-        .mockResolvedValueOnce({ rows: [{ total: 15 }] })                       // syncCentralInventory
-        .mockResolvedValueOnce({ rows: [] })                                     // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                    // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'ss-1', quantity: 10 }] }) // existing
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE shelf_stock
+        .mockResolvedValueOnce({ rows: [] }) // INSERT transaction log
+        .mockResolvedValueOnce({ rows: [{ total: 15 }] }) // syncCentralInventory
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -511,14 +479,15 @@ describe('adjustStock', () => {
 
   it('deletes stock row when quantityChange brings it to 0', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                    // BEGIN
-        .mockResolvedValueOnce({ rows: [{ id: 'ss-1', quantity: 5 }] })        // existing
-        .mockResolvedValueOnce({ rows: [] })                                    // DELETE shelf_stock
-        .mockResolvedValueOnce({ rows: [] })                                    // INSERT transaction log
-        .mockResolvedValueOnce({ rows: [{ total: 0 }] })                       // syncCentralInventory
-        .mockResolvedValueOnce({ rows: [] })                                    // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                   // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'ss-1', quantity: 5 }] }) // existing
+        .mockResolvedValueOnce({ rows: [] }) // DELETE shelf_stock
+        .mockResolvedValueOnce({ rows: [] }) // INSERT transaction log
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] }) // syncCentralInventory
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -529,9 +498,10 @@ describe('adjustStock', () => {
 
   it('rolls back and rethrows on error', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
-        .mockRejectedValueOnce(new Error('DB error')),         // existing query fails
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockRejectedValueOnce(new Error('DB error')), // existing query fails
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -542,14 +512,15 @@ describe('adjustStock', () => {
 
   it('uses Math.max(0, quantityChange) when inserting new row with negative change', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                              // BEGIN
-        .mockResolvedValueOnce({ rows: [] })                              // existing — empty
-        .mockResolvedValueOnce({ rows: [{ id: 'ss-0' }] })               // insert with qty=0
-        .mockResolvedValueOnce({ rows: [] })                              // transaction log
-        .mockResolvedValueOnce({ rows: [{ total: 0 }] })                 // syncCentralInventory
-        .mockResolvedValueOnce({ rows: [] })                             // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                             // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // existing — empty
+        .mockResolvedValueOnce({ rows: [{ id: 'ss-0' }] }) // insert with qty=0
+        .mockResolvedValueOnce({ rows: [] }) // transaction log
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] }) // syncCentralInventory
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -573,47 +544,56 @@ describe('moveStock', () => {
   })
 
   it('throws when source and destination are same', async () => {
-    await expect(moveStock('loc-1', 'loc-1', 'prod', null, null, 5)).rejects.toThrow('Source and destination must differ')
+    await expect(moveStock('loc-1', 'loc-1', 'prod', null, null, 5)).rejects.toThrow(
+      'Source and destination must differ'
+    )
   })
 
   it('throws when insufficient stock at source', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                             // BEGIN
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: 'ss-1', quantity: 3 }] }) // from stock — only 3
-        .mockResolvedValueOnce({ rows: [] }),                             // ROLLBACK
+        .mockResolvedValueOnce({ rows: [] }), // ROLLBACK
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
 
-    await expect(moveStock('from', 'to', 'prod', null, null, 10)).rejects.toThrow('Insufficient stock at source location')
+    await expect(moveStock('from', 'to', 'prod', null, null, 10)).rejects.toThrow(
+      'Insufficient stock at source location'
+    )
   })
 
   it('throws when no stock at source', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [{ perishable: false }] }) // perishable check
-        .mockResolvedValueOnce({ rows: [] }),                    // from stock — empty
+        .mockResolvedValueOnce({ rows: [] }), // from stock — empty
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
 
-    await expect(moveStock('from', 'to', 'prod', null, null, 5)).rejects.toThrow('Insufficient stock at source location')
+    await expect(moveStock('from', 'to', 'prod', null, null, 5)).rejects.toThrow(
+      'Insufficient stock at source location'
+    )
   })
 
   it('moves stock and deletes source row when it hits zero', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                              // BEGIN
-        .mockResolvedValueOnce({ rows: [{ perishable: false }] })        // perishable check
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: false }] }) // perishable check
         .mockResolvedValueOnce({ rows: [{ id: 'ss-from', quantity: 5 }] }) // from stock
-        .mockResolvedValueOnce({ rows: [] })                              // DELETE from
-        .mockResolvedValueOnce({ rows: [] })                              // INSERT move_out log
+        .mockResolvedValueOnce({ rows: [] }) // DELETE from
+        .mockResolvedValueOnce({ rows: [] }) // INSERT move_out log
         .mockResolvedValueOnce({ rows: [{ id: 'ss-to', quantity: 3 }] }) // to stock — exists
-        .mockResolvedValueOnce({ rows: [] })                              // UPDATE to
-        .mockResolvedValueOnce({ rows: [] })                              // INSERT move_in log
-        .mockResolvedValueOnce({ rows: [] }),                             // COMMIT
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE to
+        .mockResolvedValueOnce({ rows: [] }) // INSERT move_in log
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -624,16 +604,17 @@ describe('moveStock', () => {
 
   it('moves stock and updates source row when quantity remains', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                               // BEGIN
-        .mockResolvedValueOnce({ rows: [{ perishable: false }] })         // perishable check
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: false }] }) // perishable check
         .mockResolvedValueOnce({ rows: [{ id: 'ss-from', quantity: 10 }] }) // from stock
-        .mockResolvedValueOnce({ rows: [] })                               // UPDATE from
-        .mockResolvedValueOnce({ rows: [] })                               // INSERT move_out log
-        .mockResolvedValueOnce({ rows: [] })                               // to stock — empty
-        .mockResolvedValueOnce({ rows: [] })                               // INSERT to
-        .mockResolvedValueOnce({ rows: [] })                               // INSERT move_in log
-        .mockResolvedValueOnce({ rows: [] }),                              // COMMIT
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE from
+        .mockResolvedValueOnce({ rows: [] }) // INSERT move_out log
+        .mockResolvedValueOnce({ rows: [] }) // to stock — empty
+        .mockResolvedValueOnce({ rows: [] }) // INSERT to
+        .mockResolvedValueOnce({ rows: [] }) // INSERT move_in log
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -644,8 +625,9 @@ describe('moveStock', () => {
 
   it('rolls back and rethrows on DB error', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })             // BEGIN
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockRejectedValueOnce(new Error('move fail')), // from stock query throws
       release: vi.fn(),
     }
@@ -657,33 +639,37 @@ describe('moveStock', () => {
 
   it('handles perishable product: throws when insufficient batch stock', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                         // BEGIN
-        .mockResolvedValueOnce({ rows: [{ perishable: true }] })                     // perishable check
-        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '2' }] }),   // batches — only 2 avail
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: true }] }) // perishable check
+        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '2' }] }), // batches — only 2 avail
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
 
-    await expect(moveStock('from', 'to', 'prod', null, null, 10)).rejects.toThrow('Insufficient stock at source location')
+    await expect(moveStock('from', 'to', 'prod', null, null, 10)).rejects.toThrow(
+      'Insufficient stock at source location'
+    )
     expect(client.release).toHaveBeenCalled()
   })
 
   it('handles perishable product: moves entire batch when take === avail', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                          // BEGIN
-        .mockResolvedValueOnce({ rows: [{ perishable: true }] })                      // perishable check
-        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '5' }] })    // batches (avail=5=take)
-        .mockResolvedValueOnce({ rows: [] })                                          // UPDATE batch location
-        .mockResolvedValueOnce({ rows: [] })                                          // INSERT move_out transaction
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: true }] }) // perishable check
+        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '5' }] }) // batches (avail=5=take)
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE batch location
+        .mockResolvedValueOnce({ rows: [] }) // INSERT move_out transaction
         // syncPerishableStock receives the outer client directly (ownClient=false, no BEGIN/COMMIT):
-        .mockResolvedValueOnce({ rows: [{ location_id: 'from', total: '0' }] })      // batchTotals SELECT
-        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'from' }] })       // existing shelf_stock SELECT
-        .mockResolvedValueOnce({ rows: [] })                                          // DELETE shelf_stock (qty=0)
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                           // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                                          // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                         // COMMIT
+        .mockResolvedValueOnce({ rows: [{ location_id: 'from', total: '0' }] }) // batchTotals SELECT
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'from' }] }) // existing shelf_stock SELECT
+        .mockResolvedValueOnce({ rows: [] }) // DELETE shelf_stock (qty=0)
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -734,9 +720,7 @@ describe('getOrCreateOpenShelf', () => {
   })
 
   it('creates and returns new open shelf when not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'new-open-shelf' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'new-open-shelf' })
     const result = await getOrCreateOpenShelf('wh-1', 'WH')
     expect(result).toBe('new-open-shelf')
     expect(mockQueryOne).toHaveBeenCalledTimes(2)
@@ -752,13 +736,14 @@ describe('syncPerishableStock', () => {
 
   it('opens its own connection when no client provided, commits on success', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                        // BEGIN
-        .mockResolvedValueOnce({ rows: [] })                        // batchTotals — empty
-        .mockResolvedValueOnce({ rows: [] })                        // existing shelf_stock — empty
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })         // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                        // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                       // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [] }) // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -769,9 +754,7 @@ describe('syncPerishableStock', () => {
 
   it('rolls back and rethrows when a query fails', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(new Error('sync fail')),
+      query: vi.fn().mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(new Error('sync fail')),
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -782,14 +765,15 @@ describe('syncPerishableStock', () => {
 
   it('inserts new shelf_stock row when location not in existing map', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
-        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-new', total: '5' }] })       // batchTotals
-        .mockResolvedValueOnce({ rows: [] })                                              // existing shelf_stock — empty
-        .mockResolvedValueOnce({ rows: [] })                                              // INSERT shelf_stock
-        .mockResolvedValueOnce({ rows: [{ total: '5' }] })                               // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-new', total: '5' }] }) // batchTotals
+        .mockResolvedValueOnce({ rows: [] }) // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [] }) // INSERT shelf_stock
+        .mockResolvedValueOnce({ rows: [{ total: '5' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -800,14 +784,15 @@ describe('syncPerishableStock', () => {
 
   it('deletes shelf_stock row when qty drops to 0 for existing location', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
-        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-1', total: '0' }] })         // batchTotals (qty=0)
-        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'loc-1' }] })          // existing shelf_stock
-        .mockResolvedValueOnce({ rows: [] })                                              // DELETE shelf_stock
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                               // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-1', total: '0' }] }) // batchTotals (qty=0)
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'loc-1' }] }) // existing shelf_stock
+        .mockResolvedValueOnce({ rows: [] }) // DELETE shelf_stock
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -817,14 +802,15 @@ describe('syncPerishableStock', () => {
 
   it('removes orphaned shelf_stock rows not in batchTotals', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
-        .mockResolvedValueOnce({ rows: [] })                                              // batchTotals — empty
-        .mockResolvedValueOnce({ rows: [{ id: 'orphan-ss', location_id: 'old-loc' }] })  // existing shelf_stock (orphan)
-        .mockResolvedValueOnce({ rows: [] })                                              // DELETE orphan
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                               // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
-        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [{ id: 'orphan-ss', location_id: 'old-loc' }] }) // existing shelf_stock (orphan)
+        .mockResolvedValueOnce({ rows: [] }) // DELETE orphan
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -834,11 +820,12 @@ describe('syncPerishableStock', () => {
 
   it('uses provided client and does NOT open its own connection', async () => {
     const externalClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                       // batchTotals — empty
-        .mockResolvedValueOnce({ rows: [] })                       // existing shelf_stock — empty
-        .mockResolvedValueOnce({ rows: [{ total: '0' }] })        // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] })                       // UPDATE products
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [] }) // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] }) // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
         .mockResolvedValueOnce({ rows: [{ inventory_sync: false }] }), // recompute getInventorySync — sync off, no-op
       release: vi.fn(),
     }
@@ -900,57 +887,104 @@ describe('upsertShelfStock', () => {
 
   it('inserts new row when none exists and quantity > 0', async () => {
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })   // SELECT — no existing
-        .mockResolvedValueOnce({ rows: [] }),  // INSERT
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // SELECT — no existing
+        .mockResolvedValueOnce({ rows: [] }), // INSERT
     }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 5, mode: 'add' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: 5,
+      mode: 'add',
+    })
     expect(client.query.mock.calls[1][0]).toContain('INSERT INTO shelf_stock')
   })
 
   it('does nothing when quantity=0 and no existing row', async () => {
     const client = { query: vi.fn().mockResolvedValueOnce({ rows: [] }) }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 0, mode: 'set' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: 0,
+      mode: 'set',
+    })
     expect(client.query).toHaveBeenCalledTimes(1) // only SELECT
   })
 
   it('adds to existing quantity in add mode', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '10' }] }) // existing=10
-        .mockResolvedValueOnce({ rows: [] }),                              // UPDATE
+        .mockResolvedValueOnce({ rows: [] }), // UPDATE
     }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 3, mode: 'add' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: 3,
+      mode: 'add',
+    })
     expect(client.query.mock.calls[1][1][0]).toBe(13) // 10 + 3
   })
 
   it('sets quantity directly in set mode', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '10' }] })
         .mockResolvedValueOnce({ rows: [] }),
     }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 7, mode: 'set' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: 7,
+      mode: 'set',
+    })
     expect(client.query.mock.calls[1][1][0]).toBe(7)
   })
 
   it('deletes existing row when result quantity is <= 0 in add mode', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '5' }] }) // existing=5
-        .mockResolvedValueOnce({ rows: [] }),                             // DELETE
+        .mockResolvedValueOnce({ rows: [] }), // DELETE
     }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: -10, mode: 'add' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: -10,
+      mode: 'add',
+    })
     expect(client.query.mock.calls[1][0]).toContain('DELETE FROM shelf_stock')
   })
 
   it('deletes row when set mode results in 0', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '5' }] })
         .mockResolvedValueOnce({ rows: [] }),
     }
-    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 0, mode: 'set' })
+    await upsertShelfStock(client, {
+      locationId: 'loc-1',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      quantity: 0,
+      mode: 'set',
+    })
     expect(client.query.mock.calls[1][0]).toContain('DELETE FROM shelf_stock')
   })
 })

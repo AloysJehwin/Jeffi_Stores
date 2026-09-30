@@ -115,9 +115,7 @@ describe('GET /api/search', () => {
   })
 
   it('returns products and categories for a valid query', async () => {
-    queryManyMock
-      .mockResolvedValueOnce(sampleProducts)
-      .mockResolvedValueOnce(sampleCategories)
+    queryManyMock.mockResolvedValueOnce(sampleProducts).mockResolvedValueOnce(sampleCategories)
 
     const res = await GET(makeReq('bolt') as any)
     expect(res.status).toBe(200)
@@ -130,9 +128,7 @@ describe('GET /api/search', () => {
   })
 
   it('returns empty arrays when db returns null', async () => {
-    queryManyMock
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null)
+    queryManyMock.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
 
     const res = await GET(makeReq('bolt') as any)
     expect(res.status).toBe(200)
@@ -157,9 +153,7 @@ describe('GET /api/search', () => {
   })
 
   it('works for unauthenticated requests (no session cookie)', async () => {
-    queryManyMock
-      .mockResolvedValueOnce(sampleProducts)
-      .mockResolvedValueOnce([])
+    queryManyMock.mockResolvedValueOnce(sampleProducts).mockResolvedValueOnce([])
 
     const res = await GET(makeReq('bolt') as any)
     expect(res.status).toBe(200)

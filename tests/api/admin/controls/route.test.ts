@@ -7,13 +7,21 @@ vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), query: vi.fn
 vi.mock('@/lib/gst', () => ({ round2: vi.fn().mockImplementation((n: number) => Math.round(n * 100) / 100) }))
 vi.mock('@/lib/s3', () => ({
   uploadProductImage: vi.fn().mockResolvedValue({
-    url: 'https://cdn/x.jpg', thumbnailUrl: 'https://cdn/x-t.jpg',
-    s3Key: 'products/p1/x.jpg', s3ThumbnailKey: 'products/p1/thumbnails/x.jpg',
-    fileName: 'x.jpg', fileSize: 1234, mimeType: 'image/jpeg', width: 800, height: 600,
+    url: 'https://cdn/x.jpg',
+    thumbnailUrl: 'https://cdn/x-t.jpg',
+    s3Key: 'products/p1/x.jpg',
+    s3ThumbnailKey: 'products/p1/thumbnails/x.jpg',
+    fileName: 'x.jpg',
+    fileSize: 1234,
+    mimeType: 'image/jpeg',
+    width: 800,
+    height: 600,
   }),
   copyGalleryImageToProduct: vi.fn().mockResolvedValue({
-    url: 'https://cdn/g.jpg', thumbnailUrl: 'https://cdn/g-t.jpg',
-    s3Key: 'products/p1/g.jpg', s3ThumbnailKey: 'products/p1/thumbnails/g.jpg',
+    url: 'https://cdn/g.jpg',
+    thumbnailUrl: 'https://cdn/g-t.jpg',
+    s3Key: 'products/p1/g.jpg',
+    s3ThumbnailKey: 'products/p1/thumbnails/g.jpg',
   }),
 }))
 
@@ -24,7 +32,19 @@ import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
 
 const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['controls:read', 'controls:write'] }
 
-const PRODUCTS = [{ id: 'p1', name: 'Bolt', mrp_ex_gst: '100', mrp: '118', price_ex_gst: '90', base_price: '106.2', discount_pct: '10', gst_percentage: '18', has_variants: false }]
+const PRODUCTS = [
+  {
+    id: 'p1',
+    name: 'Bolt',
+    mrp_ex_gst: '100',
+    mrp: '118',
+    price_ex_gst: '90',
+    base_price: '106.2',
+    discount_pct: '10',
+    gst_percentage: '18',
+    has_variants: false,
+  },
+]
 
 function makeMockClient(responses: Record<number, any> = {}) {
   let idx = 0
@@ -207,7 +227,11 @@ describe('POST /api/admin/controls', () => {
   // inflate_price
   it('inflate_price: updates products and variants', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'Bolt', mrp_ex_gst: '100', discount_pct: '10', gst_percentage: '18', has_variants: false }] }, // snapshot
+      0: {
+        rows: [
+          { id: 'p1', name: 'Bolt', mrp_ex_gst: '100', discount_pct: '10', gst_percentage: '18', has_variants: false },
+        ],
+      }, // snapshot
       1: { rows: [{ id: 'p1', mrp_ex_gst: '100', discount_pct: '10', gst_percentage: '18', has_variants: false }] }, // products
       2: { rows: [] }, // update product
       3: { rows: [{ id: 'v1', mrp_ex_gst: '90', discount_pct: '10', gst_percentage: '18' }] }, // variants
@@ -248,7 +272,9 @@ describe('POST /api/admin/controls', () => {
   // set_discount
   it('set_discount: updates products and variants', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'P', mrp_ex_gst: '100', discount_pct: '0', price_ex_gst: '100', base_price: '118' }] },
+      0: {
+        rows: [{ id: 'p1', name: 'P', mrp_ex_gst: '100', discount_pct: '0', price_ex_gst: '100', base_price: '118' }],
+      },
       1: { rows: [{ id: 'p1', mrp_ex_gst: '100', gst_percentage: '18' }] },
       2: { rows: [] },
       3: { rows: [{ id: 'v1', mrp_ex_gst: '90', gst_percentage: '18' }] },
@@ -290,7 +316,19 @@ describe('POST /api/admin/controls', () => {
   // set_mrp_ex_gst
   it('set_mrp_ex_gst: updates all products', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'P', mrp_ex_gst: '100', mrp: '118', price_ex_gst: '90', base_price: '106.2', discount_pct: '10' }] },
+      0: {
+        rows: [
+          {
+            id: 'p1',
+            name: 'P',
+            mrp_ex_gst: '100',
+            mrp: '118',
+            price_ex_gst: '90',
+            base_price: '106.2',
+            discount_pct: '10',
+          },
+        ],
+      },
       1: { rows: [{ id: 'p1', discount_pct: '10', gst_percentage: '18' }] },
       2: { rows: [] },
       3: { rows: [{ id: 'log-1' }] },
@@ -325,8 +363,8 @@ describe('POST /api/admin/controls', () => {
     it(`${op}: updates products`, async () => {
       const client = makeMockClient({
         0: { rows: [{ id: 'p1', name: 'P' }] }, // snapshot
-        1: { rows: [] },                           // update
-        2: { rows: [{ id: 'log-1' }] },            // log
+        1: { rows: [] }, // update
+        2: { rows: [{ id: 'log-1' }] }, // log
       })
       vi.mocked(withTransaction).mockImplementation(fn => fn(client))
       const res = await POST(makePost({ operation: op, value, product_ids: ['p1'] }))
@@ -373,7 +411,21 @@ describe('POST /api/admin/controls', () => {
   // set_selling_unit
   it('set_selling_unit: creates base unit row and inherits to variants', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'P', unit: null, factor: null, dimension: null, display_label: null, min_qty: null, max_qty: null, qty_step: null }] },
+      0: {
+        rows: [
+          {
+            id: 'p1',
+            name: 'P',
+            unit: null,
+            factor: null,
+            dimension: null,
+            display_label: null,
+            min_qty: null,
+            max_qty: null,
+            qty_step: null,
+          },
+        ],
+      },
       1: { rows: [] }, // upsert product unit
       2: { rows: [{ id: 'v1', product_id: 'p1' }] }, // variants
       3: { rows: [] }, // demote existing base
@@ -382,28 +434,54 @@ describe('POST /api/admin/controls', () => {
       6: { rows: [{ id: 'log-1' }] },
     })
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
-    const res = await POST(makePost({
-      operation: 'set_selling_unit',
-      value: { unit: 'pcs', factor: 1, dimension: 'count', display_label: 'Piece', min_qty: 1, max_qty: 100, qty_step: 1 },
-      product_ids: ['p1'],
-      inherit_to_variants: true,
-    }))
+    const res = await POST(
+      makePost({
+        operation: 'set_selling_unit',
+        value: {
+          unit: 'pcs',
+          factor: 1,
+          dimension: 'count',
+          display_label: 'Piece',
+          min_qty: 1,
+          max_qty: 100,
+          qty_step: 1,
+        },
+        product_ids: ['p1'],
+        inherit_to_variants: true,
+      })
+    )
     expect(res.status).toBe(200)
   })
 
   it('set_selling_unit: skips variant inheritance when inherit_to_variants=false', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'P', unit: null, factor: null, dimension: null, display_label: null, min_qty: null, max_qty: null, qty_step: null }] },
+      0: {
+        rows: [
+          {
+            id: 'p1',
+            name: 'P',
+            unit: null,
+            factor: null,
+            dimension: null,
+            display_label: null,
+            min_qty: null,
+            max_qty: null,
+            qty_step: null,
+          },
+        ],
+      },
       1: { rows: [] },
       2: { rows: [{ id: 'log-1' }] },
     })
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
-    const res = await POST(makePost({
-      operation: 'set_selling_unit',
-      value: { unit: 'pcs', factor: 1 },
-      product_ids: ['p1'],
-      inherit_to_variants: false,
-    }))
+    const res = await POST(
+      makePost({
+        operation: 'set_selling_unit',
+        value: { unit: 'pcs', factor: 1 },
+        product_ids: ['p1'],
+        inherit_to_variants: false,
+      })
+    )
     expect(res.status).toBe(200)
   })
 
@@ -424,24 +502,42 @@ describe('POST /api/admin/controls', () => {
   it('set_selling_unit: throws when factor <= 0', async () => {
     const client = makeMockClient({ 0: { rows: [{ id: 'p1', name: 'P' }] } })
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
-    const res = await POST(makePost({ operation: 'set_selling_unit', value: { unit: 'pcs', factor: 0 }, product_ids: ['p1'] }))
+    const res = await POST(
+      makePost({ operation: 'set_selling_unit', value: { unit: 'pcs', factor: 0 }, product_ids: ['p1'] })
+    )
     expect(res.status).toBe(500)
   })
 
   it('set_selling_unit: handles null max_qty', async () => {
     const client = makeMockClient({
-      0: { rows: [{ id: 'p1', name: 'P', unit: null, factor: null, dimension: null, display_label: null, min_qty: null, max_qty: null, qty_step: null }] },
+      0: {
+        rows: [
+          {
+            id: 'p1',
+            name: 'P',
+            unit: null,
+            factor: null,
+            dimension: null,
+            display_label: null,
+            min_qty: null,
+            max_qty: null,
+            qty_step: null,
+          },
+        ],
+      },
       1: { rows: [] },
       2: { rows: [] }, // variants empty (no inherit needed)
       3: { rows: [] }, // update variant.unit varchar
       4: { rows: [{ id: 'log-1' }] },
     })
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
-    const res = await POST(makePost({
-      operation: 'set_selling_unit',
-      value: { unit: 'box', factor: 12, max_qty: null },
-      product_ids: ['p1'],
-    }))
+    const res = await POST(
+      makePost({
+        operation: 'set_selling_unit',
+        value: { unit: 'box', factor: 12, max_qty: null },
+        product_ids: ['p1'],
+      })
+    )
     expect(res.status).toBe(200)
   })
 
@@ -464,19 +560,39 @@ describe('POST /api/admin/controls', () => {
   it('set_images enqueues a job and returns job_id; background worker replaces the slot', async () => {
     // Two products selected; only p1 has an image in slot 1 (display_order 0).
     vi.mocked(queryMany).mockResolvedValueOnce([
-      { id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.jpg', file_size: 10, mime_type: 'image/jpeg', width: 100, height: 100, alt_text: null, display_order: 0, is_primary: true },
+      {
+        id: 'img1',
+        product_id: 'p1',
+        image_url: 'u',
+        thumbnail_url: 't',
+        s3_bucket: 'b',
+        s3_key: 'k',
+        s3_thumbnail_key: 'tk',
+        file_name: 'old.jpg',
+        file_size: 10,
+        mime_type: 'image/jpeg',
+        width: 100,
+        height: 100,
+        alt_text: null,
+        display_order: 0,
+        is_primary: true,
+      },
     ] as any)
     // queryOne is called first to INSERT the job row (returns id), then for the log row.
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'job1' } as any).mockResolvedValueOnce({ id: 'log1' } as any)
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ id: 'job1' } as any)
+      .mockResolvedValueOnce({ id: 'log1' } as any)
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
     const client = makeMockClient({})
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
 
-    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1', 'p2']), slot: '1' }))
+    const res = await POST(
+      makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1', 'p2']), slot: '1' })
+    )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.job_id).toBe('job1')
-    expect(json.total).toBe(1)   // only p1 has slot 1
+    expect(json.total).toBe(1) // only p1 has slot 1
     expect(json.skipped).toBe(1) // p2 skipped
 
     // Let the detached worker finish: it replaces the slot in a transaction and
@@ -496,7 +612,9 @@ describe('POST /api/admin/controls', () => {
   })
 
   it('set_images 400 when no image file provided', async () => {
-    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1' }, false))
+    const res = await POST(
+      makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1' }, false)
+    )
     expect(res.status).toBe(400)
   })
 
@@ -520,37 +638,90 @@ describe('POST /api/admin/controls', () => {
 
   it('set_images 404 when the referenced gallery image is not found', async () => {
     vi.mocked(queryMany).mockResolvedValueOnce([] as any) // gallery lookup returns nothing
-    const res = await POST(makeImagePost(
-      { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g-missing' },
-      false // no file → gallery path
-    ))
+    const res = await POST(
+      makeImagePost(
+        { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g-missing' },
+        false // no file → gallery path
+      )
+    )
     expect(res.status).toBe(404)
     expect((await res.json()).error).toContain('Gallery image not found')
   })
 
   it('set_images from a GALLERY image enqueues a job and the worker copies via copyGalleryImageToProduct', async () => {
     vi.mocked(queryMany)
-      .mockResolvedValueOnce([{ s3_key: 'gallery/g.png', s3_thumbnail_key: 'gallery/thumbnails/g.png', image_url: 'u', thumbnail_url: 't', file_name: 'g.png', file_size: 5, mime_type: 'image/png', width: 10, height: 10 }] as any) // gallery row
-      .mockResolvedValueOnce([{ id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.png', file_size: 1, mime_type: 'image/png', width: 1, height: 1, alt_text: null, display_order: 0, is_primary: true }] as any) // slot read
-    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'jobG' } as any).mockResolvedValueOnce({ id: 'logG' } as any)
+      .mockResolvedValueOnce([
+        {
+          s3_key: 'gallery/g.png',
+          s3_thumbnail_key: 'gallery/thumbnails/g.png',
+          image_url: 'u',
+          thumbnail_url: 't',
+          file_name: 'g.png',
+          file_size: 5,
+          mime_type: 'image/png',
+          width: 10,
+          height: 10,
+        },
+      ] as any) // gallery row
+      .mockResolvedValueOnce([
+        {
+          id: 'img1',
+          product_id: 'p1',
+          image_url: 'u',
+          thumbnail_url: 't',
+          s3_bucket: 'b',
+          s3_key: 'k',
+          s3_thumbnail_key: 'tk',
+          file_name: 'old.png',
+          file_size: 1,
+          mime_type: 'image/png',
+          width: 1,
+          height: 1,
+          alt_text: null,
+          display_order: 0,
+          is_primary: true,
+        },
+      ] as any) // slot read
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ id: 'jobG' } as any)
+      .mockResolvedValueOnce({ id: 'logG' } as any)
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
     const client = makeMockClient({})
     vi.mocked(withTransaction).mockImplementation(fn => fn(client))
 
-    const res = await POST(makeImagePost(
-      { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g1' },
-      false
-    ))
+    const res = await POST(
+      makeImagePost(
+        { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g1' },
+        false
+      )
+    )
     expect(res.status).toBe(200)
     expect((await res.json()).job_id).toBe('jobG')
-    await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     const { copyGalleryImageToProduct } = await import('@/lib/s3')
     expect(copyGalleryImageToProduct).toHaveBeenCalled()
   })
 
   it('set_images worker marks the job FAILED when the per-product replace throws', async () => {
     vi.mocked(queryMany).mockResolvedValueOnce([
-      { id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.jpg', file_size: 10, mime_type: 'image/jpeg', width: 100, height: 100, alt_text: null, display_order: 0, is_primary: true },
+      {
+        id: 'img1',
+        product_id: 'p1',
+        image_url: 'u',
+        thumbnail_url: 't',
+        s3_bucket: 'b',
+        s3_key: 'k',
+        s3_thumbnail_key: 'tk',
+        file_name: 'old.jpg',
+        file_size: 10,
+        mime_type: 'image/jpeg',
+        width: 100,
+        height: 100,
+        alt_text: null,
+        display_order: 0,
+        is_primary: true,
+      },
     ] as any)
     vi.mocked(queryOne).mockResolvedValueOnce({ id: 'jobF' } as any)
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
@@ -559,7 +730,8 @@ describe('POST /api/admin/controls', () => {
 
     const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1' }))
     expect(res.status).toBe(200) // enqueue still succeeds
-    await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
     // A bulk_image_jobs UPDATE marking failure should have been issued.
     const calls = vi.mocked(query).mock.calls.map(c => String(c[0]))
     expect(calls.some(sql => sql.includes('bulk_image_jobs') && sql.includes("'failed'"))).toBe(true)

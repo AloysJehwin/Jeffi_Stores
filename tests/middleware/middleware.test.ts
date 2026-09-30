@@ -5,14 +5,15 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks — vi.hoisted() ensures these are defined before vi.mock() factories run
 // ---------------------------------------------------------------------------
 
-const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } =
-  vi.hoisted(() => ({
+const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } = vi.hoisted(
+  () => ({
     mockVerifyToken: vi.fn(),
     mockVerifyBusinessToken: vi.fn(),
     mockApplyRateLimit: vi.fn().mockResolvedValue(null),
     mockGetScopeForPath: vi.fn().mockReturnValue(null),
     mockHasScope: vi.fn().mockReturnValue(true),
-  }))
+  })
+)
 
 vi.mock('@/lib/jwt', () => ({
   verifyToken: mockVerifyToken,
@@ -79,9 +80,7 @@ function forwardedRequestHeader(res: Response, name: string): string | null {
 /** Opaque-session model: the cookie value is a bare session id and middleware calls the
  *  (mocked) verifyBusinessToken to resolve it. This sets the mock's return for the given
  *  claims and hands back a dummy opaque cookie value to put in the request. */
-async function mintBusinessJwt(
-  claims: Record<string, unknown> = {}
-): Promise<string> {
+async function mintBusinessJwt(claims: Record<string, unknown> = {}): Promise<string> {
   mockVerifyBusinessToken.mockResolvedValue({
     userId: 'biz-001',
     email: 'biz@example.com',
@@ -235,10 +234,7 @@ describe('middleware', () => {
     })
 
     it('returns rate-limit response when applyRateLimit fires', async () => {
-      const limitedRes = NextResponse.json(
-        { error: 'Too many requests' },
-        { status: 429 }
-      )
+      const limitedRes = NextResponse.json({ error: 'Too many requests' }, { status: 429 })
       mockApplyRateLimit.mockResolvedValue(limitedRes)
 
       const req = makeNextRequest('http://localhost/api/admin/auth/email-otp/start', {

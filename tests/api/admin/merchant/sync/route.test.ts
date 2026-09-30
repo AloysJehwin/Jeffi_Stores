@@ -25,11 +25,7 @@ vi.mock('@/lib/merchant/sync', () => ({
 import { POST, GET } from '@/app/api/admin/merchant/sync/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import {
-  syncAllProductsToMerchant,
-  syncProductToMerchant,
-  sendSyncFailureEmail,
-} from '@/lib/merchant/sync'
+import { syncAllProductsToMerchant, syncProductToMerchant, sendSyncFailureEmail } from '@/lib/merchant/sync'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

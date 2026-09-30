@@ -181,13 +181,19 @@ describe('POST /api/admin/products/[id]/draft/variant-images', () => {
   })
 
   it('stages a gallery image (image_url present) as primary and saves', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ variant_images: [] } as any)
-      .mockResolvedValueOnce({
-        id: 'g1', image_url: 'https://cdn/img.jpg', thumbnail_url: 'https://cdn/t.jpg',
-        s3_key: 'k', s3_thumbnail_key: 'tk', custom_name: 'nice.jpg', file_name: 'img.jpg',
-        file_size: 100, mime_type: 'image/jpeg', width: 10, height: 20,
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ variant_images: [] } as any).mockResolvedValueOnce({
+      id: 'g1',
+      image_url: 'https://cdn/img.jpg',
+      thumbnail_url: 'https://cdn/t.jpg',
+      s3_key: 'k',
+      s3_thumbnail_key: 'tk',
+      custom_name: 'nice.jpg',
+      file_name: 'img.jpg',
+      file_size: 100,
+      mime_type: 'image/jpeg',
+      width: 10,
+      height: 20,
+    } as any)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }, VARIANT_ID), params())
     expect(res.status).toBe(200)
     const { image } = await res.json()
@@ -203,10 +209,17 @@ describe('POST /api/admin/products/[id]/draft/variant-images', () => {
     mockQueryOne
       .mockResolvedValueOnce({ variant_images: [{ id: 'x', variant_id: VARIANT_ID }] } as any)
       .mockResolvedValueOnce({
-        id: 'g2', image_url: null, thumbnail_url: null,
-        s3_key: 'gallery/img2.jpg', s3_thumbnail_key: 'gallery/t2.jpg',
-        custom_name: null, file_name: 'img2.jpg',
-        file_size: 50, mime_type: 'image/png', width: 5, height: 6,
+        id: 'g2',
+        image_url: null,
+        thumbnail_url: null,
+        s3_key: 'gallery/img2.jpg',
+        s3_thumbnail_key: 'gallery/t2.jpg',
+        custom_name: null,
+        file_name: 'img2.jpg',
+        file_size: 50,
+        mime_type: 'image/png',
+        width: 5,
+        height: 6,
       } as any)
     const res = await POST(jsonReq('POST', { gallery_image_id: UUID1 }, VARIANT_ID), params())
     expect(res.status).toBe(200)
@@ -228,9 +241,15 @@ describe('POST /api/admin/products/[id]/draft/variant-images', () => {
   it('uploads a file and stages it as a fresh upload', async () => {
     mockQueryOne.mockResolvedValueOnce({ variant_images: [] } as any)
     mockUpload.mockResolvedValue({
-      url: 'https://cdn/u.jpg', thumbnailUrl: 'https://cdn/ut.jpg',
-      s3Key: 's3k', s3ThumbnailKey: 's3tk', fileName: 'u.jpg',
-      fileSize: 999, mimeType: 'image/jpeg', width: 100, height: 200,
+      url: 'https://cdn/u.jpg',
+      thumbnailUrl: 'https://cdn/ut.jpg',
+      s3Key: 's3k',
+      s3ThumbnailKey: 's3tk',
+      fileName: 'u.jpg',
+      fileSize: 999,
+      mimeType: 'image/jpeg',
+      width: 100,
+      height: 200,
     } as any)
     const form = new FormData()
     form.append('file', new File(['bytes'], 'u.jpg', { type: 'image/jpeg' }))

@@ -110,15 +110,12 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
     const body = await res.json()
     expect(body.error).toBe('Dangerous SQL detected')
     // Should log to audit
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('dry_run_rejected'),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('dry_run_rejected'), expect.any(Array))
   })
 
   it('returns 400 when product_sql validation fails', async () => {
     mockValidateSql
-      .mockReturnValueOnce(validAudienceValidation as any)   // audience passes
+      .mockReturnValueOnce(validAudienceValidation as any) // audience passes
       .mockReturnValueOnce({ ok: false, reason: 'Bad product SQL' } as any) // product fails
     const res = await POST(makePost({ sql: 'SELECT id FROM users', product_sql: 'DROP TABLE products' }))
     expect(res.status).toBe(400)
@@ -159,9 +156,7 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
       .mockReturnValueOnce(validProductValidation as any)
 
     const audienceRows = [{ id: 'u1' }, { id: 'u2' }]
-    const productRows = [
-      { name: 'Widget', price: 100, image_url: '/img/w.jpg' },
-    ]
+    const productRows = [{ name: 'Widget', price: 100, image_url: '/img/w.jpg' }]
     let callCount = 0
     const client = {
       query: vi.fn().mockImplementation((sql: string) => {
@@ -180,7 +175,9 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
     }
     mockGetClient.mockResolvedValueOnce(client as any)
 
-    const res = await POST(makePost({ sql: 'SELECT id FROM users', product_sql: 'SELECT name, price, image_url FROM products' }))
+    const res = await POST(
+      makePost({ sql: 'SELECT id FROM users', product_sql: 'SELECT name, price, image_url FROM products' })
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.count).toBe(2)
@@ -209,10 +206,7 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
     expect(body.error).toContain('timed out')
     expect(body.code).toBe('57014')
     // Audit log for failure
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('dry_run_failed'),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('dry_run_failed'), expect.any(Array))
     expect(client.release).toHaveBeenCalled()
   })
 
@@ -220,7 +214,12 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
     mockValidateSql.mockReturnValueOnce(validAudienceValidation as any)
     const client = {
       query: vi.fn().mockImplementation((sql: string) => {
-        if (['BEGIN READ ONLY', 'ROLLBACK'].includes(sql) || sql.includes('timeout') || sql.includes('lock_timeout') || sql.includes('idle_in_transaction')) {
+        if (
+          ['BEGIN READ ONLY', 'ROLLBACK'].includes(sql) ||
+          sql.includes('timeout') ||
+          sql.includes('lock_timeout') ||
+          sql.includes('idle_in_transaction')
+        ) {
           return Promise.resolve()
         }
         return Promise.reject(new Error('syntax error near FROM'))
@@ -240,7 +239,12 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
     mockValidateSql.mockReturnValueOnce(validAudienceValidation as any)
     const client = {
       query: vi.fn().mockImplementation((sql: string) => {
-        if (['BEGIN READ ONLY', 'ROLLBACK'].includes(sql) || sql.includes('timeout') || sql.includes('lock') || sql.includes('idle')) {
+        if (
+          ['BEGIN READ ONLY', 'ROLLBACK'].includes(sql) ||
+          sql.includes('timeout') ||
+          sql.includes('lock') ||
+          sql.includes('idle')
+        ) {
           return Promise.resolve()
         }
         return Promise.resolve({ rows: [{ id: 'u1' }], rowCount: 1 })
@@ -251,9 +255,6 @@ describe('POST /api/admin/campaigns/scenarios/dry-run', () => {
 
     await POST(makePost({ sql: 'SELECT id FROM users' }))
     // Audit success log
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining("'dry_run'"),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("'dry_run'"), expect.any(Array))
   })
 })

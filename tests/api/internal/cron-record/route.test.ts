@@ -56,7 +56,14 @@ describe('POST /api/internal/cron-record', () => {
   })
 
   it('accepts all valid jobIds', async () => {
-    const validIds = ['delhivery_sync', 'cancel_stale_orders', 'sweep_auto_tasks', 'run_campaigns', 'compute_health', 'daily_briefing']
+    const validIds = [
+      'delhivery_sync',
+      'cancel_stale_orders',
+      'sweep_auto_tasks',
+      'run_campaigns',
+      'compute_health',
+      'daily_briefing',
+    ]
     for (const jobId of validIds) {
       vi.clearAllMocks()
       mockQuery.mockResolvedValue(undefined as any)
@@ -78,15 +85,15 @@ describe('POST /api/internal/cron-record', () => {
     // 3 upserts + 1 log upsert = 4 query calls
     expect(mockQuery).toHaveBeenCalledTimes(4)
     // status should be 'ok'
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT'),
-      ['cron_last_status_delhivery_sync', 'ok']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [
+      'cron_last_status_delhivery_sync',
+      'ok',
+    ])
     // error should be empty string on success
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT'),
-      ['cron_last_error_delhivery_sync', '']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [
+      'cron_last_error_delhivery_sync',
+      '',
+    ])
   })
 
   it('sets status=error and stores errorMsg on failure', async () => {
@@ -95,14 +102,14 @@ describe('POST /api/internal/cron-record', () => {
 
     await POST(makeRequest({ jobId: 'run_campaigns', ok: false, errorMsg: 'timeout' }, 'test-cron-secret') as any)
 
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT'),
-      ['cron_last_status_run_campaigns', 'error']
-    )
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('ON CONFLICT'),
-      ['cron_last_error_run_campaigns', 'timeout']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [
+      'cron_last_status_run_campaigns',
+      'error',
+    ])
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT'), [
+      'cron_last_error_run_campaigns',
+      'timeout',
+    ])
   })
 
   it('prepends new entry to existing log and trims to 50', async () => {

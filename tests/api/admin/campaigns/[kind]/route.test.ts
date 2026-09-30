@@ -48,9 +48,7 @@ function makePatch(kind: string, body: unknown) {
 }
 
 const sampleCampaign = { kind: 'welcome', name: 'Welcome', enabled: true, delay_hours: 0 }
-const sampleSends = [
-  { id: 's1', user_email: 'a@b.com', user_name: 'Alice', sent_at: '2024-01-01' },
-]
+const sampleSends = [{ id: 's1', user_email: 'a@b.com', user_name: 'Alice', sent_at: '2024-01-01' }]
 
 // ── GET tests ─────────────────────────────────────────────────────────────────
 
@@ -123,11 +121,11 @@ describe('GET /api/admin/campaigns/[kind]', () => {
     const waLogs = [
       { to_number: '+919876543210', body: 'We miss you!', status: 'sent', error: null, sent_at: '2024-01-02' },
     ]
-    mockQueryOne.mockResolvedValueOnce(sampleCampaign as any)   // campaign lookup
+    mockQueryOne.mockResolvedValueOnce(sampleCampaign as any) // campaign lookup
     mockQueryMany
-      .mockResolvedValueOnce(sampleSends as any)                // recentSends
-      .mockResolvedValueOnce(waLogs as any)                     // whatsappLogs
-    mockQueryOne.mockResolvedValueOnce({ total: '1' } as any)   // count
+      .mockResolvedValueOnce(sampleSends as any) // recentSends
+      .mockResolvedValueOnce(waLogs as any) // whatsappLogs
+    mockQueryOne.mockResolvedValueOnce({ total: '1' } as any) // count
 
     const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
@@ -178,7 +176,9 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('ignores delay_hours out of range (>720)', async () => {
-    const res = await PATCH(makePatch('welcome', { delay_hours: 999 }), { params: Promise.resolve({ kind: 'welcome' }) })
+    const res = await PATCH(makePatch('welcome', { delay_hours: 999 }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(200)
     // Query still called but without delay_hours param in SET
     const callArgs = mockQuery.mock.calls[0]
@@ -186,7 +186,9 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('updates discount_percent within valid range', async () => {
-    const res = await PATCH(makePatch('welcome', { discount_percent: 10 }), { params: Promise.resolve({ kind: 'welcome' }) })
+    const res = await PATCH(makePatch('welcome', { discount_percent: 10 }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('discount_percent'),
@@ -195,17 +197,22 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('updates subject_template', async () => {
-    const res = await PATCH(makePatch('welcome', { subject_template: 'Hello {{name}}' }), { params: Promise.resolve({ kind: 'welcome' }) })
+    const res = await PATCH(makePatch('welcome', { subject_template: 'Hello {{name}}' }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(200)
   })
 
   it('returns 400 when body_template validation fails', async () => {
     mockQueryOne.mockResolvedValueOnce({ scenario_kind: 'abandoned-cart' } as any)
-    mockValidateTemplate.mockReturnValueOnce({ ok: false, reason: 'Missing required variable', hint: 'Add {{name}}' } as any)
-    const res = await PATCH(
-      makePatch('welcome', { body_template: '<p>Bad template</p>' }),
-      { params: Promise.resolve({ kind: 'welcome' }) }
-    )
+    mockValidateTemplate.mockReturnValueOnce({
+      ok: false,
+      reason: 'Missing required variable',
+      hint: 'Add {{name}}',
+    } as any)
+    const res = await PATCH(makePatch('welcome', { body_template: '<p>Bad template</p>' }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toBe('Missing required variable')
@@ -215,44 +222,40 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   it('updates body_template when validation passes', async () => {
     mockQueryOne.mockResolvedValueOnce({ scenario_kind: 'welcome' } as any)
     mockValidateTemplate.mockReturnValueOnce({ ok: true } as any)
-    const res = await PATCH(
-      makePatch('welcome', { body_template: '<p>Hello {{name}}</p>' }),
-      { params: Promise.resolve({ kind: 'welcome' }) }
-    )
+    const res = await PATCH(makePatch('welcome', { body_template: '<p>Hello {{name}}</p>' }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(200)
   })
 
   it('returns 400 when scenario_kind is seeded and change attempted', async () => {
     // First queryOne call: no scenario_kind (or different), second: seeded check returns row
     mockQueryOne
-      .mockResolvedValueOnce({ scenario_kind: null } as any)  // current
-      .mockResolvedValueOnce({ kind: 'welcome' } as any)       // seeded check
-    const res = await PATCH(
-      makePatch('welcome', { scenario_kind: 'new-kind' }),
-      { params: Promise.resolve({ kind: 'welcome' }) }
-    )
+      .mockResolvedValueOnce({ scenario_kind: null } as any) // current
+      .mockResolvedValueOnce({ kind: 'welcome' } as any) // seeded check
+    const res = await PATCH(makePatch('welcome', { scenario_kind: 'new-kind' }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Cannot change scenario on a seeded campaign')
   })
 
   it('returns 400 when unknown scenario_kind provided', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ scenario_kind: null } as any)  // current
-      .mockResolvedValueOnce(null)                             // seeded check — not seeded
-      .mockResolvedValueOnce(null)                             // exists check — does not exist
-    const res = await PATCH(
-      makePatch('welcome', { scenario_kind: 'nonexistent-scenario' }),
-      { params: Promise.resolve({ kind: 'welcome' }) }
-    )
+      .mockResolvedValueOnce({ scenario_kind: null } as any) // current
+      .mockResolvedValueOnce(null) // seeded check — not seeded
+      .mockResolvedValueOnce(null) // exists check — does not exist
+    const res = await PATCH(makePatch('welcome', { scenario_kind: 'nonexistent-scenario' }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Unknown scenario_kind')
   })
 
   it('updates parameters object', async () => {
-    const res = await PATCH(
-      makePatch('welcome', { parameters: { foo: 'bar' } }),
-      { params: Promise.resolve({ kind: 'welcome' }) }
-    )
+    const res = await PATCH(makePatch('welcome', { parameters: { foo: 'bar' } }), {
+      params: Promise.resolve({ kind: 'welcome' }),
+    })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('parameters'),

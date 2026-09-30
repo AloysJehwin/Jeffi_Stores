@@ -58,7 +58,8 @@ const adminPayload = {
 
 function makeGetRequest(id: string, cookies: Record<string, string> = {}) {
   const cookieHeader = Object.entries({ admin_sid: 'valid-token', ...cookies })
-    .map(([k, v]) => `${k}=${v}`).join('; ')
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ')
   return new NextRequest(`http://localhost/api/admin/products/${id}`, {
     method: 'GET',
     headers: { cookie: cookieHeader },
@@ -185,7 +186,7 @@ describe('PATCH /api/admin/products/[id]', () => {
     expect(body.ok).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE products'),
-      expect.arrayContaining(['cat-2', expect.any(String), 'prod-1']),
+      expect.arrayContaining(['cat-2', expect.any(String), 'prod-1'])
     )
   })
 

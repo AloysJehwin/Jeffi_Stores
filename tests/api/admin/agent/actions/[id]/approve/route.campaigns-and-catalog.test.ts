@@ -88,7 +88,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     vi.mocked(logActivity).mockResolvedValue(undefined as any)
     // default fetch: return a 200 empty response so any un-mocked call doesn't hit real network
     global.fetch = vi.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({}), text: async () => '',
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => '',
     }) as any
   })
 
@@ -101,8 +104,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when create_coupon insert throws unique violation', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_coupon', {
-        code: 'DUP', discountType: 'flat', discountValue: 100,
-        validUntil: null, minPurchaseAmount: null, usageLimit: null, description: null,
+        code: 'DUP',
+        discountType: 'flat',
+        discountValue: 100,
+        validUntil: null,
+        minPurchaseAmount: null,
+        usageLimit: null,
+        description: null,
       }) as any
     )
     const err: any = new Error('unique_violation')
@@ -116,8 +124,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when create_coupon insert throws generic error', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('create_coupon', {
-        code: 'X', discountType: 'flat', discountValue: 100,
-        validUntil: null, minPurchaseAmount: null, usageLimit: null, description: null,
+        code: 'X',
+        discountType: 'flat',
+        discountValue: 100,
+        validUntil: null,
+        minPurchaseAmount: null,
+        usageLimit: null,
+        description: null,
       }) as any
     )
     mockQueryOne.mockRejectedValueOnce(new Error('db down'))
@@ -148,7 +161,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes update_campaign_template with only subject', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(proposed('update_campaign_template', { campaignKind: 'k', newSubject: 'S', newBody: null }) as any)
+      .mockResolvedValueOnce(
+        proposed('update_campaign_template', { campaignKind: 'k', newSubject: 'S', newBody: null }) as any
+      )
       .mockResolvedValueOnce({ kind: 'k', name: 'K' } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -159,7 +174,9 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when update_campaign_template campaign missing', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(proposed('update_campaign_template', { campaignKind: 'x', newSubject: 'S', newBody: null }) as any)
+      .mockResolvedValueOnce(
+        proposed('update_campaign_template', { campaignKind: 'x', newSubject: 'S', newBody: null }) as any
+      )
       .mockResolvedValueOnce(null)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
@@ -171,7 +188,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when send_mailer_broadcast missing subject/body', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('send_mailer_broadcast', {
-        audience: 'test_only', testEmail: 'x@y.com', subject: '', body: 'b', fromName: 'S',
+        audience: 'test_only',
+        testEmail: 'x@y.com',
+        subject: '',
+        body: 'b',
+        fromName: 'S',
       }) as any
     )
     const res = await POST(makeReq(), params())
@@ -182,7 +203,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when send_mailer_broadcast test_only missing testEmail', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('send_mailer_broadcast', {
-        audience: 'test_only', testEmail: null, subject: 'Hi', body: 'b', fromName: 'S',
+        audience: 'test_only',
+        testEmail: null,
+        subject: 'Hi',
+        body: 'b',
+        fromName: 'S',
       }) as any
     )
     const res = await POST(makeReq(), params())
@@ -193,7 +218,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('reports all-failed when mailer_broadcast sendMail rejects for every recipient', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('send_mailer_broadcast', {
-        audience: 'test_only', testEmail: 'x@y.com', subject: 'Hi', body: '<p>Hello</p>', fromName: 'S',
+        audience: 'test_only',
+        testEmail: 'x@y.com',
+        subject: 'Hi',
+        body: '<p>Hello</p>',
+        fromName: 'S',
       }) as any
     )
     vi.mocked(transporter.sendMail).mockRejectedValue(new Error('SMTP boom'))
@@ -217,8 +246,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne
       .mockResolvedValueOnce(
         proposed('generate_personalized_coupon', {
-          userId: 'u1', customerEmail: 'c@x.com', discountType: 'flat', discountValue: 100,
-          daysValid: 7, campaign: 'BIRTHDAY', validUntil: '2099-01-01',
+          userId: 'u1',
+          customerEmail: 'c@x.com',
+          discountType: 'flat',
+          discountValue: 100,
+          daysValid: 7,
+          campaign: 'BIRTHDAY',
+          validUntil: '2099-01-01',
         }) as any
       )
       .mockResolvedValueOnce({ id: 'coupon-1', code: 'BIRTHDAY-ABC123' } as any)
@@ -231,8 +265,13 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 on generate_personalized_coupon unique violation', async () => {
     mockQueryOne.mockResolvedValueOnce(
       proposed('generate_personalized_coupon', {
-        userId: 'u1', customerEmail: 'c@x.com', discountType: 'flat', discountValue: 100,
-        daysValid: 7, campaign: 'BIRTHDAY', validUntil: '2099-01-01',
+        userId: 'u1',
+        customerEmail: 'c@x.com',
+        discountType: 'flat',
+        discountValue: 100,
+        daysValid: 7,
+        campaign: 'BIRTHDAY',
+        validUntil: '2099-01-01',
       }) as any
     )
     const err: any = new Error('unique')
@@ -249,8 +288,15 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne
       .mockResolvedValueOnce(
         proposed('create_product', {
-          name: 'Bolt', sku: 'DUP', slug: 'bolt', basePrice: 100,
-          brandId: null, categoryId: null, shortDescription: null, weightGrams: 50, gstPercentage: 18,
+          name: 'Bolt',
+          sku: 'DUP',
+          slug: 'bolt',
+          basePrice: 100,
+          brandId: null,
+          categoryId: null,
+          shortDescription: null,
+          weightGrams: 50,
+          gstPercentage: 18,
         }) as any
       )
       .mockResolvedValueOnce({ id: 'existing' } as any)
@@ -263,12 +309,19 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryOne
       .mockResolvedValueOnce(
         proposed('create_product', {
-          name: 'Bolt', sku: 'NEW', slug: 'bolt', basePrice: 100,
-          brandId: null, categoryId: null, shortDescription: null, weightGrams: 50, gstPercentage: 18,
+          name: 'Bolt',
+          sku: 'NEW',
+          slug: 'bolt',
+          basePrice: 100,
+          brandId: null,
+          categoryId: null,
+          shortDescription: null,
+          weightGrams: 50,
+          gstPercentage: 18,
         }) as any
       )
-      .mockResolvedValueOnce(null)  // dup check
-      .mockResolvedValueOnce(null)  // insert fails
+      .mockResolvedValueOnce(null) // dup check
+      .mockResolvedValueOnce(null) // insert fails
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Insert failed/)
@@ -311,9 +364,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('returns 500 when adjust_inventory delta is zero', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('adjust_inventory', { productId: 'p1', delta: 0, reason: 'x' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('adjust_inventory', { productId: 'p1', delta: 0, reason: 'x' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Invalid delta/)
@@ -321,7 +372,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when adjust_inventory product not found', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({ rows: [] }), // SELECT
       release: vi.fn(),
@@ -337,15 +389,14 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when adjust_inventory would push stock negative', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 2 }] }),
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValueOnce(client as any)
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('adjust_inventory', { productId: 'p1', delta: -5, reason: 'x' }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('adjust_inventory', { productId: 'p1', delta: -5, reason: 'x' }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/drop stock to -3/)
@@ -353,7 +404,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes adjust_inventory successfully', async () => {
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] }) // SELECT
         .mockResolvedValueOnce({}) // UPDATE
@@ -375,9 +427,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 500 when set_product_featured hits limit', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('set_product_featured', { productId: 'p1', featured: true, limit: 6 }) as any
-      )
+      .mockResolvedValueOnce(proposed('set_product_featured', { productId: 'p1', featured: true, limit: 6 }) as any)
       .mockResolvedValueOnce({ n: 6 } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
@@ -386,9 +436,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('executes set_product_featured (unfeature) successfully', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(
-        proposed('set_product_featured', { productId: 'p1', featured: false, limit: 6 }) as any
-      )
+      .mockResolvedValueOnce(proposed('set_product_featured', { productId: 'p1', featured: false, limit: 6 }) as any)
       .mockResolvedValueOnce({ id: 'p1', name: 'X', is_featured: false } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -409,7 +457,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes create_brand successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce(proposed('create_brand', { name: 'B', slug: 'b', logoUrl: null }) as any)
-      .mockResolvedValueOnce(null)  // dup check
+      .mockResolvedValueOnce(null) // dup check
       .mockResolvedValueOnce({ id: 'brand-1', name: 'B', slug: 'b', logo_url: null, is_active: true } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)
@@ -419,9 +467,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── create_category ───────────────────────────────────────────────────
 
   it('returns 500 when create_category missing name/slug', async () => {
-    mockQueryOne.mockResolvedValueOnce(
-      proposed('create_category', { name: '', slug: '', parentId: null }) as any
-    )
+    mockQueryOne.mockResolvedValueOnce(proposed('create_category', { name: '', slug: '', parentId: null }) as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/name and slug required/)
@@ -430,7 +476,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('returns 500 when create_category parent missing', async () => {
     mockQueryOne
       .mockResolvedValueOnce(proposed('create_category', { name: 'C', slug: 'c', parentId: 'ghost' }) as any)
-      .mockResolvedValueOnce(null)  // parent lookup fails
+      .mockResolvedValueOnce(null) // parent lookup fails
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Parent category not found/)
@@ -448,7 +494,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('executes create_category successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce(proposed('create_category', { name: 'C', slug: 'c', parentId: null }) as any)
-      .mockResolvedValueOnce(null)  // dup
+      .mockResolvedValueOnce(null) // dup
       .mockResolvedValueOnce({ id: 'cat-1', name: 'C', slug: 'c', parent_id: null, is_active: true } as any)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(200)

@@ -128,9 +128,7 @@ describe('POST /api/checkout/intents — buyNow mode', () => {
 describe('POST /api/checkout/intents — cart mode', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
-    vi.mocked(loadActiveCart).mockResolvedValue([
-      { id: 'cart-item-1', product_id: PRODUCT_ID },
-    ] as any)
+    vi.mocked(loadActiveCart).mockResolvedValue([{ id: 'cart-item-1', product_id: PRODUCT_ID }] as any)
     vi.mocked(signIntent).mockResolvedValue('cart-intent-token-abc')
   })
 

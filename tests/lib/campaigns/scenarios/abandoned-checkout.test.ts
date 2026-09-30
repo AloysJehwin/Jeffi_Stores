@@ -73,8 +73,13 @@ describe('abandonedCheckout scenario', () => {
   describe('findSuppressed', () => {
     it('returns mapped suppressed rows', async () => {
       const row = {
-        id: 'o1', user_id: 'u1', order_number: 'ORD-001', total_amount: '599.00',
-        reason: 'cooldown', reason_detail: 'Sent 01 Jan 10:00', blocked_until: '2024-01-08T10:00:00Z',
+        id: 'o1',
+        user_id: 'u1',
+        order_number: 'ORD-001',
+        total_amount: '599.00',
+        reason: 'cooldown',
+        reason_detail: 'Sent 01 Jan 10:00',
+        blocked_until: '2024-01-08T10:00:00Z',
       }
       mockQueryMany.mockResolvedValue([row])
       const suppressed = await abandonedCheckout.findSuppressed!({ campaign, params: defaultParams })
@@ -104,7 +109,7 @@ describe('abandonedCheckout scenario', () => {
     it('sends email and returns ok=true', async () => {
       mockFetchUser.mockResolvedValue({ id: 'u1', first_name: 'Alice', email: 'a@x.com' })
       mockQueryMany.mockResolvedValue([
-        { name: 'Bolt M6', quantity: 2, unit_price: 50, product_slug: 'bolt-m6', image_url: 'img.jpg' }
+        { name: 'Bolt M6', quantity: 2, unit_price: 50, product_slug: 'bolt-m6', image_url: 'img.jpg' },
       ])
       mockResolveCoupon.mockResolvedValue({ couponCode: 'SAVE5', discountPercent: 5 })
       mockSendEmail.mockResolvedValue({ ok: true })

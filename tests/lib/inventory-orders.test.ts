@@ -47,16 +47,8 @@ vi.mock('@/lib/search', () => ({
 
 import { query, queryOne, queryMany } from '@/lib/db'
 import { buildProductSearchClause } from '@/lib/search'
-import {
-  logStockMovement,
-  updateWeightedAvgCost,
-  getStockLedger,
-  getStockValuation,
-} from '@/lib/inventory'
-import {
-  cancelOrder,
-  CANCELLABLE_STATUSES,
-} from '@/lib/orders'
+import { logStockMovement, updateWeightedAvgCost, getStockLedger, getStockValuation } from '@/lib/inventory'
+import { cancelOrder, CANCELLABLE_STATUSES } from '@/lib/orders'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
@@ -125,10 +117,7 @@ describe('logStockMovement', () => {
       subVariantId: 'sv-1',
     })
 
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('product_sub_variants'),
-      ['sv-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('product_sub_variants'), ['sv-1'])
   })
 
   it('fetches stock from product_variants when variantId is set (no subVariantId)', async () => {
@@ -137,10 +126,7 @@ describe('logStockMovement', () => {
 
     await logStockMovement(null, { ...baseParams, variantId: 'var-1' })
 
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('product_variants'),
-      ['var-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('product_variants'), ['var-1'])
   })
 
   it('fetches stock from products table when only productId given', async () => {
@@ -149,10 +135,7 @@ describe('logStockMovement', () => {
 
     await logStockMovement(null, baseParams)
 
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('FROM products'),
-      ['prod-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('FROM products'), ['prod-1'])
   })
 
   it('handles null inventory_quantity gracefully (treats as 0)', async () => {
@@ -328,7 +311,13 @@ describe('getStockLedger', () => {
 
     await getStockLedger({ search: 'bolt' })
 
-    expect(buildProductSearchClause).toHaveBeenCalledWith('bolt', expect.any(String), expect.any(String), expect.any(String), expect.any(Number))
+    expect(buildProductSearchClause).toHaveBeenCalledWith(
+      'bolt',
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      expect.any(Number)
+    )
   })
 
   it('defaults limit to 50 and offset to 0', async () => {
@@ -472,9 +461,7 @@ describe('getStockValuation', () => {
 
 describe('CANCELLABLE_STATUSES', () => {
   it('exports the correct cancellable statuses', () => {
-    expect(CANCELLABLE_STATUSES).toEqual(
-      expect.arrayContaining(['pending', 'confirmed', 'processing'])
-    )
+    expect(CANCELLABLE_STATUSES).toEqual(expect.arrayContaining(['pending', 'confirmed', 'processing']))
     expect(CANCELLABLE_STATUSES).not.toContain('shipped')
     expect(CANCELLABLE_STATUSES).not.toContain('delivered')
     expect(CANCELLABLE_STATUSES).not.toContain('cancelled')
@@ -557,10 +544,7 @@ describe('cancelOrder', () => {
       const result = await cancelOrder('order-1', { reason: 'user_request' })
 
       expect(result).toEqual({ success: true, directCancel: true, restoredToCart: false })
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("status = 'cancelled'"),
-        ['order-1']
-      )
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'cancelled'"), ['order-1'])
     })
 
     it('cancels when payment_status is failed', async () => {
@@ -576,11 +560,9 @@ describe('cancelOrder', () => {
     it('restores items to cart when restoreToCart=true and cart item exists', async () => {
       const order = makeOrder({ order_type: 'cart' })
       mockQueryOne
-        .mockResolvedValueOnce(order as any)          // order lookup
+        .mockResolvedValueOnce(order as any) // order lookup
         .mockResolvedValueOnce({ id: 'cart-item-1', quantity: 1 } as any) // existing cart item
-      mockQueryMany.mockResolvedValue([
-        { product_id: 'p1', variant_id: null, quantity: 2, unit_price: 50 },
-      ] as any)
+      mockQueryMany.mockResolvedValue([{ product_id: 'p1', variant_id: null, quantity: 2, unit_price: 50 }] as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', {
@@ -590,20 +572,14 @@ describe('cancelOrder', () => {
 
       expect(result).toEqual({ success: true, directCancel: true, restoredToCart: true })
       // Should UPDATE existing cart item
-      const updateCall = mockQuery.mock.calls.find((c) =>
-        (c[0] as string).includes('UPDATE cart_items')
-      )
+      const updateCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('UPDATE cart_items'))
       expect(updateCall).toBeDefined()
     })
 
     it('inserts new cart item when no existing cart item found', async () => {
       const order = makeOrder({ order_type: 'cart' })
-      mockQueryOne
-        .mockResolvedValueOnce(order as any)
-        .mockResolvedValueOnce(null as any) // no existing cart item
-      mockQueryMany.mockResolvedValue([
-        { product_id: 'p1', variant_id: null, quantity: 1, unit_price: 100 },
-      ] as any)
+      mockQueryOne.mockResolvedValueOnce(order as any).mockResolvedValueOnce(null as any) // no existing cart item
+      mockQueryMany.mockResolvedValue([{ product_id: 'p1', variant_id: null, quantity: 1, unit_price: 100 }] as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', {
@@ -612,9 +588,7 @@ describe('cancelOrder', () => {
       })
 
       expect(result).toMatchObject({ success: true, restoredToCart: true })
-      const insertCall = mockQuery.mock.calls.find((c) =>
-        (c[0] as string).includes('INSERT INTO cart_items')
-      )
+      const insertCall = mockQuery.mock.calls.find(c => (c[0] as string).includes('INSERT INTO cart_items'))
       expect(insertCall).toBeDefined()
     })
 
@@ -679,9 +653,7 @@ describe('cancelOrder', () => {
       const { sendOrderAutoCancelledEmail } = await import('@/lib/email')
       const mockSendEmail = vi.mocked(sendOrderAutoCancelledEmail)
 
-      mockQueryOne
-        .mockResolvedValueOnce(makeOrder({ order_type: 'direct' }) as any)
-        .mockResolvedValueOnce(null as any) // no slug
+      mockQueryOne.mockResolvedValueOnce(makeOrder({ order_type: 'direct' }) as any).mockResolvedValueOnce(null as any) // no slug
       mockQueryMany.mockResolvedValue([])
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -746,9 +718,7 @@ describe('cancelOrder', () => {
 
   describe('cancel_requested path (paid / processing)', () => {
     it('sets status to cancel_requested for confirmed+paid order', async () => {
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ status: 'confirmed', payment_status: 'paid' }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ status: 'confirmed', payment_status: 'paid' }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', { reason: 'user_request' })
@@ -759,16 +729,11 @@ describe('cancelOrder', () => {
         restoredToCart: false,
         cancelRequested: true,
       })
-      expect(mockQuery).toHaveBeenCalledWith(
-        expect.stringContaining("status = 'cancel_requested'"),
-        ['order-1']
-      )
+      expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("status = 'cancel_requested'"), ['order-1'])
     })
 
     it('sets status to cancel_requested for processing order', async () => {
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ status: 'processing', payment_status: 'paid' }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ status: 'processing', payment_status: 'paid' }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', { reason: 'user_request' })
@@ -777,9 +742,7 @@ describe('cancelOrder', () => {
     })
 
     it('sets cancel_requested for pending order that has paid status', async () => {
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ status: 'pending', payment_status: 'paid' }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ status: 'pending', payment_status: 'paid' }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', { reason: 'user_request' })
@@ -790,9 +753,7 @@ describe('cancelOrder', () => {
     it('sends sendOrderStatusUpdate email for cancel_requested path', async () => {
       const { sendOrderStatusUpdate } = await import('@/lib/email')
 
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ status: 'confirmed', payment_status: 'paid' }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ status: 'confirmed', payment_status: 'paid' }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       await cancelOrder('order-1', { reason: 'user_request' })
@@ -828,9 +789,7 @@ describe('cancelOrder', () => {
     it('skips logActivity in cancel_requested path when user_id is null', async () => {
       const { logActivity } = await import('@/lib/activity')
 
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ status: 'confirmed', payment_status: 'paid', user_id: null }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ status: 'confirmed', payment_status: 'paid', user_id: null }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
       const result = await cancelOrder('order-1', { reason: 'user_request' })
@@ -871,9 +830,7 @@ describe('cancelOrder', () => {
       const { logActivity } = await import('@/lib/activity')
       const { createAutoTask } = await import('@/lib/auto-tasks')
 
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ user_id: null, order_type: null }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ user_id: null, order_type: null }) as any)
       mockQueryMany.mockResolvedValue([])
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -887,9 +844,7 @@ describe('cancelOrder', () => {
     it('order_type fallback to "cart" when order_type is null (auto_cancel_unpaid email)', async () => {
       const { sendOrderAutoCancelledEmail } = await import('@/lib/email')
 
-      mockQueryOne.mockResolvedValue(
-        makeOrder({ order_type: null }) as any
-      )
+      mockQueryOne.mockResolvedValue(makeOrder({ order_type: null }) as any)
       mockQueryMany.mockResolvedValue([])
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
@@ -900,7 +855,7 @@ describe('cancelOrder', () => {
         expect.any(String),
         expect.any(String),
         expect.any(String),
-        'cart',           // fallback from null order_type
+        'cart', // fallback from null order_type
         expect.any(Number),
         expect.any(String)
       )
@@ -923,7 +878,7 @@ describe('cancelOrder', () => {
 
       expect(vi.mocked(sendOrderAutoCancelledEmail)).toHaveBeenCalledWith(
         expect.any(String),
-        'Customer',       // the || 'Customer' fallback
+        'Customer', // the || 'Customer' fallback
         expect.any(String),
         expect.any(String),
         expect.any(String),
@@ -948,7 +903,7 @@ describe('cancelOrder', () => {
       await cancelOrder('order-1', { reason: 'auto_cancel_unpaid' })
 
       expect(vi.mocked(sendOrderAutoCancelledEmail)).toHaveBeenCalledWith(
-        'jane-customer@example.com',  // fell through to customer_email
+        'jane-customer@example.com', // fell through to customer_email
         'Jane Doe',
         expect.any(String),
         expect.any(String),

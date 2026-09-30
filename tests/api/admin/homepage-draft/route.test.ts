@@ -79,7 +79,9 @@ describe('authorization', () => {
 describe('GET /api/admin/homepage-draft', () => {
   it('reports nothing pending when there is no draft', async () => {
     expect(await (await GET(req('GET'))).json()).toEqual({
-      hasDraft: false, updatedAt: null, updatedBy: null,
+      hasDraft: false,
+      updatedAt: null,
+      updatedBy: null,
       sections: { added: 0, removed: 0, edited: 0, reordered: false },
       slides: { added: 0, removed: 0, edited: 0, reordered: false },
     })
@@ -105,9 +107,13 @@ describe('DELETE /api/admin/homepage-draft', () => {
     expect(await res.json()).toEqual({ success: true, discarded: true })
     expect(fake.state.draft).toBeNull()
     expect(fake.state.live.sections.map(s => s.id)).toEqual([A, B, C])
-    expect(vi.mocked(logAdminAudit)).toHaveBeenCalledWith(expect.objectContaining({
-      adminId: ADMIN_ID, action: 'delete', entityType: 'homepage',
-    }))
+    expect(vi.mocked(logAdminAudit)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminId: ADMIN_ID,
+        action: 'delete',
+        entityType: 'homepage',
+      })
+    )
     expect(vi.mocked(revalidatePath)).not.toHaveBeenCalled()
   })
 
@@ -140,21 +146,29 @@ describe('POST /api/admin/homepage-draft/publish', () => {
     expect(fake.state.live.sections.find(s => s.id === C)).toMatchObject({ title: 'Edited', display_order: 0 })
     expect(fake.state.live.hero_slides[0].image_url).toBe('https://cdn.example.com/new.png')
     expect(vi.mocked(revalidatePath)).toHaveBeenCalledWith('/')
-    expect(vi.mocked(logAdminAudit)).toHaveBeenCalledWith(expect.objectContaining({
-      adminId: ADMIN_ID, action: 'update', entityType: 'homepage',
-    }))
+    expect(vi.mocked(logAdminAudit)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adminId: ADMIN_ID,
+        action: 'update',
+        entityType: 'homepage',
+      })
+    )
   })
 
   it('leaves live and the draft untouched when the publish fails', async () => {
     seedDraft()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const original = fake.db.withTransaction
-    fake.db.withTransaction = (fn: any) => original((client: any) => fn({
-      query: async (sql: string, params?: any[]) => {
-        if (sql.startsWith('INSERT INTO hero_slides')) throw Object.assign(new Error('value too long'), { code: '22001' })
-        return client.query(sql, params)
-      },
-    }))
+    fake.db.withTransaction = (fn: any) =>
+      original((client: any) =>
+        fn({
+          query: async (sql: string, params?: any[]) => {
+            if (sql.startsWith('INSERT INTO hero_slides'))
+              throw Object.assign(new Error('value too long'), { code: '22001' })
+            return client.query(sql, params)
+          },
+        })
+      )
     const res = await PUBLISH(req('POST'))
     fake.db.withTransaction = original
     expect(res.status).toBe(500)

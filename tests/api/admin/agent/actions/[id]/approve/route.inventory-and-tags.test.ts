@@ -69,7 +69,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 for invalid delta (0) in adjust_inventory', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'adjust_inventory',
       payload: { productId: 'prod-1', delta: 0, reason: 'count' },
       status: 'proposed',
@@ -82,7 +84,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 for non-integer delta in adjust_inventory', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'adjust_inventory',
       payload: { productId: 'prod-1', delta: 1.5, reason: 'partial' },
       status: 'proposed',
@@ -95,19 +99,22 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('executes adjust_inventory successfully', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'adjust_inventory',
       payload: { productId: 'prod-1', delta: 5, reason: 'restock' },
       status: 'proposed',
     } as any)
 
     const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                              // BEGIN
-        .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] })    // SELECT FOR UPDATE
-        .mockResolvedValueOnce({ rows: [] })                              // UPDATE
-        .mockResolvedValueOnce({ rows: [] })                              // COMMIT
-        .mockResolvedValue({ rows: [] }),                                 // any extra
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] }) // SELECT FOR UPDATE
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE
+        .mockResolvedValueOnce({ rows: [] }) // COMMIT
+        .mockResolvedValue({ rows: [] }), // any extra
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValueOnce(mockClient as any)
@@ -123,17 +130,20 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when adjust_inventory product not found', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'adjust_inventory',
       payload: { productId: 'bad-id', delta: 1, reason: 'test' },
       status: 'proposed',
     } as any)
 
     const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })    // BEGIN
-        .mockResolvedValueOnce({ rows: [] })    // SELECT FOR UPDATE — empty = not found
-        .mockResolvedValueOnce({ rows: [] }),   // ROLLBACK
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SELECT FOR UPDATE — empty = not found
+        .mockResolvedValueOnce({ rows: [] }), // ROLLBACK
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValueOnce(mockClient as any)
@@ -145,17 +155,20 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when adjust_inventory would drop below zero', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'adjust_inventory',
       payload: { productId: 'prod-1', delta: -50, reason: 'correction' },
       status: 'proposed',
     } as any)
 
     const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })                             // BEGIN
-        .mockResolvedValueOnce({ rows: [{ inventory_quantity: 3 }] })   // SELECT FOR UPDATE
-        .mockResolvedValueOnce({ rows: [] }),                            // ROLLBACK
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [{ inventory_quantity: 3 }] }) // SELECT FOR UPDATE
+        .mockResolvedValueOnce({ rows: [] }), // ROLLBACK
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValueOnce(mockClient as any)
@@ -170,7 +183,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when set_product_featured limit reached', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'set_product_featured',
         payload: { productId: 'prod-1', featured: true, limit: 3 },
         status: 'proposed',
@@ -185,7 +200,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes set_product_featured (unfeature) successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'set_product_featured',
         payload: { productId: 'prod-1', featured: false, limit: 6 },
         status: 'proposed',
@@ -200,7 +217,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when set_product_featured product not found', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'set_product_featured',
         payload: { productId: 'bad-id', featured: false, limit: 6 },
         status: 'proposed',
@@ -217,12 +236,14 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes create_brand successfully', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_brand',
         payload: { name: 'Acme', slug: 'acme', logoUrl: null },
         status: 'proposed',
       } as any)
-      .mockResolvedValueOnce(null)  // no dup
+      .mockResolvedValueOnce(null) // no dup
       .mockResolvedValueOnce({ id: 'brand-1', name: 'Acme', slug: 'acme', logo_url: null, is_active: true } as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
@@ -233,7 +254,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when create_brand slug already exists', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_brand',
         payload: { name: 'Acme', slug: 'acme', logoUrl: null },
         status: 'proposed',
@@ -249,7 +272,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when create_category name or slug missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'create_category',
       payload: { name: '', slug: '', parentId: null },
       status: 'proposed',
@@ -263,13 +288,21 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('executes create_category successfully (no parent)', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_category',
         payload: { name: 'Fasteners', slug: 'fasteners', parentId: null },
         status: 'proposed',
       } as any)
       .mockResolvedValueOnce(null) // no dup slug
-      .mockResolvedValueOnce({ id: 'cat-1', name: 'Fasteners', slug: 'fasteners', parent_id: null, is_active: true } as any)
+      .mockResolvedValueOnce({
+        id: 'cat-1',
+        name: 'Fasteners',
+        slug: 'fasteners',
+        parent_id: null,
+        is_active: true,
+      } as any)
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
@@ -279,7 +312,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when create_category parent not found', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_category',
         payload: { name: 'Bolts', slug: 'bolts', parentId: 'nonexistent-parent' },
         status: 'proposed',
@@ -294,7 +329,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
   it('returns 500 when create_category slug already exists', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+        id: ACTION_ID,
+        admin_id: ADMIN.adminId,
+        conversation_id: 'conv-1',
         kind: 'create_category',
         payload: { name: 'Bolts', slug: 'bolts', parentId: null },
         status: 'proposed',
@@ -310,7 +347,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('executes add_customer_tag successfully', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'add_customer_tag',
       payload: { customerId: 'cust-1', tagSlug: 'vip' },
       status: 'proposed',
@@ -324,7 +363,9 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
 
   it('returns 500 when add_customer_tag customerId missing', async () => {
     mockQueryOne.mockResolvedValueOnce({
-      id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
+      id: ACTION_ID,
+      admin_id: ADMIN.adminId,
+      conversation_id: 'conv-1',
       kind: 'add_customer_tag',
       payload: { customerId: '', tagSlug: 'vip' },
       status: 'proposed',

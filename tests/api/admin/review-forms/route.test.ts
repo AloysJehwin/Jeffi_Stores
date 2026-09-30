@@ -46,7 +46,9 @@ function makePostReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/review-forms', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -93,10 +95,7 @@ describe('GET /api/admin/review-forms', () => {
     const res = await GET(makeGetReq({ page: '2' }))
     expect(res.status).toBe(200)
     // offset 25 should be passed as param
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([25, 25])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([25, 25]))
   })
 })
 
@@ -146,11 +145,13 @@ describe('POST /api/admin/review-forms', () => {
     mockHasScope.mockReturnValue(true)
     const form = { id: 'rf-1', title: 'Test Form', slug: 'test-form' }
     mockQueryMany.mockResolvedValue([form])
-    const res = await POST(makePostReq({
-      title: 'Test Form',
-      slug: 'test-form',
-      google_review_url: 'https://g.co/r/test',
-    }))
+    const res = await POST(
+      makePostReq({
+        title: 'Test Form',
+        slug: 'test-form',
+        google_review_url: 'https://g.co/r/test',
+      })
+    )
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.form).toEqual(form)
@@ -160,11 +161,13 @@ describe('POST /api/admin/review-forms', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockRejectedValue(Object.assign(new Error('duplicate'), { code: '23505' }))
-    const res = await POST(makePostReq({
-      title: 'Test Form',
-      slug: 'existing-slug',
-      google_review_url: 'https://g.co/r/test',
-    }))
+    const res = await POST(
+      makePostReq({
+        title: 'Test Form',
+        slug: 'existing-slug',
+        google_review_url: 'https://g.co/r/test',
+      })
+    )
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toMatch(/Slug already exists/)
@@ -175,12 +178,14 @@ describe('POST /api/admin/review-forms', () => {
     mockHasScope.mockReturnValue(true)
     const form = { id: 'rf-2', title: 'NPS Form', slug: 'nps-form' }
     mockQueryMany.mockResolvedValue([form])
-    const res = await POST(makePostReq({
-      title: 'NPS Form',
-      slug: 'nps-form',
-      template_type: 'nps',
-      google_review_url: 'https://g.co/r/nps',
-    }))
+    const res = await POST(
+      makePostReq({
+        title: 'NPS Form',
+        slug: 'nps-form',
+        template_type: 'nps',
+        google_review_url: 'https://g.co/r/nps',
+      })
+    )
     expect(res.status).toBe(201)
   })
 })

@@ -8,9 +8,9 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
-  withTransaction: vi.fn().mockImplementation(async (fn: any) =>
-    fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })
-  ),
+  withTransaction: vi
+    .fn()
+    .mockImplementation(async (fn: any) => fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })),
 }))
 
 vi.mock('@/lib/orders', () => ({
@@ -60,23 +60,17 @@ describe('GET /api/cron/cancel-stale-orders', () => {
 
   it('returns 401 when CRON_SECRET env var is not set', async () => {
     delete process.env.CRON_SECRET
-    const res = await cancelStaleGET(
-      makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await cancelStaleGET(makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any)
     expect(res.status).toBe(401)
   })
 
   it('returns 401 when wrong secret is provided', async () => {
-    const res = await cancelStaleGET(
-      makeRequest('/api/cron/cancel-stale-orders', 'Bearer wrong-secret') as any
-    )
+    const res = await cancelStaleGET(makeRequest('/api/cron/cancel-stale-orders', 'Bearer wrong-secret') as any)
     expect(res.status).toBe(401)
   })
 
   it('returns 200 with success=true when correct secret is provided', async () => {
-    const res = await cancelStaleGET(
-      makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await cancelStaleGET(makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -86,9 +80,7 @@ describe('GET /api/cron/cancel-stale-orders', () => {
     const { queryMany } = await import('@/lib/db')
     vi.mocked(queryMany).mockResolvedValueOnce([])
 
-    const res = await cancelStaleGET(
-      makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await cancelStaleGET(makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any)
     const body = await res.json()
     expect(body.processed).toBe(0)
     expect(body.cancelled).toBe(0)
@@ -106,9 +98,7 @@ describe('GET /api/cron/cancel-stale-orders', () => {
       .mockResolvedValueOnce({ success: true, directCancel: false, restoredToCart: false })
       .mockResolvedValueOnce({ success: false, error: 'already cancelled', status: 400 })
 
-    const res = await cancelStaleGET(
-      makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await cancelStaleGET(makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any)
     const body = await res.json()
     expect(body.cancelled).toBe(1)
     expect(body.failed).toBe(1)
@@ -127,16 +117,12 @@ describe('GET /api/cron/compute-health', () => {
   })
 
   it('returns 401 when wrong secret is provided', async () => {
-    const res = await computeHealthGET(
-      makeRequest('/api/cron/compute-health', 'Bearer wrong') as any
-    )
+    const res = await computeHealthGET(makeRequest('/api/cron/compute-health', 'Bearer wrong') as any)
     expect(res.status).toBe(401)
   })
 
   it('returns 200 with success=true when correct secret is provided', async () => {
-    const res = await computeHealthGET(
-      makeRequest('/api/cron/compute-health', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await computeHealthGET(makeRequest('/api/cron/compute-health', `Bearer ${CRON_SECRET}`) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -146,9 +132,7 @@ describe('GET /api/cron/compute-health', () => {
     const { queryMany } = await import('@/lib/db')
     vi.mocked(queryMany).mockResolvedValueOnce([])
 
-    const res = await computeHealthGET(
-      makeRequest('/api/cron/compute-health', `Bearer ${CRON_SECRET}`) as any
-    )
+    const res = await computeHealthGET(makeRequest('/api/cron/compute-health', `Bearer ${CRON_SECRET}`) as any)
     const body = await res.json()
     expect(body.processed).toBe(0)
   })

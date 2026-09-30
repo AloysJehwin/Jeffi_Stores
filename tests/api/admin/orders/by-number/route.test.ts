@@ -31,7 +31,9 @@ const sampleOrder = {
 }
 
 describe('GET /api/admin/orders/by-number', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

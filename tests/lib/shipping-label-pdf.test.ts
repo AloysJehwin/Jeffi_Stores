@@ -42,7 +42,8 @@ vi.mock('pdfkit', () => {
       restore: vi.fn().mockReturnThis(),
       widthOfString: vi.fn().mockReturnValue(50),
       heightOfString: vi.fn().mockReturnValue(10),
-      x: 50, y: 100,
+      x: 50,
+      y: 100,
       page: { width: 288, height: 432, margins: { top: 0, bottom: 0, left: 0, right: 0 } },
     }
     return doc
@@ -99,7 +100,7 @@ const basePkg = {
 
 const baseItems: LabelItem[] = [
   { name: 'Hex Bolt M10', qty: 2, price: 85, total: 170 },
-  { name: 'Flat Washer',  qty: 5, price: 10, total: 50  },
+  { name: 'Flat Washer', qty: 5, price: 10, total: 50 },
 ]
 const baseAwb = 'AWB123456789'
 
@@ -137,7 +138,10 @@ describe('buildLabelPDF', () => {
 
   it('handles many items (overflow branch) without throwing', async () => {
     const manyItems: LabelItem[] = Array.from({ length: 30 }, (_, i) => ({
-      name: `Item ${i + 1}`, qty: 1, price: 10, total: 10,
+      name: `Item ${i + 1}`,
+      qty: 1,
+      price: 10,
+      total: 10,
     }))
     const buf = await buildLabelPDF(basePkg, baseAwb, baseOrder, manyItems)
     expect(Buffer.isBuffer(buf)).toBe(true)
@@ -149,12 +153,22 @@ describe('buildLabelPDF', () => {
   })
 
   it('handles missing total_amount and cod (orderRow fallback) without throwing', async () => {
-    const buf = await buildLabelPDF({ ...basePkg, total_amount: undefined, cod: undefined }, baseAwb, baseOrder, baseItems)
+    const buf = await buildLabelPDF(
+      { ...basePkg, total_amount: undefined, cod: undefined },
+      baseAwb,
+      baseOrder,
+      baseItems
+    )
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
 
   it('handles cod > 0 with no total_amount (cod as totalAmount) without throwing', async () => {
-    const buf = await buildLabelPDF({ ...basePkg, total_amount: undefined, cod: '350.00' }, baseAwb, baseOrder, baseItems)
+    const buf = await buildLabelPDF(
+      { ...basePkg, total_amount: undefined, cod: '350.00' },
+      baseAwb,
+      baseOrder,
+      baseItems
+    )
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
 
@@ -166,7 +180,9 @@ describe('buildLabelPDF', () => {
   it('handles address line duplicating name without throwing', async () => {
     const buf = await buildLabelPDF(
       { ...basePkg, name: 'Test Customer', add: 'Test Customer, 10 Main Street, Mumbai' },
-      baseAwb, baseOrder, baseItems,
+      baseAwb,
+      baseOrder,
+      baseItems
     )
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
@@ -177,7 +193,12 @@ describe('buildLabelPDF', () => {
   })
 
   it('handles pkg.order fallback for invoiceNo without throwing', async () => {
-    const buf = await buildLabelPDF({ ...basePkg, oid: undefined, order: 'INV-FALLBACK' }, baseAwb, baseOrder, baseItems)
+    const buf = await buildLabelPDF(
+      { ...basePkg, oid: undefined, order: 'INV-FALLBACK' },
+      baseAwb,
+      baseOrder,
+      baseItems
+    )
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
 
@@ -219,9 +240,7 @@ describe('buildLabelPDF', () => {
 
 describe('buildMergedLabelsPDF', () => {
   it('returns a non-empty Buffer for a single label', async () => {
-    const buf = await buildMergedLabelsPDF([
-      { pkg: basePkg, awb: baseAwb, orderRow: baseOrder, items: baseItems },
-    ])
+    const buf = await buildMergedLabelsPDF([{ pkg: basePkg, awb: baseAwb, orderRow: baseOrder, items: baseItems }])
     expect(Buffer.isBuffer(buf)).toBe(true)
     expect(buf.length).toBeGreaterThan(0)
   })
@@ -229,7 +248,12 @@ describe('buildMergedLabelsPDF', () => {
   it('returns a non-empty Buffer for multiple labels', async () => {
     const buf = await buildMergedLabelsPDF([
       { pkg: basePkg, awb: 'AWB111', orderRow: baseOrder, items: baseItems },
-      { pkg: { ...basePkg, oid: 'ORD-002' }, awb: 'AWB222', orderRow: { ...baseOrder, order_number: 'ORD-002' }, items: [] },
+      {
+        pkg: { ...basePkg, oid: 'ORD-002' },
+        awb: 'AWB222',
+        orderRow: { ...baseOrder, order_number: 'ORD-002' },
+        items: [],
+      },
       { pkg: { ...basePkg, cod: '300' }, awb: 'AWB333', orderRow: baseOrder, items: baseItems },
     ])
     expect(Buffer.isBuffer(buf)).toBe(true)
@@ -276,19 +300,18 @@ describe('buildMergedLabelsPDF', () => {
 
   it('handles bwip failure in merged labels gracefully', async () => {
     mockBwipToBuffer.mockRejectedValue(new Error('bwip down'))
-    const buf = await buildMergedLabelsPDF([
-      { pkg: basePkg, awb: 'AWB001', orderRow: baseOrder, items: baseItems },
-    ])
+    const buf = await buildMergedLabelsPDF([{ pkg: basePkg, awb: 'AWB001', orderRow: baseOrder, items: baseItems }])
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
 
   it('handles overflow items in a merged label without throwing', async () => {
     const manyItems: LabelItem[] = Array.from({ length: 25 }, (_, i) => ({
-      name: `Part ${i}`, qty: 1, price: 5, total: 5,
+      name: `Part ${i}`,
+      qty: 1,
+      price: 5,
+      total: 5,
     }))
-    const buf = await buildMergedLabelsPDF([
-      { pkg: basePkg, awb: 'AWB001', orderRow: baseOrder, items: manyItems },
-    ])
+    const buf = await buildMergedLabelsPDF([{ pkg: basePkg, awb: 'AWB001', orderRow: baseOrder, items: manyItems }])
     expect(Buffer.isBuffer(buf)).toBe(true)
   })
 })

@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { GET, POST } from '@/app/api/admin/products/[id]/variants/[variantId]/units/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction, query as dbQuery} from '@/lib/db'
+import { queryOne, queryMany, withTransaction, query as dbQuery } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -90,9 +90,9 @@ describe('GET /api/admin/products/[id]/variants/[variantId]/units', () => {
     mockQueryOne.mockResolvedValue({ id: 'var-1' })
     const productUnits = [{ id: 'u2', unit: 'box', factor: 10 }]
     mockQueryMany
-      .mockResolvedValueOnce([])          // variant units empty
+      .mockResolvedValueOnce([]) // variant units empty
       .mockResolvedValueOnce(productUnits) // product units
-      .mockResolvedValueOnce([])           // rules
+      .mockResolvedValueOnce([]) // rules
     const res = await GET(makeGetReq(), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -136,9 +136,11 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units', () => {
     mockQueryOne.mockResolvedValue({ id: 'var-1' })
     const newUnit = { id: 'u1', unit: 'pc', factor: 1 }
     // is_base not set → only one client.query call (the INSERT RETURNING)
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [newUnit] }),
+      })
+    )
     const res = await POST(makePostReq({ unit: 'pc', factor: 1 }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -151,11 +153,14 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/units', () => {
     mockQueryOne.mockResolvedValue({ id: 'var-1' })
     const newUnit = { id: 'u2', unit: 'box', factor: 10, is_base: true }
     // is_base=true → UPDATE first, then INSERT RETURNING
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })       // UPDATE set is_base = false
-        .mockResolvedValueOnce({ rows: [newUnit] }), // INSERT RETURNING
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [] }) // UPDATE set is_base = false
+          .mockResolvedValueOnce({ rows: [newUnit] }), // INSERT RETURNING
+      })
+    )
     const res = await POST(makePostReq({ unit: 'box', factor: 10, is_base: true }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()

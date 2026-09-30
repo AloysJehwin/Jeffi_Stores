@@ -51,9 +51,7 @@ function makePostReq(body: unknown) {
   })
 }
 
-const stockAtLocation = [
-  { location_id: 'loc-1', product_id: 'prod-1', quantity: 10 },
-]
+const stockAtLocation = [{ location_id: 'loc-1', product_id: 'prod-1', quantity: 10 }]
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -129,39 +127,55 @@ describe('POST /api/admin/shelving/stock', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await POST(makePostReq({ action: 'adjust', location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 }))
+    const res = await POST(
+      makePostReq({ action: 'adjust', location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 })
+    )
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makePostReq({ action: 'adjust', location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 }))
+    const res = await POST(
+      makePostReq({ action: 'adjust', location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 })
+    )
     expect(res.status).toBe(403)
   })
 
   // Move action
   describe('action: move', () => {
     it('returns 400 when from_location_id missing', async () => {
-      const res = await POST(makePostReq({ action: 'move', to_location_id: 'loc-2', product_id: 'prod-1', quantity: 5 }))
+      const res = await POST(
+        makePostReq({ action: 'move', to_location_id: 'loc-2', product_id: 'prod-1', quantity: 5 })
+      )
       expect(res.status).toBe(400)
       expect((await res.json()).error).toContain('from_location_id')
     })
 
     it('returns 400 when quantity is zero or negative', async () => {
-      const res = await POST(makePostReq({ action: 'move', from_location_id: 'loc-1', to_location_id: 'loc-2', product_id: 'prod-1', quantity: 0 }))
+      const res = await POST(
+        makePostReq({
+          action: 'move',
+          from_location_id: 'loc-1',
+          to_location_id: 'loc-2',
+          product_id: 'prod-1',
+          quantity: 0,
+        })
+      )
       expect(res.status).toBe(400)
       expect((await res.json()).error).toBe('quantity must be positive')
     })
 
     it('moves stock successfully using product_id directly', async () => {
       mockMoveStock.mockResolvedValueOnce(undefined as any)
-      const res = await POST(makePostReq({
-        action: 'move',
-        from_location_id: 'loc-1',
-        to_location_id: 'loc-2',
-        product_id: 'prod-1',
-        quantity: 3,
-      }))
+      const res = await POST(
+        makePostReq({
+          action: 'move',
+          from_location_id: 'loc-1',
+          to_location_id: 'loc-2',
+          product_id: 'prod-1',
+          quantity: 3,
+        })
+      )
       expect(res.status).toBe(200)
       expect((await res.json()).ok).toBe(true)
       expect(mockMoveStock).toHaveBeenCalledWith('loc-1', 'loc-2', 'prod-1', null, null, 3, 'admin-1')
@@ -170,26 +184,30 @@ describe('POST /api/admin/shelving/stock', () => {
     it('resolves product_id via variant_id when product_id absent', async () => {
       mockQueryOne.mockResolvedValueOnce({ product_id: 'resolved-prod-1' } as any)
       mockMoveStock.mockResolvedValueOnce(undefined as any)
-      const res = await POST(makePostReq({
-        action: 'move',
-        from_location_id: 'loc-1',
-        to_location_id: 'loc-2',
-        variant_id: 'var-1',
-        quantity: 2,
-      }))
+      const res = await POST(
+        makePostReq({
+          action: 'move',
+          from_location_id: 'loc-1',
+          to_location_id: 'loc-2',
+          variant_id: 'var-1',
+          quantity: 2,
+        })
+      )
       expect(res.status).toBe(200)
       expect(mockMoveStock).toHaveBeenCalledWith('loc-1', 'loc-2', 'resolved-prod-1', 'var-1', null, 2, 'admin-1')
     })
 
     it('returns 500 when variant not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null) // variant not found
-      const res = await POST(makePostReq({
-        action: 'move',
-        from_location_id: 'loc-1',
-        to_location_id: 'loc-2',
-        variant_id: 'nonexistent',
-        quantity: 2,
-      }))
+      const res = await POST(
+        makePostReq({
+          action: 'move',
+          from_location_id: 'loc-1',
+          to_location_id: 'loc-2',
+          variant_id: 'nonexistent',
+          quantity: 2,
+        })
+      )
       expect(res.status).toBe(500)
       expect((await res.json()).error).toBe('Variant not found')
     })
@@ -223,7 +241,9 @@ describe('POST /api/admin/shelving/stock', () => {
 
     it('adjusts with negative quantity_change (removal)', async () => {
       mockAdjustStock.mockResolvedValueOnce({ quantity: 5 } as any)
-      const res = await POST(makePostReq({ location_id: 'loc-1', product_id: 'prod-1', quantity_change: -3, reason: 'sale' }))
+      const res = await POST(
+        makePostReq({ location_id: 'loc-1', product_id: 'prod-1', quantity_change: -3, reason: 'sale' })
+      )
       expect(res.status).toBe(200)
       expect(mockAdjustStock).toHaveBeenCalledWith('loc-1', 'prod-1', null, null, -3, 'sale', 'admin-1')
     })

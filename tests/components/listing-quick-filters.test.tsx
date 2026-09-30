@@ -11,7 +11,12 @@ vi.mock('next/navigation', () => ({
 import QuickFilterChips from '@/components/visitor/listing/QuickFilterChips'
 import ListingPromoBanner, { pickPromoOffer, type PromoOffer } from '@/components/visitor/listing/ListingPromoBanner'
 import {
-  categoryChipScope, chipSelected, rankChips, splitList, toggleChip, type CategoryNode,
+  categoryChipScope,
+  chipSelected,
+  rankChips,
+  splitList,
+  toggleChip,
+  type CategoryNode,
 } from '@/components/visitor/listing/quick-filters'
 
 afterEach(cleanup)
@@ -129,14 +134,24 @@ describe('QuickFilterChips', () => {
 
   it('renders nothing when there is nothing to offer', () => {
     nav.params = new URLSearchParams()
-    const { container } = render(<QuickFilterChips showInStock={false} showOnSale={false} categories={[]} brands={[]} />)
+    const { container } = render(
+      <QuickFilterChips showInStock={false} showOnSale={false} categories={[]} brands={[]} />
+    )
     expect(container.innerHTML).toBe('')
   })
 })
 
 const OFFER: PromoOffer = {
-  slug: 'diwali', title: 'Diwali deals', subtitle: 'Up to 30% off', badge_text: 'Diwali', badge_color: 'bg-rose-600',
-  image_url: 'https://cdn.example/d.jpg', image_url_mobile: null, blurhash: null, blurhash_mobile: null, cta_label: null,
+  slug: 'diwali',
+  title: 'Diwali deals',
+  subtitle: 'Up to 30% off',
+  badge_text: 'Diwali',
+  badge_color: 'bg-rose-600',
+  image_url: 'https://cdn.example/d.jpg',
+  image_url_mobile: null,
+  blurhash: null,
+  blurhash_mobile: null,
+  cta_label: null,
 }
 
 describe('pickPromoOffer', () => {

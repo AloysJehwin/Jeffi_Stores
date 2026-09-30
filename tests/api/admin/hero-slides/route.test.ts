@@ -7,7 +7,11 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const { mockUpload, mockRun } = vi.hoisted(() => ({ mockUpload: vi.fn(), mockRun: vi.fn() }))
 vi.mock('@/lib/s3', () => ({ uploadGalleryImage: mockUpload }))
-vi.mock('replicate', () => ({ default: class { run = mockRun } }))
+vi.mock('replicate', () => ({
+  default: class {
+    run = mockRun
+  },
+}))
 
 const fake = makeHomepageDraftDb()
 vi.mock('@/lib/db', () => ({
@@ -115,8 +119,14 @@ describe('POST /api/admin/hero-slides', () => {
     expect(res.status).toBe(200)
     const { slide } = await res.json()
     expect(slide).toMatchObject({
-      title: 'Hi', badge_color: 'bg-primary-500', filter_in_stock: false, filter_on_sale: false,
-      is_active: true, display_order: 2, image_url: null, blurhash: null,
+      title: 'Hi',
+      badge_color: 'bg-primary-500',
+      filter_in_stock: false,
+      filter_on_sale: false,
+      is_active: true,
+      display_order: 2,
+      image_url: null,
+      blurhash: null,
     })
     expect(fake.state.draft!.hero_slides.map(s => s.id)).toEqual([S1, S2, slide.id])
     expect(fake.state.draft!.updated_by).toBe(ADMIN_ID)
@@ -125,18 +135,45 @@ describe('POST /api/admin/hero-slides', () => {
   })
 
   it('maps every optional field onto the draft slide', async () => {
-    const res = await POST(req('POST', {
-      title: 'Full', subtitle: 'sub', badgeText: 'NEW', badgeColor: 'bg-red-500',
-      imageUrl: '/a.jpg', imageUrlMobile: '/m.jpg', ctaLabel: 'Buy', ctaUrl: '/shop',
-      filterCategory: 'cat', filterBrand: 'br', filterGrade: 'gr', filterMaterial: 'mat',
-      filterMinPrice: 10, filterMaxPrice: 100, filterInStock: true, filterOnSale: true, isActive: false,
-    }))
+    const res = await POST(
+      req('POST', {
+        title: 'Full',
+        subtitle: 'sub',
+        badgeText: 'NEW',
+        badgeColor: 'bg-red-500',
+        imageUrl: '/a.jpg',
+        imageUrlMobile: '/m.jpg',
+        ctaLabel: 'Buy',
+        ctaUrl: '/shop',
+        filterCategory: 'cat',
+        filterBrand: 'br',
+        filterGrade: 'gr',
+        filterMaterial: 'mat',
+        filterMinPrice: 10,
+        filterMaxPrice: 100,
+        filterInStock: true,
+        filterOnSale: true,
+        isActive: false,
+      })
+    )
     const { slide } = await res.json()
     expect(slide).toMatchObject({
-      subtitle: 'sub', badge_text: 'NEW', badge_color: 'bg-red-500', image_url: '/a.jpg', image_url_mobile: '/m.jpg',
-      cta_label: 'Buy', cta_url: '/shop', filter_category: 'cat', filter_brand: 'br', filter_grade: 'gr',
-      filter_material: 'mat', filter_min_price: 10, filter_max_price: 100, filter_in_stock: true,
-      filter_on_sale: true, is_active: false,
+      subtitle: 'sub',
+      badge_text: 'NEW',
+      badge_color: 'bg-red-500',
+      image_url: '/a.jpg',
+      image_url_mobile: '/m.jpg',
+      cta_label: 'Buy',
+      cta_url: '/shop',
+      filter_category: 'cat',
+      filter_brand: 'br',
+      filter_grade: 'gr',
+      filter_material: 'mat',
+      filter_min_price: 10,
+      filter_max_price: 100,
+      filter_in_stock: true,
+      filter_on_sale: true,
+      is_active: false,
     })
   })
 
@@ -158,7 +195,10 @@ describe('PATCH /api/admin/hero-slides (reorder)', () => {
     const res = await PATCH(req('PATCH', { order: [S2, S1] }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(fake.state.draft!.hero_slides.map(s => [s.id, s.display_order])).toEqual([[S2, 0], [S1, 1]])
+    expect(fake.state.draft!.hero_slides.map(s => [s.id, s.display_order])).toEqual([
+      [S2, 0],
+      [S1, 1],
+    ])
     expect(fake.state.live.hero_slides.map(s => s.id)).toEqual([S1, S2])
     expect(liveWrites()).toEqual([])
   })
@@ -209,8 +249,15 @@ describe('POST /api/admin/hero-slides/[id]/image', () => {
   it('uploads to S3 and sets the desktop image on the draft slide', async () => {
     const res = await UPLOAD(uploadReq({ file: png() }), paramsFor(S1))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ url: 'https://cdn.example.com/gallery/new.png', field: 'image_url', blurhash: 'LEHV6nWB2yk8' })
-    expect(draftSlide(S1)).toMatchObject({ image_url: 'https://cdn.example.com/gallery/new.png', blurhash: 'LEHV6nWB2yk8' })
+    expect(await res.json()).toEqual({
+      url: 'https://cdn.example.com/gallery/new.png',
+      field: 'image_url',
+      blurhash: 'LEHV6nWB2yk8',
+    })
+    expect(draftSlide(S1)).toMatchObject({
+      image_url: 'https://cdn.example.com/gallery/new.png',
+      blurhash: 'LEHV6nWB2yk8',
+    })
     expect(fake.state.live.hero_slides[0].image_url).toBeNull()
     expect(liveWrites()).toEqual([])
   })
@@ -218,7 +265,9 @@ describe('POST /api/admin/hero-slides/[id]/image', () => {
   it('sets the mobile image fields when field=image_url_mobile', async () => {
     await UPLOAD(uploadReq({ file: png(), field: 'image_url_mobile' }), paramsFor(S2))
     expect(draftSlide(S2)).toMatchObject({
-      image_url: null, image_url_mobile: 'https://cdn.example.com/gallery/new.png', blurhash_mobile: 'LEHV6nWB2yk8',
+      image_url: null,
+      image_url_mobile: 'https://cdn.example.com/gallery/new.png',
+      blurhash_mobile: 'LEHV6nWB2yk8',
     })
   })
 })
@@ -231,7 +280,10 @@ describe('POST /api/admin/hero-slides/[id]/generate-image', () => {
     const res = await GENERATE(req('POST', { prompt: 'bolts and nuts on steel' }), paramsFor(S1))
     expect(res.status).toBe(200)
     expect((await res.json()).url).toBe('https://cdn.example.com/gallery/new.png')
-    expect(draftSlide(S1)).toMatchObject({ image_url: 'https://cdn.example.com/gallery/new.png', blurhash: 'LEHV6nWB2yk8' })
+    expect(draftSlide(S1)).toMatchObject({
+      image_url: 'https://cdn.example.com/gallery/new.png',
+      blurhash: 'LEHV6nWB2yk8',
+    })
     expect(liveWrites()).toEqual([])
   })
 

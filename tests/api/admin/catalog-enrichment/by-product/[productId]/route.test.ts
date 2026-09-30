@@ -31,7 +31,9 @@ function makeReq(productId: string) {
   return new NextRequest(`http://localhost/api/admin/catalog-enrichment/by-product/${productId}`)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/catalog-enrichment/by-product/[productId]', () => {
   it('returns 401 when unauthenticated', async () => {

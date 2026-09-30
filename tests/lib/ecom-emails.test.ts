@@ -98,7 +98,10 @@ describe('ecom-emails', () => {
     it('summarises store, plan and billing interval', async () => {
       const { sendPaymentConfirmedEmail } = await import('@/lib/ecom-emails')
       await sendPaymentConfirmedEmail(OWNER, {
-        display_name: 'Acme Ltd', slug: 'acme', plan: 'growth', billing_interval: 'monthly',
+        display_name: 'Acme Ltd',
+        slug: 'acme',
+        plan: 'growth',
+        billing_interval: 'monthly',
       })
       const mail = lastMail()
       expect(mail.html).toContain('growth')
@@ -109,7 +112,10 @@ describe('ecom-emails', () => {
     it('defaults a null plan to Basic', async () => {
       const { sendPaymentConfirmedEmail } = await import('@/lib/ecom-emails')
       await sendPaymentConfirmedEmail(OWNER, {
-        display_name: 'Acme', slug: 'acme', plan: null, billing_interval: 'yearly',
+        display_name: 'Acme',
+        slug: 'acme',
+        plan: null,
+        billing_interval: 'yearly',
       })
       expect(lastMail().html).toContain('Basic')
     })
@@ -137,7 +143,7 @@ describe('ecom-emails', () => {
       sendMail.mockRejectedValue(new Error('SES throttled'))
       const { sendKycApprovedEmail } = await import('@/lib/ecom-emails')
       await expect(
-        sendKycApprovedEmail(OWNER, { display_name: 'Acme', slug: 'acme' }, 'https://x'),
+        sendKycApprovedEmail(OWNER, { display_name: 'Acme', slug: 'acme' }, 'https://x')
       ).resolves.toBeUndefined()
     })
 
@@ -145,7 +151,7 @@ describe('ecom-emails', () => {
       sendMail.mockRejectedValue(new Error('connection reset'))
       const { sendStoreLiveEmail } = await import('@/lib/ecom-emails')
       await expect(
-        sendStoreLiveEmail(OWNER, { display_name: 'Acme', slug: 'acme', plan: 'basic' }),
+        sendStoreLiveEmail(OWNER, { display_name: 'Acme', slug: 'acme', plan: 'basic' })
       ).resolves.toBeUndefined()
     })
   })
@@ -161,4 +167,3 @@ describe('ecom-emails', () => {
     })
   })
 })
-

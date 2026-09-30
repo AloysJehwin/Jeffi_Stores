@@ -52,7 +52,9 @@ function makePatchReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/cash-sale/[id]/detail', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -166,18 +168,29 @@ describe('PATCH /api/admin/cash-sale/[id]/detail', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     const mockClient = {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [{ status: 'completed' }] })  // SELECT FOR UPDATE
-        .mockResolvedValueOnce({ rows: [] })                          // UPDATE cash_sales
-        .mockResolvedValueOnce({ rows: [                              // SELECT items
-          { product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Bolt', variant_name: null, quantity: '5' }
-        ]})
-        .mockResolvedValueOnce({ rows: [] })                           // batchMovements query
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ status: 'completed' }] }) // SELECT FOR UPDATE
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE cash_sales
+        .mockResolvedValueOnce({
+          rows: [
+            // SELECT items
+            {
+              product_id: 'p1',
+              variant_id: null,
+              sub_variant_id: null,
+              product_name: 'Bolt',
+              variant_name: null,
+              quantity: '5',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] }) // batchMovements query
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] }) // SELECT products inventory
-        .mockResolvedValueOnce({ rows: [] })                           // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }) // UPDATE products
         .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }) // perishable check (sync loop)
         .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }) // perishable check (restore loop)
-        .mockResolvedValueOnce({ rows: [] })                           // UPDATE shelf_stock
+        .mockResolvedValueOnce({ rows: [] }), // UPDATE shelf_stock
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await PATCH(makePatchReq({ action: 'cancel' }), { params })

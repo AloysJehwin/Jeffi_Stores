@@ -68,8 +68,13 @@ const params = { params: Promise.resolve({ id: ACTION_ID }) }
 
 function action(kind: string, payload: any, over: any = {}) {
   return {
-    id: ACTION_ID, admin_id: 'admin-1', conversation_id: 'conv-1',
-    kind, payload, status: 'proposed', ...over,
+    id: ACTION_ID,
+    admin_id: 'admin-1',
+    conversation_id: 'conv-1',
+    kind,
+    payload,
+    status: 'proposed',
+    ...over,
   }
 }
 
@@ -103,11 +108,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('adjust_inventory success', async () => {
     mockQueryOne.mockResolvedValueOnce(action('adjust_inventory', { productId: 'p1', delta: 5, reason: 'restock' }))
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce(undefined)                          // BEGIN
+      query: vi
+        .fn()
+        .mockResolvedValueOnce(undefined) // BEGIN
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] }) // SELECT FOR UPDATE
-        .mockResolvedValueOnce(undefined)                          // UPDATE
-        .mockResolvedValue(undefined),                             // COMMIT
+        .mockResolvedValueOnce(undefined) // UPDATE
+        .mockResolvedValue(undefined), // COMMIT
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -119,10 +125,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('adjust_inventory product not found', async () => {
     mockQueryOne.mockResolvedValueOnce(action('adjust_inventory', { productId: 'p1', delta: 5, reason: 'x' }))
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce(undefined)          // BEGIN
-        .mockResolvedValueOnce({ rows: [] })       // SELECT → none
-        .mockResolvedValue(undefined),             // ROLLBACK
+      query: vi
+        .fn()
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SELECT → none
+        .mockResolvedValue(undefined), // ROLLBACK
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -134,7 +141,8 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('adjust_inventory would drop stock negative', async () => {
     mockQueryOne.mockResolvedValueOnce(action('adjust_inventory', { productId: 'p1', delta: -20, reason: 'x' }))
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 5 }] })
         .mockResolvedValue(undefined),
@@ -149,9 +157,10 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   it('adjust_inventory throws mid-transaction', async () => {
     mockQueryOne.mockResolvedValueOnce(action('adjust_inventory', { productId: 'p1', delta: 5, reason: 'x' }))
     const client = {
-      query: vi.fn()
-        .mockResolvedValueOnce(undefined)                              // BEGIN
-        .mockRejectedValueOnce(new Error('lock timeout')),             // SELECT throws
+      query: vi
+        .fn()
+        .mockResolvedValueOnce(undefined) // BEGIN
+        .mockRejectedValueOnce(new Error('lock timeout')), // SELECT throws
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -163,24 +172,24 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   // ── set_product_featured ──────────────────────────────────────────────────
 
   it('set_product_featured under limit success', async () => {
-    primeAction(action('set_product_featured', { productId: 'p1', featured: true, limit: 6 }),
+    primeAction(
+      action('set_product_featured', { productId: 'p1', featured: true, limit: 6 }),
       { n: 3 }, // count
-      { id: 'p1', name: 'N', is_featured: true })
+      { id: 'p1', name: 'N', is_featured: true }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('set_product_featured limit reached', async () => {
-    primeAction(action('set_product_featured', { productId: 'p1', featured: true, limit: 2 }),
-      { n: 2 })
+    primeAction(action('set_product_featured', { productId: 'p1', featured: true, limit: 2 }), { n: 2 })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/limit .* reached/i)
   })
 
   it('set_product_featured unfeature not found', async () => {
-    primeAction(action('set_product_featured', { productId: 'p1', featured: false, limit: 0 }),
-      null) // update → not found
+    primeAction(action('set_product_featured', { productId: 'p1', featured: false, limit: 0 }), null) // update → not found
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
@@ -201,8 +210,11 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_brand success', async () => {
-    primeAction(action('create_brand', { name: 'Acme', slug: 'acme', logoUrl: 'l.png' }),
-      null, { id: 'b1', name: 'Acme', slug: 'acme' })
+    primeAction(action('create_brand', { name: 'Acme', slug: 'acme', logoUrl: 'l.png' }), null, {
+      id: 'b1',
+      name: 'Acme',
+      slug: 'acme',
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -236,10 +248,12 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_category success with parent', async () => {
-    primeAction(action('create_category', { name: 'C', slug: 'c', parentId: 'par1' }),
+    primeAction(
+      action('create_category', { name: 'C', slug: 'c', parentId: 'par1' }),
       { id: 'par1' }, // parent exists
-      null,           // dup check none
-      { id: 'cat1', name: 'C', slug: 'c', parent_id: 'par1', is_active: true })
+      null, // dup check none
+      { id: 'cat1', name: 'C', slug: 'c', parent_id: 'par1', is_active: true }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
@@ -307,15 +321,31 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('create_customer_task success (invalid priority → medium)', async () => {
-    primeAction(action('create_customer_task', { customerId: 'u1', title: 'Call', dueAt: null, assignedToAdminId: null, priority: 'bogus' }),
-      { id: 'task-1' })
+    primeAction(
+      action('create_customer_task', {
+        customerId: 'u1',
+        title: 'Call',
+        dueAt: null,
+        assignedToAdminId: null,
+        priority: 'bogus',
+      }),
+      { id: 'task-1' }
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('create_customer_task insert fails', async () => {
-    primeAction(action('create_customer_task', { customerId: 'u1', title: 'Call', dueAt: '2026-01-01', assignedToAdminId: 'a2', priority: 'high' }),
-      null)
+    primeAction(
+      action('create_customer_task', {
+        customerId: 'u1',
+        title: 'Call',
+        dueAt: '2026-01-01',
+        assignedToAdminId: 'a2',
+        priority: 'high',
+      }),
+      null
+    )
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
   })
@@ -334,23 +364,38 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
   })
 
   it('close_customer_task already completed', async () => {
-    primeAction(action('close_customer_task', { taskId: 't1', resolution: null }),
-      { id: 't1', user_id: 'u1', title: 'T', status: 'completed', description: null })
+    primeAction(action('close_customer_task', { taskId: 't1', resolution: null }), {
+      id: 't1',
+      user_id: 'u1',
+      title: 'T',
+      status: 'completed',
+      description: null,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already completed/i)
   })
 
   it('close_customer_task success with resolution (existing description)', async () => {
-    primeAction(action('close_customer_task', { taskId: 't1', resolution: 'fixed it' }),
-      { id: 't1', user_id: 'u1', title: 'T', status: 'open', description: 'prev' })
+    primeAction(action('close_customer_task', { taskId: 't1', resolution: 'fixed it' }), {
+      id: 't1',
+      user_id: 'u1',
+      title: 'T',
+      status: 'open',
+      description: 'prev',
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })
 
   it('close_customer_task success no resolution', async () => {
-    primeAction(action('close_customer_task', { taskId: 't1', resolution: '' }),
-      { id: 't1', user_id: 'u1', title: 'T', status: 'open', description: null })
+    primeAction(action('close_customer_task', { taskId: 't1', resolution: '' }), {
+      id: 't1',
+      user_id: 'u1',
+      title: 'T',
+      status: 'open',
+      description: null,
+    })
     const res = await POST(makeReq(), params)
     expect(res.status).toBe(200)
   })

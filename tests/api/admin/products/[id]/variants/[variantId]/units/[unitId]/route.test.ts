@@ -19,7 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 import { PATCH, DELETE } from '@/app/api/admin/products/[id]/variants/[variantId]/units/[unitId]/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction, query as dbQuery} from '@/lib/db'
+import { queryOne, withTransaction, query as dbQuery } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -83,7 +83,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
     mockHasScope.mockReturnValue(true)
     mockQueryOne
       .mockResolvedValueOnce({ id: 'var-1' }) // variant exists
-      .mockResolvedValueOnce(null)             // unit not found
+      .mockResolvedValueOnce(null) // unit not found
     const res = await PATCH(makePatchReq({}), { params })
     expect(res.status).toBe(404)
     const body = await res.json()
@@ -93,9 +93,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 on invalid JSON', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const req = new NextRequest(baseUrl, {
       method: 'PATCH',
       body: 'not-json',
@@ -110,9 +108,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when unit is empty string', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ unit: '' }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -122,9 +118,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when factor is zero', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ factor: 0 }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -134,9 +128,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when factor is negative', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ factor: -2 }), { params })
     expect(res.status).toBe(400)
   })
@@ -144,9 +136,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when dimension is invalid', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ dimension: 'time' }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -156,9 +146,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when min_qty is not positive', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ min_qty: -1 }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -168,9 +156,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when max_qty is not positive', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ max_qty: 0 }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -180,9 +166,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 400 when qty_step is not positive', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const res = await PATCH(makePatchReq({ qty_step: 0 }), { params })
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -192,13 +176,13 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('updates unit on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const updated = { id: 'unit-1', unit: 'box', factor: 10 }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [updated] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [updated] }),
+      })
+    )
     const res = await PATCH(makePatchReq({ unit: 'box', factor: 10 }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -208,12 +192,11 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('sets is_base and clears others when is_base=true', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const updated = { id: 'unit-1', is_base: true }
-    const clientQuery = vi.fn()
-      .mockResolvedValueOnce({ rows: [] })     // UPDATE SET is_base=FALSE for variant
+    const clientQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE SET is_base=FALSE for variant
       .mockResolvedValueOnce({ rows: [updated] }) // UPDATE SET ... RETURNING
     mockWithTx.mockImplementation(async (fn: any) => fn({ query: clientQuery }))
     const res = await PATCH(makePatchReq({ is_base: true }), { params })
@@ -225,13 +208,13 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns current row when no fields sent and is_base=false', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     const current = { id: 'unit-1', unit: 'pc', factor: 1 }
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [current] }),
-    }))
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [current] }),
+      })
+    )
     const res = await PATCH(makePatchReq({}), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -241,12 +224,12 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('sets display_label to null when empty', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', display_label: null }] }),
-    }))
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', display_label: null }] }),
+      })
+    )
     const res = await PATCH(makePatchReq({ display_label: '' }), { params })
     expect(res.status).toBe(200)
   })
@@ -254,12 +237,12 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('sets max_qty to NULL when null sent', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', max_qty: null }] }),
-    }))
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', max_qty: null }] }),
+      })
+    )
     const res = await PATCH(makePatchReq({ max_qty: null }), { params })
     expect(res.status).toBe(200)
   })
@@ -267,12 +250,12 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('sets conversion_meta to NULL when null sent', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', conversion_meta: null }] }),
-    }))
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', conversion_meta: null }] }),
+      })
+    )
     const res = await PATCH(makePatchReq({ conversion_meta: null }), { params })
     expect(res.status).toBe(200)
   })
@@ -280,12 +263,12 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('stores conversion_meta as JSON object', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
-    mockWithTx.mockImplementation(async (fn: any) => fn({
-      query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', conversion_meta: { r: 5 } }] }),
-    }))
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockWithTx.mockImplementation(async (fn: any) =>
+      fn({
+        query: vi.fn().mockResolvedValueOnce({ rows: [{ id: 'unit-1', conversion_meta: { r: 5 } }] }),
+      })
+    )
     const res = await PATCH(makePatchReq({ conversion_meta: { r: 5 } }), { params })
     expect(res.status).toBe(200)
   })
@@ -293,9 +276,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 409 on duplicate key error', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     mockWithTx.mockRejectedValue(new Error('duplicate key value violates unique constraint'))
     const res = await PATCH(makePatchReq({ unit: 'box' }), { params })
     expect(res.status).toBe(409)
@@ -306,9 +287,7 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/units/[unitId]', (
   it('returns 500 on unknown db error', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'unit-1', is_base: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({ id: 'unit-1', is_base: false })
     mockWithTx.mockRejectedValue(new Error('connection reset'))
     const res = await PATCH(makePatchReq({ unit: 'box' }), { params })
     expect(res.status).toBe(500)
@@ -347,7 +326,7 @@ describe('DELETE /api/admin/products/[id]/variants/[variantId]/units/[unitId]', 
     mockHasScope.mockReturnValue(true)
     mockQueryOne
       .mockResolvedValueOnce({ id: 'var-1' }) // variant
-      .mockResolvedValueOnce(null)             // unit not found
+      .mockResolvedValueOnce(null) // unit not found
     const res = await DELETE(makeDeleteReq(), { params })
     expect(res.status).toBe(404)
     const body = await res.json()
@@ -373,8 +352,8 @@ describe('DELETE /api/admin/products/[id]/variants/[variantId]/units/[unitId]', 
     mockQueryOne
       .mockResolvedValueOnce({ id: 'var-1' })
       .mockResolvedValueOnce({ id: 'unit-1', is_base: true })
-      .mockResolvedValueOnce(null)             // no sibling
-      .mockResolvedValueOnce({ rowCount: 1 })  // DELETE
+      .mockResolvedValueOnce(null) // no sibling
+      .mockResolvedValueOnce({ rowCount: 1 }) // DELETE
     const res = await DELETE(makeDeleteReq(), { params })
     expect(res.status).toBe(200)
     const body = await res.json()

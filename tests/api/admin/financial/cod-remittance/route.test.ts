@@ -12,8 +12,22 @@ import { queryMany, query } from '@/lib/db'
 const ADMIN = { adminId: 'a1', role: 'administrator', scopes: ['finance'] }
 
 const ORDERS = [
-  { id: 'o1', order_number: '1001', customer_name: 'Alice', payment_status: 'cod_collected', delivered_at: '2024-06-03T10:00:00Z', total_amount: '500' },
-  { id: 'o2', order_number: '1002', customer_name: 'Bob', payment_status: 'cod_pending', delivered_at: null, total_amount: '200' },
+  {
+    id: 'o1',
+    order_number: '1001',
+    customer_name: 'Alice',
+    payment_status: 'cod_collected',
+    delivered_at: '2024-06-03T10:00:00Z',
+    total_amount: '500',
+  },
+  {
+    id: 'o2',
+    order_number: '1002',
+    customer_name: 'Bob',
+    payment_status: 'cod_pending',
+    delivered_at: null,
+    total_amount: '200',
+  },
 ]
 const ALL_COD = [
   { payment_status: 'cod_pending', total_amount: '200' },

@@ -40,7 +40,9 @@ function makeDelete() {
 // ── PATCH tests ───────────────────────────────────────────────────────────────
 
 describe('PATCH /api/admin/shelving/locations/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
@@ -133,7 +135,9 @@ describe('PATCH /api/admin/shelving/locations/[id]', () => {
 // ── DELETE tests ──────────────────────────────────────────────────────────────
 
 describe('DELETE /api/admin/shelving/locations/[id]', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)

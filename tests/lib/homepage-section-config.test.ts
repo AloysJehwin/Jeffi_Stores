@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SECTION_META, SECTION_TYPES, SECTION_COPY_DEFAULTS,
-  configId, configIds, configNumber, friendlyCount, justLandedDays, launchedWithin, safeHref, valueStatMetrics,
+  SECTION_META,
+  SECTION_TYPES,
+  SECTION_COPY_DEFAULTS,
+  configId,
+  configIds,
+  configNumber,
+  friendlyCount,
+  justLandedDays,
+  launchedWithin,
+  safeHref,
+  valueStatMetrics,
   type HomepageSection,
 } from '@/lib/homepage-sections'
 
@@ -10,8 +19,17 @@ const ID = '11111111-2222-3333-4444-555555555555'
 
 describe('new section types', () => {
   it('registers each with metadata and default heading copy', () => {
-    for (const t of ['countdown_deal', 'testimonials', 'recently_viewed', 'category_tabs', 'bundle_spotlight',
-      'back_in_stock', 'blog_teaser', 'social_strip', 'value_stats'] as const) {
+    for (const t of [
+      'countdown_deal',
+      'testimonials',
+      'recently_viewed',
+      'category_tabs',
+      'bundle_spotlight',
+      'back_in_stock',
+      'blog_teaser',
+      'social_strip',
+      'value_stats',
+    ] as const) {
       expect(SECTION_TYPES).toContain(t)
       expect(SECTION_META[t].label).toBeTruthy()
       expect(SECTION_COPY_DEFAULTS[t].title).toBeTruthy()
@@ -78,9 +96,15 @@ describe('store stats', () => {
   })
 
   it('keeps catalogue order, custom labels, and drops unknown metrics', () => {
-    const picked = valueStatMetrics(cfg({ metrics: [
-      { metric: 'customers', label: 'Buyers' }, { metric: 'orders_shipped', label: '' }, { metric: 'bogus' },
-    ] }))
+    const picked = valueStatMetrics(
+      cfg({
+        metrics: [
+          { metric: 'customers', label: 'Buyers' },
+          { metric: 'orders_shipped', label: '' },
+          { metric: 'bogus' },
+        ],
+      })
+    )
     expect(picked).toEqual([
       { metric: 'orders_shipped', label: 'Orders shipped' },
       { metric: 'customers', label: 'Buyers' },

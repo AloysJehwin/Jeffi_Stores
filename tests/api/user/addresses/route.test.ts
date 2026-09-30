@@ -182,10 +182,7 @@ describe('POST /api/user/addresses', () => {
 
     const res = await POST(makePost({ ...VALID_ADDRESS_BODY, phone: '919876543210' }) as any)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['+919876543210'])
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['+919876543210']))
   })
 
   it('returns 500 when queryOne returns null', async () => {

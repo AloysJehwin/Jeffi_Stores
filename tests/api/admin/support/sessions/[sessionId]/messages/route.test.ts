@@ -112,9 +112,14 @@ describe('POST /api/admin/support/sessions/[sessionId]/messages', () => {
     mockLogActivity.mockResolvedValue(undefined as any)
     // First queryOne: session lookup; Second: UPDATE session; Third: INSERT message; Fourth (optional): customer lookup
     mockQueryOne
-      .mockResolvedValueOnce(OPEN_SESSION as any)   // session
-      .mockResolvedValueOnce(undefined as any)       // UPDATE admin_name (returns undefined — ok)
-      .mockResolvedValueOnce({ id: 'm1', sender: 'admin', message: 'Hi there', created_at: new Date().toISOString() } as any) // INSERT
+      .mockResolvedValueOnce(OPEN_SESSION as any) // session
+      .mockResolvedValueOnce(undefined as any) // UPDATE admin_name (returns undefined — ok)
+      .mockResolvedValueOnce({
+        id: 'm1',
+        sender: 'admin',
+        message: 'Hi there',
+        created_at: new Date().toISOString(),
+      } as any) // INSERT
       .mockResolvedValueOnce({ first_name: 'Alice', last_name: 'M', email: 'alice@example.com' } as any) // customer
   })
 
@@ -166,10 +171,16 @@ describe('POST /api/admin/support/sessions/[sessionId]/messages', () => {
   })
 
   it('does NOT send agent connected email when admin already named', async () => {
-    mockQueryOne.mockReset()
+    mockQueryOne
+      .mockReset()
       .mockResolvedValueOnce({ ...OPEN_SESSION, admin_name: 'John Smith' } as any)
       .mockResolvedValueOnce(undefined as any)
-      .mockResolvedValueOnce({ id: 'm2', sender: 'admin', message: 'Reply', created_at: new Date().toISOString() } as any)
+      .mockResolvedValueOnce({
+        id: 'm2',
+        sender: 'admin',
+        message: 'Reply',
+        created_at: new Date().toISOString(),
+      } as any)
     mockSendAgentConnected.mockResolvedValue(undefined as any)
 
     const res = await POST(makePost({ message: 'Reply' }), PARAMS)
@@ -178,7 +189,12 @@ describe('POST /api/admin/support/sessions/[sessionId]/messages', () => {
   })
 
   it('falls back to email when admin has no first/last name', async () => {
-    mockAuth.mockResolvedValue({ ...ADMIN, first_name: undefined, last_name: undefined, email: 'jsmith@example.com' } as any)
+    mockAuth.mockResolvedValue({
+      ...ADMIN,
+      first_name: undefined,
+      last_name: undefined,
+      email: 'jsmith@example.com',
+    } as any)
     mockSendAgentConnected.mockResolvedValue(undefined as any)
     const res = await POST(makePost({ message: 'Hi' }), PARAMS)
     expect(res.status).toBe(200)

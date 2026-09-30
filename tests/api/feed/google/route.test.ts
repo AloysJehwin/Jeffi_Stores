@@ -55,7 +55,13 @@ const simpleProduct = {
   },
   brands: { id: 'brand-1', name: 'Unbrako' },
   product_images: [
-    { id: 'img-1', image_url: 'https://cdn.example.com/img.jpg', thumbnail_url: null, is_primary: true, display_order: 1 },
+    {
+      id: 'img-1',
+      image_url: 'https://cdn.example.com/img.jpg',
+      thumbnail_url: null,
+      is_primary: true,
+      display_order: 1,
+    },
   ],
   product_variants: [],
 }
@@ -220,9 +226,7 @@ describe('GET /api/feed/google', () => {
   })
 
   it('escapes XML special characters in product name', async () => {
-    queryManyMock.mockResolvedValue([
-      { ...simpleProduct, name: 'Bolt & Nut <M8>', sku: 'BN-M8' },
-    ])
+    queryManyMock.mockResolvedValue([{ ...simpleProduct, name: 'Bolt & Nut <M8>', sku: 'BN-M8' }])
 
     const res = await GET(makeReq() as any)
     const xml = await res.text()

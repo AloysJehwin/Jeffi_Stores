@@ -57,7 +57,9 @@ function makeJsonReq(method: string, body: unknown) {
   })
 }
 
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 // ---------------------------------------------------------------------------
 // GET
@@ -135,9 +137,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (file upload
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ id: 'var-1' })
-    mockQueryMany.mockResolvedValueOnce([
-      { id: 'i1' }, { id: 'i2' }, { id: 'i3' }, { id: 'i4' }, { id: 'i5' },
-    ])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'i1' }, { id: 'i2' }, { id: 'i3' }, { id: 'i4' }, { id: 'i5' }])
     const req = new NextRequest(baseUrl, { method: 'POST' })
     const res = await POST(req, { params })
     expect(res.status).toBe(400)
@@ -220,8 +220,8 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (gallery)', 
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })  // variant check
-      .mockResolvedValueOnce(null)              // gallery image not found
+      .mockResolvedValueOnce({ id: 'var-1' }) // variant check
+      .mockResolvedValueOnce(null) // gallery image not found
     mockQueryMany.mockResolvedValueOnce([])
     const res = await POST(makeJsonReq('POST', { gallery_image_id: UUID1 }), { params })
     expect(res.status).toBe(404)
@@ -232,9 +232,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (gallery)', 
   it('returns 400 when gallery image has no usable URL', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'gimg-1', image_url: null, s3_key: null, thumbnail_url: null, s3_thumbnail_key: null })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({
+      id: 'gimg-1',
+      image_url: null,
+      s3_key: null,
+      thumbnail_url: null,
+      s3_thumbnail_key: null,
+    })
     mockQueryMany.mockResolvedValueOnce([])
     const res = await POST(makeJsonReq('POST', { gallery_image_id: UUID1 }), { params })
     expect(res.status).toBe(400)
@@ -245,9 +249,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (gallery)', 
   it('returns 410 when gallery image file is missing from storage', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'gimg-1', image_url: 'https://cdn.example.com/missing.jpg', thumbnail_url: null, s3_key: null, s3_thumbnail_key: null })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({
+      id: 'gimg-1',
+      image_url: 'https://cdn.example.com/missing.jpg',
+      thumbnail_url: null,
+      s3_key: null,
+      s3_thumbnail_key: null,
+    })
     mockQueryMany.mockResolvedValueOnce([])
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
     const res = await POST(makeJsonReq('POST', { gallery_image_id: UUID1 }), { params })
@@ -258,9 +266,13 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (gallery)', 
   it('returns 502 when gallery image storage is unreachable', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'var-1' })
-      .mockResolvedValueOnce({ id: 'gimg-1', image_url: 'https://cdn.example.com/img.jpg', thumbnail_url: null, s3_key: null, s3_thumbnail_key: null })
+    mockQueryOne.mockResolvedValueOnce({ id: 'var-1' }).mockResolvedValueOnce({
+      id: 'gimg-1',
+      image_url: 'https://cdn.example.com/img.jpg',
+      thumbnail_url: null,
+      s3_key: null,
+      s3_thumbnail_key: null,
+    })
     mockQueryMany.mockResolvedValueOnce([])
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')))
     const res = await POST(makeJsonReq('POST', { gallery_image_id: UUID1 }), { params })
@@ -476,11 +488,14 @@ describe('PATCH /api/admin/products/[id]/variants/[variantId]/images', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
-    const res = await PATCH(makeJsonReq('PATCH', {
-      imageId: UUID1,
-      isPrimary: true,
-      displayOrder: 0,
-    }), { params })
+    const res = await PATCH(
+      makeJsonReq('PATCH', {
+        imageId: UUID1,
+        isPrimary: true,
+        displayOrder: 0,
+      }),
+      { params }
+    )
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledTimes(3)
   })
