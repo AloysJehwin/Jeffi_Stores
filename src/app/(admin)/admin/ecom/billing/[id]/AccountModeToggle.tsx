@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function AccountModeToggle({
   tenantId,
@@ -13,7 +14,7 @@ export default function AccountModeToggle({
 }) {
   const [ownRazorpay, setOwnRazorpay] = useState(initial)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   // Turning ON requires connected creds — the API enforces this too (409), but disabling the control
   // up front avoids a guaranteed-failing round trip and explains why.
@@ -22,7 +23,6 @@ export default function AccountModeToggle({
   async function toggle() {
     const next = !ownRazorpay
     setBusy(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/ecom/${tenantId}/account-mode`, {
         method: 'PATCH',
@@ -31,12 +31,12 @@ export default function AccountModeToggle({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data?.error || 'Failed to update account mode')
+        showToast(data?.error || 'Failed to update account mode', 'error')
         return
       }
       setOwnRazorpay(next)
     } catch {
-      setError('Failed to update account mode')
+      showToast('Failed to update account mode', 'error')
     } finally {
       setBusy(false)
     }
@@ -57,7 +57,6 @@ export default function AccountModeToggle({
         {busy ? 'Saving…' : ownRazorpay ? 'Switch to platform' : 'Switch to own Razorpay'}
       </button>
       {!canEnable && <div className="text-[11px] text-foreground-muted mt-1">Connect a Razorpay account first.</div>}
-      {error && <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
     </div>
   )
 }

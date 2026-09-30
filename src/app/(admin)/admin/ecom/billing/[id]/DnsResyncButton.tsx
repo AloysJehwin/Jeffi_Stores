@@ -1,26 +1,31 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function DnsResyncButton({ tenantId }: { tenantId: string }) {
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ added: string[]; removed: string[] } | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   async function resync() {
     setBusy(true)
-    setError(null)
-    setResult(null)
     try {
       const res = await fetch(`/api/admin/ecom/${tenantId}/dns/resync`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data?.error || 'DNS re-sync failed')
+        showToast(data?.error || 'DNS re-sync failed', 'error')
         return
       }
-      setResult({ added: data.added ?? [], removed: data.removed ?? [] })
+      const added = data.added ?? []
+      const removed = data.removed ?? []
+      showToast(
+        added.length === 0 && removed.length === 0
+          ? 'Already in sync.'
+          : `Added ${added.length}, removed ${removed.length}.`,
+        'success',
+      )
     } catch {
-      setError('DNS re-sync failed')
+      showToast('DNS re-sync failed', 'error')
     } finally {
       setBusy(false)
     }
@@ -41,14 +46,6 @@ export default function DnsResyncButton({ tenantId }: { tenantId: string }) {
       <div className="text-[11px] text-foreground-muted mt-1">
         Adds any host the current plan includes (e.g. forms-) and removes hosts it no longer does.
       </div>
-      {result && (
-        <div className="text-[11px] text-foreground-secondary mt-1">
-          {result.added.length === 0 && result.removed.length === 0
-            ? 'Already in sync.'
-            : `Added ${result.added.length}, removed ${result.removed.length}.`}
-        </div>
-      )}
-      {error && <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
     </div>
   )
 }

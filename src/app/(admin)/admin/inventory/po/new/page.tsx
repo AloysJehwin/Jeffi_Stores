@@ -12,6 +12,7 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 const PURCHASE_UNITS = [
   { value: '', label: '— same as sell unit —' },
@@ -132,6 +133,7 @@ const formatINR = (n: number) => formatINRBase(n, 0)
 export default function NewPOPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showToast } = useToast()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({ supplier_id: '', order_date: '', expected_date: '', notes: '', status: 'draft' })
@@ -534,13 +536,13 @@ export default function NewPOPage() {
       })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || 'Failed to create PO')
+        showToast(json.error || 'Failed to create PO', 'error')
         setSaving(false)
         return
       }
       router.push(ap('/admin/inventory?tab=po'))
     } catch {
-      setError('Failed to create purchase order')
+      showToast('Failed to create purchase order', 'error')
       setSaving(false)
     }
   }
