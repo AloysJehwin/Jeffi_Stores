@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { attributeValuesResponse } from '@/lib/product-attribute-filters.server'
+import { attributeValuesResponse } from '@/lib/product-attribute-filters'
 
 export const dynamic = 'force-dynamic'
 

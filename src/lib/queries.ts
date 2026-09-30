@@ -3,7 +3,7 @@ import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 import { getStockValuation } from './inventory'
-import { buildAttributeFilterClauses, type FilterParams } from './product-attribute-filters.server'
+import { buildAttributeFilterClauses, type FilterParams } from './product-attribute-filters'
 
 export const VARIANT_STOCK_TOTAL_SQL = `
   COALESCE((SELECT COUNT(*) FROM product_variants pv

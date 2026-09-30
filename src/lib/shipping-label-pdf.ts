@@ -6,6 +6,7 @@
  * pdfkit / bwip-js are loaded via the eval('require') workaround used across the
  * PDF libs. Route files can't export non-handler symbols, hence this lib.
  */
+import 'server-only'
 import { round2 } from '@/lib/gst'
 import { storeSignature } from '@/lib/brand'
 

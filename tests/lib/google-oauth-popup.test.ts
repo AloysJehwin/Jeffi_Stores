@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 
 describe('openGoogleOAuthPopup — server-side (window undefined)', () => {
   it('resolves with window unavailable error when window is not defined', async () => {

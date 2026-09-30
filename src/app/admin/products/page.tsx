@@ -26,8 +26,8 @@ import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/admin-cookie'
-import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/product-attribute-filters'
-import { getSpecFilterFields } from '@/lib/product-attribute-filters.server'
+import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/product-attribute-filters-shared'
+import { getSpecFilterFields } from '@/lib/product-attribute-filters'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

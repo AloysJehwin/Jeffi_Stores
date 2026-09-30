@@ -1,3 +1,4 @@
+import 'server-only'
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'

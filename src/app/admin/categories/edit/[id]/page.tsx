@@ -6,7 +6,7 @@ import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import { publishCategoryDraft } from '@/lib/category-draft'
 import CategoryForm from '@/components/admin/CategoryForm'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 import { ChevronLeft } from 'lucide-react'
 
 async function getCategory(id: string) {

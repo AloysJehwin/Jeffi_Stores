@@ -10,7 +10,7 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/iconSuggest', () => ({ suggestIcon: vi.fn() }))
+vi.mock('@/lib/icon-suggest', () => ({ suggestIcon: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ import { PATCH } from '@/app/api/admin/categories/[id]/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

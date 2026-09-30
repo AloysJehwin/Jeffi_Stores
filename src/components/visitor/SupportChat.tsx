@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import type { BotPayload, BotOrderCard, BotAction, BotNavLink, BotChip } from '@/lib/support-bot'
-import { renderTextWithLinks } from '@/lib/linkify'
+import { renderTextWithLinks } from '@/components/ui/Linkify'
 
 interface Message {
   id: string

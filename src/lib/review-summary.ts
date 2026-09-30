@@ -1,5 +1,6 @@
+import 'server-only'
 import { queryOne } from '@/lib/db'
-import { EMPTY_REVIEW_SUMMARY, toReviewSummary, type ReviewSummary } from './review-summary'
+import { EMPTY_REVIEW_SUMMARY, toReviewSummary, type ReviewSummary } from '@/components/visitor/pdp/review-summary'
 
 /** Average and count of approved reviews only; a failure hides the summary instead of failing the page. */
 export async function getApprovedReviewSummary(productId: string): Promise<ReviewSummary> {

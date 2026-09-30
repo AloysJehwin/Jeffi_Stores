@@ -9,14 +9,14 @@ vi.mock('@/lib/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/iconSuggest', () => ({
+vi.mock('@/lib/icon-suggest', () => ({
   suggestIcon: vi.fn(),
 }))
 
 import { POST } from '@/app/api/admin/categories/suggest-icon/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { suggestIcon } from '@/lib/icon-suggest'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

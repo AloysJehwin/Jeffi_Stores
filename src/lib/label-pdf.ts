@@ -1,3 +1,4 @@
+import 'server-only'
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
 const bwipjs = eval('require')('bwip-js')

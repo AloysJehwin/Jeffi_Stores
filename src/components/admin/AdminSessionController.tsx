@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
-import { subscribeAdminEvents, reconnectAdminEvents } from '@/lib/admin-events-client'
+import { subscribeAdminEvents, reconnectAdminEvents } from '@/lib/client/admin-events-client'
 
 const WARN_BEFORE_MS = 60_000
 const HEARTBEAT_GAP_MS = 2 * 60_000

@@ -1,3 +1,4 @@
+import 'server-only'
 import { queryMany } from '@/lib/db'
 import path from 'path'
 

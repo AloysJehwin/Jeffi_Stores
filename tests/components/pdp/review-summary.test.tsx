@@ -11,7 +11,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import { toReviewSummary } from '@/components/visitor/pdp/review-summary'
-import { getApprovedReviewSummary } from '@/components/visitor/pdp/review-summary.server'
+import { getApprovedReviewSummary } from '@/lib/review-summary'
 import ReviewSummaryLink from '@/components/visitor/pdp/ReviewSummaryLink'
 
 afterEach(cleanup)

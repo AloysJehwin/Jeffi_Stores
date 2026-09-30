@@ -104,7 +104,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
     if (!clientId) { onError('Google sign-in is not configured in this environment.'); return }
     setBusy(true)
     try {
-      const { openGoogleOAuthPopup } = await import('@/lib/google-oauth-popup')
+      const { openGoogleOAuthPopup } = await import('@/lib/client/google-oauth-popup')
       const result = await openGoogleOAuthPopup({ clientId })
       if (!result.accessToken) {
         if (result.error && result.error !== 'popup_closed') onError(result.error)

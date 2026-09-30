@@ -2,12 +2,12 @@ import { query, queryMany, queryOne, getClient } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
 import { embed, findSimilarCustomers } from '@/lib/rag'
 import { resolveTenantId } from '@/lib/tenant-context'
-import { SALES_TOOLS } from './tools/sales'
-import { MARKETING_TOOLS } from './tools/marketing'
-import { CATALOG_TOOLS } from './tools/catalog'
-import { CUSTOMER_OPS_TOOLS } from './tools/customer-ops'
-import { OPERATIONS_TOOLS } from './tools/operations'
-import { ok, err } from './tool-envelope'
+import { SALES_TOOLS } from './sales'
+import { MARKETING_TOOLS } from './marketing'
+import { CATALOG_TOOLS } from './catalog'
+import { CUSTOMER_OPS_TOOLS } from './customer-ops'
+import { OPERATIONS_TOOLS } from './operations'
+import { ok, err } from '../tool-envelope'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }

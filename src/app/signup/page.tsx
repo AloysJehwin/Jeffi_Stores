@@ -8,7 +8,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { Suspense } from 'react'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 
 export default function SignupPageWrapper() {

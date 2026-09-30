@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import { bp } from '@/lib/business-path'
 
 export default function BusinessSignInWrapper() {

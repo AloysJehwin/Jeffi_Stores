@@ -1,3 +1,4 @@
+import 'server-only'
 import path from 'path'
 import type { Policy, Section } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/site-controls'

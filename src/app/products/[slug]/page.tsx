@@ -18,7 +18,7 @@ import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 import { cardPropsFor } from '@/lib/product-cards'
 import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtTogether'
 import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
-import { getApprovedReviewSummary } from '@/components/visitor/pdp/review-summary.server'
+import { getApprovedReviewSummary } from '@/lib/review-summary'
 import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
 
 const getProductBySlug = cache(async (slug: string) => {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { renderTextWithLinks } from '@/lib/linkify'
+import { renderTextWithLinks } from '@/components/ui/Linkify'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Message {
