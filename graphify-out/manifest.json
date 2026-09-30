@@ -8120,13 +8120,13 @@
     "semantic_hash": ""
   },
   "src/app/(ecom)/ecom/EcomMain.tsx": {
-    "mtime": 1788717544.8921642,
-    "ast_hash": "595c7b73ef0846d82d4e21a5e2a17a3f",
+    "mtime": 1790775152.9563951,
+    "ast_hash": "5da8e16a55b2a3f1226db9e511b1b9ba",
     "semantic_hash": ""
   },
   "src/app/(ecom)/ecom/EcomNav.tsx": {
-    "mtime": 1790757448.969776,
-    "ast_hash": "989eaf2f307ec7bc7ebc96491bd65698",
+    "mtime": 1790775160.139709,
+    "ast_hash": "6aa21ef6e2cfe5f43cbcb8f95d60a692",
     "semantic_hash": ""
   },
   "src/app/(ecom)/ecom/OwnerAuthForm.tsx": {
@@ -8322,56 +8322,6 @@
   "src/app/(ecom)/ecom/page.tsx": {
     "mtime": 1790757449.0448022,
     "ast_hash": "8c037c5b83683bb86b4e3ed5f2c80584",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/campaigns/page.tsx": {
-    "mtime": 1790757449.0513058,
-    "ast_hash": "afd13930fe2eb2ea5ba88f807422d209",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/coupons/page.tsx": {
-    "mtime": 1790757449.0569758,
-    "ast_hash": "0c48040a20a2819a4c363f587ec6440c",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/crm/page.tsx": {
-    "mtime": 1790757449.0639307,
-    "ast_hash": "ee1b9e7cab419c67ed878f6442b7bbac",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/customers/page.tsx": {
-    "mtime": 1790757449.0701382,
-    "ast_hash": "2a6c53f3e2d68a407e70124e8d475adf",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/dashboard/page.tsx": {
-    "mtime": 1790757449.0749862,
-    "ast_hash": "e84090ed8a17bfe87e9c08c76ce7e03d",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/invoice/page.tsx": {
-    "mtime": 1790757449.0796256,
-    "ast_hash": "a81f04f1629dd45f83f5cf8347eec45b",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/orders/page.tsx": {
-    "mtime": 1790757449.0852413,
-    "ast_hash": "d0d130f508100b6b390ae7c51c02e97a",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/products/page.tsx": {
-    "mtime": 1790757449.091174,
-    "ast_hash": "9fe9a397bd6b56eb1d324c12df909ed7",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/shipment/page.tsx": {
-    "mtime": 1790757449.0966983,
-    "ast_hash": "59df0bde756e831c2f5b5cb234388001",
-    "semantic_hash": ""
-  },
-  "src/app/(ecom)/ecom/preview/storefront/page.tsx": {
-    "mtime": 1790757449.1070087,
-    "ast_hash": "eb5d49a660b669143ba0b2e1a753c469",
     "semantic_hash": ""
   },
   "src/app/(ecom)/ecom/pricing/PricingCards.tsx": {
