@@ -47,6 +47,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
   'src/app/(admin)/admin/products/ProductsTableClient.tsx',
+  'src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
   'src/app/(admin)/admin/invoices/InvoicesClient.tsx',
   'src/app/(admin)/admin/quotations/QuotationsClient.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
