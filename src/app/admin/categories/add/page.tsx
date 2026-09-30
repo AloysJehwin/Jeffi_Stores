@@ -1,5 +1,5 @@
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories } from '@/lib/queries'
 import CategoryForm from '@/components/admin/CategoryForm'
 import { ChevronLeft } from 'lucide-react'

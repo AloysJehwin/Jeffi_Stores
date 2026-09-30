@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
-import { getPayables } from '@/lib/financial'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
+import { getPayables } from '@/lib/payments/financial'
 
 export const dynamic = 'force-dynamic'
 

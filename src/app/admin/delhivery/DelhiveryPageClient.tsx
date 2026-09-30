@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TextControl, TextAreaControl } from '@/components/admin/site-controls/controls'

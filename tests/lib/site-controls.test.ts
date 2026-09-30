@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
 }))
 
@@ -9,10 +9,10 @@ let mockTenantSlug: string | null = null
 vi.mock('next/headers', () => ({
   headers: async () => ({ get: (k: string) => (k === 'x-tenant-slug' ? mockTenantSlug : null) }),
 }))
-vi.mock('@/lib/tenant-context', () => ({ getCurrentTenant: () => null }))
+vi.mock('@/lib/tenancy/tenant-context', () => ({ getCurrentTenant: () => null }))
 
-import { getSiteControls, getFeatureFlags, invalidateSiteControlsCache } from '@/lib/site-controls'
-import { queryMany } from '@/lib/db'
+import { getSiteControls, getFeatureFlags, invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { queryMany } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 

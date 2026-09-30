@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
-import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
+import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 
 export async function GET(request: NextRequest) {
   try {

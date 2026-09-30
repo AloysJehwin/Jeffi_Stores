@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers'
-import { verifyStaffToken, STAFF_COOKIE } from '@/lib/staff-session'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { verifyStaffToken, STAFF_COOKIE } from '@/lib/auth/staff-session'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import PortalShell from '@/components/portal/PortalShell'
 import PortalSignIn from '@/components/portal/PortalSignIn'
 import PortalSignOutButton from '@/components/portal/PortalSignOutButton'
-import { STAFF_NOTES } from '@/lib/portal-config'
+import { STAFF_NOTES } from '@/lib/tenancy/portal-config'
 import StaffNotesEntry from './_components/StaffNotesEntry'
 
 export const dynamic = 'force-dynamic'

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
-import { parseBody } from '@/lib/validate'
+import { parseBody } from '@/lib/shared/validate'
 import {
   applyDraftOrder,
   getEditableHomepage,
   nextDisplayOrder,
   withHomepageDraft,
   type DraftHeroSlide,
-} from '@/lib/homepage-draft'
+} from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 

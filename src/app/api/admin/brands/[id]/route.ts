@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { query, queryOne } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const patchSchema = z
   .object({

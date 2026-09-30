@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { lookupTenantContextById } from '@/lib/tenant-registry'
-import { runWithTenantContext } from '@/lib/tenant-context'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import {
   getImportJob,
   updateImportJob,

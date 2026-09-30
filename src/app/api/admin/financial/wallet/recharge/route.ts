@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { resolveTenant } from '@/lib/tenant-context'
-import { getTenantWallet, rechargeWallet } from '@/lib/wallet'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { getTenantWallet, rechargeWallet } from '@/lib/payments/wallet'
 
 export const dynamic = 'force-dynamic'
 

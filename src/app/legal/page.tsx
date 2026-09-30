@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { policies } from '@/lib/legals/policies'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {

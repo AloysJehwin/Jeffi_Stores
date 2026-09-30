@@ -2,17 +2,17 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { queryMany, queryOne } from '@/lib/db'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
-import { buildSearchClause, buildSearchRank } from '@/lib/search'
+import { buildSearchClause, buildSearchRank } from '@/lib/catalog/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/business/ProductCard'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 const PAGE_SIZE = 21
 

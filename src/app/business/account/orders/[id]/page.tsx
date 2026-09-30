@@ -11,7 +11,7 @@ import BusinessAccountMobileHeader from '@/components/business/AccountMobileHead
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const PH = { 'X-Auth-Portal': 'business' }

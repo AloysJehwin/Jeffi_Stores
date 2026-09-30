@@ -34,7 +34,7 @@ function types() {
 
 async function importStore() {
   vi.resetModules()
-  return import('@/lib/tenant-backup-store')
+  return import('@/lib/tenancy/tenant-backup-store')
 }
 
 describe('tenant-backup-store', () => {

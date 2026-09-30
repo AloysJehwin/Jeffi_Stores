@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { query, queryMany, queryOne } from '@/lib/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

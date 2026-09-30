@@ -1,7 +1,7 @@
-import { query, queryMany, queryOne, getClient } from '@/lib/db'
+import { query, queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
-import { embed, findSimilarCustomers } from '@/lib/rag'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { embed, findSimilarCustomers } from '@/lib/shared/rag'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { SALES_TOOLS } from './sales'
 import { MARKETING_TOOLS } from './marketing'
 import { CATALOG_TOOLS } from './catalog'
@@ -961,7 +961,7 @@ export const TOOLS: ToolDef[] = [
         throw new Error('Invalid dir — must be project-relative')
       }
       const FORBIDDEN =
-        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/(auth\/)?jwt\.ts|lib\/auth[^/]*|lib\/(shared\/)?db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
       if (FORBIDDEN.test(requested)) throw new Error('Path is forbidden')
       const root = path.resolve(process.cwd(), requested)
       const projectRoot = path.resolve(process.cwd())
@@ -1023,7 +1023,7 @@ export const TOOLS: ToolDef[] = [
         throw new Error('Invalid path — must be project-relative')
       }
       const FORBIDDEN =
-        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+        /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/(auth\/)?jwt\.ts|lib\/auth[^/]*|lib\/(shared\/)?db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
       if (FORBIDDEN.test(requested)) throw new Error('File is forbidden')
       const projectRoot = path.resolve(process.cwd())
       const full = path.resolve(projectRoot, requested)

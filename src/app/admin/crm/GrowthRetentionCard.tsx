@@ -1,7 +1,7 @@
 'use client'
 
 import { CompactStat, pctStr, numStr, daysStr } from '@/components/admin/dashboard/Primitives'
-import type { Growth, CohortRow } from '@/lib/crm-insights-shared'
+import type { Growth, CohortRow } from '@/lib/shared/crm-insights-shared'
 
 function cohortLabel(iso: string): string {
   const d = new Date(`${iso}-01T00:00:00`)

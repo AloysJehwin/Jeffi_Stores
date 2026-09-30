@@ -1,4 +1,4 @@
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function markOrderShipped(action: AgentAction): Promise<ActionResult> {

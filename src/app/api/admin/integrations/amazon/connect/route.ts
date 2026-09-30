@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { requireAdminScope } from '@/lib/jwt'
-import { resolveTenant } from '@/lib/tenant-context'
-import { signAdminState } from '@/lib/oauth-state'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { signAdminState } from '@/lib/shared/oauth-state'
 
 export const dynamic = 'force-dynamic'
 

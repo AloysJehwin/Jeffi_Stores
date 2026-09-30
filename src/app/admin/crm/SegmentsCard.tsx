@@ -5,7 +5,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface SegmentMeta {
   key: string

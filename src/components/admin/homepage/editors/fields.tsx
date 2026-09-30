@@ -11,7 +11,7 @@ import {
   type HomepageSection,
   type SectionCopy,
   type SectionType,
-} from '@/lib/homepage-sections'
+} from '@/lib/catalog/homepage-sections'
 
 /** Live catalogue data loaded server-side, so an editor never shows an empty picker. */
 export interface SectionOptions {

@@ -1,4 +1,4 @@
-import type { PackageType } from '@/lib/shipping'
+import type { PackageType } from '@/lib/shipping/shipping'
 
 // Dropdown value sets for the import template. Only stock_status is DB-enforced
 // (CHECK in catalog.sql); the rest mirror the product form's option lists so the

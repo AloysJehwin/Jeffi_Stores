@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query } from '@/lib/shared/db'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 
 export const dynamic = 'force-dynamic'

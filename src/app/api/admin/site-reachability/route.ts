@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { storeBaseUrlAsync } from '@/lib/brand'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

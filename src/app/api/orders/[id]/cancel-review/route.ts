@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query } from '@/lib/db'
-import { requireAdminScope } from '@/lib/jwt'
+import { queryOne, query } from '@/lib/shared/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
 import { sendOrderStatusUpdate } from '@/lib/email'
-import { cancelDelhiveryShipment } from '@/lib/delhivery'
-import { restoreOrderStock } from '@/lib/order-stock'
-import { logActivity } from '@/lib/activity'
+import { cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
+import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { logActivity } from '@/lib/shared/activity'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

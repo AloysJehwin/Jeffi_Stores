@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { LABEL_SIZES } from '@/lib/label-sizes'
+import { LABEL_SIZES } from '@/lib/documents/label-sizes'
 
 describe('LABEL_SIZES', () => {
   it('exports an array of 6 sizes', () => {

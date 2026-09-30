@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'

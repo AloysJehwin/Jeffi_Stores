@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { isPaymentBypassed } from '@/lib/ecom-payment-bypass'
+import { isPaymentBypassed } from '@/lib/payments/ecom-payment-bypass'
 
 const ORIGINAL = process.env.ECOM_PAYMENT_BYPASS_EMAILS
 

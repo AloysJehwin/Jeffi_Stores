@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
 import { z } from 'zod'
-import { queryMany } from '@/lib/db'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { getOfferById } from '@/lib/product-offers'
+import { queryMany } from '@/lib/shared/db'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { getOfferById } from '@/lib/catalog/product-offers'
 import type { AssignOption } from '@/components/admin/OffersProductPicker'
 import OfferDetailClient from './OfferDetailClient'
 

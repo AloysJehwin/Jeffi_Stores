@@ -10,14 +10,14 @@ const { mockOwner, mockFav, mockBankWithRoute, mockSave, mockSettle } = vi.hoist
 }))
 
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: 'sid' }) }) }))
-vi.mock('@/lib/owner-session', () => ({ OWNER_COOKIE: 'owner_sid', resolveOwnerSession: mockOwner }))
-vi.mock('@/lib/session-signals-request', () => ({ extractSessionSignals: () => ({}) }))
-vi.mock('@/lib/bank-verify', () => ({ verifyBankAccountFAV: mockFav }))
+vi.mock('@/lib/auth/owner-session', () => ({ OWNER_COOKIE: 'owner_sid', resolveOwnerSession: mockOwner }))
+vi.mock('@/lib/auth/session-signals-request', () => ({ extractSessionSignals: () => ({}) }))
+vi.mock('@/lib/payments/bank-verify', () => ({ verifyBankAccountFAV: mockFav }))
 vi.mock('@/lib/tenant-registry', () => ({
   getOwnerBankWithRoute: mockBankWithRoute,
   saveBankVerification: mockSave,
 }))
-vi.mock('@/lib/razorpay-route', () => ({ configureRouteSettlement: mockSettle }))
+vi.mock('@/lib/payments/razorpay-route', () => ({ configureRouteSettlement: mockSettle }))
 
 import { POST } from '@/app/api/ecom/bank/verify/route'
 

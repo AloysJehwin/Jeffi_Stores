@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { queryOne, query } from '@/lib/db'
-import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { queryOne, query } from '@/lib/shared/db'
+import { resolveShipmentStatus, isAdvancement } from '@/lib/shipping/shipment-status'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

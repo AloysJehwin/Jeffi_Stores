@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
+import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/auth/otp'
 import { sendOTPEmail } from '@/lib/email'
-import { sendOTPSMS } from '@/lib/sms'
-import { sendOTPWhatsApp } from '@/lib/whatsapp'
-import { queryOne } from '@/lib/db'
+import { sendOTPSMS } from '@/lib/shared/sms'
+import { sendOTPWhatsApp } from '@/lib/shared/whatsapp'
+import { queryOne } from '@/lib/shared/db'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 
 function normalizeIndianPhone(raw: string): string | null {

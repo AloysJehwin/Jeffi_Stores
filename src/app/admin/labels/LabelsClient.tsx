@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { LabelSpec, LabelSize } from '@/lib/label-sizes'
+import { LabelSpec, LabelSize } from '@/lib/documents/label-sizes'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'

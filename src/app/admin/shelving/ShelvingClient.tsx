@@ -14,7 +14,7 @@ import {
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'

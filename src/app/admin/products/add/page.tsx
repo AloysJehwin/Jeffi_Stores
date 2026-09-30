@@ -1,9 +1,9 @@
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/auth/admin-auth'
 import { createProduct } from './actions'
 
 export default async function AddProductPage() {
@@ -11,7 +11,7 @@ export default async function AddProductPage() {
   const categories = await getAllCategories()
   const brands = await getAllBrands()
   const session = await getAdminSession()
-  const { hasPlanScope } = await import('@/lib/plan-gate')
+  const { hasPlanScope } = await import('@/lib/auth/plan-gate')
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
 
   return (

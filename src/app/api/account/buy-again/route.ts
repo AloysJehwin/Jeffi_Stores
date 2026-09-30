@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { getProductCardsByIds, cardPropsFor } from '@/lib/product-cards'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { queryMany } from '@/lib/shared/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { getProductCardsByIds, cardPropsFor } from '@/lib/catalog/product-cards'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
 }))
@@ -12,21 +12,21 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn(),
 }))
 
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn(),
   completeAutoTask: vi.fn(),
 }))
 
-vi.mock('@/lib/order-stock', () => ({
+vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn(),
 }))
 
-vi.mock('@/lib/sms', () => ({
+vi.mock('@/lib/shared/sms', () => ({
   sendOrderDeliveredSMS: vi.fn(),
   sendOutForDeliverySMS: vi.fn(),
 }))
 
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   fetchDelhiveryInvoiceCharges: vi.fn(),
   // Real helper — the route uses it to build the cgm param; keeping the real maths means the
   // assertion below pins the actual value sent to Delhivery.
@@ -37,7 +37,7 @@ vi.mock('@/lib/delhivery', () => ({
   },
 }))
 
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getBusinessValues: vi.fn(async () => ({ delhiveryOriginPincode: '492001' })),
 }))
 
@@ -48,12 +48,12 @@ vi.mock('@/lib/integrations/resolve', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/delhivery/sync-statuses/route'
-import { query, queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
-import { restoreOrderStock } from '@/lib/order-stock'
-import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
-import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
+import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/shared/sms'
+import { fetchDelhiveryInvoiceCharges } from '@/lib/shipping/delhivery'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const mockQuery = vi.mocked(query)

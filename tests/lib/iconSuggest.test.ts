@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const { mockAiChat } = vi.hoisted(() => ({ mockAiChat: vi.fn() }))
 
-vi.mock('@/lib/ai-client', () => ({ aiChat: mockAiChat }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: mockAiChat }))
 
-import { suggestIcon, ICON_OPTIONS } from '@/lib/icon-suggest'
+import { suggestIcon, ICON_OPTIONS } from '@/lib/shared/icon-suggest'
 
 function makeAiResponse(content: string) {
   return { content, provider: 'ollama', model: 'm', latencyMs: 1, fallbackUsed: false }

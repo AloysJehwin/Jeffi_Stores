@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { CompactStat, numStr, rsCompact } from '@/components/admin/dashboard/Primitives'
-import type { Intent, SearchTerm } from '@/lib/crm-insights-shared'
+import type { Intent, SearchTerm } from '@/lib/shared/crm-insights-shared'
 
 export default function IntentCard({ intent, topSearches }: { intent: Intent; topSearches: SearchTerm[] }) {
   const totalAbandoned = intent.abandoned.reduce((s, a) => s + a.count, 0)

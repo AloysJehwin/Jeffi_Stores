@@ -1,11 +1,11 @@
-import { humanizeLabel } from '@/lib/format'
+import { humanizeLabel } from '@/lib/shared/format'
 import {
   ALIASED_SPEC_KEYS,
   COLUMN_SPEC_ALIASES,
   readSpecifications,
   specValues,
   type AliasedColumn,
-} from '@/lib/product-specs'
+} from '@/lib/catalog/product-specs'
 
 export type HandlingFlag = 'fragile' | 'hazardous' | 'flammable' | 'perishable'
 

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import NewCampaignClient from './NewCampaignClient'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

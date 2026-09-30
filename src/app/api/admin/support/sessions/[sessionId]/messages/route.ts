@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { sendAgentConnectedEmail } from '@/lib/email'
-import { logActivity } from '@/lib/activity'
+import { logActivity } from '@/lib/shared/activity'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   try {

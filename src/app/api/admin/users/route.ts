@@ -1,17 +1,17 @@
 import crypto from 'crypto'
 import { NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { createAdminUser } from '@/lib/auth'
-import { generateClientCertificate } from '@/lib/certificates'
-import { issueTenantAdminCert } from '@/lib/tenant-ca'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { createAdminUser } from '@/lib/auth/auth'
+import { generateClientCertificate } from '@/lib/tenancy/certificates'
+import { issueTenantAdminCert } from '@/lib/tenancy/tenant-ca'
 import { sendAdminCertificateEmail } from '@/lib/email'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 import { NextRequest } from 'next/server'
-import { isPlatformOwner } from '@/lib/scopes'
-import { assignableScopeKeys } from '@/lib/scopes-server'
-import { resolveRequestTenantId } from '@/lib/request-tenant'
-import { resolveTenant } from '@/lib/tenant-context'
-import { recordPortalCert } from '@/lib/portal-certs'
+import { isPlatformOwner } from '@/lib/auth/scopes'
+import { assignableScopeKeys } from '@/lib/auth/scopes-server'
+import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { recordPortalCert } from '@/lib/tenancy/portal-certs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     // Hard-cutover mode: never hand the p12/password back to the browser; the new admin fetches it
     // from certificate.jeffistores.in. In 'email'/'both' the blob still flows for the on-screen
     // download during the transition window.
-    const { mayDeliverBlob, certPortalUrl } = await import('@/lib/cert-delivery')
+    const { mayDeliverBlob, certPortalUrl } = await import('@/lib/tenancy/cert-delivery')
     return NextResponse.json({
       success: true,
       emailSent: emailResult.success,

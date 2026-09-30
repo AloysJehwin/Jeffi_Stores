@@ -3,28 +3,28 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/ewaybill', () => ({
+vi.mock('@/lib/shipping/ewaybill', () => ({
   generateEWayBill: vi.fn(),
   isEWayBillConfigured: vi.fn(),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/orders/[id]/ewaybill-generate/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateEWayBill, isEWayBillConfigured } from '@/lib/ewaybill'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateEWayBill, isEWayBillConfigured } from '@/lib/shipping/ewaybill'
+import { parseBody } from '@/lib/shared/validate'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

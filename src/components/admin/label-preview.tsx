@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { LabelSpec } from '@/lib/label-sizes'
+import { LabelSpec } from '@/lib/documents/label-sizes'
 
 // Shared client-side label preview components. These mirror the server PDF
 // renderers (src/lib/label-pdf.ts) closely enough for an at-a-glance preview;

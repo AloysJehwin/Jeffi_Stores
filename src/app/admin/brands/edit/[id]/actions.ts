@@ -1,10 +1,10 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne, withTransaction } from '@/lib/db'
+import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
 
 export async function updateBrand(brandId: string, formData: FormData) {

@@ -10,17 +10,17 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
-// Mock @/lib/db BEFORE importing any scenario module
+// Mock @/lib/shared/db BEFORE importing any scenario module
 // ---------------------------------------------------------------------------
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   query: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
-// Mock @/lib/automation-emails
+// Mock @/lib/shared/automation-emails
 // ---------------------------------------------------------------------------
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   fetchProductImageUrl: vi.fn(),
@@ -32,16 +32,16 @@ vi.mock('@/lib/automation-emails', () => ({
 }))
 
 // ---------------------------------------------------------------------------
-// Mock @/lib/email-campaigns (used by review-request)
+// Mock @/lib/shared/email-campaigns (used by review-request)
 // ---------------------------------------------------------------------------
-vi.mock('@/lib/email-campaigns', () => ({
+vi.mock('@/lib/shared/email-campaigns', () => ({
   renderCampaignEmail: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
-// Mock @/lib/jwt (used by review-request for generateReviewToken)
+// Mock @/lib/auth/jwt (used by review-request for generateReviewToken)
 // ---------------------------------------------------------------------------
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   generateReviewToken: vi.fn(),
 }))
 
@@ -63,7 +63,7 @@ import { restock } from '@/lib/campaigns/scenarios/restock'
 import { reviewReminder } from '@/lib/campaigns/scenarios/review-reminder'
 import { reviewRequest } from '@/lib/campaigns/scenarios/review-request'
 
-import { queryMany, query } from '@/lib/db'
+import { queryMany, query } from '@/lib/shared/db'
 import {
   fetchUserContext,
   fetchProductImageUrl,
@@ -72,9 +72,9 @@ import {
   sendCampaignEmailRendered,
   renderItemRows,
   renderHeroProduct,
-} from '@/lib/automation-emails'
-import { renderCampaignEmail } from '@/lib/email-campaigns'
-import { generateReviewToken } from '@/lib/jwt'
+} from '@/lib/shared/automation-emails'
+import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { generateReviewToken } from '@/lib/auth/jwt'
 
 // Typed mocks
 const mockQueryMany = vi.mocked(queryMany)

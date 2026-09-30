@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateBusiness } from '@/lib/jwt'
+import { authenticateBusiness } from '@/lib/auth/jwt'
 import { SignJWT } from 'jose'
 
 export const dynamic = 'force-dynamic'

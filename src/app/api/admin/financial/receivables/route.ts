@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getReceivablesAging } from '@/lib/financial'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getReceivablesAging } from '@/lib/payments/financial'
 
 export const dynamic = 'force-dynamic'
 

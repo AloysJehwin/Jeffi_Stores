@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getTenant, getProvisioningJob, setTenantInstanceState } from '@/lib/tenant-registry'
 import { getProvisioningProvider } from '@/lib/provisioning'
 import { dbInstanceId } from '@/lib/provisioning/steps'

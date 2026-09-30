@@ -20,15 +20,15 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateBusiness: mockAuthenticateBusiness,
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 

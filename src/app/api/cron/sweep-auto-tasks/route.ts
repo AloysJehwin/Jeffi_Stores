@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
-import { createAutoTask, type AutoTaskKind } from '@/lib/auto-tasks'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { query, queryMany } from '@/lib/shared/db'
+import { createAutoTask, type AutoTaskKind } from '@/lib/shared/auto-tasks'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

@@ -5,7 +5,7 @@ import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import CopySku from '@/components/ui/CopySku'
-import { ADMIN_INPUT_CLASS } from '@/lib/format'
+import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export interface Warehouse {

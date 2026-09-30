@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { uploadAvatarImage } from '@/lib/s3'
-import { query } from '@/lib/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { uploadAvatarImage } from '@/lib/shared/s3'
+import { query } from '@/lib/shared/db'
 
 const MAX_SIZE = 2 * 1024 * 1024
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp']

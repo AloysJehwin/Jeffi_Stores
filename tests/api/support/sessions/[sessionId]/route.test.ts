@@ -9,11 +9,11 @@ const mockAuthenticateAnyUser = vi.hoisted(() => vi.fn())
 const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: mockAuthenticateAnyUser,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: vi.fn(),

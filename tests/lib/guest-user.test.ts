@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock @/lib/db ─────────────────────────────────────────────────────────────
+// ── Mock @/lib/shared/db ─────────────────────────────────────────────────────────────
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: unknown[]) => mockQueryOne(...args),
   query: (...args: unknown[]) => mockQuery(...args),
 }))
 
 // ── Import under test ─────────────────────────────────────────────────────────
-import { getOrCreateGuestUser, mergeGuestToUser, getUserIdForSession } from '@/lib/guest-user'
+import { getOrCreateGuestUser, mergeGuestToUser, getUserIdForSession } from '@/lib/shared/guest-user'
 
 // ─────────────────────────────────────────────────────────────────────────────
 

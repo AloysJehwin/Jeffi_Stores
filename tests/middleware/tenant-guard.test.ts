@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 const { mockResolveTenant } = vi.hoisted(() => ({ mockResolveTenant: vi.fn() }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: vi.fn(),
   verifyBusinessToken: vi.fn(),
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/shared/rate-limit', () => ({ applyRateLimit: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/auth/scopes', () => ({
   getScopeForPath: vi.fn().mockReturnValue(null),
   hasScope: vi.fn().mockReturnValue(true),
   isPlatformAdmin: vi.fn().mockReturnValue(true),

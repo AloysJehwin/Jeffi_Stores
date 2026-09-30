@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
-import { verifyBankAccountFAV } from '@/lib/bank-verify'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { verifyBankAccountFAV } from '@/lib/payments/bank-verify'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const { getOwnerBankWithRoute, saveBankVerification } = await import('@/lib/tenant-registry')
   const existing = await getOwnerBankWithRoute(owner.id).catch(() => null)
   if (existing?.linkedAccountId) {
-    const { configureRouteSettlement } = await import('@/lib/razorpay-route')
+    const { configureRouteSettlement } = await import('@/lib/payments/razorpay-route')
     settlement = await configureRouteSettlement(existing.linkedAccountId, {
       accountNumber,
       ifsc: ifsc.toUpperCase(),

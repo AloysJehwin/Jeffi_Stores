@@ -12,11 +12,11 @@ const mockQuery = vi.hoisted(() => vi.fn())
 const mockSendSupportEscalationEmail = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const mockLogActivity = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: mockAuthenticateAnyUser,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
@@ -27,7 +27,7 @@ vi.mock('@/lib/email', () => ({
   sendSupportEscalationEmail: mockSendSupportEscalationEmail,
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 

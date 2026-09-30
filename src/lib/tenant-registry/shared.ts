@@ -1,8 +1,8 @@
 import { Pool } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { createPgPool, rdsSslOption, rdsIamPassword } from '../pg-pool'
-import type { TenantContext } from '../tenant-context'
+import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import type { TenantContext } from '@/lib/tenancy/tenant-context'
 
 /**
  * Control-plane registry client + host->tenant resolver.

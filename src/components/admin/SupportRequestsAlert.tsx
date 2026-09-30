@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface SupportSession {
   id: string

@@ -1,4 +1,4 @@
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { listProductStatuses } from './client'
 
 // Advisory lock so two refreshes can't run concurrently (distinct from the sync lock).

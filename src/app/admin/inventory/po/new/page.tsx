@@ -9,8 +9,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { ap } from '@/lib/admin-path'
-import { formatINR as formatINRBase } from '@/lib/format'
+import { ap } from '@/lib/shared/admin-path'
+import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const PURCHASE_UNITS = [

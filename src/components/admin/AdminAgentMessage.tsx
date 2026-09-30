@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   product: id => `/admin/products/${id}`,

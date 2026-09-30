@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import type { PublicOffer } from '@/lib/razorpay-offers'
+import type { PublicOffer } from '@/lib/payments/razorpay-offers'
 
 // Offers were hardcoded here: HDFC, ICICI, Kotak, SBI and RuPay deals that do not exist on this
 // Razorpay account. Customers were shown discounts they could never receive. The list now comes

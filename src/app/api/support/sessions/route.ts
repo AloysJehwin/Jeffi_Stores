@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
-import { logActivity } from '@/lib/activity'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { logActivity } from '@/lib/shared/activity'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getTenantOwners } from '@/lib/tenant-registry'
-import { createAdminNotification } from '@/lib/admin-notify'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { z } from 'zod'
-import { parseBody, zUuid } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const postSchema = z.object({
   productId: zUuid.nullish(),

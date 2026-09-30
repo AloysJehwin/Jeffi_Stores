@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,11 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne } from '@/lib/shared/db'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/auth/admin-auth'
 import { updateProduct } from './actions'
 
 export default async function EditProductPage({
@@ -48,7 +48,7 @@ export default async function EditProductPage({
   const serializedStockTotal = serialCountRow?.total ?? 0
 
   const session = await getAdminSession()
-  const { hasPlanScope } = await import('@/lib/plan-gate')
+  const { hasPlanScope } = await import('@/lib/auth/plan-gate')
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
   const hasReturns = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
 
@@ -177,7 +177,7 @@ export default async function EditProductPage({
   // receive paths. Resolve each grain's step here so the form asks for the right count
   // instead of one field per base unit.
   if (liveStockGrains.length > 0) {
-    const { resolveGrainUnit } = await import('@/lib/selling-unit')
+    const { resolveGrainUnit } = await import('@/lib/catalog/selling-unit')
     for (const g of liveStockGrains) {
       const u = await resolveGrainUnit(
         { query },

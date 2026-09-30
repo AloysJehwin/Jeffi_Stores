@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyGoogle } from '@/lib/google-verify'
-import { resolveAdminByEmail } from '@/lib/admin-identity'
-import { hasPlanScope } from '@/lib/plan-gate'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { issueStaffToken, setStaffCookie } from '@/lib/staff-session'
+import { verifyGoogle } from '@/lib/shared/google-verify'
+import { resolveAdminByEmail } from '@/lib/auth/admin-identity'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { issueStaffToken, setStaffCookie } from '@/lib/auth/staff-session'
 
 export const dynamic = 'force-dynamic'
 

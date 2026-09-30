@@ -1,18 +1,18 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
 
 vi.mock('@/lib/email', () => ({
   transporter: { sendMail: vi.fn() },
 }))
-vi.mock('@/lib/daily-briefing', () => ({
+vi.mock('@/lib/shared/daily-briefing', () => ({
   collectBriefingData: vi.fn(),
   narrate: vi.fn(),
   renderBriefingEmail: vi.fn(),
@@ -20,10 +20,10 @@ vi.mock('@/lib/daily-briefing', () => ({
 }))
 
 import { GET } from '@/app/api/cron/daily-briefing/route'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { transporter } from '@/lib/email'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { collectBriefingData, narrate, renderBriefingEmail } from '@/lib/daily-briefing'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { collectBriefingData, narrate, renderBriefingEmail } from '@/lib/shared/daily-briefing'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)

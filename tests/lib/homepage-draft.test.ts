@@ -4,7 +4,7 @@ const mockQuery = vi.fn()
 const mockQueryOne = vi.fn()
 const mockClientQuery = vi.fn()
 const tx = { rollbacks: 0 }
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   withTransaction: async (fn: any) => {
@@ -27,7 +27,7 @@ import {
   nextDisplayOrder,
   publishHomepageDraft,
   withHomepageDraft,
-} from '@/lib/homepage-draft'
+} from '@/lib/catalog/homepage-draft'
 
 const ADMIN_ID = '44444444-4444-4444-8444-444444444444'
 const T0 = '2026-09-01T00:00:00.000Z'

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { requireAdminScope } from '@/lib/jwt'
-import { resolveTenant } from '@/lib/tenant-context'
-import { currentAdminBaseUrl } from '@/lib/brand'
-import { buildOAuthUrl, isMetaEnabled } from '@/lib/meta'
-import { signAdminState } from '@/lib/oauth-state'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { currentAdminBaseUrl } from '@/lib/catalog/brand'
+import { buildOAuthUrl, isMetaEnabled } from '@/lib/catalog/meta'
+import { signAdminState } from '@/lib/shared/oauth-state'
 
 export const dynamic = 'force-dynamic'
 

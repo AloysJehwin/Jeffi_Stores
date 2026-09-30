@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne } from '@/lib/db'
-import { round2 } from '@/lib/gst'
-import { buildVectorSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
+import { buildVectorSearchClause } from '@/lib/catalog/search'
 import { z } from 'zod'
-import { parseBody, zNonEmpty, zEmail } from '@/lib/validate'
-import { lineItemExGst } from '@/lib/pricing'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { parseBody, zNonEmpty, zEmail } from '@/lib/shared/validate'
+import { lineItemExGst } from '@/lib/catalog/pricing'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 type UnitRow = { unit: string; dimension: string; min_qty: string; max_qty: string | null; qty_step: string }
 

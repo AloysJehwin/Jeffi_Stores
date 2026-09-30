@@ -1,11 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   query: vi.fn(),
 }))
 
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock('@/lib/automation-emails', () => ({
 }))
 
 import { buildWinbackScenario } from '@/lib/campaigns/scenarios/_winback-base'
-import { queryMany } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/automation-emails'
+import { queryMany } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockFetchUser = fetchUserContext as ReturnType<typeof vi.fn>

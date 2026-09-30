@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, listPlans, updateTenantPlan } from '@/lib/tenant-registry'
-import { upgradeSubscription, downgradeSubscription, type BillingInterval } from '@/lib/razorpay-subscriptions'
+import { upgradeSubscription, downgradeSubscription, type BillingInterval } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 import { rejectKyc, getKyc, getOwnerById } from '@/lib/tenant-registry'
-import { sendKycRejectedEmail } from '@/lib/ecom-emails'
+import { sendKycRejectedEmail } from '@/lib/shared/ecom-emails'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { buildLabelPDF, type LabelItem } from '@/lib/shipping-label-pdf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { buildLabelPDF, type LabelItem } from '@/lib/documents/shipping-label-pdf'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 export const runtime = 'nodejs'

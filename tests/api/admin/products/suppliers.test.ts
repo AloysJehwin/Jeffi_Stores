@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
 const mockWithTransaction = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
   withTransaction: (...a: any[]) => mockWithTransaction(...a),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { GET, POST } from '@/app/api/admin/products/[id]/suppliers/route'
 import { PATCH, DELETE } from '@/app/api/admin/products/[id]/suppliers/[psId]/route'
 

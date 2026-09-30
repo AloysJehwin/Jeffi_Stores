@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

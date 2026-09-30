@@ -1,9 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn() }))
 
-import { recordImplicitSignal, recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
-import * as db from '@/lib/db'
+import { recordImplicitSignal, recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
+import * as db from '@/lib/shared/db'
 
 const mockQuery = db.query as ReturnType<typeof vi.fn>
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>

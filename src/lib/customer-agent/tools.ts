@@ -1,7 +1,7 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
-import { findSimilarProductIds } from '@/lib/rag'
-import { buildProductSearchClause } from '@/lib/search'
+import { findSimilarProductIds } from '@/lib/shared/rag'
+import { buildProductSearchClause } from '@/lib/catalog/search'
 
 function vec(arr: number[]) {
   return '[' + arr.join(',') + ']'

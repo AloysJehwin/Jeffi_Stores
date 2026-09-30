@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Mock Redis so the distributed lock always succeeds (single-process test env)
-vi.mock('@/lib/redis', () => ({
+vi.mock('@/lib/shared/redis', () => ({
   default: { set: vi.fn().mockResolvedValue('OK') },
 }))
 

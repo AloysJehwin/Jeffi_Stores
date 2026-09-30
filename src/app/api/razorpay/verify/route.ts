@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { z } from 'zod'
-import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { createDraftInvoice } from '@/lib/invoice'
-import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
+import { createDraftInvoice } from '@/lib/documents/invoice'
+import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
 import {
   loadActiveCart,
   cartSubtotal,
@@ -13,17 +13,17 @@ import {
   cartItemsForHash,
   validateCouponForUser,
   commitOrder,
-} from '@/lib/order-commit'
-import { logActivity } from '@/lib/activity'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
-import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
-import { sendOrderConfirmedSMS } from '@/lib/sms'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { getRazorpayInstanceFor } from '@/lib/razorpay'
+} from '@/lib/orders/order-commit'
+import { logActivity } from '@/lib/shared/activity'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
+import { parseBody, zNonEmpty, zUuid } from '@/lib/shared/validate'
+import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
-import { settleVariantChangePayment } from '@/lib/variant-change'
-import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
+import { settleVariantChangePayment } from '@/lib/orders/variant-change'
+import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/payments/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 const VerifySchema = z.object({

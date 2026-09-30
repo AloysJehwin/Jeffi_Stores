@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 vi.mock('@/lib/queries', () => ({
@@ -14,8 +14,8 @@ vi.mock('@/lib/email', () => ({
 }))
 
 import { POST } from '@/app/api/customers/[id]/contact/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'
 import * as email from '@/lib/email'
 

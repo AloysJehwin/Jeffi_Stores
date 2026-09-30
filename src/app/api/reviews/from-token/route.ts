@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany } from '@/lib/db'
-import { verifyReviewToken } from '@/lib/jwt'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { verifyReviewToken } from '@/lib/auth/jwt'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)

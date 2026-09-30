@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyDeliveryRules, DeliverySettings } from '@/lib/delivery-rules'
+import { applyDeliveryRules, DeliverySettings } from '@/lib/shipping/delivery-rules'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 //

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { query, queryOne, resolveRequestTenant } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
-import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
-import { loadActiveCart, cartSubtotal, cartItemsForHash, validateCouponForUser } from '@/lib/order-commit'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { query, queryOne, resolveRequestTenant } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
+import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
+import { loadActiveCart, cartSubtotal, cartItemsForHash, validateCouponForUser } from '@/lib/orders/order-commit'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const CreateRazorpayOrderSchema = z.object({
   draftToken: z.string().nullish(),

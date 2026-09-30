@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getStockAtLocation, getStockForProduct, adjustStock, moveStock, getBatchesAtLocation } from '@/lib/shelf'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getStockAtLocation, getStockForProduct, adjustStock, moveStock, getBatchesAtLocation } from '@/lib/catalog/shelf'
+import { queryOne } from '@/lib/shared/db'
 
 async function getInventoryQuantity(
   productId: string,

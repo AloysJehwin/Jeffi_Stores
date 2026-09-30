@@ -6,14 +6,14 @@ const { queryMock, queryManyMock } = vi.hoisted(() => ({
   queryManyMock: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: queryMock,
   queryOne: vi.fn(),
   queryMany: queryManyMock,
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn().mockResolvedValue(null),
   authenticateAdmin: vi.fn().mockResolvedValue(null),
 }))
@@ -27,7 +27,7 @@ vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildProductSearchClause: vi.fn((_raw: string, _n: string, _s: string, _v: string, idx: number) => ({
     clause: 'TRUE',
     params: ['mock:*', 'mock query', 'mock%'],
@@ -52,7 +52,7 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_MRP_SQL: '(SELECT NULL)',
   VARIANT_STOCK_TOTAL_SQL: '0',
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: false,
     gstEnabled: false,

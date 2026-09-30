@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { query, queryOne } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { logActivity } from '@/lib/activity'
-import { parseBody, zNonEmpty, zPhone, zIndianPin } from '@/lib/validate'
+import { query, queryOne } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { logActivity } from '@/lib/shared/activity'
+import { parseBody, zNonEmpty, zPhone, zIndianPin } from '@/lib/shared/validate'
 
 const UpdateAddressSchema = z.object({
   full_name: zNonEmpty.optional(),

@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/customer-conversations-ai', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/customer-conversations-ai', () => ({
   getAiSummary: vi.fn(),
   refreshAiSummary: vi.fn(),
   aiProfileConfigured: vi.fn(),
 }))
 
 import { GET, POST } from '@/app/api/admin/customers/[id]/ai-summary/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/customer-conversations-ai'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getAiSummary, refreshAiSummary, aiProfileConfigured } from '@/lib/shared/customer-conversations-ai'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

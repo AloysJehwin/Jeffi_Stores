@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { productLabel, variantLabel } from '@/lib/product-label'
-import { round2 } from '@/lib/gst'
+import { productLabel, variantLabel } from '@/lib/catalog/product-label'
+import { round2 } from '@/lib/catalog/gst'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
@@ -14,7 +14,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
 import SerialEntryModal, {
   type SerialItem,

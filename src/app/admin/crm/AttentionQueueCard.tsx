@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import CollapsibleSection from '@/components/admin/CollapsibleSection'
-import type { AttentionItem, AttentionSeverity } from '@/lib/crm-insights-shared'
+import type { AttentionItem, AttentionSeverity } from '@/lib/shared/crm-insights-shared'
 
 const DOT: Record<AttentionSeverity, string> = {
   high: 'bg-red-500',

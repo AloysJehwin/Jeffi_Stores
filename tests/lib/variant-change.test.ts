@@ -4,16 +4,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mocks — declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn(),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -25,10 +25,10 @@ import {
   applyVariantChange,
   settleVariantChangePayment,
   type VariantPriceRow,
-} from '@/lib/variant-change'
-import { queryOne, withTransaction } from '@/lib/db'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { logActivity } from '@/lib/activity'
+} from '@/lib/orders/variant-change'
+import { queryOne, withTransaction } from '@/lib/shared/db'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { logActivity } from '@/lib/shared/activity'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockWithTransaction = vi.mocked(withTransaction)

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const Schema = z

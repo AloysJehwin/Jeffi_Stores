@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
+import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/auth/otp'
 import { sendAdminOTPEmail } from '@/lib/email'
-import { resolveAdminByEmail } from '@/lib/admin-identity'
-import { hasPlanScope } from '@/lib/plan-gate'
-import { staffOtpKey } from '@/lib/staff-auth'
+import { resolveAdminByEmail } from '@/lib/auth/admin-identity'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
+import { staffOtpKey } from '@/lib/auth/staff-auth'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { signIntent, verifyIntent } from '@/lib/checkout-intent'
+import { signIntent, verifyIntent } from '@/lib/orders/checkout-intent'
 
 describe('signIntent + verifyIntent (cart)', () => {
   it('round-trips a cart payload', async () => {

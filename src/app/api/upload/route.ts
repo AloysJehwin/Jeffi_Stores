@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadProductImage } from '@/lib/s3'
-import { requireAdminScope } from '@/lib/jwt'
+import { uploadProductImage } from '@/lib/shared/s3'
+import { requireAdminScope } from '@/lib/auth/jwt'
 
 export async function POST(request: NextRequest) {
   try {

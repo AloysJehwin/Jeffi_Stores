@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiDenial } from '@/lib/ai-scope'
-import { query, queryOne } from '@/lib/db'
-import { uploadGalleryImage } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiDenial } from '@/lib/auth/ai-scope'
+import { query, queryOne } from '@/lib/shared/db'
+import { uploadGalleryImage } from '@/lib/shared/s3'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120

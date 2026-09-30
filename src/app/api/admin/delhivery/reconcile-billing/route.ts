@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { query } from '@/lib/db'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { reconcileDelhiveryBilling, type BillingReconcileRow } from '@/lib/wallet'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { query } from '@/lib/shared/db'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { reconcileDelhiveryBilling, type BillingReconcileRow } from '@/lib/payments/wallet'
 
 export const dynamic = 'force-dynamic'
 

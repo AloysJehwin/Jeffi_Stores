@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { returnToAdmin } from '@/lib/oauth-state'
+import { returnToAdmin } from '@/lib/shared/oauth-state'
 
 describe('returnToAdmin', () => {
   it('serves a no-store page that navigates onward instead of a cross-site redirect', async () => {

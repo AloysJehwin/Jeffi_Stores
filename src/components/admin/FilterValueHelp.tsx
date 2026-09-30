@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Search } from 'lucide-react'
-import { joinFilterValues, splitFilterValues } from '@/lib/product-attribute-filters-shared'
+import { joinFilterValues, splitFilterValues } from '@/lib/catalog/product-attribute-filters-shared'
 
 interface ValueRow {
   value: string

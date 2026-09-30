@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { categoryFor } from '@/lib/activity-shared'
+import { categoryFor } from '@/lib/shared/activity-shared'
 
 describe('categoryFor', () => {
   it('returns auth for login', () => expect(categoryFor('login')).toBe('auth'))

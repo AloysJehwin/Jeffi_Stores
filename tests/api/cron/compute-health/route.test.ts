@@ -1,24 +1,24 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/customer-health', () => ({
+vi.mock('@/lib/shared/customer-health', () => ({
   recomputeHealth: vi.fn(),
   getHealth: vi.fn(),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn(),
   completeAutoTask: vi.fn(),
 }))
 
 import { GET } from '@/app/api/cron/compute-health/route'
-import { queryMany } from '@/lib/db'
-import { recomputeHealth, getHealth } from '@/lib/customer-health'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { queryMany } from '@/lib/shared/db'
+import { recomputeHealth, getHealth } from '@/lib/shared/customer-health'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockRecomputeHealth = vi.mocked(recomputeHealth)

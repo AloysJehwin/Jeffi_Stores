@@ -36,7 +36,7 @@ vi.mock('sharp', () => {
   return { default: vi.fn().mockReturnValue(instance) }
 })
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
@@ -53,9 +53,9 @@ import {
   uploadReviewImage,
   uploadAvatarImage,
   deleteGalleryImage,
-} from '@/lib/s3'
+} from '@/lib/shared/s3'
 import { DeleteObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
 function makeFile(type = 'image/jpeg', size = 1024): File {
   const buf = Buffer.alloc(size)

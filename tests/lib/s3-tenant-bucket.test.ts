@@ -19,8 +19,8 @@ vi.mock('@aws-sdk/client-s3', () => ({
 vi.mock('sharp', () => ({ default: () => ({}) }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 
-import { getS3Url } from '@/lib/s3'
-import { runWithTenantContext } from '@/lib/tenant-context'
+import { getS3Url } from '@/lib/shared/s3'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 const TENANT = {
   tenantId: 't-1',

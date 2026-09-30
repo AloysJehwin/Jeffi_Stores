@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
-import { revokeSession, revokeAllForPrincipal } from '@/lib/auth-sessions'
-import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
+import { verifyToken } from '@/lib/auth/jwt'
+import { revokeSession, revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
+import { adminCookieName, adminCookieDomain } from '@/lib/auth/admin-cookie'
 
 export async function POST() {
   try {

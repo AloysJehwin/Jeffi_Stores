@@ -3,24 +3,24 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildVectorSearchClause: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/cash-sale/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne } from '@/lib/db'
-import { buildVectorSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { buildVectorSearchClause } from '@/lib/catalog/search'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

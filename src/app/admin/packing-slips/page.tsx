@@ -1,6 +1,6 @@
 import { cookies, headers } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
-import { queryMany } from '@/lib/db'
+import { verifyToken } from '@/lib/auth/jwt'
+import { queryMany } from '@/lib/shared/db'
 import PackingSlipsClient from './PackingSlipsClient'
 
 export const dynamic = 'force-dynamic'

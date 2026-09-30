@@ -6,14 +6,14 @@ const mockResolveAdminByEmail = vi.fn()
 const mockHasPlanScope = vi.fn()
 const mockStaffSessionFromRequest = vi.fn()
 
-vi.mock('@/lib/tenant-context', () => ({ resolveTenantId: (...a: unknown[]) => mockResolveTenantId(...a) }))
-vi.mock('@/lib/admin-identity', () => ({ resolveAdminByEmail: (...a: unknown[]) => mockResolveAdminByEmail(...a) }))
-vi.mock('@/lib/plan-gate', () => ({ hasPlanScope: (...a: unknown[]) => mockHasPlanScope(...a) }))
-vi.mock('@/lib/staff-session', () => ({
+vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: (...a: unknown[]) => mockResolveTenantId(...a) }))
+vi.mock('@/lib/auth/admin-identity', () => ({ resolveAdminByEmail: (...a: unknown[]) => mockResolveAdminByEmail(...a) }))
+vi.mock('@/lib/auth/plan-gate', () => ({ hasPlanScope: (...a: unknown[]) => mockHasPlanScope(...a) }))
+vi.mock('@/lib/auth/staff-session', () => ({
   staffSessionFromRequest: (...a: unknown[]) => mockStaffSessionFromRequest(...a),
 }))
 
-import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
+import { requireStaff, isStaffDenied } from '@/lib/auth/staff-auth'
 
 const claims = { adminId: 'admin-1', tenantId: null, email: 'owner@example.com', name: 'Owner' }
 const req = () => new NextRequest('https://jeffistores.in/api/staff/notes')

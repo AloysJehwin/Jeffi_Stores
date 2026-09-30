@@ -1,4 +1,4 @@
-import type { ShipmentRow } from '@/lib/tenant-shipments-shared'
+import type { ShipmentRow } from '@/lib/orders/tenant-shipments-shared'
 import { Section } from '../EcomUI'
 import ShipmentCorrection from './ShipmentCorrection'
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryOne, queryMany, query } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { getRazorpayInstance } from '@/lib/razorpay'
-import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { getRazorpayInstance } from '@/lib/payments/razorpay'
+import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
 import {
   loadActiveCart,
   cartSubtotal,
@@ -11,14 +11,14 @@ import {
   cartItemsForHash,
   validateCouponForUser,
   commitOrder,
-} from '@/lib/order-commit'
+} from '@/lib/orders/order-commit'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { createDraftInvoice } from '@/lib/invoice'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { logActivity } from '@/lib/activity'
-import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { createDraftInvoice } from '@/lib/documents/invoice'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { logActivity } from '@/lib/shared/activity'
+import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 const Schema = z.object({
   razorpayOrderId: zNonEmpty,

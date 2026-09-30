@@ -9,7 +9,7 @@ const { mockCreateSign } = vi.hoisted(() => ({
 }))
 
 // ---- mock db ----
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // ---- mock google-merchant-helpers (used by google-sheets) ----
-vi.mock('@/lib/google-merchant-helpers', () => ({
+vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   getGoogleProductCategory: vi.fn().mockReturnValue('Hardware'),
   buildProductType: vi.fn().mockReturnValue('Tools > Hand Tools'),
   buildProductHighlights: vi.fn().mockReturnValue(['Made of Steel']),
@@ -45,7 +45,7 @@ import {
   buildProductHighlights,
   buildProductDetails,
   buildCustomLabels,
-} from '@/lib/google-merchant-helpers'
+} from '@/lib/shared/google-merchant-helpers'
 
 const mockGetGoogleProductCategory = vi.mocked(getGoogleProductCategory)
 const mockBuildProductType = vi.mocked(buildProductType)
@@ -53,8 +53,8 @@ const mockBuildProductHighlights = vi.mocked(buildProductHighlights)
 const mockBuildProductDetails = vi.mocked(buildProductDetails)
 const mockBuildCustomLabels = vi.mocked(buildCustomLabels)
 
-import { syncAllProductsToSheet, syncProductToSheet } from '@/lib/google-sheets'
-import { queryMany, queryOne } from '@/lib/db'
+import { syncAllProductsToSheet, syncProductToSheet } from '@/lib/shared/google-sheets'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)

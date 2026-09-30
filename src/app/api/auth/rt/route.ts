@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { resolveSession, type PrincipalType } from '@/lib/auth-sessions'
-import { queryOne } from '@/lib/db'
-import { extractSessionSignals } from '@/lib/session-signals-request'
-import { adminCookieNameForHost } from '@/lib/admin-cookie'
+import { resolveSession, type PrincipalType } from '@/lib/auth/auth-sessions'
+import { queryOne } from '@/lib/shared/db'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { adminCookieNameForHost } from '@/lib/auth/admin-cookie'
 import {
   BIND_COOKIE,
   BIND_ENDPOINT,
@@ -19,7 +19,7 @@ import {
   logBinding,
   sidHashOf,
   canRegisterKey,
-} from '@/lib/session-binding'
+} from '@/lib/auth/session-binding'
 
 export const dynamic = 'force-dynamic'
 

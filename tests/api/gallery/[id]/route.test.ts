@@ -1,26 +1,26 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   deleteGalleryImage: vi.fn(),
   uploadGalleryImage: vi.fn(),
 }))
 
 import { DELETE } from '@/app/api/gallery/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne, query } from '@/lib/db'
-import { deleteGalleryImage } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryOne, query } from '@/lib/shared/db'
+import { deleteGalleryImage } from '@/lib/shared/s3'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryOne = vi.mocked(queryOne)

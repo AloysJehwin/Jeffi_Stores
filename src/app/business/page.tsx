@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
-import { bp } from '@/lib/business-path'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { verifyToken } from '@/lib/auth/jwt'
+import { bp } from '@/lib/shared/business-path'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import type { Metadata } from 'next'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
 

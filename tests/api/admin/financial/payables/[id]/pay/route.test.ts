@@ -3,22 +3,22 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
 
 // zCurrency must expose .refine() because the route calls it at module-load time
 const mockRefine = vi.fn().mockReturnThis()
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zCurrency: { refine: vi.fn().mockReturnThis() },
   zNonEmpty: { refine: vi.fn().mockReturnThis() },
@@ -27,10 +27,10 @@ vi.mock('@/lib/validate', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/financial/payables/[id]/pay/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

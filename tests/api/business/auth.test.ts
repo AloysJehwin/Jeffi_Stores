@@ -14,23 +14,23 @@ const mockCookieStore = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/otp', () => ({
+vi.mock('@/lib/auth/otp', () => ({
   verifyOTP: vi.fn(),
   isOTPVerified: vi.fn(),
   deleteOTP: vi.fn().mockResolvedValue(undefined),
   resetSendOtpCounter: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
@@ -44,8 +44,8 @@ vi.mock('next/headers', () => ({
 
 import { POST as loginPOST } from '@/app/api/business/login/route'
 import { POST as signupPOST } from '@/app/api/business/signup/route'
-import * as otpLib from '@/lib/otp'
-import * as db from '@/lib/db'
+import * as otpLib from '@/lib/auth/otp'
+import * as db from '@/lib/shared/db'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

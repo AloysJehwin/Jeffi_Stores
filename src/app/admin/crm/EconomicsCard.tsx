@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { CompactStat, rsCompact, rs, numStr, pctStr, daysStr, Chip } from '@/components/admin/dashboard/Primitives'
-import { CRM_SEGMENT_KEYS } from '@/lib/crm-insights-shared'
-import type { Economics, SegmentRate, SegmentReturn, CrmSegmentKey } from '@/lib/crm-insights-shared'
+import { CRM_SEGMENT_KEYS } from '@/lib/shared/crm-insights-shared'
+import type { Economics, SegmentRate, SegmentReturn, CrmSegmentKey } from '@/lib/shared/crm-insights-shared'
 
 const SEGMENT_LABEL: Record<CrmSegmentKey, string> = {
   vip: 'VIP',

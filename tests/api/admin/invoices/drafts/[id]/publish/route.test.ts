@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
 }))
@@ -13,9 +13,9 @@ vi.mock('@/lib/db', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/invoices/drafts/[id]/publish/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, withTransaction } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

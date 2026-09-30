@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/ewaybill'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/shipping/ewaybill'
+import { parseBody } from '@/lib/shared/validate'
 
 const Schema = z
   .object({

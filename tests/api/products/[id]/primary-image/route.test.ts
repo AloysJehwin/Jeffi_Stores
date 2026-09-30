@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import { GET } from '@/app/api/products/[id]/primary-image/route'
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)
 

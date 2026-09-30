@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -17,9 +17,9 @@ vi.mock('@/lib/campaigns/template-validation', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET, PATCH } from '@/app/api/admin/campaigns/[kind]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 const mockAuth = vi.mocked(authenticateAdmin)

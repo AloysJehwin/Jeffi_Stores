@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
-import { hasScope } from '@/lib/scopes'
-import { canUseAi } from '@/lib/ai-scope'
+import { hasScope } from '@/lib/auth/scopes'
+import { canUseAi } from '@/lib/auth/ai-scope'
 
 interface AdminScopes {
   role: string

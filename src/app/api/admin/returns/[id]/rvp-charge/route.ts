@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { correctWalletDebitForAwb } from '@/lib/wallet'
-import { logActivity } from '@/lib/activity'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { correctWalletDebitForAwb } from '@/lib/payments/wallet'
+import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
 

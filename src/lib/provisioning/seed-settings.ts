@@ -1,5 +1,5 @@
 import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '../pg-pool'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { getTenant, getKyc, getDraft } from '../tenant-registry'
 
 /**

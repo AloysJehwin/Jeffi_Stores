@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface Props {
   scopeKey: string

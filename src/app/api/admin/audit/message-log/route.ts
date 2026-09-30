@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryCount } from '@/lib/db'
-import { requireAdminScope } from '@/lib/jwt'
+import { queryMany, queryCount } from '@/lib/shared/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
 
 export const dynamic = 'force-dynamic'
 

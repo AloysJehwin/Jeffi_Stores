@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getCookieDomain, cookieDomainOption } from '@/lib/cookie-domain'
+import { getCookieDomain, cookieDomainOption } from '@/lib/auth/cookie-domain'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helper to reset env between tests

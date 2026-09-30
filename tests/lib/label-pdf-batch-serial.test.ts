@@ -27,7 +27,7 @@ import {
   type LabelSerial,
   type LabelProduct,
   type LabelSize,
-} from '@/lib/label-pdf'
+} from '@/lib/documents/label-pdf'
 
 const fullBatch: LabelBatch = {
   batchId: 'B-1',

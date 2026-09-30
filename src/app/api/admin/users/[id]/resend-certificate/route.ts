@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { isPlatformOwner } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformOwner } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
 import { sendAdminCertificateEmail, sendCertInviteEmail } from '@/lib/email'
-import { certDeliveryMode } from '@/lib/cert-delivery'
+import { certDeliveryMode } from '@/lib/tenancy/cert-delivery'
 
 export const dynamic = 'force-dynamic'
 

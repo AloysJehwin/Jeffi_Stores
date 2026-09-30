@@ -10,7 +10,7 @@ const { mockQuery, mockQueryOne, mockQueryMany, mockListProductStatuses } = vi.h
   mockListProductStatuses: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,

@@ -5,9 +5,9 @@ const mockAuth = vi.fn()
 const mockHasScope = vi.fn()
 const mockGetPL = vi.fn()
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: mockAuth }))
-vi.mock('@/lib/scopes', () => ({ hasScope: mockHasScope }))
-vi.mock('@/lib/financial', () => ({ getPLReport: mockGetPL }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: mockAuth }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: mockHasScope }))
+vi.mock('@/lib/payments/financial', () => ({ getPLReport: mockGetPL }))
 
 const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: [] }
 

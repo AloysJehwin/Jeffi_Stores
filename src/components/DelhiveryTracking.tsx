@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { type ShipmentStatus, shipmentStatusToStep, shipmentStatusToReverseStep } from '@/lib/shipment-status'
+import { type ShipmentStatus, shipmentStatusToStep, shipmentStatusToReverseStep } from '@/lib/shipping/shipment-status'
 
 type Scan = {
   date: string | null

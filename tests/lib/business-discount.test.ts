@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
 // Also mock pricing so we can verify re-exports work without circular issues
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   getBusinessDiscountPct,
   getBusinessDiscountMap,
   applyBusinessDiscount,
   applyDiscount,
-} from '@/lib/business-discount'
+} from '@/lib/catalog/business-discount'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

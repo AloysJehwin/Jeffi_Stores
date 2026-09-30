@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isPassiveAdminRequest } from '@/lib/passive-admin-paths'
+import { isPassiveAdminRequest } from '@/lib/auth/passive-admin-paths'
 
 describe('isPassiveAdminRequest', () => {
   it('treats session checks, the event stream and the bell poll as passive', () => {

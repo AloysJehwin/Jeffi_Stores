@@ -6,11 +6,11 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { pickUnitPrice } from '@/lib/pricing'
-import { bp } from '@/lib/business-path'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 import QuantityInput from '@/components/shared/QuantityInput'
-import { round2 } from '@/lib/gst'
-import { resolveEdd } from '@/lib/edd-cache'
+import { round2 } from '@/lib/catalog/gst'
+import { resolveEdd } from '@/lib/shipping/edd-cache'
 
 interface VariantImage {
   id: string

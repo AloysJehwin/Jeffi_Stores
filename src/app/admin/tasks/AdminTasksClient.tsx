@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface AdminOption {
   id: string

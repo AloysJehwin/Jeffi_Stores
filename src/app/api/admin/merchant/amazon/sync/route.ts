@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import {
   syncAllProductsToAmazon,
   syncProductToAmazon,
@@ -8,7 +8,7 @@ import {
   validateProductForAmazon,
   dryRunAmazonSync,
 } from '@/lib/amazon/sync'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300

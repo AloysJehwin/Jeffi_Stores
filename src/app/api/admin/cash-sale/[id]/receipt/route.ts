@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/product-label'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
+import { productLabel } from '@/lib/catalog/product-label'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/documents/receipt-pdf'
 
 export const dynamic = 'force-dynamic'
 

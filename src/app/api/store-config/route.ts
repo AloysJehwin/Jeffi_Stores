@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSiteControls } from '@/lib/site-controls'
-import { storefrontAiAllowed } from '@/lib/storefront-ai'
+import { getSiteControls } from '@/lib/catalog/site-controls'
+import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 
 export const dynamic = 'force-dynamic'
 

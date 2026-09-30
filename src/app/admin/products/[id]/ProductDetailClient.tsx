@@ -10,9 +10,9 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
 import CopySku from '@/components/ui/CopySku'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
-import { formatINR, formatDate } from '@/lib/format'
+import { formatINR, formatDate } from '@/lib/shared/format'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (

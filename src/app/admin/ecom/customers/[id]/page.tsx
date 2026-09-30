@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import {
   getTenant,
   getTenantBilling,
@@ -13,10 +13,10 @@ import {
   getTenantBankAccount,
   lookupTenantContextById,
 } from '@/lib/tenant-registry'
-import { runWithTenantContext } from '@/lib/tenant-context'
-import { queryMany } from '@/lib/db'
-import type { ShipmentRow } from '@/lib/tenant-shipments-shared'
-import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { queryMany } from '@/lib/shared/db'
+import type { ShipmentRow } from '@/lib/orders/tenant-shipments-shared'
+import { listTenantAdminCerts, getTenantCa } from '@/lib/tenancy/tenant-ca'
 import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
 import { TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
 import TenantObjectHeader from '@/components/admin/ecom/TenantObjectHeader'

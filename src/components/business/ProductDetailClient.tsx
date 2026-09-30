@@ -9,7 +9,7 @@ import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {

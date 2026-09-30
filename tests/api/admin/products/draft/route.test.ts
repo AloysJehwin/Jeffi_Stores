@@ -3,19 +3,19 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: 'zNonEmpty',
 }))
@@ -23,10 +23,10 @@ vi.mock('@/lib/validate', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/products/draft/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

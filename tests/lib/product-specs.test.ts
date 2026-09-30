@@ -7,7 +7,7 @@ import {
   specKeySql,
   specLabel,
   specValues,
-} from '@/lib/product-specs'
+} from '@/lib/catalog/product-specs'
 
 describe('canonicalSpecKey', () => {
   it('meets however the key was typed', () => {

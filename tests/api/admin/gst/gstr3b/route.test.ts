@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
 import { GET } from '@/app/api/admin/gst/gstr3b/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryOne, queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryOne = vi.mocked(queryOne)

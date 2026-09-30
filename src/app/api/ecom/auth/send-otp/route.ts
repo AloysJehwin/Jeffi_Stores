@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
+import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/auth/otp'
 import { sendOTPEmail } from '@/lib/email'
 
 // Ecom OWNER send-otp. Reuses the shared OTP lib (Redis-backed, rate-limited) +

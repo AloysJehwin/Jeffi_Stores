@@ -5,11 +5,11 @@ vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
 }))
 
-vi.mock('@/lib/message-log', () => ({
+vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
-import { logMessage } from '@/lib/message-log'
+import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
 
@@ -26,7 +26,7 @@ async function loadWa(env: Record<string, string | undefined> = {}) {
   for (const [k, v] of Object.entries(merged)) {
     vi.stubEnv(k, v === undefined ? '' : v)
   }
-  return import('@/lib/whatsapp')
+  return import('@/lib/shared/whatsapp')
 }
 
 beforeEach(() => {

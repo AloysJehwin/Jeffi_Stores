@@ -1,5 +1,5 @@
 import { queryOne, queryMany, queryCount, type AnalyticsRange } from './shared'
-import { getDashboardInsights, rangeDays, type DashboardInsights } from '../dashboard-insights'
+import { getDashboardInsights, rangeDays, type DashboardInsights } from '@/lib/shared/dashboard-insights'
 import { DashboardStats } from '@/types'
 
 export async function getDashboardStats(): Promise<DashboardStats> {

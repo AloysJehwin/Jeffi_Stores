@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { listConversations, parseChannels, clampConversationLimit } from '@/lib/customer-conversations'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { listConversations, parseChannels, clampConversationLimit } from '@/lib/shared/customer-conversations'
 
 export const dynamic = 'force-dynamic'
 

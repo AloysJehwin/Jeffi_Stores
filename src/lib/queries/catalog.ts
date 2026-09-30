@@ -1,6 +1,6 @@
 import { queryOne, queryMany, queryCount } from './shared'
-import { buildSearchClause, buildProductSearchClause, buildProductSearchRank } from '../search'
-import { buildAttributeFilterClauses, type FilterParams } from '../product-attribute-filters'
+import { buildSearchClause, buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
+import { buildAttributeFilterClauses, type FilterParams } from '@/lib/catalog/product-attribute-filters'
 
 export async function getAllProducts() {
   const products = await queryMany(`

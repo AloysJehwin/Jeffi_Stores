@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 

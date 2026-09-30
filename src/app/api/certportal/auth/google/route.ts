@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyGoogle } from '@/lib/google-verify'
-import { issuePortalToken, setPortalCookie } from '@/lib/portal-session'
+import { verifyGoogle } from '@/lib/shared/google-verify'
+import { issuePortalToken, setPortalCookie } from '@/lib/auth/portal-session'
 
 // certificate.jeffistores.in Google sign-in. Any verified Google (Gmail) account may sign in; the
 // portal then shows only the certificates issued to that exact verified email. Signing in reveals

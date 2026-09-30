@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateBusiness } from '@/lib/jwt'
-import { revokeSession } from '@/lib/auth-sessions'
-import { queryOne } from '@/lib/db'
+import { authenticateBusiness } from '@/lib/auth/jwt'
+import { revokeSession } from '@/lib/auth/auth-sessions'
+import { queryOne } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'

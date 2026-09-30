@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
   const authenticateAdmin = vi.fn()
   return {
@@ -23,45 +23,45 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('inv')),
   assignInvoiceNumber: vi.fn().mockResolvedValue('JS/26-27/999'),
 }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
 }))
-vi.mock('@/lib/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', () => ({
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/order-stock', () => ({
+vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { GET, PATCH, DELETE } from '@/app/api/orders/[id]/route'
-import * as db from '@/lib/db'
-import * as jwt from '@/lib/jwt'
-import * as inventoryDeduct from '@/lib/inventory-deduct'
+import * as db from '@/lib/shared/db'
+import * as jwt from '@/lib/auth/jwt'
+import * as inventoryDeduct from '@/lib/orders/inventory-deduct'
 
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
 const USER = { userId: 'user-1', isBusiness: false }
@@ -119,9 +119,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   }
 
   it('does NOT issue a razorpay auto-refund on cancelling a paid order', async () => {
-    const razorpay = await import('@/lib/razorpay')
+    const razorpay = await import('@/lib/payments/razorpay')
     const email = await import('@/lib/email')
-    const autoTasks = await import('@/lib/auto-tasks')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -155,11 +155,11 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows every rejecting side-effect on a cancelled+paid order (catch arrows)', async () => {
-    const razorpay = await import('@/lib/razorpay')
+    const razorpay = await import('@/lib/payments/razorpay')
     const email = await import('@/lib/email')
-    const autoTasks = await import('@/lib/auto-tasks')
-    const activity = await import('@/lib/activity')
-    const delhivery = await import('@/lib/delhivery')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
+    const activity = await import('@/lib/shared/activity')
+    const delhivery = await import('@/lib/shipping/delhivery')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -198,8 +198,8 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('does NOT create a refund task on cancel even when razorpay is enabled', async () => {
-    const razorpay = await import('@/lib/razorpay')
-    const autoTasks = await import('@/lib/auto-tasks')
+    const razorpay = await import('@/lib/payments/razorpay')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -226,7 +226,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('restores stock on cancellation when a sale ledger row exists', async () => {
-    const orderStock = await import('@/lib/order-stock')
+    const orderStock = await import('@/lib/orders/order-stock')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({
@@ -245,8 +245,8 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('completes process_confirmed and generates invoice for paid confirmed→processing', async () => {
-    const invoice = await import('@/lib/invoice')
-    const autoTasks = await import('@/lib/auto-tasks')
+    const invoice = await import('@/lib/documents/invoice')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
     const email = await import('@/lib/email')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
@@ -286,7 +286,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows a failing invoice render on paid confirmed→processing', async () => {
-    const invoice = await import('@/lib/invoice')
+    const invoice = await import('@/lib/documents/invoice')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({
@@ -321,9 +321,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('generates invoice when payment flips to paid on a confirmed order', async () => {
-    const invoice = await import('@/lib/invoice')
+    const invoice = await import('@/lib/documents/invoice')
     const email = await import('@/lib/email')
-    const marketing = await import('@/lib/marketing')
+    const marketing = await import('@/lib/shared/marketing')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
@@ -344,7 +344,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('completes confirm_cod_payment task when cod payment flips to paid', async () => {
-    const autoTasks = await import('@/lib/auto-tasks')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,
@@ -361,7 +361,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('creates a COD confirmation task when a cod order is delivered', async () => {
-    const autoTasks = await import('@/lib/auto-tasks')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,
@@ -402,7 +402,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows a rejecting completeAutoTask on shipped transition', async () => {
-    const autoTasks = await import('@/lib/auto-tasks')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,
@@ -419,8 +419,8 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows rejecting side-effects on failed payment_status', async () => {
-    const autoTasks = await import('@/lib/auto-tasks')
-    const activity = await import('@/lib/activity')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
+    const activity = await import('@/lib/shared/activity')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,
@@ -440,8 +440,8 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows rejecting completeAutoTask + attributeConversion on refunded/paid', async () => {
-    const autoTasks = await import('@/lib/auto-tasks')
-    const marketing = await import('@/lib/marketing')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
+    const marketing = await import('@/lib/shared/marketing')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,
@@ -460,7 +460,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
   })
 
   it('swallows attributeConversion rejection when payment flips to paid', async () => {
-    const marketing = await import('@/lib/marketing')
+    const marketing = await import('@/lib/shared/marketing')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       ...BASE_ORDER,

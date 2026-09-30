@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { promises as dns } from 'dns'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, getCustomDomain, setCustomDomainStatus } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'

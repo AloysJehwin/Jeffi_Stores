@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { NOTE_TAGS, type CustomerNote } from '@/lib/customer-notes-shared'
+import { NOTE_TAGS, type CustomerNote } from '@/lib/shared/customer-notes-shared'
 import NoteAttachments from './NoteAttachments'
 
 interface CustomerNotesProps {

@@ -1,7 +1,7 @@
-import { queryMany } from '@/lib/db'
-import { generateReviewToken } from '@/lib/jwt'
-import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/automation-emails'
-import { renderCampaignEmail } from '@/lib/email-campaigns'
+import { queryMany } from '@/lib/shared/db'
+import { generateReviewToken } from '@/lib/auth/jwt'
+import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
+import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 

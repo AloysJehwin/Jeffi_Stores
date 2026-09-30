@@ -1,5 +1,5 @@
 import { controlPlanePool } from '../tenant-registry'
-import { mailShell } from '../mail-template'
+import { mailShell } from '@/lib/shared/mail-template'
 
 const STUCK_AFTER_MIN = 30
 
@@ -23,11 +23,11 @@ export interface StuckJob {
  * plain text, unreadable next to every other mail the system produces.
  */
 async function send(subject: string, body: string): Promise<void> {
-  const { platformAdminEmail, adminMailFrom, platformBrandName } = await import('../brand')
+  const { platformAdminEmail, adminMailFrom, platformBrandName } = await import('@/lib/catalog/brand')
   const to = platformAdminEmail()
   if (!to) return
   try {
-    const { sendAuditedMail } = await import('../mail-audit')
+    const { sendAuditedMail } = await import('@/lib/shared/mail-audit')
     await sendAuditedMail({
       to,
       from: adminMailFrom(),

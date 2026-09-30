@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendAdminCertificateEmail: vi.fn() }))
 
 import { POST } from '@/app/api/admin/users/[id]/resend-certificate/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 import { sendAdminCertificateEmail } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)

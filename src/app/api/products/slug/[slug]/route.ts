@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params

@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0, command: '', oid: 0, fields: [] }),
   queryMany: vi.fn(),
 }))
@@ -12,7 +12,7 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
@@ -20,9 +20,9 @@ vi.mock('@/lib/auto-tasks', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/delhivery/sync-statuses/route'
-import { query, queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

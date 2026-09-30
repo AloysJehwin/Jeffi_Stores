@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -12,8 +12,8 @@ import {
   getHealth,
   getOrComputeHealth,
   HEALTH_WEIGHTS,
-} from '@/lib/customer-health'
-import * as db from '@/lib/db'
+} from '@/lib/shared/customer-health'
+import * as db from '@/lib/shared/db'
 
 const mockQuery = db.query as ReturnType<typeof vi.fn>
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>

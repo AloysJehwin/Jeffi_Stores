@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany, query } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/auth/jwt'
 import {
   generateInvoicePDF,
   InvoiceBusinessSettings,
   InvoiceOrder,
   InvoiceOrderItem,
   InvoiceBuyerAddress,
-} from '@/lib/invoice-pdf'
-import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
-import { uploadInvoicePDF } from '@/lib/s3'
-import { getFinancialYear } from '@/lib/gst'
-import { generateOrderInvoice } from '@/lib/invoice'
+} from '@/lib/documents/invoice-pdf'
+import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/documents/receipt-pdf'
+import { uploadInvoicePDF } from '@/lib/shared/s3'
+import { getFinancialYear } from '@/lib/catalog/gst'
+import { generateOrderInvoice } from '@/lib/documents/invoice'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

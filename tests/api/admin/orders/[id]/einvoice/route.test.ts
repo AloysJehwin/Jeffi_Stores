@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/einvoice', () => ({
+vi.mock('@/lib/shipping/einvoice', () => ({
   generateIRN: vi.fn(),
   cancelIRN: vi.fn(),
   isEInvoiceConfigured: vi.fn().mockReturnValue(true),
@@ -18,10 +18,10 @@ vi.mock('@/lib/einvoice', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST, DELETE } from '@/app/api/admin/orders/[id]/einvoice/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
-import { generateIRN, cancelIRN, isEInvoiceConfigured } from '@/lib/einvoice'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { generateIRN, cancelIRN, isEInvoiceConfigured } from '@/lib/shipping/einvoice'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

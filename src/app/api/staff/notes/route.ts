@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
-import { hasScope } from '@/lib/scopes'
-import { zUuid } from '@/lib/validate'
-import { listNotes, createNote, addAttachment, getNote, MAX_ATTACHMENTS } from '@/lib/customer-notes'
-import { notifyOwnersOfNote } from '@/lib/customer-notes-notify'
+import { requireStaff, isStaffDenied } from '@/lib/auth/staff-auth'
+import { hasScope } from '@/lib/auth/scopes'
+import { zUuid } from '@/lib/shared/validate'
+import { listNotes, createNote, addAttachment, getNote, MAX_ATTACHMENTS } from '@/lib/shared/customer-notes'
+import { notifyOwnersOfNote } from '@/lib/shared/customer-notes-notify'
 
 export const dynamic = 'force-dynamic'
 

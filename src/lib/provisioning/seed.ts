@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from '../pg-pool'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
-import { DEFAULT_SECTIONS } from '@/lib/homepage-sections'
+import { DEFAULT_SECTIONS } from '@/lib/catalog/homepage-sections'
 
 /**
  * Starter-data seeding for a freshly-provisioned tenant DB.

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
-import { verifyReviewToken } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { verifyReviewToken } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 function ampResponse(body: Record<string, unknown>, origin: string | null, status = 200) {
   return NextResponse.json(body, {

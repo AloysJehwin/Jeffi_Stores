@@ -1,7 +1,7 @@
 'use client'
 
 import { CompactStat, numStr, pctStr } from '@/components/admin/dashboard/Primitives'
-import type { Reach } from '@/lib/crm-insights-shared'
+import type { Reach } from '@/lib/shared/crm-insights-shared'
 
 function Channel({ label, sent, failed }: { label: string; sent: number; failed: number }) {
   const failRate = sent > 0 ? (failed / sent) * 100 : null

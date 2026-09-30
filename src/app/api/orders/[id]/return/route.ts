@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { sendReturnStatusEmail } from '@/lib/email'
-import { logActivity } from '@/lib/activity'
-import { createAutoTask } from '@/lib/auto-tasks'
-import { checkReturnEligibility } from '@/lib/return-policy'
-import { createAdminNotification } from '@/lib/admin-notify'
-import { getBusinessValues } from '@/lib/site-controls'
+import { logActivity } from '@/lib/shared/activity'
+import { createAutoTask } from '@/lib/shared/auto-tasks'
+import { checkReturnEligibility } from '@/lib/catalog/return-policy'
+import { createAdminNotification } from '@/lib/shared/admin-notify'
+import { getBusinessValues } from '@/lib/catalog/site-controls'
 
 const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'other']
 

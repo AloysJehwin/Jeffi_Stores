@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/product-label'
-import { queryMany } from '@/lib/db'
+import { productLabel } from '@/lib/catalog/product-label'
+import { queryMany } from '@/lib/shared/db'
 import {
   buildProductSearchClause,
   buildProductSearchRank,
   buildVectorSearchClause,
   buildSearchClause,
-} from '@/lib/search'
-import { authenticateAdmin } from '@/lib/jwt'
+} from '@/lib/catalog/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 
 export const dynamic = 'force-dynamic'
 

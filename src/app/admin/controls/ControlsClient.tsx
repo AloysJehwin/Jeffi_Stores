@@ -13,10 +13,10 @@ import {
   type Dimension,
   computeAreaFactor,
   computeVolumeFactor,
-} from '@/lib/units'
+} from '@/lib/catalog/units'
 import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
-import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/product-attribute-filters-shared'
+import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
 type OperationSnapshot = {

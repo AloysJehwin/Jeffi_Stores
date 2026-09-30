@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import type { DraftDiff, HomepageDraftSummary } from '@/lib/homepage-draft'
+import type { DraftDiff, HomepageDraftSummary } from '@/lib/catalog/homepage-draft'
 import { HOMEPAGE_DRAFT_CHANGED } from './draft-events'
 
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`

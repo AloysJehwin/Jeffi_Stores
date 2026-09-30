@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
-import { aiChat, AiClientError } from '@/lib/ai-client'
-import { aiDenial } from '@/lib/ai-scope'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
+import { aiDenial } from '@/lib/auth/ai-scope'
 
 export const dynamic = 'force-dynamic'
 

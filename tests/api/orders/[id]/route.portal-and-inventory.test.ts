@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
   const authenticateAdmin = vi.fn()
   return {
@@ -13,7 +13,7 @@ vi.mock('@/lib/jwt', async () => {
     }),
   }
 })
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('@/lib/db', () => ({
 }))
 // Moving to processing is blocked while an address change is pending; these tests are about
 // inventory, so there is none.
-vi.mock('@/lib/address-change', () => ({
+vi.mock('@/lib/orders/address-change', () => ({
   hasPendingAddressChange: vi.fn().mockResolvedValue(false),
   addressChangeBlockReason: vi.fn().mockReturnValue('not_confirmed'),
 }))
@@ -29,40 +29,40 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.alloc(0)),
   assignInvoiceNumber: vi.fn().mockResolvedValue('JS/26-27/999'),
 }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/delhivery', () => ({
   cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', () => ({
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/order-stock', () => ({
+vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { GET, PATCH, DELETE } from '@/app/api/orders/[id]/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 // ------------------------------------------------------------------ helpers
 
@@ -403,7 +403,7 @@ describe('PATCH /api/orders/[id] (extended)', () => {
   })
 
   it('creates refund auto-task when cancelling a paid order', async () => {
-    const { createAutoTask } = await import('@/lib/auto-tasks')
+    const { createAutoTask } = await import('@/lib/shared/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({

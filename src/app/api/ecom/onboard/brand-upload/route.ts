@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
-import { uploadBrandingImage } from '@/lib/s3'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { uploadBrandingImage } from '@/lib/shared/s3'
 
 export const dynamic = 'force-dynamic'
 

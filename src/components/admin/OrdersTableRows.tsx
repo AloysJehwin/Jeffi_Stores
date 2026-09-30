@@ -5,7 +5,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import OrderDetailModal from '@/components/admin/OrderDetailModal'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 function statusBadgeClass(status: string) {
   if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'

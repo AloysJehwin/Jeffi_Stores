@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { makeHomepageDraftDb, slideRow } from '../../../helpers/homepage-draft-db'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const { mockUpload, mockRun } = vi.hoisted(() => ({ mockUpload: vi.fn(), mockRun: vi.fn() }))
-vi.mock('@/lib/s3', () => ({ uploadGalleryImage: mockUpload }))
+vi.mock('@/lib/shared/s3', () => ({ uploadGalleryImage: mockUpload }))
 vi.mock('replicate', () => ({
   default: class {
     run = mockRun
@@ -14,15 +14,15 @@ vi.mock('replicate', () => ({
 }))
 
 const fake = makeHomepageDraftDb()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => fake.db.query(...(a as [string, any[]])),
   queryOne: (...a: any[]) => fake.db.queryOne(...(a as [string])),
   queryMany: (...a: any[]) => fake.db.queryMany(...(a as [string])),
   withTransaction: (fn: any) => fake.db.withTransaction(fn),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { GET, POST, PATCH } from '@/app/api/admin/hero-slides/route'
 import { PATCH as PATCH_ONE, DELETE } from '@/app/api/admin/hero-slides/[id]/route'
 import { POST as UPLOAD } from '@/app/api/admin/hero-slides/[id]/image/route'

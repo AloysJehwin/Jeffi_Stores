@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { listSocialPostsForScope, enqueueSocialPost } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'

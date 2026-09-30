@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 interface Validation {

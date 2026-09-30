@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
@@ -20,7 +20,7 @@ vi.mock('@/lib/email', () => ({
   sendPurchaseOrderEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zUuid: (() => {
     const { z } = require('zod')
@@ -32,17 +32,17 @@ vi.mock('@/lib/validate', () => ({
   })(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn(),
 }))
 
 import { GET as poRouteGET, POST as poRoutePOST } from '@/app/api/admin/inventory/po/route'
 import { GET, PATCH } from '@/app/api/admin/inventory/po/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
-import { buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
+import { buildSearchClause } from '@/lib/catalog/search'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

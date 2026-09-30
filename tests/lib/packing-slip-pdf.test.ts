@@ -16,7 +16,7 @@ vi.mock('bwip-js', () => ({
   toBuffer: vi.fn().mockResolvedValue(Buffer.from('mock-barcode-png')),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -41,9 +41,9 @@ import {
   type PackingSlipItem,
   type PackingSlipAddress,
   type StoreSettings,
-} from '@/lib/packing-slip-pdf'
+} from '@/lib/documents/packing-slip-pdf'
 
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 const mockQueryMany = vi.mocked(queryMany)
 
 // ---------------------------------------------------------------------------

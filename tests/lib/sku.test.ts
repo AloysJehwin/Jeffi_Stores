@@ -5,12 +5,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // generateVariantSku — pure function, tested directly
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { generateProductSku, generateVariantSku } from '@/lib/sku'
-import { withTransaction } from '@/lib/db'
+import { generateProductSku, generateVariantSku } from '@/lib/catalog/sku'
+import { withTransaction } from '@/lib/shared/db'
 
 const mockWithTransaction = vi.mocked(withTransaction)
 

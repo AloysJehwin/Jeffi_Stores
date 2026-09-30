@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
-import { queryOne, query } from '@/lib/db'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/auth/issue-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
+import { queryOne, query } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
-import { logActivity } from '@/lib/activity'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { logActivity } from '@/lib/shared/activity'
+import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''

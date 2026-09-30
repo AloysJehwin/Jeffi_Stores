@@ -5,7 +5,7 @@ import {
   buildVectorSearchClause,
   buildSearchClause,
   buildSearchRank,
-} from '@/lib/search'
+} from '@/lib/catalog/search'
 
 // ---------------------------------------------------------------------------
 // buildProductSearchClause

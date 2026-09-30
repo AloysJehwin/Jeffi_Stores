@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { query, queryOne } from '@/lib/db'
-import { decryptSecret, hashRecoveryCode, verifyMfaTicket, verifyTotp } from '@/lib/mfa'
-import { issueAdminSession } from '@/lib/admin-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { query, queryOne } from '@/lib/shared/db'
+import { decryptSecret, hashRecoveryCode, verifyMfaTicket, verifyTotp } from '@/lib/auth/mfa'
+import { issueAdminSession } from '@/lib/auth/admin-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 export async function POST(request: Request) {
   try {

@@ -15,17 +15,17 @@ const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetSco
   })
 )
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: mockVerifyToken,
   verifyBusinessToken: mockVerifyBusinessToken,
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/rate-limit', () => ({
+vi.mock('@/lib/shared/rate-limit', () => ({
   applyRateLimit: mockApplyRateLimit,
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   getScopeForPath: mockGetScopeForPath,
   hasScope: mockHasScope,
 }))

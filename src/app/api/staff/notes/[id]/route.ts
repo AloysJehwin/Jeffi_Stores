@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
-import { hasScope } from '@/lib/scopes'
-import { getNote, deleteNote } from '@/lib/customer-notes'
+import { requireStaff, isStaffDenied } from '@/lib/auth/staff-auth'
+import { hasScope } from '@/lib/auth/scopes'
+import { getNote, deleteNote } from '@/lib/shared/customer-notes'
 
 export const dynamic = 'force-dynamic'
 

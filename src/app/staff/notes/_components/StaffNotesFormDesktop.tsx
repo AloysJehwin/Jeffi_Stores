@@ -1,6 +1,6 @@
 'use client'
 
-import { NOTE_TAGS } from '@/lib/customer-notes-shared'
+import { NOTE_TAGS } from '@/lib/shared/customer-notes-shared'
 import AdminSelect from '@/components/admin/AdminSelect'
 import NoteAttachments from '@/components/admin/NoteAttachments'
 import StaffQrScanner from './StaffQrScanner'

@@ -6,11 +6,11 @@ vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
 }))
 
-vi.mock('@/lib/message-log', () => ({
+vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
-import { logMessage } from '@/lib/message-log'
+import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
 
@@ -29,7 +29,7 @@ async function loadSms(env: Record<string, string | undefined> = {}) {
     if (v === undefined) vi.stubEnv(k, '')
     else vi.stubEnv(k, v)
   }
-  return import('@/lib/sms')
+  return import('@/lib/shared/sms')
 }
 
 beforeEach(() => {

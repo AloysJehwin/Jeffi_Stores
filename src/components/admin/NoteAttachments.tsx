@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { NoteAttachment } from '@/lib/customer-notes-shared'
+import type { NoteAttachment } from '@/lib/shared/customer-notes-shared'
 
 export default function NoteAttachments({
   attachments,

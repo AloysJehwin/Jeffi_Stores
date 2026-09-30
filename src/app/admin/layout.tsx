@@ -2,13 +2,13 @@ export const dynamic = 'force-dynamic'
 
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
-import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/scopes'
-import { getAdminSession } from '@/lib/admin-auth'
+import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/auth/scopes'
+import { getAdminSession } from '@/lib/auth/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
-import { getSiteControls, getStoreIdentity } from '@/lib/site-controls'
-import { getHost } from '@/lib/get-host'
+import { getSiteControls, getStoreIdentity } from '@/lib/catalog/site-controls'
+import { getHost } from '@/lib/tenancy/get-host'
 import { LogOut } from 'lucide-react'
 
 export async function generateMetadata() {

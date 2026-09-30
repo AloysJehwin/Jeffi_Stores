@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { buildProductRowSql, planDataNeeds, planProductRows, type ProductRowQueryDeps } from '@/lib/homepage-data'
-import { DEFAULT_SECTIONS, type HomepageSection } from '@/lib/homepage-sections'
+import { buildProductRowSql, planDataNeeds, planProductRows, type ProductRowQueryDeps } from '@/lib/catalog/homepage-data'
+import { DEFAULT_SECTIONS, type HomepageSection } from '@/lib/catalog/homepage-sections'
 
 const make = (over: Partial<HomepageSection> = {}): HomepageSection => ({
   id: 'x',

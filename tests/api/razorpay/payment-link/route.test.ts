@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   const authenticateAdmin = vi.fn()
   return {
     authenticateAdmin,
@@ -16,18 +16,18 @@ vi.mock('@/lib/jwt', async () => {
     },
   }
 })
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstanceFor: vi.fn(),
 }))
 
 import { POST } from '@/app/api/razorpay/payment-link/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
 
 function rzpMock(impl: Record<string, unknown>) {
   vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: { paymentLink: impl } } as any)

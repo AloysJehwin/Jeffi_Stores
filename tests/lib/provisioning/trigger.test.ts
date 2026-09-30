@@ -27,7 +27,7 @@ const steps = {
 vi.mock('@/lib/provisioning/steps', () => steps)
 
 const backup = { findLatestBackup: vi.fn() }
-vi.mock('@/lib/tenant-backup-store', () => backup)
+vi.mock('@/lib/tenancy/tenant-backup-store', () => backup)
 
 // Provider factory — trigger only forwards the instance to steps.* (all mocked), so a
 // bare object is enough.

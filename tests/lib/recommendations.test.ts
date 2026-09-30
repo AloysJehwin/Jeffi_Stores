@@ -19,15 +19,15 @@ const { mockQueryMany, mockFindSimilarProductIds, mockAiChat, AiClientError } = 
   }
 })
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: mockQueryMany,
 }))
 
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   findSimilarProductIds: mockFindSimilarProductIds,
 }))
 
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: mockAiChat,
   AiClientError,
 }))
@@ -40,7 +40,7 @@ vi.mock('@/lib/queries', () => ({
 }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
-import { aggregateUserSignals, getCandidates, getFeaturedForUser, getBestSellerCards } from '@/lib/recommendations'
+import { aggregateUserSignals, getCandidates, getFeaturedForUser, getBestSellerCards } from '@/lib/catalog/recommendations'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

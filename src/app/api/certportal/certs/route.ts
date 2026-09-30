@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/portal-session'
+import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
 
 export const dynamic = 'force-dynamic'
 

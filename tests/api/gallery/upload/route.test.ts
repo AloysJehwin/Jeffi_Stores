@@ -1,31 +1,31 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(() => true),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadGalleryImage: vi.fn(),
   deleteGalleryImage: vi.fn(),
   fetchRemoteImage: vi.fn(),
 }))
 
 import { POST, OPTIONS } from '@/app/api/gallery/upload/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { uploadGalleryImage, fetchRemoteImage } from '@/lib/s3'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { uploadGalleryImage, fetchRemoteImage } from '@/lib/shared/s3'
+import { queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

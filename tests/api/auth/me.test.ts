@@ -14,22 +14,22 @@ const mockCookieStore = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateBusiness: vi.fn(),
   authenticateAnyUser: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
@@ -43,8 +43,8 @@ vi.mock('next/headers', () => ({
 
 import { GET } from '@/app/api/auth/me/route'
 import { POST as logoutPOST } from '@/app/api/auth/logout/route'
-import * as jwtLib from '@/lib/jwt'
-import * as db from '@/lib/db'
+import * as jwtLib from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 function meRequest(cookieValue?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }

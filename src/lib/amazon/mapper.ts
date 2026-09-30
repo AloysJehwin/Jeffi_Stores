@@ -1,4 +1,4 @@
-import { buildProductHighlights } from '@/lib/google-merchant-helpers'
+import { buildProductHighlights } from '@/lib/shared/google-merchant-helpers'
 
 // Amazon SP-API mapper — analog of src/lib/merchant/mapper.ts (Google).
 //

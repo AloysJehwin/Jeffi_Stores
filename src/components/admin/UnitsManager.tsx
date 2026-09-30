@@ -6,7 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import BaseUnitForm, { BaseUnitRow } from '@/components/admin/BaseUnitForm'
 import { type ProductUnit } from '@/components/admin/BaseUnitForm'
-import { Dimension, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
+import { Dimension, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/catalog/units'
 
 export interface UnitLoadedInfo {
   unitKey: string

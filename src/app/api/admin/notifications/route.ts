@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { listAdminNotifications } from '@/lib/admin-notify'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { listAdminNotifications } from '@/lib/shared/admin-notify'
 
 export const dynamic = 'force-dynamic'
 

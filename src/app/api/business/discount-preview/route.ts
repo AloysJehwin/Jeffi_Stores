@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
-import { getBusinessDiscountMap } from '@/lib/business-discount'
-import { loadActiveCart } from '@/lib/order-commit'
-import { round2 } from '@/lib/gst'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
+import { getBusinessDiscountMap } from '@/lib/catalog/business-discount'
+import { loadActiveCart } from '@/lib/orders/order-commit'
+import { round2 } from '@/lib/catalog/gst'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
-import { hasPlanScope } from '@/lib/plan-gate'
+import { requireStaff, isStaffDenied } from '@/lib/auth/staff-auth'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
 
 export const dynamic = 'force-dynamic'
 

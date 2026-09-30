@@ -30,7 +30,7 @@ const reg = {
 }
 vi.mock('@/lib/tenant-registry', () => reg)
 
-vi.mock('@/lib/tenant-backup-store', () => ({ getTenantBackup: vi.fn(), putTenantBackup: vi.fn() }))
+vi.mock('@/lib/tenancy/tenant-backup-store', () => ({ getTenantBackup: vi.fn(), putTenantBackup: vi.fn() }))
 vi.mock('@/lib/provisioning/seed', () => ({ seedTenantData: vi.fn() }))
 
 // ── dynamically-imported step dependencies ───────────────────────────────────
@@ -38,10 +38,10 @@ const legals = { generateTenantLegals: vi.fn() }
 vi.mock('@/lib/legals/provision', () => legals)
 
 const poolAuto = { ensurePoolInstance: vi.fn(), deletePoolIfEmpty: vi.fn() }
-vi.mock('@/lib/pool-autoscale', () => poolAuto)
+vi.mock('@/lib/tenancy/pool-autoscale', () => poolAuto)
 
 const delhivery = { createDelhiveryPickupLocation: vi.fn() }
-vi.mock('@/lib/delhivery', () => delhivery)
+vi.mock('@/lib/shipping/delhivery', () => delhivery)
 
 vi.mock('@/lib/provisioning/user-data', () => ({ appBootUserData: () => '#!/bin/sh boot' }))
 

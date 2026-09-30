@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { resolveTenant } from '@/lib/tenant-context'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/payments/razorpay'
 
 export const dynamic = 'force-dynamic'
 

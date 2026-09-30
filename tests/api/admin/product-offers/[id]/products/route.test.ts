@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const mockQueryMany = vi.fn()
 const mockQueryOne = vi.fn()
 const mockClientQuery = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
   withTransaction: (fn: any) => fn({ query: (...a: any[]) => mockClientQuery(...a) }),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 import { GET, PUT, POST } from '@/app/api/admin/product-offers/[id]/products/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }

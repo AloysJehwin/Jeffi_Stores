@@ -3,13 +3,13 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-vi.mock('@/lib/tenant-context', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/ai-client'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/shared/ai-client'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 const GATEWAY_REPLY = {
   content: 'Hello world',

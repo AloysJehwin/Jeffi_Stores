@@ -1,10 +1,10 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
-import * as mailAudit from '@/lib/mail-audit'
+import * as mailAudit from '@/lib/shared/mail-audit'
 import {
   sendRfqSubmittedEmail,
   sendRfqConvertedToQuotationEmail,
@@ -12,7 +12,7 @@ import {
   sendBusinessAccountRejectedEmail,
   sendBusinessInvoiceGeneratedEmail,
   sendBusinessOrderStatusEmail,
-} from '@/lib/email-business'
+} from '@/lib/shared/email-business'
 
 const mockSendAuditedMail = mailAudit.sendAuditedMail as ReturnType<typeof vi.fn>
 

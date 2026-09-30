@@ -1,29 +1,29 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
   authenticateAdmin: vi.fn(),
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
-vi.mock('@/lib/checkout-intent', () => ({ verifyIntent: vi.fn() }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/checkout-intent', () => ({ verifyIntent: vi.fn() }))
+vi.mock('@/lib/orders/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
   loadActiveCart: vi.fn(),
   cartSubtotal: vi.fn(),
 }))
 
 import { GET } from '@/app/api/checkout/intents/[token]/route'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { verifyIntent } from '@/lib/checkout-intent'
-import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/order-commit'
-import { queryOne } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { verifyIntent } from '@/lib/orders/checkout-intent'
+import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/orders/order-commit'
+import { queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAnyUser)
 const mockVerifyIntent = vi.mocked(verifyIntent)

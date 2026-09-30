@@ -1,26 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
-vi.mock('@/lib/site-controls', () => ({ getFeatureFlags: vi.fn() }))
-vi.mock('@/lib/notify', () => ({ notifyVariantChangeRequested: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
+vi.mock('@/lib/shared/notify', () => ({ notifyVariantChangeRequested: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/email', () => ({ sendVariantChangeRequestedEmail: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/variant-change', () => ({
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/variant-change', () => ({
   computeVariantChangePreview: vi.fn(),
   loadVariantPriceRow: vi.fn(),
 }))
 
 import { GET, POST } from '@/app/api/admin/orders/[id]/variant-change/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
-import * as db from '@/lib/db'
-import * as sc from '@/lib/site-controls'
-import * as vc from '@/lib/variant-change'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
+import * as db from '@/lib/shared/db'
+import * as sc from '@/lib/catalog/site-controls'
+import * as vc from '@/lib/orders/variant-change'
 import * as email from '@/lib/email'
-import * as notify from '@/lib/notify'
+import * as notify from '@/lib/shared/notify'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
@@ -203,7 +203,7 @@ describe('POST variant-change', () => {
     // Force the .catch(() => {}) handlers on email/notify/logActivity to execute.
     vi.mocked(email.sendVariantChangeRequestedEmail).mockRejectedValueOnce(new Error('mail fail'))
     vi.mocked(notify.notifyVariantChangeRequested).mockRejectedValueOnce(new Error('notify fail'))
-    const activity = await import('@/lib/activity')
+    const activity = await import('@/lib/shared/activity')
     vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
     const res = await POST(makePost({ orderItemId: UUID, newVariantId: UUID2, adminNotes: 'note' }), PARAMS)
     const body = await res.json()

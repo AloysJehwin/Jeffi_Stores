@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { collectBriefingData, narrate, renderBriefingEmail, briefingFromAsync } from '@/lib/daily-briefing'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { collectBriefingData, narrate, renderBriefingEmail, briefingFromAsync } from '@/lib/shared/daily-briefing'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

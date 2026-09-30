@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany, query } from '@/lib/db'
-import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/pricing'
-import { sendRfqConvertedToQuotationEmail } from '@/lib/email-business'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/catalog/pricing'
+import { sendRfqConvertedToQuotationEmail } from '@/lib/shared/email-business'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()

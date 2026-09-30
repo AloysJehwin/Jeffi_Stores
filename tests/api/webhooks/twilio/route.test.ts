@@ -5,29 +5,29 @@ vi.mock('twilio', () => ({
   default: { validateRequest },
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/message-log', () => ({
+vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/whatsapp', () => ({
+vi.mock('@/lib/shared/whatsapp', () => ({
   sendFreeTextWhatsApp: vi.fn().mockResolvedValue(true),
   sendSupportAckWhatsApp: vi.fn().mockResolvedValue(true),
 }))
 
 import { POST } from '@/app/api/webhooks/twilio/route'
-import { query, queryOne } from '@/lib/db'
-import { logMessage } from '@/lib/message-log'
-import { logActivity } from '@/lib/activity'
-import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/whatsapp'
+import { query, queryOne } from '@/lib/shared/db'
+import { logMessage } from '@/lib/shared/message-log'
+import { logActivity } from '@/lib/shared/activity'
+import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/shared/whatsapp'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)

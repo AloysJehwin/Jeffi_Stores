@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
-import { requireAdminScope } from '@/lib/jwt'
+import { query, queryMany } from '@/lib/shared/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
 
 export async function GET(request: NextRequest) {
   try {

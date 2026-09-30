@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 
 // POST /api/admin/mailer/draft — upsert a draft (partial data allowed)
 // Body: { draft_id?, template_key, title?, subject?, template_data? }

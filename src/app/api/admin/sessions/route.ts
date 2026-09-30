@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { listActiveSessions } from '@/lib/auth-sessions'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { listActiveSessions } from '@/lib/auth/auth-sessions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'

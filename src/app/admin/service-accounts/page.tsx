@@ -1,8 +1,8 @@
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES, hasScope } from '@/lib/scopes'
+import { ADMIN_SCOPES, hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import Link from 'next/link'
 import ServiceAccountRevokeButton from '@/components/admin/ServiceAccountRevokeButton'
 

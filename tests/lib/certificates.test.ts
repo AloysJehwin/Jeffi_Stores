@@ -57,7 +57,7 @@ vi.mock('crypto', async importOriginal => {
   }
 })
 
-import { generateClientCertificate } from '@/lib/certificates'
+import { generateClientCertificate } from '@/lib/tenancy/certificates'
 
 beforeEach(() => {
   vi.clearAllMocks()

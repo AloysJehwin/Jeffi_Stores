@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface CouponRow {
   id: string

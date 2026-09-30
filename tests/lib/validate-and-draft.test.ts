@@ -4,14 +4,14 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
-import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/validate'
+import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/shared/validate'
 import {
   signDraftToken,
   verifyDraftToken,
   hashCartItems,
   type DraftPayload,
   type DraftCartItem,
-} from '@/lib/order-draft'
+} from '@/lib/orders/order-draft'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // validate.ts — schemas

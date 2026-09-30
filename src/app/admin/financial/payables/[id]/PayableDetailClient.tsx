@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
-import { ap } from '@/lib/admin-path'
-import { formatINR as formatINRBase, formatDate } from '@/lib/format'
+import { ap } from '@/lib/shared/admin-path'
+import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
-import { generateTotpSecret, buildOtpauthUrl, verifyMfaTicket } from '@/lib/mfa'
+import { queryOne } from '@/lib/shared/db'
+import { generateTotpSecret, buildOtpauthUrl, verifyMfaTicket } from '@/lib/auth/mfa'
 import QRCode from 'qrcode'
 
 export async function POST(request: Request) {
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     const secret = await generateTotpSecret()
     // The store being administered, so a tenant owner sees their own name in the app.
-    const { getStoreIdentity } = await import('@/lib/site-controls')
+    const { getStoreIdentity } = await import('@/lib/catalog/site-controls')
     const storeName = await getStoreIdentity()
       .then(i => i.name)
       .catch(() => '')

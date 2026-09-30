@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
     constructor(
@@ -22,9 +22,9 @@ vi.mock('@/lib/ai-client', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/campaigns/generate/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

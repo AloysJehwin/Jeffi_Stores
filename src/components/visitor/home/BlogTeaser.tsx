@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { BookOpen } from 'lucide-react'
 import StoreImage from '@/components/visitor/StoreImage'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.blog_teaser
 

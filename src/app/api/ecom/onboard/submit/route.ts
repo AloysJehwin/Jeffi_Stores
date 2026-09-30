@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import {
   createTenant,
   linkOwnerTenant,
@@ -16,10 +16,10 @@ import {
   saveIntegrationCredential,
   updateOwnerName,
 } from '@/lib/tenant-registry'
-import { sendKycSubmittedEmail } from '@/lib/ecom-emails'
-import { OnboardSchema } from '@/lib/onboard-schema'
+import { sendKycSubmittedEmail } from '@/lib/shared/ecom-emails'
+import { OnboardSchema } from '@/lib/catalog/onboard-schema'
 import { encryptToken } from '@/lib/crypto/token-cipher'
-import { verifyDelhiveryToken } from '@/lib/delhivery'
+import { verifyDelhiveryToken } from '@/lib/shipping/delhivery'
 
 export const dynamic = 'force-dynamic'
 

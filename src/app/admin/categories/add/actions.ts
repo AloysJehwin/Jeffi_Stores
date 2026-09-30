@@ -1,11 +1,11 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query } from '@/lib/db'
-import { suggestIcon } from '@/lib/icon-suggest'
+import { query } from '@/lib/shared/db'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
 
 export async function createCategory(formData: FormData) {
   const name = formData.get('name') as string

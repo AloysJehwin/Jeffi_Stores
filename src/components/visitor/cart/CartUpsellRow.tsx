@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import ProductCard from '@/components/visitor/ProductCard'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
-import type { CardProps } from '@/lib/product-cards'
+import type { CardProps } from '@/lib/catalog/product-cards'
 
 const TITLE = 'Frequently bought with your cart'
 const MAX_IDS = 20

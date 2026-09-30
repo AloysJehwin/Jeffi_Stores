@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { recomputeHealth, getHealth } from '@/lib/customer-health'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { queryMany } from '@/lib/shared/db'
+import { recomputeHealth, getHealth } from '@/lib/shared/customer-health'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

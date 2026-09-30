@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-import { resolveEdd, invalidateEddCache } from '@/lib/edd-cache'
+import { resolveEdd, invalidateEddCache } from '@/lib/shipping/edd-cache'
 
 describe('edd-cache', () => {
   beforeEach(() => {

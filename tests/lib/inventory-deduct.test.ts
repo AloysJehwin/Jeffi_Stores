@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ withTransaction: vi.fn() }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/shared/db', () => ({ withTransaction: vi.fn() }))
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
   recomputeStockStatusForProduct: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/catalog/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
 
-import { deductOrderStock, deductStockForLines } from '@/lib/inventory-deduct'
-import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock } from '@/lib/shelf'
+import { deductOrderStock, deductStockForLines } from '@/lib/orders/inventory-deduct'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { syncPerishableStock } from '@/lib/catalog/shelf'
 
 // A scripted fake pg client: responses keyed by call index, default { rows: [] }.
 // Also records every SQL string so we can assert ordering/content.

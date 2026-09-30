@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...a: any[]) => mockQueryOne(...a),
   query: (...a: any[]) => mockQuery(...a),
   queryMany: vi.fn(),
 }))
 const mockPublish = vi.fn()
-vi.mock('@/lib/session-events', () => ({ publishSessionEvent: (...a: any[]) => mockPublish(...a) }))
+vi.mock('@/lib/auth/session-events', () => ({ publishSessionEvent: (...a: any[]) => mockPublish(...a) }))
 
 import {
   computeDeadline,
@@ -20,7 +20,7 @@ import {
   revokeSession,
   sweepExpiredAdminSessions,
   DEFAULT_ADMIN_IDLE_MINUTES,
-} from '@/lib/auth-sessions'
+} from '@/lib/auth/auth-sessions'
 
 const TOKEN = 'a'.repeat(64)
 const ROW_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'

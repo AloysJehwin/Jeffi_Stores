@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPolicyBySlug, policies } from '@/lib/legals/policies'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export async function generateStaticParams() {
   return policies.map(p => ({ slug: p.slug }))

@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   JWT_MAX_AGE_S: 28800,
 }))
 
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   extendSession: vi.fn(),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
 import { POST } from '@/app/api/admin/refresh/route'
-import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/jwt'
-import { extendSession } from '@/lib/auth-sessions'
+import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/auth/jwt'
+import { extendSession } from '@/lib/auth/auth-sessions'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockExtend = vi.mocked(extendSession)

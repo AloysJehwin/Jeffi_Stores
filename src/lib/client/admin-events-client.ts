@@ -1,4 +1,4 @@
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 export type SessionFrame =
   | { kind: 'session'; type: 'hello' | 'deadline'; deadlineAt: number; expiresAt: number; serverNow: number }

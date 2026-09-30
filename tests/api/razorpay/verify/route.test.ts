@@ -4,10 +4,10 @@ import crypto from 'crypto'
 // Set env before module is imported so the route picks it up
 process.env.RAZORPAY_KEY_SECRET = 'test_secret_key'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
@@ -19,14 +19,14 @@ vi.mock('@/lib/email', () => ({
   sendNewOrderNotification: vi.fn().mockResolvedValue(undefined),
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/order-draft', () => ({
+vi.mock('@/lib/orders/order-draft', () => ({
   verifyDraftToken: vi.fn(),
   hashCartItems: vi.fn(),
 }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/orders/order-commit', () => ({
   loadActiveCart: vi.fn(),
   cartSubtotal: vi.fn(),
   cartTaxAmount: vi.fn(),
@@ -34,37 +34,37 @@ vi.mock('@/lib/order-commit', () => ({
   validateCouponForUser: vi.fn(),
   commitOrder: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
-vi.mock('@/lib/sms', () => ({
+vi.mock('@/lib/shared/sms', () => ({
   sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }),
 }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(() => ({ orders: { fetch: vi.fn().mockResolvedValue({ amount: 15000 }) } })),
 }))
-vi.mock('@/lib/variant-change', () => ({
+vi.mock('@/lib/orders/variant-change', () => ({
   settleVariantChangePayment: vi.fn(),
 }))
 
 import { POST } from '@/app/api/razorpay/verify/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as orderCommit from '@/lib/order-commit'
-import * as variantChange from '@/lib/variant-change'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as orderCommit from '@/lib/orders/order-commit'
+import * as variantChange from '@/lib/orders/variant-change'
 
 // ------------------------------------------------------------------ helpers
 
@@ -269,7 +269,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('happy path with draftToken: commits order and returns success', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
@@ -316,7 +316,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('returns 400 when draftToken is invalid/expired', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue(null)
 
@@ -335,7 +335,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('returns 403 when draftToken userId does not match', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: 'other-user-id',
@@ -362,7 +362,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('returns 404 when user not found in commitDraft', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -392,7 +392,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('returns 400 when cart is empty in commitDraft cart mode', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -423,7 +423,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('returns 409 when cart hash changed during payment in commitDraft', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -456,7 +456,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commits draftToken buyNow order successfully', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -565,8 +565,8 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('triggers high-value order auto-task when total >= 50000 in commitDraft', async () => {
-    const { createAutoTask } = await import('@/lib/auto-tasks')
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { createAutoTask } = await import('@/lib/shared/auto-tasks')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
@@ -624,7 +624,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft idempotency: returns existing order when payment already committed', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -654,7 +654,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft: applies coupon discount when couponId is present', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -694,7 +694,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft buyNow: returns 404 when product not found', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -723,7 +723,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft buyNow: looks up variant and sub-variant when IDs present', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -764,7 +764,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft: returns 400 when draft mode is neither cart nor buyNow', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -825,8 +825,8 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('triggers high-value order auto-task when total >= 50000 in commitDraft', async () => {
-    const { createAutoTask } = await import('@/lib/auto-tasks')
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { createAutoTask } = await import('@/lib/shared/auto-tasks')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
@@ -930,7 +930,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('variant-change: falls back to amount 0 when rzp fetch throws', async () => {
-    const { getRazorpayInstance } = await import('@/lib/razorpay')
+    const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
     vi.mocked(getRazorpayInstance).mockReturnValueOnce({
       orders: { fetch: vi.fn().mockRejectedValue(new Error('rzp down')) },
     } as any)
@@ -951,8 +951,8 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft: sends SMS when user notification_channel is sms', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
-    const { sendOrderConfirmedSMS } = await import('@/lib/sms')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
+    const { sendOrderConfirmedSMS } = await import('@/lib/shared/sms')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -994,7 +994,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('markLegacyOrderPaid: sends SMS when user notification_channel is sms', async () => {
-    const { sendOrderConfirmedSMS } = await import('@/lib/sms')
+    const { sendOrderConfirmedSMS } = await import('@/lib/shared/sms')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_ORDER)
@@ -1020,13 +1020,13 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft: exercises fire-and-forget catch handlers and item maps on rejection', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
     const email = await import('@/lib/email')
-    const invoice = await import('@/lib/invoice')
-    const activity = await import('@/lib/activity')
-    const aiFeedback = await import('@/lib/ai-feedback')
-    const autoTasks = await import('@/lib/auto-tasks')
-    const sms = await import('@/lib/sms')
+    const invoice = await import('@/lib/documents/invoice')
+    const activity = await import('@/lib/shared/activity')
+    const aiFeedback = await import('@/lib/shared/ai-feedback')
+    const autoTasks = await import('@/lib/shared/auto-tasks')
+    const sms = await import('@/lib/shared/sms')
 
     // Make every fire-and-forget reject so its .catch(() => {}) closure runs.
     vi.mocked(email.sendOrderConfirmationEmail).mockRejectedValue(new Error('x'))
@@ -1085,9 +1085,9 @@ describe('POST /api/razorpay/verify', () => {
 
   it('markLegacyOrderPaid: exercises catch handlers and maps with non-empty items', async () => {
     const email = await import('@/lib/email')
-    const invoice = await import('@/lib/invoice')
-    const aiFeedback = await import('@/lib/ai-feedback')
-    const sms = await import('@/lib/sms')
+    const invoice = await import('@/lib/documents/invoice')
+    const aiFeedback = await import('@/lib/shared/ai-feedback')
+    const sms = await import('@/lib/shared/sms')
 
     vi.mocked(email.sendOrderConfirmationEmail).mockRejectedValue(new Error('x'))
     vi.mocked(email.sendNewOrderNotification).mockRejectedValue(new Error('x'))
@@ -1122,8 +1122,8 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft buyNow: GST disabled → taxAmount 0 and missing gst_percentage fallback', async () => {
-    const { verifyDraftToken } = await import('@/lib/order-draft')
-    const { getFeatureFlags } = await import('@/lib/site-controls')
+    const { verifyDraftToken } = await import('@/lib/orders/order-draft')
+    const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
     vi.mocked(getFeatureFlags).mockResolvedValueOnce({ gstEnabled: false } as any)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
@@ -1163,7 +1163,7 @@ describe('POST /api/razorpay/verify', () => {
   })
 
   it('commitDraft: does not apply discount when coupon validation is not ok', async () => {
-    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 export const dynamic = 'force-dynamic'

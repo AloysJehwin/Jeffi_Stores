@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { humanizeLabel } from '@/lib/format'
+import { humanizeLabel } from '@/lib/shared/format'
 
 type FacetValue = { value: string; count: number }
 

@@ -21,17 +21,17 @@ const mockFs = vi.hoisted(() => ({
 
 vi.mock('node:fs/promises', () => mockFs)
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   getClient: vi.fn(),
 }))
-vi.mock('@/lib/tenant-context', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   embed: vi.fn(),
   findSimilarProductIds: vi.fn(),
   findSimilarCustomers: vi.fn(),
@@ -50,8 +50,8 @@ vi.mock('pg', () => {
 })
 
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
-import * as db from '@/lib/db'
-import * as rag from '@/lib/rag'
+import * as db from '@/lib/shared/db'
+import * as rag from '@/lib/shared/rag'
 
 const mockQuery = vi.mocked(db.query)
 const mockQueryMany = vi.mocked(db.queryMany)
@@ -345,7 +345,7 @@ describe('admin-agent/tools', () => {
     })
 
     it('skips the platform RAG index on a tenant and searches the tenant DB', async () => {
-      const { resolveTenantId } = await import('@/lib/tenant-context')
+      const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
       vi.mocked(resolveTenantId).mockResolvedValueOnce('tenant-1')
       mockQueryMany.mockResolvedValueOnce([
         {
@@ -1466,6 +1466,14 @@ describe('admin-agent/tools', () => {
 
     it('throws for forbidden path (lib/auth.ts)', async () => {
       await expect(tool().handler({ path: 'src/lib/auth.ts' })).rejects.toThrow(/forbidden/)
+    })
+
+    it('throws for forbidden path (lib/auth/jwt.ts after domain regroup)', async () => {
+      await expect(tool().handler({ path: 'src/lib/auth/jwt.ts' })).rejects.toThrow(/forbidden/)
+    })
+
+    it('throws for forbidden path (lib/shared/db.ts after domain regroup)', async () => {
+      await expect(tool().handler({ path: 'src/lib/shared/db.ts' })).rejects.toThrow(/forbidden/)
     })
 
     it('throws for path with password keyword', async () => {

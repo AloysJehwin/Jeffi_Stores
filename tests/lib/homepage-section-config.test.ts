@@ -12,7 +12,7 @@ import {
   safeHref,
   valueStatMetrics,
   type HomepageSection,
-} from '@/lib/homepage-sections'
+} from '@/lib/catalog/homepage-sections'
 
 const cfg = (config: Record<string, unknown>) => ({ config }) as Pick<HomepageSection, 'config'>
 const ID = '11111111-2222-3333-4444-555555555555'

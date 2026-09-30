@@ -1,35 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({
   sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
   sendNewOrderNotification: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ taxableAmount: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/order-commit', () => ({
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shared/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/order-commit', () => ({
   quoteShipping: vi.fn().mockResolvedValue({ shipping: 0, codFee: 0 }),
   validateCouponForUser: vi.fn().mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' }),
 }))
-vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
+vi.mock('@/lib/documents/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/catalog/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
 // GST enabled ⇒ line price follows the price_at_addition/variant/sub_variant/base_price
 // precedence these tests assert (the GST-off path charges the ex-GST column instead).
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: false,
     codEnabled: true,
@@ -39,23 +39,23 @@ vi.mock('@/lib/site-controls', () => ({
   }),
   getBusinessValues: vi.fn().mockResolvedValue({ businessStateCode: '22' }),
 }))
-vi.mock('@/lib/edd', () => ({ computeEdd: vi.fn().mockReturnValue('2026-09-30') }))
-vi.mock('@/lib/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/delhivery', () => ({
+vi.mock('@/lib/shipping/edd', () => ({ computeEdd: vi.fn().mockReturnValue('2026-09-30') }))
+vi.mock('@/lib/shared/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shipping/delhivery', () => ({
   checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/orders/create/route'
-import * as db from '@/lib/db'
-import * as jwt from '@/lib/jwt'
-import * as bizDiscount from '@/lib/business-discount'
-import * as gstLib from '@/lib/gst'
-import * as orderCommit from '@/lib/order-commit'
-import { getFeatureFlags } from '@/lib/site-controls'
+import * as db from '@/lib/shared/db'
+import * as jwt from '@/lib/auth/jwt'
+import * as bizDiscount from '@/lib/catalog/business-discount'
+import * as gstLib from '@/lib/catalog/gst'
+import * as orderCommit from '@/lib/orders/order-commit'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 const enableRazorpay = () =>
   vi.mocked(getFeatureFlags).mockResolvedValueOnce({

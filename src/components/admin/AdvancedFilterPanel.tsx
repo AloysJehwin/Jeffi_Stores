@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
 import AdminSelect from './AdminSelect'
-import { splitFilterValues, type AdvancedFilterField } from '@/lib/product-attribute-filters-shared'
+import { splitFilterValues, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 interface Props {
   fields: AdvancedFilterField[]

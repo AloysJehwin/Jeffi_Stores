@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
     constructor(
@@ -14,9 +14,9 @@ vi.mock('@/lib/ai-client', () => ({
   },
 }))
 
-import { collectBriefingData, narrate, renderBriefingEmail, type BriefingData } from '@/lib/daily-briefing'
-import * as db from '@/lib/db'
-import * as aiClient from '@/lib/ai-client'
+import { collectBriefingData, narrate, renderBriefingEmail, type BriefingData } from '@/lib/shared/daily-briefing'
+import * as db from '@/lib/shared/db'
+import * as aiClient from '@/lib/shared/ai-client'
 
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>
@@ -217,7 +217,7 @@ describe('narrate', () => {
   })
 
   it('returns empty string when AiClientError is thrown', async () => {
-    const { AiClientError } = await import('@/lib/ai-client')
+    const { AiClientError } = await import('@/lib/shared/ai-client')
     mockAiChat.mockRejectedValueOnce(new AiClientError('AI unavailable', 'openai'))
     const result = await narrate(sampleData)
     expect(result).toBe('')

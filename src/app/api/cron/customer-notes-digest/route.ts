@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendNotesDigest } from '@/lib/customer-notes-notify'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { sendNotesDigest } from '@/lib/shared/customer-notes-notify'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

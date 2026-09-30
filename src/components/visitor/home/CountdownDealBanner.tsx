@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { Package } from 'lucide-react'
 import StoreImage from '@/components/visitor/StoreImage'
 import DealCountdown from './DealCountdown'
-import type { CardProps } from '@/lib/product-card-props'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import type { CardProps } from '@/lib/catalog/product-card-props'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.countdown_deal
 

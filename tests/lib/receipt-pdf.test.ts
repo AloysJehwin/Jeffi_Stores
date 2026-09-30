@@ -44,8 +44,8 @@ vi.mock('pdfkit', () => {
   return { default: vi.fn().mockImplementation(() => makeMockDoc()) }
 })
 
-import { generateReceiptPDF } from '@/lib/receipt-pdf'
-import type { ReceiptBusinessSettings, ReceiptItem, ReceiptOrder } from '@/lib/receipt-pdf'
+import { generateReceiptPDF } from '@/lib/documents/receipt-pdf'
+import type { ReceiptBusinessSettings, ReceiptItem, ReceiptOrder } from '@/lib/documents/receipt-pdf'
 
 const mockBusiness: ReceiptBusinessSettings = {
   legalName: 'Jeffi Stores Pvt Ltd',

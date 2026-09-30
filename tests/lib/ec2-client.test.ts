@@ -65,14 +65,14 @@ describe('ec2-client', () => {
   describe('ec2() request/error handling', () => {
     it('throws with status + body slice when the API returns non-2xx', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(403, 'UnauthorizedOperation: nope')))
-      const { describeInstance } = await import('@/lib/ec2-client')
+      const { describeInstance } = await import('@/lib/shared/ec2-client')
       await expect(describeInstance('i-1')).rejects.toThrow(/DescribeInstances failed \(403\).*UnauthorizedOperation/)
     })
 
     it('sends a signed POST to the EC2 endpoint', async () => {
       const fetchMock = vi.fn().mockResolvedValue(res(200, describeXml()))
       vi.stubGlobal('fetch', fetchMock)
-      const { describeInstance } = await import('@/lib/ec2-client')
+      const { describeInstance } = await import('@/lib/shared/ec2-client')
       await describeInstance('i-abc')
       expect(fetchMock).toHaveBeenCalledWith(
         'https://ec2.us-east-1.amazonaws.com/',
@@ -88,14 +88,14 @@ describe('ec2-client', () => {
   describe('describeInstance', () => {
     it('parses instanceType and state from the XML', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({ state: 'running', type: 'm5.large' }))))
-      const { describeInstance } = await import('@/lib/ec2-client')
+      const { describeInstance } = await import('@/lib/shared/ec2-client')
       const s = await describeInstance('i-1')
       expect(s).toEqual({ instanceType: 'm5.large', state: 'running' })
     })
 
     it('falls back to empty strings when tags are absent', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, '<Response></Response>')))
-      const { describeInstance } = await import('@/lib/ec2-client')
+      const { describeInstance } = await import('@/lib/shared/ec2-client')
       const s = await describeInstance('i-1')
       expect(s).toEqual({ instanceType: '', state: '' })
     })
@@ -106,7 +106,7 @@ describe('ec2-client', () => {
     it('stopInstance issues StopInstances', async () => {
       const fetchMock = vi.fn().mockResolvedValue(res(200, '<ok/>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { stopInstance } = await import('@/lib/ec2-client')
+      const { stopInstance } = await import('@/lib/shared/ec2-client')
       await stopInstance('i-1')
       expect(String(fetchMock.mock.calls[0][1].body)).toContain('Action=StopInstances')
     })
@@ -114,7 +114,7 @@ describe('ec2-client', () => {
     it('startInstance issues StartInstances', async () => {
       const fetchMock = vi.fn().mockResolvedValue(res(200, '<ok/>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { startInstance } = await import('@/lib/ec2-client')
+      const { startInstance } = await import('@/lib/shared/ec2-client')
       await startInstance('i-1')
       expect(String(fetchMock.mock.calls[0][1].body)).toContain('Action=StartInstances')
     })
@@ -122,7 +122,7 @@ describe('ec2-client', () => {
     it('modifyInstanceType issues ModifyInstanceAttribute with the new type', async () => {
       const fetchMock = vi.fn().mockResolvedValue(res(200, '<ok/>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { modifyInstanceType } = await import('@/lib/ec2-client')
+      const { modifyInstanceType } = await import('@/lib/shared/ec2-client')
       await modifyInstanceType('i-1', 't4g.medium')
       const body = String(fetchMock.mock.calls[0][1].body)
       expect(body).toContain('Action=ModifyInstanceAttribute')
@@ -139,14 +139,14 @@ describe('ec2-client', () => {
         .mockResolvedValueOnce(res(200, describeXml({ state: 'pending' })))
         .mockResolvedValueOnce(res(200, describeXml({ state: 'running' })))
       vi.stubGlobal('fetch', fetchMock)
-      const { waitForState } = await import('@/lib/ec2-client')
+      const { waitForState } = await import('@/lib/shared/ec2-client')
       await expect(waitForState('i-1', 'running')).resolves.toBeUndefined()
       expect(fetchMock).toHaveBeenCalledTimes(3)
     })
 
     it('throws once the timeout budget is exceeded without reaching the state', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({ state: 'pending' }))))
-      const { waitForState } = await import('@/lib/ec2-client')
+      const { waitForState } = await import('@/lib/shared/ec2-client')
       // timeoutMs of 0 means the loop condition is immediately false → straight to throw.
       await expect(waitForState('i-1', 'running', 0)).rejects.toThrow(/did not reach 'running'/)
     })
@@ -155,7 +155,7 @@ describe('ec2-client', () => {
   // ── runInstance — env-driven param assembly ────────────────────────────────
   describe('runInstance', () => {
     it('throws when TENANT_APP_AMI_ID is not set (no billable launch)', async () => {
-      const { runInstance } = await import('@/lib/ec2-client')
+      const { runInstance } = await import('@/lib/shared/ec2-client')
       await expect(runInstance({ instanceType: 't4g.small', name: 'x' })).rejects.toThrow(
         /TENANT_APP_AMI_ID is not set/
       )
@@ -171,7 +171,7 @@ describe('ec2-client', () => {
         .fn()
         .mockResolvedValue(res(200, '<RunInstancesResponse><instanceId>i-new</instanceId></RunInstancesResponse>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { runInstance } = await import('@/lib/ec2-client')
+      const { runInstance } = await import('@/lib/shared/ec2-client')
       const out = await runInstance({ instanceType: 't4g.small', name: 'jeffi-tenant-acme', userData: 'echo hi' })
       expect(out).toEqual({ instanceId: 'i-new' })
       const body = String(fetchMock.mock.calls[0][1].body)
@@ -190,7 +190,7 @@ describe('ec2-client', () => {
       process.env.TENANT_RDS_SECURITY_GROUP = 'sg-rds'
       const fetchMock = vi.fn().mockResolvedValue(res(200, '<r><instanceId>i-2</instanceId></r>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { runInstance } = await import('@/lib/ec2-client')
+      const { runInstance } = await import('@/lib/shared/ec2-client')
       await runInstance({ instanceType: 't4g.small', name: 'x' })
       const body = String(fetchMock.mock.calls[0][1].body)
       expect(body).toContain('SecurityGroupId.1=sg-rds')
@@ -202,7 +202,7 @@ describe('ec2-client', () => {
     it('throws when RunInstances returns no instanceId', async () => {
       process.env.TENANT_APP_AMI_ID = 'ami-123'
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, '<RunInstancesResponse></RunInstancesResponse>')))
-      const { runInstance } = await import('@/lib/ec2-client')
+      const { runInstance } = await import('@/lib/shared/ec2-client')
       await expect(runInstance({ instanceType: 't4g.small', name: 'x' })).rejects.toThrow(/returned no instanceId/)
     })
   })
@@ -211,13 +211,13 @@ describe('ec2-client', () => {
   describe('getInstanceIp', () => {
     it('returns the public ipAddress when assigned', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({ ip: '52.1.2.3' }))))
-      const { getInstanceIp } = await import('@/lib/ec2-client')
+      const { getInstanceIp } = await import('@/lib/shared/ec2-client')
       await expect(getInstanceIp('i-1')).resolves.toBe('52.1.2.3')
     })
 
     it('returns null when no IP has been assigned yet', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({}))))
-      const { getInstanceIp } = await import('@/lib/ec2-client')
+      const { getInstanceIp } = await import('@/lib/shared/ec2-client')
       await expect(getInstanceIp('i-1')).resolves.toBeNull()
     })
   })
@@ -227,38 +227,38 @@ describe('ec2-client', () => {
     it('terminateInstance issues TerminateInstances', async () => {
       const fetchMock = vi.fn().mockResolvedValue(res(200, '<ok/>'))
       vi.stubGlobal('fetch', fetchMock)
-      const { terminateInstance } = await import('@/lib/ec2-client')
+      const { terminateInstance } = await import('@/lib/shared/ec2-client')
       await terminateInstance('i-1')
       expect(String(fetchMock.mock.calls[0][1].body)).toContain('Action=TerminateInstances')
     })
 
     it('reports gone when the instance is terminated', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({ state: 'terminated' }))))
-      const { isInstanceGone } = await import('@/lib/ec2-client')
+      const { isInstanceGone } = await import('@/lib/shared/ec2-client')
       await expect(isInstanceGone('i-1')).resolves.toBe(true)
     })
 
     it('reports gone when the state is empty (no such instance row)', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, '<Response></Response>')))
-      const { isInstanceGone } = await import('@/lib/ec2-client')
+      const { isInstanceGone } = await import('@/lib/shared/ec2-client')
       await expect(isInstanceGone('i-1')).resolves.toBe(true)
     })
 
     it('reports NOT gone when the instance is still running', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, describeXml({ state: 'running' }))))
-      const { isInstanceGone } = await import('@/lib/ec2-client')
+      const { isInstanceGone } = await import('@/lib/shared/ec2-client')
       await expect(isInstanceGone('i-1')).resolves.toBe(false)
     })
 
     it('classifies a NotFound API error as gone', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(400, 'InvalidInstanceID.NotFound: does not exist')))
-      const { isInstanceGone } = await import('@/lib/ec2-client')
+      const { isInstanceGone } = await import('@/lib/shared/ec2-client')
       await expect(isInstanceGone('i-1')).resolves.toBe(true)
     })
 
     it('re-classifies an unrelated API error as NOT gone (do not delete siblings)', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(500, 'InternalError: try later')))
-      const { isInstanceGone } = await import('@/lib/ec2-client')
+      const { isInstanceGone } = await import('@/lib/shared/ec2-client')
       await expect(isInstanceGone('i-1')).resolves.toBe(false)
     })
   })

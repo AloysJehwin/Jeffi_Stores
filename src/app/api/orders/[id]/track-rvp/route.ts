@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { resolveShipmentStatus } from '@/lib/shipment-status'
+import { resolveShipmentStatus } from '@/lib/shipping/shipment-status'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

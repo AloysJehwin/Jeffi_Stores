@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryOne } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { logActivity } from '@/lib/activity'
-import { parseBody, zNonEmpty, zPhone } from '@/lib/validate'
+import { queryOne } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { logActivity } from '@/lib/shared/activity'
+import { parseBody, zNonEmpty, zPhone } from '@/lib/shared/validate'
 
 const UpdateUserSchema = z
   .object({

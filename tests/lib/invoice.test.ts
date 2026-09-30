@@ -2,20 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // isGSTEnabled is captured at module load time in invoice.ts.
 // vi.hoisted runs before module resolution, ensuring the env var is set when
-// @/lib/invoice is first imported.
+// @/lib/documents/invoice is first imported.
 vi.hoisted(() => {
   process.env.ENABLE_GST = 'true'
   process.env.BUSINESS_STATE_CODE = '22'
 })
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   getFinancialYear: vi.fn().mockReturnValue('2024-25'),
   generateInvoiceNumber: vi.fn().mockReturnValue('JS/2024-25/0001'),
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
@@ -24,19 +24,19 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/invoice-pdf', () => ({
+vi.mock('@/lib/documents/invoice-pdf', () => ({
   generateInvoicePDF: vi.fn().mockResolvedValue(Buffer.from('mock-invoice-pdf')),
 }))
 
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadInvoicePDF: vi.fn().mockResolvedValue('https://s3.example.com/invoices/JS-2024-25-0001.pdf'),
 }))
 
-import { createDraftInvoice, generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { generateInvoicePDF } from '@/lib/invoice-pdf'
-import { uploadInvoicePDF } from '@/lib/s3'
-import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST } from '@/lib/gst'
+import { createDraftInvoice, generateOrderInvoice, assignInvoiceNumber } from '@/lib/documents/invoice'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { generateInvoicePDF } from '@/lib/documents/invoice-pdf'
+import { uploadInvoicePDF } from '@/lib/shared/s3'
+import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST } from '@/lib/catalog/gst'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

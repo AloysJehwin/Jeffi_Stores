@@ -1,9 +1,9 @@
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { verifyToken } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import AdminAuditClient from './AdminAuditClient'
 import AccessDenied from '@/components/admin/AccessDenied'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export default async function AdminAuditPage() {
   const cookieStore = await cookies()

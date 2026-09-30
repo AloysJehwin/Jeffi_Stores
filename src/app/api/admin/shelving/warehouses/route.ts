@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { listWarehouses, createWarehouse, getOrCreateOpenShelf } from '@/lib/shelf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { listWarehouses, createWarehouse, getOrCreateOpenShelf } from '@/lib/catalog/shelf'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

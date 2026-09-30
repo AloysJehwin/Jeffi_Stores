@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, queryCount } from '@/lib/db'
-import { authenticateAdmin, requireAdminScope } from '@/lib/jwt'
+import { query, queryOne, queryCount } from '@/lib/shared/db'
+import { authenticateAdmin, requireAdminScope } from '@/lib/auth/jwt'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   getS3Url: vi.fn(async (key: string) => `https://cdn.test/${key}`),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -20,7 +20,7 @@ import {
   CONVERSATION_CHANNELS,
   type ConversationRow,
   type SummaryRow,
-} from '@/lib/customer-conversations'
+} from '@/lib/shared/customer-conversations'
 
 describe('buildConversationsSql', () => {
   // Each channel sub-select must alias its own columns; when a single channel is selected there is

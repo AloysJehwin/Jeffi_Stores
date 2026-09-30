@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { authenticateBusiness } from '@/lib/jwt'
-import { revokeSession } from '@/lib/auth-sessions'
-import { logActivity } from '@/lib/activity'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { authenticateBusiness } from '@/lib/auth/jwt'
+import { revokeSession } from '@/lib/auth/auth-sessions'
+import { logActivity } from '@/lib/shared/activity'
+import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 
 export async function POST(request: NextRequest) {
   try {

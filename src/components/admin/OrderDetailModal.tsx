@@ -5,7 +5,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import CopySku from '@/components/ui/CopySku'
 
 const METRO_PINS_3 = new Set([

@@ -1,4 +1,4 @@
-import { queryMany, query } from '@/lib/db'
+import { queryMany, query } from '@/lib/shared/db'
 import { matchAsin, amazonConfigured } from './client'
 
 // Backfill Amazon ASINs onto product variants (and simple products) by matching against the

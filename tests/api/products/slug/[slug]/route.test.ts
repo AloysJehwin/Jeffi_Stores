@@ -5,7 +5,7 @@ const { queryOneMock } = vi.hoisted(() => ({
   queryOneMock: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: queryOneMock,
   queryMany: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_STOCK_TOTAL_SQL: '0',
 }))
 
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: false,
     gstEnabled: false,

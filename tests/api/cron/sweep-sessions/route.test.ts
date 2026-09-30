@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/auth-sessions', () => ({ sweepExpiredAdminSessions: vi.fn() }))
+vi.mock('@/lib/auth/auth-sessions', () => ({ sweepExpiredAdminSessions: vi.fn() }))
 
 import { GET } from '@/app/api/cron/sweep-sessions/route'
-import { sweepExpiredAdminSessions } from '@/lib/auth-sessions'
+import { sweepExpiredAdminSessions } from '@/lib/auth/auth-sessions'
 
 const mockSweep = vi.mocked(sweepExpiredAdminSessions)
 const req = (auth?: string) =>

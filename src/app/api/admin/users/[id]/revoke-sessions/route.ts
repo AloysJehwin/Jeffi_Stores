@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { revokeAllForPrincipal, type PrincipalType } from '@/lib/auth-sessions'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { revokeAllForPrincipal, type PrincipalType } from '@/lib/auth/auth-sessions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'

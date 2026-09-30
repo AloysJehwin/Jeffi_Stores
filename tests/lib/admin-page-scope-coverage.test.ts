@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import glob from 'fast-glob'
-import { getScopeForPath } from '@/lib/scopes'
+import { getScopeForPath } from '@/lib/auth/scopes'
 
 /**
  * Middleware gates a page with getScopeForPath. A page whose path matches no scope's `routes`

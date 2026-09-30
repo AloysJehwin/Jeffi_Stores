@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import Tooltip from '@/components/ui/Tooltip'
 import HoverCard from '@/components/ui/HoverCard'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 function CustomerDetailModal({ customer, onClose, backUrl }: { customer: any; onClose: () => void; backUrl: string }) {
   if (typeof document === 'undefined') return null

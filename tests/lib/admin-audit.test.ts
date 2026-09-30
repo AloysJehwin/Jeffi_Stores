@@ -5,14 +5,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 const { mockQuery } = vi.hoisted(() => ({ mockQuery: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { logAdminAudit, diffOf } from '@/lib/admin-audit'
+import { logAdminAudit, diffOf } from '@/lib/shared/admin-audit'
 import type { NextRequest } from 'next/server'
 
 // ---------------------------------------------------------------------------

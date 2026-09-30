@@ -2,10 +2,10 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import type { KeyboardShortcuts } from '@/lib/site-controls'
-import { hasScope } from '@/lib/scopes'
-import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
-import { ap } from '@/lib/admin-path'
+import type { KeyboardShortcuts } from '@/lib/catalog/site-controls'
+import { hasScope } from '@/lib/auth/scopes'
+import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
+import { ap } from '@/lib/shared/admin-path'
 
 interface Combo {
   modifier: 'mod' | 'mod+shift' | 'f'

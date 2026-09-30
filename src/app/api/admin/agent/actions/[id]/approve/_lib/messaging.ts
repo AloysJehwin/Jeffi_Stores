@@ -1,10 +1,10 @@
-import { queryOne, queryMany } from '@/lib/db'
-import { sendTestCampaignEmail } from '@/lib/automation-emails'
+import { queryOne, queryMany } from '@/lib/shared/db'
+import { sendTestCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendOrderDelayNotification, sendProductAnnouncementEmail } from '@/lib/email'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
-import type { CampaignKind } from '@/lib/marketing'
-import { sendAuditedMail } from '@/lib/mail-audit'
-import { mailShell } from '@/lib/mail-template'
+import type { CampaignKind } from '@/lib/shared/marketing'
+import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { mailShell } from '@/lib/shared/mail-template'
 import type { AgentAction, ActionResult } from './shared'
 
 export async function sendTestEmail(action: AgentAction): Promise<ActionResult> {
@@ -171,7 +171,7 @@ export async function sendMailerBroadcast(action: AgentAction): Promise<ActionRe
   } else {
     return { result: null, error: `Unknown audience: ${audience}` }
   }
-  const { currentBrandNameAsync } = await import('@/lib/brand')
+  const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
   const brandName = await currentBrandNameAsync()
   const fromHeader = `"${(fromName || brandName).replace(/"/g, '')}" <${process.env.SES_FROM_EMAIL}>`
   const isFullDocument = /<(?:!doctype|html)\b/i.test(body)

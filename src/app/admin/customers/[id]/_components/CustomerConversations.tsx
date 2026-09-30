@@ -16,13 +16,13 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import NoteAttachments from '@/components/admin/NoteAttachments'
-import type { NoteAttachment } from '@/lib/customer-notes-shared'
+import type { NoteAttachment } from '@/lib/shared/customer-notes-shared'
 import {
   CONVERSATION_CHANNELS,
   type ConversationChannel,
   type ConversationItem,
   type ConversationSummary,
-} from '@/lib/customer-conversations-shared'
+} from '@/lib/shared/customer-conversations-shared'
 
 const CHANNEL_META: Record<ConversationChannel, { Icon: LucideIcon; label: string }> = {
   chat: { Icon: MessageSquare, label: 'Chat' },

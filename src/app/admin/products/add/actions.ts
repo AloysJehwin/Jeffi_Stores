@@ -1,11 +1,11 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { generateProductSku, generateVariantSku } from '@/lib/sku'
-import { round2 } from '@/lib/gst'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { generateProductSku, generateVariantSku } from '@/lib/catalog/sku'
+import { round2 } from '@/lib/catalog/gst'
 
 export async function createProduct(formData: FormData) {
   const name = formData.get('name') as string
@@ -200,7 +200,7 @@ export async function createProduct(formData: FormData) {
 
       const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
-        const { copyGalleryImageToProduct } = await import('@/lib/s3')
+        const { copyGalleryImageToProduct } = await import('@/lib/shared/s3')
         const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
           galleryImageRefs.map(r => r.id),
         ])
@@ -317,7 +317,7 @@ export async function createProduct(formData: FormData) {
       }
     }
 
-    const { syncProductToSheet } = await import('@/lib/google-sheets')
+    const { syncProductToSheet } = await import('@/lib/shared/google-sheets')
     syncProductToSheet(data.id).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(data.id).catch(() => {})

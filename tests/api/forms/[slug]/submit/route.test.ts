@@ -1,19 +1,19 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/s3', () => ({ uploadGalleryImage: vi.fn() }))
+vi.mock('@/lib/shared/s3', () => ({ uploadGalleryImage: vi.fn() }))
 vi.mock('nodemailer', () => ({
   default: { createTransport: vi.fn().mockReturnValue({ sendMail: vi.fn() }) },
 }))
 
 import { POST } from '@/app/api/forms/[slug]/submit/route'
-import { queryOne, withTransaction } from '@/lib/db'
-import { uploadGalleryImage } from '@/lib/s3'
+import { queryOne, withTransaction } from '@/lib/shared/db'
+import { uploadGalleryImage } from '@/lib/shared/s3'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockWithTransaction = vi.mocked(withTransaction)

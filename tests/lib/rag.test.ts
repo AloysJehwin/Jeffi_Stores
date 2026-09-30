@@ -19,12 +19,12 @@ vi.mock('pg', () => {
   return { Pool }
 })
 
-vi.mock('@/lib/ai-client', () => ({ aiEmbed: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn() }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
-import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/rag'
-import { aiEmbed } from '@/lib/ai-client'
+import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/shared/rag'
+import { aiEmbed } from '@/lib/shared/ai-client'
 
 const mockAiEmbed = vi.mocked(aiEmbed)
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
@@ -10,7 +10,7 @@ vi.mock('@/lib/amazon/client', () => ({
 }))
 
 import { refreshAmazonStatusSnapshot, getAmazonSummary, getAmazonStatusPage } from '@/lib/amazon/status'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as client from '@/lib/amazon/client'
 
 const mockQuery = vi.mocked(db.query)

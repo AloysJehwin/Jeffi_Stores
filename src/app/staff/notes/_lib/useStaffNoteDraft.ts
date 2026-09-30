@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { CustomerHit, OrderHit } from '@/lib/customer-notes'
-import type { CustomerNote } from '@/lib/customer-notes-shared'
+import type { CustomerHit, OrderHit } from '@/lib/shared/customer-notes'
+import type { CustomerNote } from '@/lib/shared/customer-notes-shared'
 
 export const MAX_FILES = 8
 

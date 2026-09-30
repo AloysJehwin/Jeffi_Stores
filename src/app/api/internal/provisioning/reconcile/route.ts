@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reconcileOrphanedTenants } from '@/lib/tenant-registry'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

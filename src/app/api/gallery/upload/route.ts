@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { uploadGalleryImage, fetchRemoteImage } from '@/lib/s3'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { uploadGalleryImage, fetchRemoteImage } from '@/lib/shared/s3'
+import { queryOne } from '@/lib/shared/db'
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 })

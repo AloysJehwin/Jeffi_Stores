@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
-import { authenticateAdmin, type AdminJWTPayload } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin, type AdminJWTPayload } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
-import { parseBody } from '@/lib/validate'
-import { SECTION_TYPES, type SectionType } from '@/lib/homepage-sections'
+import { parseBody } from '@/lib/shared/validate'
+import { SECTION_TYPES, type SectionType } from '@/lib/catalog/homepage-sections'
 import {
   applyDraftOrder,
   endsBeforeStart,
@@ -12,7 +12,7 @@ import {
   nextDisplayOrder,
   withHomepageDraft,
   type DraftSection,
-} from '@/lib/homepage-draft'
+} from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 

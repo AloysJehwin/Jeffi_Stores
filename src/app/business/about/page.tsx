@@ -2,9 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { bp } from '@/lib/business-path'
-import { queryMany } from '@/lib/db'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { bp } from '@/lib/shared/business-path'
+import { queryMany } from '@/lib/shared/db'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 const CATEGORY_BRANDS: Record<string, string> = {

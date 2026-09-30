@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
-import { storeBaseUrlAsync } from '@/lib/brand'
+import { query } from '@/lib/shared/db'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

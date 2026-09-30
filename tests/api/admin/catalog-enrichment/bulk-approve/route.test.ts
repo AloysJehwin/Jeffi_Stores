@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 // reEmbed imports these dynamically — mock them
-vi.mock('@/lib/rag', () => ({ embed: vi.fn() }))
+vi.mock('@/lib/shared/rag', () => ({ embed: vi.fn() }))
 const mockPoolInstance = vi.hoisted(() => ({
   query: vi.fn().mockResolvedValue({}),
   end: vi.fn().mockResolvedValue(undefined),
@@ -21,9 +21,9 @@ vi.mock('pg', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/catalog-enrichment/bulk-approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -139,11 +139,11 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     mockQueryMany.mockResolvedValue(sampleRows as any)
     mockQuery.mockResolvedValue(undefined as any)
 
-    // reEmbed calls queryOne from @/lib/db via dynamic import.
+    // reEmbed calls queryOne from @/lib/shared/db via dynamic import.
     // Since that module is mocked, the dynamic import re-uses the mock.
     // We need queryOne to be called from within reEmbed — it returns null
     // meaning reEmbed returns false (can't embed), which is fine.
-    const { queryOne } = await import('@/lib/db')
+    const { queryOne } = await import('@/lib/shared/db')
     vi.mocked(queryOne).mockResolvedValue(null)
 
     const res = await POST(makeRequest({ ids: ['log-1', 'log-2'] }))
@@ -165,7 +165,7 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([sampleRows[0]] as any)
     mockQuery.mockResolvedValue(undefined as any)
-    const { queryOne } = await import('@/lib/db')
+    const { queryOne } = await import('@/lib/shared/db')
     vi.mocked(queryOne).mockResolvedValue(null)
 
     const res = await POST(makeRequest({ ids: ['log-1'] })) // no action field
@@ -188,8 +188,8 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     mockQueryMany.mockResolvedValue([sampleRows[0]] as any)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const { queryOne } = await import('@/lib/db')
-    const { embed } = await import('@/lib/rag')
+    const { queryOne } = await import('@/lib/shared/db')
+    const { embed } = await import('@/lib/shared/rag')
     vi.mocked(queryOne).mockResolvedValue({
       id: 'prod-1',
       name: 'Bolt M20',
@@ -219,8 +219,8 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     mockQueryMany.mockResolvedValue([sampleRows[1]] as any)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const { queryOne } = await import('@/lib/db')
-    const { embed } = await import('@/lib/rag')
+    const { queryOne } = await import('@/lib/shared/db')
+    const { embed } = await import('@/lib/shared/rag')
     vi.mocked(queryOne).mockResolvedValue({
       id: 'prod-2',
       name: 'Nut M10',
@@ -249,8 +249,8 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     mockQueryMany.mockResolvedValue([sampleRows[0]] as any)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const { queryOne } = await import('@/lib/db')
-    const { embed } = await import('@/lib/rag')
+    const { queryOne } = await import('@/lib/shared/db')
+    const { embed } = await import('@/lib/shared/rag')
     vi.mocked(queryOne).mockResolvedValue({
       id: 'prod-1',
       name: 'Bolt',

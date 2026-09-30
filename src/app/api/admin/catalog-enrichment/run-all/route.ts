@@ -1,11 +1,11 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
-import { aiChat } from '@/lib/ai-client'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
+import { aiChat } from '@/lib/shared/ai-client'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
   // Resolve the tenant's descriptor inside the request: the loop below outlives the response.
   const SYSTEM_PROMPT = systemPrompt(await storeDescriptorForPrompt())
-  const { resolveTenantId } = await import('@/lib/tenant-context')
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
   const cacheNamespace = (await resolveTenantId()) ?? 'platform'
 
   const candidates = await queryMany<ProductRow>(
@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         })
         const e = parseEnrichment(r.content)
 
-        const { query } = await import('@/lib/db')
+        const { query } = await import('@/lib/shared/db')
         await query(
           `INSERT INTO product_ai_enrichment_log
              (product_id, source_name, source_desc,

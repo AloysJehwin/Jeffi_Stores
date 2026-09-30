@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { clearPortalCookie } from '@/lib/portal-session'
+import { clearPortalCookie } from '@/lib/auth/portal-session'
 
 export const dynamic = 'force-dynamic'
 

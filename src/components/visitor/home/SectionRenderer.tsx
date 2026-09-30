@@ -28,10 +28,10 @@ import {
   safeHref,
   SECTION_COPY_DEFAULTS,
   type HomepageSection,
-} from '@/lib/homepage-sections'
-import { cardPropsFor } from '@/lib/product-card-props'
-import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/homepage-extras'
-import type { ProductOffer } from '@/lib/product-offers-shared'
+} from '@/lib/catalog/homepage-sections'
+import { cardPropsFor } from '@/lib/catalog/product-card-props'
+import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/catalog/homepage-extras'
+import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 export interface SectionData {
   heroSlides: any[]

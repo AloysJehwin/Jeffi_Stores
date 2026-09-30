@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params

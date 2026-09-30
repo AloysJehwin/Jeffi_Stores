@@ -1,37 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
 }))
-vi.mock('@/lib/invoice-pdf', () => ({
+vi.mock('@/lib/documents/invoice-pdf', () => ({
   generateInvoicePDF: vi.fn().mockResolvedValue(Buffer.from('pdf-data')),
 }))
-vi.mock('@/lib/receipt-pdf', () => ({
+vi.mock('@/lib/documents/receipt-pdf', () => ({
   generateReceiptPDF: vi.fn().mockResolvedValue(Buffer.from('receipt-data')),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadInvoicePDF: vi.fn().mockResolvedValue('https://s3.example.com/invoice.pdf'),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   getFinancialYear: vi.fn().mockReturnValue('2024-25'),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('invoice-data')),
 }))
 
 import { GET, POST } from '@/app/api/orders/[id]/invoice/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as invoicePdf from '@/lib/invoice-pdf'
-import * as receiptPdf from '@/lib/receipt-pdf'
-import * as invoiceLib from '@/lib/invoice'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as invoicePdf from '@/lib/documents/invoice-pdf'
+import * as receiptPdf from '@/lib/documents/receipt-pdf'
+import * as invoiceLib from '@/lib/documents/invoice'
 
 const USER = { userId: 'user-1', isBusiness: false }
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
@@ -257,7 +257,7 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   })
 
   it('returns 400 when generateOrderInvoice returns null', async () => {
-    const invoiceMod = await import('@/lib/invoice')
+    const invoiceMod = await import('@/lib/documents/invoice')
     vi.mocked(invoiceMod.generateOrderInvoice).mockResolvedValueOnce(null)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
@@ -272,7 +272,7 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   })
 
   it('returns success with invoice number after generation', async () => {
-    const invoiceMod = await import('@/lib/invoice')
+    const invoiceMod = await import('@/lib/documents/invoice')
     vi.mocked(invoiceMod.generateOrderInvoice).mockResolvedValueOnce(Buffer.from('pdf'))
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)

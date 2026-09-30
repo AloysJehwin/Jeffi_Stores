@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import SectionRenderer, { type SectionData } from '@/components/visitor/home/SectionRenderer'
-import type { HomepageSection, SectionType } from '@/lib/homepage-sections'
+import type { HomepageSection, SectionType } from '@/lib/catalog/homepage-sections'
 
 afterEach(cleanup)
 

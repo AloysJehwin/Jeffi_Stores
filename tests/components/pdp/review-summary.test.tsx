@@ -3,15 +3,15 @@ import { render, screen, cleanup } from '@testing-library/react'
 
 const { queryOneMock } = vi.hoisted(() => ({ queryOneMock: vi.fn() }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: queryOneMock,
   queryMany: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-import { toReviewSummary } from '@/lib/review-summary-types'
-import { getApprovedReviewSummary } from '@/lib/review-summary'
+import { toReviewSummary } from '@/lib/shared/review-summary-types'
+import { getApprovedReviewSummary } from '@/lib/shared/review-summary'
 import ReviewSummaryLink from '@/components/visitor/pdp/ReviewSummaryLink'
 
 afterEach(cleanup)

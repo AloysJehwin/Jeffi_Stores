@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/auth-sessions', () => ({ touchSession: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/auth-sessions', () => ({ touchSession: vi.fn() }))
 
 import { POST } from '@/app/api/admin/session/heartbeat/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { touchSession } from '@/lib/auth-sessions'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { touchSession } from '@/lib/auth/auth-sessions'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockTouch = vi.mocked(touchSession)

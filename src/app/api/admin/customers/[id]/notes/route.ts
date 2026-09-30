@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { zUuid } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { zUuid } from '@/lib/shared/validate'
 import {
   listNotes,
   createNote,
@@ -10,7 +10,7 @@ import {
   deleteNote,
   setNoteShared,
   MAX_ATTACHMENTS,
-} from '@/lib/customer-notes'
+} from '@/lib/shared/customer-notes'
 
 export const dynamic = 'force-dynamic'
 

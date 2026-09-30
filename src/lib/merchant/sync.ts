@@ -1,4 +1,4 @@
-import { queryOne, query } from '@/lib/db'
+import { queryOne, query } from '@/lib/shared/db'
 import { productToGmcItems } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
 import {

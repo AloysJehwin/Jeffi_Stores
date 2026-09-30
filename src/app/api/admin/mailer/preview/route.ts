@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { renderCampaignEmail } from '@/lib/email-campaigns'
-import { previewVarMap, substituteVars } from '@/lib/template-vars'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { previewVarMap, substituteVars } from '@/lib/shared/template-vars'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)

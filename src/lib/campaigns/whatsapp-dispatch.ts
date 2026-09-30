@@ -1,13 +1,13 @@
-import { queryOne } from '@/lib/db'
-import { canSendMarketing } from '@/lib/marketing'
-import type { CampaignKind } from '@/lib/marketing'
+import { queryOne } from '@/lib/shared/db'
+import { canSendMarketing } from '@/lib/shared/marketing'
+import type { CampaignKind } from '@/lib/shared/marketing'
 import { CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import {
   sendAbandonedCartWhatsApp,
   sendBackInStockWhatsApp,
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
-} from '@/lib/whatsapp'
+} from '@/lib/shared/whatsapp'
 
 // Campaign → WhatsApp bridge. Fire-and-forget from a scenario's send() when
 // params.whatsappEnabled is true. Sends the kind's mapped template to the

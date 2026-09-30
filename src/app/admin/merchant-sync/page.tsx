@@ -1,6 +1,6 @@
 import MerchantSyncClient from './_components/MerchantSyncClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { listIntegrationCredentials } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'

@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { formatINR, formatDate } from '@/lib/format'
+import { formatINR, formatDate } from '@/lib/shared/format'
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-surface-secondary text-foreground-secondary',

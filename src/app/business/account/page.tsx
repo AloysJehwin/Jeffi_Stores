@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 import { BusinessAccountMobileTabBar } from '@/components/business/AccountMobileHeader'
 // BusinessAccountNavBar is rendered by layout.tsx for all /business/account/* pages
 

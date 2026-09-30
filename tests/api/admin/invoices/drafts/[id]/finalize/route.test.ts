@@ -3,23 +3,23 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must be before imports) ────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   getFinancialYear: vi.fn().mockReturnValue('2024-25'),
   generateInvoiceNumber: vi.fn().mockReturnValue('JS/2024-25/0001'),
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
-vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn(), recomputeStockStatusForProduct: vi.fn() }))
+vi.mock('@/lib/orders/inventory', () => ({ logStockMovement: vi.fn(), recomputeStockStatusForProduct: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   generateOrderInvoice: vi.fn(),
   assignInvoiceNumber: vi.fn().mockResolvedValue('JS/2024-25/0001'),
 }))
@@ -27,11 +27,11 @@ vi.mock('@/lib/invoice', () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/invoices/drafts/[id]/finalize/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, withTransaction } from '@/lib/shared/db'
 import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { generateOrderInvoice } from '@/lib/documents/invoice'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

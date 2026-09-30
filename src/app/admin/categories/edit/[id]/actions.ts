@@ -1,12 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne } from '@/lib/db'
-import { publishCategoryDraft } from '@/lib/category-draft'
-import { suggestIcon } from '@/lib/icon-suggest'
+import { query, queryOne } from '@/lib/shared/db'
+import { publishCategoryDraft } from '@/lib/catalog/category-draft'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
 
 export async function updateCategory(categoryId: string, formData: FormData) {
   const name = formData.get('name') as string

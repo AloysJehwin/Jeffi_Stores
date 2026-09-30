@@ -1,15 +1,15 @@
 import { notFound } from 'next/navigation'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
-import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
-import { pickUnitPrice } from '@/lib/pricing'
+import { getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 import type { Metadata } from 'next'
 import CompareChangeButton from '@/components/visitor/CompareChangeButton'
 import CompareAddButton from '@/components/visitor/CompareAddButton'

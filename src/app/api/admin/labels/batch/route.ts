@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getHost } from '@/lib/get-host'
-import { ap } from '@/lib/admin-path'
-import { queryMany } from '@/lib/db'
-import { generateBatchLabelPDF, generateSerialLabelPDF, type LabelBatch, type LabelSerial } from '@/lib/label-pdf'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getHost } from '@/lib/tenancy/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { queryMany } from '@/lib/shared/db'
+import { generateBatchLabelPDF, generateSerialLabelPDF, type LabelBatch, type LabelSerial } from '@/lib/documents/label-pdf'
 
 function buildQrUrl(host: string, productId: string, sku?: string | null): string {
   const params = new URLSearchParams({ scan_pid: productId })

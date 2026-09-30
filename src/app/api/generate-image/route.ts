@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiDenial } from '@/lib/ai-scope'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiDenial } from '@/lib/auth/ai-scope'
 
 export const dynamic = 'force-dynamic'
 

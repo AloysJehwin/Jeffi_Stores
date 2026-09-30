@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface SignupEntry {
   id: string

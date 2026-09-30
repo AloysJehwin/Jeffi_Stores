@@ -1,23 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
-import { cartLineUnitPrice, cartItemsForHash, cartSubtotal, cartTaxAmount, type CartLine } from '@/lib/order-commit'
+import { cartLineUnitPrice, cartItemsForHash, cartSubtotal, cartTaxAmount, type CartLine } from '@/lib/orders/order-commit'
 
 beforeEach(() => vi.clearAllMocks())
 

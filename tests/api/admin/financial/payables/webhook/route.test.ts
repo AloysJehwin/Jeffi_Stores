@@ -4,7 +4,7 @@ import crypto from 'crypto'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@/lib/db', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/financial/payables/webhook/route'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

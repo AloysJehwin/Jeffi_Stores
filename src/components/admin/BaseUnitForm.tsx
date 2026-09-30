@@ -1,5 +1,5 @@
 import AdminSelect from '@/components/admin/AdminSelect'
-import { Dimension, DIMENSION_LABEL, UNITS } from '@/lib/units'
+import { Dimension, DIMENSION_LABEL, UNITS } from '@/lib/catalog/units'
 
 // ── Read-only base unit row ──
 

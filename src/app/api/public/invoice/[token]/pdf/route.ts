@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryOne } from '@/lib/db'
-import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
-import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/documents/invoice-pdf'
+import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/documents/receipt-pdf'
 
 export const dynamic = 'force-dynamic'
 

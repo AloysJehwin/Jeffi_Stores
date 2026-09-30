@@ -21,7 +21,7 @@ import {
   Package,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 const FUNNEL_LABELS: Record<string, string> = {
   home: 'Homepage',

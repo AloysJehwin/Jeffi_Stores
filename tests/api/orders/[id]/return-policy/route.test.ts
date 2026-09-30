@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/return-policy', () => ({
+vi.mock('@/lib/catalog/return-policy', () => ({
   getOrderItemsPolicy: vi.fn(),
 }))
 
 import { GET } from '@/app/api/orders/[id]/return-policy/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as returnPolicy from '@/lib/return-policy'
-import type { OrderItemPolicy } from '@/lib/return-policy'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as returnPolicy from '@/lib/catalog/return-policy'
+import type { OrderItemPolicy } from '@/lib/catalog/return-policy'
 
 const USER = { userId: 'user-1' }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }

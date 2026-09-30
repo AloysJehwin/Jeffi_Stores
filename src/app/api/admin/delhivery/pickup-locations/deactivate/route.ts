@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { deactivateDelhiveryPickupLocation } from '@/lib/delhivery'
-import { getBusinessValues } from '@/lib/site-controls'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { deactivateDelhiveryPickupLocation } from '@/lib/shipping/delhivery'
+import { getBusinessValues } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

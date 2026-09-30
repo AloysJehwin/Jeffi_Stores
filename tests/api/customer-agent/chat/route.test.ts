@@ -1,12 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
     constructor(
@@ -40,14 +40,14 @@ vi.mock('@/lib/customer-agent/tools', () => ({
   ],
   getCustomerTool: vi.fn(),
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/customer-agent/chat/route'
-import { authenticateUser } from '@/lib/jwt'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 import { getCustomerTool } from '@/lib/customer-agent/tools'
 
 const mockAuth = vi.mocked(authenticateUser)

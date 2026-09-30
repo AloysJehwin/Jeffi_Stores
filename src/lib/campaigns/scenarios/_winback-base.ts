@@ -1,5 +1,5 @@
-import { queryMany } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/automation-emails'
+import { queryMany } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule, ParamSchema } from '../types'
 

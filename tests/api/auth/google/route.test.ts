@@ -25,7 +25,7 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: vi.fn(),
@@ -34,20 +34,20 @@ vi.mock('@/lib/db', () => ({
 
 // Opaque sessions: the route issues a server-side session and sets cookie = sid.
 // Mocking issueUserToken avoids exercising createSession's DB INSERT.
-vi.mock('@/lib/issue-session', () => ({
+vi.mock('@/lib/auth/issue-session', () => ({
   issueUserToken: mockIssueUserToken,
   USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadAvatarImage: mockUploadAvatarImage,
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 

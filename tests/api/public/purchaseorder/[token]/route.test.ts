@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -8,7 +8,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import { GET } from '@/app/api/public/purchaseorder/[token]/route'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
-import { lineItemExGst } from '@/lib/pricing'
+import { lineItemExGst } from '@/lib/catalog/pricing'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)

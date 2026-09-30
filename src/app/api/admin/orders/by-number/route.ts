@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { queryOne } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)

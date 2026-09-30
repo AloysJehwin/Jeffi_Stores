@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
-vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
+vi.mock('@/lib/documents/invoice', () => ({ generateOrderInvoice: vi.fn().mockResolvedValue(null) }))
 
 import { GET, POST } from '@/app/api/admin/financial/cod-remittance/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany, query } from '@/lib/shared/db'
 
 const ADMIN = { adminId: 'a1', role: 'administrator', scopes: ['finance'] }
 

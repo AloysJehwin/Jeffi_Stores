@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireStaff, isStaffDenied } from '@/lib/staff-auth'
-import { searchOrdersForCustomer } from '@/lib/customer-notes'
-import { zUuid } from '@/lib/validate'
+import { requireStaff, isStaffDenied } from '@/lib/auth/staff-auth'
+import { searchOrdersForCustomer } from '@/lib/shared/customer-notes'
+import { zUuid } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

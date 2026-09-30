@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // Mock auth
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn().mockReturnValue(true),
 }))
 
@@ -13,7 +13,7 @@ const mockQuery = vi.fn()
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
 const mockGetClient = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
@@ -22,7 +22,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 const mockGetCampaign = vi.fn()
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: (...a: any[]) => mockGetCampaign(...a),
 }))
 
@@ -40,8 +40,8 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
   validateScenarioSql: (...a: any[]) => mockValidateScenarioSql(...a),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { GET, PATCH, DELETE } from '@/app/api/admin/campaigns/[kind]/draft/route'
 import { POST as publishPost } from '@/app/api/admin/campaigns/[kind]/publish/route'
 import { GET as eligibleGet } from '@/app/api/admin/campaigns/[kind]/eligible/route'

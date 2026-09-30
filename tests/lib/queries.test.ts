@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -8,14 +8,14 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn().mockReturnValue({ clause: '1=1', params: [], nextIdx: 2 }),
   buildProductSearchClause: vi.fn().mockReturnValue({ clause: '1=1', params: [], nextIdx: 2 }),
   buildProductSearchRank: vi.fn().mockReturnValue({ rank: '0::int', params: [], nextIdx: 2 }),
   buildVectorSearchClause: vi.fn().mockReturnValue({ clause: '1=1', params: [], nextIdx: 2 }),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   getStockValuation: vi.fn().mockResolvedValue({ totalValue: 0 }),
 }))
 
@@ -53,7 +53,7 @@ import {
   EFFECTIVE_STOCK_SQL,
   EFFECTIVE_PRICE_SQL,
 } from '@/lib/queries'
-import { queryOne, queryMany, queryCount } from '@/lib/db'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)

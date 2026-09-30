@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
 import { NextRequest } from 'next/server'
-import { isPlatformOwner } from '@/lib/scopes'
-import { assignableScopeKeys } from '@/lib/scopes-server'
-import { resolveRequestTenantId } from '@/lib/request-tenant'
-import { revokeAllForPrincipal } from '@/lib/auth-sessions'
-import { revokePortalCerts } from '@/lib/portal-certs'
+import { isPlatformOwner } from '@/lib/auth/scopes'
+import { assignableScopeKeys } from '@/lib/auth/scopes-server'
+import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
+import { revokeAllForPrincipal } from '@/lib/auth/auth-sessions'
+import { revokePortalCerts } from '@/lib/tenancy/portal-certs'
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -63,7 +63,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (idle_timeout_minutes !== undefined) {
       // null clears the per-admin override (falls back to the default); otherwise must be one of
       // the allowed choices.
-      const { ADMIN_IDLE_TIMEOUT_CHOICES } = await import('@/lib/auth-sessions')
+      const { ADMIN_IDLE_TIMEOUT_CHOICES } = await import('@/lib/auth/auth-sessions')
       if (idle_timeout_minutes !== null && !ADMIN_IDLE_TIMEOUT_CHOICES.includes(idle_timeout_minutes)) {
         return NextResponse.json({ error: 'Invalid idle timeout' }, { status: 400 })
       }

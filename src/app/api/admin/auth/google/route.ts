@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
-import { issueMfaTicket } from '@/lib/mfa'
-import { resolveAdminByEmail, enforceCertGate } from '@/lib/admin-identity'
-import { logActivity } from '@/lib/activity'
+import { query } from '@/lib/shared/db'
+import { issueMfaTicket } from '@/lib/auth/mfa'
+import { resolveAdminByEmail, enforceCertGate } from '@/lib/auth/admin-identity'
+import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
 

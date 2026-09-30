@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADMIN_SCOPES, ALL_SCOPE_KEYS, TENANT_SCOPE_KEYS, assignableScopes } from '@/lib/scopes'
+import { ADMIN_SCOPES, ALL_SCOPE_KEYS, TENANT_SCOPE_KEYS, assignableScopes } from '@/lib/auth/scopes'
 
 const ECOM = [
   'ecom_customers:read',

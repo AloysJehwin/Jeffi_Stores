@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { resolveShipmentStatus } from '@/lib/shipment-status'
+import { resolveShipmentStatus } from '@/lib/shipping/shipment-status'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

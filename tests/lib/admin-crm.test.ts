@@ -1,12 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
 import { vi as _vi } from 'vitest'
 
 // We test the pure transformation logic directly — DB is mocked
-import { getCrmDashboardData } from '@/lib/admin-crm'
-import * as db from '@/lib/db'
+import { getCrmDashboardData } from '@/lib/shared/admin-crm'
+import * as db from '@/lib/shared/db'
 
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import AccountSearch from '@/components/visitor/AccountSearch'
 

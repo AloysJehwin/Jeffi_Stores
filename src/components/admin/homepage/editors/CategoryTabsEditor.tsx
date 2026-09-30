@@ -1,6 +1,6 @@
 'use client'
 
-import { configIds, configNumber } from '@/lib/homepage-sections'
+import { configIds, configNumber } from '@/lib/catalog/homepage-sections'
 import {
   Grid,
   HeadingFields,

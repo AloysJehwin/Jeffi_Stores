@@ -1,9 +1,9 @@
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/auth/scopes'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(

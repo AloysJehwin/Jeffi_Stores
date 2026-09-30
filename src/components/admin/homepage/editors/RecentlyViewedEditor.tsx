@@ -1,6 +1,6 @@
 'use client'
 
-import { configNumber } from '@/lib/homepage-sections'
+import { configNumber } from '@/lib/catalog/homepage-sections'
 import {
   Grid,
   LimitField,

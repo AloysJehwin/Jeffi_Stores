@@ -12,7 +12,7 @@ export async function sendAdminCertificateEmail(
   tenant?: { slug: string; storeName: string }
 ) {
   // portal: invite only, never the .p12 or password. both: attachment plus the portal link. email: attachment only.
-  const { certDeliveryMode, certPortalUrl } = await import('../cert-delivery')
+  const { certDeliveryMode, certPortalUrl } = await import('@/lib/tenancy/cert-delivery')
   const mode = certDeliveryMode()
   if (mode === 'portal') {
     return sendCertInviteEmail(email, displayName, role, tenant)
@@ -132,7 +132,7 @@ export async function sendCertInviteEmail(
   role: string,
   tenant?: { slug: string; storeName: string }
 ) {
-  const { certPortalUrl } = await import('../cert-delivery')
+  const { certPortalUrl } = await import('@/lib/tenancy/cert-delivery')
   const portalUrl = certPortalUrl()
   const from = tenant
     ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`

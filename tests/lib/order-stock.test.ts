@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ withTransaction: vi.fn() }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/shared/db', () => ({ withTransaction: vi.fn() }))
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
   recomputeStockStatusForProduct: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/catalog/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
 
-import { restoreOrderStock } from '@/lib/order-stock'
-import { withTransaction } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock } from '@/lib/shelf'
+import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { withTransaction } from '@/lib/shared/db'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { syncPerishableStock } from '@/lib/catalog/shelf'
 
 type Route = (sql: string, params: any[]) => any
 const PLAIN = { rows: [{ perishable: false, serialized: false }] }

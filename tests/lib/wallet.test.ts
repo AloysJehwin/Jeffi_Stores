@@ -5,7 +5,7 @@ const pool = { query: vi.fn(), connect: vi.fn().mockResolvedValue(client) }
 
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => pool }))
 
-import { rechargeWallet, correctWalletDebitForAwb } from '@/lib/wallet'
+import { rechargeWallet, correctWalletDebitForAwb } from '@/lib/payments/wallet'
 
 beforeEach(() => {
   vi.clearAllMocks()

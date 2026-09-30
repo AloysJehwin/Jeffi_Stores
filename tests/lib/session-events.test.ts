@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('@/lib/redis', () => ({ getRedisClient: () => ({ get: vi.fn(), set: vi.fn() }) }))
+vi.mock('@/lib/shared/redis', () => ({ getRedisClient: () => ({ get: vi.fn(), set: vi.fn() }) }))
 
-import { publishSessionEvent, subscribeSessionEvents } from '@/lib/session-events'
+import { publishSessionEvent, subscribeSessionEvents } from '@/lib/auth/session-events'
 
 describe('session events (in-process fallback when redis has no pub/sub)', () => {
   it('delivers a published event to a subscriber of the same session only', async () => {

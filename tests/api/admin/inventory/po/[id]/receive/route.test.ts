@@ -3,20 +3,20 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   getClient: vi.fn(),
 }))
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
   updateWeightedAvgCost: vi.fn(),
   recomputeStockStatusForProduct: vi.fn(),
 }))
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   adjustStock: vi.fn(),
   syncPerishableStock: vi.fn(),
   getOrCreateOpenShelf: vi.fn().mockResolvedValue('shelf-open-1'),
@@ -24,7 +24,7 @@ vi.mock('@/lib/shelf', () => ({
 vi.mock('@/lib/email', () => ({
   sendPOReceiveNotificationEmail: vi.fn(),
 }))
-vi.mock('@/lib/validate', async () => {
+vi.mock('@/lib/shared/validate', async () => {
   const { z } = await import('zod')
   return {
     parseBody: vi.fn(),
@@ -35,13 +35,13 @@ vi.mock('@/lib/validate', async () => {
 // ── Imports ────────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/inventory/po/[id]/receive/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, getClient } from '@/lib/db'
-import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, getClient } from '@/lib/shared/db'
+import { logStockMovement, updateWeightedAvgCost } from '@/lib/orders/inventory'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
-import { adjustStock, syncPerishableStock } from '@/lib/shelf'
-import { parseBody } from '@/lib/validate'
+import { adjustStock, syncPerishableStock } from '@/lib/catalog/shelf'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

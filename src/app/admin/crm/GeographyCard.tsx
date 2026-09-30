@@ -1,8 +1,8 @@
 'use client'
 
 import { ListRows, rsCompact, numStr } from '@/components/admin/dashboard/Primitives'
-import { ap } from '@/lib/admin-path'
-import type { GeoRow } from '@/lib/crm-insights-shared'
+import { ap } from '@/lib/shared/admin-path'
+import type { GeoRow } from '@/lib/shared/crm-insights-shared'
 
 export default function GeographyCard({ states, cities }: { states: GeoRow[]; cities: GeoRow[] }) {
   if (states.length === 0 && cities.length === 0) return null

@@ -11,7 +11,7 @@ import {
   CARTON_MAX_WEIGHT_GRAMS,
   type ShipmentItem,
   type StoredDims,
-} from '@/lib/shipping'
+} from '@/lib/shipping/shipping'
 
 // ---------------------------------------------------------------------------
 // Helpers

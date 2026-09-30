@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -9,22 +9,22 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 2 }),
 }))
 
 import { GET, POST } from '@/app/api/admin/review-forms/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryCount } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryCount } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -82,7 +82,7 @@ describe('GET /api/admin/review-forms', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
     mockQueryCount.mockResolvedValue(0)
-    const { buildSearchClause } = await import('@/lib/search')
+    const { buildSearchClause } = await import('@/lib/catalog/search')
     await GET(makeGetReq({ search: 'rate' }))
     expect(buildSearchClause).toHaveBeenCalledWith('rate', expect.any(Array), expect.any(Number))
   })

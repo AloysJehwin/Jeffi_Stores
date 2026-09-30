@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { isPlatformAdmin } from '@/lib/scopes'
-import { parseBody } from '@/lib/validate'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
+import { parseBody } from '@/lib/shared/validate'
 import { getTenant, setOwnRazorpay } from '@/lib/tenant-registry'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 

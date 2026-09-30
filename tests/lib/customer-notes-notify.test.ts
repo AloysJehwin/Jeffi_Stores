@@ -4,18 +4,18 @@ const mockSendAuditedMail = vi.fn()
 const mockOwnerAdminEmails = vi.fn()
 const mockListNotesSince = vi.fn()
 
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: (...a: unknown[]) => mockSendAuditedMail(...a) }))
-vi.mock('@/lib/brand', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: (...a: unknown[]) => mockSendAuditedMail(...a) }))
+vi.mock('@/lib/catalog/brand', () => ({
   adminMailFrom: () => '"Jeffi Stores" <admin@jeffistores.in>',
   currentBrandNameAsync: async () => 'Jeffi Stores',
   currentAdminBaseUrl: () => 'https://admin.jeffistores.in/admin',
 }))
-vi.mock('@/lib/customer-notes', () => ({
+vi.mock('@/lib/shared/customer-notes', () => ({
   ownerAdminEmails: (...a: unknown[]) => mockOwnerAdminEmails(...a),
   listNotesSince: (...a: unknown[]) => mockListNotesSince(...a),
 }))
 
-import { notifyOwnersOfNote, sendNotesDigest } from '@/lib/customer-notes-notify'
+import { notifyOwnersOfNote, sendNotesDigest } from '@/lib/shared/customer-notes-notify'
 
 const note = {
   id: 'n1',

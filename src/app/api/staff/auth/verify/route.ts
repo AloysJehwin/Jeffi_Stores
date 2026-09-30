@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/otp'
-import { resolveAdminByEmail } from '@/lib/admin-identity'
-import { resolveTenantId } from '@/lib/tenant-context'
-import { issueStaffToken, setStaffCookie } from '@/lib/staff-session'
-import { staffOtpKey } from '@/lib/staff-auth'
+import { verifyOTP, deleteOTP } from '@/lib/auth/otp'
+import { resolveAdminByEmail } from '@/lib/auth/admin-identity'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { issueStaffToken, setStaffCookie } from '@/lib/auth/staff-session'
+import { staffOtpKey } from '@/lib/auth/staff-auth'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,11 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
-import { queryOne } from '@/lib/db'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import { queryOne } from '@/lib/shared/db'
 import BrandForm from '@/components/admin/BrandForm'
 import { ChevronLeft } from 'lucide-react'
-import { getAdminSession } from '@/lib/admin-auth'
-import { hasScope } from '@/lib/scopes'
+import { getAdminSession } from '@/lib/auth/admin-auth'
+import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
 
 async function getBrand(id: string) {

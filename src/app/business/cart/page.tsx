@@ -12,8 +12,8 @@ import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import CopySku from '@/components/ui/CopySku'
-import { mrpDiscountPct, applyDiscount } from '@/lib/pricing'
-import { bp } from '@/lib/business-path'
+import { mrpDiscountPct, applyDiscount } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 
 interface AppliedCoupon {
   couponId: string

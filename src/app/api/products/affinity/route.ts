@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { frequentlyBoughtWith, alsoViewedWith } from '@/lib/product-affinity'
-import { getProductCardsByIds, cardPropsFor } from '@/lib/product-cards'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { frequentlyBoughtWith, alsoViewedWith } from '@/lib/catalog/product-affinity'
+import { getProductCardsByIds, cardPropsFor } from '@/lib/catalog/product-cards'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

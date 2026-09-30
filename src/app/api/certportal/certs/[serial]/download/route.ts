@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/portal-session'
-import { decryptPortalSecret } from '@/lib/portal-certs'
+import { verifyPortalToken, PORTAL_COOKIE } from '@/lib/auth/portal-session'
+import { decryptPortalSecret } from '@/lib/tenancy/portal-certs'
 
 export const dynamic = 'force-dynamic'
 

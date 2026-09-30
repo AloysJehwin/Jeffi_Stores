@@ -1,5 +1,5 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 // On the platform (flagship) admin there is no ALS tenant — middleware sets one only on tenant
 // hosts. import_jobs.tenant_id is NOT NULL, so flagship jobs are keyed to this sentinel; the worker

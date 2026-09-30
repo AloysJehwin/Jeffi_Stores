@@ -21,7 +21,7 @@ import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Category {

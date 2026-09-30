@@ -1,5 +1,5 @@
 import { getTenant, getKyc, controlPlanePool } from '../tenant-registry'
-import { getS3Url } from '../s3'
+import { getS3Url } from '@/lib/shared/s3'
 import { buildTenantPolicies, POLICY_VERSION, type TenantLegalInfo } from './generate'
 
 // Provisioning glue for per-tenant legals. Fetches the tenant's business identity (KYC) +

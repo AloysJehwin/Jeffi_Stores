@@ -1,12 +1,12 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
   authenticateUser: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock('@/lib/jwt', () => ({
 }))
 
 import { GET } from '@/app/api/gallery/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)

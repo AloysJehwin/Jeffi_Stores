@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Hoist mock functions so vi.mock factory can reference them ────────────────
 // mockSign/mockJwtVerify back the jose mock used by the still-stateless REVIEW tokens.
-// mockResolveSession backs @/lib/auth-sessions — the opaque server-side session store
+// mockResolveSession backs @/lib/auth/auth-sessions — the opaque server-side session store
 // that every authenticate*/verify* function now delegates to.
 const { mockSign, mockJwtVerify, mockResolveSession } = vi.hoisted(() => ({
   mockSign: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('jose', () => {
 })
 
 // ── Mock the opaque session store (single source of truth for auth) ───────────
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   resolveSession: mockResolveSession,
 }))
 
@@ -69,7 +69,7 @@ vi.mock('next/server', () => ({
 }))
 
 // ── Mock ./scopes ─────────────────────────────────────────────────────────────
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn((role: string, scopes: string[], required: string) => {
     if (role === 'super_admin') return true
     return scopes.includes(required)
@@ -78,7 +78,7 @@ vi.mock('@/lib/scopes', () => ({
 }))
 
 // ── Mock ./audit-context ──────────────────────────────────────────────────────
-vi.mock('@/lib/audit-context', () => ({
+vi.mock('@/lib/auth/audit-context', () => ({
   setAuditAdminId: vi.fn(),
 }))
 
@@ -101,8 +101,8 @@ function makeRequest(opts: {
 }
 
 // ── Import after mocks ────────────────────────────────────────────────────────
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
-import * as dbMod from '@/lib/db'
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
+import * as dbMod from '@/lib/shared/db'
 const mockDbQueryOne = vi.mocked(dbMod.queryOne)
 
 import {
@@ -121,7 +121,7 @@ import {
   authenticateServiceAccount,
   JWT_EXPIRES_IN,
   JWT_MAX_AGE_S,
-} from '@/lib/jwt'
+} from '@/lib/auth/jwt'
 
 beforeEach(() => {
   vi.clearAllMocks()

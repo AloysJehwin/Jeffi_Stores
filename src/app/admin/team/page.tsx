@@ -1,12 +1,12 @@
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES, isPlatformOwner, assignableScopes } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner, assignableScopes } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
@@ -108,7 +108,7 @@ export default async function TeamPage() {
   let visibleScopes = assignableScopes(false)
   let planSlug: string | null = null
   if (tenantId) {
-    const { getTenantPlan } = await import('@/lib/plan-gate')
+    const { getTenantPlan } = await import('@/lib/auth/plan-gate')
     const { plan, scopes } = await getTenantPlan(tenantId)
     planSlug = plan
     if (scopes.size > 0) visibleScopes = visibleScopes.filter(s => scopes.has(s.key))

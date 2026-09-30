@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryCount: vi.fn(),
   queryOne: vi.fn(),
 }))
 
 import { GET } from '@/app/api/orders/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const USER = { userId: 'user-1', isBusiness: false }
 const BIZ_USER = { userId: 'biz-user-1', isBusiness: true }

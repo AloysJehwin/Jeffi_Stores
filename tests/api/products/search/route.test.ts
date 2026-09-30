@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/shared/rag', () => ({
   embed: vi.fn(),
   runWithHnswTuning: vi.fn(),
 }))
-vi.mock('@/lib/storefront-ai', () => ({ storefrontAiAllowed: vi.fn() }))
+vi.mock('@/lib/shared/storefront-ai', () => ({ storefrontAiAllowed: vi.fn() }))
 
 import { GET } from '@/app/api/products/search/route'
-import { queryMany } from '@/lib/db'
-import { embed, runWithHnswTuning } from '@/lib/rag'
-import { storefrontAiAllowed } from '@/lib/storefront-ai'
+import { queryMany } from '@/lib/shared/db'
+import { embed, runWithHnswTuning } from '@/lib/shared/rag'
+import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockEmbed = vi.mocked(embed)

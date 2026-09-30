@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { queryOne, query, resolveRequestTenant } from '@/lib/db'
-import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
-import { applyVariantChange } from '@/lib/variant-change'
-import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
+import { applyVariantChange } from '@/lib/orders/variant-change'
+import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { logActivity } from '@/lib/activity'
+import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { parseBody } from '@/lib/validate'
-import { setSubVariantActive } from '@/lib/variant-status'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { parseBody } from '@/lib/shared/validate'
+import { setSubVariantActive } from '@/lib/orders/variant-status'
 
 export const dynamic = 'force-dynamic'
 

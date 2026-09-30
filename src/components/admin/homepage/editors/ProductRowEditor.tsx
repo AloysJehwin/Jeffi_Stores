@@ -1,6 +1,6 @@
 'use client'
 
-import { configNumber, productSource } from '@/lib/homepage-sections'
+import { configNumber, productSource } from '@/lib/catalog/homepage-sections'
 import {
   CtaFields,
   Grid,

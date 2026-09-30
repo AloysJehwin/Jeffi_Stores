@@ -9,16 +9,16 @@ const { queryMock, queryOneMock, queryManyMock, queryCountMock, authenticateAdmi
   authenticateAdminMock: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: queryMock,
   queryOne: queryOneMock,
   queryMany: queryManyMock,
   queryCount: queryCountMock,
 }))
 
-vi.mock('@/lib/jwt', async () => {
+vi.mock('@/lib/auth/jwt', async () => {
   const { NextResponse } = await import('next/server')
-  const { hasScope } = await vi.importActual<typeof import('@/lib/scopes')>('@/lib/scopes')
+  const { hasScope } = await vi.importActual<typeof import('@/lib/auth/scopes')>('@/lib/auth/scopes')
   return {
     authenticateAdmin: authenticateAdminMock,
     authenticateUser: vi.fn().mockResolvedValue(null),

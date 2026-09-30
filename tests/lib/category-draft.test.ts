@@ -5,13 +5,13 @@ const mockQuery = vi.fn()
 const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...a: any[]) => mockQueryOne(...a),
   query: (...a: any[]) => mockQuery(...a),
   withTransaction: (...a: any[]) => mockWithTransaction(...a),
 }))
 
-import { publishCategoryDraft } from '@/lib/category-draft'
+import { publishCategoryDraft } from '@/lib/catalog/category-draft'
 
 describe('publishCategoryDraft', () => {
   beforeEach(() => {

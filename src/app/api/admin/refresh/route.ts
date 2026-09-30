@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/jwt'
-import { extendSession } from '@/lib/auth-sessions'
-import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
+import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/auth/jwt'
+import { extendSession } from '@/lib/auth/auth-sessions'
+import { adminCookieName, adminCookieDomain } from '@/lib/auth/admin-cookie'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)

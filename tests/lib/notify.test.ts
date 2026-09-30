@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/sms', () => ({
+vi.mock('@/lib/shared/sms', () => ({
   sendOrderConfirmedSMS: vi.fn().mockResolvedValue(true),
   sendOrderShippedSMS: vi.fn().mockResolvedValue(true),
   sendOrderDeliveredSMS: vi.fn().mockResolvedValue(true),
@@ -13,7 +13,7 @@ vi.mock('@/lib/sms', () => ({
   sendOutForDeliverySMS: vi.fn().mockResolvedValue(true),
 }))
 
-vi.mock('@/lib/whatsapp', () => ({
+vi.mock('@/lib/shared/whatsapp', () => ({
   sendOrderConfirmedWhatsApp: vi.fn().mockResolvedValue(true),
   sendOrderShippedWhatsApp: vi.fn().mockResolvedValue(true),
   sendOrderDeliveredWhatsApp: vi.fn().mockResolvedValue(true),
@@ -29,10 +29,10 @@ import {
   notifyOrderCancelled,
   notifyOutForDelivery,
   notifyPaymentFailed,
-} from '@/lib/notify'
-import { queryOne } from '@/lib/db'
-import * as sms from '@/lib/sms'
-import * as wa from '@/lib/whatsapp'
+} from '@/lib/shared/notify'
+import { queryOne } from '@/lib/shared/db'
+import * as sms from '@/lib/shared/sms'
+import * as wa from '@/lib/shared/whatsapp'
 
 const mockQueryOne = vi.mocked(queryOne)
 

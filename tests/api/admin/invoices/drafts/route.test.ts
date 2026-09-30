@@ -1,36 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ taxableAmount: 80, cgst: 7.2, sgst: 7.2, igst: 0 }),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn().mockReturnValue(100),
 }))
 
 import { GET, POST } from '@/app/api/admin/invoices/drafts/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, withTransaction } from '@/lib/db'
-import { isInterState } from '@/lib/gst'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, withTransaction } from '@/lib/shared/db'
+import { isInterState } from '@/lib/catalog/gst'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

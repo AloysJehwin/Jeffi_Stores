@@ -1,16 +1,16 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {},
 }))
-vi.mock('@/lib/validate', async importOriginal => {
-  const actual = await importOriginal<typeof import('@/lib/validate')>()
+vi.mock('@/lib/shared/validate', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
 })
 
 import { POST } from '@/app/api/reviews/generate/route'
-import { aiChat } from '@/lib/ai-client'
+import { aiChat } from '@/lib/shared/ai-client'
 
 const mockAiChat = vi.mocked(aiChat)
 

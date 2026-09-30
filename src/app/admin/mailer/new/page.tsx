@@ -7,8 +7,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
-import { ap } from '@/lib/admin-path'
-import { formsHostForHost } from '@/lib/forms-host'
+import { ap } from '@/lib/shared/admin-path'
+import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [

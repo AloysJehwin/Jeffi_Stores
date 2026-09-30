@@ -12,11 +12,11 @@ const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQueryMany = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateBusiness: mockAuthenticateBusiness,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,

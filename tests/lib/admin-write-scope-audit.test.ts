@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import glob from 'fast-glob'
-import { AI_ACTION_SCOPES } from '@/lib/ai-scope'
+import { AI_ACTION_SCOPES } from '@/lib/auth/ai-scope'
 
 /**
  * Every mutating admin endpoint must gate on a :write scope, so an action is never reachable

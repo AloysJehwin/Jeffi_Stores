@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('@/lib/campaigns/template-validation', () => ({
   validateCampaignBodyTemplate: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   const { z } = require('zod')
   const zNonEmpty = z.string().min(1)
   return {
@@ -44,9 +44,9 @@ vi.mock('@/lib/validate', () => {
 // ---------------------------------------------------------------------------
 
 import { GET, POST } from '@/app/api/admin/campaigns/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query } from '@/lib/shared/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 // ---------------------------------------------------------------------------

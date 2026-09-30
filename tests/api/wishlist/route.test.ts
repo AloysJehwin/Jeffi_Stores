@@ -6,13 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Expose the spies via vi.mocked() after import instead.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
@@ -25,15 +25,15 @@ vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }))
 
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/guest-user', () => ({
+vi.mock('@/lib/shared/guest-user', () => ({
   getUserIdForSession: vi.fn().mockResolvedValue('guest-user-uuid'),
 }))
 
@@ -45,7 +45,7 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_MRP_SQL: `(SELECT MIN(pv.mrp) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_STOCK_TOTAL_SQL: `(SELECT COALESCE(SUM(pv.inventory_quantity),0) FROM product_variants pv WHERE pv.product_id = p.id)`,
 }))
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: false,
     gstEnabled: false,
@@ -58,8 +58,8 @@ vi.mock('@/lib/site-controls', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 import { GET, POST, DELETE } from '@/app/api/wishlist/route'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 
 const USER_ID = '550e8400-e29b-41d4-a716-446655440001'
 const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440002'

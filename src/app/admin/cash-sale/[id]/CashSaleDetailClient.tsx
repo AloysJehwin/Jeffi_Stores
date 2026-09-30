@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { variantLabel } from '@/lib/product-label'
+import { variantLabel } from '@/lib/catalog/product-label'
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
-import { formatINR, formatDate } from '@/lib/format'
+import { ap } from '@/lib/shared/admin-path'
+import { formatINR, formatDate } from '@/lib/shared/format'
 
 const PAYMENT_MODE_LABELS: Record<string, string> = {
   cash: 'Cash',

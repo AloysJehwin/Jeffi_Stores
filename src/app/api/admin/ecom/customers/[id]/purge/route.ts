@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { isPlatformAdmin } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant, purgeTenant } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'

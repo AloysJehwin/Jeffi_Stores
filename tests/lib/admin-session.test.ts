@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // issueAdminSession no longer signs a JWT. It creates an opaque server-side session via
 // createSession() and sets the admin_sid cookie to the returned session id (sid).
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   createSession: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   JWT_MAX_AGE_S: 28800,
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
@@ -26,8 +26,8 @@ vi.mock('next/server', () => {
   return { NextResponse: MockNextResponse }
 })
 
-import { issueAdminSession } from '@/lib/admin-session'
-import { createSession } from '@/lib/auth-sessions'
+import { issueAdminSession } from '@/lib/auth/admin-session'
+import { createSession } from '@/lib/auth/auth-sessions'
 import { NextResponse } from 'next/server'
 
 const mockCreateSession = vi.mocked(createSession)

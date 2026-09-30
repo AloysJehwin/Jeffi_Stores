@@ -1,4 +1,4 @@
-import type { TenantContext } from '../tenant-context'
+import type { TenantContext } from '@/lib/tenancy/tenant-context'
 import { controlPlanePool, RESERVED_LABELS, ROOT_DOMAIN } from './shared'
 
 // In-process cache: host -> { ctx, expires }. Short TTL so tenant/plan changes
@@ -70,7 +70,7 @@ export function appFromHost(hostname: string): HostApp | null {
   return null
 }
 
-export { formsHostForSlug, formsHostForHost } from '../forms-host'
+export { formsHostForSlug, formsHostForHost } from '@/lib/tenancy/forms-host'
 
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()

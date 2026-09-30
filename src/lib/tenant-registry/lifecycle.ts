@@ -218,13 +218,13 @@ export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; erro
   if (ownerId) {
     const draft = await getDraft(ownerId).catch(() => null)
     const pickupName = (draft?.data as any)?.wh?.pickupLocation || tenant.slug
-    const { deactivateDelhiveryPickupLocation } = await import('../delhivery')
+    const { deactivateDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
     await deactivateDelhiveryPickupLocation(pickupName).catch(() => {})
   }
 
   let deletedBackups = 0
   if (ownerId) {
-    const { deleteTenantBackups } = await import('../tenant-backup-store')
+    const { deleteTenantBackups } = await import('@/lib/tenancy/tenant-backup-store')
     const res = await deleteTenantBackups({ ownerId, slug: tenant.slug })
     deletedBackups = res.deleted
   }

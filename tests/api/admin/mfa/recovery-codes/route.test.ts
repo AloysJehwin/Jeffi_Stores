@@ -3,25 +3,25 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/mfa', () => ({
+vi.mock('@/lib/auth/mfa', () => ({
   generateRecoveryCodes: vi.fn(),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, POST } from '@/app/api/admin/mfa/recovery-codes/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
-import { generateRecoveryCodes } from '@/lib/mfa'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
+import { generateRecoveryCodes } from '@/lib/auth/mfa'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQuery = vi.mocked(query)

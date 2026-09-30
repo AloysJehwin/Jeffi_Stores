@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { queryOne } from '@/lib/db'
+import { queryOne } from '@/lib/shared/db'
 import FormClient from './FormClient'
 import FormsTopNav from './FormsTopNav'
 

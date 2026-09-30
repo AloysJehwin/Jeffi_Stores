@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { resolveBuyNowItem } from '@/lib/order-commit'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { resolveBuyNowItem } from '@/lib/orders/order-commit'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 

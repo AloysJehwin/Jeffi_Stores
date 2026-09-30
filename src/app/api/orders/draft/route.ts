@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 import {
   loadActiveCart,
   cartSubtotal,
@@ -14,12 +14,12 @@ import {
   findExistingUnpaidRazorpayOrder,
   resolveBuyNowItem,
   quoteShipping,
-} from '@/lib/order-commit'
-import { signDraftToken, hashCartItems } from '@/lib/order-draft'
-import { getBusinessDiscountMap } from '@/lib/business-discount'
-import { verifyIntent } from '@/lib/checkout-intent'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody, zUuid } from '@/lib/validate'
+} from '@/lib/orders/order-commit'
+import { signDraftToken, hashCartItems } from '@/lib/orders/order-draft'
+import { getBusinessDiscountMap } from '@/lib/catalog/business-discount'
+import { verifyIntent } from '@/lib/orders/checkout-intent'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const DraftSchema = z.object({
   addressId: zUuid,

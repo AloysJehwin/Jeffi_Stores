@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, withTransaction } from '@/lib/db'
-import { round2 } from '@/lib/gst'
-import { buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
+import { buildSearchClause } from '@/lib/catalog/search'
 import { z } from 'zod'
-import { parseBody, zUuid, zCurrency } from '@/lib/validate'
+import { parseBody, zUuid, zCurrency } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

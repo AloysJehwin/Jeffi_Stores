@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/mfa', () => ({
+vi.mock('@/lib/auth/mfa', () => ({
   verifyMfaTicket: vi.fn(),
   generateTotpSecret: vi.fn(),
   buildOtpauthUrl: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('@/lib/mfa', () => ({
   hashRecoveryCode: vi.fn(),
 }))
 
-vi.mock('@/lib/admin-session', () => ({
+vi.mock('@/lib/auth/admin-session', () => ({
   issueAdminSession: vi.fn(),
 }))
 
@@ -51,9 +51,9 @@ import {
   verifyTotp,
   decryptSecret,
   hashRecoveryCode,
-} from '@/lib/mfa'
-import { queryOne, query } from '@/lib/db'
-import { issueAdminSession } from '@/lib/admin-session'
+} from '@/lib/auth/mfa'
+import { queryOne, query } from '@/lib/shared/db'
+import { issueAdminSession } from '@/lib/auth/admin-session'
 import { NextResponse } from 'next/server'
 
 const mockVerifyTicket = vi.mocked(verifyMfaTicket)

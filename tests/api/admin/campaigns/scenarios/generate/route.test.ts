@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
 
@@ -21,7 +21,7 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
   validateScenarioSql: vi.fn(),
 }))
 
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
     constructor(
@@ -39,11 +39,11 @@ vi.mock('@/lib/ai-client', () => ({
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/campaigns/scenarios/generate/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 
 // ---------------------------------------------------------------------------
 // Helpers

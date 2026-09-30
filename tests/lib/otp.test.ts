@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/redis', () => ({
+vi.mock('@/lib/shared/redis', () => ({
   default: {
     get: vi.fn(),
     set: vi.fn(),
@@ -20,8 +20,8 @@ import {
   checkSendOtpRateLimit,
   recordSendOtp,
   resetSendOtpCounter,
-} from '@/lib/otp'
-import redis from '@/lib/redis'
+} from '@/lib/auth/otp'
+import redis from '@/lib/shared/redis'
 
 const mockRedis = vi.mocked(redis)
 

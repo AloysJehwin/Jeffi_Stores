@@ -28,7 +28,7 @@ const meta = {
   publishInstagramCarousel: vi.fn(),
   publishInstagramReel: vi.fn(),
 }
-vi.mock('@/lib/meta', () => meta)
+vi.mock('@/lib/catalog/meta', () => meta)
 
 // Cipher seam — passthrough so we can assert the encrypted token was decrypted.
 const cipher = { decryptToken: vi.fn((s: string) => `dec:${s}`) }
@@ -36,7 +36,7 @@ vi.mock('@/lib/crypto/token-cipher', () => cipher)
 
 // DB/caption seams — the fixtures always carry a non-empty caption, so ensureCaption never
 // reaches these, but they're mocked anyway to keep the suite hermetic (no real pg.Pool/Ollama).
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/social/caption', () => ({ generateSocialCaption: vi.fn() }))
 
 function post(over: Partial<ScheduledSocialPost> = {}): ScheduledSocialPost {
@@ -205,7 +205,7 @@ describe('social/publisher — publishScheduledPost', () => {
   it('generates a caption from the linked product when the post caption is blank', async () => {
     reg.getTenantSocialAccounts.mockResolvedValue([account()])
     meta.publishFacebookPost.mockResolvedValue({ id: 'fb_1' })
-    const dbMod = await import('@/lib/db')
+    const dbMod = await import('@/lib/shared/db')
     const captionMod = await import('@/lib/social/caption')
     vi.mocked(dbMod.queryOne).mockResolvedValue({ name: 'Widget', description: 'A fine widget' })
     vi.mocked(captionMod.generateSocialCaption).mockResolvedValue('Introducing the Widget!')

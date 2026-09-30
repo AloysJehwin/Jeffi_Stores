@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
-import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
+import { queryMany } from '@/lib/shared/db'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCurrentTenantId } from '@/lib/tenancy/tenant-context'
 import { getSocialPost } from '@/lib/tenant-registry'
 import { publishScheduledPost } from '@/lib/social/publisher'
 

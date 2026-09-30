@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
-import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { logAdminAudit } from '@/lib/admin-audit'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { query, queryMany } from '@/lib/shared/db'
+import { authenticateAdmin, authenticateServiceAccount } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 

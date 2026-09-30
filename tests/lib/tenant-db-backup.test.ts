@@ -13,7 +13,7 @@
  *   - inserts are chunked to stay under Postgres' 65535 bind-parameter limit
  */
 import { describe, it, expect, vi } from 'vitest'
-import { dumpTenantDb, restoreTenantDb } from '@/lib/tenant-db-backup'
+import { dumpTenantDb, restoreTenantDb } from '@/lib/tenancy/tenant-db-backup'
 
 /** A fake pg client/pool that answers the queries the module issues. */
 function makeDb(

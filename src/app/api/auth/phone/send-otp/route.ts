@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { generateOTP, storePhoneOTP, checkSendPhoneOtpRateLimit, recordSendPhoneOtp } from '@/lib/otp'
-import { sendOTPSMS } from '@/lib/sms'
-import { queryOne } from '@/lib/db'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { generateOTP, storePhoneOTP, checkSendPhoneOtpRateLimit, recordSendPhoneOtp } from '@/lib/auth/otp'
+import { sendOTPSMS } from '@/lib/shared/sms'
+import { queryOne } from '@/lib/shared/db'
 
 function normalizeIndianPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '')

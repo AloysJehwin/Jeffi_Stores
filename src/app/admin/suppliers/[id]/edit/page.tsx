@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
-import { ap } from '@/lib/admin-path'
-import { ADMIN_INPUT_CLASS } from '@/lib/format'
+import { ap } from '@/lib/shared/admin-path'
+import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const inputCls = ADMIN_INPUT_CLASS

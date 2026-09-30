@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADMIN_SCOPES, ALL_SCOPE_KEYS, getScopeForPath, hasScope, type ScopeDefinition } from '@/lib/scopes'
+import { ADMIN_SCOPES, ALL_SCOPE_KEYS, getScopeForPath, hasScope, type ScopeDefinition } from '@/lib/auth/scopes'
 
 // ---------------------------------------------------------------------------
 // ADMIN_SCOPES catalogue

@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/product-label'
+import { productLabel } from '@/lib/catalog/product-label'
 import { z } from 'zod'
-import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
-import { authenticateAnyUser as authenticateUser, requireAdminScope } from '@/lib/jwt'
-import { listSharedNotesForOrder } from '@/lib/customer-notes'
-import { addressChangeBlockReason, hasPendingAddressChange } from '@/lib/address-change'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { authenticateAnyUser as authenticateUser, requireAdminScope } from '@/lib/auth/jwt'
+import { listSharedNotesForOrder } from '@/lib/shared/customer-notes'
+import { addressChangeBlockReason, hasPendingAddressChange } from '@/lib/orders/address-change'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
-import { cancelDelhiveryShipment } from '@/lib/delhivery'
-import { logActivity } from '@/lib/activity'
-import { deductOrderStock } from '@/lib/inventory-deduct'
-import { restoreOrderStock } from '@/lib/order-stock'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
-import { attributeConversion } from '@/lib/marketing'
-import { getCurrentTenant } from '@/lib/tenant-context'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody } from '@/lib/validate'
-import { isPlatformOwner } from '@/lib/scopes'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/documents/invoice'
+import { cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
+import { logActivity } from '@/lib/shared/activity'
+import { deductOrderStock } from '@/lib/orders/inventory-deduct'
+import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
+import { attributeConversion } from '@/lib/shared/marketing'
+import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
+import { isPlatformOwner } from '@/lib/auth/scopes'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 import {
   notifyOrderConfirmed,
   notifyOrderShipped,
@@ -25,7 +25,7 @@ import {
   notifyOrderCancelled,
   notifyOutForDelivery,
   notifyPaymentFailed,
-} from '@/lib/notify'
+} from '@/lib/shared/notify'
 
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     // Plan gate: Basic plan has no returns module — hide return/replacement UI.
-    const { currentTenantPlanGate } = await import('@/lib/plan-gate')
+    const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
     const returnsEnabled = (await currentTenantPlanGate('returns:read')).allowed
 
     let order: any

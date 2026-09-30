@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server'
 // (NOT verifyToken/JWT) and returns expiresAt from the session row. It also passes
 // the request User-Agent so a cookie replayed from a different browser is rejected.
 
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   resolveSession: vi.fn(),
 }))
 vi.mock('next/headers', () => ({
@@ -16,7 +16,7 @@ vi.mock('next/headers', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/check-session/route'
-import { resolveSession } from '@/lib/auth-sessions'
+import { resolveSession } from '@/lib/auth/auth-sessions'
 import { cookies } from 'next/headers'
 
 // ── Helpers ────────────────────────────────────────────────────────────────

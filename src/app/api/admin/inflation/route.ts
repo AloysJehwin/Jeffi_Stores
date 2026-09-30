@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, withTransaction } from '@/lib/db'
-import { round2 } from '@/lib/gst'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { queryMany, withTransaction } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { z } from 'zod'
-import { parseBody, zUuid } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 const postSchema = z.object({
   percentage: z.number().gt(0, 'percentage must be greater than 0'),

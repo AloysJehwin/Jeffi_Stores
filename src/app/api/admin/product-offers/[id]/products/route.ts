@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryOne, withTransaction } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
-import { parseBody, zUuid } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
 

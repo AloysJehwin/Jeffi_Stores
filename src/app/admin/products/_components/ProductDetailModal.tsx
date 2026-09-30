@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
 

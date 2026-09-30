@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne } from '@/lib/db'
-import { buildVectorSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { buildVectorSearchClause } from '@/lib/catalog/search'
 
 export const dynamic = 'force-dynamic'
 

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/label-sizes'
-import { round2 } from '@/lib/gst'
+import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/documents/label-sizes'
+import { round2 } from '@/lib/catalog/gst'
 import CopySku from '@/components/ui/CopySku'
 
 interface LabelEntry {

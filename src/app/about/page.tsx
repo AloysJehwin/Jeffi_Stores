@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { queryMany } from '@/lib/db'
-import { getStoreIdentity } from '@/lib/site-controls'
+import { queryMany } from '@/lib/shared/db'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import CategoryOffer, { type OfferCategory } from '@/components/visitor/CategoryOffer'
 
 export default async function AboutPage() {

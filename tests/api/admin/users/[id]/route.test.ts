@@ -3,13 +3,13 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/tenancy/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
+vi.mock('@/lib/auth/scopes', () => ({
   ALL_SCOPE_KEYS: ['orders', 'products', 'invoices', 'inventory', 'mailer', 'customers'],
   isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
   // A tenant may only hand out what its plan sells; off-tenant this is the full set.
@@ -28,8 +28,8 @@ vi.mock('@/lib/scopes', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { PATCH, DELETE } from '@/app/api/admin/users/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQuery = vi.mocked(query)

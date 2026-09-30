@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
-import { getOffersWithSettings } from '@/lib/razorpay-offers'
-import { logAdminAudit } from '@/lib/admin-audit'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
+import { getOffersWithSettings } from '@/lib/payments/razorpay-offers'
+import { logAdminAudit } from '@/lib/shared/admin-audit'
 
 export const dynamic = 'force-dynamic'
 

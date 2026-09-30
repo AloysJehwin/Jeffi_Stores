@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { backfillAsins } from '@/lib/amazon/asin-backfill'
 
 // Backfill Amazon ASINs onto variants/products by matching the live catalog. Read-only vs Amazon,

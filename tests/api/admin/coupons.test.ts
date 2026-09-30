@@ -5,26 +5,26 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   const { z } = require('zod')
   const zNonEmpty = z.string().min(1)
   return {
@@ -46,10 +46,10 @@ vi.mock('@/lib/validate', () => {
 
 import { GET as couponsGET, POST as couponsPOST } from '@/app/api/admin/coupons/route'
 import { PATCH as couponPATCH, DELETE as couponDELETE } from '@/app/api/admin/coupons/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, queryCount } from '@/lib/db'
-import { buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query, queryCount } from '@/lib/shared/db'
+import { buildSearchClause } from '@/lib/catalog/search'
 
 // ---------------------------------------------------------------------------
 // Helpers

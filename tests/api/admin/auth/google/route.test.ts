@@ -8,13 +8,13 @@ const mockResolveAdminByEmail = vi.hoisted(() => vi.fn())
 const mockEnforceCertGate = vi.hoisted(() => vi.fn())
 const mockLogActivity = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/db', () => ({ query: mockQuery }))
-vi.mock('@/lib/mfa', () => ({ issueMfaTicket: mockIssueMfaTicket }))
-vi.mock('@/lib/admin-identity', () => ({
+vi.mock('@/lib/shared/db', () => ({ query: mockQuery }))
+vi.mock('@/lib/auth/mfa', () => ({ issueMfaTicket: mockIssueMfaTicket }))
+vi.mock('@/lib/auth/admin-identity', () => ({
   resolveAdminByEmail: mockResolveAdminByEmail,
   enforceCertGate: mockEnforceCertGate,
 }))
-vi.mock('@/lib/activity', () => ({ logActivity: mockLogActivity }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: mockLogActivity }))
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)

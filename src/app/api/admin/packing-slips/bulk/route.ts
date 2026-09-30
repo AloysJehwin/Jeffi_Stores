@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { generateBulkPackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/packing-slip-pdf'
+import { queryMany } from '@/lib/shared/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { generateBulkPackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/documents/packing-slip-pdf'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)

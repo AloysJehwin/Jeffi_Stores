@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getDeliverySettings } from '@/lib/delivery-settings'
+import { getDeliverySettings } from '@/lib/shipping/delivery-settings'
 
 export const dynamic = 'force-dynamic'
 

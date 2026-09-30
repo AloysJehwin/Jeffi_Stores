@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 })

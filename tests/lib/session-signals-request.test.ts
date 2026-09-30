@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 // Mock NextRequest cookie access
 function makeNextRequest(headers: Record<string, string> = {}, fpHashCookie?: string) {

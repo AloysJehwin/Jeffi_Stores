@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import { CompactStat, numStr, Chip } from '@/components/admin/dashboard/Primitives'
-import type { Health, HealthTransitions, HealthGain } from '@/lib/crm-insights-shared'
+import type { Health, HealthTransitions, HealthGain } from '@/lib/shared/crm-insights-shared'
 
 const scoreStr = (v: number | null) => (v == null ? 'n/a' : v.toFixed(1))
 

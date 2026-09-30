@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser } from '@/lib/jwt'
-import { queryMany, queryOne } from '@/lib/db'
-import { logActivity } from '@/lib/activity'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
-import { fetchUserOrders, getBotReply } from '@/lib/support-bot'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
+import { fetchUserOrders, getBotReply } from '@/lib/shared/support-bot'
 
 const postSchema = z.object({
   message: zNonEmpty.max(2000),

@@ -1,9 +1,9 @@
 import fs from 'fs'
 import path from 'path'
 import { Pool } from 'pg'
-import { createPgPool, rdsSslOption } from './pg-pool'
-import { controlPlanePool } from './tenant-registry'
-import { buildTenantSchemaSql, desiredTableColumns } from './tenant-migrations-schema'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
+import { controlPlanePool } from '@/lib/tenant-registry'
+import { buildTenantSchemaSql, desiredTableColumns } from '@/lib/tenant-migrations-schema'
 
 /**
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).

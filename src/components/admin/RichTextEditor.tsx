@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { TEMPLATE_VARS } from '@/lib/template-vars'
+import { TEMPLATE_VARS } from '@/lib/shared/template-vars'
 
 interface Props {
   value: string

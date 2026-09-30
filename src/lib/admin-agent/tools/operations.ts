@@ -1,5 +1,5 @@
-import { queryMany, queryOne } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 import type { ToolDef } from '../tools'
 
 function clamp(n: number, min: number, max: number) {

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 import {
   ADMIN_PRODUCT_FILTER_FIELDS,
   filterParamNames,
@@ -10,8 +10,8 @@ import {
   specKeyFromParam,
   specParam,
   splitFilterValues,
-} from '@/lib/product-attribute-filters-shared'
-import { buildAttributeFilterClauses, getAttributeValues, getSpecFilterFields } from '@/lib/product-attribute-filters'
+} from '@/lib/catalog/product-attribute-filters-shared'
+import { buildAttributeFilterClauses, getAttributeValues, getSpecFilterFields } from '@/lib/catalog/product-attribute-filters'
 
 beforeEach(() => {
   vi.clearAllMocks()

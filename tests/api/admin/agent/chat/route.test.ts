@@ -3,14 +3,14 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
     constructor(
@@ -22,11 +22,11 @@ vi.mock('@/lib/ai-client', () => ({
     }
   },
 }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   findSimilar: vi.fn().mockResolvedValue([]),
 }))
-vi.mock('@/lib/tenant-context', async importOriginal => ({
-  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
@@ -63,10 +63,10 @@ vi.mock('@/lib/admin-agent/tools', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/agent/chat/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 import { getTool } from '@/lib/admin-agent/tools'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -1103,7 +1103,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockResolvedValueOnce([
       { source_table: 'products', source_id: 'p1', content: 'Hex bolt M6' } as any,
     ])
@@ -1123,7 +1123,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockRejectedValueOnce(new Error('pgvector down'))
 
     mockAiChat.mockResolvedValue({ content: 'still ok', provider: 'ollama', model: 'qwen2.5' } as any)
@@ -1139,9 +1139,9 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { resolveTenantId } = await import('@/lib/tenant-context')
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
     vi.mocked(resolveTenantId).mockResolvedValue('tenant-1')
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockResolvedValue([
       { source_table: 'users', source_id: 'u1', content: 'Flagship Customer | a@b.c' } as any,
     ])

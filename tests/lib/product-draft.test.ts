@@ -6,14 +6,14 @@ const mockQueryMany = vi.fn()
 const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: any[]) => mockQueryOne(...args),
   queryMany: (...args: any[]) => mockQueryMany(...args),
   withTransaction: (...args: any[]) => mockWithTransaction(...args),
 }))
 
 const mockRecompute = vi.fn()
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   recomputeStockStatusForProduct: (...args: any[]) => mockRecompute(...args),
 }))
 
@@ -52,7 +52,7 @@ function smartClientMock(sql: string) {
   return Promise.resolve({ rows: [], rowCount: 0 })
 }
 
-import { publishProductDraft } from '@/lib/product-draft'
+import { publishProductDraft } from '@/lib/catalog/product-draft'
 
 describe('publishProductDraft', () => {
   beforeEach(() => {

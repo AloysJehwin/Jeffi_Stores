@@ -29,8 +29,8 @@ import {
   ShoppingBag,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { categoryFor, type ActivityCategory } from '@/lib/activity-shared'
-import { ap } from '@/lib/admin-path'
+import { categoryFor, type ActivityCategory } from '@/lib/shared/activity-shared'
+import { ap } from '@/lib/shared/admin-path'
 
 interface ActivityEvent {
   id: string

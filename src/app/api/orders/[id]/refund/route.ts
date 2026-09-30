@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/db'
-import { requireAdminScope } from '@/lib/jwt'
-import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
-import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/razorpay-route'
+import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/shared/db'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
+import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { sendPaymentStatusUpdate } from '@/lib/email'
-import { logActivity } from '@/lib/activity'
+import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
-import { computeRefundableAmount } from '@/lib/refund'
+import { computeRefundableAmount } from '@/lib/payments/refund'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

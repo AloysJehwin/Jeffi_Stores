@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from '@/components/ui/DatePicker'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 

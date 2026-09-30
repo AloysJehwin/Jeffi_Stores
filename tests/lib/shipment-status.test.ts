@@ -6,7 +6,7 @@ import {
   rankOf,
   shipmentStatusToStep,
   shipmentStatusToReverseStep,
-} from '@/lib/shipment-status'
+} from '@/lib/shipping/shipment-status'
 
 // Delhivery returns scans OLDEST-first. Each scan: { scanType, activity, date }.
 const s = (activity: string, date?: string, scanType = 'UD') => ({ scanType, activity, date: date ?? null })

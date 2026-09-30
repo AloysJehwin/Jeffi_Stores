@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getBrochureProductsByIds } from '@/lib/queries'
-import { generateBrochurePDF, loadBrochureStore } from '@/lib/brochure-pdf'
+import { generateBrochurePDF, loadBrochureStore } from '@/lib/documents/brochure-pdf'
 
 export const dynamic = 'force-dynamic'
 

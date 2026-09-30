@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
-import { invalidateDeliverySettingsCache } from '@/lib/delivery-settings'
-import { invalidateSiteControlsCache } from '@/lib/site-controls'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
 
 // All keys editable via this endpoint. Grouped for readability.
 const EDITABLE_KEYS = [

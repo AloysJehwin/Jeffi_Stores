@@ -3,10 +3,10 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn(), AiClientError: Error }))
-vi.mock('@/lib/brand', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: vi.fn(), AiClientError: Error }))
+vi.mock('@/lib/catalog/brand', () => ({
   storeDescriptorForPrompt: vi.fn().mockResolvedValue('Test Store, an online store'),
   storeBaseUrlAsync: vi.fn().mockResolvedValue('https://store.test'),
 }))
@@ -14,9 +14,9 @@ vi.mock('@/lib/brand', () => ({
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/ai-generate-email/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { aiChat } from '@/lib/ai-client'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { aiChat } from '@/lib/shared/ai-client'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { mrpDiscountPct } from '@/lib/catalog/pricing'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 

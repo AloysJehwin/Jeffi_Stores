@@ -3,23 +3,23 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/icon-suggest', () => ({ suggestIcon: vi.fn() }))
+vi.mock('@/lib/shared/icon-suggest', () => ({ suggestIcon: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { PATCH } from '@/app/api/admin/categories/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
-import { suggestIcon } from '@/lib/icon-suggest'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne } from '@/lib/shared/db'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

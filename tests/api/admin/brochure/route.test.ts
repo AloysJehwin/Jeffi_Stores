@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
@@ -13,7 +13,7 @@ vi.mock('@/lib/queries', () => ({
   getBrochureProductsByIds: vi.fn(),
 }))
 
-vi.mock('@/lib/brochure-pdf', () => ({
+vi.mock('@/lib/documents/brochure-pdf', () => ({
   generateBrochurePDF: vi.fn().mockResolvedValue(Buffer.from('pdf-bytes')),
   loadBrochureStore: vi.fn().mockResolvedValue({
     name: 'JEFFI STORES',
@@ -27,10 +27,10 @@ vi.mock('@/lib/brochure-pdf', () => ({
 }))
 
 import { POST } from '@/app/api/admin/brochure/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getBrochureProductsByIds } from '@/lib/queries'
-import { generateBrochurePDF } from '@/lib/brochure-pdf'
+import { generateBrochurePDF } from '@/lib/documents/brochure-pdf'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 

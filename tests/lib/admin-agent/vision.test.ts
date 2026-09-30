@@ -3,12 +3,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('pdf-to-img', () => ({
   pdf: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({ aiVision: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiVision: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
 import { ocrImage, ocrPdfPages, isVisionConfigured } from '@/lib/admin-agent/vision'
 import * as pdfToImg from 'pdf-to-img'
-import { aiVision } from '@/lib/ai-client'
+import { aiVision } from '@/lib/shared/ai-client'
 
 const mockAiVision = vi.mocked(aiVision)
 

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
 import { advanceProvisioningJob } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
-import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
-import { verifyCronRequest } from '@/lib/cron-auth'
+import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +73,7 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   // next deploy. Non-fatal: the store is live regardless, so a fleet-reload failure is logged
   // and alerted, never allowed to fail provisioning.
   try {
-    const { refreshTenantMtlsFleet } = await import('@/lib/mtls-fleet')
+    const { refreshTenantMtlsFleet } = await import('@/lib/tenancy/mtls-fleet')
     await refreshTenantMtlsFleet(r.slug)
   } catch (e: any) {
     const reason = e?.message ?? String(e)
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
   // Per-tenant lock so a double kick (owner route + webhook) never interleaves ticks.
   let locked = false
   try {
-    const { default: redis } = await import('@/lib/redis')
+    const { default: redis } = await import('@/lib/shared/redis')
     locked = (await redis.set(`prov:lock:${tenantId}`, '1', 'PX', RETICK_DELAY_MS * 2, 'NX')) === 'OK'
   } catch {
     locked = true // redis unavailable → proceed rather than starve

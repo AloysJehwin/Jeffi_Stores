@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react'
 import Toggle from '@/components/ui/Toggle'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import type { DeliverySettings } from '@/lib/delivery-rules'
-import { applyDeliveryRules } from '@/lib/delivery-rules'
+import type { DeliverySettings } from '@/lib/shipping/delivery-rules'
+import { applyDeliveryRules } from '@/lib/shipping/delivery-rules'
 
 interface Props {
   initial: DeliverySettings

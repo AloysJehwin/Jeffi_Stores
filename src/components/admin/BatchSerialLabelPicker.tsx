@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { LABEL_SIZES, type LabelSize, type LabelSpec } from '@/lib/label-sizes'
+import { LABEL_SIZES, type LabelSize, type LabelSpec } from '@/lib/documents/label-sizes'
 import { BatchSerialPreview } from '@/components/admin/label-preview'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import CopySku from '@/components/ui/CopySku'

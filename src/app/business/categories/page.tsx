@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn().mockResolvedValue([]),
   queryCount: vi.fn().mockResolvedValue(0),
 }))
 
 const { mockRequireAdminScope } = vi.hoisted(() => ({ mockRequireAdminScope: vi.fn() }))
-vi.mock('@/lib/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
+vi.mock('@/lib/auth/jwt', () => ({ requireAdminScope: mockRequireAdminScope }))
 
 import { NextResponse } from 'next/server'
 import { GET } from '@/app/api/admin/audit/message-log/route'
-import { queryMany, queryCount } from '@/lib/db'
+import { queryMany, queryCount } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryCount = vi.mocked(queryCount)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { deleteGalleryImage } from '@/lib/s3'
-import { queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { deleteGalleryImage } from '@/lib/shared/s3'
+import { queryOne, query } from '@/lib/shared/db'
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params

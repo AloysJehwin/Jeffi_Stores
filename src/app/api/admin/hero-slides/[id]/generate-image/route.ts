@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Replicate from 'replicate'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiDenial } from '@/lib/ai-scope'
-import { uploadGalleryImage } from '@/lib/s3'
-import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/homepage-draft'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiDenial } from '@/lib/auth/ai-scope'
+import { uploadGalleryImage } from '@/lib/shared/s3'
+import { applyDraftPatch, getEditableHomepage, withHomepageDraft } from '@/lib/catalog/homepage-draft'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { sendTestCampaignEmail } from '@/lib/automation-emails'
-import { type CampaignKind } from '@/lib/marketing'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { sendTestCampaignEmail } from '@/lib/shared/automation-emails'
+import { type CampaignKind } from '@/lib/shared/marketing'
 
 export const dynamic = 'force-dynamic'
 

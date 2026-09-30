@@ -10,15 +10,15 @@ const { mockVerifyToken, mockRevokeSession, mockRevokeAll } = vi.hoisted(() => (
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
 }))
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({ domain: '.jeffistores.in' }),
 }))
 // Opaque sessions: the route resolves the admin_sid cookie via verifyToken and
 // revokes the server-side session before clearing the cookie.
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: mockVerifyToken,
 }))
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   revokeSession: mockRevokeSession,
   revokeAllForPrincipal: mockRevokeAll,
 }))

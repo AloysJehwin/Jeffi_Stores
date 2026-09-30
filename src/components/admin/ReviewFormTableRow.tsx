@@ -7,7 +7,7 @@ import { Star, MessageSquare, FileText } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 interface FormRow {
   id: string

@@ -6,13 +6,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Expose the spies via vi.mocked() after import instead.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   queryOne: vi.fn().mockResolvedValue(null),
   queryMany: vi.fn().mockResolvedValue([]),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn().mockResolvedValue(null),
 }))
 
@@ -24,15 +24,15 @@ vi.mock('next/headers', () => ({
   }),
 }))
 
-vi.mock('@/lib/ai-feedback', () => ({
+vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignal: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/guest-user', () => ({
+vi.mock('@/lib/shared/guest-user', () => ({
   getUserIdForSession: vi.fn().mockResolvedValue('guest-user-uuid'),
 }))
 
@@ -40,9 +40,9 @@ vi.mock('@/lib/guest-user', () => ({
 // Import route handlers AFTER mocks are registered
 // ---------------------------------------------------------------------------
 import { GET, POST, PATCH, DELETE } from '@/app/api/cart/route'
-import { authenticateAnyUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { cookies } from 'next/headers'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
 
 // ---------------------------------------------------------------------------
 // Constants

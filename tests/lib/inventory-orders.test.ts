@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Module mocks (must be hoisted before imports) ─────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -16,15 +16,15 @@ vi.mock('@/lib/email', () => ({
   sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildProductSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 2 }),
   // getStockValuation now reuses the shared buildSearchClause (per-word substring +
   // pg_trgm word_similarity fuzzy fallback). Mirror its contract: the first param it
@@ -45,10 +45,10 @@ vi.mock('@/lib/search', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { query, queryOne, queryMany } from '@/lib/db'
-import { buildProductSearchClause } from '@/lib/search'
-import { logStockMovement, updateWeightedAvgCost, getStockLedger, getStockValuation } from '@/lib/inventory'
-import { cancelOrder, CANCELLABLE_STATUSES } from '@/lib/orders'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { buildProductSearchClause } from '@/lib/catalog/search'
+import { logStockMovement, updateWeightedAvgCost, getStockLedger, getStockValuation } from '@/lib/orders/inventory'
+import { cancelOrder, CANCELLABLE_STATUSES } from '@/lib/orders/orders'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
@@ -686,7 +686,7 @@ describe('cancelOrder', () => {
     })
 
     it('creates auto task for auto_cancel_unpaid when user_id is present', async () => {
-      const { createAutoTask } = await import('@/lib/auto-tasks')
+      const { createAutoTask } = await import('@/lib/shared/auto-tasks')
 
       mockQueryOne.mockResolvedValue(makeOrder() as any)
       mockQueryMany.mockResolvedValue([])
@@ -787,7 +787,7 @@ describe('cancelOrder', () => {
     })
 
     it('skips logActivity in cancel_requested path when user_id is null', async () => {
-      const { logActivity } = await import('@/lib/activity')
+      const { logActivity } = await import('@/lib/shared/activity')
 
       mockQueryOne.mockResolvedValue(makeOrder({ status: 'confirmed', payment_status: 'paid', user_id: null }) as any)
       mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
@@ -827,8 +827,8 @@ describe('cancelOrder', () => {
 
   describe('direct cancel — null user_id branches', () => {
     it('skips logActivity and createAutoTask when user_id is null (auto_cancel_unpaid)', async () => {
-      const { logActivity } = await import('@/lib/activity')
-      const { createAutoTask } = await import('@/lib/auto-tasks')
+      const { logActivity } = await import('@/lib/shared/activity')
+      const { createAutoTask } = await import('@/lib/shared/auto-tasks')
 
       mockQueryOne.mockResolvedValue(makeOrder({ user_id: null, order_type: null }) as any)
       mockQueryMany.mockResolvedValue([])
@@ -941,7 +941,7 @@ describe('cancelOrder', () => {
     })
 
     it('skips logActivity in direct-cancel path when user_id is null (user_request)', async () => {
-      const { logActivity } = await import('@/lib/activity')
+      const { logActivity } = await import('@/lib/shared/activity')
 
       mockQueryOne.mockResolvedValue(makeOrder({ user_id: null }) as any)
       mockQueryMany.mockResolvedValue([])

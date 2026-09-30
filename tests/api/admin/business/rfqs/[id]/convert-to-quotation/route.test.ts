@@ -5,23 +5,23 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   stackDiscounts: vi.fn(),
   applyDiscount: vi.fn(),
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendRfqConvertedToQuotationEmail: vi.fn(),
 }))
 
@@ -30,10 +30,10 @@ vi.mock('@/lib/email-business', () => ({
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/admin/business/rfqs/[id]/convert-to-quotation/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany, query } from '@/lib/db'
-import { sendRfqConvertedToQuotationEmail } from '@/lib/email-business'
-import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/pricing'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { sendRfqConvertedToQuotationEmail } from '@/lib/shared/email-business'
+import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/catalog/pricing'
 
 // ---------------------------------------------------------------------------
 // Helpers

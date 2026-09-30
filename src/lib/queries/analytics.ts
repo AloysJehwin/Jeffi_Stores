@@ -1,5 +1,5 @@
 import { queryOne, queryMany, type RevenuePeriod } from './shared'
-import { getStockValuation } from '../inventory'
+import { getStockValuation } from '@/lib/orders/inventory'
 
 export interface RevenueTrend {
   months: string[]

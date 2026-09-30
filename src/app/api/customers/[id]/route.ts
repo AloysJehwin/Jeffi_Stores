@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getCustomerById } from '@/lib/queries'
-import { query } from '@/lib/db'
-import { logActivity } from '@/lib/activity'
-import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { query } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
+import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

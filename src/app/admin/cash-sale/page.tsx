@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { ap } from '@/lib/admin-path'
-import { getHost } from '@/lib/get-host'
+import { verifyToken } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 import CashSaleClient from './CashSaleClient'
-import { adminCookieName } from '@/lib/admin-cookie'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 

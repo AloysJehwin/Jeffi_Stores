@@ -1,8 +1,8 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
-import { storefrontAiGate, storefrontAiField } from '@/lib/storefront-ai'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { storefrontAiGate, storefrontAiField } from '@/lib/shared/storefront-ai'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
 

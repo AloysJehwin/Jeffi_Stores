@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
-import { getFeaturedForUser, getBestSellerCards, type RecCard } from '@/lib/recommendations'
+import { query } from '@/lib/shared/db'
+import { authenticateUser } from '@/lib/auth/jwt'
+import { getFeaturedForUser, getBestSellerCards, type RecCard } from '@/lib/catalog/recommendations'
 
 export const dynamic = 'force-dynamic'
 

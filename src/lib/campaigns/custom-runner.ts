@@ -1,7 +1,7 @@
-import { getClient, queryOne } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/automation-emails'
-import { storeBaseUrlAsync } from '@/lib/brand'
-import type { Campaign, CampaignKind } from '@/lib/marketing'
+import { getClient, queryOne } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
+import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
 import type { SweepResult } from './types'
 import { validateScenarioSql } from './sql-safety'
 
