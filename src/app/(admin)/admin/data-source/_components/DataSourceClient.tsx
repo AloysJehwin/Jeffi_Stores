@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 
 interface RowResult {
@@ -66,6 +67,7 @@ const TAB_KEYS: Tab[] = ['import', 'google_sheet', 'history']
 
 export default function DataSourceClient({ initialGsheet }: { initialGsheet?: GsheetStatus }) {
   const canWrite = useCanWrite('products')
+  const { showToast } = useToast()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -73,7 +75,6 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   const [expanded, setExpanded] = useState<string | null>(null)
   const [detail, setDetail] = useState<ImportJob | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [gsheet, setGsheet] = useState<GsheetStatus>(
     initialGsheet ?? { enabled: false, connected: false, spreadsheetId: null, lastSync: null }
@@ -100,16 +101,13 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     const connected = searchParams.get('connected')
     if (connected === null) return
     const error = searchParams.get('error')
-    setNotice(
-      connected === '0'
-        ? { kind: 'err', text: `Google connection failed${error ? `: ${error}` : '.'}` }
-        : { kind: 'ok', text: 'Google account connected.' }
-    )
+    if (connected === '0') showToast(`Google connection failed${error ? `: ${error}` : '.'}`, 'error')
+    else showToast('Google account connected.', 'success')
     const params = new URLSearchParams(searchParams.toString())
     params.delete('connected')
     params.delete('error')
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
+  }, [searchParams, pathname, router, showToast])
   const loadJobs = useCallback(async () => {
     const res = await fetch('/api/admin/data-source/jobs', { credentials: 'include' })
     if (res.ok) setJobs((await res.json()).jobs ?? [])
@@ -152,16 +150,15 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
 
   const createSheet = async () => {
     setCreating(true)
-    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/create', { method: 'POST', credentials: 'include' })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setNotice({ kind: 'err', text: body.error || `Could not create sheet (${res.status})` })
+        showToast(body.error || `Could not create sheet (${res.status})`, 'error')
         return
       }
       if (body.spreadsheetId) setSheetInput(body.spreadsheetId)
-      setNotice({ kind: 'ok', text: 'Created your template sheet. Fill it in, then Sync now.' })
+      showToast('Created your template sheet. Fill it in, then Sync now.', 'success')
       await loadGsheet()
     } finally {
       setCreating(false)
@@ -170,7 +167,6 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
 
   const syncNow = async () => {
     setSyncing(true)
-    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/sync', {
         method: 'POST',
@@ -180,10 +176,10 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setNotice({ kind: 'err', text: body.error || `Sync failed (${res.status})` })
+        showToast(body.error || `Sync failed (${res.status})`, 'error')
         return
       }
-      setNotice({ kind: 'ok', text: `Queued Google Sheet import of ${body.totalRows} rows.` })
+      showToast(`Queued Google Sheet import of ${body.totalRows} rows.`, 'success')
       await Promise.all([loadJobs(), loadGsheet()])
     } finally {
       setSyncing(false)
@@ -194,7 +190,6 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     const jobId = gsheet.lastSync?.id
     if (!jobId) return
     setReconciling(true)
-    setNotice(null)
     try {
       const res = await fetch('/api/admin/data-source/google/reconcile', {
         method: 'POST',
@@ -204,16 +199,15 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
       })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setNotice({ kind: 'err', text: body.error || `Reconcile failed (${res.status})` })
+        showToast(body.error || `Reconcile failed (${res.status})`, 'error')
         return
       }
-      setNotice({
-        kind: 'ok',
-        text:
-          decision === 'approve'
-            ? `Removed ${body.applied} product(s) no longer in the sheet.`
-            : `Kept ${body.applied} product(s); they're now unmanaged by the sheet.`,
-      })
+      showToast(
+        decision === 'approve'
+          ? `Removed ${body.applied} product(s) no longer in the sheet.`
+          : `Kept ${body.applied} product(s); they're now unmanaged by the sheet.`,
+        'success'
+      )
       await Promise.all([loadJobs(), loadGsheet()])
     } finally {
       setReconciling(false)
@@ -221,7 +215,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   }
 
   const onDisconnected = async (result: { kind: 'ok' | 'err'; text: string }) => {
-    setNotice(result)
+    showToast(result.text, result.kind === 'ok' ? 'success' : 'error')
     if (result.kind === 'ok') setSheetInput('')
     await Promise.all([loadJobs(), loadGsheet()])
   }
@@ -230,17 +224,16 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    setNotice(null)
     try {
       const fd = new FormData()
       fd.append('file', file)
       const res = await fetch('/api/admin/data-source/import', { method: 'POST', credentials: 'include', body: fd })
       const body = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setNotice({ kind: 'err', text: body.error || `Upload failed (${res.status})` })
+        showToast(body.error || `Upload failed (${res.status})`, 'error')
         return
       }
-      setNotice({ kind: 'ok', text: `Queued import of ${body.totalRows} rows. Processing in the background.` })
+      showToast(`Queued import of ${body.totalRows} rows. Processing in the background.`, 'success')
       await loadJobs()
     } finally {
       setUploading(false)
@@ -283,8 +276,6 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
           </button>
         ))}
       </div>
-
-      {notice && <p className={`text-sm ${notice.kind === 'ok' ? 'text-green-600' : 'text-red-600'}`}>{notice.text}</p>}
 
       {tab === 'import' && (
         <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">

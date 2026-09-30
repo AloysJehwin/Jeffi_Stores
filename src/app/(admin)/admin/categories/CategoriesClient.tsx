@@ -23,6 +23,7 @@ import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Category {
   id: string
@@ -193,11 +194,10 @@ function PolicyExpandRow({
   const [replacementAllowed, setReplacementAllowed] = useState(!!effectiveReplaceAllowed)
   const [replacementDays, setReplacementDays] = useState(effectiveReplaceDays ?? 7)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   async function handleSave() {
     setSaving(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/categories/${category.id}`, {
         method: 'PATCH',
@@ -223,7 +223,7 @@ function PolicyExpandRow({
       const updated = await res.json()
       onSaved(updated)
     } catch (e: any) {
-      setError(e.message || 'Save failed')
+      showToast(e.message || 'Save failed', 'error')
       setSaving(false)
     }
   }
@@ -313,7 +313,6 @@ function PolicyExpandRow({
           )}
 
           <div className="flex items-center gap-2 ml-auto">
-            {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
             <button
               onClick={onClose}
               className="px-3 py-1.5 text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors"
