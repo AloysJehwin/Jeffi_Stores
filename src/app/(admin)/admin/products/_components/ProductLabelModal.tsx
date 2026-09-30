@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/documents/label-sizes'
 import { round2 } from '@/lib/catalog/gst'
 import CopySku from '@/components/ui/CopySku'
+import { useToast } from '@/contexts/ToastContext'
 
 interface LabelEntry {
   id: string
@@ -603,6 +604,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   const [error, setError] = useState('')
   const [modalSize, setModalSize] = useState<'sm' | 'md' | 'lg'>('md')
   const [showPrice, setShowPrice] = useState(false)
+  const { showToast } = useToast()
 
   const spec = LABEL_SIZES.find(s => s.size === size)!
 
@@ -655,7 +657,6 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   async function handleDownload() {
     const ids = entries.filter(e => selected.has(e.id)).map(e => e.id)
     if (ids.length === 0) return
-    setError('')
     setDownloading(true)
     try {
       const res = await fetch('/api/admin/labels', {
@@ -675,7 +676,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
-      setError(e.message || 'Download failed')
+      showToast(e.message || 'Download failed', 'error')
     } finally {
       setDownloading(false)
     }
