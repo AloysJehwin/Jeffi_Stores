@@ -54,10 +54,9 @@
     --accent-600: #5a8a00;
   }
 
-  /* White label text on the amber/green brand fills fails WCAG AA (2.1-3.2:1).
-     Where a solid brand background is paired with text-white, use near-black text
-     instead (7-8:1). Scoped to that exact pairing so tints (bg-*/10) and
-     ghost/outline styles that set their own text color are untouched. */
+  /* White label text on the solid amber and green brand fills fails WCAG AA
+     contrast; near-black text passes. Scoped to the brand-fill plus text-white
+     pairing so tinted backgrounds and ghost styles keep their own text color. */
   .bg-primary-500.text-white,
   .bg-primary-600.text-white,
   .bg-accent-500.text-white,
