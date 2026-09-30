@@ -3640,8 +3640,8 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-client-write-gate.test.ts": {
-    "mtime": 1790770601.905469,
-    "ast_hash": "17f5ee2727394c688b11cc030061db4f",
+    "mtime": 1790782719.3114998,
+    "ast_hash": "04edb2739a0d266b2561f4298bde96fd",
     "semantic_hash": ""
   },
   "tests/lib/admin-cookie.test.ts": {
@@ -3870,8 +3870,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ResponsiveList.tsx": {
-    "mtime": 1790756110.9316354,
-    "ast_hash": "c866bb71f7ea0d07f964c06da023a1bb",
+    "mtime": 1790782121.5486655,
+    "ast_hash": "7ab911dd1d65ca948d20821919007439",
     "semantic_hash": ""
   },
   "tests/lib/format.test.ts": {
@@ -7500,8 +7500,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/page.tsx": {
-    "mtime": 1790768884.3017473,
-    "ast_hash": "a01a01c3d77a8a0273861de87d10c61e",
+    "mtime": 1790782183.6515412,
+    "ast_hash": "7db72af605baa9633fa6e8425028984a",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/quotations/QuotationsClient.tsx": {
@@ -12287,6 +12287,41 @@
   "src/components/visitor/home/Reveal.tsx": {
     "mtime": 1790781184.5475872,
     "ast_hash": "1a8f4d00e5e5232c56f78b3400cf9611",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/products/_components/ProductMobileCardBody.tsx": {
+    "mtime": 1790782033.6797178,
+    "ast_hash": "f4286e0085ef26138a176848c072d584",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/products/_components/ProductMobileDetailBody.tsx": {
+    "mtime": 1790782050.840288,
+    "ast_hash": "da89f84906b0517d12c1f2469fdf8be2",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/products/_components/ProductsMobileList.tsx": {
+    "mtime": 1790782108.209745,
+    "ast_hash": "6d1f9c15ad07f0f888d0c0996e5290f2",
+    "semantic_hash": ""
+  },
+  "src/components/admin/mobile/MobileActionSheet.tsx": {
+    "mtime": 1790782001.0868034,
+    "ast_hash": "181323f1a878ce53b4d117eb92fad4df",
+    "semantic_hash": ""
+  },
+  "src/components/admin/mobile/MobileDetailSheet.tsx": {
+    "mtime": 1790781986.7171428,
+    "ast_hash": "67cf97060f1f20d82924d5402d0879d5",
+    "semantic_hash": ""
+  },
+  "src/components/admin/mobile/MobileListCard.tsx": {
+    "mtime": 1790782010.2601805,
+    "ast_hash": "cb33c421b3ab1ea639b455c6a13865f5",
+    "semantic_hash": ""
+  },
+  "tests/components/admin/mobile-product-pattern.test.tsx": {
+    "mtime": 1790782307.19575,
+    "ast_hash": "8f7baba840415ddc56fb6d5b77035f39",
     "semantic_hash": ""
   }
 }
