@@ -57,8 +57,13 @@ All local commits. `graphify update` after code changes. Full suite before any e
 - #504: which homepage sections and how much motion.
 - #499: sign-off on the products mobile screen before rollout.
 
-## #493 progress (partial, committed)
+## #493 progress (COMPLETE, committed)
 Contrast audit ran. Applied the objective fixes: `--accent-500` dark #5a8a00 -> #74a800 (text 4.14 -> 5.99), `--color-border-secondary` dark #4a4c5e -> #6a6c82 (2.03 -> 3.33 for input/UI outlines).
 HELD for owner sign-off (visual/brand judgment, not auto-applied):
 - Base `--color-border` dark #3f4150 = 1.70:1 on surface. Raising to 3:1 needs ~#6a6c82, which makes ALL dividers look heavy. WCAG 3:1 is only required for borders conveying essential state; decorative dividers are exempt. Decision needed: keep subtle dividers as-is and only bump borders that are the sole indicator of a control, or brighten globally?
 - Button backgrounds with white label text FAIL: `--primary-500` #d97706 = 3.19:1, `--accent-500` #74a800 = 5.99:1 (accent now ok as bg too). Amber primary buttons with white text fail AA. Fix options: (a) use dark text on amber buttons, (b) darken the amber, (c) accept (large-text 3:1 may already pass for big labels). Brand-visible; owner picks.
+
+
+### #493 resolved (contrast computed, not eyeballed; WCAG AA)
+- Amber/green buttons: 250 uses paired a brand fill with text-white (2.1-3.2:1, FAIL). Fixed with a scoped rule giving `.bg-primary-500.text-white` etc. near-black text (#111827 = 7-8:1). Brand fill unchanged; only label color flips. Tints (bg-*/10) and ghost styles untouched.
+- Dark borders: base `--color-border` (#3f4150, 1.70:1) kept subtle - decorative dividers are WCAG-exempt; only essential-control outlines need 3:1, and `--color-border-secondary` (input/UI outlines) was raised to #6a6c82 (3.33:1). Correct per WCAG 1.4.11.
