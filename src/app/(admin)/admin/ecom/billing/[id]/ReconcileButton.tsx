@@ -2,26 +2,26 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function ReconcileButton({ tenantId }: { tenantId: string }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   async function run() {
     setBusy(true)
-    setMsg(null)
     try {
       const res = await fetch(`/api/admin/ecom/${tenantId}/reconcile-settlements`, { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setMsg(data?.error || 'Failed')
+        showToast(data?.error || 'Failed', 'error')
         return
       }
-      setMsg(`Settled ${data.settled} of ${data.scanned}`)
+      showToast(`Settled ${data.settled} of ${data.scanned}`, 'success')
       router.refresh()
     } catch {
-      setMsg('Failed')
+      showToast('Failed', 'error')
     } finally {
       setBusy(false)
     }
@@ -39,7 +39,6 @@ export default function ReconcileButton({ tenantId }: { tenantId: string }) {
       >
         {busy ? 'Reconciling…' : 'Reconcile now'}
       </button>
-      {msg && <div className="text-[11px] text-foreground-muted mt-1">{msg}</div>}
       <div className="text-[11px] text-foreground-muted mt-1">
         Settles captured rows whose transfer already processed at Razorpay.
       </div>

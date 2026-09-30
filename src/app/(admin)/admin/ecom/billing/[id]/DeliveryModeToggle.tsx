@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function DeliveryModeToggle({
   tenantId,
@@ -13,7 +14,7 @@ export default function DeliveryModeToggle({
 }) {
   const [ownDelhivery, setOwnDelhivery] = useState(initial)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   // Turning ON requires a connected token — the API enforces this too (409), but disabling the control
   // up front avoids a guaranteed-failing round trip and explains why.
@@ -22,7 +23,6 @@ export default function DeliveryModeToggle({
   async function toggle() {
     const next = !ownDelhivery
     setBusy(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/ecom/${tenantId}/delivery-mode`, {
         method: 'PATCH',
@@ -31,12 +31,12 @@ export default function DeliveryModeToggle({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data?.error || 'Failed to update delivery mode')
+        showToast(data?.error || 'Failed to update delivery mode', 'error')
         return
       }
       setOwnDelhivery(next)
     } catch {
-      setError('Failed to update delivery mode')
+      showToast('Failed to update delivery mode', 'error')
     } finally {
       setBusy(false)
     }
@@ -57,7 +57,6 @@ export default function DeliveryModeToggle({
         {busy ? 'Saving…' : ownDelhivery ? 'Switch to platform' : 'Switch to own Delhivery'}
       </button>
       {!canEnable && <div className="text-[11px] text-foreground-muted mt-1">Connect a Delhivery token first.</div>}
-      {error && <div className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</div>}
     </div>
   )
 }

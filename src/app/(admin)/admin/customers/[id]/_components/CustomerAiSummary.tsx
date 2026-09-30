@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { useCanUseAi } from '@/contexts/AdminScopesContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface AiSummary {
   summary: string | null
@@ -33,7 +34,7 @@ export default function CustomerAiSummary({
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     let alive = true
@@ -57,20 +58,19 @@ export default function CustomerAiSummary({
 
   async function refresh() {
     setRefreshing(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/customers/${customerId}/ai-summary`, {
         method: 'POST',
         credentials: 'include',
       })
       if (res.status === 503) {
-        setError('AI profile generation is not available')
+        showToast('AI profile generation is not available', 'error')
         return
       }
       if (res.ok) setData(await res.json())
-      else setError((await res.json().catch(() => null))?.error || 'Could not generate a profile')
+      else showToast((await res.json().catch(() => null))?.error || 'Could not generate a profile', 'error')
     } catch {
-      setError('AI profile generation is not available')
+      showToast('AI profile generation is not available', 'error')
     } finally {
       setRefreshing(false)
     }
@@ -116,8 +116,6 @@ export default function CustomerAiSummary({
           No profile yet{canGenerate ? '. Use Generate to create one from this customer’s history.' : '.'}
         </p>
       )}
-
-      {error && <p className="text-xs text-red-600 dark:text-red-400 mt-3">{error}</p>}
     </div>
   )
 }
