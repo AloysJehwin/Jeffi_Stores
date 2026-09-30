@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { Pool } from 'pg'
+import { createPgPool, rdsSslOption } from './pg-pool'
 import { controlPlanePool } from './tenant-registry'
 import { buildTenantSchemaSql, desiredTableColumns } from './tenant-migrations-schema'
 
@@ -36,17 +37,13 @@ function tenantPool(infra: { rdsEndpoint: string; rdsPort: number; rdsDb: string
       'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for the schema fan-out'
     )
   }
-  const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-  const ssl = fs.existsSync(certPath)
-    ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-    : { rejectUnauthorized: false }
-  return new Pool({
+  return createPgPool({
     host: infra.rdsEndpoint,
     port: infra.rdsPort,
     database: infra.rdsDb,
     user: masterUser,
     password: masterPassword,
-    ssl,
+    ssl: rdsSslOption(),
     max: 2,
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 10000,

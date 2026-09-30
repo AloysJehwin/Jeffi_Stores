@@ -1,7 +1,7 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { Signer } from '@aws-sdk/rds-signer'
+import { createPgPool, rdsSslOption, rdsIamPassword } from './pg-pool'
 import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from './audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from './tenant-context'
 import type { TenantContext as TenantContextType } from './tenant-context'
@@ -21,11 +21,6 @@ const tenantPools: Map<string, Pool> = dbGlobal.__tenantPools ?? (dbGlobal.__ten
 export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext }
 export { getCurrentTenant, getCurrentTenantId, runWithTenantContext }
 export { ensureTenantContext as resolveRequestTenant }
-
-function makeRdsSigner(host: string, port: number, user: string, region: string): () => Promise<string> {
-  const signer = new Signer({ hostname: host, port, region, username: user })
-  return () => signer.getAuthToken()
-}
 
 // The shared pool tuning (sizing, keepalive, maxUses). Credential/target fields
 // are merged in per source (DEFAULT env, or a tenant's infra).
@@ -51,13 +46,6 @@ function basePoolConfig(): any {
   }
 }
 
-function rdsSslOption(): any {
-  const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-  return fs.existsSync(certPath)
-    ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-    : { rejectUnauthorized: false }
-}
-
 // Build a pool from the DEFAULT env configuration (unchanged from before).
 function buildDefaultPool(): Pool {
   const dbUrl = process.env.DATABASE_URL || ''
@@ -75,7 +63,7 @@ function buildDefaultPool(): Pool {
     config.user = user
     config.database = dbName
     config.ssl = rdsSslOption()
-    config.password = makeRdsSigner(host, port, user, region)
+    config.password = rdsIamPassword(host, port, user, region)
   } else {
     if (dbUrl.includes('rds.amazonaws.com')) {
       // Strip sslmode/uselibpqcompat from the URL — pg v8 treats sslmode=require as
@@ -94,7 +82,7 @@ function buildDefaultPool(): Pool {
       config.connectionString = dbUrl
     }
   }
-  return attachErrorHandler(new Pool(config))
+  return createPgPool(config)
 }
 
 // Build a pool for a specific tenant from its infra pointers (per-tenant RDS).
@@ -110,25 +98,13 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
   if (infra.iamAuth) {
     const user = process.env.RDS_USER || 'app_user'
     config.user = user
-    config.password = makeRdsSigner(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
+    config.password = rdsIamPassword(infra.rdsEndpoint, infra.rdsPort, user, infra.region)
   } else {
     // Password-based tenants would resolve creds from db_secret_ref; not used on
     // the IAM-first path. Left explicit so the branch is obvious.
     throw new Error('Password-auth tenant pools not yet implemented; use IAM auth')
   }
-  return attachErrorHandler(new Pool(config))
-}
-
-function attachErrorHandler(p: Pool): Pool {
-  // Fires when an *idle* pooled client errors out (e.g. RDS drops the socket).
-  // pg has already removed the bad client from the pool by the time this runs,
-  // so the pool self-heals on its own. We must keep this listener registered so
-  // an idle-client error does not crash the process as an unhandled 'error'
-  // event — but we deliberately do NOTHING here.
-  p.on('error', () => {
-    /* idle-client error — pool already evicted it; no action needed */
-  })
-  return p
+  return createPgPool(config)
 }
 
 function getPool(explicitTenant?: TenantContextType | null): Pool {

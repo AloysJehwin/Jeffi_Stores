@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
-import fs from 'fs'
-import path from 'path'
+import { createPgPool, rdsSslOption } from '../pg-pool'
 import { getTenant, getKyc, getDraft } from '../tenant-registry'
 
 /**
@@ -24,17 +23,13 @@ function tenantMasterPool(endpoint: string, dbName: string): Pool {
   const masterPassword = process.env.RDS_MASTER_PASSWORD
   if (!masterPassword) throw new Error('RDS_MASTER_PASSWORD is not set — required to seed a tenant DB')
   const user = process.env.TENANT_RDS_MASTER_USER || process.env.RDS_MASTER_USER || 'postgres'
-  const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-  const ssl = fs.existsSync(certPath)
-    ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-    : { rejectUnauthorized: false }
-  return new Pool({
+  return createPgPool({
     host: endpoint,
     port: 5432,
     database: dbName,
     user,
     password: masterPassword,
-    ssl,
+    ssl: rdsSslOption(),
     max: 2,
     connectionTimeoutMillis: 20000,
   })

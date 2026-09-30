@@ -66,6 +66,7 @@ function PoolCtor(this: any, cfg: any) {
   pgConfigs.push(cfg)
   this.query = pgQuery
   this.end = pgEnd
+  this.on = () => {}
 }
 vi.mock('pg', () => ({ Pool: PoolCtor, default: { Pool: PoolCtor } }))
 

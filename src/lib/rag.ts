@@ -1,7 +1,5 @@
 import { Pool } from 'pg'
-import path from 'path'
-import fs from 'fs'
-import { Signer } from '@aws-sdk/rds-signer'
+import { createPgPool, rdsSslOption, rdsIamPassword } from './pg-pool'
 
 export interface RagResult {
   source_table: string
@@ -41,12 +39,8 @@ function getPool(): Pool {
       // Prod: authenticate to RDS via IAM (like the main pool in db.ts) — no stored
       // password. Uses the RDS CA bundle for real cert verification when present.
       const region = process.env.AWS_REGION || 'us-east-1'
-      const signer = new Signer({ hostname: host, port, region, username: user })
-      config.password = () => signer.getAuthToken()
-      const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-      config.ssl = fs.existsSync(certPath)
-        ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-        : { rejectUnauthorized: false }
+      config.password = rdsIamPassword(host, port, user, region)
+      config.ssl = rdsSslOption()
     } else {
       config.password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
       // RDS requires SSL; set RAG_PG_SSL=1 when pointing at RDS with a password.
@@ -54,8 +48,7 @@ function getPool(): Pool {
       config.ssl = process.env.RAG_PG_SSL === '1' ? { rejectUnauthorized: false } : undefined
     }
 
-    pool = new Pool(config)
-    pool.on('error', () => {})
+    pool = createPgPool(config)
   }
   return pool
 }

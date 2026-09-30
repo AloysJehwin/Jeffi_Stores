@@ -1,7 +1,4 @@
-import { SignatureV4 } from '@smithy/signature-v4'
-import { HttpRequest } from '@smithy/protocol-http'
-import { defaultProvider } from '@aws-sdk/credential-provider-node'
-import { Sha256 } from '@aws-crypto/sha256-js'
+import { signedAwsFetch } from '@/lib/aws-signing'
 
 /**
  * Minimal EC2 Query-API client (SigV4-signed REST) — mirrors tenant-dns.ts. Avoids adding
@@ -14,22 +11,15 @@ const API_VERSION = '2016-11-15'
 
 async function ec2(params: Record<string, string>): Promise<string> {
   const body = new URLSearchParams({ Version: API_VERSION, ...params }).toString()
-  const request = new HttpRequest({
+  const res = await signedAwsFetch({
+    service: 'ec2',
+    region: 'us-east-1',
     method: 'POST',
-    protocol: 'https:',
     hostname: EC2_HOST,
     path: '/',
     headers: { host: EC2_HOST, 'content-type': 'application/x-www-form-urlencoded' },
     body,
   })
-  const signer = new SignatureV4({
-    service: 'ec2',
-    region: 'us-east-1',
-    credentials: defaultProvider(),
-    sha256: Sha256,
-  })
-  const signed = await signer.sign(request)
-  const res = await fetch(`https://${EC2_HOST}/`, { method: 'POST', headers: signed.headers as any, body })
   const text = await res.text()
   if (!res.ok) throw new Error(`EC2 ${params.Action} failed (${res.status}): ${text.slice(0, 400)}`)
   return text

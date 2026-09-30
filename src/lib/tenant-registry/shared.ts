@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import path from 'path'
 import fs from 'fs'
-import { Signer } from '@aws-sdk/rds-signer'
+import { createPgPool, rdsSslOption, rdsIamPassword } from '../pg-pool'
 import type { TenantContext } from '../tenant-context'
 
 /**
@@ -70,16 +70,12 @@ export function controlPlanePool(): Pool {
     const port = parseInt(process.env.CONTROL_PLANE_RDS_PORT || '5432', 10)
     const user = process.env.CONTROL_PLANE_RDS_USER || 'app_user'
     const region = process.env.AWS_REGION || 'us-east-1'
-    const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
     config.host = host
     config.port = port
     config.user = user
     config.database = process.env.CONTROL_PLANE_RDS_DB || 'jeffi_control_plane'
-    config.ssl = fs.existsSync(certPath)
-      ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-      : { rejectUnauthorized: false }
-    const signer = new Signer({ hostname: host, port, region, username: user })
-    config.password = () => signer.getAuthToken()
+    config.ssl = rdsSslOption()
+    config.password = rdsIamPassword(host, port, user, region)
   } else {
     config.connectionString = url
     if (url.includes('rds.amazonaws.com')) {
@@ -87,10 +83,7 @@ export function controlPlanePool(): Pool {
       if (fs.existsSync(certPath)) config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
     }
   }
-  const p = new Pool(config)
-  p.on('error', () => {
-    /* idle-client error — pool self-heals */
-  })
+  const p = createPgPool(config)
   cpGlobal.__cpPool = p
   return p
 }

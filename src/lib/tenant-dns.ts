@@ -1,7 +1,4 @@
-import { SignatureV4 } from '@smithy/signature-v4'
-import { HttpRequest } from '@smithy/protocol-http'
-import { defaultProvider } from '@aws-sdk/credential-provider-node'
-import { Sha256 } from '@aws-crypto/sha256-js'
+import { signedAwsFetch } from '@/lib/aws-signing'
 
 /**
  * Minimal Route53 client (SigV4-signed REST) — the app's npm registry can't fetch
@@ -44,24 +41,13 @@ async function route53(
   path: string,
   body?: string
 ): Promise<{ ok: boolean; status: number; text: string }> {
-  const request = new HttpRequest({
+  const res = await signedAwsFetch({
+    service: 'route53',
+    region: 'us-east-1',
     method,
-    protocol: 'https:',
     hostname: ROUTE53_HOST,
     path,
     headers: { host: ROUTE53_HOST, ...(body ? { 'content-type': 'application/xml' } : {}) },
-    ...(body ? { body } : {}),
-  })
-  const signer = new SignatureV4({
-    service: 'route53',
-    region: 'us-east-1',
-    credentials: defaultProvider(),
-    sha256: Sha256,
-  })
-  const signed = await signer.sign(request)
-  const res = await fetch(`https://${ROUTE53_HOST}${path}`, {
-    method,
-    headers: signed.headers as any,
     ...(body ? { body } : {}),
   })
   const text = await res.text().catch(() => '')

@@ -20,11 +20,10 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import { Pool } from 'pg'
+import { createPgPool, rdsSslOption } from '../pg-pool'
 import { buildTenantSchemaSql } from '../tenant-migrations-schema'
 import { dumpTenantDb, restoreTenantDb } from '../tenant-db-backup'
 import { upsertTenantDns, deleteTenantDns } from '../tenant-dns'
-import fs from 'fs'
-import path from 'path'
 import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
 
 /**
@@ -221,17 +220,13 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
         'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for schema load / backup / restore'
       )
     }
-    const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-    const ssl = fs.existsSync(certPath)
-      ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-      : { rejectUnauthorized: false }
-    return new Pool({
+    return createPgPool({
       host: endpoint,
       port: 5432,
       database: dbName,
       user: RDS_MASTER_USER,
       password: masterPassword,
-      ssl,
+      ssl: rdsSslOption(),
       max: 2,
       connectionTimeoutMillis: 20000,
     })

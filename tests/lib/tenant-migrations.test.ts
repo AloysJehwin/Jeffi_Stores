@@ -6,6 +6,7 @@ vi.mock('pg', () => ({
   Pool: class {
     query = (...a: any[]) => mockQuery(...a)
     end = mockEnd
+    on = () => {}
   },
 }))
 const cpQuery = vi.fn()
