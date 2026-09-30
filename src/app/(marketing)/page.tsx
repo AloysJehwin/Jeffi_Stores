@@ -8,6 +8,7 @@ import {
 } from '@/lib/queries'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import SectionRenderer from '@/components/visitor/home/SectionRenderer'
+import Reveal from '@/components/visitor/home/Reveal'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getConfiguredSections, buildProductRowSql, planDataNeeds, planProductRows } from '@/lib/catalog/homepage-data'
@@ -250,30 +251,38 @@ export default async function HomePage() {
 
   return (
     <div className="bg-surface">
-      {sections.map((section, i) => (
-        <SectionRenderer
-          key={section.id}
-          section={section}
-          rowIndex={sections.slice(0, i).filter(s => s.type === 'product_row').length}
-          data={{
-            heroSlides,
-            offers,
-            mainCategories,
-            topBrands,
-            categoryShowcase,
-            dealOfTheDay,
-            productRows,
-            freeShippingThreshold,
-            gstEnabled,
-            stats,
-            aboutCopy,
-            storeName: identity.name,
-            businessLandingUrl,
-            businessSignupUrl,
-            extras,
-          }}
-        />
-      ))}
+      {sections.map((section, i) => {
+        const rendered = (
+          <SectionRenderer
+            key={section.id}
+            section={section}
+            rowIndex={sections.slice(0, i).filter(s => s.type === 'product_row').length}
+            data={{
+              heroSlides,
+              offers,
+              mainCategories,
+              topBrands,
+              categoryShowcase,
+              dealOfTheDay,
+              productRows,
+              freeShippingThreshold,
+              gstEnabled,
+              stats,
+              aboutCopy,
+              storeName: identity.name,
+              businessLandingUrl,
+              businessSignupUrl,
+              extras,
+            }}
+          />
+        )
+        if (section.type === 'hero') return rendered
+        return (
+          <Reveal key={section.id} disabled={i <= 1}>
+            {rendered}
+          </Reveal>
+        )
+      })}
 
       <ReviewCouponPopup />
     </div>
