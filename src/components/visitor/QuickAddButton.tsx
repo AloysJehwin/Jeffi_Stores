@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import QuickAddPicker from '@/components/visitor/QuickAddPicker'
 
 interface QuickAddButtonProps {
   productId: string
@@ -23,7 +23,6 @@ export default function QuickAddButton({
   hasVariants,
   inStock,
 }: QuickAddButtonProps) {
-  const router = useRouter()
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const prefersReduced = useReducedMotion()
@@ -37,14 +36,6 @@ export default function QuickAddButton({
     e.preventDefault()
     e.stopPropagation()
   }
-
-  const goToOptions = useCallback(
-    (e: React.MouseEvent) => {
-      stop(e)
-      router.push(`/products/${slug}`)
-    },
-    [router, slug]
-  )
 
   const addSimple = useCallback(
     async (quantity: number) => {
@@ -67,13 +58,9 @@ export default function QuickAddButton({
   const onButtonClick = useCallback(
     (e: React.MouseEvent) => {
       stop(e)
-      if (hasVariants) {
-        router.push(`/products/${slug}`)
-        return
-      }
       setOpen(v => !v)
     },
-    [hasVariants, router, slug]
+    []
   )
 
   useEffect(() => {
@@ -108,7 +95,7 @@ export default function QuickAddButton({
         disabled
         aria-label="Out of stock"
         onClick={stop}
-        className="w-8 h-8 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed"
+        className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted opacity-60 cursor-not-allowed"
       >
         <PlusIcon />
       </button>
@@ -123,21 +110,30 @@ export default function QuickAddButton({
         type="button"
         onClick={onButtonClick}
         aria-label={label}
-        aria-haspopup={hasVariants ? undefined : 'dialog'}
-        aria-expanded={hasVariants ? undefined : open}
-        className="w-8 h-8 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="w-7 h-7 rounded-full bg-accent-500 hover:bg-accent-600 text-white flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm"
       >
         <PlusIcon />
       </button>
 
-      {open && !hasVariants && (
+      {open && hasVariants && (
         <QuickAddPicker
+          productId={productId}
+          productName={productName}
+          slug={slug}
+          onClose={() => setOpen(false)}
+          onStop={stop}
+        />
+      )}
+
+      {open && !hasVariants && (
+        <SimpleQtyPicker
           qty={qty}
           adding={adding}
           prefersReduced={!!prefersReduced}
           onQty={setQty}
           onAdd={() => addSimple(qty)}
-          onChooseOptions={goToOptions}
           onClose={() => setOpen(false)}
           onStop={stop}
         />
@@ -146,18 +142,17 @@ export default function QuickAddButton({
   )
 }
 
-interface PickerProps {
+interface SimplePickerProps {
   qty: number
   adding: boolean
   prefersReduced: boolean
   onQty: (n: number) => void
   onAdd: () => void
-  onChooseOptions: (e: React.MouseEvent) => void
   onClose: () => void
   onStop: (e: React.MouseEvent) => void
 }
 
-function QuickAddPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, onStop }: PickerProps) {
+function SimpleQtyPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, onStop }: SimplePickerProps) {
   const dec = (e: React.MouseEvent) => {
     onStop(e)
     onQty(Math.max(1, qty - 1))
@@ -197,7 +192,6 @@ function QuickAddPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, on
 
   return (
     <>
-      {/* Desktop popover, >=640px */}
       <motion.div
         role="dialog"
         aria-label="Quick add"
@@ -210,7 +204,6 @@ function QuickAddPicker({ qty, adding, prefersReduced, onQty, onAdd, onClose, on
         {body}
       </motion.div>
 
-      {/* Mobile bottom-sheet, <640px */}
       <div className="sm:hidden fixed inset-0 z-50 flex flex-col justify-end" onClick={onStop}>
         <div className="absolute inset-0 bg-black/50" onClick={onClose} />
         <motion.div
@@ -256,7 +249,7 @@ function StepButton({
 
 function PlusIcon() {
   return (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   )
