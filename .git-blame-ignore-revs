@@ -1,0 +1,15 @@
+# Prettier format sweeps. Ignore in blame so line history skips reformatting.
+# Configure once:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: format tests with Prettier
+40cf7e2781bf10e17b39fdc8a6ef16b644dd7a8b
+# style: format src/lib, middleware, instrumentation, types, contexts
+e7a1f5842f2cc6a29044f9fea8c233e3e6cc20f2
+# style: format src/components and src/hooks
+0c62bea477cc666f8701fa07574261b5db22beb0
+# style: format src/app/api
+9bf9e72e123c2a7f88496e8e7fb5c7fc06a54a05
+# style: format the rest of src/app and enforce format:check in CI note
+afadbdaed5bd701a994b0e6eccd2c4b6d2c5b0fc
+# style: format files left unformatted by the restructure batches
+1a1ae8fa04fc25dbe4de33daf938299834741f5d
