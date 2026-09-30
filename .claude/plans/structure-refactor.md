@@ -364,6 +364,8 @@ Every batch:
 6. `s3-bucket-policy.json`: remove only, or also keep a reviewed copy under `deploy/aws/`? Review the live bucket policy (Principal `*` Put/Delete)?
 7. Security fix for admin-only handlers outside `/api/admin`: in-place `requireAdminScope` (C1, recommended, no URL change) or a later URL move? The move targets already exist, so it would be a handler merge.
 8. Is a later `src/lib` domain regroup (auth, tenancy, payments, orders, documents, ...) wanted after Track C? If yes, it must keep auth under `src/lib/auth*` or update the agent denylist, and must exempt client-consumed modules from `server-only`.
+
+   **Decided (owner, autonomous run):** YES to both. (a) `src/lib` domain regroup into `auth/ tenancy/ payments/ orders/ documents/ shipping/ catalog/ shared/`, nothing left flat, `auth` path prefix kept for the agent denylist, client modules exempt from `server-only` (issue #526). (b) `src/app` route groups `(admin)/(ecom)/(storefront)/(business)/(portal)/(auth)/(marketing)` + `api/(admin)/(ecom)/(internal)/(public)`, URLs unchanged, the 6 Next-required root files pinned, no group-level layouts (issue #527). Both run after Track C, as verified batches, committed locally.
 9. Rename `src/components/visitor` to `storefront` (about 90 files) or keep the name?
 10. Group `scripts/` into `smoke/`, `ml/`, `data/`, `ops/`? `seed-ss202.mjs` is referenced by `seed-ss202.yml`.
 11. The blanket `*.sh` and `/scripts/` ignores leave `deploy/maintenance.sh`, `deploy/scheduler-setup.sh` and the ai-platform guard scripts untracked though docs reference them. Review them for secrets and track them?
