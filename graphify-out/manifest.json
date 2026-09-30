@@ -525,8 +525,8 @@
     "semantic_hash": ""
   },
   "src/contexts/ThemeContext.tsx": {
-    "mtime": 1790755597.8403618,
-    "ast_hash": "65ed5eb07f38600676ce57a7d37b682d",
+    "mtime": 1790775694.67153,
+    "ast_hash": "de4043af39799085fd6ad28aefcdb590",
     "semantic_hash": ""
   },
   "src/contexts/ToastContext.tsx": {
@@ -7010,8 +7010,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/FinancialClient.tsx": {
-    "mtime": 1790768884.2534792,
-    "ast_hash": "5f90dc38f86061dbcdf0b192a3354f7c",
+    "mtime": 1790775823.736681,
+    "ast_hash": "130ed5bc6e9d4d7772f7a52fb02a2f27",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/CashflowTab.tsx": {
@@ -12267,6 +12267,11 @@
   "src/lib/tenancy/tenant-mtls.ts": {
     "mtime": 1790768941.0750933,
     "ast_hash": "b145b0ca8772d59814b7e5bea2da72a2",
+    "semantic_hash": ""
+  },
+  ".claude/plans/milestone-2-admin-storefront-ux.md": {
+    "mtime": 1790775950.6940215,
+    "ast_hash": "2e47aabcbbd0e2a198a2f3d6eddf8e44",
     "semantic_hash": ""
   }
 }
