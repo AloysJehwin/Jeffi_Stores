@@ -32,8 +32,13 @@ function resolveTheme(theme: Theme): 'light' | 'dark' {
 }
 
 export function ThemeProvider({ children, storageKey = 'jeffi-theme' }: { children: ReactNode; storageKey?: string }) {
-  const [theme, setThemeState] = useState<Theme>('light')
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
+  // Initialize from what the pre-hydration script in layout.tsx already applied to
+  // <html>, not a hardcoded 'light', so the first client render matches the painted
+  // theme and dark mode doesn't flash light for one frame before useEffect runs.
+  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme(storageKey))
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  )
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
