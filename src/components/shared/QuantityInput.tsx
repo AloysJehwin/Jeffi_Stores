@@ -76,20 +76,19 @@ function CountStepper({
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
-          <button
-            type="button"
+        <div className="flex items-center gap-1.5">
+          <RoundStep
+            label="Decrease quantity"
+            disabled={quantity <= qtyMin}
             onClick={() => {
               const next = Math.max(qtyMin, quantity - 1)
               onChange(next, String(next))
             }}
-            disabled={quantity <= qtyMin}
-            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
-          </button>
+          </RoundStep>
           <input
             type="text"
             inputMode="numeric"
@@ -106,21 +105,20 @@ function CountStepper({
               const clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
               onChange(clamped, String(clamped))
             }}
-            className="w-14 sm:w-16 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
+            className="w-12 min-h-[36px] text-center font-semibold bg-transparent text-foreground focus:outline-none text-base tabular-nums"
           />
-          <button
-            type="button"
+          <RoundStep
+            label="Increase quantity"
+            disabled={quantity >= ceiling}
             onClick={() => {
               const next = Math.min(ceiling, quantity + 1)
               onChange(next, String(next))
             }}
-            disabled={quantity >= ceiling}
-            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-          </button>
+          </RoundStep>
         </div>
         {unitLabel && (
           <span className="text-sm text-foreground-muted">
@@ -130,6 +128,30 @@ function CountStepper({
       </div>
       <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={1} />
     </div>
+  )
+}
+
+function RoundStep({
+  onClick,
+  disabled,
+  label,
+  children,
+}: {
+  onClick: () => void
+  disabled: boolean
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="w-9 h-9 rounded-full border border-border-default bg-surface-secondary text-foreground flex items-center justify-center hover:border-accent-400 transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      {children}
+    </button>
   )
 }
 
@@ -505,15 +527,12 @@ function SliderInput({
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
-          <button
-            type="button"
-            onClick={dec}
-            disabled={quantity <= qtyMin}
-            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            −
-          </button>
+        <div className="flex items-center gap-1.5">
+          <RoundStep label="Decrease quantity" disabled={quantity <= qtyMin} onClick={dec}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </RoundStep>
           <input
             type="text"
             inputMode="decimal"
@@ -530,16 +549,13 @@ function SliderInput({
               clamped = Math.max(qtyMin, Math.min(ceiling, parseFloat(clamped.toFixed(6))))
               onChange(clamped, fmtQty(clamped))
             }}
-            className="w-20 sm:w-24 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
+            className="w-16 min-h-[36px] text-center font-semibold bg-transparent text-foreground focus:outline-none text-base tabular-nums"
           />
-          <button
-            type="button"
-            onClick={inc}
-            disabled={quantity >= ceiling}
-            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            +
-          </button>
+          <RoundStep label="Increase quantity" disabled={quantity >= ceiling} onClick={inc}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </RoundStep>
         </div>
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
