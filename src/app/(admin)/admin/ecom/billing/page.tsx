@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, billingSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
+import EcomBillingMobileList from './_components/EcomBillingMobileList'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,11 @@ export default async function EcomBillingPage({ searchParams }: { searchParams: 
 
       <EcomFilters />
 
-      <div className="rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
+      <div className="md:hidden">
+        <EcomBillingMobileList tenants={tenants} />
+      </div>
+
+      <div className="hidden md:block rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
         <table className="w-full text-sm">
           <thead className="bg-surface-secondary text-foreground-muted">
             <tr>

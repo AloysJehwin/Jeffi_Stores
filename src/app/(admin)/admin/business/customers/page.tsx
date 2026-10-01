@@ -12,6 +12,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import BusinessCustomersMobileList from './_components/BusinessCustomersMobileList'
 
 const PAGE_SIZE = 25
 
@@ -149,8 +150,25 @@ async function BusinessCustomersListContent({
 
   return (
     <>
+      <div className="md:hidden">
+        <BusinessCustomersMobileList
+          customers={customers.map(c => ({
+            user_id: c.user_id,
+            email: c.email,
+            first_name: c.first_name,
+            last_name: c.last_name,
+            company_name: c.company_name,
+            gst_number: c.gst_number,
+            industry: c.industry,
+            approval_status: c.approval_status,
+            created_at: c.created_at,
+            href: ap(`/admin/business/customers/${c.user_id}`, host),
+          }))}
+        />
+      </div>
+
       {/* Table */}
-      <div className="bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
+      <div className="hidden md:block bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-default bg-surface-secondary text-foreground-secondary text-xs uppercase tracking-wide">
