@@ -5,9 +5,11 @@ import Pagination from '@/components/admin/Pagination'
 import DeleteCampaignButton from '@/components/admin/DeleteCampaignButton'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AdminFilters from '@/components/admin/AdminFilters'
+import ResponsiveList from '@/components/admin/ResponsiveList'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import MailerMobileList from './_components/MailerMobileList'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -157,134 +159,97 @@ async function MailerListContent({
   }
 
   return (
-    <>
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary">
-              <tr>
-                {['Title', 'Template', 'Audience', 'Recipients', 'Status', 'Date', 'Actions'].map(h => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {campaigns.map(c => (
-                <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                      className="font-medium text-foreground hover:text-accent-500 transition-colors"
-                    >
-                      {c.title}
-                    </Link>
-                    <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">
-                    {TEMPLATE_LABELS[c.template_key] || c.template_key}
-                  </td>
-                  <td className="px-4 py-3 capitalize text-foreground-secondary">
-                    {c.audience_type.replace('_', ' ')}
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary text-xs">
-                    {c.status === 'scheduled' && c.scheduled_at
-                      ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`
-                      : c.sent_at
-                        ? new Date(c.sent_at).toLocaleString('en-IN', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                            timeZone: 'Asia/Kolkata',
-                          })
-                        : new Date(c.created_at).toLocaleDateString('en-IN')}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {(c.status === 'draft' || c.status === 'scheduled') && (
-                        <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
-                      )}
-                      <Link
-                        href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                        className="text-accent-500 hover:underline text-sm"
-                      >
-                        View
-                      </Link>
-                      {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {campaigns.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-foreground-muted">
-                    No campaigns yet.{' '}
-                    <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">
-                      Create your first one.
-                    </Link>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+    <ResponsiveList
+      items={campaigns}
+      getKey={c => c.id}
+      minWidth="none"
+      emptyState={
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+          No campaigns yet.{' '}
+          <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">
+            Create your first one.
+          </Link>
         </div>
-
-        <div className="md:hidden divide-y divide-border-default">
+      }
+      pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
+      mobileList={
+        <MailerMobileList
+          campaigns={campaigns}
+          templateLabels={TEMPLATE_LABELS}
+          statusStyles={STATUS_STYLES}
+          currentListUrl={currentListUrl}
+          host={host}
+        />
+      }
+      renderCard={() => null}
+      tableHead={
+        <>
+          {['Title', 'Template', 'Audience', 'Recipients', 'Status', 'Date', 'Actions'].map(h => (
+            <th
+              key={h}
+              className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
+            >
+              {h}
+            </th>
+          ))}
+        </>
+      }
+      tableBody={
+        <tbody className="text-sm divide-y divide-border-default">
           {campaigns.map(c => (
-            <div key={c.id} className="p-4 space-y-2">
-              <div className="flex items-start justify-between gap-2">
+            <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
+              <td className="px-4 py-3">
                 <Link
                   href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                  className="font-medium text-foreground"
+                  className="font-medium text-foreground hover:text-accent-500 transition-colors"
                 >
                   {c.title}
                 </Link>
+                <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
+              </td>
+              <td className="px-4 py-3 text-foreground-secondary">
+                {TEMPLATE_LABELS[c.template_key] || c.template_key}
+              </td>
+              <td className="px-4 py-3 capitalize text-foreground-secondary">
+                {c.audience_type.replace('_', ' ')}
+              </td>
+              <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
+              <td className="px-4 py-3">
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
+                  className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
                 >
                   {c.status}
                 </span>
-              </div>
-              <p className="text-xs text-foreground-muted">
-                {TEMPLATE_LABELS[c.template_key]} · {c.audience_type.replace('_', ' ')}
-              </p>
-              {c.recipient_count != null && (
-                <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>
-              )}
-              <div className="flex gap-3 pt-1">
-                {(c.status === 'draft' || c.status === 'scheduled') && (
-                  <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
-                )}
-                <Link
-                  href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                  className="text-xs text-accent-500 hover:underline"
-                >
-                  View
-                </Link>
-                {c.status !== 'sending' && (
-                  <div className="hidden md:block">
-                    <DeleteCampaignButton id={c.id} title={c.title} />
-                  </div>
-                )}
-              </div>
-            </div>
+              </td>
+              <td className="px-4 py-3 text-foreground-secondary text-xs">
+                {c.status === 'scheduled' && c.scheduled_at
+                  ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`
+                  : c.sent_at
+                    ? new Date(c.sent_at).toLocaleString('en-IN', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: 'Asia/Kolkata',
+                      })
+                    : new Date(c.created_at).toLocaleDateString('en-IN')}
+              </td>
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  {(c.status === 'draft' || c.status === 'scheduled') && (
+                    <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
+                  )}
+                  <Link
+                    href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                    className="text-accent-500 hover:underline text-sm"
+                  >
+                    View
+                  </Link>
+                  {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
+                </div>
+              </td>
+            </tr>
           ))}
-          {campaigns.length === 0 && <p className="p-6 text-center text-foreground-muted text-sm">No campaigns yet.</p>}
-        </div>
-      </div>
-
-      <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </>
+        </tbody>
+      }
+    />
   )
 }
