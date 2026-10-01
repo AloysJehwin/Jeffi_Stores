@@ -27,8 +27,9 @@ import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 import { lineItemExGst } from '@/lib/catalog/pricing'
+import QuotationsMobileList from './_components/QuotationsMobileList'
 
-interface Quotation {
+export interface Quotation {
   id: string
   quote_number: string
   quote_date: string
@@ -65,7 +66,7 @@ interface Quotation {
 
 type View = 'list' | 'editor'
 
-const STATUS_COLORS: Record<string, string> = {
+export const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   final: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
 }
@@ -683,6 +684,37 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
     }
   }
 
+  async function startConvert(q: Quotation) {
+    setConvertPendingQuoteId(q.id)
+    setConvertPaymentMode('cash')
+    setConvertEnableDelivery(false)
+    setConvertQrImageUrl(null)
+    setConvertQrTotal(q.total_amount || 0)
+    setConvertSavedAsDraft(false)
+    setConvertInsufficientItems([])
+    setConvertHasStockIssue(false)
+    setConvertStep('payment')
+    setConvertBatchPickerItems(null)
+    setConvertSerialPickerItems(null)
+    setShowConvertModal(true)
+    try {
+      const res = await fetch(`/api/admin/quotations/${q.id}`)
+      const data = await res.json()
+      const qItems: any[] = data.items || []
+      const stockIssue = qItems.some(item => {
+        if (!item.product_id || item.inventory_quantity === null || item.inventory_quantity === undefined) return false
+        const rawQty = parseFloat(item.quantity)
+        const factor = parseFloat(item.sell_unit_factor)
+        const baseQty = item.sell_unit_dimension === 'count' && factor > 1 ? rawQty * factor : rawQty
+        return parseFloat(item.inventory_quantity) < baseQty
+      })
+      setConvertHasStockIssue(stockIssue)
+      if (stockIssue) setConvertPaymentMode('credit')
+    } catch (_) {
+      // stock check is best-effort
+    }
+  }
+
   async function deleteQuote(id: string) {
     const confirmed = await confirm({
       title: 'Delete Quotation',
@@ -893,7 +925,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         </div>
 
         <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-primary">
@@ -1136,43 +1168,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                           )}
                           {q.status === 'final' && !q.converted_order_id && canWrite && (
                             <button
-                              onClick={async () => {
-                                setConvertPendingQuoteId(q.id)
-                                setConvertPaymentMode('cash')
-                                setConvertEnableDelivery(false)
-                                setConvertQrImageUrl(null)
-                                setConvertQrTotal(q.total_amount || 0)
-                                setConvertSavedAsDraft(false)
-                                setConvertInsufficientItems([])
-                                setConvertHasStockIssue(false)
-                                setConvertStep('payment')
-                                setConvertBatchPickerItems(null)
-                                setConvertSerialPickerItems(null)
-                                setShowConvertModal(true)
-                                // Fetch items to check stock availability
-                                try {
-                                  const res = await fetch(`/api/admin/quotations/${q.id}`)
-                                  const data = await res.json()
-                                  const qItems: any[] = data.items || []
-                                  const stockIssue = qItems.some(item => {
-                                    if (
-                                      !item.product_id ||
-                                      item.inventory_quantity === null ||
-                                      item.inventory_quantity === undefined
-                                    )
-                                      return false
-                                    const rawQty = parseFloat(item.quantity)
-                                    const factor = parseFloat(item.sell_unit_factor)
-                                    const baseQty =
-                                      item.sell_unit_dimension === 'count' && factor > 1 ? rawQty * factor : rawQty
-                                    return parseFloat(item.inventory_quantity) < baseQty
-                                  })
-                                  setConvertHasStockIssue(stockIssue)
-                                  if (stockIssue) setConvertPaymentMode('credit')
-                                } catch (_) {
-                                  // stock check is best-effort
-                                }
-                              }}
+                              onClick={() => startConvert(q)}
                               title="Convert to Invoice"
                               className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
                             >
@@ -1215,6 +1211,34 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="md:hidden p-4">
+            {loading ? (
+              <div className="space-y-2">
+                {[...Array(8)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-24 bg-surface-secondary rounded-lg animate-pulse"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  />
+                ))}
+              </div>
+            ) : quotations.length === 0 ? (
+              <div className="py-8 text-center text-foreground-muted text-sm">
+                No quotations found. Create your first one.
+              </div>
+            ) : (
+              <QuotationsMobileList
+                quotations={sortedQuotations}
+                canWrite={canWrite}
+                sendingEmailId={sendingEmailId}
+                onEdit={openEdit}
+                onSendEmail={sendQuoteEmail}
+                onDelete={deleteQuote}
+                onConvert={startConvert}
+              />
+            )}
           </div>
           {totalPages > 1 && (
             <div className="px-4 py-3 border-t border-border-default bg-surface-elevated flex items-center justify-between gap-2">

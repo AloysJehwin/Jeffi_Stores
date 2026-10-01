@@ -24,8 +24,9 @@ import SerialEntryModal, {
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
 import Toggle from '@/components/ui/Toggle'
+import InvoicesMobileList from './_components/InvoicesMobileList'
 
-interface Invoice {
+export interface Invoice {
   id: string
   order_number: string
   invoice_number: string
@@ -73,7 +74,7 @@ const inputCls =
   'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400 disabled:opacity-60 disabled:cursor-not-allowed'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
-const PAYMENT_COLORS: Record<string, string> = {
+export const PAYMENT_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   unpaid: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
@@ -82,7 +83,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 }
 
-const SOURCE_COLORS: Record<string, string> = {
+export const SOURCE_COLORS: Record<string, string> = {
   online: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   offline: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   cash_sale: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
@@ -2440,139 +2441,15 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 </table>
               </div>
 
-              <div className="md:hidden divide-y divide-border-default">
-                {invoices.map(inv => (
-                  <div
-                    key={inv.id}
-                    className="p-4 space-y-2.5 hover:bg-surface-secondary transition-colors cursor-pointer"
-                    onClick={() => setSelectedInvoice(inv)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div onClick={e => e.stopPropagation()}>
-                        <a
-                          href={ap(
-                            inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`
-                          )}
-                          className="font-mono font-semibold text-sm text-accent-500 hover:underline"
-                        >
-                          {inv.invoice_number}
-                        </a>
-                        {inv.order_number && (
-                          <div className="text-xs text-foreground-muted mt-0.5 font-mono">{inv.order_number}</div>
-                        )}
-                      </div>
-                      <span className="font-semibold text-foreground text-sm shrink-0">
-                        ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <span className="text-sm text-foreground font-medium">{inv.customer_name}</span>
-                        {inv.customer_phone && (
-                          <span className="text-xs text-foreground-muted ml-2">+91 {inv.customer_phone}</span>
-                        )}
-                      </div>
-                      <span className="text-xs text-foreground-muted shrink-0">{fmtDate(inv.invoice_date)}</span>
-                    </div>
-                    {inv.buyer_gstin && (
-                      <div className="text-xs text-foreground-muted font-mono">{inv.buyer_gstin}</div>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}
-                      >
-                        {inv.payment_status}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}
-                      >
-                        {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
-                      </span>
-                      {inv.status === 'cancelled' && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                          Cancelled
-                        </span>
-                      )}
-                      {inv.irn && (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}
-                        >
-                          {inv.irn_status === 'generated' ? (
-                            <>
-                              <Check className="w-3 h-3" /> IRN
-                            </>
-                          ) : (
-                            'IRN Stub'
-                          )}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-4 pt-1 border-t border-border-default" onClick={e => e.stopPropagation()}>
-                      {inv.source === 'cash_sale' ? (
-                        <>
-                          <a
-                            href={`/api/admin/cash-sale/${inv.id}/receipt`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
-                          >
-                            Receipt PDF
-                          </a>
-                          <a
-                            href={ap(`/admin/cash-sale/${inv.id}`)}
-                            className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                          >
-                            View Sale
-                          </a>
-                        </>
-                      ) : (
-                        <>
-                          <a
-                            href={`/api/orders/${inv.id}/invoice`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
-                          >
-                            PDF
-                          </a>
-                          <a
-                            href={ap(`/admin/invoices/${inv.id}`)}
-                            className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                          >
-                            View Invoice
-                          </a>
-                          {inv.customer_email && (
-                            <button
-                              onClick={() => sendInvoiceEmail(inv)}
-                              disabled={sendingEmailId === inv.id}
-                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
-                            >
-                              {sendingEmailId === inv.id ? 'Sending…' : 'Send Email'}
-                            </button>
-                          )}
-                          {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
-                            <button
-                              onClick={() => openEdit(inv)}
-                              className="text-xs text-foreground-secondary hover:text-foreground font-medium"
-                            >
-                              Edit
-                            </button>
-                          )}
-                          {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
-                            <button
-                              onClick={() => cancelInvoice(inv)}
-                              disabled={cancellingId === inv.id}
-                              className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <InvoicesMobileList
+                invoices={invoices}
+                canWrite={canWrite}
+                sendingEmailId={sendingEmailId}
+                cancellingId={cancellingId}
+                onSendEmail={sendInvoiceEmail}
+                onEdit={openEdit}
+                onCancel={cancelInvoice}
+              />
             </>
           )}
         </div>

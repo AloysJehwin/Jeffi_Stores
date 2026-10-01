@@ -1,7 +1,4 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
-import { hasScope } from '@/lib/auth/scopes'
-import { headers } from 'next/headers'
 import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
@@ -14,6 +11,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
+import OrdersMobileList from './_components/OrdersMobileList'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -76,12 +74,6 @@ async function OrdersStats() {
 }
 
 async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
-  const h = await headers()
-  const canPackingSlips = hasScope(
-    h.get('x-user-role') || '',
-    JSON.parse(h.get('x-user-scopes') || '[]'),
-    'packing_slips:read'
-  )
   const host = await getHost()
   const page = Math.max(1, parseInt(sp(resolvedSearchParams, 'page') || '1', 10))
   const sort = sp(resolvedSearchParams, 'sort')
@@ -137,165 +129,11 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
 
   return (
     <>
-      <div className="md:hidden space-y-3">
-        {orders && orders.length > 0 ? (
-          orders.map((order: any) => (
-            <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
-              <Link
-                href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                className="block"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      #{order.order_number || order.id.slice(0, 8)}
-                    </span>
-                    <span
-                      className={`px-1.5 py-0.5 text-xs font-medium rounded ${
-                        order.source === 'online'
-                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                          : order.source === 'business'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                            : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                      }`}
-                    >
-                      {order.source === 'online'
-                        ? 'Online'
-                        : order.source === 'business'
-                          ? 'Business'
-                          : order.source === 'cash_sale'
-                            ? 'Cash Sale'
-                            : 'Offline'}
-                    </span>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                      order.status === 'delivered'
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                        : order.status === 'processing' || order.status === 'shipped'
-                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                          : order.status === 'out_for_delivery'
-                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-                            : order.status === 'cancelled'
-                              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                              : order.status === 'cancel_requested'
-                                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                    }`}
-                  >
-                    {order.status === 'cancel_requested'
-                      ? 'Cancel Req.'
-                      : order.status === 'out_for_delivery'
-                        ? 'Out for Delivery'
-                        : order.status}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-foreground">
-                    {order.users
-                      ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() ||
-                        order.customer_name ||
-                        'Guest'
-                      : order.customer_name || 'Guest'}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-foreground-muted">
-                    {new Date(order.created_at).toLocaleDateString('en-IN')}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                      order.payment_status === 'paid'
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                        : order.payment_status === 'pending'
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                    }`}
-                  >
-                    {order.payment_status}
-                  </span>
-                </div>
-                {order.estimated_delivery_date && (
-                  <div className="text-xs text-foreground-muted mt-1">
-                    EDD:{' '}
-                    <span className="text-foreground">
-                      {new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </div>
-                )}
-              </Link>
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
-                {canPackingSlips && (
-                  <a
-                    href={`/api/admin/packing-slips/${order.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Packing Slip
-                  </a>
-                )}
-                {order.awb_number && (
-                  <a
-                    href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                      />
-                    </svg>
-                    Shipping Label
-                  </a>
-                )}
-                {order.invoice_number && (
-                  <a
-                    href={`/api/orders/${order.id}/invoice`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Invoice
-                  </a>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-            No orders found.
-          </div>
-        )}
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
+      <OrdersMobileList
+        orders={orders ?? []}
+        backUrl={currentListUrl}
+        pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
+      />
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
@@ -365,6 +203,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
           </table>
         </div>
       </div>
+
       <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
