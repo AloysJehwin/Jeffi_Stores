@@ -12495,8 +12495,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/_components/InventoryOverviewTab.tsx": {
-    "mtime": 1790856203.9827108,
-    "ast_hash": "ec0f04572ade07718c5cfd25dd3e7649",
+    "mtime": 1790856819.3821964,
+    "ast_hash": "48ab21670def59eda5982b894066d15d",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/OverviewCharts.tsx": {
@@ -12507,6 +12507,11 @@
   "src/app/(admin)/admin/inventory/_components/InventoryOverviewCharts.tsx": {
     "mtime": 1790856136.2411103,
     "ast_hash": "b11279534aaac91e7eb2ee69bcd79409",
+    "semantic_hash": ""
+  },
+  "src/app/api/(admin)/admin/inventory/stock-levels/route.ts": {
+    "mtime": 1790856711.0662417,
+    "ast_hash": "0a152ba18b026ed7e89d1789c615e3e6",
     "semantic_hash": ""
   }
 }
