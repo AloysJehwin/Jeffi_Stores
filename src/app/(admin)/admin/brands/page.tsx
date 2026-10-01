@@ -3,15 +3,14 @@ import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryMany, queryCount } from '@/lib/shared/db'
-import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import BrandTableRow from '@/components/admin/BrandTableRow'
-import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import BrandsMobileList from './_components/BrandsMobileList'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -199,54 +198,7 @@ async function BrandsListContent({
     <>
       <div className="md:hidden space-y-3">
         {brands && brands.length > 0 ? (
-          brands.map((brand: any) => (
-            <div key={brand.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-foreground">{brand.name}</div>
-                  {brand.description && (
-                    <div className="text-xs text-foreground-muted mt-1 line-clamp-2">{brand.description}</div>
-                  )}
-                </div>
-                <BrandStatusToggle
-                  brandId={brand.id}
-                  brandData={{
-                    name: brand.name,
-                    slug: brand.slug,
-                    description: brand.description ?? null,
-                    website: brand.website ?? null,
-                    is_active: brand.is_active,
-                    return_allowed: brand.return_allowed,
-                    return_window_days: brand.return_window_days,
-                    replacement_allowed: brand.replacement_allowed,
-                    replacement_window_days: brand.replacement_window_days,
-                  }}
-                />
-              </div>
-              <div className="text-xs text-foreground-muted mb-3">{brand.slug}</div>
-              {brand.website && (
-                <div className="text-xs text-foreground-muted mb-3">
-                  <a
-                    href={brand.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent-500 hover:underline"
-                  >
-                    {brand.website}
-                  </a>
-                </div>
-              )}
-              <div className="hidden md:flex items-center justify-end gap-3 text-sm">
-                <Link
-                  href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                  className="text-accent-500 font-medium"
-                >
-                  Edit
-                </Link>
-                <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
-              </div>
-            </div>
-          ))
+          <BrandsMobileList brands={brands} backUrl={currentListUrl} />
         ) : (
           <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
             No brands found. Add your first brand to get started.

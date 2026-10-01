@@ -7,8 +7,8 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
-import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
 import CouponTableRow from '@/components/admin/CouponTableRow'
+import CouponsMobileList from './_components/CouponsMobileList'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
@@ -410,51 +410,12 @@ async function CouponsListContent({
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden divide-y divide-border-default">
-          {(coupons as CouponRow[]).map(c => (
-            <div key={c.id} className="p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-mono font-bold text-accent-500">{c.code}</span>
-                  {c.generated_for_campaign && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 w-fit">
-                      {c.generated_for_campaign}
-                    </span>
-                  )}
-                </div>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}
-                >
-                  {c.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              <p className="text-sm text-foreground-secondary">{c.description || '—'}</p>
-              <div className="text-xs text-foreground-muted">
-                {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
-                {c.valid_until && ` · Expires ${new Date(c.valid_until).toLocaleDateString('en-IN')}`}
-              </div>
-              <div className="flex gap-3 pt-1">
-                <Link
-                  href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                  className="text-sm text-accent-500 hover:underline"
-                >
-                  View
-                </Link>
-                <div className="hidden md:flex gap-3">
-                  {canWrite && (
-                    <Link
-                      href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                      className="text-sm text-accent-500 hover:underline"
-                    >
-                      Edit
-                    </Link>
-                  )}
-                  {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
-                </div>
-              </div>
-            </div>
-          ))}
-          {coupons.length === 0 && <p className="p-6 text-center text-foreground-muted text-sm">No coupons found</p>}
+        <div className="md:hidden p-4">
+          {coupons.length > 0 ? (
+            <CouponsMobileList coupons={coupons as CouponRow[]} backUrl={currentListUrl} />
+          ) : (
+            <p className="text-center text-foreground-muted text-sm">No coupons found</p>
+          )}
         </div>
       </div>
 
