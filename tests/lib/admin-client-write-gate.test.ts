@@ -50,6 +50,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
   'src/app/(admin)/admin/invoices/InvoicesClient.tsx',
   'src/app/(admin)/admin/quotations/QuotationsClient.tsx',
+  // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')
+  // in the page), passed in and used to gate every action — same pattern as the siblings above.
+  'src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
   'src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
   'src/app/(admin)/admin/labels/LabelsClient.tsx',
@@ -83,7 +86,7 @@ function ungatedMutatingComponents(): string[] {
     .filter(f => !ALLOWED_WITHOUT_CLIENT_GATE.has(f))
     .filter(f => {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
-      return !/useCanWrite\(|RequireWrite\b|useCanUseAi\(|RequireAi\b/.test(src)
+      return !/useCanWrite\(|RequireWrite\b|useCanUseAi\(|RequireAi\b|useHasScope\(['"][^'"]+:write['"]\)/.test(src)
     })
     .sort()
 }
