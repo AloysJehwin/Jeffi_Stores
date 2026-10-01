@@ -67,7 +67,7 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
         </div>
         <div className="p-6 space-y-6">
           {/* KPI row */}
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             {[
               { label: 'Gross Revenue', val: m.revenue },
               { label: 'Net Revenue', val: m.net_revenue },
@@ -264,7 +264,7 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
         </div>
         <div className="p-6 space-y-6">
           {/* KPI row */}
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             {[
               { label: 'Cash In', val: m.cash_in, pos: true },
               { label: 'PO Payments', val: m.po_payments, pos: false },

@@ -129,7 +129,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
         <Skeleton />
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <SummaryCard label="Total Inflow" value={formatINR(data.summary.total_inflow)} sub="payments received" />
             <SummaryCard label="Total Outflow" value={formatINR(data.summary.total_outflow)} sub="payments made" />
             <SummaryCard
