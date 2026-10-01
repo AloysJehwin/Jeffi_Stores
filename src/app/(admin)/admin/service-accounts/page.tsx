@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import Link from 'next/link'
 import ServiceAccountRevokeButton from '@/components/admin/ServiceAccountRevokeButton'
+import ServiceAccountsMobileList from './_components/ServiceAccountsMobileList'
 
 async function getServiceAccounts() {
   return queryMany(
@@ -161,54 +162,8 @@ export default async function ServiceAccountsPage() {
         ) : (
           <>
             {/* Mobile cards */}
-            <div className="md:hidden divide-y divide-border-default">
-              {accounts.map((sa: any) => {
-                const saScopes: string[] = sa.allowed_scopes || []
-                return (
-                  <div key={sa.id} className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                            <svg
-                              className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
-                              />
-                            </svg>
-                          </div>
-                          <p className="text-sm font-semibold text-foreground">{sa.name}</p>
-                        </div>
-                        <p className="text-xs text-foreground-muted font-mono mt-1 ml-9">{sa.common_name}</p>
-                      </div>
-                      <StatusBadge isRevoked={sa.is_revoked} />
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {saScopes.length > 0 ? (
-                        saScopes.map((s: string) => <ScopeBadge key={s} scope={s} label={scopeLabels[s] || s} />)
-                      ) : (
-                        <span className="text-xs text-foreground-muted">No scopes</span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-foreground-muted">
-                      <span>Created {new Date(sa.created_at).toLocaleDateString('en-IN')}</span>
-                      <span>{sa.last_used_at ? `Used ${relativeTime(sa.last_used_at)}` : 'Never used'}</span>
-                    </div>
-                    {canWrite && !sa.is_revoked && (
-                      <div className="hidden md:block">
-                        <ServiceAccountRevokeButton id={sa.id} name={sa.name} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+            <div className="md:hidden p-4">
+              <ServiceAccountsMobileList accounts={accounts as any} scopeLabels={scopeLabels} canWrite={canWrite} />
             </div>
 
             {/* Desktop table */}

@@ -2,6 +2,7 @@ import { queryOne, queryMany } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
+import TeamMobileList from './_components/TeamMobileList'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES, isPlatformOwner, assignableScopes } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
@@ -156,85 +157,8 @@ export default async function TeamPage() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden divide-y divide-border-default">
-          {allAdmins.map((admin: any) => {
-            const status = certStatus(admin)
-            const cert = (admin.certificates as any[])?.[0]
-            const scopes: string[] = admin.scopes || []
-            return (
-              <div key={admin.id} className="p-4 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">
-                        {(admin.first_name || admin.username)[0]}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">
-                        {admin.first_name && admin.last_name
-                          ? `${admin.first_name} ${admin.last_name}`
-                          : admin.username}
-                        {admin.id === adminInfo.id && (
-                          <span className="ml-1.5 text-xs font-normal text-accent-500">(you)</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-foreground-muted capitalize">{admin.role.replace('_', ' ')}</p>
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      admin.is_active !== false
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                        : 'bg-surface-secondary text-foreground-muted'
-                    }`}
-                  >
-                    {admin.is_active !== false ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-1">
-                  {isPlatformOwner(admin.role) ? (
-                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
-                      All Access
-                    </span>
-                  ) : scopes.length > 0 ? (
-                    <>
-                      {scopes.slice(0, 4).map(scope => (
-                        <span
-                          key={scope}
-                          className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs"
-                        >
-                          {scopeLabels[scope] || scope}
-                        </span>
-                      ))}
-                      {scopes.length > 4 && (
-                        <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">
-                          +{scopes.length - 4}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-xs text-foreground-muted">No scopes</span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 text-xs text-foreground-muted">
-                  <div className="flex items-center gap-2">
-                    <CertBadge status={status} />
-                    {cert && !cert.is_revoked && new Date(cert.expires_at) > new Date() && (
-                      <span>Exp {new Date(cert.expires_at).toLocaleDateString('en-IN')}</span>
-                    )}
-                  </div>
-                  <span>{admin.last_login ? new Date(admin.last_login).toLocaleDateString('en-IN') : 'Never'}</span>
-                </div>
-
-                <div className="pt-0.5">
-                  <AdminUserActions admin={admin} currentAdminId={adminInfo.id} allowedScopeKeys={allowedScopeKeys} />
-                </div>
-              </div>
-            )
-          })}
+        <div className="md:hidden">
+          <TeamMobileList admins={allAdmins} currentAdminId={adminInfo.id} scopeLabels={scopeLabels} />
         </div>
 
         {/* Desktop table */}

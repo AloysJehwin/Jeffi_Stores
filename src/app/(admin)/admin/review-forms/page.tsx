@@ -3,10 +3,9 @@ import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
-import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
-import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import ReviewFormTableRow from '@/components/admin/ReviewFormTableRow'
+import ReviewFormsMobileList from './_components/ReviewFormsMobileList'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
@@ -232,52 +231,16 @@ async function ReviewFormsListContent({
           </table>
         </div>
 
-        <div className="md:hidden divide-y divide-border-default">
-          {(forms as FormRow[]).map(f => {
-            const formUrl = `${formsBase}/${f.slug}`
-            return (
-              <div key={f.id} className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-foreground">{f.title}</span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}
-                  >
-                    {f.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <CopyLinkButton url={formUrl} />
-                <p className="text-xs text-foreground-muted">
-                  Coupon: {f.coupon_code || 'None'} · {f.submissions_count} submissions
-                </p>
-                <div className="flex gap-3 pt-1">
-                  <a
-                    href={formUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-foreground-muted hover:underline"
-                  >
-                    Open ↗
-                  </a>
-                  <Link
-                    href={ap(`/admin/review-forms/${f.id}/submissions`, host)}
-                    className="text-xs text-accent-500 hover:underline"
-                  >
-                    Submissions
-                  </Link>
-                  <div className="hidden md:flex gap-3">
-                    <Link
-                      href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                      className="text-xs text-accent-500 hover:underline"
-                    >
-                      Edit
-                    </Link>
-                    <DeleteReviewFormButton id={f.id} title={f.title} />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-          {forms.length === 0 && <p className="p-6 text-center text-foreground-muted text-sm">No review forms yet.</p>}
+        <div className="md:hidden p-4">
+          {forms.length > 0 ? (
+            <ReviewFormsMobileList
+              forms={forms as FormRow[]}
+              backUrl={currentListUrl}
+              formsBase={formsBase}
+            />
+          ) : (
+            <p className="text-center text-foreground-muted text-sm">No review forms yet.</p>
+          )}
         </div>
       </div>
 
