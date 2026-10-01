@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, Fragment } from 'react'
+import { useState, useCallback, useEffect, useMemo, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -18,6 +18,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
+import CategoriesMobileList from './_components/CategoriesMobileList'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
@@ -618,6 +619,7 @@ export default function CategoriesClient({
   )
 
   const q = search.toLowerCase()
+  const categoriesById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories])
   const allMainCategories = categories
     .filter(c => !c.parent_category_id)
     .sort((a, b) => a.display_order - b.display_order)
@@ -950,241 +952,27 @@ export default function CategoriesClient({
         </DragOverlay>
       </DndContext>
 
-      <div className="md:hidden space-y-3">
-        {typeFilter === 'sub'
-          ? pagedSubOnly.map(sub => {
-              const parent = categories.find(c => c.id === sub.parent_category_id)
-              return (
-                <div
-                  key={sub.id}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 cursor-pointer"
-                  onClick={() => setViewCategory(sub)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-foreground flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
-                        <CategoryIcon
-                          iconName={sub.icon_name}
-                          categoryName={sub.name}
-                          className="w-3.5 h-3.5 text-foreground-muted"
-                        />
-                      </div>
-                      {sub.name}
-                    </div>
-                    <RequireWrite
-                      scope="categories:write"
-                      fallback={
-                        <span
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                        >
-                          {sub.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      }
-                    >
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)
-                        }}
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                      >
-                        {sub.is_active ? 'Active' : 'Inactive'}
-                      </button>
-                    </RequireWrite>
-                  </div>
-                  {parent && <p className="text-xs text-foreground-muted mb-1">Under: {parent.name}</p>}
-                  <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                    <span>{sub.slug}</span>
-                    <span>Order: {sub.display_order}</span>
-                  </div>
-                  <div
-                    className="hidden md:flex items-center justify-end gap-3 text-sm"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <RequireWrite scope="categories:write">
-                      <DraftEditButton
-                        entity="categories"
-                        id={sub.id}
-                        name={sub.name}
-                        hasDraft={false}
-                        backUrl={backUrl}
-                        label="Edit"
-                        className="text-accent-500 font-medium text-sm"
-                      />
-                    </RequireWrite>
-                    <DeleteCategoryButton
-                      categoryId={sub.id}
-                      categoryName={sub.name}
-                      onDeleted={() => handleCategoryDeleted(sub.id)}
-                    />
-                  </div>
-                </div>
-              )
-            })
-          : mainCategories.map(cat => {
-              const subcats = getSubcats(cat.id)
-              const visibleSubcats = q
-                ? subcats.filter(s => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q))
-                : subcats
-              const isCollapsed = collapsed.has(cat.id)
-              return (
-                <div key={cat.id}>
-                  <div
-                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 cursor-pointer"
-                    onClick={() => setViewCategory(cat)}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {subcats.length > 0 && (
-                          <button
-                            onClick={e => {
-                              e.stopPropagation()
-                              toggleCollapse(cat.id)
-                            }}
-                            className="text-foreground-muted"
-                          >
-                            <svg
-                              className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        )}
-                        <div className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
-                          <CategoryIcon
-                            iconName={cat.icon_name}
-                            categoryName={cat.name}
-                            className="w-4 h-4 text-accent-600 dark:text-accent-400"
-                          />
-                        </div>
-                        <div className="text-sm font-semibold text-foreground">{cat.name}</div>
-                        {subcats.length > 0 && (
-                          <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">
-                            {subcats.length}
-                          </span>
-                        )}
-                      </div>
-                      <RequireWrite
-                        scope="categories:write"
-                        fallback={
-                          <span
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                          >
-                            {cat.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        }
-                      >
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat)
-                          }}
-                          className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                        >
-                          {cat.is_active ? 'Active' : 'Inactive'}
-                        </button>
-                      </RequireWrite>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                      <span>{cat.slug}</span>
-                      <span>Order: {cat.display_order}</span>
-                    </div>
-                    <div
-                      className="hidden md:flex items-center justify-end gap-3 text-sm"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <RequireWrite scope="categories:write">
-                        <DraftEditButton
-                          entity="categories"
-                          id={cat.id}
-                          name={cat.name}
-                          hasDraft={false}
-                          backUrl={backUrl}
-                          label="Edit"
-                          className="text-accent-500 font-medium text-sm"
-                        />
-                      </RequireWrite>
-                      <DeleteCategoryButton
-                        categoryId={cat.id}
-                        categoryName={cat.name}
-                        onDeleted={() => handleCategoryDeleted(cat.id)}
-                      />
-                    </div>
-                  </div>
-
-                  {!isCollapsed &&
-                    visibleSubcats.map(sub => (
-                      <div
-                        key={sub.id}
-                        className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2 cursor-pointer"
-                        onClick={() => setViewCategory(sub)}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="text-sm text-foreground flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
-                              <CategoryIcon
-                                iconName={sub.icon_name}
-                                categoryName={sub.name}
-                                className="w-3.5 h-3.5 text-foreground-muted"
-                              />
-                            </div>
-                            <span className="text-foreground-muted mr-1">└</span>
-                            {sub.name}
-                          </div>
-                          <RequireWrite
-                            scope="categories:write"
-                            fallback={
-                              <span
-                                className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                              >
-                                {sub.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            }
-                          >
-                            <button
-                              onClick={e => {
-                                e.stopPropagation()
-                                handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)
-                              }}
-                              className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                            >
-                              {sub.is_active ? 'Active' : 'Inactive'}
-                            </button>
-                          </RequireWrite>
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                          <span>{sub.slug}</span>
-                          <span>Order: {sub.display_order}</span>
-                        </div>
-                        <div
-                          className="hidden md:flex items-center justify-end gap-3 text-sm"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <RequireWrite scope="categories:write">
-                            <DraftEditButton
-                              entity="categories"
-                              id={sub.id}
-                              name={sub.name}
-                              hasDraft={false}
-                              backUrl={backUrl}
-                              label="Edit"
-                              className="text-accent-500 font-medium text-sm"
-                            />
-                          </RequireWrite>
-                          <DeleteCategoryButton
-                            categoryId={sub.id}
-                            categoryName={sub.name}
-                            onDeleted={() => handleCategoryDeleted(sub.id)}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )
-            })}
+      <div className="md:hidden">
+        {(typeFilter === 'sub' ? pagedSubOnly.length === 0 : mainCategories.length === 0) ? (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center text-foreground-muted">
+            {typeFilter === 'sub' ? 'No subcategories found.' : 'No categories found.'}
+          </div>
+        ) : (
+          <CategoriesMobileList
+            typeFilter={typeFilter}
+            pagedMain={mainCategories}
+            pagedSubOnly={pagedSubOnly}
+            getSubcats={getSubcats}
+            query={q}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            categoriesById={categoriesById}
+            productCounts={productCounts}
+            backUrl={backUrl}
+            onToggleStatus={handleToggleStatus}
+            onDeleted={handleCategoryDeleted}
+          />
+        )}
       </div>
 
       {totalPages > 1 && (
