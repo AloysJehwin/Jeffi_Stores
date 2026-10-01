@@ -19,6 +19,7 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import ResponsiveList from '@/components/admin/ResponsiveList'
 import SuppliersMobileList from './_components/SuppliersMobileList'
+import PurchaseOrdersMobileList from './_components/PurchaseOrdersMobileList'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -1628,7 +1629,25 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
       ) : (
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-4 space-y-3">
+            {pos.length === 0 ? (
+              <p className="py-8 text-center text-foreground-secondary text-sm">
+                {search || statusFilter ? 'No purchase orders match your filters' : 'No purchase orders yet'}
+              </p>
+            ) : (
+              <PurchaseOrdersMobileList
+                pos={sortedPOs}
+                statusBadge={STATUS_BADGE}
+                sendingEmailId={sendingEmailId}
+                onView={openPO}
+                onSend={sendPO}
+                onReceive={openReceive}
+                onSendEmail={sendPOEmail}
+                onCancel={cancelPO}
+              />
+            )}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>

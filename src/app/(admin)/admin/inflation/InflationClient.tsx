@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
 
 interface Category {
   id: string
@@ -537,7 +538,16 @@ export default function InflationClient({ categories, brands }: { categories: Ca
         ) : logs.length === 0 ? (
           <p className="p-6 text-sm text-foreground-muted">No inflation applied yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
+            <div className="md:hidden p-4 pt-3 space-y-3">
+              <InflationHistoryMobileList
+                logs={pagedLogs}
+                canWrite={canWrite}
+                rollingBack={rollingBack}
+                onRollback={handleRollback}
+              />
+            </div>
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface border-b border-border-default">
                 <tr>
@@ -685,6 +695,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 ))}
               </tbody>
             </table>
+            </div>
             {logsTotalPages > 1 && (
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border-default">
                 <p className="text-xs text-foreground-muted whitespace-nowrap">
