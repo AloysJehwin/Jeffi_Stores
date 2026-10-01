@@ -375,16 +375,21 @@ jobs:
             echo "── Logging in to GHCR ──"
             echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
-            # Reclaim disk BEFORE pulling the new image. The old prune ran only
-            # after blue-green-deploy.sh, so on a near-full disk the pull itself
-            # failed first ("no space left on device" registering a layer, which
-            # broke the #507 deploy). Prune dangling images, stopped containers
-            # and build cache now; running containers and their images are kept.
+            # Reclaim disk BEFORE pulling the new image. The 20G host sits at 100%
+            # because every deploy re-pulls the :latest tag, orphaning the previous
+            # version; those old layers are held by STOPPED blue-green containers, so
+            # a plain `image prune -f` reclaims 0B and the next pull dies with
+            # "no space left on device" (broke #507 and the #529 merge deploy).
+            # Blue-green keeps no tagged rollback image (single :latest), so removing
+            # every image not used by a RUNNING container is safe and reclaims the
+            # orphaned versions. Order matters: drop stopped containers first so their
+            # images become unreferenced, then prune images (-a) and build cache.
             echo "── Reclaiming disk before pull ──"
+            docker system df || true
             df -h / | tail -1 || true
             docker container prune -f || true
-            docker image prune -f || true
-            docker builder prune -f || true
+            docker image prune -a -f || true
+            docker builder prune -a -f || true
             df -h / | tail -1 || true
 
             # nginx's config is bind-mounted as a single FILE, which Docker resolves once, by
