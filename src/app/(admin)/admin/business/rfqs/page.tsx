@@ -10,8 +10,10 @@ import { queryMany } from '@/lib/shared/db'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import BusinessRfqsMobileList from './_components/BusinessRfqsMobileList'
+import RfqTrendChart, { type RfqTrendPoint } from './_components/RfqTrendChart'
 
 const PAGE_SIZE = 25
 
@@ -48,6 +50,82 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 type SP = { [key: string]: string | undefined }
+
+interface StatusCountRow {
+  status: string
+  count: string
+}
+
+// Streamed stats: one GROUP BY status count query + one grouped-by-month query.
+// Mirrors the orders page gradient summary card + stat tiles, with an RFQ trend
+// alongside. Mobile-first: tiles stack 2-up then widen; the trend scrolls.
+async function BusinessRFQsStats() {
+  const [statusRows, trendRows] = await Promise.all([
+    queryMany<StatusCountRow>(`SELECT status, COUNT(*)::text AS count FROM business_rfqs GROUP BY status`),
+    queryMany<{ month: string; count: string }>(
+      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, COUNT(*)::text AS count
+       FROM business_rfqs
+       WHERE created_at >= date_trunc('month', now()) - interval '11 months'
+       GROUP BY 1
+       ORDER BY 1`
+    ),
+  ])
+
+  const byStatus = Object.fromEntries(statusRows.map(r => [r.status, parseInt(r.count, 10) || 0]))
+  const total = statusRows.reduce((sum, r) => sum + (parseInt(r.count, 10) || 0), 0)
+  const pending = byStatus.pending || 0
+  const inReview = (byStatus.reviewed || 0) + (byStatus.negotiating || 0)
+  const offerAccepted = byStatus.offer_accepted || 0
+  const converted = byStatus.converted || 0
+  const rejected = byStatus.rejected || 0
+
+  const trend: RfqTrendPoint[] = buildMonthlyTrend(trendRows)
+
+  const tiles = [
+    { label: 'Total', value: total },
+    { label: 'Pending', value: pending },
+    { label: 'In Review', value: inReview },
+    { label: 'Offer Accepted', value: offerAccepted },
+    { label: 'Converted', value: converted },
+    { label: 'Rejected', value: rejected },
+  ]
+
+  return (
+    <div className="animate-fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
+          <div>
+            <p className="text-white/80 text-sm">Total RFQs</p>
+            <p className="text-3xl sm:text-4xl font-bold mt-1">{total.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mt-4">
+            {tiles.map(t => (
+              <div key={t.label} className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+                <p className="text-lg sm:text-2xl font-bold leading-none">{t.value}</p>
+                <p className="text-[10px] sm:text-xs text-white/80 mt-1">{t.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <RfqTrendChart data={trend} />
+      </div>
+    </div>
+  )
+}
+
+// Pads the grouped-by-month rows to a continuous 12-month window ending this
+// month, so sparse months render as zero bars rather than gaps.
+function buildMonthlyTrend(rows: { month: string; count: string }[]): RfqTrendPoint[] {
+  const counts = new Map(rows.map(r => [r.month, parseInt(r.count, 10) || 0]))
+  const out: RfqTrendPoint[] = []
+  const now = new Date()
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    out.push({ month: key, count: counts.get(key) || 0 })
+  }
+  return out
+}
 
 export default function BusinessRFQsPage({ searchParams }: { searchParams: Promise<SP> }) {
   // Auth gating + redirect must run BEFORE any list content renders, so an
@@ -90,6 +168,11 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
           Review and respond to quote requests from business partners
         </p>
       </div>
+
+      {/* Stats + trend stream above the filters while the shell stays mounted */}
+      <Suspense fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}>
+        <BusinessRFQsStats />
+      </Suspense>
 
       {/* Filters */}
       <form method="get" className="flex gap-3 mb-4">
