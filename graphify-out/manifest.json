@@ -7010,8 +7010,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/FinancialClient.tsx": {
-    "mtime": 1790775823.736681,
-    "ast_hash": "130ed5bc6e9d4d7772f7a52fb02a2f27",
+    "mtime": 1790843412.619382,
+    "ast_hash": "64d4a94989307abd0ddd4137a78c6576",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/CashflowTab.tsx": {
@@ -7060,8 +7060,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/shared.tsx": {
-    "mtime": 1790768884.2554653,
-    "ast_hash": "dd33d68f0eea4ca6762882c146cd3cf3",
+    "mtime": 1790843385.9024014,
+    "ast_hash": "ca95537ed3992a5719e0fbf2bb6781ae",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/loading.tsx": {
@@ -12482,6 +12482,16 @@
   "src/app/(admin)/admin/packing-slips/_components/PackingSlipsMobileList.tsx": {
     "mtime": 1790833244.8026404,
     "ast_hash": "48529933341814183da80cc017a81f4c",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/financial/_components/OverviewTab.tsx": {
+    "mtime": 1790843381.0510676,
+    "ast_hash": "082da5f404ce7e07b2c0cf9ca57a844a",
+    "semantic_hash": ""
+  },
+  ".claude/plans/admin-overview-pages.md": {
+    "mtime": 1790843118.2993648,
+    "ast_hash": "d8d4a757e17eb63015b7d637708204d5",
     "semantic_hash": ""
   }
 }
