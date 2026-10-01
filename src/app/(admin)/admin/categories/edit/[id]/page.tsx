@@ -5,6 +5,7 @@ import { getAllCategories } from '@/lib/queries'
 import { queryOne } from '@/lib/shared/db'
 import CategoryForm from '@/components/admin/CategoryForm'
 import { ChevronLeft } from 'lucide-react'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateCategory } from './actions'
 
 async function getCategory(id: string) {
@@ -48,6 +49,7 @@ export default async function EditCategoryPage({
   const backUrl = back && back.startsWith('/admin/categories') ? back : '/admin/categories'
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -106,5 +108,6 @@ export default async function EditCategoryPage({
         isDraft={isDraft || isCreateDraft}
       />
     </div>
+    </MobileEditBlock>
   )
 }

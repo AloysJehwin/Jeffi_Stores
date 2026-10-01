@@ -3,6 +3,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories } from '@/lib/queries'
 import CategoryForm from '@/components/admin/CategoryForm'
 import { ChevronLeft } from 'lucide-react'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { createCategory } from './actions'
 
 export default async function AddCategoryPage() {
@@ -10,6 +11,7 @@ export default async function AddCategoryPage() {
   const categories = await getAllCategories()
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -29,5 +31,6 @@ export default async function AddCategoryPage() {
 
       <CategoryForm categories={categories || []} action={createCategory} submitLabel="Save as Draft" />
     </div>
+    </MobileEditBlock>
   )
 }

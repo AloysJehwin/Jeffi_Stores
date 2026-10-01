@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { ADMIN_SCOPES } from '@/lib/auth/scopes'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 
 interface Created {
   id: string
@@ -274,6 +275,7 @@ curl --cert cert.pem --key key.pem \\
 
   // ── Create form ───────────────────────────────────────────────────────────
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6 space-y-6">
       {/* Page header */}
       <div className="flex items-center gap-3">
@@ -445,5 +447,6 @@ curl --cert cert.pem --key key.pem \\
         </div>
       </form>
     </div>
+    </MobileEditBlock>
   )
 }

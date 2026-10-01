@@ -2,11 +2,13 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import BrandForm from '@/components/admin/BrandForm'
 import { ChevronLeft } from 'lucide-react'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { createBrand } from './actions'
 
 export default async function AddBrandPage() {
   const host = await getHost()
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -26,5 +28,6 @@ export default async function AddBrandPage() {
 
       <BrandForm action={createBrand} submitLabel="Save as Draft" />
     </div>
+    </MobileEditBlock>
   )
 }

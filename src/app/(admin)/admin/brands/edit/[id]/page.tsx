@@ -4,6 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne } from '@/lib/shared/db'
 import BrandForm from '@/components/admin/BrandForm'
 import { ChevronLeft } from 'lucide-react'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
@@ -51,6 +52,7 @@ export default async function EditBrandPage({
   const backUrl = back && back.startsWith('/admin/brands') ? back : '/admin/brands'
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -107,5 +109,6 @@ export default async function EditBrandPage({
         hasReturns={hasReturns}
       />
     </div>
+    </MobileEditBlock>
   )
 }

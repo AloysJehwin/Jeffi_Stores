@@ -10,6 +10,7 @@ import RichTextEditor from '@/components/admin/RichTextEditor'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 
 const TEMPLATES = [
   {
@@ -380,6 +381,7 @@ export default function NewCampaignPage() {
   }
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       {/* Restore draft banner */}
       {showRestoreBanner && (
@@ -1023,5 +1025,6 @@ export default function NewCampaignPage() {
         </div>
       )}
     </div>
+    </MobileEditBlock>
   )
 }
