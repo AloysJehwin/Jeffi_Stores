@@ -12485,8 +12485,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/OverviewTab.tsx": {
-    "mtime": 1790855467.57401,
-    "ast_hash": "186720272632a06816343854fdee4050",
+    "mtime": 1790857311.3538485,
+    "ast_hash": "f8e927b31f381955a61bffdec4dacb1b",
     "semantic_hash": ""
   },
   ".claude/plans/admin-overview-pages.md": {
@@ -12495,8 +12495,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/_components/InventoryOverviewTab.tsx": {
-    "mtime": 1790856819.3821964,
-    "ast_hash": "48ab21670def59eda5982b894066d15d",
+    "mtime": 1790857338.6657372,
+    "ast_hash": "bdaf4e66d500b21b07dd674777b77b39",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/OverviewCharts.tsx": {
