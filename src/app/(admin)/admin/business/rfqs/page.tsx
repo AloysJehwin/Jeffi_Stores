@@ -11,6 +11,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import BusinessRfqsMobileList from './_components/BusinessRfqsMobileList'
 
 const PAGE_SIZE = 25
 
@@ -195,8 +196,25 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
 
   return (
     <>
+      <div className="md:hidden">
+        <BusinessRfqsMobileList
+          rfqs={rfqs.map(rfq => ({
+            id: rfq.id,
+            rfq_number: rfq.rfq_number,
+            status: rfq.status,
+            item_count: rfq.item_count,
+            created_at: rfq.created_at,
+            company_name: rfq.company_name,
+            first_name: rfq.first_name,
+            last_name: rfq.last_name,
+            email: rfq.email,
+            href: ap(`/admin/business/rfqs/${rfq.id}`, host),
+          }))}
+        />
+      </div>
+
       {/* Table */}
-      <div className="bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
+      <div className="hidden md:block bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border-default bg-surface-secondary text-foreground-secondary text-xs uppercase tracking-wide">

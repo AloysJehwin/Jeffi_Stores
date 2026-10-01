@@ -5,6 +5,7 @@ import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, tenantSummary, planMix } from '@/lib/tenant-registry'
 import { EcomHero, PlanMixChart, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
 import PurgeCustomerButton from '@/components/admin/ecom/PurgeCustomerButton'
+import EcomCustomersMobileList from './_components/EcomCustomersMobileList'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,11 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
 
       <EcomFilters />
 
-      <div className="rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
+      <div className="md:hidden">
+        <EcomCustomersMobileList tenants={tenants} />
+      </div>
+
+      <div className="hidden md:block rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
         <table className="w-full text-sm">
           <thead className="bg-surface-secondary text-foreground-muted">
             <tr>

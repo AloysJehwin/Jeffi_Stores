@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants } from '@/lib/tenant-registry'
 import { EcomFilters } from '@/components/admin/ecom/EcomUI'
+import EcomInstancesMobileList from './_components/EcomInstancesMobileList'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +31,11 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
 
       <EcomFilters />
 
-      <div className="rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
+      <div className="md:hidden">
+        <EcomInstancesMobileList tenants={tenants} />
+      </div>
+
+      <div className="hidden md:block rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
         <table className="w-full text-sm">
           <thead className="bg-surface-secondary text-foreground-muted">
             <tr>
