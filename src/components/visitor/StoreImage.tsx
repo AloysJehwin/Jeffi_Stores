@@ -17,7 +17,14 @@ interface StoreImageProps {
 
 // Storefront image. Public CDN/S3 URLs only — never admin or signed URLs.
 export default function StoreImage({
-  src, alt, className, wrapperClassName, blurhash, priority, sizes, onClick,
+  src,
+  alt,
+  className,
+  wrapperClassName,
+  blurhash,
+  priority,
+  sizes,
+  onClick,
 }: StoreImageProps) {
   const [loaded, setLoaded] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -34,21 +41,20 @@ export default function StoreImage({
 
   return (
     <div className={wrapperClassName ?? 'relative w-full h-full'} onClick={onClick}>
-      {!loaded && (
-        blurhash
-          ? <BlurhashCanvas hash={blurhash} />
-          : (
-            <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-                  animation: 'img-shimmer 1.4s infinite',
-                }}
-              />
-            </div>
-          )
-      )}
+      {!loaded &&
+        (blurhash ? (
+          <BlurhashCanvas hash={blurhash} />
+        ) : (
+          <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                animation: 'img-shimmer 1.4s infinite',
+              }}
+            />
+          </div>
+        ))}
       <img
         ref={imgRef}
         src={src}

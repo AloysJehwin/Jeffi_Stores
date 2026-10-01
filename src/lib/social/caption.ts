@@ -3,8 +3,8 @@
 // to click the AIEnrichButton in the composer. Goes through the ai-platform gateway
 // (JSON mode, truncation-tolerant parse).
 
-import { aiChat } from '@/lib/ai-client'
-import { AI_ADMIN_SCOPE } from '@/lib/ai-scope'
+import { aiChat } from '@/lib/shared/ai-client'
+import { AI_ADMIN_SCOPE } from '@/lib/auth/ai-scope'
 
 const SYSTEM_PROMPT = (store: string) => `You write short social media captions for ${store}.
 Return ONLY valid JSON: {"caption":"<caption text>"}
@@ -17,16 +17,21 @@ RULES:
 - Do not invent specs, prices, or claims not given to you.`
 
 /** Generate a short caption from a product's name/description. Returns '' on any failure. */
-export async function generateSocialCaption(opts: { productName: string; productDescription?: string | null }): Promise<string> {
+export async function generateSocialCaption(opts: {
+  productName: string
+  productDescription?: string | null
+}): Promise<string> {
   const userPrompt = [
     `Product: ${opts.productName}`,
     opts.productDescription ? `Description: ${opts.productDescription}` : null,
-  ].filter(Boolean).join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   try {
-    const { currentTenantPlanGate } = await import('@/lib/plan-gate')
+    const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
     if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) return ''
-    const { storeDescriptorForPrompt } = await import('@/lib/brand')
+    const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
     const r = await aiChat({
       modelHint: 'email',
       jsonMode: true,
@@ -59,7 +64,10 @@ function extractCaption(raw: string): string {
   let caption = tryParse(raw)
   if (caption) return caption
 
-  const stripped = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+  const stripped = raw
+    .replace(/^```[\w]*\n?/, '')
+    .replace(/\n?```$/, '')
+    .trim()
   caption = tryParse(stripped)
   if (caption) return caption
 

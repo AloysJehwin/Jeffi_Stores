@@ -1,8 +1,8 @@
-import type { Campaign, CampaignKind } from '@/lib/marketing'
+import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
 
 export type ParamDef =
   | { type: 'integer'; min?: number; max?: number; label: string; description?: string }
-  | { type: 'number';  min?: number; max?: number; label: string; description?: string }
+  | { type: 'number'; min?: number; max?: number; label: string; description?: string }
   | { type: 'boolean'; label: string; description?: string }
 
 export type ParamSchema<P> = { [K in keyof P]: ParamDef }
@@ -37,10 +37,7 @@ export interface SweepResult {
   skipped: number
 }
 
-export function resolveParams<P extends Record<string, unknown>>(
-  defaults: P,
-  override: unknown
-): P {
+export function resolveParams<P extends Record<string, unknown>>(defaults: P, override: unknown): P {
   if (!override || typeof override !== 'object') return { ...defaults }
   const out: Record<string, unknown> = { ...defaults }
   for (const [k, v] of Object.entries(override as Record<string, unknown>)) {

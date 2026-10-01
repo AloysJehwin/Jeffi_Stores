@@ -1,8 +1,15 @@
 'use client'
 
-import { configNumber } from '@/lib/homepage-sections'
+import { configNumber } from '@/lib/catalog/homepage-sections'
 import {
-  CtaFields, Grid, HeadingFields, LayoutField, LimitField, NumberField, useSectionBinding, type EditorProps,
+  CtaFields,
+  Grid,
+  HeadingFields,
+  LayoutField,
+  LimitField,
+  NumberField,
+  useSectionBinding,
+  type EditorProps,
 } from './fields'
 
 export default function BackInStockEditor(props: EditorProps) {

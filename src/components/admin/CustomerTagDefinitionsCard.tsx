@@ -11,29 +11,29 @@ interface TagDef {
 }
 
 const COLORS = ['accent', 'blue', 'purple', 'green', 'orange', 'gold', 'red', 'gray', 'teal'] as const
-type Color = typeof COLORS[number]
+type Color = (typeof COLORS)[number]
 
 const COLOR_PREVIEW: Record<string, string> = {
-  blue:   'bg-blue-500',
+  blue: 'bg-blue-500',
   purple: 'bg-purple-500',
-  green:  'bg-green-500',
+  green: 'bg-green-500',
   orange: 'bg-orange-500',
-  gold:   'bg-yellow-500',
-  red:    'bg-red-500',
-  gray:   'bg-zinc-400',
-  teal:   'bg-teal-500',
+  gold: 'bg-yellow-500',
+  red: 'bg-red-500',
+  gray: 'bg-zinc-400',
+  teal: 'bg-teal-500',
   accent: 'bg-accent-500',
 }
 
 const COLOR_BADGE: Record<string, string> = {
-  blue:   'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-  green:  'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  green: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
   orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-  gold:   'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-  red:    'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  gray:   'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
-  teal:   'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  gold: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+  gray: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+  teal: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
   accent: 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300',
 }
 
@@ -52,7 +52,9 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   async function add() {
     const t = input.trim()
@@ -129,7 +131,12 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
               <input
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    add()
+                  }
+                }}
                 placeholder="New tag name (e.g. wholesale-prospect)"
                 maxLength={60}
                 disabled={busy}

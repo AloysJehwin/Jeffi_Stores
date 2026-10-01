@@ -3,13 +3,13 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-vi.mock('@/lib/tenant-context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/ai-client'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/shared/ai-client'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 const GATEWAY_REPLY = {
   content: 'Hello world',
@@ -68,9 +68,21 @@ describe('aiChat (gateway client)', () => {
     const tools = [{ type: 'function' as const, function: { name: 'fn', description: 'd', parameters: {} } }]
     await aiChat({
       messages: [{ role: 'user', content: 'hi' }],
-      modelHint: 'sql', jsonMode: true, temperature: 0.9, maxTokens: 500, noCache: true, tools,
+      modelHint: 'sql',
+      jsonMode: true,
+      temperature: 0.9,
+      maxTokens: 500,
+      noCache: true,
+      tools,
     })
-    expect(sentBody()).toMatchObject({ modelHint: 'sql', jsonMode: true, temperature: 0.9, maxTokens: 500, noCache: true, tools })
+    expect(sentBody()).toMatchObject({
+      modelHint: 'sql',
+      jsonMode: true,
+      temperature: 0.9,
+      maxTokens: 500,
+      noCache: true,
+      tools,
+    })
   })
 
   it('partitions the cache under platform when no tenant is in scope', async () => {
@@ -101,7 +113,12 @@ describe('aiChat (gateway client)', () => {
   })
 
   it('throws AiClientError with the gateway status and body on a non-ok reply', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 429, text: async () => 'rate limited', json: async () => ({}) })
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      text: async () => 'rate limited',
+      json: async () => ({}),
+    })
     const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
     expect(err).toBeInstanceOf(AiClientError)
     expect(err.message).toBe('AI gateway HTTP 429: rate limited')
@@ -116,7 +133,11 @@ describe('aiChat (gateway client)', () => {
   })
 
   it('returns tool calls from the gateway unchanged', async () => {
-    const reply = { ...GATEWAY_REPLY, content: '', toolCalls: [{ name: 'search_products', arguments: { query: 'shelf' } }] }
+    const reply = {
+      ...GATEWAY_REPLY,
+      content: '',
+      toolCalls: [{ name: 'search_products', arguments: { query: 'shelf' } }],
+    }
     mockFetch.mockResolvedValueOnce(okJson(reply))
     const result = await aiChat({ messages: [{ role: 'user', content: 'find' }] })
     expect(result.toolCalls).toEqual([{ name: 'search_products', arguments: { query: 'shelf' } }])

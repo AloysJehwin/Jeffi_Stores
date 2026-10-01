@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // Mock auth
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn().mockReturnValue(true),
 }))
 
@@ -13,7 +13,7 @@ const mockQuery = vi.fn()
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
 const mockGetClient = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
@@ -22,7 +22,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 const mockGetCampaign = vi.fn()
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: (...a: any[]) => mockGetCampaign(...a),
 }))
 
@@ -40,11 +40,11 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
   validateScenarioSql: (...a: any[]) => mockValidateScenarioSql(...a),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { GET, PATCH, DELETE } from '@/app/api/admin/campaigns/[kind]/draft/route'
-import { POST as publishPost } from '@/app/api/admin/campaigns/[kind]/publish/route'
-import { GET as eligibleGet } from '@/app/api/admin/campaigns/[kind]/eligible/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/campaigns/[kind]/draft/route'
+import { POST as publishPost } from '@/app/api/(admin)/admin/campaigns/[kind]/publish/route'
+import { GET as eligibleGet } from '@/app/api/(admin)/admin/campaigns/[kind]/eligible/route'
 
 const mockAdmin = { id: 'admin-1', role: 'super_admin', scopes: [] }
 
@@ -323,7 +323,12 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: {} })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT', product_sql: null, enabled: true, description: null, ai_prompt: null,
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT',
+      product_sql: null,
+      enabled: true,
+      description: null,
+      ai_prompt: null,
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: false, reason: 'unsafe' })
     const res = await eligibleGet(eligibleReq(), { params })
@@ -335,11 +340,17 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: { sendCooldownDays: 3 } })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT id FROM users', product_sql: null, enabled: false, description: 'd', ai_prompt: 'prompt',
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT id FROM users',
+      product_sql: null,
+      enabled: false,
+      description: 'd',
+      ai_prompt: 'prompt',
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: true, normalized: 'SELECT id FROM users' })
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({}) // statement_timeout
         .mockResolvedValueOnce({}) // lock_timeout
@@ -363,11 +374,17 @@ describe('campaigns eligible route', () => {
     mockGetCampaign.mockResolvedValueOnce({ kind: 'abandoned_cart', parameters: {} })
     mockGetScenario.mockReturnValueOnce(undefined)
     mockQueryOne.mockResolvedValueOnce({
-      kind: 'abandoned_cart', generated_sql: 'SELECT id', product_sql: null, enabled: true, description: null, ai_prompt: null,
+      kind: 'abandoned_cart',
+      generated_sql: 'SELECT id',
+      product_sql: null,
+      enabled: true,
+      description: null,
+      ai_prompt: null,
     })
     mockValidateScenarioSql.mockReturnValueOnce({ ok: true, normalized: 'SELECT id' })
     const client = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({}) // statement_timeout
         .mockResolvedValueOnce({}) // lock_timeout

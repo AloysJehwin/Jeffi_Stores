@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 
-const ROUTE = path.join(process.cwd(), 'src/app/api/admin/settings/route.ts')
-const PAGE = path.join(process.cwd(), 'src/app/admin/settings/site-controls/page.tsx')
+const ROUTE = path.join(process.cwd(), 'src/app/api/(admin)/admin/settings/route.ts')
+const PAGE = path.join(process.cwd(), 'src/app/(admin)/admin/settings/site-controls/page.tsx')
 
 function editableKeys(): Set<string> {
   const src = fs.readFileSync(ROUTE, 'utf8')
@@ -26,6 +26,6 @@ describe('every setting the admin UI renders is writable through the API', () =>
   })
 
   it('reads a non-trivial number of controls (guards the regex)', () => {
-    expect(keysRenderedByPage().length).toBeGreaterThan(20)
+    expect(keysRenderedByPage().length).toBeGreaterThanOrEqual(64)
   })
 })

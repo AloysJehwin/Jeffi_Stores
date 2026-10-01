@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 global.fetch = vi.fn()
 
-import { generateIRN, cancelIRN, isEInvoiceConfigured, __resetTokenCacheForTests } from '@/lib/einvoice'
-import type { EInvoicePayload } from '@/lib/einvoice'
+import { generateIRN, cancelIRN, isEInvoiceConfigured, __resetTokenCacheForTests } from '@/lib/shipping/einvoice'
+import type { EInvoicePayload } from '@/lib/shipping/einvoice'
 
 const MOCK_PAYLOAD: EInvoicePayload = {
   invoiceNumber: 'INV-2024-001',
@@ -372,7 +372,7 @@ describe('generateIRN – additional branches', () => {
     await generateIRN(MOCK_PAYLOAD)
 
     const authCall = mockFetch.mock.calls[0]
-    expect((authCall[0] as string)).toContain('https://custom-irp.example.com')
+    expect(authCall[0] as string).toContain('https://custom-irp.example.com')
     delete process.env.EINVOICE_BASE_URL
   })
 })

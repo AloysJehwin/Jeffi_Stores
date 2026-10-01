@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 
 describe('ap (admin-path)', () => {
   it('returns path unchanged when host does not start with admin.', () => {

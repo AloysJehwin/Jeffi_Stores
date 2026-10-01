@@ -1,11 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import {
-  policies,
-  POLICY_VERSION,
-  CONSENT_POLICIES,
-  getPolicyBySlug,
-} from '@/app/legal/policies'
+import { policies, POLICY_VERSION, CONSENT_POLICIES, getPolicyBySlug } from '@/lib/legals/policies'
 
 describe('policies constants', () => {
   it('POLICY_VERSION is a date-like string', () => {

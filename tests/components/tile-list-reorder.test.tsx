@@ -16,7 +16,10 @@ function Harness({ initial, onTiles }: { initial: Tile[]; onTiles: (t: Tile[]) =
       fields={FIELDS}
       blank={{ icon: '', title: '' }}
       disabled={false}
-      onCommit={t => { setTiles(t); onTiles(t) }}
+      onCommit={t => {
+        setTiles(t)
+        onTiles(t)
+      }}
     />
   )
 }
@@ -35,7 +38,14 @@ const THREE: Tile[] = [
 describe('TileListEditor reordering', () => {
   it('shows the reordered titles after moving a tile down', () => {
     let latest: Tile[] = []
-    render(<Harness initial={THREE} onTiles={t => { latest = t }} />)
+    render(
+      <Harness
+        initial={THREE}
+        onTiles={t => {
+          latest = t
+        }}
+      />
+    )
 
     fireEvent.click(screen.getAllByText('Down')[0])
 
@@ -53,7 +63,14 @@ describe('TileListEditor reordering', () => {
 
   it('does not write a stale title back when a reordered field is blurred', () => {
     let latest: Tile[] = []
-    render(<Harness initial={THREE} onTiles={t => { latest = t }} />)
+    render(
+      <Harness
+        initial={THREE}
+        onTiles={t => {
+          latest = t
+        }}
+      />
+    )
 
     fireEvent.click(screen.getAllByText('Down')[0])
     const first = titleInputs()[0]

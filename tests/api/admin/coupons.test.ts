@@ -5,26 +5,26 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   query: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildSearchClause: vi.fn(),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   const { z } = require('zod')
   const zNonEmpty = z.string().min(1)
   return {
@@ -44,12 +44,12 @@ vi.mock('@/lib/validate', () => {
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as couponsGET, POST as couponsPOST } from '@/app/api/admin/coupons/route'
-import { PATCH as couponPATCH, DELETE as couponDELETE } from '@/app/api/admin/coupons/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, queryCount } from '@/lib/db'
-import { buildSearchClause } from '@/lib/search'
+import { GET as couponsGET, POST as couponsPOST } from '@/app/api/(admin)/admin/coupons/route'
+import { PATCH as couponPATCH, DELETE as couponDELETE } from '@/app/api/(admin)/admin/coupons/[id]/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, query, queryCount } from '@/lib/shared/db'
+import { buildSearchClause } from '@/lib/catalog/search'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,11 +63,13 @@ function makeReq(url: string) {
 }
 
 function jsonReq(url: string, body: unknown, method = 'POST') {
-  return new NextRequest(new Request(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }))
+  return new NextRequest(
+    new Request(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 function patchReq(url: string, body: unknown) {
@@ -154,11 +156,13 @@ describe('POST /api/admin/coupons', () => {
   })
 
   it('creates a percentage coupon and returns 201', async () => {
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'SAVE10',
-      discount_type: 'percentage',
-      discount_value: 10,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'SAVE10',
+        discount_type: 'percentage',
+        discount_value: 10,
+      })
+    )
     const json = await res.json()
 
     expect(res.status).toBe(201)
@@ -166,13 +170,17 @@ describe('POST /api/admin/coupons', () => {
   })
 
   it('creates a flat discount coupon', async () => {
-    vi.mocked(queryMany).mockResolvedValue([{ id: 'flat-id', code: 'FLAT50', discount_type: 'fixed', discount_value: 50 }] as any)
+    vi.mocked(queryMany).mockResolvedValue([
+      { id: 'flat-id', code: 'FLAT50', discount_type: 'fixed', discount_value: 50 },
+    ] as any)
 
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'FLAT50',
-      discount_type: 'fixed',
-      discount_value: 50,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'FLAT50',
+        discount_type: 'fixed',
+        discount_value: 50,
+      })
+    )
     const json = await res.json()
 
     expect(res.status).toBe(201)
@@ -182,54 +190,64 @@ describe('POST /api/admin/coupons', () => {
   it('stores code as uppercase', async () => {
     vi.mocked(queryMany).mockResolvedValue([{ id: 'x', code: 'LOWER10' }] as any)
 
-    await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'lower10',
-      discount_type: 'percentage',
-      discount_value: 10,
-    }))
+    await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'lower10',
+        discount_type: 'percentage',
+        discount_value: 10,
+      })
+    )
 
     expect(queryMany).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO coupons'),
-      expect.arrayContaining(['LOWER10']),
+      expect.arrayContaining(['LOWER10'])
     )
   })
 
   it('returns 400 when code is missing', async () => {
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      discount_type: 'percentage',
-      discount_value: 10,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        discount_type: 'percentage',
+        discount_value: 10,
+      })
+    )
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when discount_type is invalid', async () => {
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'TEST',
-      discount_type: 'invalid_type',
-      discount_value: 10,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'TEST',
+        discount_type: 'invalid_type',
+        discount_value: 10,
+      })
+    )
     expect(res.status).toBe(400)
   })
 
   it('returns 409 on duplicate coupon code', async () => {
     vi.mocked(queryMany).mockRejectedValue(Object.assign(new Error('unique violation'), { code: '23505' }))
 
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'SAVE10',
-      discount_type: 'percentage',
-      discount_value: 10,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'SAVE10',
+        discount_type: 'percentage',
+        discount_value: 10,
+      })
+    )
     expect(res.status).toBe(409)
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
 
-    const res = await couponsPOST(jsonReq('http://localhost/api/admin/coupons', {
-      code: 'TEST',
-      discount_type: 'percentage',
-      discount_value: 5,
-    }))
+    const res = await couponsPOST(
+      jsonReq('http://localhost/api/admin/coupons', {
+        code: 'TEST',
+        discount_type: 'percentage',
+        discount_value: 5,
+      })
+    )
     expect(res.status).toBe(401)
   })
 })
@@ -246,10 +264,9 @@ describe('PATCH /api/admin/coupons/[id]', () => {
   })
 
   it('updates discount_value and returns 200', async () => {
-    const res = await couponPATCH(
-      patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 20 }),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponPATCH(patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 20 }), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -258,44 +275,40 @@ describe('PATCH /api/admin/coupons/[id]', () => {
   })
 
   it('returns 400 when no fields provided', async () => {
-    const res = await couponPATCH(
-      patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, {}),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponPATCH(patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, {}), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(400)
   })
 
   it('returns 404 when coupon not found', async () => {
     vi.mocked(queryMany).mockResolvedValue([] as any)
 
-    const res = await couponPATCH(
-      patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { is_active: false }),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponPATCH(patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { is_active: false }), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(404)
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
 
-    const res = await couponPATCH(
-      patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 5 }),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponPATCH(patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 5 }), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(401)
   })
 
   it('uppercases code field when updated', async () => {
     vi.mocked(queryMany).mockResolvedValue([{ ...SAMPLE_COUPON, code: 'NEWCODE' }] as any)
 
-    await couponPATCH(
-      patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { code: 'newcode' }),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    await couponPATCH(patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { code: 'newcode' }), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
 
     expect(queryMany).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE coupons'),
-      expect.arrayContaining(['NEWCODE']),
+      expect.arrayContaining(['NEWCODE'])
     )
   })
 })
@@ -313,10 +326,9 @@ describe('DELETE /api/admin/coupons/[id]', () => {
   })
 
   it('deletes coupon and returns success', async () => {
-    const res = await couponDELETE(
-      deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponDELETE(deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -326,10 +338,9 @@ describe('DELETE /api/admin/coupons/[id]', () => {
   it('returns 409 when coupon is used by a review form', async () => {
     vi.mocked(queryOne).mockResolvedValue({ id: 'form-1' } as any)
 
-    const res = await couponDELETE(
-      deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponDELETE(deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error).toContain('review form')
@@ -338,33 +349,27 @@ describe('DELETE /api/admin/coupons/[id]', () => {
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
 
-    const res = await couponDELETE(
-      deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponDELETE(deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when coupons scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
 
-    const res = await couponDELETE(
-      deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponDELETE(deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
     expect(res.status).toBe(403)
   })
 
   it('unlinks coupon from campaigns before deleting', async () => {
-    const res = await couponDELETE(
-      deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: Promise.resolve({ id: COUPON_ID }) }
-    )
+    const res = await couponDELETE(deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`), {
+      params: Promise.resolve({ id: COUPON_ID }),
+    })
 
     expect(res.status).toBe(200)
-    expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE campaigns'),
-      [COUPON_ID],
-    )
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('UPDATE campaigns'), [COUPON_ID])
   })
 })

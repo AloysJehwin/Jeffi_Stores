@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/agent/conversations/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/agent/conversations/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -33,7 +33,9 @@ function makeReq(searchParams: Record<string, string> = {}) {
   return new NextRequest(url)
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/agent/conversations', () => {
   it('returns 401 when unauthenticated', async () => {

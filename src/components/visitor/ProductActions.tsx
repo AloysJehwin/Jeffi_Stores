@@ -6,10 +6,10 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { pickUnitPrice } from '@/lib/pricing'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 import QuantityInput from '@/components/shared/QuantityInput'
-import { round2 } from '@/lib/gst'
-import { resolveEdd } from '@/lib/edd-cache'
+import { round2 } from '@/lib/catalog/gst'
+import { resolveEdd } from '@/lib/shipping/edd-cache'
 import StickyAddToCartBar from './pdp/StickyAddToCartBar'
 import { PDP_BUY_BUTTONS_ID, PDP_OPTIONS_ID, stickyBarAction } from './pdp/pdp'
 
@@ -80,7 +80,11 @@ interface ProductActionsProps {
   initialSkuParam?: string
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
-  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number; dimension: string }) => void
+  onUnitChange?: (
+    unitKey: string,
+    unitLabel: string | null,
+    unitMeta: { min: number; max: number | null; step: number; factor: number; dimension: string }
+  ) => void
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
   extraDeliveryDays?: number
@@ -99,7 +103,13 @@ const MODE_LABELS: Record<string, string> = {
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
   const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
+  if (match)
+    return (
+      <>
+        {match[1]}
+        <sup>2</sup>
+      </>
+    )
   return <>{label}</>
 }
 
@@ -115,18 +125,37 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 }
 
 export default function ProductActions({
-  productId, productName, sku, stockStatus,
-  basePrice, basePriceExGst, salePrice, mrp, gstPercentage,
-  variants, variantType, initialSkuParam, discountPct,
-  onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
-  extraDeliveryDays = 0, handlingDays = 2, is_active = true,
-  launchDate, discontinueDate, isCodAllowed, stickyImage,
+  productId,
+  productName,
+  sku,
+  stockStatus,
+  basePrice,
+  basePriceExGst,
+  salePrice,
+  mrp,
+  gstPercentage,
+  variants,
+  variantType,
+  initialSkuParam,
+  discountPct,
+  onVariantChange,
+  onUnitChange,
+  productUnits: productUnitsProp,
+  sellUnitId,
+  extraDeliveryDays = 0,
+  handlingDays = 2,
+  is_active = true,
+  launchDate,
+  discontinueDate,
+  isCodAllowed,
+  stickyImage,
 }: ProductActionsProps) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
   const isPreLaunch = !!launchDate && new Date(launchDate) > today
   const isDiscontinued = !!discontinueDate && new Date(discontinueDate) <= today
   const gstEnabled = useStoreConfig().flags.gstEnabled
-  const { addToCart } = useCart()
+  const { addToCart, cartItems } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
@@ -147,11 +176,13 @@ export default function ProductActions({
   }, [showAddressPicker])
   useEffect(() => {
     if (!user) {
-      resolveEdd(false, handlingDays, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+      resolveEdd(false, handlingDays, extraDeliveryDays).then(v => {
+        if (v) setEdd(v)
+      })
       return
     }
     fetch('/api/user/addresses')
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(d => {
         const list = d?.addresses ?? []
         setAddresses(list)
@@ -159,15 +190,21 @@ export default function ProductActions({
         setSelectedPin(pin)
         return resolveEdd(true, handlingDays, extraDeliveryDays)
       })
-      .then(v => { if (v) setEdd(v) })
+      .then(v => {
+        if (v) setEdd(v)
+      })
       .catch(() => {})
   }, [user])
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
-    fetch(`/api/products/edd?pin=${pin}&handlingDays=${handlingDays}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.edd) setEdd(d.edd) })
+    fetch(
+      `/api/products/edd?pin=${pin}&handlingDays=${handlingDays}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`
+    )
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (d?.edd) setEdd(d.edd)
+      })
       .catch(() => {})
   }
   const [isAddingToCart, setIsAddingToCart] = useState(false)
@@ -208,13 +245,17 @@ export default function ProductActions({
         if (sv) return sv.id
       }
     }
-    const initialVariant = variants.find(v => {
-      if (initialSkuParam && v.sku === initialSkuParam) return true
-      return false
-    }) || variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] || variants[0]
+    const initialVariant =
+      variants.find(v => {
+        if (initialSkuParam && v.sku === initialSkuParam) return true
+        return false
+      }) ||
+      variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] ||
+      variants[0]
     const subs = initialVariant?.sub_variants || []
     if (subs.length > 0) {
-      const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
+      const firstActive =
+        subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
       return firstActive?.id ?? null
     }
     return null
@@ -248,7 +289,8 @@ export default function ProductActions({
     if (subs.length > 0) {
       const currentStillValid = subs.find(s => s.id === selectedSubVariantId)
       if (!currentStillValid) {
-        const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
+        const firstActive =
+          subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
         setSelectedSubVariantId(firstActive?.id ?? null)
       }
     } else {
@@ -270,9 +312,19 @@ export default function ProductActions({
   }, [selectedVariantId])
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
-  const displaySku = hasVariants && selectedVariant
-    ? (selectedSubVariant?.sku || selectedVariant.sku)
-    : sku
+
+  // Show View cart when this product is in the cart. Prefer an exact variant +
+  // sub-variant match, but fall back to a product-level match so it still shows
+  // when the selected variant differs from what was added (or none is selected yet).
+  const productInCart = cartItems.some(ci => ci.product_id === productId)
+  const exactInCart = cartItems.some(
+    ci =>
+      ci.product_id === productId &&
+      (ci.variant_id ?? null) === (selectedVariantId ?? null) &&
+      (ci.sub_variant_id ?? null) === (selectedSubVariantId ?? null)
+  )
+  const inCart = exactInCart || productInCart
+  const displaySku = hasVariants && selectedVariant ? selectedSubVariant?.sku || selectedVariant.sku : sku
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
   const toInclGst = (exGst: number) => round2(exGst * gstMultiplier)
@@ -288,10 +340,16 @@ export default function ProductActions({
   const priceFromMrp = (inclMrp: number | null | undefined, exGstMrp: number | null | undefined): number | null => {
     if (!(discountPct != null && discountPct > 0)) return null
     const mrpBasis = !gstEnabled
-      ? (exGstMrp != null && Number(exGstMrp) > 0 ? Number(exGstMrp)
-         : (inclMrp != null && Number(inclMrp) > 0 ? toExGst(Number(inclMrp)) : null))
-      : (inclMrp != null && Number(inclMrp) > 0 ? Number(inclMrp)
-         : (exGstMrp != null && Number(exGstMrp) > 0 ? toInclGst(Number(exGstMrp)) : null))
+      ? exGstMrp != null && Number(exGstMrp) > 0
+        ? Number(exGstMrp)
+        : inclMrp != null && Number(inclMrp) > 0
+          ? toExGst(Number(inclMrp))
+          : null
+      : inclMrp != null && Number(inclMrp) > 0
+        ? Number(inclMrp)
+        : exGstMrp != null && Number(exGstMrp) > 0
+          ? toInclGst(Number(exGstMrp))
+          : null
     return mrpBasis != null ? round2(mrpBasis * discFactor) : null
   }
 
@@ -301,14 +359,20 @@ export default function ProductActions({
           const fromMrp = priceFromMrp(selectedSubVariant.mrp, null)
           if (fromMrp != null) return fromMrp
           // No MRP on the sub-variant: fall back to its stored price.
-          if (!gstEnabled) return round2(pickUnitPrice({ inclusive: selectedSubVariant.price, exGst: selectedSubVariant.price_ex_gst }, false))
+          if (!gstEnabled)
+            return round2(
+              pickUnitPrice({ inclusive: selectedSubVariant.price, exGst: selectedSubVariant.price_ex_gst }, false)
+            )
           if (selectedSubVariant.price != null) return round2(Number(selectedSubVariant.price))
           if (selectedSubVariant.price_ex_gst != null) return toInclGst(Number(selectedSubVariant.price_ex_gst))
         }
         if (selectedVariant) {
           const fromMrp = priceFromMrp(selectedVariant.mrp, selectedVariant.mrp_ex_gst)
           if (fromMrp != null) return fromMrp
-          if (!gstEnabled) return round2(pickUnitPrice({ inclusive: selectedVariant.price, exGst: selectedVariant.price_ex_gst }, false))
+          if (!gstEnabled)
+            return round2(
+              pickUnitPrice({ inclusive: selectedVariant.price, exGst: selectedVariant.price_ex_gst }, false)
+            )
           if (selectedVariant.price != null) return round2(Number(selectedVariant.price))
         }
         return round2(pickUnitPrice({ inclusive: basePrice, exGst: basePriceExGst }, gstEnabled))
@@ -319,25 +383,38 @@ export default function ProductActions({
         return round2(pickUnitPrice({ inclusive: salePrice ?? basePrice, exGst: basePriceExGst }, gstEnabled))
       })()
   const effectiveMrpRaw = hasVariants
-    ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
+    ? selectedSubVariant?.mrp != null
+      ? Number(selectedSubVariant.mrp)
+      : selectedVariant?.mrp != null
+        ? Number(selectedVariant.mrp)
+        : mrp
     : mrp
   // When GST is off the price shown is ex-GST; strip GST from the MRP too so the
   // strike-through comparison and discount % stay on the same (ex-GST) basis.
-  const effectiveMrp = (!gstEnabled && effectiveMrpRaw != null && gstMultiplier > 0)
-    ? round2(Number(effectiveMrpRaw) / gstMultiplier)
-    : effectiveMrpRaw
+  const effectiveMrp =
+    !gstEnabled && effectiveMrpRaw != null && gstMultiplier > 0
+      ? round2(Number(effectiveMrpRaw) / gstMultiplier)
+      : effectiveMrpRaw
   const effectiveStock = hasVariants
-    ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 9999 : 0)
-    : (stockStatus !== 'Out of Stock' ? 9999 : 0)
+    ? (selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock'
+      ? 9999
+      : 0
+    : stockStatus !== 'Out of Stock'
+      ? 9999
+      : 0
 
-  const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
-    ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
-    : 0
+  const mrpDiscount =
+    effectiveMrp && effectiveMrp > effectivePrice
+      ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
+      : 0
 
-  const perUnitRate = selectedVariant?.pricing_type && selectedVariant.pricing_type !== 'unit'
-    && selectedVariant.numeric_value && selectedVariant.unit
-    ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
-    : null
+  const perUnitRate =
+    selectedVariant?.pricing_type &&
+    selectedVariant.pricing_type !== 'unit' &&
+    selectedVariant.numeric_value &&
+    selectedVariant.unit
+      ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
+      : null
 
   const productUnits = productUnitsProp ?? []
   // Resolve MOST SPECIFIC GRAIN FIRST. A sell_unit_id pointer only speaks for the
@@ -349,8 +426,9 @@ export default function ProductActions({
   const sellUnit = (() => {
     // 1. Sub-variant's own unit row — the most specific grain.
     if (selectedSubVariantId) {
-      const u = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
-        ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
+      const u =
+        productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base) ??
+        productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
       if (u) return u
     }
     // 2. Variant's explicit pointer, then its own unit row.
@@ -359,8 +437,9 @@ export default function ProductActions({
       if (u) return u
     }
     if (selectedVariantId) {
-      const u = productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
-        ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      const u =
+        productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base) ??
+        productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
       if (u) return u
     }
     // 3. Product-level pointer, then its own unit row.
@@ -368,14 +447,18 @@ export default function ProductActions({
       const u = productUnits.find(u => u.id === sellUnitId)
       if (u) return u
     }
-    return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
-      ?? productUnits[0]
-      ?? null
+    return (
+      productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base) ?? productUnits[0] ?? null
+    )
   })()
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'
   const effectiveUnitLabel = sellUnit?.display_label ?? sellUnit?.unit ?? null
 
-  const isContinuous = sellUnit?.dimension === 'length' || sellUnit?.dimension === 'weight' || sellUnit?.dimension === 'area' || sellUnit?.dimension === 'volume'
+  const isContinuous =
+    sellUnit?.dimension === 'length' ||
+    sellUnit?.dimension === 'weight' ||
+    sellUnit?.dimension === 'area' ||
+    sellUnit?.dimension === 'volume'
   const unitFactor = sellUnit?.factor != null ? Number(sellUnit.factor) : 1
   // baseUnit = the factor-1 unit that is distinct from the sell unit (e.g. "pc" when selling by "pair")
   const baseUnit = (() => {
@@ -384,7 +467,8 @@ export default function ProductActions({
     const pool = variantUnits.length > 0 ? variantUnits : productLevelUnits
     return pool.find(u => Number(u.factor) === 1 && u.unit !== (sellUnit?.unit ?? '')) ?? null
   })()
-  const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? (unitFactor !== 1 && sellUnit?.dimension === 'count' ? 'pc' : null)
+  const baseUnitLabel =
+    baseUnit?.display_label ?? baseUnit?.unit ?? (unitFactor !== 1 && sellUnit?.dimension === 'count' ? 'pc' : null)
   const showPerBasePrice = unitFactor !== 1
   // The label shown after "Rs. X /". Hide the whole "/ unit" suffix when there
   // is no meaningful per-unit label (generic pieces/units) so we never render a
@@ -392,9 +476,14 @@ export default function ProductActions({
   const perUnitLabel = showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel
   const GENERIC_UNITS = new Set(['unit', 'units', 'pc', 'pcs', 'piece', 'pieces', 'nos', 'no', 'each'])
   const showPerUnit = !!perUnitLabel && !GENERIC_UNITS.has(String(perUnitLabel).trim().toLowerCase())
-  const qtyStep = sellUnit?.dimension === 'count'
-    ? 1
-    : (sellUnit?.qty_step != null ? Number(sellUnit.qty_step) : (isContinuous ? 0.001 : 1))
+  const qtyStep =
+    sellUnit?.dimension === 'count'
+      ? 1
+      : sellUnit?.qty_step != null
+        ? Number(sellUnit.qty_step)
+        : isContinuous
+          ? 0.001
+          : 1
   const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
   const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
 
@@ -426,7 +515,14 @@ export default function ProductActions({
         showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
         return
       }
-      await addToCart(productId, quantity, selectedVariantId || undefined, effectiveUnitKey, effectiveUnitKey, selectedSubVariantId || undefined)
+      await addToCart(
+        productId,
+        quantity,
+        selectedVariantId || undefined,
+        effectiveUnitKey,
+        effectiveUnitKey,
+        selectedSubVariantId || undefined
+      )
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -471,14 +567,11 @@ export default function ProductActions({
 
   return (
     <div className="space-y-4">
-
       {hasVariants && (
         <div id={PDP_OPTIONS_ID} className="space-y-3">
           {hasMultipleModes && (
             <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                Buy by
-              </label>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">Buy by</label>
               <div className="flex flex-wrap gap-2">
                 {pricingTypes.map(pt => (
                   <button
@@ -501,7 +594,9 @@ export default function ProductActions({
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-2">
               {hasMultipleModes
-                ? (selectedMode === 'unit' ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}` : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
+                ? selectedMode === 'unit'
+                  ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`
+                  : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`
                 : `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`}
             </label>
             {(() => {
@@ -513,7 +608,7 @@ export default function ProductActions({
               return (
                 <>
                   <div className="flex flex-wrap gap-2">
-                    {visible.map((variant) => (
+                    {visible.map(variant => (
                       <button
                         key={variant.id}
                         type="button"
@@ -538,7 +633,13 @@ export default function ProductActions({
                       className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
                     >
                       {showAllVariants ? 'Show fewer' : `Show all ${modeVariants.length} options`}
-                      <svg className={`w-4 h-4 transition-transform ${showAllVariants ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${showAllVariants ? 'rotate-180' : ''}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
@@ -562,7 +663,7 @@ export default function ProductActions({
                 return (
                   <>
                     <div className="flex flex-wrap gap-2">
-                      {visible.map((sv) => (
+                      {visible.map(sv => (
                         <button
                           key={sv.id}
                           type="button"
@@ -587,7 +688,13 @@ export default function ProductActions({
                         className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
                       >
                         {showAllSubVariants ? 'Show fewer' : `Show all ${subs.length} options`}
-                        <svg className={`w-4 h-4 transition-transform ${showAllSubVariants ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg
+                          className={`w-4 h-4 transition-transform ${showAllSubVariants ? 'rotate-180' : ''}`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
@@ -608,7 +715,11 @@ export default function ProductActions({
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
+              {showPerUnit && (
+                <span className="text-sm text-foreground-secondary">
+                  / <UnitLabel label={perUnitLabel} />
+                </span>
+              )}
               {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -619,10 +730,13 @@ export default function ProductActions({
             {showPerBasePrice && (
               <div className="mb-1">
                 <span className="text-base font-semibold text-foreground">
-                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
+                  <UnitLabel label={effectiveUnitLabel} />
                 </span>
                 <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
+                  <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.{' '}
+                  {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
@@ -630,7 +744,8 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />
+                ):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -643,7 +758,10 @@ export default function ProductActions({
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs.{' '}
+                  {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             )}
@@ -657,14 +775,30 @@ export default function ProductActions({
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
               <label className="text-sm font-medium text-foreground-secondary">
-                Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
+                Quantity
+                {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
+                  <>
+                    {' '}
+                    (<UnitLabel label={effectiveUnitLabel} />)
+                  </>
+                ) : (
+                  ''
+                )}
               </label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
                   <div className="flex items-center justify-end gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <svg
+                        className="w-5 h-5 text-green-600 dark:text-green-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                       <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
                     </div>
@@ -677,7 +811,11 @@ export default function ProductActions({
                 ) : (
                   <div className="flex items-center justify-end gap-2">
                     <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
                   </div>
@@ -685,21 +823,31 @@ export default function ProductActions({
                 {edd && effectiveStock > 0 && (
                   <div className="relative">
                     <p className="text-xs text-foreground-secondary whitespace-nowrap">
-                      Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      Deliver by{' '}
+                      <span className="font-medium text-foreground">
+                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
                       {user && selectedPin && (
-                        <> · <span className="font-medium">{selectedPin}</span>
+                        <>
+                          {' '}
+                          · <span className="font-medium">{selectedPin}</span>
                           {addresses.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setShowAddressPicker(v => !v)}
                               className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
-                            >Change</button>
+                            >
+                              Change
+                            </button>
                           )}
                         </>
                       )}
                     </p>
                     {showAddressPicker && (
-                      <div ref={addressPickerRef} className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
+                      <div
+                        ref={addressPickerRef}
+                        className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1"
+                      >
                         {addresses.map((a, i) => (
                           <button
                             key={i}
@@ -708,7 +856,9 @@ export default function ProductActions({
                             className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
                           >
                             <span className="font-medium block">{a.full_name}</span>
-                            <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
+                            <span className="text-foreground-secondary">
+                              {a.city}, {a.state} – {a.postal_code}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -727,7 +877,10 @@ export default function ProductActions({
               qtyStep={qtyStep}
               qtyMin={qtyMin}
               qtyMax={qtyMax}
-              onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+              onChange={(qty, raw) => {
+                setQuantity(qty)
+                setQuantityRaw(raw)
+              }}
             />
           </div>
         </>
@@ -740,7 +893,11 @@ export default function ProductActions({
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
+              {showPerUnit && (
+                <span className="text-sm text-foreground-secondary">
+                  / <UnitLabel label={perUnitLabel} />
+                </span>
+              )}
               {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -751,10 +908,13 @@ export default function ProductActions({
             {showPerBasePrice && (
               <div className="mb-1">
                 <span className="text-base font-semibold text-foreground">
-                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
+                  <UnitLabel label={effectiveUnitLabel} />
                 </span>
                 <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
+                  <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.{' '}
+                  {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
@@ -762,7 +922,8 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />
+                ):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -775,7 +936,10 @@ export default function ProductActions({
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs.{' '}
+                  {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             )}
@@ -788,13 +952,31 @@ export default function ProductActions({
 
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}</label>
+              <label className="text-sm font-medium text-foreground-secondary">
+                Quantity
+                {effectiveUnitLabel && effectiveUnitKey !== 'unit' ? (
+                  <>
+                    {' '}
+                    (<UnitLabel label={effectiveUnitLabel} />)
+                  </>
+                ) : (
+                  ''
+                )}
+              </label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
                   <div className="flex items-center justify-end gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <svg
+                        className="w-5 h-5 text-green-600 dark:text-green-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                       <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
                     </div>
@@ -807,7 +989,11 @@ export default function ProductActions({
                 ) : (
                   <div className="flex items-center justify-end gap-2">
                     <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                     <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
                   </div>
@@ -815,21 +1001,31 @@ export default function ProductActions({
                 {edd && effectiveStock > 0 && (
                   <div className="relative">
                     <p className="text-xs text-foreground-secondary whitespace-nowrap">
-                      Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      Deliver by{' '}
+                      <span className="font-medium text-foreground">
+                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
                       {user && selectedPin && (
-                        <> · <span className="font-medium">{selectedPin}</span>
+                        <>
+                          {' '}
+                          · <span className="font-medium">{selectedPin}</span>
                           {addresses.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setShowAddressPicker(v => !v)}
                               className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
-                            >Change</button>
+                            >
+                              Change
+                            </button>
                           )}
                         </>
                       )}
                     </p>
                     {showAddressPicker && (
-                      <div ref={addressPickerRef} className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
+                      <div
+                        ref={addressPickerRef}
+                        className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1"
+                      >
                         {addresses.map((a, i) => (
                           <button
                             key={i}
@@ -838,7 +1034,9 @@ export default function ProductActions({
                             className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
                           >
                             <span className="font-medium block">{a.full_name}</span>
-                            <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
+                            <span className="text-foreground-secondary">
+                              {a.city}, {a.state} – {a.postal_code}
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -857,7 +1055,10 @@ export default function ProductActions({
               qtyStep={qtyStep}
               qtyMin={qtyMin}
               qtyMax={qtyMax}
-              onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+              onChange={(qty, raw) => {
+                setQuantity(qty)
+                setQuantityRaw(raw)
+              }}
             />
           </div>
         </>
@@ -865,7 +1066,8 @@ export default function ProductActions({
 
       {isPreLaunch && launchDate && (
         <div className="text-sm text-amber-600 dark:text-amber-400 font-medium py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-          Coming Soon — Available from {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          Coming Soon — Available from{' '}
+          {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
         </div>
       )}
       {isDiscontinued && (
@@ -881,9 +1083,17 @@ export default function ProductActions({
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isBuyingNow ? (
-            <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Processing...</>
+            <>
+              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              Processing...
+            </>
           ) : (
-            <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>Buy Now</>
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Buy Now
+            </>
           )}
         </button>
 
@@ -893,17 +1103,59 @@ export default function ProductActions({
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isAddingToCart ? (
-            <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Adding...</>
+            <>
+              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              Adding...
+            </>
           ) : (
-            <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>Add to Cart</>
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              Add to Cart
+            </>
           )}
         </button>
+
+        {inCart && (
+          <a
+            href="/cart"
+            className="w-full border border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+              />
+            </svg>
+            View cart
+          </a>
+        )}
       </div>
 
       <StickyAddToCartBar
-        name={productName} image={selectedVariant?.variant_images?.[0]?.thumbnail_url || stickyImage} quantity={quantity} adding={isAddingToCart} onAdd={handleAddToCart}
-        price={effectivePrice} mrp={effectiveMrp} unitLabel={showPerUnit ? perUnitLabel : null}
-        action={stickyBarAction({ purchasable: is_active && !isPreLaunch && !isDiscontinued, hasVariants, variants, selectionInStock: effectiveStock > 0, needsChoice: !selectedVariant || (!!selectedVariant.sub_variants?.length && !selectedSubVariantId) })}
+        name={productName}
+        image={selectedVariant?.variant_images?.[0]?.thumbnail_url || stickyImage}
+        quantity={quantity}
+        adding={isAddingToCart}
+        onAdd={handleAddToCart}
+        price={effectivePrice}
+        mrp={effectiveMrp}
+        unitLabel={showPerUnit ? perUnitLabel : null}
+        action={stickyBarAction({
+          purchasable: is_active && !isPreLaunch && !isDiscontinued,
+          hasVariants,
+          variants,
+          selectionInStock: effectiveStock > 0,
+          needsChoice: !selectedVariant || (!!selectedVariant.sub_variants?.length && !selectedSubVariantId),
+        })}
       />
     </div>
   )

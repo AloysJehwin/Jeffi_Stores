@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ query: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 
-import { GET } from '@/app/api/admin/agent/tool-logs/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/agent/tool-logs/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -23,11 +23,21 @@ function makeRequest(params: Record<string, string> = {}) {
 }
 
 const sampleMessages = [
-  { id: 'm1', conversation_id: 'c1', created_at: '2024-01-01', tool_calls: [], admin_username: 'admin', admin_first_name: 'Ad', admin_last_name: 'Min' },
+  {
+    id: 'm1',
+    conversation_id: 'c1',
+    created_at: '2024-01-01',
+    tool_calls: [],
+    admin_username: 'admin',
+    admin_first_name: 'Ad',
+    admin_last_name: 'Min',
+  },
 ]
 
 describe('GET /api/admin/agent/tool-logs', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)

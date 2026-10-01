@@ -10,7 +10,7 @@ import {
   computeVolumeFactor,
   sameDimensionFactor,
   type Dimension,
-} from '@/lib/units'
+} from '@/lib/catalog/units'
 
 // ---------------------------------------------------------------------------
 // Static catalogue
@@ -23,9 +23,7 @@ describe('UNITS catalogue', () => {
   })
 
   it('ALL_DIMENSIONS matches catalogue keys', () => {
-    expect(ALL_DIMENSIONS).toEqual(
-      expect.arrayContaining(['count', 'length', 'area', 'volume', 'weight', 'custom'])
-    )
+    expect(ALL_DIMENSIONS).toEqual(expect.arrayContaining(['count', 'length', 'area', 'volume', 'weight', 'custom']))
     expect(ALL_DIMENSIONS.length).toBe(6)
   })
 
@@ -184,15 +182,11 @@ describe('computeAreaFactor', () => {
   })
 
   it('throws for an unknown side unit', () => {
-    expect(() =>
-      computeAreaFactor({ length: 1, width: 1, dim_unit: 'furlong' }, 'm2')
-    ).toThrow()
+    expect(() => computeAreaFactor({ length: 1, width: 1, dim_unit: 'furlong' }, 'm2')).toThrow()
   })
 
   it('throws for an unknown base area unit', () => {
-    expect(() =>
-      computeAreaFactor({ length: 1, width: 1, dim_unit: 'm' }, 'acre' as any)
-    ).toThrow()
+    expect(() => computeAreaFactor({ length: 1, width: 1, dim_unit: 'm' }, 'acre' as any)).toThrow()
   })
 })
 
@@ -211,15 +205,11 @@ describe('computeVolumeFactor', () => {
   })
 
   it('throws for unknown side unit', () => {
-    expect(() =>
-      computeVolumeFactor({ length: 1, width: 1, height: 1, dim_unit: 'fathom' }, 'L')
-    ).toThrow()
+    expect(() => computeVolumeFactor({ length: 1, width: 1, height: 1, dim_unit: 'fathom' }, 'L')).toThrow()
   })
 
   it('throws for unknown base volume unit', () => {
-    expect(() =>
-      computeVolumeFactor({ length: 1, width: 1, height: 1, dim_unit: 'm' }, 'barrel' as any)
-    ).toThrow()
+    expect(() => computeVolumeFactor({ length: 1, width: 1, height: 1, dim_unit: 'm' }, 'barrel' as any)).toThrow()
   })
 })
 

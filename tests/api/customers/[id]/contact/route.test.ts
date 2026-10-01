@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 vi.mock('@/lib/queries', () => ({
@@ -13,9 +13,9 @@ vi.mock('@/lib/email', () => ({
   sendAdminContactEmail: vi.fn(),
 }))
 
-import { POST } from '@/app/api/customers/[id]/contact/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
+import { POST } from '@/app/api/(public)/customers/[id]/contact/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'
 import * as email from '@/lib/email'
 
@@ -96,12 +96,7 @@ describe('POST /api/customers/[id]/contact', () => {
 
     const res = await POST(makePost({ subject: 'Hi', message: 'Hello' }) as any, PARAMS)
     expect(res.status).toBe(200)
-    expect(email.sendAdminContactEmail).toHaveBeenCalledWith(
-      'c@example.com',
-      'Customer',
-      'Hi',
-      'Hello'
-    )
+    expect(email.sendAdminContactEmail).toHaveBeenCalledWith('c@example.com', 'Customer', 'Hi', 'Hello')
   })
 
   it('returns 500 when email send throws', async () => {

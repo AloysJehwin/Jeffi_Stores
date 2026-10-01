@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,10 +13,10 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/orders/[id]/documents/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/orders/[id]/documents/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -38,13 +38,16 @@ const mockQueryOne = vi.mocked(queryOne)
 
 function mockFetchBinary(contentType = 'application/pdf', ok = true, status = 200) {
   const buffer = new ArrayBuffer(8)
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok,
-    status,
-    headers: { get: (name: string) => name === 'content-type' ? contentType : null },
-    arrayBuffer: vi.fn().mockResolvedValue(buffer),
-    text: vi.fn().mockResolvedValue('Error text'),
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok,
+      status,
+      headers: { get: (name: string) => (name === 'content-type' ? contentType : null) },
+      arrayBuffer: vi.fn().mockResolvedValue(buffer),
+      text: vi.fn().mockResolvedValue('Error text'),
+    })
+  )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -120,7 +123,7 @@ describe('GET /api/admin/orders/[id]/documents', () => {
 
   const VALID_DOC_TYPES = ['SIGNATURE_URL', 'RVP_QC_IMAGE', 'EPOD', 'SELLER_RETURN_IMAGE'] as const
 
-  VALID_DOC_TYPES.forEach((docType) => {
+  VALID_DOC_TYPES.forEach(docType => {
     it(`returns binary content for doc_type ${docType}`, async () => {
       const res = await GET(makeReq(docType), PARAMS)
       expect(res.status).toBe(200)

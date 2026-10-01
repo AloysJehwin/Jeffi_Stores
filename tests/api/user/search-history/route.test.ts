@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
 }))
 
-import { GET, POST, DELETE } from '@/app/api/user/search-history/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { GET, POST, DELETE } from '@/app/api/(public)/user/search-history/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const AUTH_USER = { userId: 'user-1' }
 

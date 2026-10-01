@@ -14,11 +14,11 @@ function loadKey(): Buffer {
     throw new Error('SOCIAL_TOKEN_ENC_KEY is not set — required to encrypt/decrypt social tokens at rest')
   }
   // Accept hex (64 chars) or base64; must decode to exactly 32 bytes.
-  const key = /^[0-9a-fA-F]{64}$/.test(raw.trim())
-    ? Buffer.from(raw.trim(), 'hex')
-    : Buffer.from(raw.trim(), 'base64')
+  const key = /^[0-9a-fA-F]{64}$/.test(raw.trim()) ? Buffer.from(raw.trim(), 'hex') : Buffer.from(raw.trim(), 'base64')
   if (key.length !== 32) {
-    throw new Error(`SOCIAL_TOKEN_ENC_KEY must decode to 32 bytes (got ${key.length}) — use a hex(64) or base64 256-bit key`)
+    throw new Error(
+      `SOCIAL_TOKEN_ENC_KEY must decode to 32 bytes (got ${key.length}) — use a hex(64) or base64 256-bit key`
+    )
   }
   return key
 }

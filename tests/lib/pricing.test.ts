@@ -6,7 +6,7 @@ import {
   lineItemInclGst,
   lineItemFromMrpIncl,
   mrpDiscountPct,
-} from '@/lib/pricing'
+} from '@/lib/catalog/pricing'
 
 describe('applyDiscount', () => {
   it('returns original price when discount is 0', () => {

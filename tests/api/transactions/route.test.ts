@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryCount: vi.fn(),
 }))
 
-import { GET } from '@/app/api/transactions/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { GET } from '@/app/api/(public)/transactions/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const AUTH_USER = { userId: 'user-1', email: 'u@example.com' }
 
@@ -83,10 +83,7 @@ describe('GET /api/transactions', () => {
     const body = await res.json()
     expect(body.page).toBe(3)
     // offset should be 20, limit 10
-    expect(db.queryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([AUTH_USER.userId, 10, 20])
-    )
+    expect(db.queryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([AUTH_USER.userId, 10, 20]))
   })
 
   it('clamps page to minimum 1', async () => {

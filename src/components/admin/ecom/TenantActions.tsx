@@ -30,7 +30,8 @@ export default function TenantActions({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function call(path: string, body?: object, label?: string) {
-    setBusy(label || path); setMsg(null)
+    setBusy(label || path)
+    setMsg(null)
     try {
       const res = await fetch(path, {
         method: 'POST',
@@ -39,10 +40,15 @@ export default function TenantActions({
       })
       const data = await res.json()
       if (!res.ok) setMsg({ ok: false, text: data.error || 'Failed' })
-      else { setMsg({ ok: true, text: 'Done' }); router.refresh() }
+      else {
+        setMsg({ ok: true, text: 'Done' })
+        router.refresh()
+      }
     } catch {
       setMsg({ ok: false, text: 'Network error' })
-    } finally { setBusy(null) }
+    } finally {
+      setBusy(null)
+    }
   }
 
   const isTest = slug === 'test'
@@ -81,15 +87,19 @@ export default function TenantActions({
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           title={failed ? 'Start a fresh provisioning run from the first step' : undefined}
         >
-          {busy === 'provision'
-            ? 'Provisioning…'
-            : failed ? 'Start fresh provision' : 'Provision infrastructure'}
+          {busy === 'provision' ? 'Provisioning…' : failed ? 'Start fresh provision' : 'Provision infrastructure'}
         </button>
       )}
 
       {isTest && status === 'active' && (
         <button
-          onClick={() => call(`/api/admin/ecom/customers/${tenantId}/disable-instance`, { action: stopped ? 'enable' : 'disable' }, 'toggle')}
+          onClick={() =>
+            call(
+              `/api/admin/ecom/customers/${tenantId}/disable-instance`,
+              { action: stopped ? 'enable' : 'disable' },
+              'toggle'
+            )
+          }
           disabled={busy !== null}
           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg disabled:opacity-50 text-sm font-medium transition-colors text-white ${
             stopped ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
@@ -101,7 +111,9 @@ export default function TenantActions({
       )}
 
       {isTest && stopped && (
-        <span className="text-xs text-amber-600 dark:text-amber-400">Instance stopped — DB powered down (auto-restarts after 7 days)</span>
+        <span className="text-xs text-amber-600 dark:text-amber-400">
+          Instance stopped — DB powered down (auto-restarts after 7 days)
+        </span>
       )}
 
       {status === 'active' && (
@@ -109,7 +121,8 @@ export default function TenantActions({
           onClick={async () => {
             const ok = await confirm({
               title: `Deprovision "${slug}"?`,
-              message: 'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
+              message:
+                'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
               variant: 'danger',
               confirmLabel: 'Deprovision & back up',
             })
@@ -125,7 +138,9 @@ export default function TenantActions({
       )}
 
       {msg && (
-        <span className={`text-sm ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{msg.text}</span>
+        <span className={`text-sm ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          {msg.text}
+        </span>
       )}
     </div>
   )

@@ -1,11 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   query: vi.fn(),
 }))
 
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock('@/lib/automation-emails', () => ({
 }))
 
 import { buildWinbackScenario } from '@/lib/campaigns/scenarios/_winback-base'
-import { queryMany } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/automation-emails'
+import { queryMany } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockFetchUser = fetchUserContext as ReturnType<typeof vi.fn>
@@ -114,10 +114,12 @@ describe('buildWinbackScenario', () => {
       const campaignWithCoupon = { ...campaign, coupon_id: 'coupon-123' }
 
       // items query
-      mockQueryMany
-        .mockResolvedValueOnce([]) // second queryMany for items
+      mockQueryMany.mockResolvedValueOnce([]) // second queryMany for items
 
-      const result = await scenario.send({ id: 'user-1' }, { campaign: campaignWithCoupon, params: scenario.defaultParams })
+      const result = await scenario.send(
+        { id: 'user-1' },
+        { campaign: campaignWithCoupon, params: scenario.defaultParams }
+      )
       expect(result).toEqual({ ok: false, reason: 'coupon_failed' })
     })
 
@@ -137,7 +139,9 @@ describe('buildWinbackScenario', () => {
       const scenario = buildWinbackScenario(defaultOpts)
       mockFetchUser.mockResolvedValue({ id: 'u1', first_name: 'Carol', email: 'c@x.com' })
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
-      mockQueryMany.mockResolvedValue([{ name: 'Bolt M6', product_slug: 'bolt-m6', image_url: 'https://img.com/bolt.jpg' }])
+      mockQueryMany.mockResolvedValue([
+        { name: 'Bolt M6', product_slug: 'bolt-m6', image_url: 'https://img.com/bolt.jpg' },
+      ])
       mockSendEmail.mockResolvedValue({ ok: true })
 
       await scenario.send({ id: 'u1' }, { campaign, params: scenario.defaultParams })

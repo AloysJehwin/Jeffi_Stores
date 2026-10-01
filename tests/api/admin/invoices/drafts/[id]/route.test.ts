@@ -5,27 +5,27 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
 }))
 
@@ -33,12 +33,12 @@ vi.mock('@/lib/pricing', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET, PATCH, DELETE } from '@/app/api/admin/invoices/drafts/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { isInterState, calculateGST } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/invoices/drafts/[id]/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
+import { isInterState, calculateGST } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -219,15 +219,15 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(200)
     // Verify query was called with 'unpaid'
-    const updateCall = client.query.mock.calls.find((args: any[]) =>
-      typeof args[0] === 'string' && args[0].includes('UPDATE orders'),
+    const updateCall = client.query.mock.calls.find(
+      (args: any[]) => typeof args[0] === 'string' && args[0].includes('UPDATE orders')
     )
     expect(updateCall).toBeDefined()
     expect(updateCall![1]).toContain('unpaid')
   })
 
   it('uses IGST when buyer has GSTIN and is inter-state', async () => {
-    const { isInterState } = await import('@/lib/gst')
+    const { isInterState } = await import('@/lib/catalog/gst')
     vi.mocked(isInterState).mockReturnValue(true)
 
     const body = { ...VALID_PATCH_BODY, buyerGstin: '27AABCU9603R1ZM', state: 'Maharashtra' }
@@ -295,7 +295,7 @@ describe('DELETE /api/admin/invoices/drafts/[id]', () => {
     await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
 
     const deleteCalls = client.query.mock.calls.filter(
-      (args: any[]) => typeof args[0] === 'string' && args[0].trim().startsWith('DELETE'),
+      (args: any[]) => typeof args[0] === 'string' && args[0].trim().startsWith('DELETE')
     )
     expect(deleteCalls.length).toBeGreaterThanOrEqual(3)
   })

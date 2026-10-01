@@ -25,7 +25,7 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: vi.fn(),
@@ -34,20 +34,20 @@ vi.mock('@/lib/db', () => ({
 
 // Opaque sessions: the route issues a server-side session and sets cookie = sid.
 // Mocking issueUserToken avoids exercising createSession's DB INSERT.
-vi.mock('@/lib/issue-session', () => ({
+vi.mock('@/lib/auth/issue-session', () => ({
   issueUserToken: mockIssueUserToken,
   USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: mockLogActivity,
 }))
 
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadAvatarImage: mockUploadAvatarImage,
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
@@ -55,7 +55,7 @@ vi.mock('@/lib/cookie-domain', () => ({
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { POST } from '@/app/api/auth/google/route'
+import { POST } from '@/app/api/(public)/auth/google/route'
 import { cookies } from 'next/headers'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -141,9 +141,9 @@ describe('POST /api/auth/google', () => {
   it('creates new user when not found, returns login response', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockQueryOne
-      .mockResolvedValueOnce(null)     // user lookup → not found
-      .mockResolvedValueOnce(DB_USER)  // INSERT → new user
-      .mockResolvedValueOnce(null)     // guest user lookup
+      .mockResolvedValueOnce(null) // user lookup → not found
+      .mockResolvedValueOnce(DB_USER) // INSERT → new user
+      .mockResolvedValueOnce(null) // guest user lookup
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -155,8 +155,8 @@ describe('POST /api/auth/google', () => {
   it('returns 500 when user insert returns null', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockQueryOne
-      .mockResolvedValueOnce(null)   // user lookup → not found
-      .mockResolvedValueOnce(null)   // INSERT → null
+      .mockResolvedValueOnce(null) // user lookup → not found
+      .mockResolvedValueOnce(null) // INSERT → null
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(500)
     const body = await res.json()
@@ -167,15 +167,12 @@ describe('POST /api/auth/google', () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockQueryOne
       .mockResolvedValueOnce(DB_USER) // user lookup → found
-      .mockResolvedValueOnce(null)    // guest user
+      .mockResolvedValueOnce(null) // guest user
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.message).toMatch(/login successful/i)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE users SET last_login/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE users SET last_login/), expect.any(Array))
   })
 
   it('returns 403 when existing user is inactive', async () => {
@@ -189,29 +186,21 @@ describe('POST /api/auth/google', () => {
 
   it('links google_id when existing user has none', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
-    mockQueryOne
-      .mockResolvedValueOnce({ ...DB_USER, google_id: null })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ ...DB_USER, google_id: null }).mockResolvedValueOnce(null)
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE users SET google_id/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE users SET google_id/), expect.any(Array))
   })
 
   it('merges guest cart when session_id cookie starts with guest_', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockCookieStore.get.mockReturnValue({ value: 'guest_abc' })
     mockQueryOne
-      .mockResolvedValueOnce(DB_USER)                         // user lookup
-      .mockResolvedValueOnce({ id: 'guest-user' })            // guest user
+      .mockResolvedValueOnce(DB_USER) // user lookup
+      .mockResolvedValueOnce({ id: 'guest-user' }) // guest user
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/merge_guest_cart_to_user/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/merge_guest_cart_to_user/), expect.any(Array))
   })
 
   it('uses accessToken path when no idToken provided', async () => {
@@ -225,9 +214,7 @@ describe('POST /api/auth/google', () => {
         email_verified: true,
       }),
     })
-    mockQueryOne
-      .mockResolvedValueOnce(DB_USER)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(DB_USER).mockResolvedValueOnce(null)
     const res = await POST(makePost({ accessToken: 'access-token-xyz' }) as any)
     expect(res.status).toBe(200)
   })
@@ -249,10 +236,7 @@ describe('POST /api/auth/google', () => {
 
   it('uploads avatar picture when user has picture url', async () => {
     mockIdTokenVerify({ ...GOOGLE_PAYLOAD, picture: 'https://example.com/avatar.jpg' })
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(DB_USER)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(DB_USER).mockResolvedValueOnce(null)
     // picture fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -277,16 +261,16 @@ describe('POST /api/auth/google', () => {
     const bizUser = { ...DB_USER, id: 'biz-user-1', user_type: 'business', google_id: GOOGLE_PAYLOAD.sub }
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockQueryOne
-      .mockResolvedValueOnce(null)      // no customer account found
-      .mockResolvedValueOnce(bizUser)   // business account found
-      .mockResolvedValueOnce(null)      // guest user lookup
+      .mockResolvedValueOnce(null) // no customer account found
+      .mockResolvedValueOnce(bizUser) // business account found
+      .mockResolvedValueOnce(null) // guest user lookup
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.user.email).toBe('user@example.com')
     // Must NOT have inserted a new user row
-    const insertCalls = (vi.mocked(mockQueryOne).mock.calls as any[]).filter(
-      (c: any[]) => String(c[0]).includes('INSERT INTO users')
+    const insertCalls = (vi.mocked(mockQueryOne).mock.calls as any[]).filter((c: any[]) =>
+      String(c[0]).includes('INSERT INTO users')
     )
     expect(insertCalls).toHaveLength(0)
   })
@@ -294,10 +278,7 @@ describe('POST /api/auth/google', () => {
   it('links google_id to business account when not already set', async () => {
     const bizUserNoGoogleId = { ...DB_USER, id: 'biz-2', user_type: 'business', google_id: null }
     mockIdTokenVerify(GOOGLE_PAYLOAD)
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(bizUserNoGoogleId)
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(bizUserNoGoogleId).mockResolvedValueOnce(null)
     vi.mocked(mockQuery).mockResolvedValue({ rows: [] } as any)
     await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(mockQuery).toHaveBeenCalledWith(

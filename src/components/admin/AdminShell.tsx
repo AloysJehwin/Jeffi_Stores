@@ -65,17 +65,11 @@ export default function AdminShell({
 
   return (
     <div className="fixed inset-0 flex flex-col bg-surface-secondary">
-
       {/* Top bar — full width, spans above sidebar + content */}
       <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
-
         {/* Mobile hamburger */}
         <div className="md:hidden flex items-center gap-2">
-          <AdminMobileNav
-            navLinks={allNavLinks}
-            username={displayName}
-            role={role}
-          />
+          <AdminMobileNav navLinks={allNavLinks} username={displayName} role={role} />
           <span className="font-bold text-white text-sm truncate max-w-[9rem]">{brandName}</span>
         </div>
 
@@ -123,10 +117,7 @@ export default function AdminShell({
       {/* Below top bar: sidebar + scrollable content */}
       <div className="flex flex-row flex-1 min-h-0">
         {/* Left sidebar — desktop only */}
-        <AdminSidebarNav
-          navLinks={desktopNavLinks}
-          collapsed={collapsed}
-        />
+        <AdminSidebarNav navLinks={desktopNavLinks} collapsed={collapsed} />
 
         <main className="flex-1 min-w-0 bg-surface-secondary overflow-y-auto relative z-0">
           <AdminScopesProvider role={role} scopes={scopes}>
@@ -141,4 +132,3 @@ export default function AdminShell({
     </div>
   )
 }
-

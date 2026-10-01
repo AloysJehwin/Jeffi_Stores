@@ -13,7 +13,14 @@ interface PromoBannerProps {
 }
 
 export default function PromoBanner({
-  title, subtitle, eyebrow, imageUrl, imageUrlMobile, blurhash, ctaLabel, ctaUrl,
+  title,
+  subtitle,
+  eyebrow,
+  imageUrl,
+  imageUrlMobile,
+  blurhash,
+  ctaLabel,
+  ctaUrl,
 }: PromoBannerProps) {
   const desktopImg = imageUrl ?? imageUrlMobile ?? null
   const mobileImg = imageUrlMobile ?? imageUrl ?? null
@@ -39,15 +46,13 @@ export default function PromoBanner({
           )}
 
           <div className="relative z-10 h-full flex flex-col justify-center gap-3 px-6 sm:px-10 md:px-14 py-10 md:py-16 max-w-[90%] sm:max-w-[60%]">
-            {eyebrow && (
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em]">{eyebrow}</p>
-            )}
+            {eyebrow && <p className="text-white/70 text-[10px] font-black uppercase tracking-[0.2em]">{eyebrow}</p>}
             {title && (
-              <h2 className="font-black text-white leading-[1.05] tracking-tight text-[clamp(1.5rem,4vw,3rem)]">{title}</h2>
+              <h2 className="font-black text-white leading-[1.05] tracking-tight text-[clamp(1.5rem,4vw,3rem)]">
+                {title}
+              </h2>
             )}
-            {subtitle && (
-              <p className="text-white/60 text-sm md:text-base leading-relaxed max-w-lg">{subtitle}</p>
-            )}
+            {subtitle && <p className="text-white/60 text-sm md:text-base leading-relaxed max-w-lg">{subtitle}</p>}
             {showCta && (
               <Link
                 href={ctaUrl}

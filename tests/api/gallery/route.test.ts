@@ -1,21 +1,21 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
   authenticateAnyUser: vi.fn(),
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
 
-import { GET } from '@/app/api/gallery/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { queryMany, queryOne } from '@/lib/db'
+import { GET } from '@/app/api/(public)/gallery/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)
@@ -42,7 +42,14 @@ describe('GET /api/gallery', () => {
   it('returns paginated images', async () => {
     mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
     mockQueryMany.mockResolvedValueOnce([
-      { id: 'img1', s3_key: 'gallery/img1.jpg', image_url: null, s3_thumbnail_key: null, thumbnail_url: null, category_name: 'Cat' },
+      {
+        id: 'img1',
+        s3_key: 'gallery/img1.jpg',
+        image_url: null,
+        s3_thumbnail_key: null,
+        thumbnail_url: null,
+        category_name: 'Cat',
+      },
     ])
     mockQueryOne.mockResolvedValueOnce({ total: '1' })
 
@@ -77,10 +84,7 @@ describe('GET /api/gallery', () => {
 
     const res = await GET(makeRequest({ search: 'bolt' }) as any)
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('ILIKE'),
-      expect.arrayContaining(['%bolt%'])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('ILIKE'), expect.arrayContaining(['%bolt%']))
   })
 
   it('composes category + search filters', async () => {

@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { ADMIN_SCOPES, ALL_SCOPE_KEYS, TENANT_SCOPE_KEYS, assignableScopes } from '@/lib/scopes'
+import { ADMIN_SCOPES, ALL_SCOPE_KEYS, TENANT_SCOPE_KEYS, assignableScopes } from '@/lib/auth/scopes'
 
-const ECOM = ['ecom_customers:read', 'ecom_customers:write', 'ecom_instances:read', 'ecom_billing:read', 'ecom_billing:write']
+const ECOM = [
+  'ecom_customers:read',
+  'ecom_customers:write',
+  'ecom_instances:read',
+  'ecom_billing:read',
+  'ecom_billing:write',
+]
 
 describe('control-plane scopes belong to the platform operator alone', () => {
   it('marks every Ecom Store scope platformOnly', () => {

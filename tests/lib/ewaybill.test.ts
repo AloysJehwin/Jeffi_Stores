@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 global.fetch = vi.fn()
 
-import { generateEWayBill, isEWayBillConfigured, __resetTokenCacheForTests } from '@/lib/ewaybill'
-import type { EWayBillPayload } from '@/lib/ewaybill'
+import { generateEWayBill, isEWayBillConfigured, __resetTokenCacheForTests } from '@/lib/shipping/ewaybill'
+import type { EWayBillPayload } from '@/lib/shipping/ewaybill'
 
 const MOCK_PAYLOAD: EWayBillPayload = {
   supplyType: 'O',

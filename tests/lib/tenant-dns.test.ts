@@ -27,10 +27,14 @@ vi.mock('@smithy/signature-v4', () => ({
     }))
   }),
 }))
-vi.mock('@aws-sdk/credential-provider-node', () => ({ defaultProvider: vi.fn(() => async () => ({ accessKeyId: 'AK', secretAccessKey: 'SK' })) }))
+vi.mock('@aws-sdk/credential-provider-node', () => ({
+  defaultProvider: vi.fn(() => async () => ({ accessKeyId: 'AK', secretAccessKey: 'SK' })),
+}))
 vi.mock('@aws-crypto/sha256-js', () => ({ Sha256: vi.fn() }))
 vi.mock('@smithy/protocol-http', () => ({
-  HttpRequest: vi.fn().mockImplementation(function (this: any, cfg: any) { Object.assign(this, cfg) }),
+  HttpRequest: vi.fn().mockImplementation(function (this: any, cfg: any) {
+    Object.assign(this, cfg)
+  }),
 }))
 
 const ZONE = 'Z08094881XKVZ9XSGBKG1'
@@ -54,7 +58,7 @@ function mockFetchSequence(responses: Array<{ ok?: boolean; status?: number; tex
 
 /** A realistic ListResourceRecordSets response for one A record. */
 function listXml(name: string, ttl: number, values: string[]) {
-  const recs = values.map((v) => `<ResourceRecord><Value>${v}</Value></ResourceRecord>`).join('')
+  const recs = values.map(v => `<ResourceRecord><Value>${v}</Value></ResourceRecord>`).join('')
   return `<?xml version="1.0"?><ListResourceRecordSetsResponse><ResourceRecordSets><ResourceRecordSet>
     <Name>${name}</Name><Type>A</Type><TTL>${ttl}</TTL><ResourceRecords>${recs}</ResourceRecords>
   </ResourceRecordSet></ResourceRecordSets></ListResourceRecordSetsResponse>`
@@ -73,7 +77,7 @@ describe('tenant-dns', () => {
   describe('upsertTenantDns', () => {
     it('does nothing (no network call) for an empty hostname list', async () => {
       const { fn } = mockFetchSequence([{}])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await upsertTenantDns([])
       expect(fn).not.toHaveBeenCalled()
     })
@@ -81,20 +85,20 @@ describe('tenant-dns', () => {
     it('THROWS when TENANT_APP_TARGET_IP is unset rather than writing a placeholder record', async () => {
       delete process.env.TENANT_APP_TARGET_IP
       mockFetchSequence([{}])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await expect(upsertTenantDns(['acme.jeffistores.in'])).rejects.toThrow(/TENANT_APP_TARGET_IP is not set/)
     })
 
     it('THROWS when TENANT_APP_TARGET_IP is only whitespace', async () => {
       process.env.TENANT_APP_TARGET_IP = '   '
       mockFetchSequence([{}])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await expect(upsertTenantDns(['acme.jeffistores.in'])).rejects.toThrow(/TENANT_APP_TARGET_IP is not set/)
     })
 
     it('POSTs an UPSERT change batch containing every hostname and the target IP', async () => {
       const { calls } = mockFetchSequence([{ ok: true }])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await upsertTenantDns(['acme.jeffistores.in', 'admin-acme.jeffistores.in'])
 
       expect(calls).toHaveLength(1)
@@ -110,22 +114,24 @@ describe('tenant-dns', () => {
     it('trims a padded target IP', async () => {
       process.env.TENANT_APP_TARGET_IP = '  52.20.193.62  '
       const { calls } = mockFetchSequence([{ ok: true }])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await upsertTenantDns(['acme.jeffistores.in'])
       expect(calls[0].body).toContain('<Value>52.20.193.62</Value>')
     })
 
     it('throws with the Route53 status and body when the UPSERT is rejected', async () => {
       mockFetchSequence([{ ok: false, status: 400, text: 'InvalidChangeBatch: bad' }])
-      const { upsertTenantDns } = await import('@/lib/tenant-dns')
-      await expect(upsertTenantDns(['acme.jeffistores.in'])).rejects.toThrow(/Route53 UPSERT failed \(400\).*InvalidChangeBatch/s)
+      const { upsertTenantDns } = await import('@/lib/tenancy/tenant-dns')
+      await expect(upsertTenantDns(['acme.jeffistores.in'])).rejects.toThrow(
+        /Route53 UPSERT failed \(400\).*InvalidChangeBatch/s
+      )
     })
   })
 
   describe('deleteTenantDns', () => {
     it('does nothing for an empty list', async () => {
       const { fn } = mockFetchSequence([{}])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns([])
       expect(fn).not.toHaveBeenCalled()
     })
@@ -135,9 +141,9 @@ describe('tenant-dns', () => {
       // must mirror those, not the current TENANT_APP_TARGET_IP.
       const { calls } = mockFetchSequence([
         { ok: true, text: listXml('acme.jeffistores.in.', 60, ['1.2.3.4']) }, // GET
-        { ok: true },                                                          // POST delete
+        { ok: true }, // POST delete
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in'])
 
       expect(calls).toHaveLength(2)
@@ -151,10 +157,8 @@ describe('tenant-dns', () => {
     })
 
     it('SKIPS a hostname whose record does not exist (Route53 returns the next name)', async () => {
-      const { calls } = mockFetchSequence([
-        { ok: true, text: listXml('zzz-other.jeffistores.in.', 300, ['9.9.9.9']) },
-      ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { calls } = mockFetchSequence([{ ok: true, text: listXml('zzz-other.jeffistores.in.', 300, ['9.9.9.9']) }])
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in'])
       // only the GET happened — no DELETE issued
       expect(calls).toHaveLength(1)
@@ -162,15 +166,21 @@ describe('tenant-dns', () => {
     })
 
     it('appends the trailing dot when querying', async () => {
-      const { calls } = mockFetchSequence([{ ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) }, { ok: true }])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { calls } = mockFetchSequence([
+        { ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) },
+        { ok: true },
+      ])
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in'])
       expect(decodeURIComponent(calls[0].url)).toContain('acme.jeffistores.in.')
     })
 
     it('accepts a hostname that already ends with a dot', async () => {
-      const { calls } = mockFetchSequence([{ ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) }, { ok: true }])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { calls } = mockFetchSequence([
+        { ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) },
+        { ok: true },
+      ])
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in.'])
       expect(calls).toHaveLength(2)
     })
@@ -180,7 +190,7 @@ describe('tenant-dns', () => {
         { ok: true, text: listXml('acme.jeffistores.in.', 120, ['1.1.1.1', '2.2.2.2']) },
         { ok: true },
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in'])
       expect(calls[1].body).toContain('<Value>1.1.1.1</Value>')
       expect(calls[1].body).toContain('<Value>2.2.2.2</Value>')
@@ -188,17 +198,22 @@ describe('tenant-dns', () => {
 
     it('skips when the record matches by name but carries no values', async () => {
       const { calls } = mockFetchSequence([
-        { ok: true, text: '<ResourceRecordSet><Name>acme.jeffistores.in.</Name><Type>A</Type><TTL>300</TTL></ResourceRecordSet>' },
+        {
+          ok: true,
+          text: '<ResourceRecordSet><Name>acme.jeffistores.in.</Name><Type>A</Type><TTL>300</TTL></ResourceRecordSet>',
+        },
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['acme.jeffistores.in'])
       expect(calls).toHaveLength(1)
     })
 
     it('throws when the LIST call fails', async () => {
       mockFetchSequence([{ ok: false, status: 403, text: 'AccessDenied' }])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
-      await expect(deleteTenantDns(['acme.jeffistores.in'])).rejects.toThrow(/Route53 list failed for acme\.jeffistores\.in \(403\)/)
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
+      await expect(deleteTenantDns(['acme.jeffistores.in'])).rejects.toThrow(
+        /Route53 list failed for acme\.jeffistores\.in \(403\)/
+      )
     })
 
     it('TOLERATES a "does not exist" DELETE failure (idempotent teardown)', async () => {
@@ -206,7 +221,7 @@ describe('tenant-dns', () => {
         { ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) },
         { ok: false, status: 400, text: 'Tried to delete resource record set but it was not found' },
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await expect(deleteTenantDns(['acme.jeffistores.in'])).resolves.toBeUndefined()
     })
 
@@ -215,8 +230,10 @@ describe('tenant-dns', () => {
         { ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) },
         { ok: false, status: 500, text: 'InternalError' },
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
-      await expect(deleteTenantDns(['acme.jeffistores.in'])).rejects.toThrow(/Route53 DELETE failed for acme\.jeffistores\.in \(500\)/)
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
+      await expect(deleteTenantDns(['acme.jeffistores.in'])).rejects.toThrow(
+        /Route53 DELETE failed for acme\.jeffistores\.in \(500\)/
+      )
     })
 
     it('processes every hostname in the list', async () => {
@@ -226,18 +243,16 @@ describe('tenant-dns', () => {
         { ok: true, text: listXml('b.jeffistores.in.', 300, ['2.2.2.2']) },
         { ok: true },
       ])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await deleteTenantDns(['a.jeffistores.in', 'b.jeffistores.in'])
-      expect(calls.filter((c) => c.method === 'POST')).toHaveLength(2)
+      expect(calls.filter(c => c.method === 'POST')).toHaveLength(2)
     })
 
     it('does NOT require TENANT_APP_TARGET_IP (teardown must work after the IP is gone)', async () => {
       delete process.env.TENANT_APP_TARGET_IP
       mockFetchSequence([{ ok: true, text: listXml('acme.jeffistores.in.', 300, ['1.1.1.1']) }, { ok: true }])
-      const { deleteTenantDns } = await import('@/lib/tenant-dns')
+      const { deleteTenantDns } = await import('@/lib/tenancy/tenant-dns')
       await expect(deleteTenantDns(['acme.jeffistores.in'])).resolves.toBeUndefined()
     })
   })
 })
-
-

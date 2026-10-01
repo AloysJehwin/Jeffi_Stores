@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
@@ -13,18 +13,24 @@ vi.mock('@/lib/queries', () => ({
   getBrochureProductsByIds: vi.fn(),
 }))
 
-vi.mock('@/lib/brochure-pdf', () => ({
+vi.mock('@/lib/documents/brochure-pdf', () => ({
   generateBrochurePDF: vi.fn().mockResolvedValue(Buffer.from('pdf-bytes')),
   loadBrochureStore: vi.fn().mockResolvedValue({
-    name: 'JEFFI STORES', address: '', city: '', phone: '', email: '', gstin: '', web: 'jeffistores.in',
+    name: 'JEFFI STORES',
+    address: '',
+    city: '',
+    phone: '',
+    email: '',
+    gstin: '',
+    web: 'jeffistores.in',
   }),
 }))
 
-import { POST } from '@/app/api/admin/brochure/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { POST } from '@/app/api/(admin)/admin/brochure/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
 import { getBrochureProductsByIds } from '@/lib/queries'
-import { generateBrochurePDF } from '@/lib/brochure-pdf'
+import { generateBrochurePDF } from '@/lib/documents/brochure-pdf'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -44,7 +50,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/brochure', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -87,7 +95,19 @@ describe('POST /api/admin/brochure', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     mockGetByIds.mockResolvedValue([
-      { id: P1, name: 'Bolt', slug: 'bolt', sku: 'B1', short_description: null, mrp: 10, base_price: 8, discount_pct: 0, brand_name: 'Unbrako', category_name: 'Bolts', thumbnail_url: null },
+      {
+        id: P1,
+        name: 'Bolt',
+        slug: 'bolt',
+        sku: 'B1',
+        short_description: null,
+        mrp: 10,
+        base_price: 8,
+        discount_pct: 0,
+        brand_name: 'Unbrako',
+        category_name: 'Bolts',
+        thumbnail_url: null,
+      },
     ] as any)
     const res = await POST(makeReq({ productIds: [P1, P2], showPrices: true, title: 'My Brochure' }))
     expect(res.status).toBe(200)

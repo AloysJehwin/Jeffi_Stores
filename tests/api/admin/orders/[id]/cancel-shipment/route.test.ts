@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,10 +13,10 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/cancel-shipment/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/cancel-shipment/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -37,12 +37,15 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQuery = vi.mocked(query)
 
 function mockFetch(body: object, ok = true, status = 200) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-    ok,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-    catch: vi.fn().mockResolvedValue(body),
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok,
+      status,
+      json: vi.fn().mockResolvedValue(body),
+      catch: vi.fn().mockResolvedValue(body),
+    })
+  )
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -110,10 +113,7 @@ describe('POST /api/admin/orders/[id]/cancel-shipment', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.waybill).toBe('AWB12345')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE orders SET awb_number = NULL/),
-      [ORDER_ID]
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE orders SET awb_number = NULL/), [ORDER_ID])
   })
 
   // ── Error handling ────────────────────────────────────────────────────────

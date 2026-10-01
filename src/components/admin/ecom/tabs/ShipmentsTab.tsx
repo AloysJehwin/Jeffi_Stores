@@ -1,4 +1,4 @@
-import type { ShipmentRow } from '@/app/admin/ecom/customers/[id]/page'
+import type { ShipmentRow } from '@/lib/orders/tenant-shipments-shared'
 import { Section } from '../EcomUI'
 import ShipmentCorrection from './ShipmentCorrection'
 
@@ -6,7 +6,9 @@ const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigi
 const num = (v: string | null) => (v == null ? null : Number(v))
 
 export default function ShipmentsTab({
-  tenantId, ownDelhivery, shipments,
+  tenantId,
+  ownDelhivery,
+  shipments,
 }: {
   tenantId: string
   ownDelhivery: boolean
@@ -42,7 +44,7 @@ export default function ShipmentsTab({
                   </td>
                 </tr>
               )}
-              {shipments.map((s) => {
+              {shipments.map(s => {
                 const quoted = num(s.shipping_amount)
                 const billed = num(s.delhivery_billed_amount)
                 const extra = num(s.delhivery_extra_charge)
@@ -50,10 +52,14 @@ export default function ShipmentsTab({
                   <tr key={s.id} className="hover:bg-surface-secondary align-middle">
                     <td className="px-4 py-3 font-medium text-foreground">{s.order_number || '—'}</td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{s.awb_number}</td>
-                    <td className="px-4 py-3 text-foreground-secondary">{s.payment_mode === 'cod' ? 'COD' : 'Prepaid'}</td>
+                    <td className="px-4 py-3 text-foreground-secondary">
+                      {s.payment_mode === 'cod' ? 'COD' : 'Prepaid'}
+                    </td>
                     <td className="px-4 py-3 text-right text-foreground">{quoted != null ? inr(quoted) : '—'}</td>
                     <td className="px-4 py-3 text-right text-foreground">{billed != null ? inr(billed) : '—'}</td>
-                    <td className={`px-4 py-3 text-right ${extra && extra > 0 ? 'text-red-600 dark:text-red-400' : extra && extra < 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
+                    <td
+                      className={`px-4 py-3 text-right ${extra && extra > 0 ? 'text-red-600 dark:text-red-400' : extra && extra < 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}
+                    >
                       {extra != null ? (extra >= 0 ? '+' : '−') + inr(Math.abs(extra)) : '—'}
                     </td>
                     <td className="px-4 py-3 text-foreground-muted">{s.shipment_status || '—'}</td>

@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Mocks — must be declared before any imports that transitively use them
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockImplementation((price: number, rate: number, isIGST: boolean) => {
     if (rate <= 0) return { taxableAmount: price, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }
@@ -23,11 +23,11 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
-vi.mock('@/lib/shipping-rate', () => ({
+vi.mock('@/lib/shipping/shipping-rate', () => ({
   computeShippingRate: vi.fn(),
 }))
 
@@ -45,9 +45,9 @@ import {
   findExistingUnpaidRazorpayOrder,
   commitOrder,
   type CartLine,
-} from '@/lib/order-commit'
-import { queryMany, queryOne, withTransaction } from '@/lib/db'
-import { computeShippingRate } from '@/lib/shipping-rate'
+} from '@/lib/orders/order-commit'
+import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
+import { computeShippingRate } from '@/lib/shipping/shipping-rate'
 
 const mockComputeShippingRate = vi.mocked(computeShippingRate)
 const mockQueryMany = vi.mocked(queryMany)
@@ -301,9 +301,7 @@ describe('resolveBuyNowItem', () => {
   })
 
   it('returns error when variant not found', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 100 })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 100 }).mockResolvedValueOnce(null)
     const result = await resolveBuyNowItem({ productId: 'p1', variantId: 'v1', qty: 1 })
     expect(result).toEqual({ ok: false, error: 'Variant not found' })
   })
@@ -355,7 +353,7 @@ describe('resolveBuyNowItem', () => {
     mockQueryOne
       .mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 100 })
       .mockResolvedValueOnce({ id: 'v1', price: 100 })
-      .mockResolvedValueOnce({ factor: '12' })  // unit row — e.g. dozen
+      .mockResolvedValueOnce({ factor: '12' }) // unit row — e.g. dozen
     const result = await resolveBuyNowItem({ productId: 'p1', variantId: 'v1', qty: 1, buyMode: 'dozen' })
     expect(result).toMatchObject({ ok: true, item: { price: 1200 } })
   })
@@ -417,9 +415,7 @@ describe('validateCouponForUser', () => {
   })
 
   it('allows when generated_for_user_id matches', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(makeCoupon({ generated_for_user_id: 'u1' }))
-      .mockResolvedValueOnce({ cnt: '0' })  // eligible list count = 0
+    mockQueryOne.mockResolvedValueOnce(makeCoupon({ generated_for_user_id: 'u1' })).mockResolvedValueOnce({ cnt: '0' }) // eligible list count = 0
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 200 })
     expect(r.ok).toBe(true)
     expect(r.appliedDiscount).toBe(50)
@@ -428,8 +424,8 @@ describe('validateCouponForUser', () => {
   it('returns not_assigned_to_user when eligible list exists but user not in it', async () => {
     mockQueryOne
       .mockResolvedValueOnce(makeCoupon())
-      .mockResolvedValueOnce({ cnt: '2' })          // eligible count > 0
-      .mockResolvedValueOnce({ cnt: '0' })           // user not in list
+      .mockResolvedValueOnce({ cnt: '2' }) // eligible count > 0
+      .mockResolvedValueOnce({ cnt: '0' }) // user not in list
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 100 })
     expect(r).toEqual({ appliedDiscount: 0, ok: false, reason: 'not_assigned_to_user' })
   })
@@ -437,26 +433,22 @@ describe('validateCouponForUser', () => {
   it('allows when eligible list exists and user is in it', async () => {
     mockQueryOne
       .mockResolvedValueOnce(makeCoupon())
-      .mockResolvedValueOnce({ cnt: '1' })           // eligible list non-empty
-      .mockResolvedValueOnce({ cnt: '1' })           // user in list
+      .mockResolvedValueOnce({ cnt: '1' }) // eligible list non-empty
+      .mockResolvedValueOnce({ cnt: '1' }) // user in list
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 200 })
     expect(r.ok).toBe(true)
   })
 
   it('returns not_yet_valid when valid_from is in the future', async () => {
     const future = new Date(Date.now() + 86400_000).toISOString()
-    mockQueryOne
-      .mockResolvedValueOnce(makeCoupon({ valid_from: future }))
-      .mockResolvedValueOnce({ cnt: '0' })
+    mockQueryOne.mockResolvedValueOnce(makeCoupon({ valid_from: future })).mockResolvedValueOnce({ cnt: '0' })
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 100 })
     expect(r).toEqual({ appliedDiscount: 0, ok: false, reason: 'not_yet_valid' })
   })
 
   it('returns expired when valid_until is in the past', async () => {
     const past = new Date(Date.now() - 86400_000).toISOString()
-    mockQueryOne
-      .mockResolvedValueOnce(makeCoupon({ valid_until: past }))
-      .mockResolvedValueOnce({ cnt: '0' })
+    mockQueryOne.mockResolvedValueOnce(makeCoupon({ valid_until: past })).mockResolvedValueOnce({ cnt: '0' })
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 100 })
     expect(r).toEqual({ appliedDiscount: 0, ok: false, reason: 'expired' })
   })
@@ -472,16 +464,14 @@ describe('validateCouponForUser', () => {
   it('returns per_user_limit_reached when user has used coupon too many times', async () => {
     mockQueryOne
       .mockResolvedValueOnce(makeCoupon({ usage_limit_per_user: 1 }))
-      .mockResolvedValueOnce({ cnt: '0' })     // eligible list
-      .mockResolvedValueOnce({ cnt: '1' })     // per-user usage >= limit
+      .mockResolvedValueOnce({ cnt: '0' }) // eligible list
+      .mockResolvedValueOnce({ cnt: '1' }) // per-user usage >= limit
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 100 })
     expect(r).toEqual({ appliedDiscount: 0, ok: false, reason: 'per_user_limit_reached' })
   })
 
   it('returns below_min_purchase when subtotal is below minimum', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(makeCoupon({ min_purchase_amount: 500 }))
-      .mockResolvedValueOnce({ cnt: '0' })
+    mockQueryOne.mockResolvedValueOnce(makeCoupon({ min_purchase_amount: 500 })).mockResolvedValueOnce({ cnt: '0' })
     const r = await validateCouponForUser({ couponId: 'c1', userId: 'u1', subtotal: 200 })
     expect(r).toEqual({ appliedDiscount: 0, ok: false, reason: 'below_min_purchase' })
   })
@@ -530,10 +520,7 @@ describe('loadAddress', () => {
     const addr = makeAddress()
     mockQueryOne.mockResolvedValue(addr)
     const result = await loadAddress('user-1', 'addr-1')
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('addresses'),
-      ['addr-1', 'user-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('addresses'), ['addr-1', 'user-1'])
     expect(result).toBe(addr)
   })
 
@@ -553,7 +540,7 @@ describe('getMinOrderAmount', () => {
 
   it('returns parsed float from settings row', async () => {
     mockQueryOne.mockResolvedValue({ value: '250.50' })
-    expect(await getMinOrderAmount()).toBe(250.50)
+    expect(await getMinOrderAmount()).toBe(250.5)
   })
 
   it('returns 0 when row is null', async () => {
@@ -578,8 +565,14 @@ describe('quoteShipping', () => {
 
   function rate(overrides: Record<string, unknown>) {
     return {
-      charge: 0, codFee: 0, totalCharge: 0, zone: '', source: 'fallback',
-      chargedWeightGrams: 0, cartonCount: 0, serviceable: true,
+      charge: 0,
+      codFee: 0,
+      totalCharge: 0,
+      zone: '',
+      source: 'fallback',
+      chargedWeightGrams: 0,
+      cartonCount: 0,
+      serviceable: true,
       ...overrides,
     } as any
   }
@@ -606,7 +599,9 @@ describe('quoteShipping', () => {
   })
 
   it('returns zeros when computeShippingRate reports unserviceable', async () => {
-    mockComputeShippingRate.mockResolvedValue(rate({ charge: 0, codFee: 0, source: 'unserviceable', serviceable: false }))
+    mockComputeShippingRate.mockResolvedValue(
+      rate({ charge: 0, codFee: 0, source: 'unserviceable', serviceable: false })
+    )
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [],
@@ -693,10 +688,11 @@ describe('commitOrder — cart mode', () => {
 
   function makeClient(orderRow = { id: 'ord-1', order_number: 'ORD-001', total_amount: '200', status: 'pending' }) {
     return {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: [makeAddress()] })    // ensureAddressOnOrder
-        .mockResolvedValueOnce({ rows: [orderRow] })         // INSERT orders
-        .mockResolvedValue({ rows: [] }),                    // subsequent queries
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [makeAddress()] }) // ensureAddressOnOrder
+        .mockResolvedValueOnce({ rows: [orderRow] }) // INSERT orders
+        .mockResolvedValue({ rows: [] }), // subsequent queries
     }
   }
 
@@ -710,7 +706,7 @@ describe('commitOrder — cart mode', () => {
 
   it('throws when address not found', async () => {
     const client = {
-      query: vi.fn().mockResolvedValueOnce({ rows: [] }),  // address not found
+      query: vi.fn().mockResolvedValueOnce({ rows: [] }), // address not found
     }
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
@@ -752,9 +748,11 @@ describe('commitOrder — cart mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeCartCommitInput({
-      paymentRecord: { gatewayOrderId: 'rpay_ord_1', paymentId: 'rpay_pay_1', signature: 'sig', amountPaise: 20000 },
-    }))
+    await commitOrder(
+      makeCartCommitInput({
+        paymentRecord: { gatewayOrderId: 'rpay_ord_1', paymentId: 'rpay_pay_1', signature: 'sig', amountPaise: 20000 },
+      })
+    )
 
     const calls = client.query.mock.calls.map((c: any[]) => c[0] as string)
     expect(calls.some((sql: string) => sql.includes('INSERT INTO payments'))).toBe(true)
@@ -774,9 +772,11 @@ describe('commitOrder — cart mode', () => {
     const client = makeClient({ id: 'ord-1', order_number: 'ORD-001', total_amount: '200', status: 'confirmed' })
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    const result = await commitOrder(makeCartCommitInput({
-      paymentRecord: { gatewayOrderId: 'g1', paymentId: 'p1', signature: 's1', amountPaise: 20000 },
-    }))
+    const result = await commitOrder(
+      makeCartCommitInput({
+        paymentRecord: { gatewayOrderId: 'g1', paymentId: 'p1', signature: 's1', amountPaise: 20000 },
+      })
+    )
 
     expect(result.status).toBe('confirmed')
   })
@@ -785,13 +785,15 @@ describe('commitOrder — cart mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeCartCommitInput({
-      user: { email: 'x@x.com', phone: null, first_name: null, last_name: null },
-    }))
+    await commitOrder(
+      makeCartCommitInput({
+        user: { email: 'x@x.com', phone: null, first_name: null, last_name: null },
+      })
+    )
 
     const orderInsertCall = client.query.mock.calls[1]
     const params = orderInsertCall[1] as any[]
-    expect(params[4]).toBe('Customer')  // customerName param
+    expect(params[4]).toBe('Customer') // customerName param
   })
 
   it('computes total = subtotal - discount + shipping', async () => {
@@ -810,9 +812,14 @@ describe('commitOrder — cart mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeCartCommitInput({
-      subtotal: 300, appliedDiscount: 50, shippingAmount: 25, codFeeAmount: 40,
-    }))
+    await commitOrder(
+      makeCartCommitInput({
+        subtotal: 300,
+        appliedDiscount: 50,
+        shippingAmount: 25,
+        codFeeAmount: 40,
+      })
+    )
 
     const orderInsertCall = client.query.mock.calls[1]
     const params = orderInsertCall[1] as any[]
@@ -883,7 +890,8 @@ describe('commitOrder — buyNow mode', () => {
 
   function makeClient(orderRow = { id: 'ord-2', order_number: 'ORD-002', total_amount: '550', status: 'pending' }) {
     return {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [makeAddress()] })
         .mockResolvedValueOnce({ rows: [orderRow] })
         .mockResolvedValue({ rows: [] }),
@@ -914,9 +922,7 @@ describe('commitOrder — buyNow mode', () => {
 
     await commitOrder(makeBuyNowInput())
 
-    const itemCalls = client.query.mock.calls.filter((c: any[]) =>
-      (c[0] as string).includes('INSERT INTO order_items')
-    )
+    const itemCalls = client.query.mock.calls.filter((c: any[]) => (c[0] as string).includes('INSERT INTO order_items'))
     expect(itemCalls).toHaveLength(1)
   })
 
@@ -924,10 +930,12 @@ describe('commitOrder — buyNow mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeBuyNowInput({
-      variant: { id: 'v1', variant_name: 'XL', sku: 'V1' },
-      subVariant: { id: 'sv1', sub_variant_name: 'Blue', sku: null },
-    }))
+    await commitOrder(
+      makeBuyNowInput({
+        variant: { id: 'v1', variant_name: 'XL', sku: 'V1' },
+        subVariant: { id: 'sv1', sub_variant_name: 'Blue', sku: null },
+      })
+    )
 
     const orderItemCall = client.query.mock.calls.find((c: any[]) =>
       (c[0] as string).includes('INSERT INTO order_items')
@@ -941,10 +949,12 @@ describe('commitOrder — buyNow mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeBuyNowInput({
-      variant: { id: 'v1', variant_name: 'Medium', sku: 'V1' },
-      subVariant: null,
-    }))
+    await commitOrder(
+      makeBuyNowInput({
+        variant: { id: 'v1', variant_name: 'Medium', sku: 'V1' },
+        subVariant: null,
+      })
+    )
 
     const orderItemCall = client.query.mock.calls.find((c: any[]) =>
       (c[0] as string).includes('INSERT INTO order_items')
@@ -957,12 +967,19 @@ describe('commitOrder — buyNow mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeBuyNowInput({
-      item: {
-        productId: 'prod-1', variantId: null, subVariantId: null,
-        qty: 2.5, buyMode: 'kg', buyUnit: 'kg', price: 100,
-      },
-    }))
+    await commitOrder(
+      makeBuyNowInput({
+        item: {
+          productId: 'prod-1',
+          variantId: null,
+          subVariantId: null,
+          qty: 2.5,
+          buyMode: 'kg',
+          buyUnit: 'kg',
+          price: 100,
+        },
+      })
+    )
 
     const orderItemCall = client.query.mock.calls.find((c: any[]) =>
       (c[0] as string).includes('INSERT INTO order_items')
@@ -976,12 +993,19 @@ describe('commitOrder — buyNow mode', () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
-    await commitOrder(makeBuyNowInput({
-      item: {
-        productId: 'prod-1', variantId: null, subVariantId: null,
-        qty: 2.9, buyMode: 'unit', buyUnit: null, price: 100,
-      },
-    }))
+    await commitOrder(
+      makeBuyNowInput({
+        item: {
+          productId: 'prod-1',
+          variantId: null,
+          subVariantId: null,
+          qty: 2.9,
+          buyMode: 'unit',
+          buyUnit: null,
+          price: 100,
+        },
+      })
+    )
 
     const orderItemCall = client.query.mock.calls.find((c: any[]) =>
       (c[0] as string).includes('INSERT INTO order_items')

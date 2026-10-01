@@ -1,6 +1,6 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { query } from '@/lib/db'
-import { retireProduct } from '@/lib/product-delete'
+import { query } from '@/lib/shared/db'
+import { retireProduct } from '@/lib/catalog/product-delete'
 
 export interface SheetOrphan {
   productId: string
@@ -19,7 +19,7 @@ export async function upsertSheetLinks(
   tenantId: string,
   spreadsheetId: string,
   jobId: string,
-  products: SeenProduct[],
+  products: SeenProduct[]
 ): Promise<void> {
   if (products.length === 0) return
   const pool = controlPlanePool()
@@ -29,7 +29,7 @@ export async function upsertSheetLinks(
        VALUES ($1, $2, $3, $4, $5, now())
        ON CONFLICT (tenant_id, spreadsheet_id, product_id)
        DO UPDATE SET sku = EXCLUDED.sku, last_job_id = EXCLUDED.last_job_id, last_synced_at = now()`,
-      [tenantId, spreadsheetId, p.productId, p.sku, jobId],
+      [tenantId, spreadsheetId, p.productId, p.sku, jobId]
     )
   }
 }
@@ -39,28 +39,27 @@ export async function upsertSheetLinks(
 export async function computeOrphans(
   tenantId: string,
   spreadsheetId: string,
-  seenSkus: string[],
+  seenSkus: string[]
 ): Promise<SheetOrphan[]> {
   const pool = controlPlanePool()
   const links = await pool.query<{ product_id: string; sku: string }>(
     `SELECT product_id, sku FROM sheet_product_links WHERE tenant_id = $1 AND spreadsheet_id = $2`,
-    [tenantId, spreadsheetId],
+    [tenantId, spreadsheetId]
   )
-  const seen = new Set(seenSkus.map((s) => s.toLowerCase()))
-  const missing = links.rows.filter((l) => !seen.has(l.sku.toLowerCase()))
+  const seen = new Set(seenSkus.map(s => s.toLowerCase()))
+  const missing = links.rows.filter(l => !seen.has(l.sku.toLowerCase()))
   if (missing.length === 0) return []
 
-  const ids = missing.map((m) => m.product_id)
-  const names = await query<{ id: string; name: string }>(
-    `SELECT id, name FROM products WHERE id = ANY($1::uuid[])`,
-    [ids],
-  )
-  const nameById = new Map(names.rows.map((r) => [r.id, r.name]))
+  const ids = missing.map(m => m.product_id)
+  const names = await query<{ id: string; name: string }>(`SELECT id, name FROM products WHERE id = ANY($1::uuid[])`, [
+    ids,
+  ])
+  const nameById = new Map(names.rows.map(r => [r.id, r.name]))
   // A link whose product no longer exists in the store (already deleted elsewhere) is dropped
   // here — it should not be flagged for deletion, just cleaned from the link table on reconcile.
   return missing
-    .filter((m) => nameById.has(m.product_id))
-    .map((m) => ({ productId: m.product_id, sku: m.sku, name: nameById.get(m.product_id) as string }))
+    .filter(m => nameById.has(m.product_id))
+    .map(m => ({ productId: m.product_id, sku: m.sku, name: nameById.get(m.product_id) as string }))
 }
 
 // Apply an approved removal set: retire each product (deactivate if it has order/PO history, else
@@ -69,7 +68,7 @@ export async function computeOrphans(
 export async function applyOrphanRemoval(
   tenantId: string,
   spreadsheetId: string,
-  products: SheetOrphan[],
+  products: SheetOrphan[]
 ): Promise<Array<SheetOrphan & { action: 'deactivated' | 'deleted' }>> {
   const results: Array<SheetOrphan & { action: 'deactivated' | 'deleted' }> = []
   for (const p of products) {
@@ -82,17 +81,13 @@ export async function applyOrphanRemoval(
 
 // Drop link rows so a set of products stops being flagged next sync (used by both "approve" after
 // removal and "keep" — a kept product becomes unmanaged by the sheet).
-export async function removeSheetLinks(
-  tenantId: string,
-  spreadsheetId: string,
-  productIds: string[],
-): Promise<void> {
+export async function removeSheetLinks(tenantId: string, spreadsheetId: string, productIds: string[]): Promise<void> {
   if (productIds.length === 0) return
   const pool = controlPlanePool()
   await pool.query(
     `DELETE FROM sheet_product_links
      WHERE tenant_id = $1 AND spreadsheet_id = $2 AND product_id = ANY($3::uuid[])`,
-    [tenantId, spreadsheetId, productIds],
+    [tenantId, spreadsheetId, productIds]
   )
 }
 
@@ -103,7 +98,7 @@ export async function forgetSheetOwnership(tenantId: string): Promise<number> {
   await pool.query(
     `UPDATE import_jobs SET pending_deletions = '[]'::jsonb, updated_at = now()
      WHERE tenant_id = $1 AND source = 'google_sheet' AND pending_deletions <> '[]'::jsonb`,
-    [tenantId],
+    [tenantId]
   )
   const res = await pool.query(`DELETE FROM sheet_product_links WHERE tenant_id = $1`, [tenantId])
   return res.rowCount ?? 0
@@ -117,8 +112,9 @@ export async function releaseSheetProducts(): Promise<number> {
 
 async function removeSheetLink(tenantId: string, spreadsheetId: string, productId: string): Promise<void> {
   const pool = controlPlanePool()
-  await pool.query(
-    `DELETE FROM sheet_product_links WHERE tenant_id = $1 AND spreadsheet_id = $2 AND product_id = $3`,
-    [tenantId, spreadsheetId, productId],
-  )
+  await pool.query(`DELETE FROM sheet_product_links WHERE tenant_id = $1 AND spreadsheet_id = $2 AND product_id = $3`, [
+    tenantId,
+    spreadsheetId,
+    productId,
+  ])
 }

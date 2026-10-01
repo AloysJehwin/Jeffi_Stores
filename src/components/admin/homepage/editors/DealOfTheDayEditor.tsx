@@ -1,6 +1,15 @@
 'use client'
 
-import { CtaFields, DateTimeField, Grid, HeadingFields, LimitField, Note, useSectionBinding, type EditorProps } from './fields'
+import {
+  CtaFields,
+  DateTimeField,
+  Grid,
+  HeadingFields,
+  LimitField,
+  Note,
+  useSectionBinding,
+  type EditorProps,
+} from './fields'
 
 export default function DealOfTheDayEditor(props: EditorProps) {
   const { canWrite } = props

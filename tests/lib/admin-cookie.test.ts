@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { adminCookieNameForHost, adminCookieDomainForHost } from '@/lib/admin-cookie'
+import { adminCookieNameForHost, adminCookieDomainForHost } from '@/lib/auth/admin-cookie'
 
 describe('the platform and a tenant admin never share a session cookie', () => {
   it('names the platform cookie admin_sid', () => {

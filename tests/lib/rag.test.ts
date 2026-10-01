@@ -19,12 +19,12 @@ vi.mock('pg', () => {
   return { Pool }
 })
 
-vi.mock('@/lib/ai-client', () => ({ aiEmbed: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn() }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
-import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/rag'
-import { aiEmbed } from '@/lib/ai-client'
+import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/shared/rag'
+import { aiEmbed } from '@/lib/shared/ai-client'
 
 const mockAiEmbed = vi.mocked(aiEmbed)
 
@@ -73,9 +73,11 @@ describe('findSimilar', () => {
   })
 
   it('handles no options (no tables filter, no minSimilarity)', async () => {
-    mockClientQuery.mockResolvedValue({ rows: [
-      { source_table: 'products', source_id: 'p1', content: 'Product 1', similarity: 0.9, metadata: { name: 'P1' } },
-    ] })
+    mockClientQuery.mockResolvedValue({
+      rows: [
+        { source_table: 'products', source_id: 'p1', content: 'Product 1', similarity: 0.9, metadata: { name: 'P1' } },
+      ],
+    })
     const results = await findSimilar('test')
     expect(results).toHaveLength(1)
     expect(results[0].similarity).toBe(0.9)
@@ -86,9 +88,7 @@ describe('findSimilar', () => {
     mockClientQuery.mockResolvedValue({ rows: [] })
     const results = await findSimilar('test', { sourceTables: ['products', 'product_variants'] })
     expect(results).toEqual([])
-    expect(mockClientQuery).toHaveBeenCalledWith(
-      expect.stringContaining('SET LOCAL'),
-    )
+    expect(mockClientQuery).toHaveBeenCalledWith(expect.stringContaining('SET LOCAL'))
   })
 
   it('filters by sourceTable (singular)', async () => {
@@ -104,18 +104,18 @@ describe('findSimilar', () => {
   })
 
   it('parses similarity when returned as string and defaults metadata null to {}', async () => {
-    mockClientQuery.mockResolvedValue({ rows: [
-      { source_table: 'products', source_id: 'p1', content: 'P1', similarity: '0.85', metadata: null },
-    ] })
+    mockClientQuery.mockResolvedValue({
+      rows: [{ source_table: 'products', source_id: 'p1', content: 'P1', similarity: '0.85', metadata: null }],
+    })
     const results = await findSimilar('test')
     expect(results[0].similarity).toBe(0.85)
     expect(results[0].metadata).toEqual({})
   })
 
   it('uses numeric similarity directly when already a number', async () => {
-    mockClientQuery.mockResolvedValue({ rows: [
-      { source_table: 'products', source_id: 'p1', content: 'P1', similarity: 0.75, metadata: {} },
-    ] })
+    mockClientQuery.mockResolvedValue({
+      rows: [{ source_table: 'products', source_id: 'p1', content: 'P1', similarity: 0.75, metadata: {} }],
+    })
     const results = await findSimilar('test')
     expect(results[0].similarity).toBe(0.75)
   })
@@ -164,10 +164,13 @@ describe('findSimilarProductIds', () => {
   it('returns product matches sorted by similarity descending', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'products'")) return { rows: [
-        { source_id: 'p1', similarity: 0.9 },
-        { source_id: 'p2', similarity: 0.7 },
-      ] }
+      if (sql.includes("source_table = 'products'"))
+        return {
+          rows: [
+            { source_id: 'p1', similarity: 0.9 },
+            { source_id: 'p2', similarity: 0.7 },
+          ],
+        }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test')
@@ -182,9 +185,7 @@ describe('findSimilarProductIds', () => {
   it('includes variant matches', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'product_variants'")) return { rows: [
-        { source_id: 'var-1', similarity: 0.8 },
-      ] }
+      if (sql.includes("source_table = 'product_variants'")) return { rows: [{ source_id: 'var-1', similarity: 0.8 }] }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test')
@@ -197,12 +198,9 @@ describe('findSimilarProductIds', () => {
   it('parses string similarity values in both product and variant rows', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'products'")) return { rows: [
-        { source_id: 'p1', similarity: '0.88' },
-      ] }
-      if (sql.includes("source_table = 'product_variants'")) return { rows: [
-        { source_id: 'var-1', similarity: '0.77' },
-      ] }
+      if (sql.includes("source_table = 'products'")) return { rows: [{ source_id: 'p1', similarity: '0.88' }] }
+      if (sql.includes("source_table = 'product_variants'"))
+        return { rows: [{ source_id: 'var-1', similarity: '0.77' }] }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test')
@@ -215,10 +213,13 @@ describe('findSimilarProductIds', () => {
   it('deduplicates products by productId (second occurrence skipped)', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'products'")) return { rows: [
-        { source_id: 'p1', similarity: 0.9 },
-        { source_id: 'p1', similarity: 0.8 }, // duplicate
-      ] }
+      if (sql.includes("source_table = 'products'"))
+        return {
+          rows: [
+            { source_id: 'p1', similarity: 0.9 },
+            { source_id: 'p1', similarity: 0.8 }, // duplicate
+          ],
+        }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test')
@@ -230,11 +231,14 @@ describe('findSimilarProductIds', () => {
   it('stops when limit is reached', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'products'")) return { rows: [
-        { source_id: 'p1', similarity: 0.9 },
-        { source_id: 'p2', similarity: 0.8 },
-        { source_id: 'p3', similarity: 0.7 },
-      ] }
+      if (sql.includes("source_table = 'products'"))
+        return {
+          rows: [
+            { source_id: 'p1', similarity: 0.9 },
+            { source_id: 'p2', similarity: 0.8 },
+            { source_id: 'p3', similarity: 0.7 },
+          ],
+        }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test', 2)
@@ -244,12 +248,8 @@ describe('findSimilarProductIds', () => {
   it('sorts mixed products and variants by similarity descending', async () => {
     mockClientQuery.mockImplementation(async (sql: string) => {
       if (sql.startsWith('SET LOCAL')) return { rows: [] }
-      if (sql.includes("source_table = 'products'")) return { rows: [
-        { source_id: 'p1', similarity: 0.7 },
-      ] }
-      if (sql.includes("source_table = 'product_variants'")) return { rows: [
-        { source_id: 'var-1', similarity: 0.9 },
-      ] }
+      if (sql.includes("source_table = 'products'")) return { rows: [{ source_id: 'p1', similarity: 0.7 }] }
+      if (sql.includes("source_table = 'product_variants'")) return { rows: [{ source_id: 'var-1', similarity: 0.9 }] }
       return { rows: [] }
     })
     const results = await findSimilarProductIds('test')

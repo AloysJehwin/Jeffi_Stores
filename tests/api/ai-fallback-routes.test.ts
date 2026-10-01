@@ -1,15 +1,15 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn() }))
-vi.mock('@/lib/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: vi.fn() }))
+vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
-import { POST as recapPOST } from '@/app/api/ai-recap/route'
-import { POST as cartPOST } from '@/app/api/ai-cart-insight/route'
-import { POST as affirmPOST } from '@/app/api/ai-affirmation/route'
-import { aiChat } from '@/lib/ai-client'
-import { currentTenantPlanGate } from '@/lib/plan-gate'
+import { POST as recapPOST } from '@/app/api/(public)/ai-recap/route'
+import { POST as cartPOST } from '@/app/api/(public)/ai-cart-insight/route'
+import { POST as affirmPOST } from '@/app/api/(public)/ai-affirmation/route'
+import { aiChat } from '@/lib/shared/ai-client'
+import { currentTenantPlanGate } from '@/lib/auth/plan-gate'
 
 const mockAiChat = vi.mocked(aiChat)
 const mockGate = vi.mocked(currentTenantPlanGate)
@@ -116,7 +116,13 @@ describe('POST /api/ai-affirmation', () => {
     expect(res.status).toBe(400)
   })
   it('502 when the model returns unparseable content', async () => {
-    mockAiChat.mockResolvedValueOnce({ content: 'not json at all', provider: 'ollama', model: 'm', latencyMs: 1, fallbackUsed: false } as any)
+    mockAiChat.mockResolvedValueOnce({
+      content: 'not json at all',
+      provider: 'ollama',
+      model: 'm',
+      latencyMs: 1,
+      fallbackUsed: false,
+    } as any)
     const res = await affirmPOST(req('http://localhost/api/ai-affirmation', { itemNames: ['X'] }))
     expect(res.status).toBe(502)
   })

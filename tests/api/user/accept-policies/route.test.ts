@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateBusiness: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: '2026-06-14',
 }))
 
-import { POST } from '@/app/api/user/accept-policies/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { POST } from '@/app/api/(public)/user/accept-policies/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const AUTH_USER = { userId: 'user-1' }
 

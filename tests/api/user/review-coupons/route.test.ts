@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
 }))
 
-import { GET } from '@/app/api/user/review-coupons/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { GET } from '@/app/api/(public)/user/review-coupons/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const AUTH_USER = { userId: 'user-1' }
 

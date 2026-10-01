@@ -3,22 +3,22 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET, POST, DELETE } from '@/app/api/admin/customers/[id]/tags/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
-import { logActivity } from '@/lib/activity'
+import { GET, POST, DELETE } from '@/app/api/(admin)/admin/customers/[id]/tags/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany } from '@/lib/shared/db'
+import { logActivity } from '@/lib/shared/activity'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

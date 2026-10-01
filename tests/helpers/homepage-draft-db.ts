@@ -35,11 +35,18 @@ export function makeHomepageDraftDb() {
       return { rows: [], rowCount: 1 }
     }
     if (sql.startsWith('SELECT sections, hero_slides FROM homepage_drafts') && sql.includes('FOR UPDATE')) {
-      const rows = state.draft ? [{ sections: clone(state.draft.sections), hero_slides: clone(state.draft.hero_slides) }] : []
+      const rows = state.draft
+        ? [{ sections: clone(state.draft.sections), hero_slides: clone(state.draft.hero_slides) }]
+        : []
       return { rows, rowCount: rows.length }
     }
     if (sql.startsWith('UPDATE homepage_drafts')) {
-      state.draft = { sections: JSON.parse(params[0]), hero_slides: JSON.parse(params[1]), updated_by: params[2], updated_at: new Date().toISOString() }
+      state.draft = {
+        sections: JSON.parse(params[0]),
+        hero_slides: JSON.parse(params[1]),
+        updated_by: params[2],
+        updated_at: new Date().toISOString(),
+      }
       return { rows: [], rowCount: 1 }
     }
     if (sql.startsWith('DELETE FROM homepage_drafts')) {
@@ -53,8 +60,13 @@ export function makeHomepageDraftDb() {
       const out: { inserted: boolean }[] = []
       for (const row of JSON.parse(params[0]) as Row[]) {
         const i = state.live[table].findIndex(r => r.id === row.id)
-        if (i === -1) { state.live[table].push(row); out.push({ inserted: true }) }
-        else if (JSON.stringify(state.live[table][i]) !== JSON.stringify(row)) { state.live[table][i] = row; out.push({ inserted: false }) }
+        if (i === -1) {
+          state.live[table].push(row)
+          out.push({ inserted: true })
+        } else if (JSON.stringify(state.live[table][i]) !== JSON.stringify(row)) {
+          state.live[table][i] = row
+          out.push({ inserted: false })
+        }
       }
       return { rows: out, rowCount: out.length }
     }
@@ -78,7 +90,7 @@ export function makeHomepageDraftDb() {
         sections: clone(d.sections),
         hero_slides: clone(d.hero_slides),
         updated_at: new Date(d.updated_at),
-        updated_by_name: d.updated_by ? state.adminNames[d.updated_by] ?? null : null,
+        updated_by_name: d.updated_by ? (state.adminNames[d.updated_by] ?? null) : null,
       }
     }
     if (sql.startsWith('SELECT COALESCE((SELECT jsonb_agg')) {
@@ -110,7 +122,9 @@ export function makeHomepageDraftDb() {
   const db = {
     query: async (sql: string, params?: any[]) => run(sql, params),
     queryOne: async (sql: string) => queryOne(sql),
-    queryMany: async (sql: string) => { throw new Error(`unexpected SQL: ${sql.slice(0, 80)}`) },
+    queryMany: async (sql: string) => {
+      throw new Error(`unexpected SQL: ${sql.slice(0, 80)}`)
+    },
     withTransaction,
   }
 
@@ -119,19 +133,49 @@ export function makeHomepageDraftDb() {
 
 export function sectionRow(id: string, display_order: number, extra: Record<string, unknown> = {}): Row {
   return {
-    id, type: 'promo_banner', title: `Section ${id}`, subtitle: null, eyebrow: null, cta_label: null, cta_url: null,
-    config: {}, display_order, is_active: true, starts_at: null, ends_at: null,
-    created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z', ...extra,
+    id,
+    type: 'promo_banner',
+    title: `Section ${id}`,
+    subtitle: null,
+    eyebrow: null,
+    cta_label: null,
+    cta_url: null,
+    config: {},
+    display_order,
+    is_active: true,
+    starts_at: null,
+    ends_at: null,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+    ...extra,
   }
 }
 
 export function slideRow(id: string, display_order: number, extra: Record<string, unknown> = {}): Row {
   return {
-    id, title: `Slide ${id}`, subtitle: null, badge_text: null, badge_color: 'bg-primary-500',
-    image_url: null, image_url_mobile: null, blurhash: null, blurhash_mobile: null, cta_label: null, cta_url: null,
-    filter_category: null, filter_brand: null, filter_grade: null, filter_material: null,
-    filter_min_price: null, filter_max_price: null, filter_in_stock: false, filter_on_sale: false,
-    display_order, is_active: true,
-    created_at: '2026-09-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z', ...extra,
+    id,
+    title: `Slide ${id}`,
+    subtitle: null,
+    badge_text: null,
+    badge_color: 'bg-primary-500',
+    image_url: null,
+    image_url_mobile: null,
+    blurhash: null,
+    blurhash_mobile: null,
+    cta_label: null,
+    cta_url: null,
+    filter_category: null,
+    filter_brand: null,
+    filter_grade: null,
+    filter_material: null,
+    filter_min_price: null,
+    filter_max_price: null,
+    filter_in_stock: false,
+    filter_on_sale: false,
+    display_order,
+    is_active: true,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z',
+    ...extra,
   }
 }

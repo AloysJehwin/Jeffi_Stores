@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // tests below can drive rows/spies. The pure helpers need no mock; the mock is inert for them.
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: any[]) => mockQueryOne(...args),
   query: (...args: any[]) => mockQuery(...args),
   queryMany: vi.fn(),
@@ -26,19 +26,26 @@ import {
   revokeAllForPrincipal,
   listActiveSessions,
   type StoredBinding,
-} from '@/lib/auth-sessions'
+} from '@/lib/auth/auth-sessions'
 
 // Device-binding fingerprint: browser family + OS family, versions DROPPED so routine
 // auto-updates never force a re-login, but a genuinely different browser/device does.
 
-const CHROME_MAC_139 = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
-const CHROME_MAC_140 = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
-const CHROME_WIN      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
-const EDGE_WIN        = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0'
-const SAFARI_IOS      = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-const SAFARI_MAC      = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
-const FF_WIN          = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0'
-const CHROME_ANDROID  = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
+const CHROME_MAC_139 =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+const CHROME_MAC_140 =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+const CHROME_WIN =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+const EDGE_WIN =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0'
+const SAFARI_IOS =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+const SAFARI_MAC =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15'
+const FF_WIN = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0'
+const CHROME_ANDROID =
+  'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36'
 
 describe('uaFingerprint', () => {
   it('classifies common browser/OS families', () => {
@@ -199,7 +206,7 @@ describe('evaluateBinding — conservative scoring', () => {
   it('TWO stable diffs → revoke', () => {
     const d = evaluateBinding(STORED, {
       userAgent: SAFARI_IOS, // family differs (safari|ios)
-      acceptLanguage: 'de',  // language differs
+      acceptLanguage: 'de', // language differs
       uaPlatform: 'macos',
       ip: '203.0.113.9',
       fpHash: 'abc123',
@@ -228,7 +235,13 @@ describe('evaluateBinding — conservative scoring', () => {
   })
 
   it('old row with all-NULL snapshot never revokes even against wildly different current', () => {
-    const emptyStored: StoredBinding = { userAgent: null, acceptLang: null, uaPlatform: null, ipNet: null, fpHash: null }
+    const emptyStored: StoredBinding = {
+      userAgent: null,
+      acceptLang: null,
+      uaPlatform: null,
+      ipNet: null,
+      fpHash: null,
+    }
     const d = evaluateBinding(emptyStored, {
       userAgent: SAFARI_IOS,
       acceptLanguage: 'de',
@@ -287,10 +300,10 @@ describe('resolveSession — binding integration', () => {
     mockQueryOne.mockResolvedValue(liveRow())
     const s = await resolveSession(SID, {
       userAgent: CHROME_MAC_139, // same family
-      acceptLanguage: 'de',      // 1 stable diff
+      acceptLanguage: 'de', // 1 stable diff
       uaPlatform: 'macos',
-      ip: '8.8.8.8',             // soft diff
-      fpHash: 'different',       // soft diff
+      ip: '8.8.8.8', // soft diff
+      fpHash: 'different', // soft diff
     })
     expect(s).not.toBeNull()
     expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining('revoked_at = now()'), [SID])
@@ -360,9 +373,18 @@ describe('resolveSession — token vs legacy lookup routing', () => {
     revoked_at: null,
     expires_at: new Date(Date.now() + 3600_000).toISOString(),
     last_seen_at: new Date().toISOString(),
-    role: null, scopes: [], cert_cn: null, approval_status: null,
-    user_agent: null, accept_lang: null, ua_platform: null, ip_net: null, fp_hash: null,
-    email: 'u@example.com', first_name: 'U', last_name: 'Ser',
+    role: null,
+    scopes: [],
+    cert_cn: null,
+    approval_status: null,
+    user_agent: null,
+    accept_lang: null,
+    ua_platform: null,
+    ip_net: null,
+    fp_hash: null,
+    email: 'u@example.com',
+    first_name: 'U',
+    last_name: 'Ser',
   })
 
   beforeEach(() => {
@@ -404,13 +426,25 @@ const liveBase = () => ({
   revoked_at: null,
   expires_at: new Date(Date.now() + 3600_000).toISOString(),
   last_seen_at: new Date().toISOString(),
-  role: null, scopes: [], cert_cn: null, approval_status: null,
-  user_agent: null, accept_lang: null, ua_platform: null, ip_net: null, fp_hash: null,
-  email: 'x@y.com', first_name: 'X', last_name: 'Y',
+  role: null,
+  scopes: [],
+  cert_cn: null,
+  approval_status: null,
+  user_agent: null,
+  accept_lang: null,
+  ua_platform: null,
+  ip_net: null,
+  fp_hash: null,
+  email: 'x@y.com',
+  first_name: 'X',
+  last_name: 'Y',
 })
 
 describe('resolveSession — extra edge paths', () => {
-  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockResolvedValue({ rowCount: 1 })
+  })
 
   it('returns null for a revoked row', async () => {
     mockQueryOne.mockResolvedValue({ ...liveBase(), revoked_at: new Date().toISOString() })
@@ -423,7 +457,10 @@ describe('resolveSession — extra edge paths', () => {
   })
 
   it('returns null for idle-expired row (last_seen > 24h ago)', async () => {
-    mockQueryOne.mockResolvedValue({ ...liveBase(), last_seen_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+    mockQueryOne.mockResolvedValue({
+      ...liveBase(),
+      last_seen_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+    })
     expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
   })
 
@@ -431,7 +468,9 @@ describe('resolveSession — extra edge paths', () => {
     mockQueryOne.mockResolvedValue({ ...liveBase(), last_seen_at: new Date(Date.now() - 10 * 60 * 1000).toISOString() })
     const s = await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
     expect(s).not.toBeNull()
-    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('last_seen_at = now()'), ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'])
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('last_seen_at = now()'), [
+      'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    ])
   })
 
   it('returns resolved session with displayName from first+last name', async () => {
@@ -448,7 +487,10 @@ describe('resolveSession — extra edge paths', () => {
 })
 
 describe('validateSession', () => {
-  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockResolvedValue({ rowCount: 1 })
+  })
 
   it('returns true when session resolves and principalType matches', async () => {
     mockQueryOne.mockResolvedValue({ ...liveBase(), principal_type: 'customer' })
@@ -467,12 +509,18 @@ describe('validateSession', () => {
 })
 
 describe('extendSession', () => {
-  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockResolvedValue({ rowCount: 1 })
+  })
 
   it('updates expiry using token_hash for a 64-hex token', async () => {
     const token = 'e'.repeat(64)
     await extendSession(token, 3600)
-    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('token_hash = $1'), expect.arrayContaining([hashToken(token)]))
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('token_hash = $1'),
+      expect.arrayContaining([hashToken(token)])
+    )
   })
 
   it('updates expiry using id for a legacy uuid', async () => {
@@ -493,7 +541,10 @@ describe('extendSession', () => {
 })
 
 describe('revokeSession', () => {
-  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockResolvedValue({ rowCount: 1 })
+  })
 
   it('revokes by token_hash for a 64-hex token', async () => {
     const token = 'f'.repeat(64)
@@ -514,7 +565,9 @@ describe('revokeSession', () => {
 })
 
 describe('revokeAllForPrincipal', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('issues bulk revoke and returns affected rowCount', async () => {
     mockQuery.mockResolvedValue({ rowCount: 3 })
@@ -534,10 +587,12 @@ describe('revokeAllForPrincipal', () => {
 })
 
 describe('listActiveSessions', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns session rows from queryMany', async () => {
-    const { queryMany } = await import('@/lib/db')
+    const { queryMany } = await import('@/lib/shared/db')
     vi.mocked(queryMany).mockResolvedValue([{ id: 'r1' }, { id: 'r2' }] as any)
     const rows = await listActiveSessions('customer', 'u1')
     expect(rows).toHaveLength(2)
@@ -545,7 +600,7 @@ describe('listActiveSessions', () => {
   })
 
   it('returns empty array when no active sessions', async () => {
-    const { queryMany } = await import('@/lib/db')
+    const { queryMany } = await import('@/lib/shared/db')
     vi.mocked(queryMany).mockResolvedValue([])
     expect(await listActiveSessions('admin', 'a1')).toEqual([])
   })

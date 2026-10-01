@@ -26,18 +26,19 @@ src/app/             Next.js App Router (storefront, /admin, /api routes)
 src/components/      Reusable React components (admin/, visitor/, shared/)
 src/lib/             Server-side helpers (db, auth, jwt, s3, email, gst,
                      invoice-pdf, razorpay, delhivery, google-sheets,
-                     google-merchant-helpers, redis, websocket, etc.)
+                     google-merchant-helpers, redis, etc.)
 src/contexts/        React contexts (cart, auth)
 src/middleware.ts    Auth + rate-limit middleware
 src/instrumentation.ts  Next.js instrumentation hook
 database/            schema.sql + migrations/*.sql
-deploy/              setup.sh, maintenance.sh, nginx.conf,
-                     scheduler-setup.sh, aws-infrastructure.yaml, lambda/
+deploy/              blue-green-deploy.sh, maintenance.sh, nginx*.conf,
+                     scheduler-setup.sh, load-secrets.mjs
+deploy/aws/          Hand-applied AWS artifacts: aws-infrastructure.yaml,
+                     IAM policies, CloudFront functions, lambda/ sources
 scripts/             One-off and scheduled Node scripts (DB sync, image
                      uploads, sheet sync, dimension/weight backfills)
 public/              Static assets served by Next
 certs/               mTLS certs for nginx <-> app (NOT in repo)
-lambda/              AWS Lambda function source
 ```
 
 ## Local Development
@@ -103,7 +104,7 @@ Routes under `src/app/`: catalog (`products`, `categories`, `brands`), `cart`, `
 
 ### Server-side libraries — `src/lib/`
 
-Authentication (`auth.ts`, `auth-guard.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queries.ts`), payments (`razorpay.ts`), email (`email.ts`, `email-campaigns.ts`), shipping (`shipping.ts`, `delhivery.ts`), GST + invoicing (`gst.ts`, `invoice.ts`, `invoice-pdf.ts`, `quotation-pdf.ts`, `po-pdf.ts`, `receipt-pdf.ts`, `packing-slip-pdf.ts`, `label-pdf.ts`), GST integrations (`einvoice.ts`, `ewaybill.ts` — currently disabled), Google integrations (`google-sheets.ts`, `google-merchant-helpers.ts`), inventory (`inventory.ts`, `sku.ts`), realtime (`websocket.ts`, `redis.ts`), rate limiting (`rate-limit.ts`), S3 (`s3.ts`), search (`search.ts`).
+Authentication (`auth.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queries.ts`), payments (`razorpay.ts`), email (`email.ts`, `email-campaigns.ts`), shipping (`shipping.ts`, `delhivery.ts`), GST + invoicing (`gst.ts`, `invoice.ts`, `invoice-pdf.ts`, `quotation-pdf.ts`, `po-pdf.ts`, `receipt-pdf.ts`, `packing-slip-pdf.ts`, `label-pdf.ts`), GST integrations (`einvoice.ts`, `ewaybill.ts` — currently disabled), Google integrations (`google-sheets.ts`, `google-merchant-helpers.ts`), inventory (`inventory.ts`, `sku.ts`), realtime (`redis.ts`), rate limiting (`rate-limit.ts`), S3 (`s3.ts`), search (`search.ts`).
 
 ### Integrations
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { safeHref } from '@/lib/homepage-sections'
+import { safeHref } from '@/lib/catalog/homepage-sections'
 import { CtaFields, Grid, HeadingFields, Note, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
@@ -34,7 +34,10 @@ export default function BlogTeaserEditor(props: EditorProps) {
       />
       <CtaFields props={props} hint="Optional link to all your articles." urlPlaceholder="https://…" />
       {badLinks > 0 && (
-        <Note>Links and images must start with https:// or /. {badLinks === 1 ? 'One card has' : `${badLinks} cards have`} a link that will be ignored.</Note>
+        <Note>
+          Links and images must start with https:// or /. {badLinks === 1 ? 'One card has' : `${badLinks} cards have`} a
+          link that will be ignored.
+        </Note>
       )}
     </Grid>
   )

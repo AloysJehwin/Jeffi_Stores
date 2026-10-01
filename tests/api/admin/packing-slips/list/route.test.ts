@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,10 +13,10 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/packing-slips/list/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/packing-slips/list/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -33,8 +33,22 @@ const mockHasScope = vi.mocked(hasScope)
 const mockQueryMany = vi.mocked(queryMany)
 
 const SAMPLE_ORDERS = [
-  { id: 'o1', order_number: 'ORD-001', customer_name: 'Alice', created_at: '2026-01-01', status: 'confirmed', total_amount: 500 },
-  { id: 'o2', order_number: 'ORD-002', customer_name: 'Bob', created_at: '2026-01-02', status: 'shipped', total_amount: 300 },
+  {
+    id: 'o1',
+    order_number: 'ORD-001',
+    customer_name: 'Alice',
+    created_at: '2026-01-01',
+    status: 'confirmed',
+    total_amount: 500,
+  },
+  {
+    id: 'o2',
+    order_number: 'ORD-002',
+    customer_name: 'Bob',
+    created_at: '2026-01-02',
+    status: 'shipped',
+    total_amount: 300,
+  },
 ]
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -79,28 +93,19 @@ describe('GET /api/admin/packing-slips/list', () => {
   it('filters with both from and to', async () => {
     const res = await GET(makeReq({ from: '2026-01-01', to: '2026-01-31' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('$1::date'),
-      ['2026-01-01', '2026-01-31']
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('$1::date'), ['2026-01-01', '2026-01-31'])
   })
 
   it('filters with only from', async () => {
     const res = await GET(makeReq({ from: '2026-01-01' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('$1::date'),
-      ['2026-01-01']
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('$1::date'), ['2026-01-01'])
   })
 
   it('filters with only to', async () => {
     const res = await GET(makeReq({ to: '2026-01-31' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('$1::date'),
-      ['2026-01-31']
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('$1::date'), ['2026-01-31'])
   })
 
   // ── Empty result ─────────────────────────────────────────────────────────

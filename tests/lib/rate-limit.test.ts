@@ -22,11 +22,7 @@ import { NextRequest } from 'next/server'
 
 function makeRequest(
   pathname: string,
-  {
-    ip = '1.2.3.4',
-    xForwardedFor,
-    xRealIp,
-  }: { ip?: string; xForwardedFor?: string; xRealIp?: string } = {}
+  { ip = '1.2.3.4', xForwardedFor, xRealIp }: { ip?: string; xForwardedFor?: string; xRealIp?: string } = {}
 ): NextRequest {
   const url = `https://example.com${pathname}`
   const headers = new Headers()
@@ -73,26 +69,23 @@ describe('TIER pattern matching', () => {
     ['/api/misc/other', 60],
   ]
 
-  it.each(tierCases)(
-    'path %s is rate-limited (config found)',
-    async (path, _expectedMax) => {
-      const { applyRateLimit } = await import('@/lib/rate-limit')
-      // First call should never be over limit (count = 1)
-      const req = makeRequest(path)
-      const result = await applyRateLimit(req)
-      // Under the limit on first call → null
-      expect(result).toBeNull()
-    }
-  )
+  it.each(tierCases)('path %s is rate-limited (config found)', async (path, _expectedMax) => {
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
+    // First call should never be over limit (count = 1)
+    const req = makeRequest(path)
+    const result = await applyRateLimit(req)
+    // Under the limit on first call → null
+    expect(result).toBeNull()
+  })
 
   it('returns null for a path that does not match any tier', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/public/images/logo.png')
     expect(await applyRateLimit(req)).toBeNull()
   })
 
   it('returns null for an unrecognised path like /storefront/page', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     expect(await applyRateLimit(makeRequest('/storefront/page'))).toBeNull()
   })
 })
@@ -115,7 +108,7 @@ describe('Redis path — over limit returns 429', () => {
 
   it('returns 429 when Redis count exceeds max for /api/admin/login (max=5)', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(6)) // count 6 > max 5
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/api/admin/login')
     const res = await applyRateLimit(req)
     expect(res).not.toBeNull()
@@ -124,7 +117,7 @@ describe('Redis path — over limit returns 429', () => {
 
   it('returns null when Redis count is exactly at the limit', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(5)) // count 5 = max 5, not over
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/api/admin/login')
     const res = await applyRateLimit(req)
     expect(res).toBeNull()
@@ -132,14 +125,14 @@ describe('Redis path — over limit returns 429', () => {
 
   it('returns null when Redis count is 1 (well under limit)', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(1))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/api/admin/login')
     expect(await applyRateLimit(req)).toBeNull()
   })
 
   it('returns 429 with correct Retry-After header', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(100)) // way over
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/api/admin/login') // windowSecs=60
     const res = await applyRateLimit(req)
     expect(res!.status).toBe(429)
@@ -148,7 +141,7 @@ describe('Redis path — over limit returns 429', () => {
 
   it('returns 429 with X-RateLimit-Limit header matching tier max', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(100))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const req = makeRequest('/api/admin/login') // max=5
     const res = await applyRateLimit(req)
     expect(res!.headers.get('X-RateLimit-Limit')).toBe('5')
@@ -156,14 +149,14 @@ describe('Redis path — over limit returns 429', () => {
 
   it('returns 429 with X-RateLimit-Remaining: 0', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(100))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     expect(res!.headers.get('X-RateLimit-Remaining')).toBe('0')
   })
 
   it('returns 429 with X-RateLimit-Reset as a numeric unix timestamp', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(100))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     const reset = res!.headers.get('X-RateLimit-Reset')
     expect(Number(reset)).toBeGreaterThan(Date.now() / 1000)
@@ -171,7 +164,7 @@ describe('Redis path — over limit returns 429', () => {
 
   it('response body contains expected error message', async () => {
     vi.stubGlobal('fetch', makeRedisFetch(100))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     const body = await res!.json()
     expect(body.error).toBe('Too many requests. Please slow down.')
@@ -196,7 +189,7 @@ describe('Redis path — fetch error falls back to mem-store', () => {
 
   it('falls back to mem-store when fetch throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     // First call → mem count = 1, under limit → null
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     expect(res).toBeNull()
@@ -204,17 +197,20 @@ describe('Redis path — fetch error falls back to mem-store', () => {
 
   it('falls back to mem-store when fetch returns !ok', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => null }))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     expect(res).toBeNull() // first mem-store hit, count=1
   })
 
   it('falls back to mem-store when JSON has no result field', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [{ result: 'not-a-number' }],
-    }))
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ result: 'not-a-number' }],
+      })
+    )
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const res = await applyRateLimit(makeRequest('/api/admin/login'))
     expect(res).toBeNull()
   })
@@ -232,7 +228,7 @@ describe('mem-store fallback — increment behaviour', () => {
   })
 
   it('allows up to max requests from the same IP on a path', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login' // max=5
     for (let i = 0; i < 5; i++) {
       const res = await applyRateLimit(makeRequest(path, { xForwardedFor: '10.0.0.1' }))
@@ -241,7 +237,7 @@ describe('mem-store fallback — increment behaviour', () => {
   })
 
   it('returns 429 on the (max+1)th request', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login' // max=5
     for (let i = 0; i < 5; i++) {
       await applyRateLimit(makeRequest(path, { xForwardedFor: '10.0.0.2' }))
@@ -251,7 +247,7 @@ describe('mem-store fallback — increment behaviour', () => {
   })
 
   it('different IPs have independent counters', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login' // max=5
 
     // Exhaust limit for IP A
@@ -264,7 +260,7 @@ describe('mem-store fallback — increment behaviour', () => {
   })
 
   it('different paths have independent counters for the same IP', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const ip = '10.2.2.2'
 
     // Exhaust /api/admin/login (max=5)
@@ -288,7 +284,7 @@ describe('IP extraction', () => {
   })
 
   it('uses x-forwarded-for first IP when multiple IPs are present', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login'
     // Exhaust the key for the first IP in the chain
     for (let i = 0; i < 5; i++) {
@@ -303,7 +299,7 @@ describe('IP extraction', () => {
   })
 
   it('falls back to x-real-ip when x-forwarded-for is absent', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login'
     for (let i = 0; i < 5; i++) {
       await applyRateLimit(makeRequest(path, { xRealIp: '77.77.77.77' }))
@@ -313,7 +309,7 @@ describe('IP extraction', () => {
   })
 
   it('falls back to 127.0.0.1 when no IP headers are present', async () => {
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     const path = '/api/admin/login'
     for (let i = 0; i < 5; i++) {
       await applyRateLimit(makeRequest(path))
@@ -343,7 +339,7 @@ describe('Redis pipeline request structure', () => {
     const mockFetch = makeRedisFetch(1)
     vi.stubGlobal('fetch', mockFetch)
 
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     await applyRateLimit(makeRequest('/api/admin/login', { xForwardedFor: '1.1.1.1' }))
 
     expect(mockFetch).toHaveBeenCalledOnce()
@@ -358,7 +354,7 @@ describe('Redis pipeline request structure', () => {
     const mockFetch = makeRedisFetch(1)
     vi.stubGlobal('fetch', mockFetch)
 
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     await applyRateLimit(makeRequest('/api/admin/login', { xForwardedFor: '2.2.2.2' }))
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit]
@@ -376,7 +372,7 @@ describe('Redis pipeline request structure', () => {
     const mockFetch = vi.fn()
     vi.stubGlobal('fetch', mockFetch)
 
-    const { applyRateLimit } = await import('@/lib/rate-limit')
+    const { applyRateLimit } = await import('@/lib/shared/rate-limit')
     await applyRateLimit(makeRequest('/api/admin/login', { xForwardedFor: '3.3.3.3' }))
 
     expect(mockFetch).not.toHaveBeenCalled()

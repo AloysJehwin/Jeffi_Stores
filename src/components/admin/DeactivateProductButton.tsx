@@ -60,7 +60,7 @@ export default function DeactivateProductButton({ productId, productName, isActi
         disabled={isUpdating}
         className={`disabled:opacity-50 ${isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}`}
       >
-        {isUpdating ? (isActive ? 'Deactivating...' : 'Activating...') : (isActive ? 'Deactivate' : 'Activate')}
+        {isUpdating ? (isActive ? 'Deactivating...' : 'Activating...') : isActive ? 'Deactivate' : 'Activate'}
       </button>
     </RequireWrite>
   )

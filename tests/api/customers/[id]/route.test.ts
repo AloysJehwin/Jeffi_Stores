@@ -1,30 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 vi.mock('@/lib/queries', () => ({
   getCustomerById: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/auto-tasks', () => ({
+vi.mock('@/lib/shared/auto-tasks', () => ({
   createAutoTask: vi.fn().mockResolvedValue(undefined),
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { GET, PATCH } from '@/app/api/customers/[id]/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
+import { GET, PATCH } from '@/app/api/(public)/customers/[id]/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 
 const ADMIN = { adminId: 'admin-1', role: 'admin', scopes: [] }
 const PARAMS = { params: Promise.resolve({ id: 'user-42' }) }

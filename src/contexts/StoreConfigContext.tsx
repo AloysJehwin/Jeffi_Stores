@@ -105,15 +105,15 @@ export function StoreConfigProvider({ children, initialConfig }: { children: Rea
         })
         setLoaded(true)
       })
-      .catch(() => { /* keep initial/defaults */ })
-    return () => { active = false }
+      .catch(() => {
+        /* keep initial/defaults */
+      })
+    return () => {
+      active = false
+    }
   }, [])
 
-  return (
-    <StoreConfigContext.Provider value={{ config, loaded }}>
-      {children}
-    </StoreConfigContext.Provider>
-  )
+  return <StoreConfigContext.Provider value={{ config, loaded }}>{children}</StoreConfigContext.Provider>
 }
 
 export function useStoreConfig(): StoreConfig {

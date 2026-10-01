@@ -14,27 +14,27 @@ const mockCookieStore = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/otp', () => ({
+vi.mock('@/lib/auth/otp', () => ({
   verifyOTP: vi.fn(),
   isOTPVerified: vi.fn(),
   deleteOTP: vi.fn().mockResolvedValue(undefined),
   resetSendOtpCounter: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
@@ -42,10 +42,10 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-import { POST as loginPOST } from '@/app/api/business/login/route'
-import { POST as signupPOST } from '@/app/api/business/signup/route'
-import * as otpLib from '@/lib/otp'
-import * as db from '@/lib/db'
+import { POST as loginPOST } from '@/app/api/(public)/business/login/route'
+import { POST as signupPOST } from '@/app/api/(public)/business/signup/route'
+import * as otpLib from '@/lib/auth/otp'
+import * as db from '@/lib/shared/db'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -282,9 +282,7 @@ describe('POST /api/business/signup', () => {
   describe('successful signup', () => {
     it('returns 200 with approvalStatus:pending on successful signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
@@ -297,9 +295,7 @@ describe('POST /api/business/signup', () => {
 
     it('inserts business_profiles row on successful signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
@@ -311,9 +307,7 @@ describe('POST /api/business/signup', () => {
 
     it('sets business_sid cookie after signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
@@ -326,9 +320,7 @@ describe('POST /api/business/signup', () => {
 
     it('deletes OTP and resets counter after signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
@@ -338,9 +330,7 @@ describe('POST /api/business/signup', () => {
 
     it('normalises GST to uppercase in business_profiles insert', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await signupPOST(signupRequest({ ...VALID_SIGNUP_BODY, gstNumber: 'lowercase123' }) as any)
@@ -354,9 +344,7 @@ describe('POST /api/business/signup', () => {
   describe('DB insert fails', () => {
     it('returns 500 when INSERT returns null', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       const res = await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)

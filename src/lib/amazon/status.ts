@@ -1,4 +1,4 @@
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { searchListingsItems } from './client'
 
 // Amazon listing-status snapshot — analog of src/lib/merchant/gmc-status.ts.
@@ -32,7 +32,8 @@ function deriveStatus(item: any): string {
   const issues: any[] = item.issues || []
   if (issues.some(i => String(i.severity || '').toUpperCase() === 'ERROR')) return 'disapproved'
   const summaries: any[] = item.summaries || []
-  const statuses = summaries.flatMap(s => Array.isArray(s.status) ? s.status : (s.status ? [s.status] : []))
+  const statuses = summaries
+    .flatMap(s => (Array.isArray(s.status) ? s.status : s.status ? [s.status] : []))
     .map((v: any) => String(v).toUpperCase())
   const buyable = statuses.includes('BUYABLE')
   if (issues.some(i => String(i.severity || '').toUpperCase() === 'WARNING')) return 'pending'
@@ -54,10 +55,9 @@ function itemAsin(item: any): string | null {
 // Pull ALL our Amazon listings (paginated) and upsert into amazon_listing_status, then
 // recompute the aggregate meta row. Returns the fresh summary.
 export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { locked: true }> {
-  const lock = await queryOne<{ acquired: boolean }>(
-    `SELECT pg_try_advisory_lock($1) AS acquired`,
-    [AMAZON_STATUS_LOCK_KEY]
-  )
+  const lock = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [
+    AMAZON_STATUS_LOCK_KEY,
+  ])
   if (!lock?.acquired) return { locked: true }
 
   try {
@@ -71,7 +71,10 @@ export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { l
         if (!sku) continue
         const status = deriveStatus(item)
         const issues = (item.issues || []).map((i: any) => ({
-          code: i.code, severity: i.severity, message: i.message, attributeNames: i.attributeNames,
+          code: i.code,
+          severity: i.severity,
+          message: i.message,
+          attributeNames: i.attributeNames,
         }))
         await query(
           `INSERT INTO amazon_listing_status
@@ -80,8 +83,7 @@ export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { l
            ON CONFLICT (sku) DO UPDATE SET
              title = EXCLUDED.title, status = EXCLUDED.status, asin = EXCLUDED.asin,
              summaries = EXCLUDED.summaries, issues = EXCLUDED.issues, synced_at = now()`,
-          [sku, itemTitle(item), status, itemAsin(item),
-           JSON.stringify(item.summaries || []), JSON.stringify(issues)]
+          [sku, itemTitle(item), status, itemAsin(item), JSON.stringify(item.summaries || []), JSON.stringify(issues)]
         )
         seen.push(sku)
       }
@@ -90,10 +92,7 @@ export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { l
 
     // Drop rows no longer present in Amazon (listings that were removed).
     if (seen.length > 0) {
-      await query(
-        `DELETE FROM amazon_listing_status WHERE sku <> ALL($1::text[])`,
-        [seen]
-      )
+      await query(`DELETE FROM amazon_listing_status WHERE sku <> ALL($1::text[])`, [seen])
     }
 
     const counts = await queryOne<{ total: number; approved: number; pending: number; disapproved: number }>(
@@ -148,7 +147,8 @@ export async function getAmazonStatusPage(
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
   const totalRow = await queryOne<{ n: number }>(
-    `SELECT COUNT(*)::int AS n FROM amazon_listing_status ${whereSql}`, args
+    `SELECT COUNT(*)::int AS n FROM amazon_listing_status ${whereSql}`,
+    args
   )
   const total = totalRow?.n ?? 0
 

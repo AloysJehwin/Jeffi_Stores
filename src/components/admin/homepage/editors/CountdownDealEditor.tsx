@@ -1,8 +1,16 @@
 'use client'
 
-import { configId } from '@/lib/homepage-sections'
+import { configId } from '@/lib/catalog/homepage-sections'
 import {
-  DateTimeField, Grid, HeadingFields, Note, Text, copyHint, sectionCopy, useSectionBinding, type EditorProps,
+  DateTimeField,
+  Grid,
+  HeadingFields,
+  Note,
+  Text,
+  copyHint,
+  sectionCopy,
+  useSectionBinding,
+  type EditorProps,
 } from './fields'
 import ProductPickerField from './ProductPickerField'
 
@@ -41,7 +49,9 @@ export default function CountdownDealEditor(props: EditorProps) {
 
       {!productId && <Note>Pick a product. The section stays hidden until one is chosen.</Note>}
       {endsAt && Date.parse(endsAt) < Date.now() && (
-        <Note>The countdown has ended, so this banner is hidden on the storefront. Set a new end time to show it again.</Note>
+        <Note>
+          The countdown has ended, so this banner is hidden on the storefront. Set a new end time to show it again.
+        </Note>
       )}
     </Grid>
   )

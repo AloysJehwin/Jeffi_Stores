@@ -3,17 +3,25 @@
 import { useEffect, useState } from 'react'
 import ProductCard from '@/components/visitor/ProductCard'
 import SectionCarousel from '@/components/visitor/SectionCarousel'
-import type { CardProps } from '@/lib/product-cards'
+import type { CardProps } from '@/lib/catalog/product-cards'
 
 const TITLE = 'Frequently bought with your cart'
 const MAX_IDS = 20
 const MAX_EXCLUDE = 50
 
 function idKey(ids: string[]): string {
-  return Array.from(new Set(ids.filter(Boolean))).sort().join(',')
+  return Array.from(new Set(ids.filter(Boolean)))
+    .sort()
+    .join(',')
 }
 
-export default function CartUpsellRow({ cartProductIds, savedProductIds }: { cartProductIds: string[]; savedProductIds: string[] }) {
+export default function CartUpsellRow({
+  cartProductIds,
+  savedProductIds,
+}: {
+  cartProductIds: string[]
+  savedProductIds: string[]
+}) {
   const [products, setProducts] = useState<CardProps[]>([])
   const idsKey = idKey(cartProductIds)
   const excludeKey = idKey([...cartProductIds, ...savedProductIds])

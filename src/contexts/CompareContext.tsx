@@ -39,7 +39,9 @@ export function CompareProvider({ children }: { children: ReactNode }) {
 
   const persist = (list: CompareProduct[]) => {
     setCompareList(list)
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
+    } catch {}
   }
 
   const addToCompare = useCallback((p: CompareProduct) => {
@@ -47,7 +49,9 @@ export function CompareProvider({ children }: { children: ReactNode }) {
       if (prev.find(x => x.id === p.id)) return prev
       if (prev.length >= MAX_COMPARE) return prev
       const next = [...prev, p]
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      } catch {}
       return next
     })
   }, [])
@@ -55,7 +59,9 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   const removeFromCompare = useCallback((id: string) => {
     setCompareList(prev => {
       const next = prev.filter(x => x.id !== id)
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      } catch {}
       return next
     })
   }, [])
@@ -64,9 +70,12 @@ export function CompareProvider({ children }: { children: ReactNode }) {
     persist([])
   }, [])
 
-  const isInCompare = useCallback((id: string) => {
-    return compareList.some(x => x.id === id)
-  }, [compareList])
+  const isInCompare = useCallback(
+    (id: string) => {
+      return compareList.some(x => x.id === id)
+    },
+    [compareList]
+  )
 
   return (
     <CompareContext.Provider value={{ compareList, addToCompare, removeFromCompare, clearCompare, isInCompare }}>

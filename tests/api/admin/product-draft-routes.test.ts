@@ -1,27 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const mockQuery = vi.fn()
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
   withTransaction: vi.fn(),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 
 // Products draft route
 import {
   POST as prodDraftPost,
   PATCH as prodDraftPatch,
   DELETE as prodDraftDelete,
-} from '@/app/api/admin/products/[id]/draft/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/route'
 
 // Products draft sub-variants
 import {
@@ -29,14 +29,14 @@ import {
   POST as svPost,
   DELETE as svDelete,
   PATCH as svPatch,
-} from '@/app/api/admin/products/[id]/draft/sub-variants/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/sub-variants/route'
 
 // Products draft units
 import {
   GET as unitsGet,
   POST as unitsPost,
   DELETE as unitsDelete,
-} from '@/app/api/admin/products/[id]/draft/units/route'
+} from '@/app/api/(admin)/admin/products/[id]/draft/units/route'
 
 // Review forms draft
 import {
@@ -44,7 +44,7 @@ import {
   PATCH as rfPatch,
   POST as rfPublish,
   DELETE as rfDelete,
-} from '@/app/api/admin/review-forms/[id]/draft/route'
+} from '@/app/api/(admin)/admin/review-forms/[id]/draft/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 
@@ -250,7 +250,10 @@ describe('review-forms draft route', () => {
   })
 
   it('POST publishes draft', async () => {
-    mockQueryOne.mockResolvedValueOnce({ form_id: 'f-1', fields: { title: 'Rev', slug: 'rev', template_type: 'google_review', google_review_url: 'http://g.co' } })
+    mockQueryOne.mockResolvedValueOnce({
+      form_id: 'f-1',
+      fields: { title: 'Rev', slug: 'rev', template_type: 'google_review', google_review_url: 'http://g.co' },
+    })
     mockQuery.mockResolvedValueOnce({})
     mockQuery.mockResolvedValueOnce({})
     const res = await rfPublish(req('POST'), { params: idParams })

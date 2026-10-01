@@ -1,7 +1,15 @@
-import { queryOne, query } from '@/lib/db'
+import { queryOne, query } from '@/lib/shared/db'
 import { productToGmcItems } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
-import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, getMerchantId, merchantConfigured, GMC_PUSH_DISABLED } from './client'
+import {
+  upsertProduct,
+  deleteProductByOfferId,
+  listProducts,
+  customBatchUpsert,
+  getMerchantId,
+  merchantConfigured,
+  GMC_PUSH_DISABLED,
+} from './client'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
@@ -30,7 +38,9 @@ async function getExistingGmcOfferIds(): Promise<Set<string>> {
   return offerIds
 }
 
-async function saveSyncStatus(result: Partial<SyncResult> & { status: 'running' | 'success' | 'error'; error?: string }) {
+async function saveSyncStatus(
+  result: Partial<SyncResult> & { status: 'running' | 'success' | 'error'; error?: string }
+) {
   try {
     await query(
       `INSERT INTO merchant_sync_log (status, synced, deleted, errors, started_at, finished_at)
@@ -52,23 +62,24 @@ export async function syncAllProductsToMerchant(): Promise<SyncResult> {
   if (GMC_PUSH_DISABLED) {
     const now = new Date().toISOString()
     return {
-      synced: 0, deleted: 0,
+      synced: 0,
+      deleted: 0,
       errors: [{ sku: '__disabled__', error: 'GMC push is disabled in this environment' }],
-      startedAt: now, finishedAt: now,
+      startedAt: now,
+      finishedAt: now,
     }
   }
   if (!(await merchantConfigured())) {
     const now = new Date().toISOString()
     return {
-      synced: 0, deleted: 0,
+      synced: 0,
+      deleted: 0,
       errors: [{ sku: '__config__', error: 'Google Merchant is not connected' }],
-      startedAt: now, finishedAt: now,
+      startedAt: now,
+      finishedAt: now,
     }
   }
-  const lockRes = await queryOne<{ acquired: boolean }>(
-    `SELECT pg_try_advisory_lock($1) AS acquired`,
-    [SYNC_LOCK_KEY]
-  )
+  const lockRes = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [SYNC_LOCK_KEY])
   if (!lockRes?.acquired) {
     const startedAt = new Date().toISOString()
     return {
@@ -171,10 +182,7 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
 
 export async function getLastSyncStatus(): Promise<any> {
   try {
-    return await queryOne(
-      `SELECT * FROM merchant_sync_log ORDER BY started_at DESC LIMIT 1`,
-      []
-    )
+    return await queryOne(`SELECT * FROM merchant_sync_log ORDER BY started_at DESC LIMIT 1`, [])
   } catch (err) {
     console.error('[route]', err)
     return null
@@ -192,5 +200,7 @@ export async function sendSyncFailureEmail(result: SyncResult): Promise<void> {
       errors: result.errors,
       kind: 'merchant_sync_report',
     })
-  } catch (err) { console.error("[route]", err) }
+  } catch (err) {
+    console.error('[route]', err)
+  }
 }

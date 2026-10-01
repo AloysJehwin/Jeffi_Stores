@@ -19,7 +19,12 @@ let worker: Worker | null = null
 let workerMobile = false
 let nextId = 1
 let lastError: string | null = null
-type Pending = { resolve: (s: string) => void; reject: (e: Error) => void; onToken?: (partial: string) => void; acc: string }
+type Pending = {
+  resolve: (s: string) => void
+  reject: (e: Error) => void
+  onToken?: (partial: string) => void
+  acc: string
+}
 const pending = new Map<number, Pending>()
 
 export function getLastOnDeviceError(): string | null {
@@ -51,7 +56,10 @@ function ensureWorker(isMobile: boolean): Worker {
   worker.postMessage({ type: 'init', isMobile })
   const failAll = (err: string) => {
     lastError = err
-    for (const [id, p] of pending) { pending.delete(id); p.reject(new Error(err)) }
+    for (const [id, p] of pending) {
+      pending.delete(id)
+      p.reject(new Error(err))
+    }
   }
   worker.addEventListener('message', (e: MessageEvent) => {
     const msg = e.data
@@ -71,7 +79,7 @@ function ensureWorker(isMobile: boolean): Worker {
       failAll(msg.error || 'model load failed')
     }
   })
-  worker.addEventListener('error', (e) => failAll(e.message || 'worker crashed'))
+  worker.addEventListener('error', e => failAll(e.message || 'worker crashed'))
   worker.addEventListener('messageerror', () => failAll('worker message error'))
   return worker
 }
@@ -104,26 +112,40 @@ function runPrompt(prompt: string, isMobile: boolean, onToken?: (partial: string
   })
 }
 
-export function generateCartInsight(signals: SessionSignals, isMobile: boolean, onToken?: (partial: string) => void): Promise<string> {
+export function generateCartInsight(
+  signals: SessionSignals,
+  isMobile: boolean,
+  onToken?: (partial: string) => void
+): Promise<string> {
   return runPrompt(buildCartInsightPrompt(signals), isMobile, onToken)
 }
 
 export function generateProductPitch(
-  productName: string, brand: string | null, category: string | null,
-  profile: UserProfile | null, isMobile: boolean, onToken?: (partial: string) => void
+  productName: string,
+  brand: string | null,
+  category: string | null,
+  profile: UserProfile | null,
+  isMobile: boolean,
+  onToken?: (partial: string) => void
 ): Promise<string> {
   return runPrompt(buildProductPitchPrompt(productName, brand, category, profile), isMobile, onToken)
 }
 
 export function generateAffirmation(
-  itemNames: string[], total: number,
-  profile: UserProfile | null, isMobile: boolean, onToken?: (partial: string) => void
+  itemNames: string[],
+  total: number,
+  profile: UserProfile | null,
+  isMobile: boolean,
+  onToken?: (partial: string) => void
 ): Promise<string> {
   return runPrompt(buildAffirmationPrompt(itemNames, total, profile), isMobile, onToken)
 }
 
 export function disposeSummarizer() {
-  if (worker) { worker.terminate(); worker = null }
+  if (worker) {
+    worker.terminate()
+    worker = null
+  }
   pending.clear()
 }
 
@@ -137,7 +159,7 @@ export function disposeSummarizer() {
  */
 export async function maybeRunFineTune(
   enabled: boolean,
-  examples: import('./fine-tune.worker').FineTuneExample[],
+  examples: import('./fine-tune.worker').FineTuneExample[]
 ): Promise<void> {
   try {
     if (!enabled) return
@@ -147,7 +169,11 @@ export async function maybeRunFineTune(
     if (!capable) return
 
     const ftWorker = new Worker(new URL('./fine-tune.worker.ts', import.meta.url), { type: 'module' })
-    const cleanup = () => { try { ftWorker.terminate() } catch {} }
+    const cleanup = () => {
+      try {
+        ftWorker.terminate()
+      } catch {}
+    }
     ftWorker.addEventListener('message', (e: MessageEvent) => {
       const msg = e.data
       if (msg?.type === 'finetune-done' || msg?.type === 'finetune-error') cleanup()

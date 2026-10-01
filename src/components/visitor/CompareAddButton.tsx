@@ -44,21 +44,27 @@ export default function CompareAddButton({ currentIds, categoryId }: CompareAddB
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const search = useCallback(async (q: string) => {
-    if (q.length < 2) { setResults([]); return }
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ q, limit: '8' })
-      if (categoryId) params.set('categoryId', categoryId)
-      currentIds.forEach(id => params.append('excludeId', id))
-      const res = await fetch(`/api/products/search?${params}`)
-      setResults(await res.json())
-    } catch {
-      setResults([])
-    } finally {
-      setLoading(false)
-    }
-  }, [categoryId, currentIds])
+  const search = useCallback(
+    async (q: string) => {
+      if (q.length < 2) {
+        setResults([])
+        return
+      }
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({ q, limit: '8' })
+        if (categoryId) params.set('categoryId', categoryId)
+        currentIds.forEach(id => params.append('excludeId', id))
+        const res = await fetch(`/api/products/search?${params}`)
+        setResults(await res.json())
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [categoryId, currentIds]
+  )
 
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value
@@ -89,8 +95,18 @@ export default function CompareAddButton({ currentIds, categoryId }: CompareAddB
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-surface-elevated border border-border-default rounded-xl shadow-2xl overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-default">
-            <svg className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            <svg
+              className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+              />
             </svg>
             <input
               ref={inputRef}
@@ -113,11 +129,25 @@ export default function CompareAddButton({ currentIds, categoryId }: CompareAddB
                 >
                   <div className="w-9 h-9 rounded border border-border-default bg-surface-secondary flex-shrink-0 overflow-hidden">
                     {r.thumbnail_url || r.image_url ? (
-                      <img src={r.thumbnail_url || r.image_url!} alt="" className="w-full h-full object-contain p-0.5" />
+                      <img
+                        src={r.thumbnail_url || r.image_url!}
+                        alt=""
+                        className="w-full h-full object-contain p-0.5"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-4 h-4 text-foreground-muted"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
                       </div>
                     )}
@@ -125,8 +155,8 @@ export default function CompareAddButton({ currentIds, categoryId }: CompareAddB
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground line-clamp-1">{r.name}</p>
                     <p className="text-xs text-foreground-muted">
-                      {r.brand_name && <span>{r.brand_name} · </span>}
-                      ₹{Number(r.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {r.brand_name && <span>{r.brand_name} · </span>}₹
+                      {Number(r.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   {r.category_id === categoryId && (

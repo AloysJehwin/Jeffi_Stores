@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
-import fs from 'fs'
-import path from 'path'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { getTenant, getKyc, getDraft } from '../tenant-registry'
 
 /**
@@ -24,11 +23,16 @@ function tenantMasterPool(endpoint: string, dbName: string): Pool {
   const masterPassword = process.env.RDS_MASTER_PASSWORD
   if (!masterPassword) throw new Error('RDS_MASTER_PASSWORD is not set — required to seed a tenant DB')
   const user = process.env.TENANT_RDS_MASTER_USER || process.env.RDS_MASTER_USER || 'postgres'
-  const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-  const ssl = fs.existsSync(certPath)
-    ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-    : { rejectUnauthorized: false }
-  return new Pool({ host: endpoint, port: 5432, database: dbName, user, password: masterPassword, ssl, max: 2, connectionTimeoutMillis: 20000 })
+  return createPgPool({
+    host: endpoint,
+    port: 5432,
+    database: dbName,
+    user,
+    password: masterPassword,
+    ssl: rdsSslOption(),
+    max: 2,
+    connectionTimeoutMillis: 20000,
+  })
 }
 
 function stateCodeFromGst(gst: string | null | undefined): string {
@@ -43,13 +47,15 @@ async function copyLogoToTenantBucket(logoS3Key: string, tenantBucket: string): 
   const s3 = new S3Client({ region: AWS_REGION })
   const key = `${KEY_PREFIX}${logoS3Key}`
   try {
-    await s3.send(new CopyObjectCommand({
-      Bucket: tenantBucket,
-      Key: key,
-      CopySource: `/${DEFAULT_BUCKET}/${key}`,
-      MetadataDirective: 'COPY',
-      CacheControl: 'public, max-age=300',
-    }))
+    await s3.send(
+      new CopyObjectCommand({
+        Bucket: tenantBucket,
+        Key: key,
+        CopySource: `/${DEFAULT_BUCKET}/${key}`,
+        MetadataDirective: 'COPY',
+        CacheControl: 'public, max-age=300',
+      })
+    )
     return `https://${tenantBucket}.s3.${AWS_REGION}.amazonaws.com/${key}`
   } catch {
     return null
@@ -60,7 +66,7 @@ export async function seedTenantSiteSettings(
   tenantId: string,
   ownerId: string,
   endpoint: string,
-  dbName: string,
+  dbName: string
 ): Promise<void> {
   const tenant = await getTenant(tenantId)
   if (!tenant) throw new Error('tenant not found')
@@ -108,7 +114,7 @@ export async function seedTenantSiteSettings(
         `INSERT INTO site_settings (key, value, updated_at)
          VALUES ($1, $2, NOW())
          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-        [key, String(value)],
+        [key, String(value)]
       )
     }
     await client.query('COMMIT')

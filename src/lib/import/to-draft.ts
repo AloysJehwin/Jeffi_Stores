@@ -61,10 +61,7 @@ export function buildVariants(group: ProductGroup): Record<string, unknown>[] {
 // marker is present AND each carries a resolved variant_id (which exists only after the
 // variants are published). The engine calls this after re-reading variant ids, passing a
 // sku -> id map. _seeded marks the group as touched so hasSubVariantChanges() fires.
-export function buildSubVariants(
-  group: ProductGroup,
-  variantIdBySku: Map<string, string>,
-): Record<string, unknown>[] {
+export function buildSubVariants(group: ProductGroup, variantIdBySku: Map<string, string>): Record<string, unknown>[] {
   const out: Record<string, unknown>[] = []
   for (const v of group.variants) {
     const variantId = v.sku ? variantIdBySku.get(v.sku) : undefined

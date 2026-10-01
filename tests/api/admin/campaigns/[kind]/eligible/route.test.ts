@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: vi.fn(),
 }))
 
@@ -25,7 +25,7 @@ vi.mock('@/lib/campaigns/types', () => ({
   resolveParams: vi.fn().mockReturnValue({ sendCooldownDays: 7 }),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
   getClient: vi.fn(),
@@ -39,13 +39,13 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET } from '@/app/api/admin/campaigns/[kind]/eligible/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCampaign } from '@/lib/marketing'
+import { GET } from '@/app/api/(admin)/admin/campaigns/[kind]/eligible/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCampaign } from '@/lib/shared/marketing'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
 import { resolveParams } from '@/lib/campaigns/types'
-import { queryMany, queryOne, getClient } from '@/lib/db'
+import { queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 
 // ---------------------------------------------------------------------------
@@ -56,9 +56,7 @@ const ADMIN = { adminId: 'admin-1', id: 'admin-1', role: 'super_admin', scopes: 
 const CAMPAIGN_KIND = 'welcome_new_customer'
 
 function makeReq() {
-  return new NextRequest(new Request(
-    `http://localhost/api/admin/campaigns/${CAMPAIGN_KIND}/eligible`,
-  ))
+  return new NextRequest(new Request(`http://localhost/api/admin/campaigns/${CAMPAIGN_KIND}/eligible`))
 }
 
 const CAMPAIGN = {
@@ -172,7 +170,14 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     const scenarioWithSuppressed = {
       ...SCENARIO,
       findSuppressed: vi.fn().mockResolvedValue([
-        { id: 'sup-1', user_id: 'user-uuid-2', reason: 'sent_recently', reason_detail: null, blocked_until: null, raw: {} },
+        {
+          id: 'sup-1',
+          user_id: 'user-uuid-2',
+          reason: 'sent_recently',
+          reason_detail: null,
+          blocked_until: null,
+          raw: {},
+        },
       ]),
     }
     vi.mocked(getScenario).mockReturnValue(scenarioWithSuppressed as any)
@@ -238,7 +243,8 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(validateScenarioSql).mockReturnValue({ ok: true, normalized: customScenario.generated_sql } as any)
 
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce(undefined) // BEGIN READ ONLY
         .mockResolvedValueOnce(undefined) // SET statement_timeout
         .mockResolvedValueOnce(undefined) // SET lock_timeout
@@ -285,7 +291,8 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(validateScenarioSql).mockReturnValue({ ok: true, normalized: 'SELECT u.id FROM users u LIMIT $3' } as any)
 
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce(undefined) // BEGIN
         .mockResolvedValueOnce(undefined) // SET timeout
         .mockResolvedValueOnce(undefined) // SET lock
@@ -314,7 +321,8 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(validateScenarioSql).mockReturnValue({ ok: true, normalized: 'SELECT u.id FROM users u LIMIT $3' } as any)
 
     const mockClient = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined)

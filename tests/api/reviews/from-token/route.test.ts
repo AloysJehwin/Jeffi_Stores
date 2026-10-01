@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ verifyReviewToken: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ verifyReviewToken: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { GET, POST } from '@/app/api/reviews/from-token/route'
-import { verifyReviewToken } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { GET, POST } from '@/app/api/(public)/reviews/from-token/route'
+import { verifyReviewToken } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 const PAYLOAD = { orderId: 'ord-1', productId: 'prod-1', userId: 'user-1' }
 
@@ -106,8 +106,8 @@ describe('POST /api/reviews/from-token', () => {
 
   it('returns 400 when order not delivered', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)   // no existing review
-      .mockResolvedValueOnce(null as any)   // order check fails
+      .mockResolvedValueOnce(null as any) // no existing review
+      .mockResolvedValueOnce(null as any) // order check fails
     const res = await POST(makePostReq({ token: 't', rating: 5, comment: 'great' }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/not delivered/)
@@ -116,9 +116,9 @@ describe('POST /api/reviews/from-token', () => {
   it('submits review on happy path', async () => {
     const review = { id: 'rev-1', rating: 5 }
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)           // no existing review
+      .mockResolvedValueOnce(null as any) // no existing review
       .mockResolvedValueOnce({ id: 'ord-1' } as any) // order check passes
-      .mockResolvedValueOnce(review as any)          // INSERT review
+      .mockResolvedValueOnce(review as any) // INSERT review
     const res = await POST(makePostReq({ token: 't', rating: 5, comment: 'great', title: 'Nice' }))
     expect(res.status).toBe(200)
     expect((await res.json()).message).toMatch(/submitted/)

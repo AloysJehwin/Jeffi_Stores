@@ -4,23 +4,32 @@ const mockSendAuditedMail = vi.fn()
 const mockOwnerAdminEmails = vi.fn()
 const mockListNotesSince = vi.fn()
 
-vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: (...a: unknown[]) => mockSendAuditedMail(...a) }))
-vi.mock('@/lib/brand', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({ sendAuditedMail: (...a: unknown[]) => mockSendAuditedMail(...a) }))
+vi.mock('@/lib/catalog/brand', () => ({
   adminMailFrom: () => '"Jeffi Stores" <admin@jeffistores.in>',
   currentBrandNameAsync: async () => 'Jeffi Stores',
   currentAdminBaseUrl: () => 'https://admin.jeffistores.in/admin',
 }))
-vi.mock('@/lib/customer-notes', () => ({
+vi.mock('@/lib/shared/customer-notes', () => ({
   ownerAdminEmails: (...a: unknown[]) => mockOwnerAdminEmails(...a),
   listNotesSince: (...a: unknown[]) => mockListNotesSince(...a),
 }))
 
-import { notifyOwnersOfNote, sendNotesDigest } from '@/lib/customer-notes-notify'
+import { notifyOwnersOfNote, sendNotesDigest } from '@/lib/shared/customer-notes-notify'
 
 const note = {
-  id: 'n1', userId: 'u1', orderNumber: 'JS-1001', adminUsername: 'priya', source: 'staff_form',
-  createdAt: '2026-09-24T10:00:00.000Z', sharedWithCustomer: false, title: 'Wants <M8> bolts',
-  body: 'Asked for 200 pcs & a quote', tags: ['quote'], attachments: [], customerName: 'Rahul & Co',
+  id: 'n1',
+  userId: 'u1',
+  orderNumber: 'JS-1001',
+  adminUsername: 'priya',
+  source: 'staff_form',
+  createdAt: '2026-09-24T10:00:00.000Z',
+  sharedWithCustomer: false,
+  title: 'Wants <M8> bolts',
+  body: 'Asked for 200 pcs & a quote',
+  tags: ['quote'],
+  attachments: [],
+  customerName: 'Rahul & Co',
 } as never
 
 describe('customer note mails', () => {
@@ -34,7 +43,13 @@ describe('customer note mails', () => {
     await notifyOwnersOfNote(note, { email: 'priya@example.com', name: 'Priya' })
     expect(mockSendAuditedMail).toHaveBeenCalledOnce()
     const opts = mockSendAuditedMail.mock.calls[0][0]
-    expect(opts).toMatchObject({ to: 'owner@example.com', kind: 'admin_notification', templateName: 'customer_note_created', entityType: 'customer_note', entityId: 'n1' })
+    expect(opts).toMatchObject({
+      to: 'owner@example.com',
+      kind: 'admin_notification',
+      templateName: 'customer_note_created',
+      entityType: 'customer_note',
+      entityId: 'n1',
+    })
     expect(opts.html).toContain('font-size:28px;font-weight:bold;color:#2563eb')
     expect(opts.html).toContain('<h2>New Customer Note</h2>')
     expect(opts.html).toContain('Priya added a note from the staff form')

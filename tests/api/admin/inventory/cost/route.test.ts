@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,10 +13,10 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { PATCH } from '@/app/api/admin/inventory/cost/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { PATCH } from '@/app/api/(admin)/admin/inventory/cost/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -90,20 +90,14 @@ describe('PATCH /api/admin/inventory/cost', () => {
     const res = await PATCH(makeReq({ product_id: 'p1', cost_price: 250 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE products SET cost_price/),
-      [250, 'p1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE products SET cost_price/), [250, 'p1'])
   })
 
   it('updates variant cost_price when variant_id is provided', async () => {
     const res = await PATCH(makeReq({ product_id: 'p1', variant_id: 'v1', cost_price: 99 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE product_variants SET cost_price/),
-      [99, 'v1']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE product_variants SET cost_price/), [99, 'v1'])
   })
 
   it('accepts cost_price of 0', async () => {

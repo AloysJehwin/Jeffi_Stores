@@ -5,11 +5,11 @@ vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
 }))
 
-vi.mock('@/lib/message-log', () => ({
+vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
-import { logMessage } from '@/lib/message-log'
+import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
 
@@ -26,7 +26,7 @@ async function loadWa(env: Record<string, string | undefined> = {}) {
   for (const [k, v] of Object.entries(merged)) {
     vi.stubEnv(k, v === undefined ? '' : v)
   }
-  return import('@/lib/whatsapp')
+  return import('@/lib/shared/whatsapp')
 }
 
 beforeEach(() => {
@@ -48,7 +48,9 @@ describe('sendTemplate path', () => {
     expect(arg.to).toBe('whatsapp:+919876543210')
     expect(arg.contentSid).toBeTruthy()
     expect(JSON.parse(arg.contentVariables)).toEqual({ '1': '123456' })
-    expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ channel: 'whatsapp', status: 'sent', providerSid: 'WA1' }))
+    expect(mockLog).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'whatsapp', status: 'sent', providerSid: 'WA1' })
+    )
   })
 
   it('sendOrderConfirmedWhatsApp passes order + amount vars', async () => {
@@ -77,11 +79,15 @@ describe('sendTemplate path', () => {
 
   it('marketing + support senders return true', async () => {
     const wa = await loadWa()
-    expect(await wa.sendPromoOfferWhatsApp({ phone: '9876543210', headline: 'Sale', code: 'X', discount: '10%' })).toBe(true)
+    expect(await wa.sendPromoOfferWhatsApp({ phone: '9876543210', headline: 'Sale', code: 'X', discount: '10%' })).toBe(
+      true
+    )
     expect(await wa.sendNewArrivalsWhatsApp({ phone: '9876543210', items: 'bolts' })).toBe(true)
     expect(await wa.sendAbandonedCartWhatsApp({ phone: '9876543210', items: 'nuts' })).toBe(true)
     expect(await wa.sendBackInStockWhatsApp({ phone: '9876543210', product: 'washer' })).toBe(true)
-    expect(await wa.sendFestiveGreetingWhatsApp({ phone: '9876543210', festival: 'Diwali', discount: '20%' })).toBe(true)
+    expect(await wa.sendFestiveGreetingWhatsApp({ phone: '9876543210', festival: 'Diwali', discount: '20%' })).toBe(
+      true
+    )
     expect(await wa.sendReorderReminderWhatsApp({ phone: '9876543210', product: 'screw' })).toBe(true)
     expect(await wa.sendSupportAckWhatsApp({ phone: '9876543210' })).toBe(true)
     expect(await wa.sendSupportTicketCreatedWhatsApp({ phone: '9876543210', ticket: 'T1' })).toBe(true)

@@ -375,6 +375,18 @@ jobs:
             echo "── Logging in to GHCR ──"
             echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
+            # Reclaim disk BEFORE pulling the new image. The old prune ran only
+            # after blue-green-deploy.sh, so on a near-full disk the pull itself
+            # failed first ("no space left on device" registering a layer, which
+            # broke the #507 deploy). Prune dangling images, stopped containers
+            # and build cache now; running containers and their images are kept.
+            echo "── Reclaiming disk before pull ──"
+            df -h / | tail -1 || true
+            docker container prune -f || true
+            docker image prune -f || true
+            docker builder prune -f || true
+            df -h / | tail -1 || true
+
             # nginx's config is bind-mounted as a single FILE, which Docker resolves once, by
             # inode. `git reset --hard` above writes a NEW inode, so the running container keeps
             # serving the old content indefinitely — a config change appears deployed but never

@@ -23,12 +23,17 @@ export default function CollapsibleSection({ title, count, defaultOpen = false, 
         <span className="flex items-center gap-2">
           <span className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">{title}</span>
           {typeof count === 'number' && count > 0 && (
-            <span className="text-xs font-semibold bg-surface-secondary text-foreground-secondary px-1.5 py-0.5 rounded-full tabular-nums">{count}</span>
+            <span className="text-xs font-semibold bg-surface-secondary text-foreground-secondary px-1.5 py-0.5 rounded-full tabular-nums">
+              {count}
+            </span>
           )}
         </span>
         <svg
           className={`w-4 h-4 text-foreground-muted transition-transform group-hover:text-foreground ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>

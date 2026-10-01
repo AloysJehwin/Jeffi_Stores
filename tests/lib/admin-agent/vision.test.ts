@@ -3,12 +3,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 vi.mock('pdf-to-img', () => ({
   pdf: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({ aiVision: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiVision: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn(async () => 'Test Store, an online store') }))
 
 import { ocrImage, ocrPdfPages, isVisionConfigured } from '@/lib/admin-agent/vision'
 import * as pdfToImg from 'pdf-to-img'
-import { aiVision } from '@/lib/ai-client'
+import { aiVision } from '@/lib/shared/ai-client'
 
 const mockAiVision = vi.mocked(aiVision)
 
@@ -61,7 +61,13 @@ describe('vision', () => {
     })
 
     it('returns the gateway reason and hint when vision fails', async () => {
-      mockAiVision.mockResolvedValueOnce({ ok: false, text: '', model: '', error: 'vision model down', hint: 'retry later' })
+      mockAiVision.mockResolvedValueOnce({
+        ok: false,
+        text: '',
+        model: '',
+        error: 'vision model down',
+        hint: 'retry later',
+      })
 
       const result = await ocrImage(Buffer.from('fake-image'), 'image/png')
       expect(result.ok).toBe(false)
@@ -101,12 +107,10 @@ describe('vision', () => {
       process.env.OLLAMA_BASE_URL = 'http://ollama:11434'
       const imageBuffer = Buffer.from('fake')
 
-      mockFetch
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ message: { content: 'fallback text' } }),
-        })
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 }).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: { content: 'fallback text' } }),
+      })
 
       const result = await ocrImage(imageBuffer, 'image/jpeg')
       expect(typeof (result as any).ok).toBe('boolean')
@@ -118,11 +122,10 @@ describe('vision', () => {
       process.env.PADDLE_OCR_URL = 'http://paddle:8866'
       const pdfBuffer = Buffer.from('%PDF-fake')
 
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ ok: true, text: 'Page 1 text', pages: 1 }),
-        })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, text: 'Page 1 text', pages: 1 }),
+      })
 
       const result = await ocrPdfPages(pdfBuffer)
       expect(typeof (result as any).ok).toBe('boolean')
@@ -141,12 +144,10 @@ describe('vision', () => {
 
       vi.mocked(pdfToImg.pdf).mockResolvedValueOnce(mockPdfIterator as any)
 
-      mockFetch
-        .mockRejectedValueOnce(new Error('paddle down'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ ok: true, text: 'page text from image', pages: 1 }),
-        })
+      mockFetch.mockRejectedValueOnce(new Error('paddle down')).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ok: true, text: 'page text from image', pages: 1 }),
+      })
 
       const result = await ocrPdfPages(pdfBuffer)
       expect(typeof (result as any).ok).toBe('boolean')

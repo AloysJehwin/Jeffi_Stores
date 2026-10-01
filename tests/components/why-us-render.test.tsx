@@ -3,16 +3,28 @@ import { render, screen, cleanup } from '@testing-library/react'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import SectionRenderer, { type SectionData } from '@/components/visitor/home/SectionRenderer'
-import { visibleSections, withDefaults, DEFAULT_SECTIONS, type HomepageSection } from '@/lib/homepage-sections'
+import { visibleSections, withDefaults, DEFAULT_SECTIONS, type HomepageSection } from '@/lib/catalog/homepage-sections'
 
 afterEach(cleanup)
 
 const SNAPSHOT = join(process.cwd(), 'tests/fixtures/homepage-sections.json')
 
 const EMPTY: SectionData = {
-  heroSlides: [], mainCategories: [], topBrands: [], categoryShowcase: [], dealOfTheDay: [], offers: [],
-  productRows: new Map(), freeShippingThreshold: 0, gstEnabled: false, stats: [],
-  aboutCopy: '', storeName: 'Test', businessLandingUrl: '/b', businessSignupUrl: '/s', extras: new Map(),
+  heroSlides: [],
+  mainCategories: [],
+  topBrands: [],
+  categoryShowcase: [],
+  dealOfTheDay: [],
+  offers: [],
+  productRows: new Map(),
+  freeShippingThreshold: 0,
+  gstEnabled: false,
+  stats: [],
+  aboutCopy: '',
+  storeName: 'Test',
+  businessLandingUrl: '/b',
+  businessSignupUrl: '/s',
+  extras: new Map(),
 }
 
 function liveRows(): HomepageSection[] {

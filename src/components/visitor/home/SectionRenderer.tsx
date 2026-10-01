@@ -20,12 +20,18 @@ import SocialStrip, { type SocialStripItem } from './SocialStrip'
 import ValueStats from './ValueStats'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import {
-  sectionLayout, sectionLimit, configNumber, justLandedDays, launchedWithin, safeHref, SECTION_COPY_DEFAULTS,
+  sectionLayout,
+  sectionLimit,
+  configNumber,
+  justLandedDays,
+  launchedWithin,
+  safeHref,
+  SECTION_COPY_DEFAULTS,
   type HomepageSection,
-} from '@/lib/homepage-sections'
-import { cardPropsFor } from '@/lib/product-card-props'
-import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/homepage-extras'
-import type { ProductOffer } from '@/lib/product-offers-shared'
+} from '@/lib/catalog/homepage-sections'
+import { cardPropsFor } from '@/lib/catalog/product-card-props'
+import type { CategoryTab, CountdownDealData, Testimonial, ValueStat } from '@/lib/catalog/homepage-extras'
+import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 export interface SectionData {
   heroSlides: any[]
@@ -77,14 +83,20 @@ function tiles<T>(raw: unknown, keys: (keyof T & string)[]): T[] | null {
   if (!Array.isArray(raw)) return null
   const rows = raw.filter(
     (r): r is Record<string, unknown> =>
-      !!r && typeof r === 'object' && keys.every(k => typeof (r as Record<string, unknown>)[k] === 'string'),
+      !!r && typeof r === 'object' && keys.every(k => typeof (r as Record<string, unknown>)[k] === 'string')
   )
   return rows.length > 0 ? (rows as T[]) : null
 }
 
 export default function SectionRenderer({
-  section, data, rowIndex,
-}: { section: HomepageSection; data: SectionData; rowIndex: number }) {
+  section,
+  data,
+  rowIndex,
+}: {
+  section: HomepageSection
+  data: SectionData
+  rowIndex: number
+}) {
   const cfg = (section.config ?? {}) as Record<string, unknown>
   const carousel = sectionLayout(section) === 'carousel'
   const extra = data.extras.get(section.id)
@@ -107,11 +119,20 @@ export default function SectionRenderer({
 
     case 'category_grid':
       if (data.mainCategories.length === 0) return null
-      return <CategoryGrid categories={data.mainCategories} title={section.title} eyebrow={section.eyebrow} carousel={carousel} />
+      return (
+        <CategoryGrid
+          categories={data.mainCategories}
+          title={section.title}
+          eyebrow={section.eyebrow}
+          carousel={carousel}
+        />
+      )
 
     case 'brand_carousel':
       if (data.topBrands.length === 0) return null
-      return <BrandCarousel brands={data.topBrands} title={section.title} eyebrow={section.eyebrow} carousel={carousel} />
+      return (
+        <BrandCarousel brands={data.topBrands} title={section.title} eyebrow={section.eyebrow} carousel={carousel} />
+      )
 
     case 'category_showcase':
       if (data.categoryShowcase.length === 0) return null
@@ -246,7 +267,12 @@ export default function SectionRenderer({
       if (tabs.length === 0) return null
       return (
         <CategoryTabs
-          tabs={tabs.map(t => ({ id: t.id, name: t.name, slug: t.slug, products: cardPropsFor(t.products, data.gstEnabled) }))}
+          tabs={tabs.map(t => ({
+            id: t.id,
+            name: t.name,
+            slug: t.slug,
+            products: cardPropsFor(t.products, data.gstEnabled),
+          }))}
           eyebrow={section.eyebrow}
           title={section.title}
         />

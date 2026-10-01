@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryCount: vi.fn(),
@@ -19,10 +19,10 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/mailer/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryMany, queryCount } from '@/lib/db'
+import { GET, POST } from '@/app/api/(admin)/admin/mailer/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryMany, queryCount } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

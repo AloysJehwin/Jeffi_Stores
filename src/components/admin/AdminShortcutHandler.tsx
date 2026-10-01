@@ -2,12 +2,15 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { KeyboardShortcuts } from '@/lib/site-controls'
-import { hasScope } from '@/lib/scopes'
-import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
-import { ap } from '@/lib/admin-path'
+import type { KeyboardShortcuts } from '@/lib/catalog/site-controls'
+import { hasScope } from '@/lib/auth/scopes'
+import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
+import { ap } from '@/lib/shared/admin-path'
 
-interface Combo { modifier: 'mod' | 'mod+shift' | 'f'; key: string }
+interface Combo {
+  modifier: 'mod' | 'mod+shift' | 'f'
+  key: string
+}
 
 function parseCombo(raw: string): Combo | null {
   const v = raw.toLowerCase().trim()
@@ -49,13 +52,16 @@ export default function AdminShortcutHandler({
     // Custom shortcuts take priority over built-ins so a user-defined combo
     // always wins over a stale/default built-in on the same keys.
     try {
-      const custom: Array<{ id: string; label: string; path: string; combo: string }> =
-        JSON.parse(shortcuts.customShortcuts || '[]')
+      const custom: Array<{ id: string; label: string; path: string; combo: string }> = JSON.parse(
+        shortcuts.customShortcuts || '[]'
+      )
       for (const c of custom) {
         const combo = parseCombo(c.combo)
         if (combo && c.path) entries.push({ combo, path: c.path })
       }
-    } catch { /* malformed JSON — skip */ }
+    } catch {
+      /* malformed JSON — skip */
+    }
 
     for (const [field, { path, scope }] of Object.entries(BUILTIN_SHORTCUT_SCOPES)) {
       // Skip binding a shortcut the session's plan/role can't reach — an out-of-plan

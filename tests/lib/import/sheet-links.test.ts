@@ -2,16 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const cp = vi.hoisted(() => ({ query: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => cp }))
-vi.mock('@/lib/db', () => ({ query: vi.fn() }))
-vi.mock('@/lib/product-delete', () => ({ retireProduct: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
+vi.mock('@/lib/catalog/product-delete', () => ({ retireProduct: vi.fn() }))
 
 import { forgetSheetOwnership, releaseSheetProducts } from '@/lib/import/sheet-links'
-import { query } from '@/lib/db'
+import { query } from '@/lib/shared/db'
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('forgetSheetOwnership', () => {
-  it("clears pending removals and drops every sheet link, scoped to the tenant", async () => {
+  it('clears pending removals and drops every sheet link, scoped to the tenant', async () => {
     cp.query.mockResolvedValueOnce({ rowCount: 2 }).mockResolvedValueOnce({ rowCount: 5 })
     expect(await forgetSheetOwnership('t1')).toBe(5)
 

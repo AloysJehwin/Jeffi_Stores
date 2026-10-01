@@ -11,8 +11,8 @@ import {
   publishInstagramImage,
   publishInstagramCarousel,
   publishInstagramReel,
-} from '../meta'
-import { queryOne } from '../db'
+} from '@/lib/catalog/meta'
+import { queryOne } from '@/lib/shared/db'
 import { generateSocialCaption } from './caption'
 import { withProductLink, productUrl } from './product-url'
 
@@ -41,8 +41,8 @@ function jeffiCreds(): ResolvedCreds | null {
 
 function tenantCreds(accounts: TenantSocialAccount[], wantIg: boolean): ResolvedCreds | null {
   // Both FB and IG rows carry the same Page token; pick IG when we need the ig_user_id.
-  const fb = accounts.find((a) => a.provider === 'facebook')
-  const ig = accounts.find((a) => a.provider === 'instagram')
+  const fb = accounts.find(a => a.provider === 'facebook')
+  const ig = accounts.find(a => a.provider === 'instagram')
   const src = wantIg ? ig : (fb ?? ig)
   if (!src) return null
   return {
@@ -60,10 +60,12 @@ async function resolveCreds(post: ScheduledSocialPost): Promise<ResolvedCreds | 
 }
 
 /** Minimal product info from the app DB, for AI caption generation. Not the full getProduct() graph. */
-async function getProductForCaption(productId: string): Promise<{ name: string; slug: string; description: string | null } | null> {
+async function getProductForCaption(
+  productId: string
+): Promise<{ name: string; slug: string; description: string | null } | null> {
   return queryOne<{ name: string; slug: string; description: string | null }>(
     `SELECT name, slug, COALESCE(short_description, description) AS description FROM products WHERE id = $1`,
-    [productId],
+    [productId]
   )
 }
 
@@ -74,7 +76,7 @@ async function getProductForCaption(productId: string): Promise<{ name: string; 
  */
 async function ensureCaption(
   post: ScheduledSocialPost,
-  product: { name: string; slug: string; description: string | null } | null,
+  product: { name: string; slug: string; description: string | null } | null
 ): Promise<string> {
   if (post.caption?.trim()) return withProductLink(post.caption, product?.slug)
   if (!product) return ''
@@ -91,7 +93,9 @@ async function ensureCaption(
  * 'publishing' → 'posted'/'failed' and records the error on failure (no throw — the caller
  * loops over many rows).
  */
-export async function publishScheduledPost(post: ScheduledSocialPost): Promise<{ ok: boolean; postedId?: string; error?: string }> {
+export async function publishScheduledPost(
+  post: ScheduledSocialPost
+): Promise<{ ok: boolean; postedId?: string; error?: string }> {
   await updateSocialPost(post.id, { status: 'publishing', bumpAttempts: true })
   try {
     const creds = await resolveCreds(post)
@@ -105,26 +109,49 @@ export async function publishScheduledPost(post: ScheduledSocialPost): Promise<{
     let postedId: string
     if (post.platform === 'fb') {
       if (!creds.pageId) throw new Error('no Facebook Page id')
-      const r = allImages.length >= 2
-        ? await publishFacebookCarousel({ pageId: creds.pageId, message: caption, imageUrls: allImages, accessToken: creds.accessToken })
-        : await publishFacebookPost({
-            pageId: creds.pageId, message: caption, imageUrl: allImages[0],
-            link: product ? productUrl(product.slug) : null,
-            accessToken: creds.accessToken,
-          })
+      const r =
+        allImages.length >= 2
+          ? await publishFacebookCarousel({
+              pageId: creds.pageId,
+              message: caption,
+              imageUrls: allImages,
+              accessToken: creds.accessToken,
+            })
+          : await publishFacebookPost({
+              pageId: creds.pageId,
+              message: caption,
+              imageUrl: allImages[0],
+              link: product ? productUrl(product.slug) : null,
+              accessToken: creds.accessToken,
+            })
       postedId = r.id
     } else if (post.platform === 'ig') {
       if (!creds.igUserId) throw new Error('no Instagram account connected')
       if (!allImages.length) throw new Error('IG post requires an image_url')
-      const r = allImages.length >= 2
-        ? await publishInstagramCarousel({ igUserId: creds.igUserId, imageUrls: allImages, caption, accessToken: creds.accessToken })
-        : await publishInstagramImage({ igUserId: creds.igUserId, imageUrl: allImages[0], caption, accessToken: creds.accessToken })
+      const r =
+        allImages.length >= 2
+          ? await publishInstagramCarousel({
+              igUserId: creds.igUserId,
+              imageUrls: allImages,
+              caption,
+              accessToken: creds.accessToken,
+            })
+          : await publishInstagramImage({
+              igUserId: creds.igUserId,
+              imageUrl: allImages[0],
+              caption,
+              accessToken: creds.accessToken,
+            })
       postedId = r.id
-    } else { // ig_reel
+    } else {
+      // ig_reel
       if (!creds.igUserId) throw new Error('no Instagram account connected')
       if (!post.video_url) throw new Error('IG Reel requires a video_url')
       const r = await publishInstagramReel({
-        igUserId: creds.igUserId, videoUrl: post.video_url, caption, accessToken: creds.accessToken,
+        igUserId: creds.igUserId,
+        videoUrl: post.video_url,
+        caption,
+        accessToken: creds.accessToken,
       })
       postedId = r.id
     }

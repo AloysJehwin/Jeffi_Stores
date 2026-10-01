@@ -1,8 +1,7 @@
 import { Pool } from 'pg'
-import fs from 'fs'
-import path from 'path'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
 import { catalogFor, SEED_PROFILES } from './seed-catalog'
-import { DEFAULT_SECTIONS } from '@/lib/homepage-sections'
+import { DEFAULT_SECTIONS } from '@/lib/catalog/homepage-sections'
 
 /**
  * Starter-data seeding for a freshly-provisioned tenant DB.
@@ -18,11 +17,17 @@ import { DEFAULT_SECTIONS } from '@/lib/homepage-sections'
 const KNOWN_PROFILES = new Set<string>(SEED_PROFILES)
 
 function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 }
 
 function skuFrom(name: string, i: number): string {
-  const base = name.replace(/[^A-Za-z0-9]+/g, '').slice(0, 6).toUpperCase()
+  const base = name
+    .replace(/[^A-Za-z0-9]+/g, '')
+    .slice(0, 6)
+    .toUpperCase()
   return `${base || 'ITEM'}-${String(i + 1).padStart(3, '0')}`
 }
 
@@ -30,11 +35,16 @@ function tenantMasterPool(endpoint: string, dbName: string): Pool {
   const masterPassword = process.env.RDS_MASTER_PASSWORD
   if (!masterPassword) throw new Error('RDS_MASTER_PASSWORD is not set — required to seed a tenant DB')
   const user = process.env.TENANT_RDS_MASTER_USER || process.env.RDS_MASTER_USER || 'postgres'
-  const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-  const ssl = fs.existsSync(certPath)
-    ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-    : { rejectUnauthorized: false }
-  return new Pool({ host: endpoint, port: 5432, database: dbName, user, password: masterPassword, ssl, max: 2, connectionTimeoutMillis: 20000 })
+  return createPgPool({
+    host: endpoint,
+    port: 5432,
+    database: dbName,
+    user,
+    password: masterPassword,
+    ssl: rdsSslOption(),
+    max: 2,
+    connectionTimeoutMillis: 20000,
+  })
 }
 
 export async function seedTenantData(endpoint: string, dbName: string, profile: string): Promise<void> {
@@ -52,7 +62,7 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
        VALUES ($1, $2, $3, 0, true)
        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
-      [cat.category, cat.categorySlug, `Starter category for ${cat.category}. Edit or remove it at any time.`],
+      [cat.category, cat.categorySlug, `Starter category for ${cat.category}. Edit or remove it at any time.`]
     )
     const categoryId = catRes.rows[0]?.id ?? null
 
@@ -62,8 +72,16 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
                                base_price, currency, is_featured, is_active)
          VALUES ($1,$2,$3,$4,$5,$6,$7,'INR',$8,true)
          ON CONFLICT DO NOTHING`,
-        [categoryId, skuFrom(item.name, i), item.name, slugify(item.name),
-         item.blurb, item.blurb.slice(0, 200), item.price, i < 3],
+        [
+          categoryId,
+          skuFrom(item.name, i),
+          item.name,
+          slugify(item.name),
+          item.blurb,
+          item.blurb.slice(0, 200),
+          item.price,
+          i < 3,
+        ]
       )
     }
 
@@ -73,7 +91,7 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
       await client.query(
         `INSERT INTO hero_slides (title, subtitle, badge_text, cta_label, cta_url, filter_category, display_order, is_active)
          VALUES ($1,$2,$3,$4,$5,$6,$7,true)`,
-        [h.title, h.subtitle, h.badge, h.cta, `/products?category=${cat.categorySlug}`, cat.category, i],
+        [h.title, h.subtitle, h.badge, h.cta, `/products?category=${cat.categorySlug}`, cat.category, i]
       )
     }
 
@@ -83,7 +101,7 @@ export async function seedTenantData(endpoint: string, dbName: string, profile: 
         await client.query(
           `INSERT INTO homepage_sections (type, title, subtitle, eyebrow, config, display_order, is_active)
            VALUES ($1,$2,$3,$4,$5,$6,true)`,
-          [s.type, s.title, s.subtitle, s.eyebrow, JSON.stringify(s.config), i],
+          [s.type, s.title, s.subtitle, s.eyebrow, JSON.stringify(s.config), i]
         )
       }
     }

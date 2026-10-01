@@ -23,7 +23,19 @@ interface Props {
   discardConfirm?: string
 }
 
-export default function DraftRowActions({ name, subtitle, updatedAt, editHref, publishPath, discardPath, entityLabel = 'item', publishMethod = 'POST', publishBody, publishConfirm, discardConfirm }: Props) {
+export default function DraftRowActions({
+  name,
+  subtitle,
+  updatedAt,
+  editHref,
+  publishPath,
+  discardPath,
+  entityLabel = 'item',
+  publishMethod = 'POST',
+  publishBody,
+  publishConfirm,
+  discardConfirm,
+}: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [publishing, setPublishing] = useState(false)
@@ -31,7 +43,10 @@ export default function DraftRowActions({ name, subtitle, updatedAt, editHref, p
   const [error, setError] = useState<string | null>(null)
 
   async function handlePublish() {
-    const ok = await confirm({ message: publishConfirm || `Apply all staged changes for "${name}" to the live ${entityLabel}?`, confirmLabel: 'Publish' })
+    const ok = await confirm({
+      message: publishConfirm || `Apply all staged changes for "${name}" to the live ${entityLabel}?`,
+      confirmLabel: 'Publish',
+    })
     if (!ok) return
     setPublishing(true)
     setError(null)
@@ -42,24 +57,40 @@ export default function DraftRowActions({ name, subtitle, updatedAt, editHref, p
         ...(publishBody ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(publishBody) } : {}),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Publish failed'); return }
+      if (!res.ok) {
+        setError(data.error || 'Publish failed')
+        return
+      }
       router.refresh()
-    } catch { setError('Network error') }
-    finally { setPublishing(false) }
+    } catch {
+      setError('Network error')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   async function handleDiscard() {
-    const ok = await confirm({ message: discardConfirm || `Discard all unsaved changes for "${name}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Discard' })
+    const ok = await confirm({
+      message: discardConfirm || `Discard all unsaved changes for "${name}"? This cannot be undone.`,
+      variant: 'danger',
+      confirmLabel: 'Discard',
+    })
     if (!ok) return
     setDiscarding(true)
     setError(null)
     try {
       const res = await fetch(discardPath, { method: 'DELETE', credentials: 'include' })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Discard failed'); return }
+      if (!res.ok) {
+        setError(data.error || 'Discard failed')
+        return
+      }
       router.refresh()
-    } catch { setError('Network error') }
-    finally { setDiscarding(false) }
+    } catch {
+      setError('Network error')
+    } finally {
+      setDiscarding(false)
+    }
   }
 
   return (

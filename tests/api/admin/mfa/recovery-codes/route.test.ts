@@ -3,25 +3,25 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
 
-vi.mock('@/lib/mfa', () => ({
+vi.mock('@/lib/auth/mfa', () => ({
   generateRecoveryCodes: vi.fn(),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/mfa/recovery-codes/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
-import { generateRecoveryCodes } from '@/lib/mfa'
+import { GET, POST } from '@/app/api/(admin)/admin/mfa/recovery-codes/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { query, queryOne } from '@/lib/shared/db'
+import { generateRecoveryCodes } from '@/lib/auth/mfa'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQuery = vi.mocked(query)
@@ -76,9 +76,7 @@ describe('GET /api/admin/mfa/recovery-codes', () => {
 
   it('returns mfa_enabled false when row is null', async () => {
     mockAuth.mockResolvedValue(adminPayload)
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ remaining: '0' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ remaining: '0' })
 
     const res = await GET(makeGetRequest())
     const body = await res.json()
@@ -88,9 +86,7 @@ describe('GET /api/admin/mfa/recovery-codes', () => {
 
   it('returns 0 remaining when codes row is null', async () => {
     mockAuth.mockResolvedValue(adminPayload)
-    mockQueryOne
-      .mockResolvedValueOnce({ mfa_enabled: false, mfa_enrolled_at: null })
-      .mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce({ mfa_enabled: false, mfa_enrolled_at: null }).mockResolvedValueOnce(null)
 
     const res = await GET(makeGetRequest())
     const body = await res.json()

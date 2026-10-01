@@ -3,9 +3,10 @@
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import BlurhashCanvas from '@/components/ui/BlurhashCanvas'
-import { offerHref, type ProductOffer } from '@/lib/product-offers-shared'
+import { offerHref, type ProductOffer } from '@/lib/catalog/product-offers-shared'
 
-const PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
+const PLACEHOLDER =
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"%3E%3Crect width="100%25" height="100%25" fill="%230d0d0d"/%3E%3C/svg%3E'
 const SWIPE_THRESHOLD = 50 // px
 
 interface Props {
@@ -51,9 +52,7 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
           {eyebrow && (
             <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow}</p>
           )}
-          {title && (
-            <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title}</h2>
-          )}
+          {title && <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title}</h2>}
         </div>
       )}
 
@@ -62,10 +61,16 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onKeyDown={(e) => {
+        onKeyDown={e => {
           if (single) return
-          if (e.key === 'ArrowLeft') { e.preventDefault(); go(active - 1) }
-          if (e.key === 'ArrowRight') { e.preventDefault(); go(active + 1) }
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault()
+            go(active - 1)
+          }
+          if (e.key === 'ArrowRight') {
+            e.preventDefault()
+            go(active + 1)
+          }
         }}
         tabIndex={single ? -1 : 0}
         role="group"
@@ -73,17 +78,13 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
         aria-label={title ?? 'Offers'}
       >
         <div className="flex items-center justify-center gap-3 md:gap-5">
-          {!single && (
-            <OfferPeek offer={prev} onClick={() => go(active - 1)} side="left" />
-          )}
+          {!single && <OfferPeek offer={prev} onClick={() => go(active - 1)} side="left" />}
 
           <div className="w-full sm:w-[70%] md:w-[64%] shrink-0">
             <OfferCard offer={current} priority />
           </div>
 
-          {!single && (
-            <OfferPeek offer={next} onClick={() => go(active + 1)} side="right" />
-          )}
+          {!single && <OfferPeek offer={next} onClick={() => go(active + 1)} side="right" />}
         </div>
 
         {!single && (
@@ -94,7 +95,19 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
               aria-label="Previous offer"
               className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 md:h-11 md:w-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
             </button>
             <button
               type="button"
@@ -102,7 +115,19 @@ export default function OfferSlider({ offers, title, eyebrow }: Props) {
               aria-label="Next offer"
               className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 z-20 grid place-items-center h-9 w-9 md:h-11 md:w-11 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
             </button>
 
             <div className="mt-4 flex items-center justify-center gap-2">

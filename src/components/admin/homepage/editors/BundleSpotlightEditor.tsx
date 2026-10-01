@@ -1,7 +1,16 @@
 'use client'
 
-import { configIds } from '@/lib/homepage-sections'
-import { CtaFields, Grid, HeadingFields, LayoutField, LimitField, Note, useSectionBinding, type EditorProps } from './fields'
+import { configIds } from '@/lib/catalog/homepage-sections'
+import {
+  CtaFields,
+  Grid,
+  HeadingFields,
+  LayoutField,
+  LimitField,
+  Note,
+  useSectionBinding,
+  type EditorProps,
+} from './fields'
 import ProductPickerField from './ProductPickerField'
 
 export default function BundleSpotlightEditor(props: EditorProps) {
@@ -26,7 +35,9 @@ export default function BundleSpotlightEditor(props: EditorProps) {
       />
       <CtaFields props={props} hint="Optional. Leave the link empty to hide the button." />
       {picked.length === 0 && bundles === 0 && (
-        <Note>No live products are marked as bundles yet. Mark some in the product editor, or pick products above.</Note>
+        <Note>
+          No live products are marked as bundles yet. Mark some in the product editor, or pick products above.
+        </Note>
       )}
     </Grid>
   )

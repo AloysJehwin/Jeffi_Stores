@@ -36,7 +36,9 @@ const RdsCommands = {
   DeleteDBInstanceCommand: cmd('DeleteDBInstance'),
 }
 vi.mock('@aws-sdk/client-rds', () => ({
-  RDSClient: vi.fn().mockImplementation(function (this: any) { this.send = rdsSend }),
+  RDSClient: vi.fn().mockImplementation(function (this: any) {
+    this.send = rdsSend
+  }),
   ...RdsCommands,
 }))
 
@@ -50,7 +52,9 @@ const S3Commands = {
   DeleteObjectsCommand: cmd('DeleteObjects'),
 }
 vi.mock('@aws-sdk/client-s3', () => ({
-  S3Client: vi.fn().mockImplementation(function (this: any) { this.send = s3Send }),
+  S3Client: vi.fn().mockImplementation(function (this: any) {
+    this.send = s3Send
+  }),
   ...S3Commands,
 }))
 
@@ -62,6 +66,7 @@ function PoolCtor(this: any, cfg: any) {
   pgConfigs.push(cfg)
   this.query = pgQuery
   this.end = pgEnd
+  this.on = () => {}
 }
 vi.mock('pg', () => ({ Pool: PoolCtor, default: { Pool: PoolCtor } }))
 
@@ -74,9 +79,9 @@ vi.mock('fs', () => {
 // Dynamic imports made inside the provider
 vi.mock('@/lib/tenant-migrations-schema', () => ({ buildTenantSchemaSql: vi.fn(() => 'CREATE TABLE x();') }))
 const dbBackup = { dumpTenantDb: vi.fn(), restoreTenantDb: vi.fn() }
-vi.mock('@/lib/tenant-db-backup', () => dbBackup)
+vi.mock('@/lib/tenancy/tenant-db-backup', () => dbBackup)
 const dns = { upsertTenantDns: vi.fn(), deleteTenantDns: vi.fn() }
-vi.mock('@/lib/tenant-dns', () => dns)
+vi.mock('@/lib/tenancy/tenant-dns', () => dns)
 
 /** Build an AWS-shaped error whose `name` drives the provider's branching. */
 function awsError(name: string) {
@@ -154,7 +159,7 @@ describe('AwsProvisioningProvider', () => {
         Engine: 'postgres',
         DBName: 'jeffi_stores',
         DBParameterGroupName: 'pg-1',
-        PubliclyAccessible: false,          // tenant DBs are VPC-only
+        PubliclyAccessible: false, // tenant DBs are VPC-only
         EnableIAMDatabaseAuthentication: true,
         StorageEncrypted: true,
       })
@@ -165,22 +170,23 @@ describe('AwsProvisioningProvider', () => {
     it('tags the instance so it is attributable in the bill', async () => {
       const p = await makeProvider()
       await p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 })
-      expect(sentInputs(rdsSend)[0].Tags).toEqual(
-        expect.arrayContaining([{ Key: 'kind', Value: 'tenant-db' }]))
+      expect(sentInputs(rdsSend)[0].Tags).toEqual(expect.arrayContaining([{ Key: 'kind', Value: 'tenant-db' }]))
     })
 
     it('SWALLOWS DBInstanceAlreadyExists and returns the id (safe retry)', async () => {
       const p = await makeProvider()
       rdsSend.mockRejectedValueOnce(awsError('DBInstanceAlreadyExists'))
-      await expect(p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 }))
-        .resolves.toEqual({ dbInstanceId: 'x' })
+      await expect(p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 })).resolves.toEqual({
+        dbInstanceId: 'x',
+      })
     })
 
     it('rethrows a genuine failure', async () => {
       const p = await makeProvider()
       rdsSend.mockRejectedValueOnce(awsError('InvalidParameterValue'))
-      await expect(p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 }))
-        .rejects.toThrow('InvalidParameterValue')
+      await expect(p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 })).rejects.toThrow(
+        'InvalidParameterValue'
+      )
     })
   })
 
@@ -225,7 +231,11 @@ describe('AwsProvisioningProvider', () => {
       const p = await makeProvider()
       await p.loadSchema('ep-1', 'jeffi_stores')
       expect(pgConfigs[0]).toMatchObject({
-        host: 'ep-1', port: 5432, database: 'jeffi_stores', user: 'postgres', password: 'master-pw',
+        host: 'ep-1',
+        port: 5432,
+        database: 'jeffi_stores',
+        user: 'postgres',
+        password: 'master-pw',
       })
     })
 
@@ -288,8 +298,10 @@ describe('AwsProvisioningProvider', () => {
       // Public access block is OFF so the public-read bucket policy takes effect —
       // tenant product images are served by direct public S3 URL (no per-tenant CDN).
       expect(sentInputs(s3Send)[1].PublicAccessBlockConfiguration).toEqual({
-        BlockPublicAcls: false, IgnorePublicAcls: false,
-        BlockPublicPolicy: false, RestrictPublicBuckets: false,
+        BlockPublicAcls: false,
+        IgnorePublicAcls: false,
+        BlockPublicPolicy: false,
+        RestrictPublicBuckets: false,
       })
       expect(sentInputs(s3Send)[2].Policy).toContain('PublicReadAccess')
     })
@@ -297,8 +309,7 @@ describe('AwsProvisioningProvider', () => {
     it('restricts CORS to the platform domain', async () => {
       const p = await makeProvider()
       await p.ensureBucket('b')
-      expect(sentInputs(s3Send)[3].CORSConfiguration.CORSRules[0].AllowedOrigins)
-        .toEqual(['https://*.jeffistores.in'])
+      expect(sentInputs(s3Send)[3].CORSConfiguration.CORSRules[0].AllowedOrigins).toEqual(['https://*.jeffistores.in'])
     })
 
     it('SWALLOWS BucketAlreadyOwnedByYou and still hardens the bucket', async () => {
@@ -362,7 +373,9 @@ describe('AwsProvisioningProvider', () => {
       const p = await makeProvider()
       await p.deleteDbInstance('db-1')
       expect(sentInputs(rdsSend)[0]).toMatchObject({
-        DBInstanceIdentifier: 'db-1', SkipFinalSnapshot: true, DeleteAutomatedBackups: true,
+        DBInstanceIdentifier: 'db-1',
+        SkipFinalSnapshot: true,
+        DeleteAutomatedBackups: true,
       })
     })
 
@@ -388,8 +401,8 @@ describe('AwsProvisioningProvider', () => {
     it('rethrows a real bucket delete failure', async () => {
       const p = await makeProvider()
       s3Send
-        .mockResolvedValueOnce({ Contents: [], IsTruncated: false })  // list: already empty
-        .mockRejectedValueOnce(awsError('BucketNotEmpty'))            // delete bucket
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false }) // list: already empty
+        .mockRejectedValueOnce(awsError('BucketNotEmpty')) // delete bucket
       await expect(p.deleteBucket('b')).rejects.toThrow('BucketNotEmpty')
     })
 
@@ -399,8 +412,8 @@ describe('AwsProvisioningProvider', () => {
       const p = await makeProvider()
       s3Send
         .mockResolvedValueOnce({ Contents: [{ Key: 'legal/policies.json' }], IsTruncated: false })
-        .mockResolvedValueOnce({})   // DeleteObjects
-        .mockResolvedValueOnce({})   // DeleteBucket
+        .mockResolvedValueOnce({}) // DeleteObjects
+        .mockResolvedValueOnce({}) // DeleteBucket
       await expect(p.deleteBucket('b')).resolves.toBeUndefined()
 
       const names = s3Send.mock.calls.map(([c]: any[]) => c.__type)
@@ -451,4 +464,3 @@ describe('AwsProvisioningProvider', () => {
     })
   })
 })
-

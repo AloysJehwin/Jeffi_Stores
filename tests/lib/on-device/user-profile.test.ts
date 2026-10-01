@@ -39,10 +39,7 @@ describe('on-device/user-profile', () => {
     })
 
     it('merges stored partial data over defaults', () => {
-      localStorage.setItem(
-        PROFILE_KEY,
-        JSON.stringify({ purchaseCount: 3, topBrands: ['bosch'] }),
-      )
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({ purchaseCount: 3, topBrands: ['bosch'] }))
       const p = readUserProfile()
       expect(p.purchaseCount).toBe(3)
       expect(p.topBrands).toEqual(['bosch'])
@@ -77,9 +74,7 @@ describe('on-device/user-profile', () => {
     })
 
     it('adds categories and brands, increments purchase count, sets date', () => {
-      updateUserProfile(
-        baseOrder({ categories: ['Tools', 'Nuts'], brands: ['Bosch'], total: 500 }),
-      )
+      updateUserProfile(baseOrder({ categories: ['Tools', 'Nuts'], brands: ['Bosch'], total: 500 }))
       const p = readUserProfile()
       expect(p.topCategories).toContain('Tools')
       expect(p.topCategories).toContain('Nuts')
@@ -115,7 +110,7 @@ describe('on-device/user-profile', () => {
         baseOrder({
           categories: ['Real', '', ''],
           brands: ['B', ''],
-        }),
+        })
       )
       const p = readUserProfile()
       expect(p.topCategories).toEqual(['Real'])
@@ -140,19 +135,8 @@ describe('on-device/user-profile', () => {
       // Second order repeats Popular plus 10 new ones -> capped to 8, Popular first
       updateUserProfile(
         baseOrder({
-          categories: [
-            'Popular',
-            'c1',
-            'c2',
-            'c3',
-            'c4',
-            'c5',
-            'c6',
-            'c7',
-            'c8',
-            'c9',
-          ],
-        }),
+          categories: ['Popular', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'],
+        })
       )
       const p = readUserProfile()
       expect(p.topCategories.length).toBe(8)
@@ -164,15 +148,13 @@ describe('on-device/user-profile', () => {
       updateUserProfile(baseOrder({ brands: ['bosch', 'Makita'] }))
       const p = readUserProfile()
       // only one bosch entry regardless of case
-      const boschCount = p.topBrands.filter((b) => b.toLowerCase() === 'bosch').length
+      const boschCount = p.topBrands.filter(b => b.toLowerCase() === 'bosch').length
       expect(boschCount).toBe(1)
-      expect(p.topBrands.map((b) => b.toLowerCase())).toContain('makita')
+      expect(p.topBrands.map(b => b.toLowerCase())).toContain('makita')
     })
 
     it('caps brands at MAX_BRANDS (5)', () => {
-      updateUserProfile(
-        baseOrder({ brands: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'] }),
-      )
+      updateUserProfile(baseOrder({ brands: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7'] }))
       expect(readUserProfile().topBrands.length).toBe(5)
     })
 

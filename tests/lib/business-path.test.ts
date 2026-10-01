@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { bp, businessBaseUrl } from '@/lib/business-path'
+import { bp, businessBaseUrl } from '@/lib/shared/business-path'
 
 describe('bp (business-path)', () => {
   it('returns path unchanged when host does not start with business.', () => {

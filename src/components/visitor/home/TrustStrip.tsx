@@ -1,5 +1,5 @@
 import IconByName from './IconByName'
-import { SECTION_TILE_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_TILE_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 export interface TrustStripItem {
   icon: string
@@ -13,8 +13,10 @@ interface TrustStripProps {
 
 export default function TrustStrip({ freeShippingThreshold, items }: TrustStripProps) {
   const amount = `₹${freeShippingThreshold.toLocaleString('en-IN')}`
-  const tiles = (items && items.length > 0 ? items : SECTION_TILE_DEFAULTS.trust_strip)
-    .map(item => ({ ...item, label: item.label.replace(/\{amount\}/g, amount) }))
+  const tiles = (items && items.length > 0 ? items : SECTION_TILE_DEFAULTS.trust_strip).map(item => ({
+    ...item,
+    label: item.label.replace(/\{amount\}/g, amount),
+  }))
 
   return (
     <div className="bg-surface-elevated border-b border-border-default">
@@ -23,7 +25,9 @@ export default function TrustStrip({ freeShippingThreshold, items }: TrustStripP
           {tiles.map((item, i) => (
             <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:justify-center min-w-0">
               <IconByName name={item.icon} className="w-5 h-5 text-accent-500 flex-shrink-0" />
-              <span className="text-xs font-semibold text-foreground-secondary leading-tight min-w-0">{item.label}</span>
+              <span className="text-xs font-semibold text-foreground-secondary leading-tight min-w-0">
+                {item.label}
+              </span>
             </div>
           ))}
         </div>

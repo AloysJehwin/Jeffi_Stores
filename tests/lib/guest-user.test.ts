@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mock @/lib/db ─────────────────────────────────────────────────────────────
+// ── Mock @/lib/shared/db ─────────────────────────────────────────────────────────────
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: unknown[]) => mockQueryOne(...args),
   query: (...args: unknown[]) => mockQuery(...args),
 }))
 
 // ── Import under test ─────────────────────────────────────────────────────────
-import {
-  getOrCreateGuestUser,
-  mergeGuestToUser,
-  getUserIdForSession,
-} from '@/lib/guest-user'
+import { getOrCreateGuestUser, mergeGuestToUser, getUserIdForSession } from '@/lib/shared/guest-user'
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -43,8 +39,8 @@ describe('getOrCreateGuestUser', () => {
 
   it('creates a new guest user when no existing one found', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(null)                        // no existing guest
-      .mockResolvedValueOnce({ id: 'new-guest-uuid' })   // insert returns new
+      .mockResolvedValueOnce(null) // no existing guest
+      .mockResolvedValueOnce({ id: 'new-guest-uuid' }) // insert returns new
 
     const id = await getOrCreateGuestUser(SESSION_ID)
     expect(id).toBe('new-guest-uuid')
@@ -52,9 +48,7 @@ describe('getOrCreateGuestUser', () => {
   })
 
   it('inserts guest with email derived from session_id', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'new-uuid' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'new-uuid' })
 
     await getOrCreateGuestUser(SESSION_ID)
 
@@ -62,23 +56,21 @@ describe('getOrCreateGuestUser', () => {
     expect(sql).toContain('INSERT INTO users')
     expect(params).toContain(`guest_${SESSION_ID}@temporary.local`)
     expect(params).toContain(SESSION_ID)
-    expect(params).toContain(true)   // is_guest
+    expect(params).toContain(true) // is_guest
   })
 
   it('throws when insert returns null (db failure)', async () => {
     mockQueryOne
-      .mockResolvedValueOnce(null)  // no existing
-      .mockResolvedValueOnce(null)  // insert fails
+      .mockResolvedValueOnce(null) // no existing
+      .mockResolvedValueOnce(null) // insert fails
 
-    await expect(getOrCreateGuestUser(SESSION_ID))
-      .rejects.toThrow('Failed to create guest user')
+    await expect(getOrCreateGuestUser(SESSION_ID)).rejects.toThrow('Failed to create guest user')
   })
 
   it('propagates unexpected database errors', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('DB timeout'))
 
-    await expect(getOrCreateGuestUser(SESSION_ID))
-      .rejects.toThrow('DB timeout')
+    await expect(getOrCreateGuestUser(SESSION_ID)).rejects.toThrow('DB timeout')
   })
 })
 
@@ -147,8 +139,8 @@ describe('getUserIdForSession', () => {
   describe('guest user without session', () => {
     it('auto-generates a session ID and creates a guest when sessionId is undefined', async () => {
       mockQueryOne
-        .mockResolvedValueOnce(null)                      // no existing
-        .mockResolvedValueOnce({ id: 'fresh-guest' })    // insert
+        .mockResolvedValueOnce(null) // no existing
+        .mockResolvedValueOnce({ id: 'fresh-guest' }) // insert
 
       const id = await getUserIdForSession(undefined, undefined)
       expect(id).toBe('fresh-guest')
@@ -159,9 +151,7 @@ describe('getUserIdForSession', () => {
     })
 
     it('creates a new guest when session not found', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 'new-guest-123' })
+      mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'new-guest-123' })
 
       const id = await getUserIdForSession('new-session', undefined)
       expect(id).toBe('new-guest-123')
@@ -172,8 +162,7 @@ describe('getUserIdForSession', () => {
     it('propagates db error from getOrCreateGuestUser', async () => {
       mockQueryOne.mockRejectedValueOnce(new Error('connection error'))
 
-      await expect(getUserIdForSession('sess', undefined))
-        .rejects.toThrow('connection error')
+      await expect(getUserIdForSession('sess', undefined)).rejects.toThrow('connection error')
     })
   })
 })

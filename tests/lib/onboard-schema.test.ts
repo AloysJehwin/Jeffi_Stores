@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { OnboardSchema } from '@/lib/onboard-schema'
+import { OnboardSchema } from '@/lib/catalog/onboard-schema'
 
 /**
  * The pincode gate. A store that onboards without a usable 6-digit pincode reaches Razorpay as

@@ -6,11 +6,7 @@ interface AdminSkeletonProps {
   showStats?: boolean
 }
 
-export default function AdminSkeleton({
-  variant = 'list',
-  rows = 6,
-  showStats = true,
-}: AdminSkeletonProps) {
+export default function AdminSkeleton({ variant = 'list', rows = 6, showStats = true }: AdminSkeletonProps) {
   return (
     <div className="p-4 sm:p-6 animate-fade-in">
       <div className="h-8 w-48 bg-surface-secondary rounded animate-pulse mb-2" />

@@ -1,0 +1,305 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { resolveGrainUnit, serialCountForBaseQuantity, type SellingUnit } from '@/lib/catalog/selling-unit'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * `required_qty` is BASE units (what batch allocation consumes); `required_serials`
+ * is how many serial rows that covers. They differ whenever qty_step != 1, and
+ * conflating them is what made the picker ask for the wrong count.
+ */
+const unitRunner = {
+  query: async (text: string, params?: unknown[]) => ({ rows: await queryMany(text, params as any[]) }),
+}
+
+function grainUnitCache() {
+  const cache = new Map<string, Promise<SellingUnit | null>>()
+  return (productId: string, variantId: string | null, subVariantId: string | null) => {
+    const key = `${productId}:${variantId || ''}:${subVariantId || ''}`
+    let hit = cache.get(key)
+    if (!hit) {
+      hit = resolveGrainUnit(unitRunner, { productId, variantId, subVariantId })
+      cache.set(key, hit)
+    }
+    return hit
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read'))
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    const orderId = request.nextUrl.searchParams.get('order_id')
+    const productId = request.nextUrl.searchParams.get('product_id')
+    const variantId = request.nextUrl.searchParams.get('variant_id') || null
+    const subVariantId = request.nextUrl.searchParams.get('sub_variant_id') || null
+    const lineItemId = request.nextUrl.searchParams.get('line_item_id') || 'item'
+    const qty = parseFloat(request.nextUrl.searchParams.get('qty') || '1')
+    const unitForGrain = grainUnitCache()
+
+    // Direct product lookup (invoice create — no order yet)
+    if (productId) {
+      const productRow = await queryOne<{ name: string; perishable: boolean; serialized: boolean }>(
+        `SELECT name, perishable, serialized FROM products WHERE id = $1`,
+        [productId]
+      )
+      if (!productRow?.perishable && !productRow?.serialized)
+        return NextResponse.json({ items: [], serialized_items: [] })
+
+      const variantRow = variantId
+        ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [
+            variantId,
+          ])
+        : null
+
+      if (productRow?.serialized) {
+        // `qty` arrives already in base units (callers fold in the factor).
+        const unit = await unitForGrain(productId, variantId, subVariantId)
+        return NextResponse.json({
+          items: [],
+          serialized_items: [
+            {
+              order_item_id: lineItemId,
+              product_name: productRow.name || '',
+              variant_name: variantRow?.variant_name || null,
+              required_qty: qty,
+              required_serials: serialCountForBaseQuantity(qty, unit),
+              qty_step: unit?.qty_step ?? 1,
+              already_assigned: false,
+              product_id: productId,
+              variant_id: variantId,
+              sub_variant_id: subVariantId,
+            },
+          ],
+        })
+      }
+
+      const batches = await queryMany<any>(
+        `
+        SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
+               sl.display_code AS location
+        FROM product_batches pb
+        LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+        WHERE pb.product_id = $1
+          AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+          AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+          AND pb.quantity_remaining > 0
+        ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+      `,
+        [productId, variantId, subVariantId]
+      )
+
+      const batchUnit = await unitForGrain(productId, variantId, subVariantId)
+      return NextResponse.json({
+        items: [
+          {
+            order_item_id: lineItemId,
+            product_name: productRow?.name || '',
+            variant_name: variantRow?.variant_name || null,
+            required_qty: qty,
+            qty_step: batchUnit?.qty_step ?? 1,
+            already_assigned: false,
+            batches,
+          },
+        ],
+        serialized_items: [],
+      })
+    }
+
+    const quotationId = request.nextUrl.searchParams.get('quotation_id')
+
+    if (!orderId && !quotationId)
+      return NextResponse.json({ error: 'order_id, quotation_id, or product_id required' }, { status: 400 })
+
+    // Quotation items path — used before order is created (quotation → invoice conversion)
+    if (quotationId) {
+      const qItems = await queryMany<any>(
+        `
+        SELECT
+          qi.id AS order_item_id,
+          qi.product_id,
+          qi.variant_id,
+          qi.sub_variant_id,
+          qi.description AS product_name,
+          NULL AS variant_name,
+          qi.quantity,
+          qi.buy_unit,
+          COALESCE(
+            qi.sold_unit_factor,
+            CASE WHEN puv.dimension = 'count' THEN puv.factor
+                 WHEN pup.dimension = 'count' THEN pup.factor
+            END
+          ) AS sold_unit_factor,
+          COALESCE(qi.base_quantity, qi.quantity) AS base_quantity,
+          NULL AS batch_id,
+          p.perishable,
+          p.serialized
+        FROM quotation_items qi
+        JOIN products p ON p.id = qi.product_id
+        LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id AND qi.buy_unit IS NOT NULL
+        LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL AND qi.buy_unit IS NOT NULL AND puv.id IS NULL
+        WHERE qi.quotation_id = $1 AND qi.product_id IS NOT NULL AND (p.perishable = true OR p.serialized = true)
+      `,
+        [quotationId]
+      )
+
+      if (!qItems.length) return NextResponse.json({ items: [], serialized_items: [] })
+
+      const qResult = []
+      const qSerializedResult = []
+
+      for (const item of qItems) {
+        const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
+        const requiredQty =
+          soldFactor > 1
+            ? parseFloat(item.quantity) * soldFactor
+            : item.base_quantity
+              ? parseFloat(item.base_quantity)
+              : parseFloat(item.quantity)
+
+        if (item.serialized) {
+          const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
+          qSerializedResult.push({
+            order_item_id: item.order_item_id,
+            product_name: item.product_name,
+            variant_name: item.variant_name || null,
+            required_qty: requiredQty,
+            required_serials: serialCountForBaseQuantity(requiredQty, unit),
+            qty_step: unit?.qty_step ?? 1,
+            already_assigned: false,
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            sub_variant_id: item.sub_variant_id || null,
+          })
+        } else {
+          const batches = await queryMany<any>(
+            `
+            SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
+                   sl.display_code AS location
+            FROM product_batches pb
+            LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+            WHERE pb.product_id = $1
+              AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+              AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+              AND pb.quantity_remaining > 0
+            ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+          `,
+            [item.product_id, item.variant_id || null, item.sub_variant_id || null]
+          )
+
+          const qBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
+          qResult.push({
+            order_item_id: item.order_item_id,
+            product_name: item.product_name,
+            variant_name: item.variant_name || null,
+            required_qty: requiredQty,
+            qty_step: qBatchUnit?.qty_step ?? 1,
+            already_assigned: false,
+            batches,
+          })
+        }
+      }
+
+      return NextResponse.json({ items: qResult, serialized_items: qSerializedResult })
+    }
+
+    // Get order items where the product is perishable
+    const items = await queryMany<any>(
+      `
+      SELECT
+        oi.id AS order_item_id,
+        oi.product_id,
+        oi.variant_id,
+        oi.sub_variant_id,
+        oi.product_name,
+        oi.variant_name,
+        oi.quantity,
+        oi.buy_unit,
+        oi.batch_id,
+        COALESCE(
+          oi.sold_unit_factor,
+          CASE WHEN puv.dimension = 'count' THEN puv.factor
+               WHEN pup.dimension = 'count' THEN pup.factor
+          END
+        ) AS sold_unit_factor,
+        COALESCE(oi.base_quantity, oi.quantity) AS base_quantity,
+        p.perishable,
+        p.serialized
+      FROM order_items oi
+      JOIN products p ON p.id = oi.product_id
+      LEFT JOIN product_units puv ON puv.unit = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
+      LEFT JOIN product_units pup ON pup.unit = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL AND oi.buy_unit IS NOT NULL AND puv.id IS NULL
+      WHERE oi.order_id = $1 AND (p.perishable = true OR p.serialized = true)
+    `,
+      [orderId]
+    )
+
+    if (!items.length) return NextResponse.json({ items: [], serialized_items: [] })
+
+    const result = []
+    const serializedResult = []
+
+    for (const item of items) {
+      const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
+      const requiredQty = soldFactor > 1 ? parseFloat(item.quantity) * soldFactor : parseFloat(item.base_quantity)
+
+      if (item.serialized) {
+        const unit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
+        serializedResult.push({
+          order_item_id: item.order_item_id,
+          product_name: item.product_name,
+          variant_name: item.variant_name || null,
+          required_qty: requiredQty,
+          required_serials: serialCountForBaseQuantity(requiredQty, unit),
+          qty_step: unit?.qty_step ?? 1,
+          already_assigned: !!item.batch_id,
+          product_id: item.product_id,
+          variant_id: item.variant_id || null,
+          sub_variant_id: item.sub_variant_id || null,
+        })
+      } else {
+        // Available batches for this product/variant, FIFO by expiry then created_at
+        const batches = await queryMany<any>(
+          `
+          SELECT
+            pb.id,
+            pb.lot_number,
+            pb.manufacture_date,
+            pb.expiry_date,
+            pb.quantity_remaining,
+            sl.display_code AS location
+          FROM product_batches pb
+          LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+          WHERE pb.product_id = $1
+            AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+            AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+            AND pb.quantity_remaining > 0
+          ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+        `,
+          [item.product_id, item.variant_id || null, item.sub_variant_id || null]
+        )
+
+        const oBatchUnit = await unitForGrain(item.product_id, item.variant_id || null, item.sub_variant_id || null)
+        result.push({
+          order_item_id: item.order_item_id,
+          product_name: item.product_name,
+          variant_name: item.variant_name || null,
+          required_qty: requiredQty,
+          qty_step: oBatchUnit?.qty_step ?? 1,
+          already_assigned: !!item.batch_id,
+          batches,
+        })
+      }
+    }
+
+    return NextResponse.json({ items: result, serialized_items: serializedResult })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  }
+}

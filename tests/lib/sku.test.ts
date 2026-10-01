@@ -5,12 +5,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // generateVariantSku — pure function, tested directly
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { generateProductSku, generateVariantSku } from '@/lib/sku'
-import { withTransaction } from '@/lib/db'
+import { generateProductSku, generateVariantSku } from '@/lib/catalog/sku'
+import { withTransaction } from '@/lib/shared/db'
 
 const mockWithTransaction = vi.mocked(withTransaction)
 
@@ -77,14 +77,15 @@ describe('generateProductSku', () => {
 
   function makeMockClient(catRow: any, maxSeqRow: any) {
     return {
-      query: vi.fn()
-        .mockResolvedValueOnce({ rows: catRow !== null ? [catRow] : [] })   // category lookup
-        .mockResolvedValueOnce({ rows: [maxSeqRow] }),                       // max_seq query
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: catRow !== null ? [catRow] : [] }) // category lookup
+        .mockResolvedValueOnce({ rows: [maxSeqRow] }), // max_seq query
     }
   }
 
   it('uses PRD prefix when categoryId is null', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
         query: vi.fn().mockResolvedValue({ rows: [{ max_seq: null }] }),
       }
@@ -95,7 +96,7 @@ describe('generateProductSku', () => {
   })
 
   it('uses PRD prefix when categoryId is null and sequence is 5', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
         query: vi.fn().mockResolvedValue({ rows: [{ max_seq: 4 }] }),
       }
@@ -106,9 +107,10 @@ describe('generateProductSku', () => {
   })
 
   it('uses sku_prefix from category when present', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ name: 'Hardware', sku_prefix: 'HW' }] })
           .mockResolvedValueOnce({ rows: [{ max_seq: 2 }] }),
       }
@@ -119,9 +121,10 @@ describe('generateProductSku', () => {
   })
 
   it('derives prefix from category name when sku_prefix is null', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ name: 'Bolts', sku_prefix: null }] })
           .mockResolvedValueOnce({ rows: [{ max_seq: 0 }] }),
       }
@@ -132,9 +135,10 @@ describe('generateProductSku', () => {
   })
 
   it('falls back to PRD when category name yields empty prefix', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ name: '123', sku_prefix: null }] })
           .mockResolvedValueOnce({ rows: [{ max_seq: 0 }] }),
       }
@@ -145,10 +149,11 @@ describe('generateProductSku', () => {
   })
 
   it('falls back to PRD when category row is not found', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })             // no category
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [] }) // no category
           .mockResolvedValueOnce({ rows: [{ max_seq: 7 }] }),
       }
       return fn(client as any)
@@ -158,7 +163,7 @@ describe('generateProductSku', () => {
   })
 
   it('pads sequence to 3 digits', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
         query: vi.fn().mockResolvedValue({ rows: [{ max_seq: 9 }] }),
       }
@@ -169,7 +174,7 @@ describe('generateProductSku', () => {
   })
 
   it('handles max_seq = null (no existing products)', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
         query: vi.fn().mockResolvedValue({ rows: [{ max_seq: null }] }),
       }
@@ -180,9 +185,10 @@ describe('generateProductSku', () => {
   })
 
   it('uppercases the prefix', async () => {
-    mockWithTransaction.mockImplementation(async (fn) => {
+    mockWithTransaction.mockImplementation(async fn => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ name: 'tools', sku_prefix: 'tls' }] })
           .mockResolvedValueOnce({ rows: [{ max_seq: 0 }] }),
       }

@@ -55,15 +55,19 @@ const SIZE_TOKENS = [
   /\b\d+(?:\.\d+)?\s*["'”]/g,
   /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\b/gi,
 ]
-function normName(s: string): string { return (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim() }
+function normName(s: string): string {
+  return (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
+}
 function familyKey(name: string): string {
   let s = (name ?? '').trim()
   for (const re of SIZE_TOKENS) s = s.replace(re, ' ')
   return normName(s) || normName(name)
 }
 function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length
-  if (!m) return n; if (!n) return m
+  const m = a.length,
+    n = b.length
+  if (!m) return n
+  if (!n) return m
   let prev = Array.from({ length: n + 1 }, (_, j) => j)
   let cur = new Array(n + 1).fill(0)
   for (let i = 1; i <= m; i++) {
@@ -77,7 +81,8 @@ function levenshtein(a: string, b: string): number {
   return prev[n]
 }
 function nameSimilarity(a: string, b: string): number {
-  const x = normName(a), y = normName(b)
+  const x = normName(a),
+    y = normName(b)
   const L = Math.max(x.length, y.length)
   return L === 0 ? 1 : 1 - levenshtein(x, y) / L
 }
@@ -95,7 +100,11 @@ function splitFamilies(products: BrochureProduct[]): { representatives: Brochure
     const bucket = byKey.get(key)
     const match = bucket?.find(r => sameFamily(r.name, p.name))
     if (match) rest.push(p)
-    else { representatives.push(p); if (bucket) bucket.push(p); else byKey.set(key, [p]) }
+    else {
+      representatives.push(p)
+      if (bucket) bucket.push(p)
+      else byKey.set(key, [p])
+    }
   }
   return { representatives, rest }
 }
@@ -105,9 +114,7 @@ const A4_RATIO = 841.89 / 595.28
 const MATRIX_PER_PAGE = 9
 const LIST_PER_PAGE = 11
 
-type PreviewPage =
-  | { kind: 'matrix'; items: BrochureProduct[] }
-  | { kind: 'list'; items: BrochureProduct[] }
+type PreviewPage = { kind: 'matrix'; items: BrochureProduct[] } | { kind: 'list'; items: BrochureProduct[] }
 
 function paginate(products: BrochureProduct[]): PreviewPage[] {
   const { representatives, rest } = splitFamilies(products)
@@ -167,7 +174,12 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
 
   // ── Reset all state when the popup closes ──
   useEffect(() => {
-    if (open) { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = '' } }
+    if (open) {
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = ''
+      }
+    }
     setSelectedFilters(new Set())
     setProducts([])
     setSelectedProducts(new Set())
@@ -187,7 +199,9 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     const seq = ++reqSeq.current
     setLoadingProducts(true)
     const key = mode === 'category' ? 'categoryIds' : 'brandIds'
-    const qs = Array.from(selectedFilters).map(id => `${key}=${encodeURIComponent(id)}`).join('&')
+    const qs = Array.from(selectedFilters)
+      .map(id => `${key}=${encodeURIComponent(id)}`)
+      .join('&')
     fetch(`/api/admin/brochure/products?${qs}`)
       .then(r => r.json())
       .then(d => {
@@ -196,8 +210,12 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
         setProducts(rows)
         setSelectedProducts(new Set(rows.map(p => p.id))) // all pre-selected
       })
-      .catch(() => { if (seq === reqSeq.current) setError('Could not load products') })
-      .finally(() => { if (seq === reqSeq.current) setLoadingProducts(false) })
+      .catch(() => {
+        if (seq === reqSeq.current) setError('Could not load products')
+      })
+      .finally(() => {
+        if (seq === reqSeq.current) setLoadingProducts(false)
+      })
   }, [open, mode, selectedFilters])
 
   const tree = useMemo(() => {
@@ -206,13 +224,14 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     for (const c of categories) {
       if (c.parent_category_id) {
         const arr = subsByParent.get(c.parent_category_id) || []
-        arr.push(c); subsByParent.set(c.parent_category_id, arr)
+        arr.push(c)
+        subsByParent.set(c.parent_category_id, arr)
       }
     }
     const rows: { cat: Category; depth: number }[] = []
     for (const m of mains) {
       rows.push({ cat: m, depth: 0 })
-      for (const sub of (subsByParent.get(m.id) || [])) rows.push({ cat: sub, depth: 1 })
+      for (const sub of subsByParent.get(m.id) || []) rows.push({ cat: sub, depth: 1 })
     }
     const seen = new Set(rows.map(r => r.cat.id))
     for (const c of categories) if (!seen.has(c.id)) rows.push({ cat: c, depth: 0 })
@@ -225,7 +244,8 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     for (const c of categories) {
       if (c.parent_category_id) {
         const arr = kids.get(c.parent_category_id) || []
-        arr.push(c.id); kids.set(c.parent_category_id, arr)
+        arr.push(c.id)
+        kids.set(c.parent_category_id, arr)
       }
     }
     const memo = new Map<string, string[]>()
@@ -244,20 +264,23 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
 
   // Toggling a category cascades to its descendants so the user sees exactly
   // what a parent pulls in. (Brands have no hierarchy — plain toggle.)
-  const toggleFilter = useCallback((id: string) => {
-    setSelectedFilters(prev => {
-      const next = new Set(prev)
-      const kids = descendantsOf.get(id) || []
-      if (next.has(id)) {
-        next.delete(id)
-        for (const k of kids) next.delete(k)
-      } else {
-        next.add(id)
-        for (const k of kids) next.add(k)
-      }
-      return next
-    })
-  }, [descendantsOf])
+  const toggleFilter = useCallback(
+    (id: string) => {
+      setSelectedFilters(prev => {
+        const next = new Set(prev)
+        const kids = descendantsOf.get(id) || []
+        if (next.has(id)) {
+          next.delete(id)
+          for (const k of kids) next.delete(k)
+        } else {
+          next.add(id)
+          for (const k of kids) next.add(k)
+        }
+        return next
+      })
+    },
+    [descendantsOf]
+  )
   const toggleProduct = useCallback((id: string) => {
     setSelectedProducts(prev => {
       const next = new Set(prev)
@@ -266,10 +289,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     })
   }, [])
 
-  const previewProducts = useMemo(
-    () => products.filter(p => selectedProducts.has(p.id)),
-    [products, selectedProducts]
-  )
+  const previewProducts = useMemo(() => products.filter(p => selectedProducts.has(p.id)), [products, selectedProducts])
   const previewPages = useMemo(() => paginate(previewProducts), [previewProducts])
   // Index entries mirror the PDF: each family representative → its page number
   // (cover=1, index=2, matrix pages start at 3).
@@ -304,7 +324,12 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
       // a locally-unique name so two brochures never collide in Downloads.
       const cd = res.headers.get('Content-Disposition') || ''
       const m = cd.match(/filename="?([^"]+)"?/i)
-      const slug = (title.trim() || 'brochure').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'brochure'
+      const slug =
+        (title.trim() || 'brochure')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40) || 'brochure'
       const fallback = `${slug}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.pdf`
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -321,9 +346,10 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
 
   if (!open || typeof document === 'undefined') return null
 
-  const filterOptions = mode === 'category'
-    ? tree.map(({ cat, depth }) => ({ id: cat.id, name: cat.name, depth }))
-    : brands.map(b => ({ id: b.id, name: b.name, depth: 0 }))
+  const filterOptions =
+    mode === 'category'
+      ? tree.map(({ cat, depth }) => ({ id: cat.id, name: cat.name, depth }))
+      : brands.map(b => ({ id: b.id, name: b.name, depth: 0 }))
 
   const allFilterIds = mode === 'category' ? categories.map(c => c.id) : brands.map(b => b.id)
 
@@ -338,7 +364,8 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
           <div className="min-w-0 pr-4">
             <h2 className="text-base font-bold text-foreground leading-tight">Generate Brochure</h2>
             <p className="text-sm text-foreground-muted mt-0.5">
-              Pick {mode === 'category' ? 'categories / sub-categories' : 'brands'}, refine the products, then download the catalogue PDF
+              Pick {mode === 'category' ? 'categories / sub-categories' : 'brands'}, refine the products, then download
+              the catalogue PDF
             </p>
           </div>
           <button
@@ -358,9 +385,19 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">{filterLabel}</p>
                 <div className="flex gap-2">
-                  <button onClick={() => setSelectedFilters(new Set(allFilterIds))} className="text-[10px] text-accent-500 hover:text-accent-600">All</button>
+                  <button
+                    onClick={() => setSelectedFilters(new Set(allFilterIds))}
+                    className="text-[10px] text-accent-500 hover:text-accent-600"
+                  >
+                    All
+                  </button>
                   <span className="text-foreground-muted text-[10px]">·</span>
-                  <button onClick={() => setSelectedFilters(new Set())} className="text-[10px] text-foreground-muted hover:text-red-500">None</button>
+                  <button
+                    onClick={() => setSelectedFilters(new Set())}
+                    className="text-[10px] text-foreground-muted hover:text-red-500"
+                  >
+                    None
+                  </button>
                 </div>
               </div>
               <div className="space-y-0.5 h-[28rem] overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
@@ -368,21 +405,27 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                   <div className="text-xs text-foreground-muted py-3 text-center">Loading…</div>
                 ) : filterOptions.length === 0 ? (
                   <div className="text-xs text-foreground-muted py-3 text-center">No {filterLabel.toLowerCase()}</div>
-                ) : filterOptions.map(opt => (
-                  <label
-                    key={opt.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-secondary"
-                    style={{ paddingLeft: opt.depth ? 22 : 8 }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedFilters.has(opt.id)}
-                      onChange={() => toggleFilter(opt.id)}
-                      className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
-                    />
-                    <span className={`text-sm truncate ${opt.depth ? 'text-foreground-secondary' : 'text-foreground font-medium'}`}>{opt.name}</span>
-                  </label>
-                ))}
+                ) : (
+                  filterOptions.map(opt => (
+                    <label
+                      key={opt.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-secondary"
+                      style={{ paddingLeft: opt.depth ? 22 : 8 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedFilters.has(opt.id)}
+                        onChange={() => toggleFilter(opt.id)}
+                        className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
+                      />
+                      <span
+                        className={`text-sm truncate ${opt.depth ? 'text-foreground-secondary' : 'text-foreground font-medium'}`}
+                      >
+                        {opt.name}
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
             </div>
 
@@ -392,36 +435,64 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Products</p>
                 {products.length > 0 && (
                   <div className="flex gap-2">
-                    <button onClick={() => setSelectedProducts(new Set(products.map(p => p.id)))} className="text-[10px] text-accent-500 hover:text-accent-600">All</button>
+                    <button
+                      onClick={() => setSelectedProducts(new Set(products.map(p => p.id)))}
+                      className="text-[10px] text-accent-500 hover:text-accent-600"
+                    >
+                      All
+                    </button>
                     <span className="text-foreground-muted text-[10px]">·</span>
-                    <button onClick={() => setSelectedProducts(new Set())} className="text-[10px] text-foreground-muted hover:text-red-500">None</button>
+                    <button
+                      onClick={() => setSelectedProducts(new Set())}
+                      className="text-[10px] text-foreground-muted hover:text-red-500"
+                    >
+                      None
+                    </button>
                   </div>
                 )}
               </div>
               <div className="space-y-0.5 h-[28rem] overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
                 {selectedFilters.size === 0 ? (
-                  <div className="text-xs text-foreground-muted py-3 text-center px-2">Select {mode === 'category' ? 'a category' : 'a brand'} to list its products</div>
+                  <div className="text-xs text-foreground-muted py-3 text-center px-2">
+                    Select {mode === 'category' ? 'a category' : 'a brand'} to list its products
+                  </div>
                 ) : loadingProducts ? (
                   <div className="text-xs text-foreground-muted py-3 text-center">Loading products…</div>
                 ) : products.length === 0 ? (
                   <div className="text-xs text-foreground-muted py-3 text-center">No products found</div>
-                ) : products.map(p => (
-                  <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-secondary">
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.has(p.id)}
-                      onChange={() => toggleProduct(p.id)}
-                      className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
-                    />
-                    {p.thumbnail_url
-                      ? <img src={p.thumbnail_url} alt="" className="w-7 h-7 rounded object-cover bg-surface-secondary flex-shrink-0" />
-                      : <div className="w-7 h-7 rounded bg-surface-secondary flex-shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
-                      <div className="text-xs text-foreground-muted truncate"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></div>
-                    </div>
-                  </label>
-                ))}
+                ) : (
+                  products.map(p => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-surface-secondary"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(p.id)}
+                        onChange={() => toggleProduct(p.id)}
+                        className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
+                      />
+                      {p.thumbnail_url ? (
+                        <img
+                          src={p.thumbnail_url}
+                          alt=""
+                          className="w-7 h-7 rounded object-cover bg-surface-secondary flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-7 h-7 rounded bg-surface-secondary flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
+                        <div className="text-xs text-foreground-muted truncate">
+                          <span className="inline-flex items-center gap-1">
+                            {p.sku}
+                            {p.sku && <CopySku sku={p.sku} />}
+                          </span>
+                        </div>
+                      </div>
+                    </label>
+                  ))
+                )}
               </div>
             </div>
 
@@ -459,7 +530,9 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
           {/* Options row */}
           <div className="flex flex-col sm:flex-row gap-4 sm:items-end mt-4">
             <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Brochure title (optional)</p>
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                Brochure title (optional)
+              </p>
               <input
                 type="text"
                 value={title}
@@ -470,7 +543,9 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
               />
             </div>
             <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Cover promo line (optional)</p>
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                Cover promo line (optional)
+              </p>
               <input
                 type="text"
                 value={promo}
@@ -514,7 +589,12 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
                 </svg>
                 {generating ? 'Generating…' : 'Download PDF'}
               </button>
@@ -535,7 +615,12 @@ function QrGlyph({ size }: { size: number }) {
       style={{ width: size, height: size }}
       title="QR → product page"
     >
-      <svg viewBox="0 0 24 24" style={{ width: size * 0.8, height: size * 0.8 }} className="text-gray-800" fill="currentColor">
+      <svg
+        viewBox="0 0 24 24"
+        style={{ width: size * 0.8, height: size * 0.8 }}
+        className="text-gray-800"
+        fill="currentColor"
+      >
         <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm0 3h3v5h-5v-3h2v-2zm-5 0h3v3h-3v-3z" />
       </svg>
     </div>
@@ -543,9 +628,20 @@ function QrGlyph({ size }: { size: number }) {
 }
 
 function Thumb({ url, size, radius = 4 }: { url: string | null; size: number; radius?: number }) {
-  if (url) return <img src={url} alt="" style={{ width: size, height: size, borderRadius: radius }} className="object-cover bg-gray-100 flex-shrink-0" />
+  if (url)
+    return (
+      <img
+        src={url}
+        alt=""
+        style={{ width: size, height: size, borderRadius: radius }}
+        className="object-cover bg-gray-100 flex-shrink-0"
+      />
+    )
   return (
-    <div style={{ width: size, height: size, borderRadius: radius }} className="bg-gray-100 dark:bg-zinc-700 flex-shrink-0 grid place-items-center text-[6px] text-gray-400">
+    <div
+      style={{ width: size, height: size, borderRadius: radius }}
+      className="bg-gray-100 dark:bg-zinc-700 flex-shrink-0 grid place-items-center text-[6px] text-gray-400"
+    >
       No image
     </div>
   )
@@ -575,7 +671,10 @@ function CoverPreviewCard({ title, promo }: { title: string; promo: string }) {
 function IndexPreviewCard({ families }: { families: { name: string; page: number }[] }) {
   const storeName = useStoreConfig().identity.name
   return (
-    <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
+    <div
+      className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden"
+      style={{ aspectRatio: `1 / ${A4_RATIO}` }}
+    >
       <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-center justify-between">
         <div className="text-[11px] font-bold uppercase truncate">{storeName}</div>
         <div className="text-[8px] opacity-90 uppercase tracking-wide">Index</div>
@@ -601,12 +700,25 @@ function IndexPreviewCard({ families }: { families: { name: string; page: number
  * a footer with the page number. Purely visual (approximation of the PDF).
  */
 function PreviewPageCard({
-  page, pageNum, totalPages, title, showPrices,
-}: { page: PreviewPage; pageNum: number; totalPages: number; title: string; showPrices: boolean }) {
+  page,
+  pageNum,
+  totalPages,
+  title,
+  showPrices,
+}: {
+  page: PreviewPage
+  pageNum: number
+  totalPages: number
+  title: string
+  showPrices: boolean
+}) {
   const storeName = useStoreConfig().identity.name
-  const heading = page.kind === 'matrix' ? 'Featured Products' : (pageNum === 1 ? 'Products' : 'More Products')
+  const heading = page.kind === 'matrix' ? 'Featured Products' : pageNum === 1 ? 'Products' : 'More Products'
   return (
-    <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
+    <div
+      className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden"
+      style={{ aspectRatio: `1 / ${A4_RATIO}` }}
+    >
       {/* header */}
       <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-start justify-between">
         <div className="min-w-0">
@@ -624,7 +736,9 @@ function PreviewPageCard({
               <div className="w-full aspect-square grid place-items-center overflow-hidden rounded-sm bg-gray-50 dark:bg-zinc-800">
                 <Thumb url={p.thumbnail_url} size={44} radius={2} />
               </div>
-              <div className="mt-1 text-[7px] font-bold text-gray-900 dark:text-gray-100 leading-tight line-clamp-2">{p.name}</div>
+              <div className="mt-1 text-[7px] font-bold text-gray-900 dark:text-gray-100 leading-tight line-clamp-2">
+                {p.name}
+              </div>
               <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}</div>
               <div className="mt-auto flex items-end justify-between pt-1">
                 {showPrices ? (
@@ -632,12 +746,18 @@ function PreviewPageCard({
                     {discountPct(p.mrp, p.base_price) > 0 && (
                       <div className="flex items-center gap-1">
                         <span className="text-[6px] text-gray-400 line-through">{rs(p.mrp)}</span>
-                        <span className="text-[6px] font-bold text-red-600">{discountPct(p.mrp, p.base_price)}% OFF</span>
+                        <span className="text-[6px] font-bold text-red-600">
+                          {discountPct(p.mrp, p.base_price)}% OFF
+                        </span>
                       </div>
                     )}
-                    <span className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</span>
+                    <span className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">
+                      {rs(p.base_price ?? p.mrp)}
+                    </span>
                   </div>
-                ) : <span />}
+                ) : (
+                  <span />
+                )}
                 {p.slug && <QrGlyph size={14} />}
               </div>
             </div>
@@ -646,19 +766,29 @@ function PreviewPageCard({
       ) : (
         <div className="px-2 py-1">
           {page.items.map((p, i) => (
-            <div key={p.id} className={`flex items-center gap-1.5 px-1 py-1 border-b border-gray-100 dark:border-zinc-800 ${i % 2 ? 'bg-[#fafcf5] dark:bg-zinc-800/40' : ''}`}>
+            <div
+              key={p.id}
+              className={`flex items-center gap-1.5 px-1 py-1 border-b border-gray-100 dark:border-zinc-800 ${i % 2 ? 'bg-[#fafcf5] dark:bg-zinc-800/40' : ''}`}
+            >
               <Thumb url={p.thumbnail_url} size={22} />
               <div className="flex-1 min-w-0">
                 <div className="text-[8px] font-bold text-gray-900 dark:text-gray-100 truncate">{p.name}</div>
-                <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}{p.brand_name ? `  •  ${p.brand_name}` : ''}</div>
-                {p.short_description && <div className="text-[6px] text-gray-600 dark:text-gray-400 truncate">{p.short_description}</div>}
+                <div className="text-[6px] text-gray-500 truncate">
+                  SKU: {p.sku}
+                  {p.brand_name ? `  •  ${p.brand_name}` : ''}
+                </div>
+                {p.short_description && (
+                  <div className="text-[6px] text-gray-600 dark:text-gray-400 truncate">{p.short_description}</div>
+                )}
               </div>
               {showPrices && (
                 <div className="shrink-0 text-right leading-tight">
                   {discountPct(p.mrp, p.base_price) > 0 && (
                     <div className="text-[6px] text-gray-400 line-through">{rs(p.mrp)}</div>
                   )}
-                  <div className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</div>
+                  <div className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">
+                    {rs(p.base_price ?? p.mrp)}
+                  </div>
                   {discountPct(p.mrp, p.base_price) > 0 && (
                     <div className="text-[6px] font-bold text-red-600">{discountPct(p.mrp, p.base_price)}% OFF</div>
                   )}
@@ -674,7 +804,9 @@ function PreviewPageCard({
       <div className="border-t border-[#7cb900] mx-2 mt-1" />
       <div className="px-2 py-1 flex items-center justify-between text-[6px] text-gray-500">
         <span className="truncate">{storeName}</span>
-        <span className="shrink-0">Page {pageNum} of {totalPages}</span>
+        <span className="shrink-0">
+          Page {pageNum} of {totalPages}
+        </span>
       </div>
     </div>
   )

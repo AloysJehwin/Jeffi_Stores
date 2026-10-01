@@ -12,15 +12,21 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
-import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
-import { round2 } from '@/lib/gst'
-import { bp } from '@/lib/business-path'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
+import { round2 } from '@/lib/catalog/gst'
+import { bp } from '@/lib/shared/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
   const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
+  if (match)
+    return (
+      <>
+        {match[1]}
+        <sup>2</sup>
+      </>
+    )
   return <>{label}</>
 }
 
@@ -49,15 +55,15 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const cartPath = isBusiness ? bp('/business/cart') : '/cart'
   const homePath = isBusiness ? bp('/business') : '/'
   const ordersPath = isBusiness ? bp('/business/account/orders') : '/account/orders'
-  const signinPath = (redirect: string) => isBusiness
-    ? bp(`/business/signin?redirect=${encodeURIComponent(redirect)}`)
-    : `/login?redirect=${encodeURIComponent(redirect)}`
+  const signinPath = (redirect: string) =>
+    isBusiness
+      ? bp(`/business/signin?redirect=${encodeURIComponent(redirect)}`)
+      : `/login?redirect=${encodeURIComponent(redirect)}`
 
   const intentToken = searchParams.get('intent')
-  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(
-    intentToken ? 'buyNow' : null
-  )
-  const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
+  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(intentToken ? 'buyNow' : null)
+  const isBuyNow =
+    intentMode === 'buyNow' || (intentMode === null && searchParams.get('buyNow') === '1' && !intentToken)
 
   const authWasLoading = useRef(false)
   const intentFetched = useRef(false)
@@ -91,13 +97,20 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod' | 'manual'>(isRazorpayEnabled ? 'razorpay' : isBusiness ? 'manual' : 'cod')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod' | 'manual'>(
+    isRazorpayEnabled ? 'razorpay' : isBusiness ? 'manual' : 'cod'
+  )
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
   const razorpayOpen = useRef(false)
   const razorpayCleanup = useRef<(() => void) | null>(null)
-  const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
+  const [pendingVerify, setPendingVerify] = useState<{
+    razorpayOrderId: string
+    razorpayPaymentId: string
+    razorpaySignature: string
+    draftToken: string
+  } | null>(null)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
@@ -129,9 +142,11 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         const age = Date.now() - (pending.ts || 0)
         if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
           sessionStorage.removeItem(storageKey)
-          setPendingVerify(pending.razorpayPaymentId && pending.razorpaySignature
-            ? pending
-            : { ...pending, razorpayPaymentId: '', razorpaySignature: '' })
+          setPendingVerify(
+            pending.razorpayPaymentId && pending.razorpaySignature
+              ? pending
+              : { ...pending, razorpayPaymentId: '', razorpaySignature: '' }
+          )
         } else {
           sessionStorage.removeItem(storageKey)
         }
@@ -143,8 +158,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     if (!pendingVerify) return
     if (pendingVerify.razorpayPaymentId && pendingVerify.razorpaySignature) {
       setIsSubmitting(true)
-      verifyPayment(pendingVerify.razorpayOrderId, pendingVerify.razorpayPaymentId, pendingVerify.razorpaySignature, { draftToken: pendingVerify.draftToken })
-        .finally(() => setPendingVerify(null))
+      verifyPayment(pendingVerify.razorpayOrderId, pendingVerify.razorpayPaymentId, pendingVerify.razorpaySignature, {
+        draftToken: pendingVerify.draftToken,
+      }).finally(() => setPendingVerify(null))
     } else {
       setIsSubmitting(true)
       const maxAttempts = 20
@@ -154,25 +170,38 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', ...portalHeader },
-          body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
+          body: JSON.stringify({
+            razorpayOrderId: pendingVerify.razorpayOrderId,
+            draftToken: pendingVerify.draftToken,
+          }),
         })
           .then(r => r.json())
           .then(data => {
             if (data.order) {
-              try { sessionStorage.removeItem(storageKey) } catch {}
+              try {
+                sessionStorage.removeItem(storageKey)
+              } catch {}
               clearCart()
               showToast('Payment confirmed!', 'success')
               window.location.href = `${ordersPath}/${data.order.id}`
             } else if (data.status === 'pending' && attempts < maxAttempts) {
-              attempts++; setTimeout(poll, 3000)
+              attempts++
+              setTimeout(poll, 3000)
             } else {
               setSubmitError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
-              setIsSubmitting(false); setPendingVerify(null)
+              setIsSubmitting(false)
+              setPendingVerify(null)
             }
           })
           .catch(() => {
-            if (attempts < maxAttempts) { attempts++; setTimeout(poll, 3000) }
-            else { setSubmitError('Could not confirm payment. Check My Orders or contact support.'); setIsSubmitting(false); setPendingVerify(null) }
+            if (attempts < maxAttempts) {
+              attempts++
+              setTimeout(poll, 3000)
+            } else {
+              setSubmitError('Could not confirm payment. Check My Orders or contact support.')
+              setIsSubmitting(false)
+              setPendingVerify(null)
+            }
           })
       }
       poll()
@@ -181,9 +210,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   }, [!!pendingVerify])
 
   useEffect(() => {
-    fetch('/api/store-settings', { credentials: 'include' }).then(r => r.json()).then(d => {
-      if (typeof d.minOrderAmount === 'number') setMinOrderAmount(d.minOrderAmount)
-    }).catch(() => {})
+    fetch('/api/store-settings', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => {
+        if (typeof d.minOrderAmount === 'number') setMinOrderAmount(d.minOrderAmount)
+      })
+      .catch(() => {})
   }, [])
 
   const addressesFetched = useRef(false)
@@ -197,14 +229,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   }, [user])
 
   useEffect(() => {
-    const unauthCondition = isBusiness
-      ? (!authLoading && !user && authWasLoading.current)
-      : (!authLoading && !user)
+    const unauthCondition = isBusiness ? !authLoading && !user && authWasLoading.current : !authLoading && !user
 
     if (unauthCondition) {
-      const currentUrl = intentToken
-        ? `${reviewPath}?intent=${encodeURIComponent(intentToken)}`
-        : reviewPath
+      const currentUrl = intentToken ? `${reviewPath}?intent=${encodeURIComponent(intentToken)}` : reviewPath
       router.push(signinPath(currentUrl))
       return
     }
@@ -252,7 +280,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           fetch(imageUrl, { credentials: 'include' })
             .then(r => r.json())
             .then(data => {
-              setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
+              setBuyNowItem(prev => (prev ? { ...prev, imageUrl: data.imageUrl || null } : prev))
             })
             .catch(() => {})
         })
@@ -268,17 +296,30 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       const buyMode = searchParams.get('buyMode') || 'unit'
       const buyUnit = searchParams.get('buyUnit')
 
-      if (!productId) { router.push(homePath); return }
+      if (!productId) {
+        router.push(homePath)
+        return
+      }
 
       fetch('/api/checkout/intents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...portalHeader },
         credentials: 'include',
-        body: JSON.stringify({ productId, variantId: variantId || null, subVariantId: subVariantId || null, qty, buyMode, buyUnit: buyUnit || null }),
+        body: JSON.stringify({
+          productId,
+          variantId: variantId || null,
+          subVariantId: subVariantId || null,
+          qty,
+          buyMode,
+          buyUnit: buyUnit || null,
+        }),
       })
-        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(r => (r.ok ? r.json() : Promise.reject()))
         .then(data => {
-          if (!data?.intent) { router.push(homePath); return }
+          if (!data?.intent) {
+            router.push(homePath)
+            return
+          }
           const next = new URLSearchParams(searchParams.toString())
           next.set('intent', data.intent)
           next.delete('buyNow')
@@ -316,20 +357,26 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     }
   }
 
-  const cartSubtotal = isBuyNow
-    ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
-    : getCartTotal()
+  const cartSubtotal = isBuyNow ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0) : getCartTotal()
 
   // Line items for the on-device recap — works for both cart and buy-now flows.
   const recapItems = isBuyNow
-    ? (buyNowItem ? [{
-        name: buyNowItem.variantName ? `${buyNowItem.productName} ${buyNowItem.variantName}` : buyNowItem.productName,
-        category: null,
-        brand: buyNowItem.brandName ?? null,
-        qty: buyNowItem.qty,
-      }] : [])
+    ? buyNowItem
+      ? [
+          {
+            name: buyNowItem.variantName
+              ? `${buyNowItem.productName} ${buyNowItem.variantName}`
+              : buyNowItem.productName,
+            category: null,
+            brand: buyNowItem.brandName ?? null,
+            qty: buyNowItem.qty,
+          },
+        ]
+      : []
     : cartItems.map((it: any) => ({
-        name: it.variant?.variant_name ? `${it.products?.name} ${it.variant.variant_name}` : (it.products?.name || 'Item'),
+        name: it.variant?.variant_name
+          ? `${it.products?.name} ${it.variant.variant_name}`
+          : it.products?.name || 'Item',
         category: null,
         brand: it.products?.brand_name ?? null,
         qty: Number(it.quantity) || 1,
@@ -347,9 +394,22 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     }
     setIsLoadingShipping(true)
     setShippingError('')
-    const items = isBuyNow && buyNowItem
-      ? [{ productId: buyNowItem.productId, variantId: buyNowItem.variantId, subVariantId: buyNowItem.subVariantId, quantity: buyNowItem.qty }]
-      : cartItems.map((i: any) => ({ productId: i.product_id, variantId: i.variant_id || null, subVariantId: i.sub_variant_id || null, quantity: parseFloat(i.quantity) }))
+    const items =
+      isBuyNow && buyNowItem
+        ? [
+            {
+              productId: buyNowItem.productId,
+              variantId: buyNowItem.variantId,
+              subVariantId: buyNowItem.subVariantId,
+              quantity: buyNowItem.qty,
+            },
+          ]
+        : cartItems.map((i: any) => ({
+            productId: i.product_id,
+            variantId: i.variant_id || null,
+            subVariantId: i.sub_variant_id || null,
+            quantity: parseFloat(i.quantity),
+          }))
     fetch('/api/shipping/rate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -357,7 +417,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       // Pass isCod so the quoted rate matches what the order route will charge —
       // Delhivery bills COD shipments differently from prepaid. Without this the
       // page shows the prepaid rate while a COD order is charged the COD rate.
-      body: JSON.stringify({ destinationPin: pin, cartItems: items, subtotal: cartSubtotal, isCod: paymentMethod === 'cod' }),
+      body: JSON.stringify({
+        destinationPin: pin,
+        cartItems: items,
+        subtotal: cartSubtotal,
+        isCod: paymentMethod === 'cod',
+      }),
     })
       .then(r => r.json())
       .then(data => {
@@ -380,14 +445,19 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
   useEffect(() => {
     const pin = selectedAddress?.postal_code
-    if (!pin) { setEdd(null); return }
+    if (!pin) {
+      setEdd(null)
+      return
+    }
     const extraDays = isBuyNow
       ? (buyNowItem?.extraDeliveryDays ?? 0)
       : Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
     setIsLoadingEdd(true)
     fetch(`/api/products/edd?pin=${pin}&extraDays=${extraDays}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.edd) setEdd(data.edd) })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.edd) setEdd(data.edd)
+      })
       .catch(() => {})
       .finally(() => setIsLoadingEdd(false))
   }, [selectedAddress?.postal_code, isBuyNow, buyNowItem?.extraDeliveryDays, cartItems])
@@ -437,7 +507,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       body: JSON.stringify({ code: codeFromUrl, subtotal: cartSubtotal }),
     })
       .then(r => r.json())
-      .then(data => { if (data.couponId) setAppliedCoupon(data) })
+      .then(data => {
+        if (data.couponId) setAppliedCoupon(data)
+      })
       .catch(() => {})
   }, [searchParams, cartSubtotal])
 
@@ -458,8 +530,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           price: buyNowItem.price,
         }),
       })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount) })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount)
+        })
         .catch(() => {})
     } else {
       if (cartCount === 0) return
@@ -469,8 +543,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         credentials: 'include',
         body: JSON.stringify({ mode: 'cart' }),
       })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount) })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount)
+        })
         .catch(() => {})
     }
   }, [isBusiness, user, isBuyNow, buyNowItem, cartCount])
@@ -478,9 +554,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const finalTotal = Math.max(0, cartSubtotal - discountAmount - businessDiscountAmount + (shippingCharge ?? 0))
 
   // COD shows only when enabled at BOTH the site level AND for every item; never for B2B.
-  const codAvailable = !isBusiness && isCodSiteEnabled && (isBuyNow
-    ? true
-    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
+  const codAvailable =
+    !isBusiness &&
+    isCodSiteEnabled &&
+    (isBuyNow ? true : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
 
   // Business buyers can always fall back to manual (contact-for-payment), so B2B never
   // hits the no-payment state. Consumer storefront has no manual option.
@@ -519,7 +596,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string,
-    payload: { orderId?: string; draftToken?: string },
+    payload: { orderId?: string; draftToken?: string }
   ) => {
     try {
       const response = await fetch('/api/razorpay/verify', {
@@ -530,14 +607,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Payment verification failed')
-      try { sessionStorage.removeItem(storageKey) } catch {}
+      try {
+        sessionStorage.removeItem(storageKey)
+      } catch {}
       clearCart()
       showToast('Payment successful!', 'success')
       window.location.href = `${ordersPath}/${data.order.id}`
     } catch (err: any) {
       const msg = razorpay_payment_id
         ? `Payment received but confirmation failed. Check My Orders — if no order appears in 2 minutes, contact support with payment ID: ${razorpay_payment_id}`
-        : (err?.message || 'Payment verification failed. Please contact support.')
+        : err?.message || 'Payment verification failed. Please contact support.'
       setSubmitError(msg)
       setIsSubmitting(false)
     }
@@ -564,13 +643,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         handler: async function (response: any) {
           if (payload.draftToken) {
             try {
-              sessionStorage.setItem(storageKey, JSON.stringify({
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-                draftToken: payload.draftToken,
-                ts: Date.now(),
-              }))
+              sessionStorage.setItem(
+                storageKey,
+                JSON.stringify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  draftToken: payload.draftToken,
+                  ts: Date.now(),
+                })
+              )
             } catch {}
           }
           razorpayCleanup.current?.()
@@ -579,7 +661,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             response.razorpay_order_id,
             response.razorpay_payment_id,
             response.razorpay_signature,
-            payload,
+            payload
           )
         },
         prefill: {
@@ -595,7 +677,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             razorpayOpen.current = false
             razorpayCleanup.current?.()
             razorpayCleanup.current = null
-            try { sessionStorage.removeItem(storageKey) } catch {}
+            try {
+              sessionStorage.removeItem(storageKey)
+            } catch {}
             if (payload.orderId) {
               fetch(`/api/orders/${payload.orderId}`, {
                 method: 'DELETE',
@@ -632,13 +716,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       razorpayOpen.current = true
       if (payload.draftToken) {
         try {
-          sessionStorage.setItem(storageKey, JSON.stringify({
-            razorpayOrderId: rzpData.razorpayOrderId,
-            razorpayPaymentId: '',
-            razorpaySignature: '',
-            draftToken: payload.draftToken,
-            ts: Date.now(),
-          }))
+          sessionStorage.setItem(
+            storageKey,
+            JSON.stringify({
+              razorpayOrderId: rzpData.razorpayOrderId,
+              razorpayPaymentId: '',
+              razorpaySignature: '',
+              draftToken: payload.draftToken,
+              ts: Date.now(),
+            })
+          )
         } catch {}
       }
 
@@ -699,14 +786,22 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       return
     }
     if (belowMinimum) {
-      showToast(`Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`, 'warning')
+      showToast(
+        `Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`,
+        'warning'
+      )
       return
     }
     if (!serviceable) {
       showToast('Delivery is not available to this pincode. Please use a different delivery address.', 'warning')
       return
     }
-    if (noPaymentMethod || (paymentMethod === 'razorpay' && !isRazorpayEnabled) || (paymentMethod === 'cod' && !codAvailable) || (paymentMethod === 'manual' && !manualAvailable)) {
+    if (
+      noPaymentMethod ||
+      (paymentMethod === 'razorpay' && !isRazorpayEnabled) ||
+      (paymentMethod === 'cod' && !codAvailable) ||
+      (paymentMethod === 'manual' && !manualAvailable)
+    ) {
       showToast('No payment method is available for this order.', 'warning')
       return
     }
@@ -816,9 +911,13 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             </svg>
           </div>
           <h2 className="text-lg font-semibold text-foreground">Confirming your payment…</h2>
-          <p className="text-sm text-foreground-secondary">Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.</p>
+          <p className="text-sm text-foreground-secondary">
+            Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.
+          </p>
           {submitError && (
-            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3">{submitError}</div>
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3">
+              {submitError}
+            </div>
           )}
         </div>
       </div>
@@ -875,9 +974,24 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 </div>
               ) : addresses.length === 0 ? (
                 <div className="text-center py-8">
-                  <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg
+                    className="w-16 h-16 text-foreground-muted mx-auto mb-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1}
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1}
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
                   </svg>
                   <p className="text-foreground-secondary mb-4">No saved addresses found</p>
                   <button
@@ -889,7 +1003,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {addresses.map((address) => (
+                  {addresses.map(address => (
                     <label
                       key={address.id}
                       className={`flex items-start gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
@@ -909,7 +1023,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-foreground">{address.full_name}</span>
                           {address.is_default && (
-                            <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded">Default</span>
+                            <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-0.5 rounded">
+                              Default
+                            </span>
                           )}
                           <span className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-0.5 rounded capitalize">
                             {address.address_type}
@@ -953,11 +1069,25 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   <div className="flex gap-4 pb-4">
                     <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                       {buyNowItem.imageUrl ? (
-                        <ImgWithSkeleton src={buyNowItem.imageUrl} alt={buyNowItem.productName} className="w-full h-full object-cover rounded-lg" />
+                        <ImgWithSkeleton
+                          src={buyNowItem.imageUrl}
+                          alt={buyNowItem.productName}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          <svg
+                            className="w-10 h-10 text-foreground-muted"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={1}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
                           </svg>
                         </div>
                       )}
@@ -970,7 +1100,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                             {buyNowItem.brandName}
                           </span>
                         )}
-                        {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}<CopySku sku={buyNowItem.sku} className="ml-1" /></span>}
+                        {buyNowItem.sku && (
+                          <span className="text-[10px] text-foreground-muted font-mono">
+                            SKU: {buyNowItem.sku}
+                            <CopySku sku={buyNowItem.sku} className="ml-1" />
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {buyNowItem.variantName && (
@@ -985,18 +1120,45 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                         )}
                       </div>
                       {(() => {
-                        const isFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
+                        const isFractional =
+                          (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') ||
+                          !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
                         const effectiveQty = isFractional ? buyNowItem.qty : Math.round(buyNowItem.qty)
                         const lineTotal = buyNowItem.price * effectiveQty
-                        const displayUnit = buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? buyNowItem.buyUnit : (buyNowItem.buyMode !== 'unit' ? buyNowItem.buyMode : null)
+                        const displayUnit =
+                          buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit'
+                            ? buyNowItem.buyUnit
+                            : buyNowItem.buyMode !== 'unit'
+                              ? buyNowItem.buyMode
+                              : null
                         return (
                           <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isFractional ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{displayUnit ? <> <UnitLabel label={displayUnit} /></> : ''}</> : effectiveQty}
+                              ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ×{' '}
+                              {isFractional ? (
+                                <>
+                                  {Number(Number(buyNowItem.qty).toFixed(6)).toString()}
+                                  {displayUnit ? (
+                                    <>
+                                      {' '}
+                                      <UnitLabel label={displayUnit} />
+                                    </>
+                                  ) : (
+                                    ''
+                                  )}
+                                </>
+                              ) : (
+                                effectiveQty
+                              )}
                               {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                                 <>
-                                  {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                  {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{mrpDiscountPct(buyNowItem.mrp, buyNowItem.price)}% off</span>
+                                  {' '}
+                                  <span className="line-through text-foreground-muted">
+                                    ₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </span>{' '}
+                                  <span className="text-accent-600 dark:text-accent-400 font-semibold">
+                                    {mrpDiscountPct(buyNowItem.mrp, buyNowItem.price)}% off
+                                  </span>
                                 </>
                               )}
                             </p>
@@ -1006,28 +1168,45 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                           </div>
                         )
                       })()}
-                      {gstEnabled && buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
-                        const isFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
-                        const lineTotal = buyNowItem.price * (isFractional ? buyNowItem.qty : Math.round(buyNowItem.qty))
-                        const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
-                        return (
-                          <p className="text-[11px] text-foreground-muted mt-0.5">
-                            incl. ₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 3 })} GST @ {buyNowItem.gstPercentage}%
-                          </p>
-                        )
-                      })()}
+                      {gstEnabled &&
+                        buyNowItem.gstPercentage != null &&
+                        buyNowItem.gstPercentage > 0 &&
+                        (() => {
+                          const isFractional =
+                            (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') ||
+                            !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
+                          const lineTotal =
+                            buyNowItem.price * (isFractional ? buyNowItem.qty : Math.round(buyNowItem.qty))
+                          const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
+                          return (
+                            <p className="text-[11px] text-foreground-muted mt-0.5">
+                              incl. ₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 3 })} GST @{' '}
+                              {buyNowItem.gstPercentage}%
+                            </p>
+                          )
+                        })()}
                     </div>
                   </div>
                 ) : (
-                  cartItems.map((item) => {
-                    const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
+                  cartItems.map(item => {
+                    const primaryImage =
+                      item.products.product_images?.find((img: any) => img.is_primary) ||
+                      item.products.product_images?.[0]
                     const isCustomQty = item.buy_mode && item.buy_mode !== 'unit'
                     const price = !gstEnabled
-                      ? pickUnitPrice({
-                          inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
-                          exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
-                        }, false)
-                      : (isCustomQty ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price))
+                      ? pickUnitPrice(
+                          {
+                            inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+                            exGst:
+                              item.sub_variant?.price_ex_gst ??
+                              item.variant?.price_ex_gst ??
+                              item.products.price_ex_gst,
+                          },
+                          false
+                        )
+                      : isCustomQty
+                        ? item.price_at_addition
+                        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                     const effectiveQty = isCustomQty ? Number(item.quantity) : Math.round(Number(item.quantity))
                     const itemTotal = price * effectiveQty
                     const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
@@ -1035,19 +1214,35 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     const discountPct = showMrp ? mrpDiscountPct(Number(mrp), Number(price)) : 0
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                     const gstRate = Number(item.products.gst_percentage || 0)
-                    const itemGst = gstRate > 0 ? itemTotal - (itemTotal / (1 + gstRate / 100)) : 0
-                    const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                    const itemGst = gstRate > 0 ? itemTotal - itemTotal / (1 + gstRate / 100) : 0
+                    const unitLabel =
+                      item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
                     const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
                     return (
                       <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                         <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                           {primaryImage ? (
-                            <ImgWithSkeleton src={primaryImage.thumbnail_url || primaryImage.image_url} alt={item.products.name} blurhash={primaryImage.blurhash} className="w-full h-full object-cover rounded-lg" />
+                            <ImgWithSkeleton
+                              src={primaryImage.thumbnail_url || primaryImage.image_url}
+                              alt={item.products.name}
+                              blurhash={primaryImage.blurhash}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <svg
+                                className="w-10 h-10 text-foreground-muted"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={1}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
                               </svg>
                             </div>
                           )}
@@ -1060,8 +1255,18 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 {item.products.brand_name}
                               </span>
                             )}
-                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
-                            <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
+                            {sku && (
+                              <span className="text-[10px] text-foreground-muted font-mono">
+                                SKU: {sku}
+                                <CopySku sku={sku} className="ml-1" />
+                              </span>
+                            )}
+                            <ProductWarningBadges
+                              fragile={item.products?.fragile}
+                              hazardous={item.products?.hazardous}
+                              flammable={item.products?.flammable}
+                              size="xs"
+                            />
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {item.variant && (
@@ -1077,11 +1282,55 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                           </div>
                           <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <> / <UnitLabel label={unitLabel ?? item.buy_unit} /></> : (showUnitLabel ? <> / <UnitLabel label={unitLabel} /></> : '')} × {isCustomQty ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{unitLabel || item.buy_unit ? <> <UnitLabel label={unitLabel ?? item.buy_unit} /></> : ''}</> : <>{effectiveQty}{showUnitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}</>}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {isCustomQty ? (
+                                <>
+                                  {' '}
+                                  / <UnitLabel label={unitLabel ?? item.buy_unit} />
+                                </>
+                              ) : showUnitLabel ? (
+                                <>
+                                  {' '}
+                                  / <UnitLabel label={unitLabel} />
+                                </>
+                              ) : (
+                                ''
+                              )}{' '}
+                              ×{' '}
+                              {isCustomQty ? (
+                                <>
+                                  {Number(Number(item.quantity).toFixed(6)).toString()}
+                                  {unitLabel || item.buy_unit ? (
+                                    <>
+                                      {' '}
+                                      <UnitLabel label={unitLabel ?? item.buy_unit} />
+                                    </>
+                                  ) : (
+                                    ''
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  {effectiveQty}
+                                  {showUnitLabel ? (
+                                    <>
+                                      {' '}
+                                      <UnitLabel label={unitLabel} />
+                                    </>
+                                  ) : (
+                                    ''
+                                  )}
+                                </>
+                              )}
                               {showMrp && (
                                 <>
-                                  {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                  {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{discountPct}% off</span>
+                                  {' '}
+                                  <span className="line-through text-foreground-muted">
+                                    ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </span>{' '}
+                                  <span className="text-accent-600 dark:text-accent-400 font-semibold">
+                                    {discountPct}% off
+                                  </span>
                                 </>
                               )}
                             </p>
@@ -1102,7 +1351,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               </div>
 
               {!isBuyNow && (
-                <Link href={cartPath} className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
+                <Link
+                  href={cartPath}
+                  className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
+                >
                   ← Modify Cart
                 </Link>
               )}
@@ -1111,20 +1363,41 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             {/* Expected Delivery Date */}
             <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
               <div className="flex items-start gap-4">
-                <svg className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2.293 2.293a1 1 0 001.414 0L9 16h4zm0 0l1-4 3 1 1 3M13 6h5l3 4v6h-2" />
+                <svg
+                  className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2.293 2.293a1 1 0 001.414 0L9 16h4zm0 0l1-4 3 1 1 3M13 6h5l3 4v6h-2"
+                  />
                 </svg>
                 <div className="flex-1">
                   {!selectedAddress ? (
-                    <p className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</p>
+                    <p className="text-sm text-foreground-muted">
+                      Select a delivery address to see expected delivery date
+                    </p>
                   ) : isLoadingEdd ? (
                     <div className="h-5 w-48 bg-border-default rounded animate-pulse" />
                   ) : edd ? (
                     <>
                       <p className="text-sm text-foreground-secondary">Expected Delivery</p>
                       <p className="text-lg font-semibold text-foreground">
-                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'long',
+                        })}
                       </p>
                     </>
                   ) : (
@@ -1137,27 +1410,49 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             {/* Delivery Promise */}
             <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
               <div className="flex items-start gap-4">
-                <svg className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                <svg
+                  className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
                 </svg>
                 <div>
                   <h3 className="font-semibold text-foreground mb-2">Our Delivery Promise</h3>
                   <ul className="space-y-1.5 text-sm text-foreground-secondary">
                     <li className="flex items-center gap-2">
                       <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                       Orders placed before 5 PM are dispatched the same day
                     </li>
                     <li className="flex items-center gap-2">
                       <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                       Tracked shipment with SMS &amp; email updates
                     </li>
                     <li className="flex items-center gap-2">
                       <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                       Secure packaging to ensure safe delivery
                     </li>
@@ -1205,7 +1500,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     shippingCharge === 0 ? (
                       <span className="font-medium text-green-600 dark:text-green-400">Free</span>
                     ) : (
-                      <span className="font-medium">₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="font-medium">
+                        ₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
                     )
                   ) : (
                     <span className="text-foreground-muted text-sm">Select address</span>
@@ -1219,7 +1516,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       </div>
                     )}
                     {shippingMeta.source === 'admin_disabled' && (
-                      <div className="text-xs text-green-600 dark:text-green-400 -mt-1">Free delivery on every order</div>
+                      <div className="text-xs text-green-600 dark:text-green-400 -mt-1">
+                        Free delivery on every order
+                      </div>
                     )}
                   </>
                 )}
@@ -1237,12 +1536,19 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 {appliedCoupon ? (
                   <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
                     <div>
-                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code}</span>
+                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                        {appliedCoupon.code}
+                      </span>
                       {appliedCoupon.description && (
                         <p className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</p>
                       )}
                     </div>
-                    <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-600 font-medium ml-3">Remove</button>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="text-xs text-red-500 hover:text-red-600 font-medium ml-3"
+                    >
+                      Remove
+                    </button>
                   </div>
                 ) : (
                   <div>
@@ -1252,7 +1558,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       <input
                         type="text"
                         value={couponCode}
-                        onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError('') }}
+                        onChange={e => {
+                          setCouponCode(e.target.value.toUpperCase())
+                          setCouponError('')
+                        }}
                         onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
                         placeholder="Enter code"
                         className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent"
@@ -1272,17 +1581,21 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
               {belowMinimum && (
                 <p className="text-xs text-red-500 mb-3 text-center font-medium">
-                  Minimum order ₹{minOrderAmount} — add ₹{(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.
+                  Minimum order ₹{minOrderAmount} — add ₹
+                  {(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to
+                  proceed.
                 </p>
               )}
 
               {/* Order Notes */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Order Notes (Optional)</label>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                  Order Notes (Optional)
+                </label>
                 <textarea
                   rows={3}
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={e => setNotes(e.target.value)}
                   className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   placeholder="Any special instructions..."
                 />
@@ -1292,8 +1605,17 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               <div className="mb-4 space-y-2">
                 <p className="text-sm font-medium text-foreground-secondary">Payment Method</p>
                 {isRazorpayEnabled && (
-                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                    <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                  <label
+                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="razorpay"
+                      checked={paymentMethod === 'razorpay'}
+                      onChange={() => setPaymentMethod('razorpay')}
+                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
+                    />
                     <div>
                       <p className="text-sm font-semibold text-foreground">Pay Online</p>
                       <p className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</p>
@@ -1301,8 +1623,17 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   </label>
                 )}
                 {codAvailable && (
-                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                    <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                  <label
+                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="cod"
+                      checked={paymentMethod === 'cod'}
+                      onChange={() => setPaymentMethod('cod')}
+                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
+                    />
                     <div>
                       <p className="text-sm font-semibold text-foreground">Cash on Delivery</p>
                       <p className="text-xs text-foreground-secondary">Pay when your order arrives</p>
@@ -1310,8 +1641,17 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   </label>
                 )}
                 {manualAvailable && (
-                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                    <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                  <label
+                    className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="manual"
+                      checked={paymentMethod === 'manual'}
+                      onChange={() => setPaymentMethod('manual')}
+                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
+                    />
                     <div>
                       <p className="text-sm font-semibold text-foreground">Contact for Payment</p>
                       <p className="text-xs text-foreground-secondary">Our team will reach out to arrange payment</p>
@@ -1320,14 +1660,19 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 )}
                 {paymentMethod === 'manual' && manualAvailable && (
                   <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
-                    Your order will be placed as unpaid. Our team will contact you to confirm the payment arrangement before dispatch.
+                    Your order will be placed as unpaid. Our team will contact you to confirm the payment arrangement
+                    before dispatch.
                   </div>
                 )}
                 {noPaymentMethod && (
-                  <p className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    No payment method is available for this order.
+                  </p>
                 )}
                 {!serviceable && (
-                  <p className="text-xs text-red-600 dark:text-red-400">Delivery is not available to this pincode. Please use a different delivery address.</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    Delivery is not available to this pincode. Please use a different delivery address.
+                  </p>
                 )}
               </div>
 
@@ -1357,13 +1702,24 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
               {noPaymentMethod ? (
                 <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
-                  We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
+                  We are unable to accept orders right now due to a technical issue. Please try again later or contact
+                  support.
                 </div>
               ) : (
                 <form onSubmit={handleSubmitOrder}>
                   <button
                     type="submit"
-                    disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || !serviceable || (paymentMethod === 'cod' && !codAvailable) || (shippingCharge === null && !shippingError) || isSubmitting || (paymentMethod === 'razorpay' && isRazorpayEnabled && !razorpayLoaded)}
+                    disabled={
+                      !selectedAddress ||
+                      addresses.length === 0 ||
+                      belowMinimum ||
+                      isLoadingShipping ||
+                      !serviceable ||
+                      (paymentMethod === 'cod' && !codAvailable) ||
+                      (shippingCharge === null && !shippingError) ||
+                      isSubmitting ||
+                      (paymentMethod === 'razorpay' && isRazorpayEnabled && !razorpayLoaded)
+                    }
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     {isSubmitting ? (
@@ -1379,7 +1735,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     ) : paymentMethod === 'razorpay' && isRazorpayEnabled ? (
                       <>
                         <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                          />
                         </svg>
                         Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </>
@@ -1387,7 +1748,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       <>
                         Place Order — Pay on Delivery
                         <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                          />
                         </svg>
                       </>
                     ) : paymentMethod === 'manual' ? (
@@ -1410,19 +1776,35 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               )}
 
               {isBuyNow ? (
-                <button onClick={() => router.back()} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                <button
+                  onClick={() => router.back()}
+                  className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4"
+                >
                   ← Go Back
                 </button>
               ) : (
-                <Link href={cartPath} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                <Link
+                  href={cartPath}
+                  className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4"
+                >
                   ← Back to Cart
                 </Link>
               )}
 
               <div className="mt-6 pt-6 border-t border-border-default">
                 <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <svg
+                    className="w-5 h-5 text-green-600 dark:text-green-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
                   </svg>
                   <span>Secure Checkout</span>
                 </div>
@@ -1434,7 +1816,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         <AddressFormModal
           isOpen={showAddressModal}
           onClose={() => setShowAddressModal(false)}
-          onSaved={(newAddress) => {
+          onSaved={newAddress => {
             setShowAddressModal(false)
             fetchAddresses()
             setSelectedAddress(newAddress)

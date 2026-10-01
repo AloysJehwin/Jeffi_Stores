@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
   categoryFor: vi.fn(),
 }))
 
-import { createAutoTask, completeAutoTask, __resetSuperAdminCache } from '@/lib/auto-tasks'
-import { query, queryOne } from '@/lib/db'
+import { createAutoTask, completeAutoTask, __resetSuperAdminCache } from '@/lib/shared/auto-tasks'
+import { query, queryOne } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
@@ -113,7 +113,7 @@ describe('completeAutoTask', () => {
       rows: [{ id: 'task-1', user_id: 'user-1', title: 'Some task' }],
       rowCount: 1,
     } as any)
-    const { logActivity } = await import('@/lib/activity')
+    const { logActivity } = await import('@/lib/shared/activity')
     await completeAutoTask('ndr_check', 'ref-3', { actorAdminId: 'admin-2' })
     expect(logActivity).toHaveBeenCalledWith(
       expect.objectContaining({

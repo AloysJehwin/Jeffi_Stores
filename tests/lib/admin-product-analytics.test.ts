@@ -1,9 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
-import * as db from '@/lib/db'
+import { getProductAnalyticsData } from '@/lib/shared/admin-product-analytics'
+import * as db from '@/lib/shared/db'
 
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>
@@ -43,7 +43,7 @@ describe('getProductAnalyticsData', () => {
   it('returns product info with parsed fields', async () => {
     mockQueryOne
       .mockResolvedValueOnce(fakeProduct) // product lookup
-      .mockResolvedValueOnce(fakeTotals)   // totals
+      .mockResolvedValueOnce(fakeTotals) // totals
       .mockResolvedValueOnce(fakeCurrentCarts) // currentCarts
 
     mockQueryMany.mockResolvedValue([])

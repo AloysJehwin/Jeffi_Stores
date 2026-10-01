@@ -1,6 +1,6 @@
 'use client'
 
-import type { SectionType } from '@/lib/homepage-sections'
+import type { SectionType } from '@/lib/catalog/homepage-sections'
 import { DateTimeField, Grid, useSectionBinding, type EditorProps } from './editors/fields'
 import AboutEditor from './editors/AboutEditor'
 import BackInStockEditor from './editors/BackInStockEditor'

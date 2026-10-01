@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
-vi.mock('@/lib/s3', () => ({
+vi.mock('@/lib/shared/s3', () => ({
   uploadAvatarImage: vi.fn(),
 }))
 
-import { POST } from '@/app/api/user/avatar/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as s3 from '@/lib/s3'
+import { POST } from '@/app/api/(public)/user/avatar/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as s3 from '@/lib/shared/s3'
 
 const AUTH_USER = { userId: 'user-1' }
 
@@ -71,7 +71,10 @@ describe('POST /api/user/avatar', () => {
 
   it('uploads and returns avatarUrl on success', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
-    vi.mocked(s3.uploadAvatarImage).mockResolvedValue({ url: 'https://cdn.example.com/avatar.jpg', s3Key: 'avatars/user-1.jpg' } as any)
+    vi.mocked(s3.uploadAvatarImage).mockResolvedValue({
+      url: 'https://cdn.example.com/avatar.jpg',
+      s3Key: 'avatars/user-1.jpg',
+    } as any)
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
     const res = await POST(makeFormDataRequest(makeJpegFile()) as any)

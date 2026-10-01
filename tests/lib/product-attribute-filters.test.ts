@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { queryMany } from '@/lib/db'
+import { queryMany } from '@/lib/shared/db'
 import {
-  ADMIN_PRODUCT_FILTER_FIELDS, filterParamNames, joinFilterValues, specKeyFromParam, specParam, splitFilterValues,
-} from '@/lib/product-attribute-filters'
-import {
-  buildAttributeFilterClauses, getAttributeValues, getSpecFilterFields,
-} from '@/lib/product-attribute-filters.server'
+  ADMIN_PRODUCT_FILTER_FIELDS,
+  filterParamNames,
+  joinFilterValues,
+  specKeyFromParam,
+  specParam,
+  splitFilterValues,
+} from '@/lib/catalog/product-attribute-filters-shared'
+import { buildAttributeFilterClauses, getAttributeValues, getSpecFilterFields } from '@/lib/catalog/product-attribute-filters'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -58,10 +61,19 @@ describe('buildAttributeFilterClauses', () => {
   })
 
   it('handles toggles, flags, multi-selects, ranges and dates', () => {
-    const { conditions, params } = buildAttributeFilterClauses({
-      is_featured: 'false', fragile: 'true', hazardous: 'false', gst_percentage: '5,18,abc',
-      price_min: '10', stock_max: 'x', created_from: '2026-01-01', created_to: 'soon',
-    }, 1)
+    const { conditions, params } = buildAttributeFilterClauses(
+      {
+        is_featured: 'false',
+        fragile: 'true',
+        hazardous: 'false',
+        gst_percentage: '5,18,abc',
+        price_min: '10',
+        stock_max: 'x',
+        created_from: '2026-01-01',
+        created_to: 'soon',
+      },
+      1
+    )
     expect(conditions).toContain('p.is_featured = $1')
     expect(conditions).toContain('p.fragile = true')
     expect(conditions).toContain('p.hazardous = false')
@@ -73,7 +85,11 @@ describe('buildAttributeFilterClauses', () => {
   })
 
   it('ignores params it does not know and empty values', () => {
-    expect(buildAttributeFilterClauses({ search: 'x', page: 2, grade: '', material: '|' }, 1)).toEqual({ conditions: [], params: [], nextIdx: 1 })
+    expect(buildAttributeFilterClauses({ search: 'x', page: 2, grade: '', material: '|' }, 1)).toEqual({
+      conditions: [],
+      params: [],
+      nextIdx: 1,
+    })
   })
 })
 

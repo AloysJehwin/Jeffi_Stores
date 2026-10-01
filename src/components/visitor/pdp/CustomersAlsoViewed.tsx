@@ -25,9 +25,13 @@ export default function CustomersAlsoViewed({ productId }: { productId: string }
 
   return (
     <section className="mt-10" aria-labelledby="also-viewed-heading">
-      <h2 id="also-viewed-heading" className="text-2xl font-bold text-foreground mb-6">{TITLE}</h2>
+      <h2 id="also-viewed-heading" className="text-2xl font-bold text-foreground mb-6">
+        {TITLE}
+      </h2>
       <SectionCarousel ariaLabel={TITLE}>
-        {products.map(p => <ProductCard key={p.id} {...p} />)}
+        {products.map(p => (
+          <ProductCard key={p.id} {...p} />
+        ))}
       </SectionCarousel>
     </section>
   )

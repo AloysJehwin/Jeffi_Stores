@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/iconSuggest', () => ({
+vi.mock('@/lib/shared/icon-suggest', () => ({
   suggestIcon: vi.fn(),
 }))
 
-import { POST } from '@/app/api/admin/categories/suggest-icon/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { suggestIcon } from '@/lib/iconSuggest'
+import { POST } from '@/app/api/(admin)/admin/categories/suggest-icon/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { suggestIcon } from '@/lib/shared/icon-suggest'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -32,7 +32,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/categories/suggest-icon', () => {
   it('returns 401 when unauthenticated', async () => {

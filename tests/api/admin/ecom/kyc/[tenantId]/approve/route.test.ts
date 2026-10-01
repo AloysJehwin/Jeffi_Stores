@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
@@ -23,11 +23,11 @@ vi.mock('@/lib/tenant-registry', () => ({
   persistLinkedAccountToOwnerBank: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay-subscriptions', () => ({
+vi.mock('@/lib/payments/razorpay-subscriptions', () => ({
   createRazorpaySubscription: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay-route', () => ({
+vi.mock('@/lib/payments/razorpay-route', () => ({
   createLinkedAccount: vi.fn(),
   createRouteStakeholder: vi.fn(),
   configureRouteSettlement: vi.fn(),
@@ -40,17 +40,22 @@ vi.mock('@/lib/razorpay-route', () => ({
   // rather than stubbed true so the approval path is exercised with a realistic verdict.
   isValidCompanyPan: vi.fn((pan: string | null | undefined, type: string) => {
     const chars: Record<string, string[]> = {
-      partnership: ['F'], llp: ['F'],
-      private_limited: ['C'], public_limited: ['C'],
+      partnership: ['F'],
+      llp: ['F'],
+      private_limited: ['C'],
+      public_limited: ['C'],
       ngo: ['T', 'A', 'B'],
-      proprietorship: [], not_yet_registered: [],
+      proprietorship: [],
+      not_yet_registered: [],
     }
-    const p = String(pan ?? '').trim().toUpperCase()
+    const p = String(pan ?? '')
+      .trim()
+      .toUpperCase()
     return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p) && (chars[type]?.includes(p[3]) ?? false)
   }),
 }))
 
-vi.mock('@/lib/ecom-emails', () => ({
+vi.mock('@/lib/shared/ecom-emails', () => ({
   sendKycApprovedEmail: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -58,18 +63,31 @@ vi.mock('@/lib/ecom-emails', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/ecom/kyc/[tenantId]/approve/route'
-import { authenticateAdmin } from '@/lib/jwt'
+import { POST } from '@/app/api/(admin)/admin/ecom/kyc/[tenantId]/approve/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
 import {
-  approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft,
-  saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute, persistLinkedAccountToOwnerBank,
+  approveKyc,
+  getTenant,
+  listPlans,
+  getKyc,
+  getOwnerById,
+  getDraft,
+  saveSubscriptionId,
+  saveLinkedAccountId,
+  getOwnerBankAccount,
+  getOwnerBankWithRoute,
+  persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
-import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
+import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
 import {
-  createLinkedAccount, createRouteStakeholder, configureRouteSettlement,
-  mapBusinessType, inferProfileCategory, normalizeIndianPhone,
-} from '@/lib/razorpay-route'
-import { sendKycApprovedEmail } from '@/lib/ecom-emails'
+  createLinkedAccount,
+  createRouteStakeholder,
+  configureRouteSettlement,
+  mapBusinessType,
+  inferProfileCategory,
+  normalizeIndianPhone,
+} from '@/lib/payments/razorpay-route'
+import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
 
 // ---------------------------------------------------------------------------
 // Helpers / fixtures
@@ -79,10 +97,13 @@ const TENANT_ID = 'tnt-0001'
 const ADMIN = { adminId: 'admin-1', email: 'admin@jeffistores.in', role: 'super_admin', scopes: [] }
 
 function postReq(body: unknown = {}) {
-  return new NextRequest(new Request(
-    `http://localhost/api/admin/ecom/kyc/${TENANT_ID}/approve`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-  ))
+  return new NextRequest(
+    new Request(`http://localhost/api/admin/ecom/kyc/${TENANT_ID}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 const params = { params: Promise.resolve({ tenantId: TENANT_ID }) }
@@ -137,11 +158,10 @@ function primeHappyPath() {
   vi.mocked(getOwnerBankWithRoute).mockResolvedValue(null as any)
   vi.mocked(persistLinkedAccountToOwnerBank).mockResolvedValue(undefined)
   vi.mocked(configureRouteSettlement).mockResolvedValue({ ok: true } as any)
-  vi.mocked(listPlans).mockResolvedValue([
-    { slug: 'basic', name: 'Basic', tier: 1, monthly_price_inr: '499' },
-  ] as any)
+  vi.mocked(listPlans).mockResolvedValue([{ slug: 'basic', name: 'Basic', tier: 1, monthly_price_inr: '499' }] as any)
   vi.mocked(createRazorpaySubscription).mockResolvedValue({
-    subscriptionId: 'sub_123', shortUrl: 'https://rzp.io/i/checkout',
+    subscriptionId: 'sub_123',
+    shortUrl: 'https://rzp.io/i/checkout',
   } as any)
   vi.mocked(saveSubscriptionId).mockResolvedValue(undefined)
 }
@@ -338,19 +358,29 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     // with none yields '', which `??` does not catch, so "" used to be sent.
     vi.mocked(getDraft).mockResolvedValue({ data: { wh: { sellerPhone: '9123456780' } } } as any)
     vi.mocked(getKyc).mockResolvedValue({
-      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
-      product_categories: null, business_address: 'fgugcijhvb', pan: null, gst_number: null,
+      owner_id: 'own-1',
+      business_name: 'Acme',
+      business_type: 'private_limited',
+      product_categories: null,
+      business_address: 'fgugcijhvb',
+      pan: null,
+      gst_number: null,
     } as any)
 
     const res = await POST(postReq(), params)
-    expect(res.status).toBe(200)                       // non-fatal: go-live still proceeds
+    expect(res.status).toBe(200) // non-fatal: go-live still proceeds
     expect(vi.mocked(createLinkedAccount)).not.toHaveBeenCalled()
   })
 
   it('takes the postal code from the onboarding draft when the address has none', async () => {
     vi.mocked(getKyc).mockResolvedValue({
-      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
-      product_categories: null, business_address: 'no digits here', pan: null, gst_number: null,
+      owner_id: 'own-1',
+      business_name: 'Acme',
+      business_type: 'private_limited',
+      product_categories: null,
+      business_address: 'no digits here',
+      pan: null,
+      gst_number: null,
     } as any)
 
     await POST(postReq(), params)
@@ -361,9 +391,13 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
   it('falls back to a 6-digit PIN found in the address', async () => {
     vi.mocked(getDraft).mockResolvedValue({ data: { wh: { sellerPhone: '9123456780' } } } as any)
     vi.mocked(getKyc).mockResolvedValue({
-      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
-      product_categories: null, business_address: '42 Main Rd, Chennai, TN, 641004',
-      pan: null, gst_number: null,
+      owner_id: 'own-1',
+      business_name: 'Acme',
+      business_type: 'private_limited',
+      product_categories: null,
+      business_address: '42 Main Rd, Chennai, TN, 641004',
+      pan: null,
+      gst_number: null,
     } as any)
 
     await POST(postReq(), params)
@@ -402,7 +436,9 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
 
   it('defaults plan slug and billing interval when tenant fields are null', async () => {
     vi.mocked(getTenant).mockResolvedValue({
-      ...TENANT, plan: null, billing_interval: null,
+      ...TENANT,
+      plan: null,
+      billing_interval: null,
     } as any)
     // no matching plan slug → first plan; interval null → 'monthly'
     const res = await POST(postReq(), params)

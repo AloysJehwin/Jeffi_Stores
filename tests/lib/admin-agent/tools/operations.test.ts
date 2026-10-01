@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
 }))
 
 import { OPERATIONS_TOOLS } from '@/lib/admin-agent/tools/operations'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)
@@ -83,9 +83,7 @@ describe('admin-agent/tools/operations', () => {
   describe('get_cashflow_summary', () => {
     it('returns cashflow summary for current window', async () => {
       // source calls queryOne twice: inflow then outflow
-      mockQueryOne
-        .mockResolvedValueOnce({ amt: '100000', cnt: 5 })
-        .mockResolvedValueOnce({ amt: '60000', cnt: 3 })
+      mockQueryOne.mockResolvedValueOnce({ amt: '100000', cnt: 5 }).mockResolvedValueOnce({ amt: '60000', cnt: 3 })
       const result = await getTool('get_cashflow_summary').handler({})
       expect((result as any).receipts).toBeDefined()
       expect((result as any).payments).toBeDefined()
@@ -93,17 +91,13 @@ describe('admin-agent/tools/operations', () => {
     })
 
     it('accepts daysBack parameter', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ amt: '80000', cnt: 4 })
-        .mockResolvedValueOnce({ amt: '50000', cnt: 2 })
+      mockQueryOne.mockResolvedValueOnce({ amt: '80000', cnt: 4 }).mockResolvedValueOnce({ amt: '50000', cnt: 2 })
       const result = await getTool('get_cashflow_summary').handler({ daysBack: 7 })
       expect((result as any).window_days).toBe(7)
     })
 
     it('handles missing data gracefully', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
+      mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       const result = await getTool('get_cashflow_summary').handler({})
       expect(typeof (result as any).net).toBe('number')
     })
@@ -156,7 +150,14 @@ describe('admin-agent/tools/operations', () => {
   describe('propose_create_pickup_request', () => {
     it('proposes pickup creation for valid orders', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-001', awb_number: 'AWB123', customer_name: 'Test', total_amount: '1000', status: 'confirmed' },
+        {
+          id: 'o1',
+          order_number: 'ORD-001',
+          awb_number: 'AWB123',
+          customer_name: 'Test',
+          total_amount: '1000',
+          status: 'confirmed',
+        },
       ])
       const result = await getTool('propose_create_pickup_request').handler({
         orderIds: ['o1'],
@@ -185,7 +186,14 @@ describe('admin-agent/tools/operations', () => {
     it('returns proposed false with eligibleCount when only some orders qualify', async () => {
       // 2 ids requested but only 1 comes back eligible
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-001', awb_number: 'AWB123', customer_name: 'Test', total_amount: '1000', status: 'confirmed' },
+        {
+          id: 'o1',
+          order_number: 'ORD-001',
+          awb_number: 'AWB123',
+          customer_name: 'Test',
+          total_amount: '1000',
+          status: 'confirmed',
+        },
       ])
       const result = await getTool('propose_create_pickup_request').handler({
         orderIds: ['o1', 'o2'],
@@ -197,7 +205,14 @@ describe('admin-agent/tools/operations', () => {
 
     it('uses tomorrow as pickupDate when not supplied', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-001', awb_number: 'AWB123', customer_name: 'Test', total_amount: '500', status: 'confirmed' },
+        {
+          id: 'o1',
+          order_number: 'ORD-001',
+          awb_number: 'AWB123',
+          customer_name: 'Test',
+          total_amount: '500',
+          status: 'confirmed',
+        },
       ])
       const result = await getTool('propose_create_pickup_request').handler({
         orderIds: ['o1'],
@@ -220,18 +235,14 @@ describe('admin-agent/tools/operations', () => {
   describe('propose_sync_delhivery_statuses', () => {
     it('proposes delhivery status sync when open AWBs exist', async () => {
       // source calls queryOne twice: open forward AWBs then RVP
-      mockQueryOne
-        .mockResolvedValueOnce({ n: 5 })
-        .mockResolvedValueOnce({ n: 2 })
+      mockQueryOne.mockResolvedValueOnce({ n: 5 }).mockResolvedValueOnce({ n: 2 })
       const result = await getTool('propose_sync_delhivery_statuses').handler({})
       expect((result as any).proposed).toBe(true)
       expect((result as any).kind).toBeDefined()
     })
 
     it('returns proposed false when no open AWBs', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ n: 0 })
-        .mockResolvedValueOnce({ n: 0 })
+      mockQueryOne.mockResolvedValueOnce({ n: 0 }).mockResolvedValueOnce({ n: 0 })
       const result = await getTool('propose_sync_delhivery_statuses').handler({})
       expect((result as any).proposed).toBe(false)
     })
@@ -471,9 +482,7 @@ describe('admin-agent/tools/operations', () => {
     })
 
     it('computes overdue amount for rows with days_overdue > 0', async () => {
-      mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', total_amount: '3000', paid_amount: '1000', days_overdue: 10 },
-      ])
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', total_amount: '3000', paid_amount: '1000', days_overdue: 10 }])
       const result = await getTool('list_payables').handler({})
       expect((result as any).summary.overdue).toBe(2000)
       expect((result as any).summary.total_payable).toBe(2000)
@@ -504,9 +513,7 @@ describe('admin-agent/tools/operations', () => {
     })
 
     it('sums 0-30 bucket correctly', async () => {
-      mockQueryMany.mockResolvedValueOnce([
-        { id: 'r1', total_amount: '1000', aging_bucket: '0-30' },
-      ])
+      mockQueryMany.mockResolvedValueOnce([{ id: 'r1', total_amount: '1000', aging_bucket: '0-30' }])
       const result = await getTool('list_receivables').handler({})
       expect((result as any).summary.bucket_0_30).toBe(1000)
     })
@@ -520,17 +527,13 @@ describe('admin-agent/tools/operations', () => {
 
   describe('get_cashflow_summary', () => {
     it('clamps daysBack to max 365', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ amt: '0', cnt: 0 })
-        .mockResolvedValueOnce({ amt: '0', cnt: 0 })
+      mockQueryOne.mockResolvedValueOnce({ amt: '0', cnt: 0 }).mockResolvedValueOnce({ amt: '0', cnt: 0 })
       const result = await getTool('get_cashflow_summary').handler({ daysBack: 999 })
       expect((result as any).window_days).toBe(365)
     })
 
     it('clamps daysBack to min 1', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ amt: '0', cnt: 0 })
-        .mockResolvedValueOnce({ amt: '0', cnt: 0 })
+      mockQueryOne.mockResolvedValueOnce({ amt: '0', cnt: 0 }).mockResolvedValueOnce({ amt: '0', cnt: 0 })
       const result = await getTool('get_cashflow_summary').handler({ daysBack: 0 })
       expect((result as any).window_days).toBe(1)
     })
@@ -577,9 +580,7 @@ describe('admin-agent/tools/operations', () => {
     })
 
     it('handles null rows gracefully', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null)
+      mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       const result = await getTool('get_gst_summary').handler({})
       expect((result as any).net_tax_payable).toBe(0)
     })
@@ -602,9 +603,7 @@ describe('admin-agent/tools/operations', () => {
   describe('propose_create_pickup_request', () => {
     it('throws when orderIds exceeds 50', async () => {
       const ids = Array.from({ length: 51 }, (_, i) => `o${i}`)
-      await expect(
-        getTool('propose_create_pickup_request').handler({ orderIds: ids })
-      ).rejects.toThrow('1-50')
+      await expect(getTool('propose_create_pickup_request').handler({ orderIds: ids })).rejects.toThrow('1-50')
     })
 
     it('throws when pickupDate format is invalid', async () => {
@@ -618,8 +617,22 @@ describe('admin-agent/tools/operations', () => {
 
     it('formats confirmation with plural orders', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'o1', order_number: 'ORD-1', awb_number: 'A1', customer_name: 'C1', total_amount: '100', status: 'confirmed' },
-        { id: 'o2', order_number: 'ORD-2', awb_number: 'A2', customer_name: 'C2', total_amount: '200', status: 'confirmed' },
+        {
+          id: 'o1',
+          order_number: 'ORD-1',
+          awb_number: 'A1',
+          customer_name: 'C1',
+          total_amount: '100',
+          status: 'confirmed',
+        },
+        {
+          id: 'o2',
+          order_number: 'ORD-2',
+          awb_number: 'A2',
+          customer_name: 'C2',
+          total_amount: '200',
+          status: 'confirmed',
+        },
       ])
       const result = await getTool('propose_create_pickup_request').handler({
         orderIds: ['o1', 'o2'],
@@ -633,9 +646,7 @@ describe('admin-agent/tools/operations', () => {
   describe('propose_sync_delhivery_statuses', () => {
     it('handles rvp query rejection gracefully (catch fallback)', async () => {
       // First call (open AWBs) resolves, second (rvp) rejects
-      mockQueryOne
-        .mockResolvedValueOnce({ n: 3 })
-        .mockRejectedValueOnce(new Error('table missing'))
+      mockQueryOne.mockResolvedValueOnce({ n: 3 }).mockRejectedValueOnce(new Error('table missing'))
       const result = await getTool('propose_sync_delhivery_statuses').handler({})
       // Should still propose since open AWBs exist (rvp defaults to 0 on error)
       expect((result as any).proposed).toBe(true)
@@ -643,17 +654,13 @@ describe('admin-agent/tools/operations', () => {
     })
 
     it('proposes false when only rvp=0 and open=0', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ n: 0 })
-        .mockResolvedValueOnce({ n: 0 })
+      mockQueryOne.mockResolvedValueOnce({ n: 0 }).mockResolvedValueOnce({ n: 0 })
       const result = await getTool('propose_sync_delhivery_statuses').handler({})
       expect((result as any).proposed).toBe(false)
     })
 
     it('formats confirmation with singular AWB', async () => {
-      mockQueryOne
-        .mockResolvedValueOnce({ n: 1 })
-        .mockResolvedValueOnce({ n: 0 })
+      mockQueryOne.mockResolvedValueOnce({ n: 1 }).mockResolvedValueOnce({ n: 0 })
       const result = await getTool('propose_sync_delhivery_statuses').handler({})
       expect((result as any).confirmation).toContain('1 forward AWB')
       expect((result as any).confirmation).not.toContain('AWBs')
@@ -662,36 +669,48 @@ describe('admin-agent/tools/operations', () => {
 
   describe('propose_pay_payable', () => {
     it('throws when payableId is empty string', async () => {
-      await expect(
-        getTool('propose_pay_payable').handler({ payableId: '', paymentMode: 'cash' })
-      ).rejects.toThrow('payableId is required')
+      await expect(getTool('propose_pay_payable').handler({ payableId: '', paymentMode: 'cash' })).rejects.toThrow(
+        'payableId is required'
+      )
     })
 
     it('throws when paymentMode is invalid', async () => {
-      await expect(
-        getTool('propose_pay_payable').handler({ payableId: 'x', paymentMode: 'crypto' })
-      ).rejects.toThrow('paymentMode must be one of')
+      await expect(getTool('propose_pay_payable').handler({ payableId: 'x', paymentMode: 'crypto' })).rejects.toThrow(
+        'paymentMode must be one of'
+      )
     })
 
     it('throws when paidAt has invalid format', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', expense_number: 'E1', supplier_name: 'V',
-        total_amount: '1000', status: 'unpaid', paid_amount: '0',
+        id: 'p1',
+        expense_number: 'E1',
+        supplier_name: 'V',
+        total_amount: '1000',
+        status: 'unpaid',
+        paid_amount: '0',
       })
       await expect(
         getTool('propose_pay_payable').handler({
-          payableId: 'p1', paymentMode: 'cash', paidAt: '15-01-2024',
+          payableId: 'p1',
+          paymentMode: 'cash',
+          paidAt: '15-01-2024',
         })
       ).rejects.toThrow('YYYY-MM-DD')
     })
 
     it('includes reference in kv_pairs when transactionRef provided', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1', expense_number: 'E1', supplier_name: 'Vendor',
-        total_amount: '5000', status: 'unpaid', paid_amount: '0',
+        id: 'p1',
+        expense_number: 'E1',
+        supplier_name: 'Vendor',
+        total_amount: '5000',
+        status: 'unpaid',
+        paid_amount: '0',
       })
       const result = await getTool('propose_pay_payable').handler({
-        payableId: 'p1', paymentMode: 'upi', transactionRef: 'UTR123',
+        payableId: 'p1',
+        paymentMode: 'upi',
+        transactionRef: 'UTR123',
       })
       const pairs = (result as any).ui_blocks[1].pairs as Array<{ key: string; value: string }>
       const refPair = pairs.find((p: any) => p.key === 'Reference')
@@ -701,9 +720,9 @@ describe('admin-agent/tools/operations', () => {
 
   describe('propose_export_gstr1', () => {
     it('throws when format is invalid', async () => {
-      await expect(
-        getTool('propose_export_gstr1').handler({ month: '2024-11', format: 'xlsx' })
-      ).rejects.toThrow('format must be json or csv')
+      await expect(getTool('propose_export_gstr1').handler({ month: '2024-11', format: 'xlsx' })).rejects.toThrow(
+        'format must be json or csv'
+      )
     })
 
     it('uses json format when specified', async () => {

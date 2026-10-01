@@ -1,26 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
-vi.mock('@/lib/site-controls', () => ({ getFeatureFlags: vi.fn() }))
-vi.mock('@/lib/notify', () => ({ notifyVariantChangeRequested: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
+vi.mock('@/lib/shared/notify', () => ({ notifyVariantChangeRequested: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/email', () => ({ sendVariantChangeRequestedEmail: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/variant-change', () => ({
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/variant-change', () => ({
   computeVariantChangePreview: vi.fn(),
   loadVariantPriceRow: vi.fn(),
 }))
 
-import { GET, POST } from '@/app/api/admin/orders/[id]/variant-change/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
-import * as db from '@/lib/db'
-import * as sc from '@/lib/site-controls'
-import * as vc from '@/lib/variant-change'
+import { GET, POST } from '@/app/api/(admin)/admin/orders/[id]/variant-change/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
+import * as db from '@/lib/shared/db'
+import * as sc from '@/lib/catalog/site-controls'
+import * as vc from '@/lib/orders/variant-change'
 import * as email from '@/lib/email'
-import * as notify from '@/lib/notify'
+import * as notify from '@/lib/shared/notify'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
@@ -31,11 +31,13 @@ function makeGet(qs = '') {
   return new NextRequest(new Request(`http://localhost/api/admin/orders/order-1/variant-change${qs}`)) as any
 }
 function makePost(body: unknown) {
-  return new NextRequest(new Request('http://localhost/api/admin/orders/order-1/variant-change', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })) as any
+  return new NextRequest(
+    new Request('http://localhost/api/admin/orders/order-1/variant-change', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  ) as any
 }
 
 beforeEach(() => {
@@ -95,23 +97,43 @@ describe('GET variant-change', () => {
 
 describe('POST variant-change', () => {
   const ORDER = {
-    id: 'order-1', order_number: 'ORD-1', status: 'confirmed', payment_status: 'paid',
-    payment_mode: 'razorpay', awb_number: null, user_id: 'user-1',
-    customer_email: 'c@x.com', customer_name: 'Cust',
-    user_email: 'u@x.com', first_name: 'Jane', last_name: 'Doe',
+    id: 'order-1',
+    order_number: 'ORD-1',
+    status: 'confirmed',
+    payment_status: 'paid',
+    payment_mode: 'razorpay',
+    awb_number: null,
+    user_id: 'user-1',
+    customer_email: 'c@x.com',
+    customer_name: 'Cust',
+    user_email: 'u@x.com',
+    first_name: 'Jane',
+    last_name: 'Doe',
   }
-  const ITEM = { id: 'item-1', product_id: 'prod-1', variant_id: 'old-v', sub_variant_id: null, quantity: '2', unit_price: '100', variant_name: 'Small' }
+  const ITEM = {
+    id: 'item-1',
+    product_id: 'prod-1',
+    variant_id: 'old-v',
+    sub_variant_id: null,
+    quantity: '2',
+    unit_price: '100',
+    variant_name: 'Small',
+  }
   const NEWV = { id: 'v-2', name: 'Large', sku: 'SKU-L', mrp: 150 }
 
   function setupHappy(previewOverride: any = {}) {
     vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(ORDER as any)   // order
-      .mockResolvedValueOnce(null as any)    // no open request
-      .mockResolvedValueOnce(ITEM as any)    // order item
+      .mockResolvedValueOnce(ORDER as any) // order
+      .mockResolvedValueOnce(null as any) // no open request
+      .mockResolvedValueOnce(ITEM as any) // order item
       .mockResolvedValueOnce({ id: 'vcr-1' } as any) // insert vcr
     vi.mocked(vc.loadVariantPriceRow).mockResolvedValue(NEWV as any)
     vi.mocked(vc.computeVariantChangePreview).mockReturnValue({
-      oldUnitPrice: 100, newUnitPrice: 120, priceDiff: 40, settlementType: 'collect', codSettlement: 'cod_adjust',
+      oldUnitPrice: 100,
+      newUnitPrice: 120,
+      priceDiff: 40,
+      settlementType: 'collect',
+      codSettlement: 'cod_adjust',
       ...previewOverride,
     } as any)
   }
@@ -181,7 +203,7 @@ describe('POST variant-change', () => {
     // Force the .catch(() => {}) handlers on email/notify/logActivity to execute.
     vi.mocked(email.sendVariantChangeRequestedEmail).mockRejectedValueOnce(new Error('mail fail'))
     vi.mocked(notify.notifyVariantChangeRequested).mockRejectedValueOnce(new Error('notify fail'))
-    const activity = await import('@/lib/activity')
+    const activity = await import('@/lib/shared/activity')
     vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
     const res = await POST(makePost({ orderItemId: UUID, newVariantId: UUID2, adminNotes: 'note' }), PARAMS)
     const body = await res.json()
@@ -223,7 +245,14 @@ describe('POST variant-change', () => {
     setupHappy()
     vi.mocked(db.queryOne)
       .mockReset()
-      .mockResolvedValueOnce({ ...ORDER, user_id: null, user_email: null, customer_email: null, first_name: null, customer_name: null } as any)
+      .mockResolvedValueOnce({
+        ...ORDER,
+        user_id: null,
+        user_email: null,
+        customer_email: null,
+        first_name: null,
+        customer_name: null,
+      } as any)
       .mockResolvedValueOnce(null as any)
       .mockResolvedValueOnce({ ...ITEM, variant_name: null } as any)
       .mockResolvedValueOnce({ id: 'vcr-4' } as any)

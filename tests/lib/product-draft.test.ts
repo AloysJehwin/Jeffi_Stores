@@ -6,25 +6,40 @@ const mockQueryMany = vi.fn()
 const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...args: any[]) => mockQueryOne(...args),
   queryMany: (...args: any[]) => mockQueryMany(...args),
   withTransaction: (...args: any[]) => mockWithTransaction(...args),
 }))
 
 const mockRecompute = vi.fn()
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   recomputeStockStatusForProduct: (...args: any[]) => mockRecompute(...args),
 }))
 
 // Base fields with all boolean flags present; override per-test.
 function baseFields(over: Record<string, unknown> = {}) {
   return {
-    name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false,
-    has_variants: false, fragile: false, hazardous: false, flammable: false,
-    perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false,
-    is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false,
-    serialized: false, stock_status: 'In Stock', inventory_quantity: '0',
+    name: 'P',
+    sku: 'S',
+    slug: 's',
+    base_price: '0',
+    is_featured: false,
+    has_variants: false,
+    fragile: false,
+    hazardous: false,
+    flammable: false,
+    perishable: false,
+    is_cod_allowed: true,
+    is_oversized: false,
+    is_digital: false,
+    is_subscription: false,
+    is_bundle: false,
+    is_searchable: true,
+    inclusive_tax: false,
+    serialized: false,
+    stock_status: 'In Stock',
+    inventory_quantity: '0',
     ...over,
   }
 }
@@ -37,7 +52,7 @@ function smartClientMock(sql: string) {
   return Promise.resolve({ rows: [], rowCount: 0 })
 }
 
-import { publishProductDraft } from '@/lib/product-draft'
+import { publishProductDraft } from '@/lib/catalog/product-draft'
 
 describe('publishProductDraft', () => {
   beforeEach(() => {
@@ -100,7 +115,28 @@ describe('publishProductDraft', () => {
   it('falls back to live variants when draft.variants is empty', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [],
       images: [],
       sub_variants: [],
@@ -125,7 +161,28 @@ describe('publishProductDraft', () => {
   it('skips variant update when no valid SKUs', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [{ id: 'v1', sku: null }], // no valid SKU
       images: [],
       sub_variants: [],
@@ -152,8 +209,46 @@ describe('publishProductDraft', () => {
   it('UPSERTs variants with valid SKUs', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '100', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0', sub_variant_type_on: false, use_own_images: false },
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', inventory_quantity: '5', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: false }],
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '100',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+        sub_variant_type_on: false,
+        use_own_images: false,
+      },
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Red',
+          price: '100',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          inventory_quantity: '5',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: false,
+          use_own_images: false,
+        },
+      ],
       images: [],
       sub_variants: [],
       units: [],
@@ -177,7 +272,28 @@ describe('publishProductDraft', () => {
   it('handles staged sub-variants with _cleared sentinel', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: false, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: false,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [],
       images: [],
       sub_variants: [{ _cleared: true, id: 'cleared-1', variant_id: 'v-1', sub_variant_id: null }],
@@ -198,20 +314,43 @@ describe('publishProductDraft', () => {
   it('handles staged sub-variants with draft-sv- IDs', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: false, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: false,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [],
       images: [],
-      sub_variants: [{
-        id: 'draft-sv-123',
-        variant_id: 'v-1',
-        sub_variant_name: 'Red',
-        sku: 'SV-RED',
-        price: 100,
-        is_active: true,
-        inventory_quantity: 10,
-        discount_pct: 0,
-        stock_status: 'In Stock',
-      }],
+      sub_variants: [
+        {
+          id: 'draft-sv-123',
+          variant_id: 'v-1',
+          sub_variant_name: 'Red',
+          sku: 'SV-RED',
+          price: 100,
+          is_active: true,
+          inventory_quantity: 10,
+          discount_pct: 0,
+          stock_status: 'In Stock',
+        },
+      ],
       units: [],
     }
 
@@ -233,12 +372,45 @@ describe('publishProductDraft', () => {
   it('handles product-level units with cleared sentinels filtered', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: false, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: false,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [],
       images: [],
       sub_variants: [],
       units: [
-        { id: 'u-1', unit: 'pc', factor: 1, is_base: true, is_purchase_default: false, dimension: 'count', variant_id: null, sub_variant_id: null, min_qty: 1, max_qty: null, qty_step: 1 },
+        {
+          id: 'u-1',
+          unit: 'pc',
+          factor: 1,
+          is_base: true,
+          is_purchase_default: false,
+          dimension: 'count',
+          variant_id: null,
+          sub_variant_id: null,
+          min_qty: 1,
+          max_qty: null,
+          qty_step: 1,
+        },
         { _cleared: true, id: 'cleared-v1', variant_id: 'v-1', sub_variant_id: null },
       ],
     }
@@ -260,8 +432,44 @@ describe('publishProductDraft', () => {
   it('deactivates sub-variants when sub_variant_type_on=false', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '100', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', inventory_quantity: '5', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: true }],
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '100',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Red',
+          price: '100',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          inventory_quantity: '5',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: false,
+          use_own_images: true,
+        },
+      ],
       images: [],
       sub_variants: [],
       units: [],
@@ -277,7 +485,8 @@ describe('publishProductDraft', () => {
     await publishProductDraft('prod-1')
     // sub_variant_type_on=false triggers UPDATE product_sub_variants SET is_active = false
     const deactivateSv = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('product_sub_variants') && sql.includes('is_active = false')
+      ([sql]: [string]) =>
+        typeof sql === 'string' && sql.includes('product_sub_variants') && sql.includes('is_active = false')
     )
     expect(deactivateSv.length).toBeGreaterThan(0)
   })
@@ -285,8 +494,44 @@ describe('publishProductDraft', () => {
   it('deletes variant images when use_own_images=false', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '100', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Blue', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', inventory_quantity: '5', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: false }],
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '100',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Blue',
+          price: '100',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          inventory_quantity: '5',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: false,
+          use_own_images: false,
+        },
+      ],
       images: [],
       sub_variants: [],
       units: [],
@@ -310,12 +555,45 @@ describe('publishProductDraft', () => {
   it('publishes with variant-level units', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '100', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '100',
+        is_featured: false,
+        has_variants: true,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
+      },
       variants: [],
       images: [],
       sub_variants: [],
       units: [
-        { id: 'u-v1', unit: 'pair', factor: 2, is_base: true, is_purchase_default: false, dimension: 'count', variant_id: 'v-1', sub_variant_id: null, min_qty: 1, max_qty: null, qty_step: 1 },
+        {
+          id: 'u-v1',
+          unit: 'pair',
+          factor: 2,
+          is_base: true,
+          is_purchase_default: false,
+          dimension: 'count',
+          variant_id: 'v-1',
+          sub_variant_id: null,
+          min_qty: 1,
+          max_qty: null,
+          qty_step: 1,
+        },
       ],
     }
 
@@ -329,7 +607,8 @@ describe('publishProductDraft', () => {
     await publishProductDraft('prod-1')
     // variant-level unit should trigger UPSERT
     const variantUnitUpsert = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('INSERT INTO product_units') && sql.includes('ON CONFLICT')
+      ([sql]: [string]) =>
+        typeof sql === 'string' && sql.includes('INSERT INTO product_units') && sql.includes('ON CONFLICT')
     )
     expect(variantUnitUpsert.length).toBeGreaterThan(0)
   })
@@ -338,11 +617,26 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: {
-        name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: false,
-        fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true,
-        is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false,
-        is_searchable: true, inclusive_tax: false, serialized: false,
-        stock_status: 'In Stock', inventory_quantity: '0',
+        name: 'P',
+        sku: 'S',
+        slug: 's',
+        base_price: '0',
+        is_featured: false,
+        has_variants: false,
+        fragile: false,
+        hazardous: false,
+        flammable: false,
+        perishable: false,
+        is_cod_allowed: true,
+        is_oversized: false,
+        is_digital: false,
+        is_subscription: false,
+        is_bundle: false,
+        is_searchable: true,
+        inclusive_tax: false,
+        serialized: false,
+        stock_status: 'In Stock',
+        inventory_quantity: '0',
       },
       variants: [],
       images: [],
@@ -350,9 +644,17 @@ describe('publishProductDraft', () => {
       // variant_id present + sub_variant_id — stored as a column in the ON CONFLICT (variant_id, unit) path
       units: [
         {
-          id: 'u-sv1', unit: 'box', factor: 12, is_base: false, is_purchase_default: true,
-          dimension: 'count', variant_id: 'v-1', sub_variant_id: 'sv-1',
-          min_qty: 1, max_qty: 100, qty_step: 1,
+          id: 'u-sv1',
+          unit: 'box',
+          factor: 12,
+          is_base: false,
+          is_purchase_default: true,
+          dimension: 'count',
+          variant_id: 'v-1',
+          sub_variant_id: 'sv-1',
+          min_qty: 1,
+          max_qty: 100,
+          qty_step: 1,
         },
       ],
     }
@@ -390,7 +692,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ has_variants: false }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     // Live product had one leaf variant → toggled off
     setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: true })
@@ -403,10 +708,16 @@ describe('publishProductDraft', () => {
     const calls = mockClientQuery.mock.calls as [string, any[]][]
     const sqls = calls.map(c => String(c[0]))
     expect(sqls.some(s => s.includes('UPDATE product_variants SET is_active = false'))).toBe(true)
-    const discard = calls.find(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM product_serials WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
+    const discard = calls.find(
+      ([sql]) =>
+        typeof sql === 'string' &&
+        sql.startsWith('DELETE FROM product_serials WHERE product_id = $1 AND variant_id IS NOT DISTINCT')
+    )
     expect(discard?.[1]).toEqual(['prod-1', 'v-1', null])
     expect(sqls.some(s => s.includes('SET variant_id = $4'))).toBe(false)
-    expect(sqls.some(s => s.includes('UPDATE products SET inventory_quantity = 0, updated_at = NOW() WHERE id = $1'))).toBe(true)
+    expect(
+      sqls.some(s => s.includes('UPDATE products SET inventory_quantity = 0, updated_at = NOW() WHERE id = $1'))
+    ).toBe(true)
     expect(mockRecompute).toHaveBeenCalledTimes(1)
   })
 
@@ -414,7 +725,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ perishable: false, has_variants: true }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -461,7 +775,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ serialized: false, perishable: true, has_variants: false }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -481,7 +798,9 @@ describe('publishProductDraft', () => {
     await publishProductDraft('prod-1')
 
     const delSerials = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes("DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'")
+      ([sql]: [string]) =>
+        typeof sql === 'string' &&
+        sql.includes("DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'")
     )
     expect(delSerials.length).toBeGreaterThan(0)
     // perishable stays on → NO batch delete
@@ -501,12 +820,24 @@ describe('publishProductDraft', () => {
       product_id: 'prod-1',
       fields: baseFields({
         product_suppliers: [
-          { supplier_id: 'sup-1', unit_cost: '10', is_preferred: true, currency: 'INR', moq: '5', lead_time_days: '3', notes: 'n', gst_inclusive: true },
+          {
+            supplier_id: 'sup-1',
+            unit_cost: '10',
+            is_preferred: true,
+            currency: 'INR',
+            moq: '5',
+            lead_time_days: '3',
+            notes: 'n',
+            gst_inclusive: true,
+          },
           { supplier_id: '', unit_cost: '5' }, // skipped: no supplier id
           { supplier_id: 'sup-2', unit_cost: 'NaN' }, // skipped: invalid cost
         ],
       }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -545,7 +876,10 @@ describe('publishProductDraft', () => {
           { supplier_id: 'sup-2', unit_cost: 15, variant_sku: 'VAR-1' }, // unchanged
         ],
       }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     let curCall = 0
     const router = (sql: string) => {
@@ -572,7 +906,9 @@ describe('publishProductDraft', () => {
 
     // price change → deactivate old + insert new dated row
     const deactivateOld = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('SET is_active = false, is_preferred = false, updated_at = NOW() WHERE id = $1')
+      ([sql]: [string]) =>
+        typeof sql === 'string' &&
+        sql.includes('SET is_active = false, is_preferred = false, updated_at = NOW() WHERE id = $1')
     )
     expect(deactivateOld.length).toBeGreaterThan(0)
     // unchanged → plain UPDATE currency=...
@@ -597,7 +933,10 @@ describe('publishProductDraft', () => {
           { supplier_id: 'sup-9', unit_cost: 5, variant_sku: 'MISSING' }, // variant unresolved → skip
         ],
       }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -615,7 +954,14 @@ describe('publishProductDraft', () => {
       // dbLeaves — return a leaf NOT covered → triggers cleanup deactivate
       if (sql.includes('SELECT DISTINCT')) {
         return Promise.resolve({
-          rows: [{ vid: '00000000-0000-0000-0000-000000000000', svid: 'orphan-sv', variant_id: null, sub_variant_id: 'orphan-sv' }],
+          rows: [
+            {
+              vid: '00000000-0000-0000-0000-000000000000',
+              svid: 'orphan-sv',
+              variant_id: null,
+              sub_variant_id: 'orphan-sv',
+            },
+          ],
           rowCount: 1,
         })
       }
@@ -624,7 +970,10 @@ describe('publishProductDraft', () => {
     // Router needs distinct resolveVariantId responses for VAR-1 (found) then MISSING (not found).
     let varLookup = 0
     const router2 = (sql: string) => {
-      if (typeof sql === 'string' && sql.includes('SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2')) {
+      if (
+        typeof sql === 'string' &&
+        sql.includes('SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2')
+      ) {
         varLookup++
         return Promise.resolve({ rows: varLookup === 1 ? [{ id: 'vid-1' }] : [], rowCount: varLookup === 1 ? 1 : 0 })
       }
@@ -641,7 +990,10 @@ describe('publishProductDraft', () => {
     expect(cacheSub.length).toBeGreaterThan(0)
     // dbLeaves cleanup deactivate for orphan leaf
     const dbLeafCleanup = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_suppliers SET is_active = false') && sql.includes('is_active = true')
+      ([sql]: [string]) =>
+        typeof sql === 'string' &&
+        sql.includes('UPDATE product_suppliers SET is_active = false') &&
+        sql.includes('is_active = true')
     )
     expect(dbLeafCleanup.length).toBeGreaterThan(0)
   })
@@ -650,7 +1002,9 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [], sub_variants: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
       units: [
         { _cleared: true, variant_id: 'v-1', sub_variant_id: null },
         { _cleared: true, variant_id: null, sub_variant_id: 'sv-1' },
@@ -662,7 +1016,8 @@ describe('publishProductDraft', () => {
 
     // cleared variant unit → DELETE + clear sell_unit_id on variant
     const delVariantUnit = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('DELETE FROM product_units WHERE product_id = $1 AND variant_id = $2')
+      ([sql]: [string]) =>
+        typeof sql === 'string' && sql.includes('DELETE FROM product_units WHERE product_id = $1 AND variant_id = $2')
     )
     expect(delVariantUnit.length).toBeGreaterThan(0)
     const clearVariantSell = mockClientQuery.mock.calls.filter(
@@ -672,7 +1027,9 @@ describe('publishProductDraft', () => {
     // cleared sub-variant unit → DELETE only. product_sub_variants has no
     // sell_unit_id column, so there is nothing to clear at that grain.
     const delSubUnit = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2')
+      ([sql]: [string]) =>
+        typeof sql === 'string' &&
+        sql.includes('DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2')
     )
     expect(delSubUnit.length).toBeGreaterThan(0)
     const clearSubSell = mockClientQuery.mock.calls.filter(
@@ -685,10 +1042,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [], sub_variants: [],
-      units: [
-        { unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null, is_base: false },
-      ],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [{ unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null, is_base: false }],
     }
     setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: false })
 
@@ -708,10 +1065,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [], sub_variants: [],
-      units: [
-        { unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null },
-      ],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [{ unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null }],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -734,7 +1091,8 @@ describe('publishProductDraft', () => {
     expect(rollback.length).toBeGreaterThan(0)
     // fallback in-place UPDATE
     const inPlace = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('UPDATE product_units SET') && sql.includes('AND unit = $14')
+      ([sql]: [string]) =>
+        typeof sql === 'string' && sql.includes('UPDATE product_units SET') && sql.includes('AND unit = $14')
     )
     expect(inPlace.length).toBeGreaterThan(0)
   })
@@ -743,10 +1101,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [], sub_variants: [],
-      units: [
-        { unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null },
-      ],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [{ unit: 'box', factor: 12, sub_variant_id: 'sv-1', variant_id: null }],
     }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
@@ -773,7 +1131,8 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [],
+      variants: [],
+      images: [],
       sub_variants: [{ _seeded: true, variant_id: 'v-1', sub_variant_name: 'Red', is_active: true }],
       units: [],
     }
@@ -788,7 +1147,8 @@ describe('publishProductDraft', () => {
     await publishProductDraft('prod-1')
 
     const delSubVariants = mockClientQuery.mock.calls.filter(
-      ([sql]: [string]) => typeof sql === 'string' && sql.includes('DELETE FROM product_sub_variants WHERE variant_id = $1')
+      ([sql]: [string]) =>
+        typeof sql === 'string' && sql.includes('DELETE FROM product_sub_variants WHERE variant_id = $1')
     )
     // COUNT > 0 → deletion skipped
     expect(delSubVariants.length).toBe(0)
@@ -803,12 +1163,22 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [],
-      sub_variants: [{
-        _edited: true, variant_id: 'v-1', sub_variant_name: 'Blue',
-        price: '', mrp: 'abc', price_ex_gst: null, mrp_ex_gst: '5',
-        inventory_quantity: '', discount_pct: '', is_active: null,
-      }],
+      variants: [],
+      images: [],
+      sub_variants: [
+        {
+          _edited: true,
+          variant_id: 'v-1',
+          sub_variant_name: 'Blue',
+          price: '',
+          mrp: 'abc',
+          price_ex_gst: null,
+          mrp_ex_gst: '5',
+          inventory_quantity: '',
+          discount_pct: '',
+          is_active: null,
+        },
+      ],
       units: [],
     }
     setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: false })
@@ -824,9 +1194,9 @@ describe('publishProductDraft', () => {
     expect(params[4]).toBeNull() // price '' -> null
     expect(params[5]).toBeNull() // mrp 'abc' -> null
     expect(params[6]).toBeNull() // price_ex_gst null -> null
-    expect(params[7]).toBe(5)    // mrp_ex_gst '5' -> 5
-    expect(params[10]).toBe(0)   // inventory_quantity '' -> null ?? 0
-    expect(params[11]).toBe(0)   // discount_pct '' -> null ?? 0
+    expect(params[7]).toBe(5) // mrp_ex_gst '5' -> 5
+    expect(params[10]).toBe(0) // inventory_quantity '' -> null ?? 0
+    expect(params[11]).toBe(0) // discount_pct '' -> null ?? 0
     expect(params[9]).toBe(true) // is_active null -> true
   })
 
@@ -834,7 +1204,10 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ perishable: 'true', serialized: 'true', has_variants: 'true' }),
-      variants: [], images: [], sub_variants: [], units: [],
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
     }
     // Live flags all on but new ones also on (string 'true') → no toggle-off
     setupPublish(draft, smartClientMock, { perishable: true, serialized: true, has_variants: true })
@@ -852,7 +1225,21 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ has_variants: true }),
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: true }],
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Red',
+          price: '100',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: false,
+          use_own_images: true,
+        },
+      ],
       images: [],
       sub_variants: [
         { _seeded: true, id: 'sv-live-1', variant_id: 'v1', sub_variant_name: 'Blue', is_active: true },
@@ -861,7 +1248,8 @@ describe('publishProductDraft', () => {
       units: [],
     }
     const router = (sql: string) => {
-      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])')) return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
+      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])'))
+        return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
       return smartClientMock(sql)
     }
     setupPublish(draft, router, { perishable: false, serialized: false, has_variants: true })
@@ -869,8 +1257,12 @@ describe('publishProductDraft', () => {
     await publishProductDraft('prod-1')
 
     const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
-    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET is_active = false') && s.includes('sku = $2'))).toBe(true)
-    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET') && s.includes('sub_variant_name = $4'))).toBe(false)
+    expect(
+      sqls.some(s => s.includes('UPDATE product_sub_variants SET is_active = false') && s.includes('sku = $2'))
+    ).toBe(true)
+    expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET') && s.includes('sub_variant_name = $4'))).toBe(
+      false
+    )
     expect(sqls.some(s => s.includes('INSERT INTO product_sub_variants'))).toBe(false)
   })
 
@@ -878,13 +1270,28 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ has_variants: true }),
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '100', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: false, use_own_images: true }],
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Red',
+          price: '100',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: false,
+          use_own_images: true,
+        },
+      ],
       images: [],
       sub_variants: [{ id: 'draft-sv-1', variant_id: 'v1', sub_variant_name: 'Green', is_active: true }],
       units: [],
     }
     const router = (sql: string) => {
-      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])')) return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
+      if (typeof sql === 'string' && sql.includes('sku = ANY($2::text[])'))
+        return Promise.resolve({ rows: [{ id: 'v1' }], rowCount: 1 })
       return smartClientMock(sql)
     }
     setupPublish(draft, router, { perishable: false, serialized: false, has_variants: true })
@@ -899,7 +1306,21 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields({ has_variants: true }),
-      variants: [{ id: 'v1', sku: 'VAR-001', variant_name: 'Red', price: '', is_active: true, stock_status: 'In Stock', pricing_type: 'unit', discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: true, use_own_images: true }],
+      variants: [
+        {
+          id: 'v1',
+          sku: 'VAR-001',
+          variant_name: 'Red',
+          price: '',
+          is_active: true,
+          stock_status: 'In Stock',
+          pricing_type: 'unit',
+          discount_pct: '0',
+          stock_decimal_precision: '0',
+          sub_variant_type_on: true,
+          use_own_images: true,
+        },
+      ],
       images: [],
       sub_variants: [{ _seeded: true, id: 'sv-live-1', variant_id: 'v1', sub_variant_name: 'Blue', is_active: true }],
       units: [],
@@ -918,7 +1339,8 @@ describe('publishProductDraft', () => {
     const draft = {
       product_id: 'prod-1',
       fields: baseFields(),
-      variants: [], images: [],
+      variants: [],
+      images: [],
       sub_variants: [{ _cleared: true, id: 'cleared-1', original_id: '11111111-1111-4111-8111-111111111111' }],
       units: [],
     }
@@ -950,11 +1372,20 @@ describe('publishProductDraft', () => {
   })
 
   it('keeps batches and shelf rows when perishable turns OFF on a still-serialized product', async () => {
-    const draft = { product_id: 'prod-1', fields: baseFields({ perishable: false, serialized: true }), variants: [], images: [], sub_variants: [], units: [] }
+    const draft = {
+      product_id: 'prod-1',
+      fields: baseFields({ perishable: false, serialized: true }),
+      variants: [],
+      images: [],
+      sub_variants: [],
+      units: [],
+    }
     const router = (sql: string) => {
       if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
-      if (sql.includes('MAX(total)')) return Promise.resolve({ rows: [{ variant_id: null, sub_variant_id: null, total: '4' }], rowCount: 1 })
-      if (sql.includes('has_active_variant')) return Promise.resolve({ rows: [{ has_active_variant: false }], rowCount: 1 })
+      if (sql.includes('MAX(total)'))
+        return Promise.resolve({ rows: [{ variant_id: null, sub_variant_id: null, total: '4' }], rowCount: 1 })
+      if (sql.includes('has_active_variant'))
+        return Promise.resolve({ rows: [{ has_active_variant: false }], rowCount: 1 })
       return smartClientMock(sql)
     }
     setupPublish(draft, router, { perishable: true, serialized: true, has_variants: false })
@@ -965,12 +1396,17 @@ describe('publishProductDraft', () => {
     expect(sqls.some(s => s === 'DELETE FROM product_batches WHERE product_id = $1')).toBe(false)
     expect(sqls.some(s => s === 'DELETE FROM shelf_stock WHERE product_id = $1')).toBe(false)
     expect(sqls.some(s => s.includes('UPDATE product_batches SET expiry_date = NULL'))).toBe(true)
-    expect(sqls.some(s => s.includes("DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'"))).toBe(false)
+    expect(
+      sqls.some(s => s.includes("DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'"))
+    ).toBe(false)
     expect(sqls.some(s => s.includes('UPDATE products SET inventory_quantity = $1'))).toBe(true)
   })
 
   describe('inventory at structural transitions', () => {
-    const liveStructure = (variants: { id: string; has_subs: boolean }[], subs: { id: string; variant_id: string }[] = []) => {
+    const liveStructure = (
+      variants: { id: string; has_subs: boolean }[],
+      subs: { id: string; variant_id: string }[] = []
+    ) => {
       mockQueryMany.mockImplementation((sql: string) => {
         if (typeof sql !== 'string') return Promise.resolve([])
         if (sql.includes('AS has_subs')) return Promise.resolve(variants)
@@ -978,151 +1414,324 @@ describe('publishProductDraft', () => {
         return Promise.resolve([])
       })
     }
-    const nowStructure = (variants: { id: string; has_subs: boolean }[], subIds: string[] = []) =>
+    const nowStructure =
+      (variants: { id: string; has_subs: boolean }[], subIds: string[] = []) =>
       (sql: string) => {
         if (typeof sql !== 'string') return Promise.resolve({ rows: [], rowCount: 0 })
         if (sql.includes('AS has_subs')) return Promise.resolve({ rows: variants, rowCount: variants.length })
-        if (sql.includes('SELECT sv.id FROM product_sub_variants sv')) return Promise.resolve({ rows: subIds.map(id => ({ id })), rowCount: subIds.length })
+        if (sql.includes('SELECT sv.id FROM product_sub_variants sv'))
+          return Promise.resolve({ rows: subIds.map(id => ({ id })), rowCount: subIds.length })
         return smartClientMock(sql)
       }
-    const ZERO_VARIANT = 'UPDATE product_variants SET inventory_quantity = 0, updated_at = NOW() WHERE id = ANY($1::uuid[])'
+    const ZERO_VARIANT =
+      'UPDATE product_variants SET inventory_quantity = 0, updated_at = NOW() WHERE id = ANY($1::uuid[])'
     const ZERO_PRODUCT = 'UPDATE products SET inventory_quantity = 0, updated_at = NOW() WHERE id = $1'
     const calls = () => mockClientQuery.mock.calls as [string, any[]][]
     const variantRow = (sku: string, subsOn: boolean) => ({
-      sku, variant_name: sku, price: '10', is_active: true, stock_status: 'In Stock', pricing_type: 'unit',
-      discount_pct: '0', stock_decimal_precision: '0', sub_variant_type_on: subsOn, use_own_images: false,
+      sku,
+      variant_name: sku,
+      price: '10',
+      is_active: true,
+      stock_status: 'In Stock',
+      pricing_type: 'unit',
+      discount_pct: '0',
+      stock_decimal_precision: '0',
+      sub_variant_type_on: subsOn,
+      use_own_images: false,
     })
 
     it('never zeroes product-grain stock from a snapshot that does not carry it', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields(), variants: [], images: [], sub_variants: [], units: [] }
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields(),
+        variants: [],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
       setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: false })
 
       await publishProductDraft('prod-1')
 
       const upd = calls().find(([sql]) => typeof sql === 'string' && sql.includes('UPDATE products SET'))
-      expect(upd?.[0]).toContain("inventory_quantity       = COALESCE(NULLIF(($2::jsonb)->>'inventory_quantity', '')::numeric, inventory_quantity)")
+      expect(upd?.[0]).toContain(
+        "inventory_quantity       = COALESCE(NULLIF(($2::jsonb)->>'inventory_quantity', '')::numeric, inventory_quantity)"
+      )
     })
 
     it('forward: the first variants discard the product-grain stock', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
-      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: false })
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', false)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), {
+        perishable: false,
+        serialized: false,
+        has_variants: false,
+      })
       liveStructure([])
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.includes('IS NOT DISTINCT FROM $2::uuid') && sql.startsWith('DELETE') && p[1] === null && p[2] === null)
+      const discards = calls().filter(
+        ([sql, p]) =>
+          typeof sql === 'string' &&
+          sql.includes('IS NOT DISTINCT FROM $2::uuid') &&
+          sql.startsWith('DELETE') &&
+          p[1] === null &&
+          p[2] === null
+      )
       expect(discards.map(c => c[0].split(' ')[2])).toEqual(['product_serials', 'product_batches', 'shelf_stock'])
       expect(discards[0][0]).toContain("status = 'in_stock'")
     })
 
     it('forward: a variant that gains sub-variants discards its own grain', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', true)], images: [], sub_variants: [], units: [] }
-      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-new']), { perishable: false, serialized: false, has_variants: true })
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', true)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-new']), {
+        perishable: false,
+        serialized: false,
+        has_variants: true,
+      })
       liveStructure([{ id: 'v-1', has_subs: false }])
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[1] === 'v-1' && p[2] === null)
+      const discards = calls().filter(
+        ([sql, p]) =>
+          typeof sql === 'string' &&
+          sql.startsWith('DELETE') &&
+          sql.includes('IS NOT DISTINCT FROM $2::uuid') &&
+          p[1] === 'v-1' &&
+          p[2] === null
+      )
       expect(discards).toHaveLength(3)
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
     })
 
     it('reverse: retiring every sub-variant discards their stock and zeroes the variant', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
-      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: true })
-      liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }, { id: 'sv-2', variant_id: 'v-1' }])
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', false)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), {
+        perishable: false,
+        serialized: false,
+        has_variants: true,
+      })
+      liveStructure(
+        [{ id: 'v-1', has_subs: true }],
+        [
+          { id: 'sv-1', variant_id: 'v-1' },
+          { id: 'sv-2', variant_id: 'v-1' },
+        ]
+      )
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM product_batches WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
-      expect(discards.map(c => c[1])).toEqual([['prod-1', 'v-1', 'sv-1'], ['prod-1', 'v-1', 'sv-2']])
+      const discards = calls().filter(
+        ([sql]) =>
+          typeof sql === 'string' &&
+          sql.startsWith('DELETE FROM product_batches WHERE product_id = $1 AND variant_id IS NOT DISTINCT')
+      )
+      expect(discards.map(c => c[1])).toEqual([
+        ['prod-1', 'v-1', 'sv-1'],
+        ['prod-1', 'v-1', 'sv-2'],
+      ])
       const zero = calls().find(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))
       expect(zero?.[1]).toEqual([['v-1']])
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(false)
     })
 
     it('reverse: retiring one sub-variant while a sibling remains discards its stock', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', true)], images: [], sub_variants: [], units: [] }
-      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-1']), { perishable: false, serialized: false, has_variants: true })
-      liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }, { id: 'sv-2', variant_id: 'v-1' }])
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', true)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: true }], ['sv-1']), {
+        perishable: false,
+        serialized: false,
+        has_variants: true,
+      })
+      liveStructure(
+        [{ id: 'v-1', has_subs: true }],
+        [
+          { id: 'sv-1', variant_id: 'v-1' },
+          { id: 'sv-2', variant_id: 'v-1' },
+        ]
+      )
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[2] === 'sv-2')
+      const discards = calls().filter(
+        ([sql, p]) =>
+          typeof sql === 'string' &&
+          sql.startsWith('DELETE') &&
+          sql.includes('IS NOT DISTINCT FROM $2::uuid') &&
+          p[2] === 'sv-2'
+      )
       expect(discards).toHaveLength(3)
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
     })
 
     it('reverse: a removed variant with siblings left is discarded, not re-parented', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
-      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), { perishable: false, serialized: false, has_variants: true })
-      liveStructure([{ id: 'v-1', has_subs: false }, { id: 'v-2', has_subs: false }])
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', false)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
+      setupPublish(draft, nowStructure([{ id: 'v-1', has_subs: false }]), {
+        perishable: false,
+        serialized: false,
+        has_variants: true,
+      })
+      liveStructure([
+        { id: 'v-1', has_subs: false },
+        { id: 'v-2', has_subs: false },
+      ])
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql, p]) => typeof sql === 'string' && sql.startsWith('DELETE') && sql.includes('IS NOT DISTINCT FROM $2::uuid') && p[1] === 'v-2')
+      const discards = calls().filter(
+        ([sql, p]) =>
+          typeof sql === 'string' &&
+          sql.startsWith('DELETE') &&
+          sql.includes('IS NOT DISTINCT FROM $2::uuid') &&
+          p[1] === 'v-2'
+      )
       expect(discards).toHaveLength(3)
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(false)
     })
 
     it('reverse: removing the last variant zeroes the product', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: false }), variants: [], images: [], sub_variants: [], units: [] }
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: false }),
+        variants: [],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
       setupPublish(draft, nowStructure([]), { perishable: false, serialized: false, has_variants: true })
       liveStructure([{ id: 'v-1', has_subs: true }], [{ id: 'sv-1', variant_id: 'v-1' }])
 
       await publishProductDraft('prod-1')
 
-      const discards = calls().filter(([sql]) => typeof sql === 'string' && sql.startsWith('DELETE FROM shelf_stock WHERE product_id = $1 AND variant_id IS NOT DISTINCT'))
-      expect(discards.map(c => c[1])).toEqual([['prod-1', 'v-1', 'sv-1'], ['prod-1', 'v-1', null]])
+      const discards = calls().filter(
+        ([sql]) =>
+          typeof sql === 'string' &&
+          sql.startsWith('DELETE FROM shelf_stock WHERE product_id = $1 AND variant_id IS NOT DISTINCT')
+      )
+      expect(discards.map(c => c[1])).toEqual([
+        ['prod-1', 'v-1', 'sv-1'],
+        ['prod-1', 'v-1', null],
+      ])
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_PRODUCT))).toBe(true)
       expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes(ZERO_VARIANT))).toBe(false)
     })
 
     it('retired rows are zeroed and a revived variant restarts at zero', async () => {
-      const draft = { product_id: 'prod-1', fields: baseFields({ has_variants: true }), variants: [variantRow('VAR-1', false)], images: [], sub_variants: [], units: [] }
+      const draft = {
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [variantRow('VAR-1', false)],
+        images: [],
+        sub_variants: [],
+        units: [],
+      }
       setupPublish(draft, smartClientMock, { perishable: false, serialized: false, has_variants: true })
 
       await publishProductDraft('prod-1')
 
       const sqls = calls().map(c => String(c[0]))
-      expect(sqls.some(s => s.includes('CASE WHEN product_variants.is_active OR NOT EXCLUDED.is_active THEN product_variants.inventory_quantity ELSE 0 END'))).toBe(true)
-      expect(sqls.some(s => s.includes('UPDATE product_variants SET inventory_quantity = 0') && s.includes('is_active = false'))).toBe(true)
+      expect(
+        sqls.some(s =>
+          s.includes(
+            'CASE WHEN product_variants.is_active OR NOT EXCLUDED.is_active THEN product_variants.inventory_quantity ELSE 0 END'
+          )
+        )
+      ).toBe(true)
+      expect(
+        sqls.some(
+          s => s.includes('UPDATE product_variants SET inventory_quantity = 0') && s.includes('is_active = false')
+        )
+      ).toBe(true)
       expect(sqls.some(s => s.includes('UPDATE product_sub_variants sv SET inventory_quantity = 0'))).toBe(true)
     })
 
     it('re-adding a sub-variant under its retired SKU revives that row instead of inserting', async () => {
       const draft = {
-        product_id: 'prod-1', fields: baseFields({ has_variants: true }),
-        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }], images: [],
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }],
+        images: [],
         sub_variants: [{ id: 'draft-sv-1', variant_id: 'v-1', sub_variant_name: 'Red', sku: 'VAR-1-RED', price: '10' }],
         units: [],
       }
-      setupPublish(draft, (sql: string) =>
-        typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
-          ? Promise.resolve({ rows: [{ id: 'sv-old', variant_id: 'v-1', product_id: 'prod-1' }], rowCount: 1 })
-          : smartClientMock(sql),
-        { perishable: false, serialized: false, has_variants: true })
+      setupPublish(
+        draft,
+        (sql: string) =>
+          typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
+            ? Promise.resolve({ rows: [{ id: 'sv-old', variant_id: 'v-1', product_id: 'prod-1' }], rowCount: 1 })
+            : smartClientMock(sql),
+        { perishable: false, serialized: false, has_variants: true }
+      )
 
       await publishProductDraft('prod-1')
 
-      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO product_sub_variants'))).toBe(false)
-      const revive = calls().find(([sql]) => typeof sql === 'string' && sql.includes('UPDATE product_sub_variants SET') && sql.includes('sub_variant_name = $4'))
+      expect(calls().some(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO product_sub_variants'))).toBe(
+        false
+      )
+      const revive = calls().find(
+        ([sql]) =>
+          typeof sql === 'string' &&
+          sql.includes('UPDATE product_sub_variants SET') &&
+          sql.includes('sub_variant_name = $4')
+      )
       expect(revive?.[1][0]).toBe('sv-old')
-      expect(revive?.[0]).toContain('inventory_quantity = CASE WHEN is_active OR NOT $10::boolean THEN inventory_quantity ELSE 0 END')
+      expect(revive?.[0]).toContain(
+        'inventory_quantity = CASE WHEN is_active OR NOT $10::boolean THEN inventory_quantity ELSE 0 END'
+      )
     })
 
     it('rejects a sub-variant SKU that belongs to another variant', async () => {
       const draft = {
-        product_id: 'prod-1', fields: baseFields({ has_variants: true }),
-        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }], images: [],
+        product_id: 'prod-1',
+        fields: baseFields({ has_variants: true }),
+        variants: [{ ...variantRow('VAR-1', true), id: 'v-1' }],
+        images: [],
         sub_variants: [{ id: 'draft-sv-1', variant_id: 'v-1', sub_variant_name: 'Red', sku: 'OTHER-RED' }],
         units: [],
       }
-      setupPublish(draft, (sql: string) =>
-        typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
-          ? Promise.resolve({ rows: [{ id: 'sv-x', variant_id: 'v-9', product_id: 'prod-1' }], rowCount: 1 })
-          : smartClientMock(sql),
-        { perishable: false, serialized: false, has_variants: true })
+      setupPublish(
+        draft,
+        (sql: string) =>
+          typeof sql === 'string' && sql.includes('FROM product_sub_variants WHERE sku = $1')
+            ? Promise.resolve({ rows: [{ id: 'sv-x', variant_id: 'v-9', product_id: 'prod-1' }], rowCount: 1 })
+            : smartClientMock(sql),
+        { perishable: false, serialized: false, has_variants: true }
+      )
 
       await expect(publishProductDraft('prod-1')).rejects.toThrow(/already used by another variant/)
     })

@@ -72,7 +72,7 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
   useEffect(() => {
     if (isOpen) {
       fetch('/api/user/search-history', { credentials: 'include' })
-        .then(r => r.ok ? r.json() : { history: [] })
+        .then(r => (r.ok ? r.json() : { history: [] }))
         .then(data => setSearchHistory(Array.isArray(data.history) ? data.history : []))
         .catch(() => setSearchHistory([]))
     }
@@ -226,7 +226,12 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
         aria-label="Search"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
         </svg>
       </button>
 
@@ -235,7 +240,11 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
         className={`fixed inset-0 z-30 transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        style={{ backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', backgroundColor: 'rgba(15, 23, 42, 0.35)' }}
+        style={{
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          backgroundColor: 'rgba(15, 23, 42, 0.35)',
+        }}
         aria-hidden="true"
         onClick={close}
       />
@@ -244,15 +253,23 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
       <div
         ref={overlayRef}
         className={`absolute left-1/2 -translate-x-1/2 top-3 sm:top-3 lg:top-5 z-40 w-[min(640px,calc(100vw-2rem))] transition-all duration-300 ease-out ${
-          isOpen
-            ? 'opacity-100 scale-100 pointer-events-auto'
-            : 'opacity-0 scale-95 pointer-events-none'
+          isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
         }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="relative">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground-muted"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <input
               ref={inputRef}
@@ -269,13 +286,22 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
               {query && (
                 <button
                   type="button"
-                  onClick={() => { setQuery(''); setProducts([]); setCategories([]); inputRef.current?.focus() }}
+                  onClick={() => {
+                    setQuery('')
+                    setProducts([])
+                    setCategories([])
+                    inputRef.current?.focus()
+                  }}
                   className="p-1.5 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
                   aria-label="Clear text"
                   title="Clear"
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
                   </svg>
                 </button>
               )}
@@ -314,8 +340,18 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary transition-colors"
                 >
                   <span className="flex-shrink-0 w-7 h-7 rounded-md bg-surface-secondary flex items-center justify-center">
-                    <svg className="w-3.5 h-3.5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      className="w-3.5 h-3.5 text-foreground-muted"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                   </span>
                   <span className="text-sm text-foreground">{q}</span>
@@ -340,17 +376,32 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                 <div className="py-1">
                   {categories.length > 0 && (
                     <>
-                      <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Categories</p>
+                      <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                        Categories
+                      </p>
                       {categories.map((cat, idx) => (
                         <Link
                           key={cat.id}
                           href={`${basePath}?category=${cat.slug}`}
-                          onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
+                          onClick={() => {
+                            saveSearchHistory(typedQueryRef.current.trim())
+                            close()
+                          }}
                           className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                         >
                           <span className="flex-shrink-0 w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
-                            <svg className="w-3.5 h-3.5 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            <svg
+                              className="w-3.5 h-3.5 text-accent-600 dark:text-accent-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                              />
                             </svg>
                           </span>
                           <span className="text-sm text-foreground">
@@ -363,28 +414,49 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
 
                   {products.length > 0 && (
                     <>
-                      <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Products</p>
+                      <p className="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                        Products
+                      </p>
                       {products.map((product, idx) => {
                         const itemIdx = categories.length + idx
-                        const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
-                        const displayPrice = product.has_variants && product.variant_min_price
-                          ? product.variant_min_price
-                          : (product.price_ex_gst || product.base_price)
+                        const primaryImage =
+                          product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
+                        const displayPrice =
+                          product.has_variants && product.variant_min_price
+                            ? product.variant_min_price
+                            : product.price_ex_gst || product.base_price
 
                         return (
                           <Link
                             key={product.id}
                             href={`${basePath}/${product.slug}`}
-                            onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
+                            onClick={() => {
+                              saveSearchHistory(typedQueryRef.current.trim())
+                              close()
+                            }}
                             className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                           >
                             <div className="w-10 h-10 bg-surface-secondary rounded-lg flex-shrink-0 overflow-hidden border border-border-default">
                               {primaryImage ? (
-                                <img src={primaryImage.thumbnail_url} alt={product.name} className="w-full h-full object-contain p-0.5" />
+                                <img
+                                  src={primaryImage.thumbnail_url}
+                                  alt={product.name}
+                                  className="w-full h-full object-contain p-0.5"
+                                />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  <svg
+                                    className="w-5 h-5 text-foreground-muted"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1}
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
                                   </svg>
                                 </div>
                               )}
@@ -394,10 +466,16 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                                 <Highlight text={product.name} query={query} />
                               </p>
                               <p className="text-xs text-accent-600 dark:text-accent-400 font-semibold mt-0.5">
-                                {product.has_variants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                {product.has_variants ? 'From ' : ''}&#x20B9;
+                                {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </p>
                             </div>
-                            <svg className="w-4 h-4 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              className="w-4 h-4 text-foreground-muted flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                           </Link>
@@ -409,11 +487,19 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                   <div className="border-t border-border-default p-3">
                     <Link
                       href={`${basePath}?search=${encodeURIComponent(query)}`}
-                      onClick={() => { saveSearchHistory(query.trim()); close() }}
+                      onClick={() => {
+                        saveSearchHistory(query.trim())
+                        close()
+                      }}
                       className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                       See all results for &quot;{query}&quot;
                     </Link>
@@ -421,8 +507,18 @@ export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/produc
                 </div>
               ) : query.trim().length >= 2 ? (
                 <div className="py-10 text-center text-foreground-muted">
-                  <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg
+                    className="w-10 h-10 mx-auto mb-3 opacity-40"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
                   </svg>
                   <p className="text-sm font-medium">No results for &quot;{query}&quot;</p>
                   <p className="text-xs mt-1 opacity-70">Try a different term</p>

@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { PATCH, DELETE } from '@/app/api/admin/products/[id]/units/[unitId]/rules/[ruleId]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/products/[id]/units/[unitId]/rules/[ruleId]/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -43,7 +43,9 @@ function makeDeleteReq() {
   })
 }
 
-beforeEach(() => { vi.resetAllMocks() })
+beforeEach(() => {
+  vi.resetAllMocks()
+})
 
 // ---------------------------------------------------------------------------
 // PATCH
@@ -99,8 +101,8 @@ describe('PATCH /api/admin/products/[id]/units/[unitId]/rules/[ruleId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'rule-1' })  // ensureRule
-      .mockResolvedValueOnce({ id: 'rule-1', config: { tiers: [] } })  // UPDATE RETURNING
+      .mockResolvedValueOnce({ id: 'rule-1' }) // ensureRule
+      .mockResolvedValueOnce({ id: 'rule-1', config: { tiers: [] } }) // UPDATE RETURNING
     const res = await PATCH(makePatchReq({ config: { tiers: [] } }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -110,9 +112,7 @@ describe('PATCH /api/admin/products/[id]/units/[unitId]/rules/[ruleId]', () => {
   it('updates is_active on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'rule-1' })
-      .mockResolvedValueOnce({ id: 'rule-1', is_active: false })
+    mockQueryOne.mockResolvedValueOnce({ id: 'rule-1' }).mockResolvedValueOnce({ id: 'rule-1', is_active: false })
     const res = await PATCH(makePatchReq({ is_active: false }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -122,9 +122,7 @@ describe('PATCH /api/admin/products/[id]/units/[unitId]/rules/[ruleId]', () => {
   it('updates priority on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ id: 'rule-1' })
-      .mockResolvedValueOnce({ id: 'rule-1', priority: 50 })
+    mockQueryOne.mockResolvedValueOnce({ id: 'rule-1' }).mockResolvedValueOnce({ id: 'rule-1', priority: 50 })
     const res = await PATCH(makePatchReq({ priority: 50 }), { params })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -137,7 +135,9 @@ describe('PATCH /api/admin/products/[id]/units/[unitId]/rules/[ruleId]', () => {
     mockQueryOne
       .mockResolvedValueOnce({ id: 'rule-1' })
       .mockResolvedValueOnce({ id: 'rule-1', config: { buy: 5, get_extra: 2 }, is_active: true, priority: 10 })
-    const res = await PATCH(makePatchReq({ config: { buy: 5, get_extra: 2 }, is_active: true, priority: 10 }), { params })
+    const res = await PATCH(makePatchReq({ config: { buy: 5, get_extra: 2 }, is_active: true, priority: 10 }), {
+      params,
+    })
     expect(res.status).toBe(200)
   })
 })

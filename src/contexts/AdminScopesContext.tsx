@@ -1,8 +1,8 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
-import { hasScope } from '@/lib/scopes'
-import { canUseAi } from '@/lib/ai-scope'
+import { hasScope } from '@/lib/auth/scopes'
+import { canUseAi } from '@/lib/auth/ai-scope'
 
 interface AdminScopes {
   role: string
@@ -39,7 +39,11 @@ export function useCanUseAi(scope: string): boolean {
 }
 
 /** Renders its children only when useCanUseAi(scope) holds. */
-export function RequireAi({ scope, children, fallback = null }: {
+export function RequireAi({
+  scope,
+  children,
+  fallback = null,
+}: {
   scope: string
   children: ReactNode
   fallback?: ReactNode
@@ -48,7 +52,11 @@ export function RequireAi({ scope, children, fallback = null }: {
 }
 
 /** Renders its children only when the admin holds the write scope. */
-export function RequireWrite({ scope, children, fallback = null }: {
+export function RequireWrite({
+  scope,
+  children,
+  fallback = null,
+}: {
   scope: string
   children: ReactNode
   fallback?: ReactNode

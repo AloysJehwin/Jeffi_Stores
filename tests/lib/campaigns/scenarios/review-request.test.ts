@@ -1,25 +1,25 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),
   sendCampaignEmailRendered: vi.fn(),
   renderItemRows: vi.fn().mockReturnValue(''),
 }))
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   generateReviewToken: vi.fn(),
 }))
-vi.mock('@/lib/email-campaigns', () => ({
+vi.mock('@/lib/shared/email-campaigns', () => ({
   renderCampaignEmail: vi.fn(),
 }))
 
 import { reviewRequest } from '@/lib/campaigns/scenarios/review-request'
-import { queryMany } from '@/lib/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/automation-emails'
-import { generateReviewToken } from '@/lib/jwt'
-import { renderCampaignEmail } from '@/lib/email-campaigns'
+import { queryMany } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
+import { generateReviewToken } from '@/lib/auth/jwt'
+import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockFetchUser = fetchUserContext as ReturnType<typeof vi.fn>
@@ -87,10 +87,13 @@ describe('reviewRequest scenario', () => {
     })
 
     it('sends email and returns ok=true with named user and slug', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'Alice', email: 'alice@x.com', baseUrl: 'https://jeffistores.com' })
-      mockQueryMany.mockResolvedValue([
-        { name: 'Bolt M6', product_id: 'p1', image_url: 'img.jpg', slug: 'bolt-m6' },
-      ])
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'Alice',
+        email: 'alice@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
+      mockQueryMany.mockResolvedValue([{ name: 'Bolt M6', product_id: 'p1', image_url: 'img.jpg', slug: 'bolt-m6' }])
       mockGenerateToken.mockResolvedValue('tok123')
       mockResolveCoupon.mockResolvedValue({ couponCode: 'SAVE10', discountPercent: 10 })
       mockRenderEmail.mockReturnValue({ subject: 'Review', html: '<html/>', ampHtml: null })
@@ -102,7 +105,12 @@ describe('reviewRequest scenario', () => {
     })
 
     it('uses "there" when first_name is null', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: null, email: 'u@x.com', baseUrl: 'https://jeffistores.com' })
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: null,
+        email: 'u@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
       mockQueryMany.mockResolvedValue([])
       mockGenerateToken.mockResolvedValue('tok')
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
@@ -115,7 +123,12 @@ describe('reviewRequest scenario', () => {
     })
 
     it('passes empty couponCode when couponCode is null', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'Bob', email: 'b@x.com', baseUrl: 'https://jeffistores.com' })
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'Bob',
+        email: 'b@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
       mockQueryMany.mockResolvedValue([])
       mockGenerateToken.mockResolvedValue('tok')
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: null })
@@ -129,7 +142,12 @@ describe('reviewRequest scenario', () => {
     })
 
     it('passes discountPercent as string when set', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'Carol', email: 'c@x.com', baseUrl: 'https://jeffistores.com' })
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'Carol',
+        email: 'c@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
       mockQueryMany.mockResolvedValue([])
       mockGenerateToken.mockResolvedValue('tok')
       mockResolveCoupon.mockResolvedValue({ couponCode: 'CODE', discountPercent: 15 })
@@ -143,10 +161,13 @@ describe('reviewRequest scenario', () => {
     })
 
     it('sets productUrl to null when slug is null', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'Dan', email: 'd@x.com', baseUrl: 'https://jeffistores.com' })
-      mockQueryMany.mockResolvedValue([
-        { name: 'Widget', product_id: 'p2', image_url: null, slug: null },
-      ])
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'Dan',
+        email: 'd@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
+      mockQueryMany.mockResolvedValue([{ name: 'Widget', product_id: 'p2', image_url: null, slug: null }])
       mockGenerateToken.mockResolvedValue('tok')
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
       mockRenderEmail.mockReturnValue({ subject: 'S', html: '<h/>', ampHtml: null })
@@ -160,10 +181,13 @@ describe('reviewRequest scenario', () => {
     })
 
     it('builds productUrl from slug when slug is present', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'Eve', email: 'e@x.com', baseUrl: 'https://jeffistores.com' })
-      mockQueryMany.mockResolvedValue([
-        { name: 'Nut', product_id: 'p3', image_url: 'img.png', slug: 'nut-m8' },
-      ])
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'Eve',
+        email: 'e@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
+      mockQueryMany.mockResolvedValue([{ name: 'Nut', product_id: 'p3', image_url: 'img.png', slug: 'nut-m8' }])
       mockGenerateToken.mockResolvedValue('tok')
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
       mockRenderEmail.mockReturnValue({ subject: 'S', html: '<h/>', ampHtml: null })
@@ -177,10 +201,13 @@ describe('reviewRequest scenario', () => {
     })
 
     it('generates 5 star links per item', async () => {
-      mockFetchUser.mockResolvedValue({ id: 'user-1', first_name: 'F', email: 'f@x.com', baseUrl: 'https://jeffistores.com' })
-      mockQueryMany.mockResolvedValue([
-        { name: 'Screw', product_id: 'p4', image_url: null, slug: 'screw' },
-      ])
+      mockFetchUser.mockResolvedValue({
+        id: 'user-1',
+        first_name: 'F',
+        email: 'f@x.com',
+        baseUrl: 'https://jeffistores.com',
+      })
+      mockQueryMany.mockResolvedValue([{ name: 'Screw', product_id: 'p4', image_url: null, slug: 'screw' }])
       mockGenerateToken.mockResolvedValue('mytoken')
       mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
       mockRenderEmail.mockReturnValue({ subject: 'S', html: '<h/>', ampHtml: null })

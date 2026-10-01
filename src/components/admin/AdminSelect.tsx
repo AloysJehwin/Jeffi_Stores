@@ -64,11 +64,14 @@ export default function AdminSelect({
   const selectedOption = options.find(o => o.value === currentValue)
   const displayLabel = selectedOption?.label || placeholder
 
-  const handleSelect = useCallback((optionValue: string) => {
-    if (!isControlled) setInternalValue(optionValue)
-    onChange?.(optionValue)
-    setIsOpen(false)
-  }, [isControlled, onChange])
+  const handleSelect = useCallback(
+    (optionValue: string) => {
+      if (!isControlled) setInternalValue(optionValue)
+      onChange?.(optionValue)
+      setIsOpen(false)
+    },
+    [isControlled, onChange]
+  )
 
   const openDropdown = useCallback(() => {
     if (disabled || !buttonRef.current) return
@@ -87,7 +90,8 @@ export default function AdminSelect({
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
-        containerRef.current && !containerRef.current.contains(e.target as Node) &&
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node) &&
         !(e.target as Element).closest('[data-adminselect-dropdown]')
       ) {
         setIsOpen(false)
@@ -112,7 +116,7 @@ export default function AdminSelect({
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children
       if (items[highlightedIndex]) {
-        (items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
+        ;(items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
       }
     }
   }, [highlightedIndex, isOpen])
@@ -174,7 +178,7 @@ export default function AdminSelect({
           aria-expanded={isOpen}
           aria-haspopup="listbox"
           disabled={disabled}
-          onClick={() => isOpen ? setIsOpen(false) : openDropdown()}
+          onClick={() => (isOpen ? setIsOpen(false) : openDropdown())}
           onKeyDown={handleKeyDown}
           className={`w-full bg-surface border text-left transition-all cursor-pointer flex items-center justify-between
             ${compact || xs ? 'rounded' : 'rounded-lg'}
@@ -189,64 +193,78 @@ export default function AdminSelect({
           </span>
           <svg
             className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact || xs || md ? 'w-3 h-3' : 'w-4 h-4'}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
 
-        {isOpen && dropRect && typeof document !== 'undefined' && createPortal(
-          <div
-            data-adminselect-dropdown
-            className="fixed z-[9999] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
-            style={{
-              top: dropUp ? undefined : dropRect.top + 4,
-              bottom: dropUp ? window.innerHeight - dropRect.bottom + 4 : undefined,
-              left: dropRect.left,
-              width: dropRect.width,
-              maxHeight: maxDropdownH,
-              animation: 'adminSelectFadeIn 0.12s ease-out',
-            }}
-          >
-            <ul ref={listRef} role="listbox" className="overflow-y-auto py-1" style={{ maxHeight: maxDropdownH }}>
-              {options.map((option, index) => {
-                const showGroupHeader = option.group && option.group !== lastGroup
-                if (option.group) lastGroup = option.group
+        {isOpen &&
+          dropRect &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <div
+              data-adminselect-dropdown
+              className="fixed z-[9999] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
+              style={{
+                top: dropUp ? undefined : dropRect.top + 4,
+                bottom: dropUp ? window.innerHeight - dropRect.bottom + 4 : undefined,
+                left: dropRect.left,
+                width: dropRect.width,
+                maxHeight: maxDropdownH,
+                animation: 'adminSelectFadeIn 0.12s ease-out',
+              }}
+            >
+              <ul ref={listRef} role="listbox" className="overflow-y-auto py-1" style={{ maxHeight: maxDropdownH }}>
+                {options.map((option, index) => {
+                  const showGroupHeader = option.group && option.group !== lastGroup
+                  if (option.group) lastGroup = option.group
 
-                return (
-                  <li key={`${option.value}-${index}`}>
-                    {showGroupHeader && (
-                      <div className={`font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary border-t border-border-default first:border-t-0 ${compact || xs ? 'px-2.5 py-1 text-[9px]' : sm ? 'px-3 py-1 text-[10px]' : 'px-4 py-1.5 text-xs'}`}>
-                        {option.group}
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={option.value === currentValue}
-                      onClick={() => handleSelect(option.value)}
-                      onMouseEnter={() => setHighlightedIndex(index)}
-                      className={`w-full text-left transition-colors flex items-center justify-between
+                  return (
+                    <li key={`${option.value}-${index}`}>
+                      {showGroupHeader && (
+                        <div
+                          className={`font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary border-t border-border-default first:border-t-0 ${compact || xs ? 'px-2.5 py-1 text-[9px]' : sm ? 'px-3 py-1 text-[10px]' : 'px-4 py-1.5 text-xs'}`}
+                        >
+                          {option.group}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={option.value === currentValue}
+                        onClick={() => handleSelect(option.value)}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                        className={`w-full text-left transition-colors flex items-center justify-between
                         ${compact || xs ? 'px-2.5 py-1 text-xs' : sm ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}
                         ${option.indent ? (compact || xs ? 'pl-5' : sm ? 'pl-6' : 'pl-8') : ''}
                         ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'text-foreground-secondary'}
                         ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
                       `}
-                    >
-                      <span>{option.label}</span>
-                      {option.value === currentValue && (
-                        <svg className={`text-accent-500 shrink-0 ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>,
-          document.body
-        )}
+                      >
+                        <span>{option.label}</span>
+                        {option.value === currentValue && (
+                          <svg
+                            className={`text-accent-500 shrink-0 ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>,
+            document.body
+          )}
       </div>
 
       {hint && !error && <p className="text-xs text-foreground-muted mt-1.5">{hint}</p>}

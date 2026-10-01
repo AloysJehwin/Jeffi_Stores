@@ -11,7 +11,7 @@ vi.mock('https', () => {
 })
 
 import https from 'https'
-import { GET } from '@/app/api/delivery-check/route'
+import { GET } from '@/app/api/(public)/delivery-check/route'
 
 function makeReq(pincode?: string) {
   const url = new URL('http://localhost/api/delivery-check')
@@ -83,10 +83,14 @@ describe('GET /api/delivery-check', () => {
   })
 
   it('returns serviceable=true on valid pincode with post office', async () => {
-    mockHttpsGet(JSON.stringify([{
-      Status: 'Success',
-      PostOffice: [{ Name: 'Anna Nagar', District: 'Chennai', State: 'Tamil Nadu' }],
-    }]))
+    mockHttpsGet(
+      JSON.stringify([
+        {
+          Status: 'Success',
+          PostOffice: [{ Name: 'Anna Nagar', District: 'Chennai', State: 'Tamil Nadu' }],
+        },
+      ])
+    )
     const res = await GET(makeReq('600040'))
     const body = await res.json()
     expect(body.serviceable).toBe(true)

@@ -35,7 +35,17 @@ const BTN_CLASS =
   'px-2 py-1 text-xs font-medium rounded-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed'
 
 export default function TileListEditor({
-  label, hint, tiles, defaults, fields, blank, disabled, max = 8, showIcon = true, itemLabel = 'Tile', onCommit,
+  label,
+  hint,
+  tiles,
+  defaults,
+  fields,
+  blank,
+  disabled,
+  max = 8,
+  showIcon = true,
+  itemLabel = 'Tile',
+  onCommit,
 }: TileListEditorProps) {
   const [confirmingRestore, setConfirmingRestore] = useState(false)
   const usingDefaults = tiles.length === 0 && !!defaults?.length
@@ -59,26 +69,37 @@ export default function TileListEditor({
       <div className="flex items-center justify-between mb-2">
         <label className={`${LABEL_CLASS} mb-0`}>{label}</label>
         <div className="flex items-center gap-1">
-          {!usingDefaults && tiles.length > 0 && !!defaults?.length && (
-            confirmingRestore ? (
+          {!usingDefaults &&
+            tiles.length > 0 &&
+            !!defaults?.length &&
+            (confirmingRestore ? (
               <>
                 <span className="text-[11px] text-foreground-muted">Replace your tiles with the built-in ones?</span>
                 <button
                   type="button"
                   disabled={disabled}
-                  onClick={() => { setConfirmingRestore(false); onCommit([]) }}
+                  onClick={() => {
+                    setConfirmingRestore(false)
+                    onCommit([])
+                  }}
                   className={`${BTN_CLASS} text-red-600 dark:text-red-400`}
                 >
                   Restore
                 </button>
-                <button type="button" onClick={() => setConfirmingRestore(false)} className={BTN_CLASS}>Cancel</button>
+                <button type="button" onClick={() => setConfirmingRestore(false)} className={BTN_CLASS}>
+                  Cancel
+                </button>
               </>
             ) : (
-              <button type="button" disabled={disabled} onClick={() => setConfirmingRestore(true)} className={BTN_CLASS}>
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setConfirmingRestore(true)}
+                className={BTN_CLASS}
+              >
                 Restore built-in tiles
               </button>
-            )
-          )}
+            ))}
           <button
             type="button"
             disabled={disabled || shown.length >= max}
@@ -93,7 +114,8 @@ export default function TileListEditor({
 
       {usingDefaults && (
         <p className="text-xs text-foreground-muted rounded-lg border border-border-default bg-surface-secondary/40 px-3 py-2 mb-3">
-          These are the built-in tiles shown on the homepage. Edit, reorder or remove any of them to make the list your own.
+          These are the built-in tiles shown on the homepage. Edit, reorder or remove any of them to make the list your
+          own.
         </p>
       )}
 
@@ -113,11 +135,22 @@ export default function TileListEditor({
                     <IconByName name={tile.icon} className="w-4 h-4 text-accent-500" />
                   </span>
                 )}
-                <span className="text-xs font-semibold text-foreground truncate">{itemLabel} {i + 1}</span>
+                <span className="text-xs font-semibold text-foreground truncate">
+                  {itemLabel} {i + 1}
+                </span>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <button type="button" disabled={disabled || i === 0} onClick={() => move(i, -1)} className={BTN_CLASS}>Up</button>
-                <button type="button" disabled={disabled || i === shown.length - 1} onClick={() => move(i, 1)} className={BTN_CLASS}>Down</button>
+                <button type="button" disabled={disabled || i === 0} onClick={() => move(i, -1)} className={BTN_CLASS}>
+                  Up
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled || i === shown.length - 1}
+                  onClick={() => move(i, 1)}
+                  className={BTN_CLASS}
+                >
+                  Down
+                </button>
                 <button
                   type="button"
                   disabled={disabled}
@@ -140,7 +173,7 @@ export default function TileListEditor({
                   onChange={v => replace(i, { icon: v })}
                 />
               )}
-              {fields.map(f => (
+              {fields.map(f =>
                 f.kind === 'textarea' ? (
                   <TextArea
                     key={`${i}-${f.key}`}
@@ -169,7 +202,7 @@ export default function TileListEditor({
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 )
-              ))}
+              )}
             </div>
           </div>
         ))}

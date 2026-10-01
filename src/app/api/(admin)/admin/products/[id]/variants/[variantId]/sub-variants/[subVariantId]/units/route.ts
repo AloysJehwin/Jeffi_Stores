@@ -1,0 +1,167 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, queryOne, withTransaction, query } from '@/lib/shared/db'
+import {
+  validateSerializedUnitStep,
+  assertUnitChangeAllowed,
+  changedUnitFields,
+  validateUnitQuantityBounds,
+} from '@/lib/catalog/selling-unit'
+
+export const dynamic = 'force-dynamic'
+
+interface Params {
+  params: Promise<{ id: string; variantId: string; subVariantId: string }>
+}
+
+async function ensureSubVariant(productId: string, variantId: string, subVariantId: string) {
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM product_sub_variants
+     WHERE id = $1 AND variant_id = $2 AND product_id = $3`,
+    [subVariantId, variantId, productId]
+  )
+  return !!row
+}
+
+export async function GET(request: NextRequest, { params }: Params) {
+  const { id, variantId, subVariantId } = await params
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!(await ensureSubVariant(id, variantId, subVariantId))) {
+    return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
+  }
+
+  const units = await queryMany(
+    `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
+            is_base, display_label, notes, min_qty, max_qty, qty_step,
+            created_at, updated_at
+     FROM product_units
+     WHERE sub_variant_id = $1
+     ORDER BY is_base DESC, unit ASC`,
+    [subVariantId]
+  )
+
+  return NextResponse.json({ units })
+}
+
+export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId, subVariantId } = await params
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!(await ensureSubVariant(id, variantId, subVariantId))) {
+    return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
+  }
+
+  const body = await request.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+
+  const unit = String(body.unit || '').trim()
+  const factor = Number(body.factor)
+  if (!unit) return NextResponse.json({ error: 'unit is required' }, { status: 400 })
+  if (!Number.isFinite(factor) || factor <= 0) {
+    return NextResponse.json({ error: 'factor must be a positive number' }, { status: 400 })
+  }
+
+  const isBase = !!body.is_base
+  const displayLabel = body.display_label ? String(body.display_label).slice(0, 80) : null
+  const notes = body.notes ? String(body.notes).slice(0, 500) : null
+  const allowedDimensions = ['count', 'length', 'area', 'volume', 'weight', 'custom']
+  const dimension = allowedDimensions.includes(body.dimension) ? body.dimension : 'count'
+  const conversionMeta = body.conversion_meta != null ? body.conversion_meta : null
+  const minQty =
+    body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
+  const maxQty =
+    body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty
+      ? Number(body.max_qty)
+      : null
+  const qtyStep =
+    body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0
+      ? Number(body.qty_step)
+      : 1
+
+  // min/max must be reachable multiples of qty_step, or the advertised bounds
+  // describe quantities nobody can actually order.
+  const boundsErr = validateUnitQuantityBounds({ qty_step: qtyStep, min_qty: minQty, max_qty: maxQty })
+  if (boundsErr) return NextResponse.json({ error: boundsErr }, { status: 400 })
+
+  // Serialized products need a whole-number qty_step so each step maps to one serial.
+  const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [id])
+  if (serialRow?.serialized) {
+    const stepErr = validateSerializedUnitStep(qtyStep)
+    if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
+  }
+
+  // An upsert on an existing unit overwrites factor/dimension/qty_step, so it is a
+  // change like any other — refuse it when stock was recorded under the old values.
+  const existingUnit = await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string }>(
+    `SELECT unit, factor::text, dimension, qty_step::text FROM product_units WHERE sub_variant_id = $1 AND unit = $2`,
+    [subVariantId, unit]
+  )
+  if (existingUnit) {
+    const guardErr = await assertUnitChangeAllowed(
+      { query },
+      { productId: id, variantId: variantId, subVariantId: subVariantId, label: unit },
+      changedUnitFields({ factor, dimension, qty_step: qtyStep }, existingUnit)
+    )
+    if (guardErr) return NextResponse.json({ error: guardErr }, { status: 409 })
+  }
+
+  try {
+    const upserted = await withTransaction(async client => {
+      if (isBase) {
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [subVariantId])
+      }
+      const res = await client.query(
+        `INSERT INTO product_units (
+           product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
+           is_base, display_label, notes, min_qty, max_qty, qty_step
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         ON CONFLICT (sub_variant_id, unit) WHERE sub_variant_id IS NOT NULL
+         DO UPDATE SET
+           factor = EXCLUDED.factor,
+           dimension = EXCLUDED.dimension,
+           conversion_meta = EXCLUDED.conversion_meta,
+           is_base = EXCLUDED.is_base,
+           display_label = EXCLUDED.display_label,
+           notes = EXCLUDED.notes,
+           min_qty = EXCLUDED.min_qty,
+           max_qty = EXCLUDED.max_qty,
+           qty_step = EXCLUDED.qty_step,
+           updated_at = NOW()
+         RETURNING *`,
+        [
+          id,
+          variantId,
+          subVariantId,
+          unit,
+          factor,
+          dimension,
+          conversionMeta ? JSON.stringify(conversionMeta) : null,
+          isBase,
+          displayLabel,
+          notes,
+          minQty,
+          maxQty,
+          qtyStep,
+        ]
+      )
+      return res.rows[0]
+    })
+    return NextResponse.json({ unit: upserted }, { status: 201 })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    if (msg.includes('duplicate key')) {
+      return NextResponse.json({ error: 'A unit with this name already exists for this sub-variant' }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Failed to create unit' }, { status: 500 })
+  }
+}

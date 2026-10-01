@@ -1,7 +1,16 @@
 'use client'
 
-import { configNumber } from '@/lib/homepage-sections'
-import { Grid, HeadingFields, LayoutField, LimitField, Note, Select, useSectionBinding, type EditorProps } from './fields'
+import { configNumber } from '@/lib/catalog/homepage-sections'
+import {
+  Grid,
+  HeadingFields,
+  LayoutField,
+  LimitField,
+  Note,
+  Select,
+  useSectionBinding,
+  type EditorProps,
+} from './fields'
 
 const RATINGS = [
   { value: '5', label: '5 stars only' },
@@ -18,7 +27,11 @@ export default function TestimonialsEditor(props: EditorProps) {
   return (
     <Grid>
       <HeadingFields props={props} eyebrowHint="Small line above the heading, e.g. Customer reviews." />
-      <LimitField props={props} label="How many reviews" hint="Approved reviews with written feedback, highest rated first." />
+      <LimitField
+        props={props}
+        label="How many reviews"
+        hint="Approved reviews with written feedback, highest rated first."
+      />
       <Select
         label="Minimum rating"
         value={String(configNumber(section, 'minRating', 4, 5))}
@@ -28,7 +41,9 @@ export default function TestimonialsEditor(props: EditorProps) {
       />
       <LayoutField props={props} />
       {approved === 0 && (
-        <Note>There are no approved reviews yet, so this section stays hidden. Approve reviews under Reviews to fill it.</Note>
+        <Note>
+          There are no approved reviews yet, so this section stays hidden. Approve reviews under Reviews to fill it.
+        </Note>
       )}
     </Grid>
   )

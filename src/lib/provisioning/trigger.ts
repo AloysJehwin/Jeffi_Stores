@@ -1,9 +1,5 @@
 import { getProvisioningProvider } from './index'
-import {
-  advanceProvisioningJob,
-  deprovisionTenant,
-  reprovisionDns,
-} from './steps'
+import { advanceProvisioningJob, deprovisionTenant, reprovisionDns } from './steps'
 import {
   getTenant,
   getProvisioningJob,
@@ -12,16 +8,20 @@ import {
   controlPlanePool,
   getDraft,
 } from '../tenant-registry'
-import { findLatestBackup } from '../tenant-backup-store'
+import { findLatestBackup } from '@/lib/tenancy/tenant-backup-store'
 import { SEED_PROFILES } from './seed-catalog'
 
 /** The tenant's onboarding category doubles as its starter-catalogue profile. */
 async function resolveSeedProfile(tenantId: string): Promise<string | undefined> {
   try {
-    const r = await controlPlanePool().query(
-      'SELECT product_categories FROM tenant_kyc WHERE tenant_id = $1', [tenantId])
+    const r = await controlPlanePool().query('SELECT product_categories FROM tenant_kyc WHERE tenant_id = $1', [
+      tenantId,
+    ])
     const raw = (r.rows[0]?.product_categories ?? '') as string
-    const first = raw.split(',').map((s) => s.trim()).filter(Boolean)[0]
+    const first = raw
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)[0]
     if (!first) return undefined
     return SEED_PROFILES.includes(first) ? first : 'Other'
   } catch {
@@ -38,12 +38,7 @@ async function resolveSeedProfile(tenantId: string): Promise<string | undefined>
 
 export type ProvisioningAction = 'provision' | 'reprovision' | 'deprovision'
 
-export type ProvisioningReason =
-  | 'first_payment'
-  | 'plan_change'
-  | 'missed_payment'
-  | 'owner_cancel'
-  | 'operator'
+export type ProvisioningReason = 'first_payment' | 'plan_change' | 'missed_payment' | 'owner_cancel' | 'operator'
 
 /** Full self-contained payload a caller hands to the engine. */
 export interface ProvisioningTrigger {
@@ -72,9 +67,9 @@ export interface TriggerResult {
  * Shared by the owner route, the payment webhook and the admin operator route.
  */
 export async function resolveRestoreKey(tenantId: string, slug: string): Promise<string | undefined> {
-  const ownerRow = await controlPlanePool().query(
-    `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId],
-  ).catch(() => null)
+  const ownerRow = await controlPlanePool()
+    .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId])
+    .catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id
   if (!ownerId) return undefined
   const draft = await getDraft(ownerId).catch(() => null)
@@ -119,7 +114,7 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
   const job = await enqueueProvisioning(t.tenantId, t.restoreFromKey ? { restoreFromKey: t.restoreFromKey } : undefined)
   // Seed optional payload fields the engine reads out of created_resources. A restored
   // store keeps its own data, so seeding is skipped there.
-  const seedProfile = t.restoreFromKey ? undefined : (t.seedProfile ?? await resolveSeedProfile(t.tenantId))
+  const seedProfile = t.restoreFromKey ? undefined : (t.seedProfile ?? (await resolveSeedProfile(t.tenantId)))
   if (seedProfile) {
     await updateProvisioningJob(job.id, {
       created_resources: { ...(job.created_resources || {}), seedProfile },
@@ -144,7 +139,10 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
   let prevStep = job.step
   for (let i = 0; i < MAX_INLINE_STEPS; i++) {
     const fresh = await getProvisioningJob(t.tenantId)
-    if (!fresh || fresh.status === 'done' || fresh.status === 'failed') { status = fresh?.status ?? status; break }
+    if (!fresh || fresh.status === 'done' || fresh.status === 'failed') {
+      status = fresh?.status ?? status
+      break
+    }
     status = await advanceProvisioningJob(fresh, provider)
     const after = await getProvisioningJob(t.tenantId)
     // Parked on a poll step (same step, still pending) → hand off to the recurring worker.

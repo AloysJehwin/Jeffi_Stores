@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyToken, verifyBusinessToken } from './lib/jwt'
-import { isPassiveAdminRequest } from './lib/passive-admin-paths'
-import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
-import { applyRateLimit } from './lib/rate-limit'
-import { extractSessionSignals } from './lib/session-signals-request'
+import { verifyToken, verifyBusinessToken } from './lib/auth/jwt'
+import { isPassiveAdminRequest } from './lib/auth/passive-admin-paths'
+import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/auth/scopes'
+import { applyRateLimit } from './lib/shared/rate-limit'
+import { extractSessionSignals } from './lib/auth/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
-import { runWithTenantContext } from './lib/tenant-context'
-import { adminCookieNameForHost } from './lib/admin-cookie'
-import { bindingGate } from './lib/session-binding-gate'
+import { runWithTenantContext } from './lib/tenancy/tenant-context'
+import { adminCookieNameForHost } from './lib/auth/admin-cookie'
+import { bindingGate } from './lib/auth/session-binding-gate'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -44,7 +44,7 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
   const xfProto = request.headers.get('x-forwarded-proto')
   const rawHost = xfHost || request.headers.get('host') || request.nextUrl.host
   // Strip any :port suffix unless it's a well-known dev port (localhost only).
-  const host = rawHost.replace(/:\d+$/, (m) => {
+  const host = rawHost.replace(/:\d+$/, m => {
     return process.env.NODE_ENV === 'production' ? '' : m
   })
   const proto = xfProto || (process.env.NODE_ENV === 'production' ? 'https' : request.nextUrl.protocol.replace(':', ''))
@@ -75,7 +75,9 @@ function isMobileUA(ua: string | null): boolean {
 }
 
 function isAdminWritePath(pathname: string): boolean {
-  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(add|new|edit(\/|$))/i.test(pathname)
+  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(add|new|edit(\/|$))/i.test(
+    pathname
+  )
 }
 
 // Strip /add, /new, or /edit/[...] suffix to derive the parent list URL.
@@ -163,10 +165,12 @@ export async function middleware(request: NextRequest) {
     // and let an unknown slug probe for a login page.
     const parsed = slugFromHost(hostname)
     if (parsed.slug || parsed.isCustomDomain) {
-      return addSecurityHeaders(new NextResponse('Not found', {
-        status: 404,
-        headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
-      }))
+      return addSecurityHeaders(
+        new NextResponse('Not found', {
+          status: 404,
+          headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+        })
+      )
     }
   }
 
@@ -178,19 +182,19 @@ export async function middleware(request: NextRequest) {
 
   // Sessions and admins live in each tenant's OWN database, so every session lookup below
   // must run against that DB. Unwrapped, they all resolve against the platform pool.
-  const inTenant = <T,>(fn: () => Promise<T>): Promise<T> =>
-    tenant ? runWithTenantContext(tenant, fn) : fn()
+  const inTenant = <T>(fn: () => Promise<T>): Promise<T> => (tenant ? runWithTenantContext(tenant, fn) : fn())
 
   // Defence in depth behind the per-tenant DB: a session must have been minted for exactly
   // the tenant addressed by this host. Cookies are NOT cleared — admin_sid is shared across
   // *.jeffistores.in, so deleting it here would sign the operator out of the platform admin.
   if (tenant) {
-    const anySid = request.cookies.get(adminCookie)?.value
-      || request.cookies.get('user_sid')?.value
-      || request.cookies.get('business_sid')?.value
+    const anySid =
+      request.cookies.get(adminCookie)?.value ||
+      request.cookies.get('user_sid')?.value ||
+      request.cookies.get('business_sid')?.value
     if (anySid) {
       const sess = await inTenant(async () => {
-        const { resolveSession } = await import('./lib/auth-sessions')
+        const { resolveSession } = await import('./lib/auth/auth-sessions')
         return resolveSession(anySid, reqSignals).catch(() => null)
       })
       if (sess && sess.tenantId !== tenant.tenantId) {
@@ -206,9 +210,9 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())
     const PORTAL_PROTECTED = ['/certs']
-    if (PORTAL_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+    if (PORTAL_PROTECTED.some(p => pathname === p || pathname.startsWith(p + '/'))) {
       const portalTok = request.cookies.get('cert_portal')?.value
-      const { verifyPortalToken } = await import('./lib/portal-session')
+      const { verifyPortalToken } = await import('./lib/auth/portal-session')
       const session = await verifyPortalToken(portalTok).catch(() => null)
       if (!session) {
         const res = NextResponse.redirect(new URL('/', request.url))
@@ -218,7 +222,11 @@ export async function middleware(request: NextRequest) {
     }
     const slug = pathname === '/' ? '' : pathname
     stripped.set('x-pathname', pathname)
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/certportal${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/certportal${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostname.startsWith('ecom.')) {
@@ -229,12 +237,12 @@ export async function middleware(request: NextRequest) {
     // onboarding legals-consent links here — so don't rewrite them into /ecom/legal (404).
     if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())
     const OWNER_PROTECTED = ['/onboard', '/dashboard']
-    if (OWNER_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+    if (OWNER_PROTECTED.some(p => pathname === p || pathname.startsWith(p + '/'))) {
       const ownerSid = request.cookies.get('owner_sid')?.value
       if (!ownerSid) {
         return addSecurityHeaders(NextResponse.redirect(new URL('/signin', request.url)))
       }
-      const { resolveOwnerSession } = await import('./lib/owner-session')
+      const { resolveOwnerSession } = await import('./lib/auth/owner-session')
       const owner = await resolveOwnerSession(ownerSid, reqSignals).catch(() => null)
       if (!owner) {
         const res = NextResponse.redirect(new URL('/signin', request.url))
@@ -245,7 +253,11 @@ export async function middleware(request: NextRequest) {
     const slug = pathname === '/' ? '' : pathname
     // Forward the real path so the ecom layout can hide its nav on auth pages.
     stripped.set('x-pathname', pathname)
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostApp === 'forms') {
@@ -253,25 +265,41 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(passThrough())
     }
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostApp === 'quotation') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostApp === 'invoice') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostApp === 'purchaseorder') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+    return addSecurityHeaders(
+      NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   if (hostApp === 'business') {
@@ -344,15 +372,18 @@ export async function middleware(request: NextRequest) {
   // check-session never saw the verified identity, so the panel reported "not detected"
   // however valid the cert was.
   if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
-    const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenant-mtls')
+    const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenancy/tenant-mtls')
     const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
-    const v = await verifyTenantClientCert(pem, tenant.tenantId)
-      .catch((): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' }))
+    const v = await verifyTenantClientCert(pem, tenant.tenantId).catch(
+      (): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' })
+    )
     if (!v.ok) {
-      return addSecurityHeaders(new NextResponse(
-        'A client certificate is required to access this admin panel.',
-        { status: 403, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Mtls-Reason': v.reason ?? 'denied' } },
-      ))
+      return addSecurityHeaders(
+        new NextResponse('A client certificate is required to access this admin panel.', {
+          status: 403,
+          headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Mtls-Reason': v.reason ?? 'denied' },
+        })
+      )
     }
     stripped.set('x-client-cert-serial', v.serial ?? '')
     stripped.set('x-client-cert-cn', v.commonName ?? '')
@@ -364,6 +395,9 @@ export async function middleware(request: NextRequest) {
     '/api/admin/auth/google',
     '/api/admin/check-session',
     '/api/admin/delhivery/sync-statuses',
+    // RazorpayX payout webhook: called server-to-server with no admin cookie. The route
+    // handler verifies the HMAC signature fail-closed, which is its only auth.
+    '/api/admin/financial/payables/webhook',
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',
@@ -452,7 +486,9 @@ export async function middleware(request: NextRequest) {
         const response = NextResponse.rewrite(rewriteUrl, { request: { headers: stripped } })
         return addSecurityHeaders(response)
       }
-      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url), { request: { headers: stripped } }))
+      return addSecurityHeaders(
+        NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url), { request: { headers: stripped } })
+      )
     }
   }
 
@@ -465,9 +501,7 @@ export async function middleware(request: NextRequest) {
 
     // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
     // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
-    const oauthCallbackPaths = [
-      '/api/admin/data-source/google/callback',
-    ]
+    const oauthCallbackPaths = ['/api/admin/data-source/google/callback']
     if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
       return addSecurityHeaders(passThrough())
     }
@@ -486,7 +520,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await inTenant(() => verifyToken(token, reqSignals, { touch: !isPassiveAdminRequest(pathname, request.method) }))
+    const payload = await inTenant(() =>
+      verifyToken(token, reqSignals, { touch: !isPassiveAdminRequest(pathname, request.method) })
+    )
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
@@ -494,10 +530,7 @@ export async function middleware(request: NextRequest) {
     const certCN = request.headers.get('x-client-cert-cn') || ''
     const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
-      return NextResponse.json(
-        { error: 'Certificate does not match authenticated user' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Certificate does not match authenticated user' }, { status: 403 })
     }
 
     const requiredScope = getScopeForPath(pathname)
@@ -513,11 +546,16 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminPath) {
-    const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') ||
-                       hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:') ||
-                       hostname.startsWith('app:') ||
-                       hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
-                       hostname.endsWith('.ngrok-free.app') || hostname.endsWith('.ngrok-free.dev')
+    const isLocalhost =
+      hostname === 'localhost' ||
+      hostname.startsWith('localhost:') ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('127.0.0.1:') ||
+      hostname.startsWith('app:') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname.endsWith('.ngrok-free.app') ||
+      hostname.endsWith('.ngrok-free.dev')
 
     if (pathname === '/admin/login') {
       return addSecurityHeaders(passThrough({ 'x-pathname': pathname }))
@@ -579,20 +617,20 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
     }
 
-    return addSecurityHeaders(passThrough({
-      'x-pathname': pathname,
-      'x-user-id': payload.adminId,
-      'x-username': payload.displayName || payload.email || 'Admin',
-      'x-user-role': payload.role,
-      'x-user-scopes': JSON.stringify(payload.scopes || []),
-    }))
+    return addSecurityHeaders(
+      passThrough({
+        'x-pathname': pathname,
+        'x-user-id': payload.adminId,
+        'x-username': payload.displayName || payload.email || 'Admin',
+        'x-user-role': payload.role,
+        'x-user-scopes': JSON.stringify(payload.scopes || []),
+      })
+    )
   }
 
   return addSecurityHeaders(passThrough())
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|screenshots|icon.png|apple-icon.png).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|images|screenshots|icon.png|apple-icon.png).*)'],
 }

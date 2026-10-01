@@ -3,24 +3,24 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
 }))
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { GET, PATCH } from '@/app/api/admin/inventory/suppliers/[id]/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
+import { GET, PATCH } from '@/app/api/(admin)/admin/inventory/suppliers/[id]/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -226,9 +226,14 @@ describe('PATCH /api/admin/inventory/suppliers/[id]', () => {
     } as any)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(makePatch({
-      name: 'New Supplier', phone: '1234567890', email: 'new@supplier.com',
-    }), routeParams as any)
+    const res = await PATCH(
+      makePatch({
+        name: 'New Supplier',
+        phone: '1234567890',
+        email: 'new@supplier.com',
+      }),
+      routeParams as any
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.success).toBe(true)

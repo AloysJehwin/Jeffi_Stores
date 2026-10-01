@@ -1,30 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/search', () => ({
+vi.mock('@/lib/catalog/search', () => ({
   buildProductSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 2 }),
   buildProductSearchRank: vi.fn().mockReturnValue({ rank: '(0+0)', params: [], nextIdx: 3 }),
 }))
 
-import { GET } from '@/app/api/admin/quotations/products/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/quotations/products/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -38,7 +38,9 @@ function makeReq(searchParams: Record<string, string> = {}) {
   return new NextRequest(url.toString())
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/quotations/products', () => {
   it('returns 401 when unauthenticated', async () => {
@@ -82,7 +84,7 @@ describe('GET /api/admin/quotations/products', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
-    const { buildProductSearchClause, buildProductSearchRank } = await import('@/lib/search')
+    const { buildProductSearchClause, buildProductSearchRank } = await import('@/lib/catalog/search')
     const res = await GET(makeReq({ q: 'bolt' }))
     expect(res.status).toBe(200)
     expect(buildProductSearchClause).toHaveBeenCalled()
@@ -95,10 +97,7 @@ describe('GET /api/admin/quotations/products', () => {
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeReq({ category_id: 'cat-1' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('$1::uuid'),
-      expect.arrayContaining(['cat-1'])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('$1::uuid'), expect.arrayContaining(['cat-1']))
   })
 
   it('respects featured filter', async () => {
@@ -107,10 +106,7 @@ describe('GET /api/admin/quotations/products', () => {
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeReq({ featured: 'true' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('is_featured = true'),
-      expect.any(Array)
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('is_featured = true'), expect.any(Array))
   })
 
   it('respects limit param', async () => {
@@ -119,10 +115,7 @@ describe('GET /api/admin/quotations/products', () => {
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeReq({ limit: '10' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining([10])
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining([10]))
   })
 
   it('returns 500 on db error', async () => {

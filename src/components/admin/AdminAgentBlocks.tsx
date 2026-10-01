@@ -2,9 +2,21 @@
 
 import { useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Package, ShoppingBag, User, AlertTriangle, Info, CheckCircle, XCircle, HelpCircle, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import {
+  Package,
+  ShoppingBag,
+  User,
+  AlertTriangle,
+  Info,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
-import { ap } from '@/lib/admin-path'
+import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from './AdminSelect'
 import CopySku from '@/components/ui/CopySku'
 
@@ -13,7 +25,9 @@ const INR_FORMATTER = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2,
 function parseNumber(input: unknown): number | null {
   if (input == null) return null
   if (typeof input === 'number') return isFinite(input) ? input : null
-  const cleaned = String(input).replace(/[₹,\s]/g, '').trim()
+  const cleaned = String(input)
+    .replace(/[₹,\s]/g, '')
+    .trim()
   if (!cleaned) return null
   const n = Number(cleaned)
   return isFinite(n) ? n : null
@@ -44,21 +58,58 @@ export interface BaseBlock {
   [key: string]: unknown
 }
 
-interface TextBlock extends BaseBlock { type: 'text'; value: string; weight?: 'normal' | 'bold' | 'muted' }
-interface HeadingBlock extends BaseBlock { type: 'heading'; value: string; level?: 1 | 2 | 3 }
-interface KvPairsBlock extends BaseBlock { type: 'kv_pairs'; pairs: { key: string; value: string }[] }
-interface TableBlock extends BaseBlock { type: 'table'; headers: string[]; rows: (string | number)[][] }
+interface TextBlock extends BaseBlock {
+  type: 'text'
+  value: string
+  weight?: 'normal' | 'bold' | 'muted'
+}
+interface HeadingBlock extends BaseBlock {
+  type: 'heading'
+  value: string
+  level?: 1 | 2 | 3
+}
+interface KvPairsBlock extends BaseBlock {
+  type: 'kv_pairs'
+  pairs: { key: string; value: string }[]
+}
+interface TableBlock extends BaseBlock {
+  type: 'table'
+  headers: string[]
+  rows: (string | number)[][]
+}
 interface ProductGridBlock extends BaseBlock {
   type: 'product_grid'
-  products: { id: string; name: string; sku?: string; price?: string | number; image_url?: string | null; stock?: number | string; subtitle?: string }[]
+  products: {
+    id: string
+    name: string
+    sku?: string
+    price?: string | number
+    image_url?: string | null
+    stock?: number | string
+    subtitle?: string
+  }[]
 }
 interface CustomerListBlock extends BaseBlock {
   type: 'customer_list'
-  customers: { id: string; name?: string; email: string; total_orders?: number | string; lifetime_value?: number | string; phone?: string | null }[]
+  customers: {
+    id: string
+    name?: string
+    email: string
+    total_orders?: number | string
+    lifetime_value?: number | string
+    phone?: string | null
+  }[]
 }
 interface OrderListBlock extends BaseBlock {
   type: 'order_list'
-  orders: { id: string; order_number: string; status: string; total?: number | string; created_at?: string; customer_name?: string }[]
+  orders: {
+    id: string
+    order_number: string
+    status: string
+    total?: number | string
+    created_at?: string
+    customer_name?: string
+  }[]
 }
 interface ChoicePickerBlock extends BaseBlock {
   type: 'choice_picker'
@@ -66,25 +117,56 @@ interface ChoicePickerBlock extends BaseBlock {
   options: { id: string; label: string; sublabel?: string }[]
   note?: string
 }
-interface CalloutBlock extends BaseBlock { type: 'callout'; tone: 'info' | 'warn' | 'error' | 'success'; message: string; title?: string }
-interface CodeBlockType extends BaseBlock { type: 'code_block'; content: string; language?: string }
-interface LinkButtonBlock extends BaseBlock { type: 'link_button'; label: string; href: string }
-interface ImageCardBlock extends BaseBlock { type: 'image_card'; image_url: string; title?: string; subtitle?: string; href?: string }
+interface CalloutBlock extends BaseBlock {
+  type: 'callout'
+  tone: 'info' | 'warn' | 'error' | 'success'
+  message: string
+  title?: string
+}
+interface CodeBlockType extends BaseBlock {
+  type: 'code_block'
+  content: string
+  language?: string
+}
+interface LinkButtonBlock extends BaseBlock {
+  type: 'link_button'
+  label: string
+  href: string
+}
+interface ImageCardBlock extends BaseBlock {
+  type: 'image_card'
+  image_url: string
+  title?: string
+  subtitle?: string
+  href?: string
+}
 
 interface QuotationResolverSubVariant {
-  id: string; name: string; sku: string | null; price: number
+  id: string
+  name: string
+  sku: string | null
+  price: number
 }
 interface QuotationResolverVariant {
-  id: string; name: string; sku: string | null; price: number
+  id: string
+  name: string
+  sku: string | null
+  price: number
   subVariants?: QuotationResolverSubVariant[]
 }
 interface QuotationResolverCandidate {
-  productId: string; name: string; sku: string | null; price: number; sim: number; score: number
+  productId: string
+  name: string
+  sku: string | null
+  price: number
+  sim: number
+  score: number
   imageUrl?: string | null
   variants?: QuotationResolverVariant[]
 }
 interface QuotationResolverLine {
-  requestedText: string; qty: number
+  requestedText: string
+  qty: number
   status: 'matched' | 'ambiguous' | 'unmatched'
   candidates: QuotationResolverCandidate[]
 }
@@ -95,9 +177,18 @@ interface QuotationResolverBlock extends BaseBlock {
 }
 
 export type UiBlock =
-  | TextBlock | HeadingBlock | KvPairsBlock | TableBlock
-  | ProductGridBlock | CustomerListBlock | OrderListBlock
-  | ChoicePickerBlock | CalloutBlock | CodeBlockType | LinkButtonBlock | ImageCardBlock
+  | TextBlock
+  | HeadingBlock
+  | KvPairsBlock
+  | TableBlock
+  | ProductGridBlock
+  | CustomerListBlock
+  | OrderListBlock
+  | ChoicePickerBlock
+  | CalloutBlock
+  | CodeBlockType
+  | LinkButtonBlock
+  | ImageCardBlock
   | QuotationResolverBlock
 
 interface Props {
@@ -117,17 +208,28 @@ export default function AdminAgentBlocks({ blocks, onPickOption, pickerResolved,
   )
 }
 
-function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pickerResolved?: boolean; onSendMessage?: (msg: string) => void }): ReactNode {
+function renderBlock(
+  b: UiBlock,
+  ctx: { onPickOption?: Props['onPickOption']; pickerResolved?: boolean; onSendMessage?: (msg: string) => void }
+): ReactNode {
   switch (b.type) {
     case 'text': {
-      const cls = b.weight === 'bold' ? 'text-sm font-semibold text-foreground' :
-                  b.weight === 'muted' ? 'text-xs text-foreground-muted' :
-                  'text-sm text-foreground'
+      const cls =
+        b.weight === 'bold'
+          ? 'text-sm font-semibold text-foreground'
+          : b.weight === 'muted'
+            ? 'text-xs text-foreground-muted'
+            : 'text-sm text-foreground'
       return <p className={`${cls} whitespace-pre-wrap`}>{b.value}</p>
     }
     case 'heading': {
       const lvl = b.level ?? 2
-      const cls = lvl === 1 ? 'text-base font-bold' : lvl === 2 ? 'text-sm font-bold' : 'text-xs font-semibold uppercase tracking-wide text-foreground-muted'
+      const cls =
+        lvl === 1
+          ? 'text-base font-bold'
+          : lvl === 2
+            ? 'text-sm font-bold'
+            : 'text-xs font-semibold uppercase tracking-wide text-foreground-muted'
       return <p className={cls}>{b.value}</p>
     }
     case 'kv_pairs':
@@ -147,13 +249,21 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
           <table className="text-xs border-collapse w-full">
             <thead>
               <tr className="border-b border-border-default">
-                {b.headers.map((h, i) => <th key={i} className="text-left font-semibold py-1.5 px-2">{h}</th>)}
+                {b.headers.map((h, i) => (
+                  <th key={i} className="text-left font-semibold py-1.5 px-2">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {b.rows.map((row, ri) => (
                 <tr key={ri} className="border-b border-border-default/50">
-                  {row.map((cell, ci) => <td key={ci} className="py-1.5 px-2 align-top">{String(cell)}</td>)}
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="py-1.5 px-2 align-top">
+                      {String(cell)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -172,18 +282,33 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
                 className="flex gap-3 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
               >
                 <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0 overflow-hidden">
-                  {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-foreground-muted" />}
+                  {p.image_url ? (
+                    <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Package className="w-5 h-5 text-foreground-muted" />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
-                  {p.sku && <p className="text-[10px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}<CopySku sku={p.sku} /></span></p>}
+                  {p.sku && (
+                    <p className="text-[10px] text-foreground-muted font-mono">
+                      <span className="inline-flex items-center gap-1">
+                        {p.sku}
+                        <CopySku sku={p.sku} />
+                      </span>
+                    </p>
+                  )}
                   <div className="flex items-center justify-between mt-1 gap-2">
                     <p className="text-xs font-medium text-foreground tabular-nums">{fmtPriceOrAsk(p.price)}</p>
-                    <p className={`text-[10px] tabular-nums ${
-                      stockInfo.tone === 'out' ? 'text-red-600 dark:text-red-400'
-                      : stockInfo.tone === 'low' ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-foreground-muted'
-                    }`}>
+                    <p
+                      className={`text-[10px] tabular-nums ${
+                        stockInfo.tone === 'out'
+                          ? 'text-red-600 dark:text-red-400'
+                          : stockInfo.tone === 'low'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-foreground-muted'
+                      }`}
+                    >
                       {stockInfo.label}
                     </p>
                   </div>
@@ -198,11 +323,18 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       return (
         <div className="space-y-1">
           {b.customers.map(c => (
-            <Link key={c.id} href={ap(`/admin/customers/${c.id}`)} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
+            <Link
+              key={c.id}
+              href={ap(`/admin/customers/${c.id}`)}
+              className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
+            >
               <User className="w-4 h-4 text-foreground-muted shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-foreground truncate">{c.name || c.email}</p>
-                <p className="text-[10px] text-foreground-muted truncate">{c.email}{c.phone ? ` · ${c.phone}` : ''}</p>
+                <p className="text-[10px] text-foreground-muted truncate">
+                  {c.email}
+                  {c.phone ? ` · ${c.phone}` : ''}
+                </p>
               </div>
               {c.total_orders !== undefined && (
                 <div className="text-right shrink-0">
@@ -224,16 +356,25 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       return (
         <div className="space-y-1">
           {b.orders.map(o => (
-            <Link key={o.id} href={ap(`/admin/orders/${o.id}`)} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
+            <Link
+              key={o.id}
+              href={ap(`/admin/orders/${o.id}`)}
+              className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
+            >
               <ShoppingBag className="w-4 h-4 text-foreground-muted shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-foreground truncate">{o.order_number}{o.customer_name ? ` · ${o.customer_name}` : ''}</p>
+                <p className="text-xs font-semibold text-foreground truncate">
+                  {o.order_number}
+                  {o.customer_name ? ` · ${o.customer_name}` : ''}
+                </p>
                 <p className="text-[10px] text-foreground-muted">
                   {o.status}
                   {o.created_at ? ` · ${new Date(o.created_at).toLocaleDateString()}` : ''}
                 </p>
               </div>
-              {o.total !== undefined && <p className="text-xs font-semibold text-foreground shrink-0 tabular-nums">{fmtINR(o.total)}</p>}
+              {o.total !== undefined && (
+                <p className="text-xs font-semibold text-foreground shrink-0 tabular-nums">{fmtINR(o.total)}</p>
+              )}
             </Link>
           ))}
         </div>
@@ -242,7 +383,10 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       if (ctx.pickerResolved) return null
       return (
         <div className="rounded-lg border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/10 p-3">
-          <p className="text-xs font-semibold text-accent-900 dark:text-accent-200 mb-2">Pick a {b.choice_kind}{b.note ? ` — ${b.note}` : ''}</p>
+          <p className="text-xs font-semibold text-accent-900 dark:text-accent-200 mb-2">
+            Pick a {b.choice_kind}
+            {b.note ? ` — ${b.note}` : ''}
+          </p>
           <div className="space-y-1">
             {b.options.map(opt => (
               <button
@@ -260,14 +404,16 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       )
     case 'callout': {
       const tone = b.tone || 'info'
-      const Icon = tone === 'warn' ? AlertTriangle : tone === 'error' ? XCircle : tone === 'success' ? CheckCircle : Info
-      const cls = tone === 'warn'
-        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200'
-        : tone === 'error'
-          ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-900 dark:text-red-200'
-          : tone === 'success'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-900 dark:text-green-200'
-            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-200'
+      const Icon =
+        tone === 'warn' ? AlertTriangle : tone === 'error' ? XCircle : tone === 'success' ? CheckCircle : Info
+      const cls =
+        tone === 'warn'
+          ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200'
+          : tone === 'error'
+            ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700 text-red-900 dark:text-red-200'
+            : tone === 'success'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-900 dark:text-green-200'
+              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-900 dark:text-blue-200'
       return (
         <div className={`rounded-lg border p-3 flex items-start gap-2 text-xs ${cls}`}>
           <Icon className="w-4 h-4 mt-0.5 shrink-0" />
@@ -286,7 +432,10 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       )
     case 'link_button':
       return (
-        <Link href={b.href} className="inline-flex items-center px-3 py-1.5 rounded text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white">
+        <Link
+          href={b.href}
+          className="inline-flex items-center px-3 py-1.5 rounded text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white"
+        >
           {b.label}
         </Link>
       )
@@ -310,8 +459,12 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
 }
 
 interface ManualPickResult {
-  productId: string; name: string; sku: string | null; price: number
-  sim?: number; score?: number
+  productId: string
+  name: string
+  sku: string | null
+  price: number
+  sim?: number
+  score?: number
   imageUrl?: string | null
   variants?: QuotationResolverVariant[]
 }
@@ -324,24 +477,38 @@ function ProductSearchPicker({ onPick }: { onPick: (p: ManualPickResult) => void
 
   const search = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (!q.trim()) { setResults([]); return }
+    if (!q.trim()) {
+      setResults([])
+      return
+    }
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
         const res = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&limit=8`)
         const json = await res.json()
-        const products = (Array.isArray(json) ? json : (json.products || json.results || [])) as Array<{
-          id: string; name: string; sku?: string | null; base_price?: number; price?: number; image_url?: string | null; thumbnail_url?: string | null
+        const products = (Array.isArray(json) ? json : json.products || json.results || []) as Array<{
+          id: string
+          name: string
+          sku?: string | null
+          base_price?: number
+          price?: number
+          image_url?: string | null
+          thumbnail_url?: string | null
         }>
-        setResults(products.map(p => ({
-          productId: p.id,
-          name: p.name,
-          sku: p.sku ?? null,
-          price: p.price ?? p.base_price ?? 0,
-          imageUrl: p.thumbnail_url || p.image_url || null,
-        })))
-      } catch { setResults([]) }
-      finally { setLoading(false) }
+        setResults(
+          products.map(p => ({
+            productId: p.id,
+            name: p.name,
+            sku: p.sku ?? null,
+            price: p.price ?? p.base_price ?? 0,
+            imageUrl: p.thumbnail_url || p.image_url || null,
+          }))
+        )
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
     }, 300)
   }, [])
 
@@ -353,7 +520,10 @@ function ProductSearchPicker({ onPick }: { onPick: (p: ManualPickResult) => void
           type="text"
           value={query}
           placeholder="Search product catalog…"
-          onChange={e => { setQuery(e.target.value); search(e.target.value) }}
+          onChange={e => {
+            setQuery(e.target.value)
+            search(e.target.value)
+          }}
           className="w-full rounded-md border border-border-default bg-surface-primary pl-7 pr-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
       </div>
@@ -364,16 +534,37 @@ function ProductSearchPicker({ onPick }: { onPick: (p: ManualPickResult) => void
             <button
               key={p.productId}
               type="button"
-              onClick={() => { onPick(p); setQuery(''); setResults([]) }}
+              onClick={() => {
+                onPick(p)
+                setQuery('')
+                setResults([])
+              }}
               className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-surface-secondary text-left"
             >
-              {p.imageUrl
-                ? <img src={p.imageUrl} alt="" className="w-8 h-8 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                : <div className="w-8 h-8 rounded bg-surface-secondary flex items-center justify-center shrink-0"><Package className="w-3.5 h-3.5 text-foreground-muted" /></div>
-              }
+              {p.imageUrl ? (
+                <img
+                  src={p.imageUrl}
+                  alt=""
+                  className="w-8 h-8 rounded object-cover shrink-0"
+                  onError={e => {
+                    ;(e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              ) : (
+                <div className="w-8 h-8 rounded bg-surface-secondary flex items-center justify-center shrink-0">
+                  <Package className="w-3.5 h-3.5 text-foreground-muted" />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
-                {p.sku && <p className="text-[10px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}<CopySku sku={p.sku} /></span></p>}
+                {p.sku && (
+                  <p className="text-[10px] text-foreground-muted font-mono">
+                    <span className="inline-flex items-center gap-1">
+                      {p.sku}
+                      <CopySku sku={p.sku} />
+                    </span>
+                  </p>
+                )}
               </div>
             </button>
           ))}
@@ -395,14 +586,26 @@ function QuotationResolverBlockUI({
   const [cardIndex, setCardIndex] = useState(0)
   const [candidateIndex, setCandidateIndex] = useState<Record<number, number>>(() => {
     const init: Record<number, number> = {}
-    lines.forEach((_, i) => { init[i] = 0 })
+    lines.forEach((_, i) => {
+      init[i] = 0
+    })
     return init
   })
   // confirmedByLine[lineIdx] = { productId, variantId?, subVariantId?, name, price, sku, imageUrl? }
-  const [confirmedByLine, setConfirmedByLine] = useState<Record<number, {
-    productId: string; variantId?: string; subVariantId?: string
-    name: string; price: number; sku: string | null; imageUrl?: string | null
-  }>>({})
+  const [confirmedByLine, setConfirmedByLine] = useState<
+    Record<
+      number,
+      {
+        productId: string
+        variantId?: string
+        subVariantId?: string
+        name: string
+        price: number
+        sku: string | null
+        imageUrl?: string | null
+      }
+    >
+  >({})
   const [variantSel, setVariantSel] = useState<Record<string, string>>({})
   const [subVariantSel, setSubVariantSel] = useState<Record<string, string>>({})
   // manualPick[lineIdx] = manually searched product (overrides candidates)
@@ -411,45 +614,51 @@ function QuotationResolverBlockUI({
   const [skippedLines, setSkippedLines] = useState<Record<number, boolean>>({})
 
   const ambiguousIndices = lines
-    .map((l, i) => (l.status === 'ambiguous' || l.status === 'unmatched') ? i : -1)
+    .map((l, i) => (l.status === 'ambiguous' || l.status === 'unmatched' ? i : -1))
     .filter(i => i >= 0)
   // "Create" enabled when all ambiguous lines are either confirmed or skipped
-  const canCreate = lines
-    .filter((l, i) => l.status === 'ambiguous' ? (!confirmedByLine[i] && !skippedLines[i]) : false)
-    .length === 0
+  const canCreate =
+    lines.filter((l, i) => (l.status === 'ambiguous' ? !confirmedByLine[i] && !skippedLines[i] : false)).length === 0
 
-  const resolvedCount = lines.filter((l, i) =>
-    (l.status === 'ambiguous' || l.status === 'unmatched') && (confirmedByLine[i] !== undefined || skippedLines[i])
+  const resolvedCount = lines.filter(
+    (l, i) =>
+      (l.status === 'ambiguous' || l.status === 'unmatched') && (confirmedByLine[i] !== undefined || skippedLines[i])
   ).length
   const needsReviewCount = lines.filter(l => l.status === 'ambiguous').length
 
   function submitQuotation() {
-    const items = lines.map((l, i) => {
-      if (l.status === 'matched' && l.candidates[0]) {
-        return { productId: l.candidates[0].productId, quantity: l.qty }
-      }
-      if (confirmedByLine[i]) {
-        const c = confirmedByLine[i]
-        return { productId: c.productId, variantId: c.variantId, subVariantId: c.subVariantId, quantity: l.qty }
-      }
-      if (skippedLines[i]) {
-        return { skipped: true, requestedText: l.requestedText, quantity: l.qty }
-      }
-      return null
-    }).filter(Boolean)
+    const items = lines
+      .map((l, i) => {
+        if (l.status === 'matched' && l.candidates[0]) {
+          return { productId: l.candidates[0].productId, quantity: l.qty }
+        }
+        if (confirmedByLine[i]) {
+          const c = confirmedByLine[i]
+          return { productId: c.productId, variantId: c.variantId, subVariantId: c.subVariantId, quantity: l.qty }
+        }
+        if (skippedLines[i]) {
+          return { skipped: true, requestedText: l.requestedText, quantity: l.qty }
+        }
+        return null
+      })
+      .filter(Boolean)
     if (!items.length) return
     onSendMessage?.(`__quotation_confirm__${JSON.stringify(items)}`)
   }
 
   const scoreColor = (score: number) =>
-    score >= 80 ? 'text-green-600 dark:text-green-400' :
-    score >= 60 ? 'text-amber-600 dark:text-amber-400' :
-    'text-red-500 dark:text-red-400'
+    score >= 80
+      ? 'text-green-600 dark:text-green-400'
+      : score >= 60
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-red-500 dark:text-red-400'
 
   const scoreBg = (score: number) =>
-    score >= 80 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
-    score >= 60 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' :
-    'border-border-default'
+    score >= 80
+      ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+      : score >= 60
+        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+        : 'border-border-default'
 
   if (!lines[cardIndex]) return null
 
@@ -494,16 +703,24 @@ function QuotationResolverBlockUI({
       },
     }))
     setShowSearch(prev => ({ ...prev, [cardIndex]: false }))
-    const nextUnresolved = lines.findIndex((l, i) =>
-      i > cardIndex && (l.status === 'ambiguous' || l.status === 'unmatched') && !confirmedByLine[i]
+    const nextUnresolved = lines.findIndex(
+      (l, i) => i > cardIndex && (l.status === 'ambiguous' || l.status === 'unmatched') && !confirmedByLine[i]
     )
     if (nextUnresolved >= 0) setCardIndex(nextUnresolved)
   }
 
   function handleManualPick(p: ManualPickResult) {
     setManualPick(prev => ({ ...prev, [cardIndex]: p }))
-    setVariantSel(prev => { const n = { ...prev }; delete n[vKey]; return n })
-    setSubVariantSel(prev => { const n = { ...prev }; delete n[vKey]; return n })
+    setVariantSel(prev => {
+      const n = { ...prev }
+      delete n[vKey]
+      return n
+    })
+    setSubVariantSel(prev => {
+      const n = { ...prev }
+      delete n[vKey]
+      return n
+    })
     setShowSearch(prev => ({ ...prev, [cardIndex]: false }))
   }
 
@@ -569,14 +786,20 @@ function QuotationResolverBlockUI({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               {isMatched && <CheckCircle className="w-3.5 h-3.5 text-green-600 dark:text-green-400 shrink-0" />}
-              {isAmbiguous && !isResolved && !isSkipped && <HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
-              {(isAmbiguous || isUnmatched) && isResolved && <CheckCircle className="w-3.5 h-3.5 text-accent-500 shrink-0" />}
+              {isAmbiguous && !isResolved && !isSkipped && (
+                <HelpCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              )}
+              {(isAmbiguous || isUnmatched) && isResolved && (
+                <CheckCircle className="w-3.5 h-3.5 text-accent-500 shrink-0" />
+              )}
               {isUnmatched && !isResolved && !isSkipped && <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
               {isSkipped && <span className="text-[10px] text-foreground-muted font-medium shrink-0">skipped</span>}
               <span className="font-medium text-foreground truncate">{currentLine.requestedText}</span>
               <span className="text-foreground-muted shrink-0">× {currentLine.qty}</span>
             </div>
-            <p className="text-[10px] text-foreground-muted mt-0.5">Item {cardIndex + 1} of {lines.length}</p>
+            <p className="text-[10px] text-foreground-muted mt-0.5">
+              Item {cardIndex + 1} of {lines.length}
+            </p>
           </div>
 
           <button
@@ -590,33 +813,58 @@ function QuotationResolverBlockUI({
         </div>
 
         {/* Resolved — show locked choice */}
-        {isResolved && (() => {
-          const c = confirmed
-          return (
-            <div className="rounded-lg border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/10 p-2">
-              <div className="flex gap-2.5">
-                {c.imageUrl
-                  ? <img src={c.imageUrl} alt="" className="w-12 h-12 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                  : <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0"><Package className="w-5 h-5 text-foreground-muted" /></div>
-                }
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{c.name}</p>
-                  <p className="text-[10px] font-mono text-foreground-muted"><span className="inline-flex items-center gap-1">{c.sku || '—'}{c.sku && <CopySku sku={c.sku} />}</span> · ₹{c.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+        {isResolved &&
+          (() => {
+            const c = confirmed
+            return (
+              <div className="rounded-lg border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/10 p-2">
+                <div className="flex gap-2.5">
+                  {c.imageUrl ? (
+                    <img
+                      src={c.imageUrl}
+                      alt=""
+                      className="w-12 h-12 rounded object-cover shrink-0"
+                      onError={e => {
+                        ;(e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0">
+                      <Package className="w-5 h-5 text-foreground-muted" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate">{c.name}</p>
+                    <p className="text-[10px] font-mono text-foreground-muted">
+                      <span className="inline-flex items-center gap-1">
+                        {c.sku || '—'}
+                        {c.sku && <CopySku sku={c.sku} />}
+                      </span>{' '}
+                      · ₹{c.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmedByLine(prev => {
+                        const n = { ...prev }
+                        delete n[cardIndex]
+                        return n
+                      })
+                      setManualPick(prev => {
+                        const n = { ...prev }
+                        delete n[cardIndex]
+                        return n
+                      })
+                    }}
+                    className="text-[10px] text-foreground-muted underline shrink-0 self-start"
+                  >
+                    change
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmedByLine(prev => { const n = { ...prev }; delete n[cardIndex]; return n })
-                    setManualPick(prev => { const n = { ...prev }; delete n[cardIndex]; return n })
-                  }}
-                  className="text-[10px] text-foreground-muted underline shrink-0 self-start"
-                >
-                  change
-                </button>
               </div>
-            </div>
-          )
-        })()}
+            )
+          })()}
 
         {/* Skipped — show undo option */}
         {isSkipped && (
@@ -624,7 +872,13 @@ function QuotationResolverBlockUI({
             <p className="text-xs text-foreground-muted">Skipped — will be added to quotation as a pending item</p>
             <button
               type="button"
-              onClick={() => setSkippedLines(prev => { const n = { ...prev }; delete n[cardIndex]; return n })}
+              onClick={() =>
+                setSkippedLines(prev => {
+                  const n = { ...prev }
+                  delete n[cardIndex]
+                  return n
+                })
+              }
               className="text-xs text-accent-600 dark:text-accent-400 hover:underline shrink-0"
             >
               Undo
@@ -646,7 +900,9 @@ function QuotationResolverBlockUI({
                 >
                   <ChevronLeft className="w-3 h-3" /> Prev
                 </button>
-                <span className="text-[10px] text-foreground-muted">{cidx + 1} / {currentLine.candidates.length} matches</span>
+                <span className="text-[10px] text-foreground-muted">
+                  {cidx + 1} / {currentLine.candidates.length} matches
+                </span>
                 <button
                   type="button"
                   disabled={cidx >= currentLine.candidates.length - 1}
@@ -660,17 +916,31 @@ function QuotationResolverBlockUI({
 
             {/* Product card — shown for matched/ambiguous when candidate exists */}
             {candidate ? (
-              <div className={`rounded-lg border p-2 ${isMatched ? scoreBg((candidate as QuotationResolverCandidate).score ?? 0) : 'border-border-default'}`}>
+              <div
+                className={`rounded-lg border p-2 ${isMatched ? scoreBg((candidate as QuotationResolverCandidate).score ?? 0) : 'border-border-default'}`}
+              >
                 <div className="flex gap-2.5 mb-2">
-                  {candidate.imageUrl
-                    ? <img src={candidate.imageUrl} alt="" className="w-14 h-14 rounded object-cover shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    : <div className="w-14 h-14 rounded bg-surface-secondary flex items-center justify-center shrink-0"><Package className="w-6 h-6 text-foreground-muted" /></div>
-                  }
+                  {candidate.imageUrl ? (
+                    <img
+                      src={candidate.imageUrl}
+                      alt=""
+                      className="w-14 h-14 rounded object-cover shrink-0"
+                      onError={e => {
+                        ;(e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded bg-surface-secondary flex items-center justify-center shrink-0">
+                      <Package className="w-6 h-6 text-foreground-muted" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-1">
                       <p className="font-semibold text-foreground leading-snug text-sm">{candidate.name}</p>
                       {!manPick && (candidate as QuotationResolverCandidate).score != null && (
-                        <span className={`font-bold tabular-nums shrink-0 text-sm ${scoreColor((candidate as QuotationResolverCandidate).score)}`}>
+                        <span
+                          className={`font-bold tabular-nums shrink-0 text-sm ${scoreColor((candidate as QuotationResolverCandidate).score)}`}
+                        >
                           {(candidate as QuotationResolverCandidate).score}
                         </span>
                       )}
@@ -694,7 +964,11 @@ function QuotationResolverBlockUI({
                       }))}
                       onChange={val => {
                         setVariantSel(prev => ({ ...prev, [vKey]: val }))
-                        setSubVariantSel(prev => { const n = { ...prev }; delete n[vKey]; return n })
+                        setSubVariantSel(prev => {
+                          const n = { ...prev }
+                          delete n[vKey]
+                          return n
+                        })
                       }}
                     />
                   </div>
@@ -730,8 +1004,12 @@ function QuotationResolverBlockUI({
                       type="button"
                       onClick={() => {
                         setSkippedLines(prev => ({ ...prev, [cardIndex]: true }))
-                        const next = lines.findIndex((l, i) =>
-                          i > cardIndex && (l.status === 'ambiguous' || l.status === 'unmatched') && !confirmedByLine[i] && !skippedLines[i]
+                        const next = lines.findIndex(
+                          (l, i) =>
+                            i > cardIndex &&
+                            (l.status === 'ambiguous' || l.status === 'unmatched') &&
+                            !confirmedByLine[i] &&
+                            !skippedLines[i]
                         )
                         if (next >= 0) setCardIndex(next)
                         else if (cardIndex + 1 < lines.length) setCardIndex(cardIndex + 1)
@@ -761,11 +1039,13 @@ function QuotationResolverBlockUI({
                   className="flex items-center gap-1 text-[10px] text-foreground-muted hover:text-foreground"
                 >
                   <Search className="w-3 h-3" />
-                  {showSearch[cardIndex] ? 'Hide search' : (manPick ? 'Search different product' : 'Search product catalog')}
+                  {showSearch[cardIndex]
+                    ? 'Hide search'
+                    : manPick
+                      ? 'Search different product'
+                      : 'Search product catalog'}
                 </button>
-                {showSearch[cardIndex] && (
-                  <ProductSearchPicker onPick={handleManualPick} />
-                )}
+                {showSearch[cardIndex] && <ProductSearchPicker onPick={handleManualPick} />}
               </div>
             )}
           </div>

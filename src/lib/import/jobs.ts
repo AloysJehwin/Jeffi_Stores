@@ -1,5 +1,5 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { resolveTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 // On the platform (flagship) admin there is no ALS tenant — middleware sets one only on tenant
 // hosts. import_jobs.tenant_id is NOT NULL, so flagship jobs are keyed to this sentinel; the worker
@@ -67,7 +67,14 @@ export async function enqueueImportJob(input: {
   const res = await pool.query(
     `INSERT INTO import_jobs (tenant_id, source, file_key, spreadsheet_id, total_rows, created_by)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [input.tenantId, input.source, input.fileKey ?? null, input.spreadsheetId ?? null, input.totalRows, input.createdBy ?? null],
+    [
+      input.tenantId,
+      input.source,
+      input.fileKey ?? null,
+      input.spreadsheetId ?? null,
+      input.totalRows,
+      input.createdBy ?? null,
+    ]
   )
   return res.rows[0] as ImportJob
 }
@@ -84,7 +91,7 @@ export async function claimNextImportJob(): Promise<ImportJob | null> {
        FOR UPDATE SKIP LOCKED
        LIMIT 1
      )
-     RETURNING *`,
+     RETURNING *`
   )
   return (res.rows[0] as ImportJob) || null
 }
@@ -102,12 +109,15 @@ export async function updateImportJob(
     pending_deletions: PendingDeletion[]
     last_error: string | null
     finished: boolean
-  }>,
+  }>
 ): Promise<void> {
   const pool = controlPlanePool()
   const sets: string[] = ['updated_at = now()']
   const args: unknown[] = []
-  const set = (col: string, val: unknown, cast = '') => { args.push(val); sets.push(`${col}=$${args.length}${cast}`) }
+  const set = (col: string, val: unknown, cast = '') => {
+    args.push(val)
+    sets.push(`${col}=$${args.length}${cast}`)
+  }
   if (patch.status !== undefined) set('status', patch.status)
   if (patch.processed_rows !== undefined) set('processed_rows', patch.processed_rows)
   if (patch.created_count !== undefined) set('created_count', patch.created_count)
@@ -115,7 +125,8 @@ export async function updateImportJob(
   if (patch.error_count !== undefined) set('error_count', patch.error_count)
   if (patch.row_results !== undefined) set('row_results', JSON.stringify(patch.row_results), '::jsonb')
   if (patch.image_progress !== undefined) set('image_progress', JSON.stringify(patch.image_progress), '::jsonb')
-  if (patch.pending_deletions !== undefined) set('pending_deletions', JSON.stringify(patch.pending_deletions), '::jsonb')
+  if (patch.pending_deletions !== undefined)
+    set('pending_deletions', JSON.stringify(patch.pending_deletions), '::jsonb')
   if (patch.last_error !== undefined) set('last_error', patch.last_error)
   if (patch.finished) sets.push('finished_at = now()')
   args.push(id)
@@ -130,10 +141,10 @@ export async function getImportJob(id: string, tenantId: string): Promise<Import
 
 export async function listImportJobs(tenantId: string, limit = 30): Promise<ImportJob[]> {
   const pool = controlPlanePool()
-  const res = await pool.query(
-    `SELECT * FROM import_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT $2`,
-    [tenantId, limit],
-  )
+  const res = await pool.query(`SELECT * FROM import_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT $2`, [
+    tenantId,
+    limit,
+  ])
   return res.rows as ImportJob[]
 }
 
@@ -141,7 +152,7 @@ export async function latestJobBySource(tenantId: string, source: ImportSource):
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT * FROM import_jobs WHERE tenant_id=$1 AND source=$2 ORDER BY created_at DESC LIMIT 1`,
-    [tenantId, source],
+    [tenantId, source]
   )
   return (res.rows[0] as ImportJob) || null
 }
@@ -153,7 +164,7 @@ export async function isSheetSyncRunning(tenantId: string): Promise<boolean> {
     `SELECT 1 FROM import_jobs
      WHERE tenant_id=$1 AND source='google_sheet' AND status='running' AND updated_at > now() - interval '15 minutes'
      LIMIT 1`,
-    [tenantId],
+    [tenantId]
   )
   return res.rows.length > 0
 }
@@ -163,7 +174,7 @@ export async function cancelPendingSheetSyncs(tenantId: string, reason: string):
   const res = await pool.query(
     `UPDATE import_jobs SET status='failed', last_error=$2, finished_at=now(), updated_at=now()
      WHERE tenant_id=$1 AND source='google_sheet' AND status='pending'`,
-    [tenantId, reason],
+    [tenantId, reason]
   )
   return res.rowCount ?? 0
 }

@@ -9,7 +9,12 @@ import TenantActions from './TenantActions'
  * startsWith(href + '/') — an object page off that prefix would never expand its nav group.
  */
 export default function TenantObjectHeader({
-  tenant: t, backHref, backLabel, kycPending, related, job,
+  tenant: t,
+  backHref,
+  backLabel,
+  kycPending,
+  related,
+  job,
 }: {
   tenant: TenantDetail
   backHref: string

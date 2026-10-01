@@ -3,9 +3,16 @@ import { SEED_CATALOGS, SEED_PROFILES, catalogFor } from '@/lib/provisioning/see
 
 // The onboarding wizard's category list — every option must have a starter catalogue.
 const ONBOARDING_CATEGORIES = [
-  'Electronics & Gadgets', 'Fashion & Apparel', 'Home & Kitchen',
-  'Health & Beauty', 'Books & Stationery', 'Sports & Fitness',
-  'Toys & Games', 'Industrial & B2B', 'Food & Groceries', 'Other',
+  'Electronics & Gadgets',
+  'Fashion & Apparel',
+  'Home & Kitchen',
+  'Health & Beauty',
+  'Books & Stationery',
+  'Sports & Fitness',
+  'Toys & Games',
+  'Industrial & B2B',
+  'Food & Groceries',
+  'Other',
 ]
 
 describe('seed catalogues', () => {
@@ -24,7 +31,7 @@ describe('seed catalogues', () => {
 
   it('has unique product names within each catalogue (slug/sku are derived)', () => {
     for (const [name, cat] of Object.entries(SEED_CATALOGS)) {
-      const names = cat.items.map((i) => i.name)
+      const names = cat.items.map(i => i.name)
       expect(new Set(names).size, `${name} has duplicate product names`).toBe(names.length)
     }
   })

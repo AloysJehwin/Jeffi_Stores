@@ -7,7 +7,9 @@ vi.mock('@/components/visitor/ProductCard', () => ({
 }))
 
 vi.mock('@/components/visitor/SectionCarousel', () => ({
-  default: ({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) => <div aria-label={ariaLabel}>{children}</div>,
+  default: ({ children, ariaLabel }: { children: ReactNode; ariaLabel: string }) => (
+    <div aria-label={ariaLabel}>{children}</div>
+  ),
 }))
 
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'

@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/email-campaigns', () => ({ renderCampaignEmail: vi.fn() }))
-vi.mock('@/lib/template-vars', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/email-campaigns', () => ({ renderCampaignEmail: vi.fn() }))
+vi.mock('@/lib/shared/template-vars', () => ({
   previewVarMap: vi.fn(),
   substituteVars: vi.fn(),
 }))
 
-import { POST } from '@/app/api/admin/mailer/preview/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { renderCampaignEmail } from '@/lib/email-campaigns'
-import { previewVarMap, substituteVars } from '@/lib/template-vars'
+import { POST } from '@/app/api/(admin)/admin/mailer/preview/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { previewVarMap, substituteVars } from '@/lib/shared/template-vars'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -66,11 +66,13 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    const res = await POST(makeRequest({
-      template_key: 'welcome',
-      template_data: { body: 'Hello {{name}}' },
-      subject: 'Hi there',
-    }))
+    const res = await POST(
+      makeRequest({
+        template_key: 'welcome',
+        template_data: { body: 'Hello {{name}}' },
+        subject: 'Hi there',
+      })
+    )
 
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -92,11 +94,13 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    await POST(makeRequest({
-      template_key: 'promo',
-      template_data: { headline: 'Big {{sale}}' },
-      subject: 'Sale for {{name}}',
-    }))
+    await POST(
+      makeRequest({
+        template_key: 'promo',
+        template_data: { headline: 'Big {{sale}}' },
+        subject: 'Sale for {{name}}',
+      })
+    )
 
     expect(mockSubstituteVars).toHaveBeenCalled()
   })
@@ -105,10 +109,12 @@ describe('POST /api/admin/mailer/preview', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
-    const res = await POST(makeRequest({
-      template_key: 'promo',
-      template_data: { count: 5 },
-    }))
+    const res = await POST(
+      makeRequest({
+        template_key: 'promo',
+        template_data: { count: 5 },
+      })
+    )
     expect(res.status).toBe(200)
   })
 })

@@ -1,15 +1,15 @@
 import type { TenantDetail, TenantKyc } from '@/lib/tenant-registry'
 import { Field, Mono, Section } from '../EcomUI'
-import KycActionButtons from '@/app/admin/ecom/kyc/KycActionButtons'
+import KycActionButtons from './KycActionButtons'
 
 const BORDER: Record<string, string> = {
-  pending:  'border-yellow-300 dark:border-yellow-700',
+  pending: 'border-yellow-300 dark:border-yellow-700',
   approved: 'border-green-300 dark:border-green-700',
   rejected: 'border-red-300 dark:border-red-700',
 }
 
 const BADGE: Record<string, string> = {
-  pending:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
@@ -30,7 +30,9 @@ export default function KycTab({ tenant: t, kyc }: { tenant: TenantDetail; kyc: 
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold text-foreground">KYC / GST Verification</h2>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BADGE[kyc.status] || BADGE.rejected}`}>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BADGE[kyc.status] || BADGE.rejected}`}
+          >
             {kyc.status}
           </span>
         </div>
@@ -42,7 +44,8 @@ export default function KycTab({ tenant: t, kyc }: { tenant: TenantDetail; kyc: 
         )}
         {kyc.status === 'approved' && t.razorpay_checkout_url && (
           <div className="text-xs text-foreground-muted">
-            Approved by {kyc.reviewed_by} on {kyc.reviewed_at ? new Date(kyc.reviewed_at).toLocaleDateString('en-IN') : '—'}
+            Approved by {kyc.reviewed_by} on{' '}
+            {kyc.reviewed_at ? new Date(kyc.reviewed_at).toLocaleDateString('en-IN') : '—'}
           </div>
         )}
         {kyc.status === 'rejected' && (
@@ -61,9 +64,20 @@ export default function KycTab({ tenant: t, kyc }: { tenant: TenantDetail; kyc: 
         {kyc.business_address && <Field wide label="Business address" value={kyc.business_address} />}
         <Field
           label="GST certificate"
-          value={kyc.gst_cert_s3_key
-            ? <a href={`/api/admin/ecom/kyc/${t.id}/cert`} target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline text-xs">View certificate ↗</a>
-            : <span className="text-foreground-muted">Not uploaded</span>}
+          value={
+            kyc.gst_cert_s3_key ? (
+              <a
+                href={`/api/admin/ecom/kyc/${t.id}/cert`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-600 dark:text-accent-400 hover:underline text-xs"
+              >
+                View certificate ↗
+              </a>
+            ) : (
+              <span className="text-foreground-muted">Not uploaded</span>
+            )
+          }
         />
       </dl>
     </section>

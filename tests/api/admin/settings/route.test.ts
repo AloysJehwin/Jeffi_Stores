@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ query: vi.fn() }))
-vi.mock('@/lib/delivery-settings', () => ({ invalidateDeliverySettingsCache: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
+vi.mock('@/lib/shipping/delivery-settings', () => ({ invalidateDeliverySettingsCache: vi.fn() }))
 
-import { PATCH } from '@/app/api/admin/settings/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
-import { invalidateDeliverySettingsCache } from '@/lib/delivery-settings'
+import { PATCH } from '@/app/api/(admin)/admin/settings/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
+import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -28,7 +28,9 @@ function makeRequest(body: object) {
 }
 
 describe('PATCH /api/admin/settings', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -61,10 +63,10 @@ describe('PATCH /api/admin/settings', () => {
     const res = await PATCH(makeRequest({ key: 'min_order_amount', value: 500 }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO site_settings'),
-      ['min_order_amount', '500']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO site_settings'), [
+      'min_order_amount',
+      '500',
+    ])
   })
 
   it('invalidates delivery cache for delivery_ keys', async () => {

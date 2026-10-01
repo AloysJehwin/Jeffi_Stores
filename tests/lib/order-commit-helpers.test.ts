@@ -1,29 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/invoice', () => ({
+vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn(),
 }))
 
-import {
-  cartLineUnitPrice,
-  cartItemsForHash,
-  cartSubtotal,
-  cartTaxAmount,
-  type CartLine,
-} from '@/lib/order-commit'
+import { cartLineUnitPrice, cartItemsForHash, cartSubtotal, cartTaxAmount, type CartLine } from '@/lib/orders/order-commit'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -146,8 +140,24 @@ describe('cartLineUnitPrice', () => {
 describe('cartItemsForHash', () => {
   it('maps CartLine array to DraftCartItem shape', () => {
     const lines: CartLine[] = [
-      makeCartLine({ product_id: 'p1', variant_id: 'v1', sub_variant_id: null, quantity: 2, price_at_addition: 500, buy_mode: 'unit', buy_unit: null }),
-      makeCartLine({ product_id: 'p2', variant_id: null, sub_variant_id: 'sv2', quantity: 3, price_at_addition: 750, buy_mode: 'box', buy_unit: 'box' }),
+      makeCartLine({
+        product_id: 'p1',
+        variant_id: 'v1',
+        sub_variant_id: null,
+        quantity: 2,
+        price_at_addition: 500,
+        buy_mode: 'unit',
+        buy_unit: null,
+      }),
+      makeCartLine({
+        product_id: 'p2',
+        variant_id: null,
+        sub_variant_id: 'sv2',
+        quantity: 3,
+        price_at_addition: 750,
+        buy_mode: 'box',
+        buy_unit: 'box',
+      }),
     ]
     const result = cartItemsForHash(lines)
     expect(result).toHaveLength(2)

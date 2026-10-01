@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-import { logMessage } from '@/lib/message-log'
-import { query } from '@/lib/db'
+import { logMessage } from '@/lib/shared/message-log'
+import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 

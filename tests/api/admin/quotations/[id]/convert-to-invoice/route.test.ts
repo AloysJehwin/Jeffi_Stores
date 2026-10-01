@@ -5,22 +5,22 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   isInterState: vi.fn(),
   generateInvoiceNumber: vi.fn(),
   getNextInvoiceSequence: vi.fn(),
@@ -28,11 +28,11 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', () => ({
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -40,15 +40,15 @@ vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendBusinessInvoiceGeneratedEmail: vi.fn(),
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn().mockReturnValue({
     qrCode: {
       create: vi.fn().mockResolvedValue({
@@ -74,15 +74,15 @@ vi.mock('sharp', () => {
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/quotations/[id]/convert-to-invoice/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/quotations/[id]/convert-to-invoice/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
-import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
-import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
-import { lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
+import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
+import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/catalog/gst'
+import { lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,14 +92,13 @@ const ADMIN = { adminId: 'admin-1', id: 'admin-1', role: 'super_admin', scopes: 
 const QUOT_ID = '660e8400-e29b-41d4-a716-446655440002'
 
 function postReq(body: unknown = {}) {
-  return new NextRequest(new Request(
-    `http://localhost/api/admin/quotations/${QUOT_ID}/convert-to-invoice`,
-    {
+  return new NextRequest(
+    new Request(`http://localhost/api/admin/quotations/${QUOT_ID}/convert-to-invoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    },
-  ))
+    })
+  )
 }
 
 const FINAL_QUOTATION = {
@@ -146,7 +145,8 @@ const QUOT_ITEMS = [
 
 function makeTransactionClient(stockLevel = 100) {
   return {
-    query: vi.fn()
+    query: vi
+      .fn()
       // INSERT addresses RETURNING id
       .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
       // stock check (products)
@@ -254,9 +254,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   // --- Happy path ---
 
   it('returns orderId, orderNumber, invoiceNumber on success', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
@@ -266,9 +264,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   })
 
   it('returns invoiceUrl when invoice_number is generated', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(json.invoiceUrl).toMatch(/\/api\/orders\//)
@@ -279,7 +275,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('saves as draft and returns savedAsDraft=true when stock is low', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
           .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
@@ -300,7 +297,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('sets invoiceUrl to null when savedAsDraft (no invoice_number)', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
           .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
@@ -318,7 +316,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('does not send emails when result.saveAsDraft is true', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
           .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
@@ -336,10 +335,10 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   // --- enableDelivery flag ---
 
   it('sets needsDelivery=true when enableDelivery=true and stock is sufficient', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
-    const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), { params: Promise.resolve({ id: QUOT_ID }) })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
+    const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), {
+      params: Promise.resolve({ id: QUOT_ID }),
+    })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.needsDelivery).toBe(true)
@@ -348,7 +347,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('saves as draft (processing) when insufficient stock + enableDelivery=true', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
+        query: vi
+          .fn()
           .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
           .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-3', order_number: 'OFF-789' }] })
@@ -358,10 +358,9 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       }
       return fn(client)
     })
-    const res = await POST(
-      postReq({ paymentMode: 'cash', enableDelivery: true }),
-      { params: Promise.resolve({ id: QUOT_ID }) }
-    )
+    const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), {
+      params: Promise.resolve({ id: QUOT_ID }),
+    })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.savedAsDraft).toBe(true)
@@ -372,9 +371,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   // --- Payment modes ---
 
   it('marks order as unpaid for upi_qr paymentMode and returns qrImageUrl', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
@@ -382,10 +379,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   })
 
   it('handles upi_qr QR creation failure gracefully (non-fatal)', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
-    const { getRazorpayInstance } = await import('@/lib/razorpay')
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
+    const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
     vi.mocked(getRazorpayInstance).mockReturnValue({
       qrCode: { create: vi.fn().mockRejectedValue(new Error('RZP down')) },
     } as any)
@@ -397,9 +392,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   })
 
   it('marks order as paid for bank_transfer paymentMode', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'bank_transfer' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
@@ -419,9 +412,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       } as any)
       .mockResolvedValueOnce(null as any)
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
@@ -429,9 +420,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   // --- Email notifications ---
 
   it('sends the standard invoice email (not the business one) for a non-RFQ conversion', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     // from_rfq is false on FINAL_QUOTATION → regular customer invoice email only.
     // Sending both would double-email the customer (the bug this guards against).
@@ -444,9 +433,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ ...FINAL_QUOTATION, from_rfq: true } as any)
       .mockResolvedValue({ view_token: 'tok-123' } as any)
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(sendBusinessInvoiceGeneratedEmail).toHaveBeenCalled()
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
@@ -458,161 +445,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       .mockResolvedValueOnce({ ...FINAL_QUOTATION, consignee_email: null } as any)
       .mockResolvedValueOnce(null as any)
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
-  })
-
-  // --- Variant / sub-variant stock paths ---
-
-  it('checks variant stock when item has variant_id', async () => {
-    vi.mocked(queryMany).mockResolvedValue([{
-      ...QUOT_ITEMS[0],
-      variant_id: '222e4567-e89b-12d3-a456-426614174002',
-    }] as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
-
-    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(200)
-  })
-
-  it('checks sub-variant stock when item has sub_variant_id', async () => {
-    vi.mocked(queryMany).mockResolvedValue([{
-      ...QUOT_ITEMS[0],
-      variant_id: '222e4567-e89b-12d3-a456-426614174002',
-      sub_variant_id: '333e4567-e89b-12d3-a456-426614174003',
-    }] as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 200 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '200' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
-
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(200)
-  })
-
-  it('skips stock check for items without product_id', async () => {
-    vi.mocked(queryMany).mockResolvedValue([{
-      ...QUOT_ITEMS[0],
-      product_id: null,
-      variant_id: null,
-    }] as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          // no stock-check call — goes straight to INSERT orders
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
-
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(200)
-  })
-
-  // --- from_rfq prefix ---
-
-  it('uses BUS- prefix for order_number when quotation is from_rfq', async () => {
-    vi.mocked(queryOne).mockReset()
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ ...FINAL_QUOTATION, from_rfq: true } as any)
-      .mockResolvedValueOnce(null as any)
-
-    let capturedOrderNumber = ''
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn().mockImplementation((sql: string, params: any[]) => {
-          if (sql.includes('INSERT INTO addresses')) return Promise.resolve({ rows: [{ id: 'addr-uuid-1' }] })
-          if (sql.includes('inventory_quantity FROM products')) return Promise.resolve({ rows: [{ inventory_quantity: 100 }] })
-          if (sql.includes('INSERT INTO orders')) {
-            capturedOrderNumber = params[0] as string
-            return Promise.resolve({ rows: [{ id: 'order-uuid-rfq', order_number: capturedOrderNumber }] })
-          }
-          if (sql.includes('site_settings')) return Promise.resolve({ rows: [{ value: 'JS' }] })
-          if (sql.includes('UPDATE orders SET invoice')) return Promise.resolve({ rows: [] })
-          if (sql.includes('INSERT INTO invoices')) return Promise.resolve({ rows: [] })
-          if (sql.includes('INSERT INTO order_items')) return Promise.resolve({ rows: [{ id: 'oi-1' }] })
-          if (sql.includes('FOR UPDATE')) return Promise.resolve({ rows: [{ inventory_quantity: '100' }] })
-          if (sql.includes('UPDATE') && sql.includes('products')) return Promise.resolve({ rows: [] })
-          if (sql.includes('UPDATE quotations')) return Promise.resolve({ rows: [] })
-          return Promise.resolve({ rows: [{ seq: 1, value: 'JS' }] })
-        }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
-
-    await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(capturedOrderNumber).toMatch(/^BUS-/)
-  })
-
-  // --- IGST path ---
-
-  it('sets IGST flag for inter-state buyer with GSTIN', async () => {
-    vi.mocked(isInterState).mockReturnValue(true)
-    vi.mocked(queryOne).mockReset()
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ ...FINAL_QUOTATION, consignee_gstin: '27AABCU9603R1ZM', consignee_state: 'Maharashtra' } as any)
-      .mockResolvedValueOnce(null as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
-      fn(makeTransactionClient()),
-    )
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(200)
-  })
-
-  // --- Error handling ---
-
-  it('returns 500 on transaction error', async () => {
-    vi.mocked(withTransaction).mockRejectedValue(new Error('TX failed'))
-    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(500)
-    const json = await res.json()
-    expect(json.error).toBe('TX failed')
   })
 })

@@ -3,27 +3,30 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string, public readonly provider: string = 'unknown') {
+    constructor(
+      message: string,
+      public readonly provider: string = 'unknown'
+    ) {
       super(message)
       this.name = 'AiClientError'
     }
   },
 }))
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   findSimilar: vi.fn().mockResolvedValue([]),
 }))
-vi.mock('@/lib/tenant-context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/lib/tenant-context')>()),
+vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
 }))
 
@@ -59,11 +62,11 @@ vi.mock('@/lib/admin-agent/tools', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/agent/chat/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query, queryOne, queryMany } from '@/lib/db'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { POST } from '@/app/api/(admin)/admin/agent/chat/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 import { getTool } from '@/lib/admin-agent/tools'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -369,7 +372,7 @@ describe('POST /api/admin/agent/chat', () => {
         model: 'gpt-4',
       } as any)
       .mockResolvedValueOnce({
-        content: "Proposed.",
+        content: 'Proposed.',
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -569,9 +572,7 @@ describe('POST /api/admin/agent/chat', () => {
     // Verify aiChat was called with messages not including 'system' from history
     const chatCall = mockAiChat.mock.calls[0][0]
     const historyMessages = chatCall.messages.filter((m: any) => m.content !== expect.stringContaining('/no_think'))
-    const systemFromHistory = historyMessages.find(
-      (m: any) => m.role === 'system' && m.content === 'System message'
-    )
+    const systemFromHistory = historyMessages.find((m: any) => m.role === 'system' && m.content === 'System message')
     expect(systemFromHistory).toBeUndefined()
   })
 
@@ -701,9 +702,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     // history must contain a user message carrying the email so it is extracted
-    mockQueryMany.mockResolvedValue([
-      { role: 'user', content: 'prepare quote for buyer@example.com' },
-    ])
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'prepare quote for buyer@example.com' }])
     mockQueryOne.mockResolvedValue({ id: 'q-action-1' } as any)
 
     // Model emits one tool call to match_quotation_items, then loop should end deterministically
@@ -759,9 +758,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
-    mockQueryMany.mockResolvedValue([
-      { role: 'user', content: 'quote buyer@example.com' },
-    ])
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'quote buyer@example.com' }])
 
     mockAiChat
       .mockResolvedValueOnce({
@@ -808,9 +805,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     // prior user messages hold the customer email
-    mockQueryMany.mockResolvedValue([
-      { role: 'user', content: 'quote for buyer@example.com please' },
-    ])
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'quote for buyer@example.com please' }])
     mockQueryOne.mockResolvedValue({ id: 'qc-action-1' } as any)
 
     const proposeTool = {
@@ -859,12 +854,17 @@ describe('POST /api/admin/agent/chat', () => {
       handler: vi.fn().mockResolvedValue({
         needs_choice: true,
         choice_kind: 'address',
-        options: [{ id: 'a1', label: 'Home' }, { id: 'a2', label: 'Office' }],
+        options: [
+          { id: 'a1', label: 'Home' },
+          { id: 'a2', label: 'Office' },
+        ],
         note: 'Pick address',
       }),
     } as any)
 
-    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    const res = await POST(
+      makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.pickers).toHaveLength(1)
@@ -885,7 +885,9 @@ describe('POST /api/admin/agent/chat', () => {
       handler: vi.fn(),
     } as any)
 
-    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    const res = await POST(
+      makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.message).toMatch(/customer email not found/i)
@@ -905,7 +907,10 @@ describe('POST /api/admin/agent/chat', () => {
       handler: vi.fn(),
     } as any)
 
-    const items = [{ skipped: true, requestedText: 'a', quantity: 1 }, { skipped: true, requestedText: 'b', quantity: 1 }]
+    const items = [
+      { skipped: true, requestedText: 'a', quantity: 1 },
+      { skipped: true, requestedText: 'b', quantity: 1 },
+    ]
     const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify(items) }))
     expect(res.status).toBe(200)
     const data = await res.json()
@@ -936,7 +941,9 @@ describe('POST /api/admin/agent/chat', () => {
       handler: vi.fn().mockResolvedValue({ proposed: false, summary: 'No matching products.' }),
     } as any)
 
-    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    const res = await POST(
+      makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) })
+    )
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.message).toBe('No matching products.')
@@ -1012,11 +1019,10 @@ describe('POST /api/admin/agent/chat', () => {
         },
       }),
     }
-    mockGetTool.mockImplementation((name: string) =>
-      name === 'match_quotation_items' ? (matchTool as any) : null
-    )
+    mockGetTool.mockImplementation((name: string) => (name === 'match_quotation_items' ? (matchTool as any) : null))
 
-    const message = 'Create a quote for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Mystery item 1 no\n3. Ghost part 3 pcs'
+    const message =
+      'Create a quote for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Mystery item 1 no\n3. Ghost part 3 pcs'
     const res = await POST(makePost({ message }))
     expect(res.status).toBe(200)
     const data = await res.json()
@@ -1039,9 +1045,7 @@ describe('POST /api/admin/agent/chat', () => {
       inputSchema: { properties: {} },
       handler: vi.fn().mockResolvedValue({ ok: false }),
     }
-    mockGetTool.mockImplementation((name: string) =>
-      name === 'match_quotation_items' ? (matchTool as any) : null
-    )
+    mockGetTool.mockImplementation((name: string) => (name === 'match_quotation_items' ? (matchTool as any) : null))
     mockAiChat.mockResolvedValue({ content: 'LLM fallback.', provider: 'ollama', model: 'qwen2.5' } as any)
 
     const message = 'Generate a quotation for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Washer 5 pcs'
@@ -1065,9 +1069,7 @@ describe('POST /api/admin/agent/chat', () => {
       inputSchema: { properties: {} },
       handler: vi.fn().mockRejectedValue(new Error('embedding down')),
     }
-    mockGetTool.mockImplementation((name: string) =>
-      name === 'match_quotation_items' ? (matchTool as any) : null
-    )
+    mockGetTool.mockImplementation((name: string) => (name === 'match_quotation_items' ? (matchTool as any) : null))
     mockAiChat.mockResolvedValue({ content: 'LLM path.', provider: 'ollama', model: 'qwen2.5' } as any)
 
     const message = 'Draft a quote for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Washer 5 pcs'
@@ -1101,7 +1103,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockResolvedValueOnce([
       { source_table: 'products', source_id: 'p1', content: 'Hex bolt M6' } as any,
     ])
@@ -1121,7 +1123,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockRejectedValueOnce(new Error('pgvector down'))
 
     mockAiChat.mockResolvedValue({ content: 'still ok', provider: 'ollama', model: 'qwen2.5' } as any)
@@ -1137,9 +1139,9 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    const { resolveTenantId } = await import('@/lib/tenant-context')
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
     vi.mocked(resolveTenantId).mockResolvedValue('tenant-1')
-    const { findSimilar } = await import('@/lib/rag')
+    const { findSimilar } = await import('@/lib/shared/rag')
     vi.mocked(findSimilar).mockResolvedValue([
       { source_table: 'users', source_id: 'u1', content: 'Flagship Customer | a@b.c' } as any,
     ])

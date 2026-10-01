@@ -67,13 +67,15 @@ function makePgMock() {
 // ---------------------------------------------------------------------------
 // Core helper: reset modules + register vi.doMock for all dependencies
 // ---------------------------------------------------------------------------
-async function importDb(opts: {
-  dbUrl?: string
-  rdsIamAuth?: string
-  certExists?: boolean
-  adminToken?: string | null
-  jwtPayload?: any
-} = {}) {
+async function importDb(
+  opts: {
+    dbUrl?: string
+    rdsIamAuth?: string
+    certExists?: boolean
+    adminToken?: string | null
+    jwtPayload?: any
+  } = {}
+) {
   vi.resetModules()
 
   // db.ts caches pools on globalThis (`__appPool` / `__tenantPools`) so Next.js
@@ -103,8 +105,7 @@ async function importDb(opts: {
   const adminToken = opts.adminToken ?? null
   vi.doMock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
-      get: (key: string) =>
-        key === 'admin_sid' && adminToken ? { value: adminToken } : undefined,
+      get: (key: string) => (key === 'admin_sid' && adminToken ? { value: adminToken } : undefined),
       set: vi.fn(),
       delete: vi.fn(),
     }),
@@ -116,9 +117,9 @@ async function importDb(opts: {
   }))
 
   // Opaque sessions: getRequestAdminId now dynamically imports resolveSession from
-  // @/lib/auth-sessions (the cookie value is the opaque session id, not a JWT).
+  // @/lib/auth/auth-sessions (the cookie value is the opaque session id, not a JWT).
   // Resolve to an admin principal only when an admin_sid cookie is present.
-  vi.doMock('@/lib/auth-sessions', () => ({
+  vi.doMock('@/lib/auth/auth-sessions', () => ({
     resolveSession: vi.fn().mockImplementation(async (sid: string) => {
       if (!sid || !adminToken) return null
       return {
@@ -142,7 +143,7 @@ async function importDb(opts: {
     delete process.env.RDS_IAM_AUTH
   }
 
-  const mod = await import('@/lib/db')
+  const mod = await import('@/lib/shared/db')
   return { mod, pg }
 }
 
@@ -253,9 +254,7 @@ describe('query() – mutation wrapping', () => {
     await mod.query('INSERT INTO orders (id) VALUES ($1)', ['o1'])
 
     // clientQuery is the vi.fn() attached to the mock client returned by poolConnect
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls).toContain('BEGIN')
     expect(calls.some(s => s.includes('set_config') && s.includes('audit.admin_id'))).toBe(true)
     expect(calls).toContain('COMMIT')
@@ -294,7 +293,7 @@ describe('query() – mutation wrapping', () => {
     pg.clientQuery
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // set_config
-      .mockRejectedValueOnce(new Error('DB constraint'))  // INSERT
+      .mockRejectedValueOnce(new Error('DB constraint')) // INSERT
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ROLLBACK
 
     vi.doMock('pg', () => ({ Pool: pg.PoolSpy, default: { Pool: pg.PoolSpy } }))
@@ -304,17 +303,19 @@ describe('query() – mutation wrapping', () => {
       readFileSync: vi.fn().mockReturnValue('CERT'),
     }))
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(function (this: any) { this.getAuthToken = vi.fn() }),
+      Signer: vi.fn().mockImplementation(function (this: any) {
+        this.getAuthToken = vi.fn()
+      }),
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_sid' ? { value: 'tok' } : undefined,
+        get: (k: string) => (k === 'admin_sid' ? { value: 'tok' } : undefined),
       }),
     }))
     vi.doMock('jose', () => ({
       jwtVerify: vi.fn().mockResolvedValue({ payload: { adminId: 'admin-err' } }),
     }))
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockResolvedValue({
         sid: 'tok',
         principalType: 'admin',
@@ -325,12 +326,10 @@ describe('query() – mutation wrapping', () => {
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     await expect(query('INSERT INTO t VALUES ($1)', [1])).rejects.toThrow('DB constraint')
 
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls).toContain('ROLLBACK')
   })
 })
@@ -342,7 +341,10 @@ describe('queryOne()', () => {
   it('returns the first row when rows are present', async () => {
     const { mod, pg } = await importDb()
     pg.poolQuery.mockResolvedValueOnce({
-      rows: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }],
+      rows: [
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+      ],
       rowCount: 2,
     })
     const result = await mod.queryOne('SELECT * FROM users')
@@ -387,9 +389,7 @@ describe('withTransaction()', () => {
     const result = await mod.withTransaction(fn)
 
     expect(result).toBe('ok')
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls).toContain('BEGIN')
     expect(calls).toContain('COMMIT')
     expect(calls).not.toContain('ROLLBACK')
@@ -401,9 +401,7 @@ describe('withTransaction()', () => {
 
     await expect(mod.withTransaction(fn)).rejects.toThrow('tx error')
 
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls).toContain('BEGIN')
     expect(calls).toContain('ROLLBACK')
   })
@@ -427,9 +425,7 @@ describe('withTransaction()', () => {
     })
     await mod.withTransaction(vi.fn().mockResolvedValue(null))
 
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls.some(s => s.includes('set_config') && s.includes('audit.admin_id'))).toBe(true)
   })
 })
@@ -496,21 +492,23 @@ describe('getRequestAdminId – error handling', () => {
       readFileSync: vi.fn().mockReturnValue('CERT'),
     }))
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(function (this: any) { this.getAuthToken = vi.fn() }),
+      Signer: vi.fn().mockImplementation(function (this: any) {
+        this.getAuthToken = vi.fn()
+      }),
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_sid' ? { value: 'bad-token' } : undefined,
+        get: (k: string) => (k === 'admin_sid' ? { value: 'bad-token' } : undefined),
       }),
     }))
     // resolveSession throws — exercises the catch block in getRequestAdminId
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockRejectedValue(new Error('db unreachable')),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
     process.env.JWT_SECRET = 'secret'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     // INSERT would wrap in transaction only if adminId is non-null.
     // Since resolveSession throws, adminId should be null -> falls through to pool.query
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
@@ -529,20 +527,22 @@ describe('getRequestAdminId – error handling', () => {
       readFileSync: vi.fn().mockReturnValue('CERT'),
     }))
     vi.doMock('@aws-sdk/rds-signer', () => ({
-      Signer: vi.fn().mockImplementation(function (this: any) { this.getAuthToken = vi.fn() }),
+      Signer: vi.fn().mockImplementation(function (this: any) {
+        this.getAuthToken = vi.fn()
+      }),
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_sid' ? { value: 'some-token' } : undefined,
+        get: (k: string) => (k === 'admin_sid' ? { value: 'some-token' } : undefined),
       }),
     }))
     // Session not found / expired (e.g. a legacy JWT cookie) -> null
-    vi.doMock('@/lib/auth-sessions', () => ({
+    vi.doMock('@/lib/auth/auth-sessions', () => ({
       resolveSession: vi.fn().mockResolvedValue(null),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
 
-    const { query } = await import('@/lib/db')
+    const { query } = await import('@/lib/shared/db')
     // No session -> adminId null -> no transaction wrapping
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
     expect(pg.poolConnect).not.toHaveBeenCalled()
@@ -584,15 +584,13 @@ describe('query() – runWithAuditContext takes precedence over cookie', () => {
 
     // Importing audit-context after resetModules ensures we share the same
     // AsyncLocalStorage instance as the db module loaded in this cycle.
-    const { runWithAuditContext } = await import('@/lib/audit-context')
+    const { runWithAuditContext } = await import('@/lib/auth/audit-context')
 
     await runWithAuditContext('ctx-admin', async () => {
       await mod.query('INSERT INTO orders (id) VALUES ($1)', ['o2'])
     })
 
-    const calls = pg.clientQuery.mock.calls.map((c: any[]) =>
-      typeof c[0] === 'string' ? c[0] : ''
-    ) as string[]
+    const calls = pg.clientQuery.mock.calls.map((c: any[]) => (typeof c[0] === 'string' ? c[0] : '')) as string[]
     expect(calls).toContain('BEGIN')
     expect(calls.some(s => s.includes('audit.admin_id'))).toBe(true)
     expect(calls).toContain('COMMIT')
@@ -600,23 +598,21 @@ describe('query() – runWithAuditContext takes precedence over cookie', () => {
 })
 
 describe('getPool – tenant isolation (fail closed)', () => {
-  beforeEach(() => { vi.resetModules() })
+  beforeEach(() => {
+    vi.resetModules()
+  })
 
   it('throws instead of serving the platform DB when a tenant has no rds_endpoint', async () => {
     const { mod, pg } = await importDb({})
     const ctx = { tenantId: 't-1', slug: 'acme', plan: 'basic', infra: null }
-    await expect(
-      mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))
-    ).rejects.toThrow(/no RDS endpoint/i)
+    await expect(mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))).rejects.toThrow(/no RDS endpoint/i)
     expect(pg.PoolSpy).not.toHaveBeenCalled()
   })
 
   it('names the offending tenant in the error', async () => {
     const { mod } = await importDb({})
     const ctx = { tenantId: 't-2', slug: 'bolts', plan: 'basic', infra: { rdsEndpoint: '' } }
-    await expect(
-      mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))
-    ).rejects.toThrow(/bolts/)
+    await expect(mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))).rejects.toThrow(/bolts/)
   })
 
   it('still uses the DEFAULT pool when no tenant is in context', async () => {

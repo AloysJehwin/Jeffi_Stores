@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -16,10 +16,10 @@ vi.mock('@/lib/email', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { GET } from '@/app/api/admin/orders/[id]/track/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { GET } from '@/app/api/(admin)/admin/orders/[id]/track/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -58,22 +58,24 @@ const mockOrder = {
 
 function buildTrackingResponse(statusType: string, scans: any[] = []) {
   return {
-    ShipmentData: [{
-      Shipment: {
-        AWB: 'AWB123456',
-        PickUpDate: '2024-01-10',
-        ExpectedDeliveryDate: '2024-01-12',
-        Origin: 'Chennai',
-        Destination: 'Mumbai',
-        Status: {
-          Status: 'In Transit',
-          StatusType: statusType,
-          StatusDateTime: '2024-01-11T10:00:00',
-          Instructions: null,
+    ShipmentData: [
+      {
+        Shipment: {
+          AWB: 'AWB123456',
+          PickUpDate: '2024-01-10',
+          ExpectedDeliveryDate: '2024-01-12',
+          Origin: 'Chennai',
+          Destination: 'Mumbai',
+          Status: {
+            Status: 'In Transit',
+            StatusType: statusType,
+            StatusDateTime: '2024-01-11T10:00:00',
+            Instructions: null,
+          },
+          Scans: scans,
         },
-        Scans: scans,
       },
-    }],
+    ],
   }
 }
 
@@ -144,15 +146,15 @@ describe('GET /api/admin/orders/[id]/track', () => {
     vi.resetModules()
 
     // Re-apply mocks for the fresh module registry
-    vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-    vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-    vi.mock('@/lib/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany: vi.fn() }))
+    vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+    vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+    vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn(), queryMany: vi.fn() }))
     vi.mock('@/lib/email', () => ({ sendOrderStatusUpdate: vi.fn() }))
 
-    const { GET: GETFresh } = await import('@/app/api/admin/orders/[id]/track/route')
-    const { authenticateAdmin: authFresh } = await import('@/lib/jwt')
-    const { hasScope: scopeFresh } = await import('@/lib/scopes')
-    const { queryOne: queryOneFresh } = await import('@/lib/db')
+    const { GET: GETFresh } = await import('@/app/api/(admin)/admin/orders/[id]/track/route')
+    const { authenticateAdmin: authFresh } = await import('@/lib/auth/jwt')
+    const { hasScope: scopeFresh } = await import('@/lib/auth/scopes')
+    const { queryOne: queryOneFresh } = await import('@/lib/shared/db')
 
     vi.mocked(authFresh).mockResolvedValue(admin as any)
     vi.mocked(scopeFresh).mockReturnValue(true)
@@ -189,10 +191,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(mockOrder as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ ShipmentData: [] }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ ShipmentData: [] }),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -207,10 +212,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'processing' } as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -228,10 +236,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'out_for_delivery' } as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('DL')),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('DL')),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -247,10 +258,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'out_for_delivery' } as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('RTO-DL')),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('RTO-DL')),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -266,10 +280,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     // status is 'delivered', but PU only allows ['processing','confirmed','pending']
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'delivered' } as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('PU')),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('PU')),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -286,38 +303,43 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'shipped' } as any)
 
     const trackingWithException = {
-      ShipmentData: [{
-        Shipment: {
-          AWB: 'AWB123456',
-          PickUpDate: '2024-01-10',
-          ExpectedDeliveryDate: '2024-01-12',
-          Origin: 'Chennai',
-          Destination: 'Mumbai',
-          Status: {
-            Status: 'NDR',
-            StatusType: 'NDR',
-            StatusDateTime: '2024-01-11T10:00:00',
-            Instructions: null,
-          },
-          Scans: [
-            {
-              ScanDetail: {
-                ScanType: 'NDR',
-                Scan: 'out for delivery',
-                ScanDateTime: '2024-01-11T09:00:00',
-                ScannedLocation: 'Mumbai Hub',
-                Instructions: null,
-              },
+      ShipmentData: [
+        {
+          Shipment: {
+            AWB: 'AWB123456',
+            PickUpDate: '2024-01-10',
+            ExpectedDeliveryDate: '2024-01-12',
+            Origin: 'Chennai',
+            Destination: 'Mumbai',
+            Status: {
+              Status: 'NDR',
+              StatusType: 'NDR',
+              StatusDateTime: '2024-01-11T10:00:00',
+              Instructions: null,
             },
-          ],
+            Scans: [
+              {
+                ScanDetail: {
+                  ScanType: 'NDR',
+                  Scan: 'out for delivery',
+                  ScanDateTime: '2024-01-11T09:00:00',
+                  ScannedLocation: 'Mumbai Hub',
+                  Instructions: null,
+                },
+              },
+            ],
+          },
         },
-      }],
+      ],
     }
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(trackingWithException),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(trackingWithException),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -333,10 +355,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'processing' } as any)
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
@@ -367,10 +392,13 @@ describe('GET /api/admin/orders/[id]/track', () => {
         },
       },
     ]
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue(buildTrackingResponse('PU', scans)),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(buildTrackingResponse('PU', scans)),
+      })
+    )
 
     const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)

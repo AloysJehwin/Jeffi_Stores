@@ -60,7 +60,9 @@ async function loadLoraWeights(): Promise<ArrayBuffer | null> {
       req.onsuccess = () => resolve(req.result || null)
       req.onerror = () => reject(req.error)
     })
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 async function runFineTune(examples: FineTuneExample[]): Promise<number> {
@@ -89,7 +91,9 @@ async function runFineTune(examples: FineTuneExample[]): Promise<number> {
     : `${basePath}/{model}`
   ;(env as any).remoteHost = baseUrl.origin
   ;(env as any).remotePathTemplate = templatePath
-  try { ;(env as any).backends.onnx.wasm.wasmPaths = `${MODEL_BASE}/ort/` } catch {}
+  try {
+    ;(env as any).backends.onnx.wasm.wasmPaths = `${MODEL_BASE}/ort/`
+  } catch {}
 
   const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID)
   const model = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
@@ -100,7 +104,9 @@ async function runFineTune(examples: FineTuneExample[]): Promise<number> {
   // Load existing LoRA weights if any
   const existingWeights = await loadLoraWeights()
   if (existingWeights && (model as any).load_lora_weights) {
-    try { await (model as any).load_lora_weights(existingWeights) } catch {}
+    try {
+      await (model as any).load_lora_weights(existingWeights)
+    } catch {}
   }
 
   let stepsRun = 0
@@ -115,7 +121,9 @@ async function runFineTune(examples: FineTuneExample[]): Promise<number> {
           await (model as any).train_step(inputs)
           stepsRun++
         }
-      } catch { /* skip failed examples */ }
+      } catch {
+        /* skip failed examples */
+      }
     }
   }
 

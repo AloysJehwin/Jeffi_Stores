@@ -52,9 +52,15 @@ function tenantComputeConfigured(): boolean {
 
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 
-function bucketName(slug: string) { return `jeffi-tenant-${slug}` }
-function dbInstanceId(slug: string) { return `jeffi-tenant-${slug}` }
-function paramGroupName(slug: string) { return `jeffi-tenant-${slug}-pg16` }
+function bucketName(slug: string) {
+  return `jeffi-tenant-${slug}`
+}
+function dbInstanceId(slug: string) {
+  return `jeffi-tenant-${slug}`
+}
+function paramGroupName(slug: string) {
+  return `jeffi-tenant-${slug}-pg16`
+}
 
 /** Higher plans (growth/pro/enterprise) get a DEDICATED EC2; Basic uses the shared pool. */
 function isDedicatedPlan(plan: string | null): boolean {
@@ -70,7 +76,11 @@ function isDedicatedPlan(plan: string | null): boolean {
 function tenantHostnames(slug: string, plan: string | null): string[] {
   const hosts = [`${slug}.${ROOT_DOMAIN}`, `admin-${slug}.${ROOT_DOMAIN}`, `invoice-${slug}.${ROOT_DOMAIN}`]
   if (plan && ['growth', 'pro', 'enterprise'].includes(plan)) {
-    hosts.push(`quotation-${slug}.${ROOT_DOMAIN}`, `purchaseorder-${slug}.${ROOT_DOMAIN}`, `forms-${slug}.${ROOT_DOMAIN}`)
+    hosts.push(
+      `quotation-${slug}.${ROOT_DOMAIN}`,
+      `purchaseorder-${slug}.${ROOT_DOMAIN}`,
+      `forms-${slug}.${ROOT_DOMAIN}`
+    )
   }
   if (plan && ['pro', 'enterprise'].includes(plan)) {
     hosts.push(`${slug}.business.${ROOT_DOMAIN}`)
@@ -111,7 +121,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (!tenantComputeConfigured() && (target || '').trim() === FLAGSHIP_APP_IP) {
           throw new Error(
             `preflight: TENANT_APP_TARGET_IP is the flagship app instance (${FLAGSHIP_APP_IP}) and no tenant compute is configured — ` +
-            `set TENANT_APP_AMI_ID (or POOL_INSTANCE_ID) so tenants are served by their own pool instance.`
+              `set TENANT_APP_AMI_ID (or POOL_INSTANCE_ID) so tenants are served by their own pool instance.`
           )
         }
         return await next(job.id, 'create_param_group', res)
@@ -124,7 +134,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
 
       case 'create_db_instance': {
         const { dbInstanceId: id } = await provider.createDbInstance({
-          dbInstanceId: dbInstanceId(slug), paramGroup: paramGroupName(slug), maxConnections: MAX_CONNECTIONS,
+          dbInstanceId: dbInstanceId(slug),
+          paramGroup: paramGroupName(slug),
+          maxConnections: MAX_CONNECTIONS,
         })
         res.dbInstanceId = id
         return await next(job.id, 'wait_db_available', res)
@@ -139,7 +151,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const endpoint = await provider.getDbEndpoint(res.dbInstanceId)
         if (!endpoint) {
           if (Date.now() - res.dbWaitStartedAt > DB_WAIT_DEADLINE_MS) {
-            throw new Error(`wait_db_available: ${res.dbInstanceId} did not become available within ${Math.round(DB_WAIT_DEADLINE_MS / 60000)} min`)
+            throw new Error(
+              `wait_db_available: ${res.dbInstanceId} did not become available within ${Math.round(DB_WAIT_DEADLINE_MS / 60000)} min`
+            )
           }
           // Still provisioning — stay on this step, worker will poll again next tick.
           await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
@@ -161,7 +175,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // churned owner). No key → fresh store → fall through to optional seeding.
         const key = res.restoreFromKey as string | undefined
         if (key) {
-          const { getTenantBackup } = await import('../tenant-backup-store')
+          const { getTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
           const archive = await getTenantBackup(key)
           await provider.restoreDb(res.endpoint, 'jeffi_stores', archive)
           res.restored = true
@@ -205,8 +219,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // legals identity read. NON-FATAL — a settings failure must not block go-live.
         try {
           const { controlPlanePool } = await import('../tenant-registry')
-          const ownerRow = await controlPlanePool().query(
-            `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id]).catch(() => null)
+          const ownerRow = await controlPlanePool()
+            .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id])
+            .catch(() => null)
           const ownerId = ownerRow?.rows?.[0]?.owner_id
           if (ownerId && res.endpoint) {
             const { seedTenantSiteSettings } = await import('./seed-settings')
@@ -247,7 +262,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           if (!target || target === FLAGSHIP_APP_IP) {
             throw new Error(
               `compute blocked: refusing to serve tenant "${slug}" from the flagship app instance (${FLAGSHIP_APP_IP}) — ` +
-              `set TENANT_APP_AMI_ID or POOL_INSTANCE_ID.`
+                `set TENANT_APP_AMI_ID or POOL_INSTANCE_ID.`
             )
           }
           res.ec2Target = target
@@ -256,21 +271,22 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           if (!res.ec2InstanceId) {
             const { instanceId, ip } = await provider.ensureAppInstance(
               {
-                name: `jeffi-tenant-${slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
+                name: `jeffi-tenant-${slug}`,
+                instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
                 userData: appBootUserData(),
               },
               // Persist before the readiness wait so rollback can terminate it if that throws.
-              async (id) => {
+              async id => {
                 res.ec2InstanceId = id
                 await updateProvisioningJob(job.id, { created_resources: res })
-              },
+              }
             )
             res.ec2InstanceId = instanceId
             res.ec2Target = ip
             res.computeMode = 'dedicated'
           }
         } else {
-          const { ensurePoolInstance } = await import('../pool-autoscale')
+          const { ensurePoolInstance } = await import('@/lib/tenancy/pool-autoscale')
           const { ip } = await ensurePoolInstance()
           res.ec2Target = ip
           res.computeMode = 'pool'
@@ -285,14 +301,15 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // (it can be retried/fixed later; shipments just can't be created until then).
         try {
           const { getKyc, getDraft, controlPlanePool } = await import('../tenant-registry')
-          const ownerRow = await controlPlanePool().query(
-            `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id]).catch(() => null)
+          const ownerRow = await controlPlanePool()
+            .query(`SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id])
+            .catch(() => null)
           const ownerId = ownerRow?.rows?.[0]?.owner_id
           const draft = ownerId ? await getDraft(ownerId).catch(() => null) : null
           const wh = (draft?.data as any)?.wh
           const kyc = await getKyc(job.tenant_id).catch(() => null)
           if (wh?.sellerPhone && wh?.originPincode) {
-            const { createDelhiveryPickupLocation } = await import('../delhivery')
+            const { createDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
             const r = await createDelhiveryPickupLocation({
               name: wh.pickupLocation || tenant.slug,
               phone: wh.sellerPhone,
@@ -350,7 +367,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
               await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
               return 'pending'
             }
-            throw new Error(`verify_serving: dedicated instance ${res.ec2InstanceId} is gone/terminated after ${attempts} attempts`)
+            throw new Error(
+              `verify_serving: dedicated instance ${res.ec2InstanceId} is gone/terminated after ${attempts} attempts`
+            )
           }
         }
         try {
@@ -370,7 +389,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
           return 'pending'
         }
-        throw new Error(`verify_serving: ${primaryHost} did not serve after ${attempts} attempts (app tier / DNS / TLS not ready)`)
+        throw new Error(
+          `verify_serving: ${primaryHost} did not serve after ${attempts} attempts (app tier / DNS / TLS not ready)`
+        )
       }
 
       case 'activate': {
@@ -407,46 +428,62 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     if (!terminal) {
       // Retryable — keep the job alive (pending) and back off before the next tick.
       const delayMs = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempts - 1))
-      const jitter = Math.floor(delayMs * 0.2 * (attempts % 3) / 2) // deterministic small jitter (no Math.random)
+      const jitter = Math.floor((delayMs * 0.2 * (attempts % 3)) / 2) // deterministic small jitter (no Math.random)
       const nextAttemptAt = new Date(Date.now() + delayMs + jitter)
       await updateProvisioningJob(job.id, {
-        status: 'pending', last_error: `retryable (attempt ${attempts}): ${msg}`,
-        created_resources: res, bumpAttempts: true, nextAttemptAt,
+        status: 'pending',
+        last_error: `retryable (attempt ${attempts}): ${msg}`,
+        created_resources: res,
+        bumpAttempts: true,
+        nextAttemptAt,
       })
       return 'pending'
     }
     // Terminal (or out of attempts) → fail + auto-rollback billable resources.
-    await updateProvisioningJob(job.id, { status: 'failed', last_error: msg, created_resources: res, bumpAttempts: true })
+    await updateProvisioningJob(job.id, {
+      status: 'failed',
+      last_error: msg,
+      created_resources: res,
+      bumpAttempts: true,
+    })
     try {
       await rollbackProvisioning(job.tenant_id, provider)
-    } catch { /* rollback failure already recorded; original failure stands */ }
+    } catch {
+      /* rollback failure already recorded; original failure stands */
+    }
     try {
       const { alertProvisioningFailure } = await import('./alerts')
       await alertProvisioningFailure(slug, job.step, msg, job.tenant_id)
-    } catch { /* alerting must never mask the failure */ }
+    } catch {
+      /* alerting must never mask the failure */
+    }
     return 'failed'
   }
 }
 
 // Retry tuning for the provisioning state machine.
 const MAX_PROVISION_ATTEMPTS = 8
-const BACKOFF_BASE_MS = 15_000   // 15s, doubling
-const BACKOFF_CAP_MS = 600_000   // capped at 10 min
+const BACKOFF_BASE_MS = 15_000 // 15s, doubling
+const BACKOFF_CAP_MS = 600_000 // capped at 10 min
 
 /** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
 function isTerminalError(msg: string): boolean {
-  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(msg)
+  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(
+    msg
+  )
 }
 
 function isTransientDnsError(msg: string): boolean {
   if (/InvalidChangeBatch|InvalidInput|NoSuchHostedZone|AccessDenied|not authorized/i.test(msg)) return false
-  return /Throttling|PriorRequestNotComplete|ServiceUnavailable|InternalError|RequestTimeout|\((429|500|502|503|504)\)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|network/i.test(msg)
+  return /Throttling|PriorRequestNotComplete|ServiceUnavailable|InternalError|RequestTimeout|\((429|500|502|503|504)\)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|network/i.test(
+    msg
+  )
 }
 
 async function retryTransient<T>(
   fn: () => Promise<T>,
   isTransient: (msg: string) => boolean,
-  attempts = 3,
+  attempts = 3
 ): Promise<{ value?: T; error?: any; attempts: number }> {
   let lastError: any
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -456,12 +493,11 @@ async function retryTransient<T>(
       lastError = e
       if (attempt === attempts || !isTransient(e?.message || String(e))) break
       const backoff = 500 * 3 ** (attempt - 1)
-      await new Promise((r) => setTimeout(r, backoff + Math.floor(Math.random() * 250)))
+      await new Promise(r => setTimeout(r, backoff + Math.floor(Math.random() * 250)))
     }
   }
   return { error: lastError, attempts }
 }
-
 
 /**
  * Record what a step actually did, so the admin UI can show each stage's history.
@@ -479,7 +515,7 @@ async function recordStepEvent(
   step: string,
   status: 'ok' | 'error',
   message: string | null,
-  detail: Record<string, unknown> = {},
+  detail: Record<string, unknown> = {}
 ): Promise<void> {
   try {
     await controlPlanePool().query(
@@ -487,9 +523,11 @@ async function recordStepEvent(
        SELECT j.id, j.tenant_id, $2, $3, $4, $5::jsonb,
               GREATEST(0, (EXTRACT(EPOCH FROM (now() - j.updated_at)) * 1000)::int)
          FROM provisioning_jobs j WHERE j.id = $1`,
-      [jobId, step, status, message, JSON.stringify(detail)],
+      [jobId, step, status, message, JSON.stringify(detail)]
     )
-  } catch { /* the log is not worth failing a provisioning step over */ }
+  } catch {
+    /* the log is not worth failing a provisioning step over */
+  }
 }
 
 async function next(id: string, step: Step, res: Record<string, any>): Promise<string> {
@@ -531,18 +569,22 @@ function resourcesFor(step: Step, res: Record<string, any>): Record<string, unkn
  * Bounded polling — if the DB is still deleting after the budget, skip (a later teardown /
  * reconciliation sweep retries). Best-effort; never throws. */
 async function deleteParamGroupWhenDbGone(
-  provider: ProvisioningProvider, dbInstanceId: string | undefined, paramGroup: string | undefined,
+  provider: ProvisioningProvider,
+  dbInstanceId: string | undefined,
+  paramGroup: string | undefined
 ): Promise<void> {
   if (!paramGroup) return
   try {
     if (dbInstanceId) {
       for (let i = 0; i < 20; i++) {
         if (await provider.isDbInstanceGone(dbInstanceId)) break
-        await new Promise((r) => setTimeout(r, 15_000))
+        await new Promise(r => setTimeout(r, 15_000))
       }
     }
     await provider.deleteParamGroup(paramGroup)
-  } catch { /* still attached / transient — a later teardown or sweep will retry */ }
+  } catch {
+    /* still attached / transient — a later teardown or sweep will retry */
+  }
 }
 
 /** Rollback a failed job's created resources (avoid leaked billing + leave a safe state). */
@@ -551,8 +593,7 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   const tenant = await getTenant(tenantId)
   const r = (job?.created_resources as Record<string, any>) || {}
   // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
-  const hosts = (r.dnsHosts as string[] | undefined)
-    ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
+  const hosts = (r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
   // Best-effort but LOUD: a swallowed removeDns failure leaves zombie A-records pointing at a
   // torn-down box (records outliving the instance). Record it + flag the lingering hosts for a
   // reconciler instead of failing the rollback.
@@ -560,8 +601,9 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
     try {
       await provider.removeDns(hosts)
     } catch (e: any) {
-      if (job) await recordStepEvent(job.id, 'rollback', 'error', `removeDns failed: ${e?.message || e}`, { dnsHosts: hosts })
-      r.manualCleanup = { ...(r.manualCleanup as Record<string, unknown> || {}), dnsHosts: hosts }
+      if (job)
+        await recordStepEvent(job.id, 'rollback', 'error', `removeDns failed: ${e?.message || e}`, { dnsHosts: hosts })
+      r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), dnsHosts: hosts }
     }
   }
   // Dedicated EC2 (higher plans) — terminate it; a Basic tenant used the shared pool (left alone
@@ -579,7 +621,12 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // Reconcile the tenant row: NEVER leave it 'active'/'provisioning' pointing at torn-down
   // infra. 'suspended' = not served, distinguishable from a clean 'terminated' deprovision.
   await setTenantStatus(tenantId, 'suspended').catch(() => {})
-  if (job) await updateProvisioningJob(job.id, { status: 'failed', last_error: 'rolled back', created_resources: { ...r, rolledBack: true } })
+  if (job)
+    await updateProvisioningJob(job.id, {
+      status: 'failed',
+      last_error: 'rolled back',
+      created_resources: { ...r, rolledBack: true },
+    })
 }
 
 export interface ReprovisionResult {
@@ -616,8 +663,8 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
 
   const desiredSet = new Set(desired)
   const prevSet = new Set(prev)
-  const added = desired.filter((h) => !prevSet.has(h))
-  const removed = prev.filter((h) => !desiredSet.has(h))
+  const added = desired.filter(h => !prevSet.has(h))
+  const removed = prev.filter(h => !desiredSet.has(h))
 
   try {
     // COMPUTE MOVE: if the new plan tier crosses the Basic↔dedicated boundary, the tenant's
@@ -632,17 +679,17 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
       // Basic → higher: provision a dedicated EC2, move off the pool.
       const { instanceId, ip } = await provider.ensureAppInstance(
         { name: `jeffi-tenant-${tenant.slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small' },
-        async (id) => {
+        async id => {
           created.ec2InstanceId = id
           if (job) await updateProvisioningJob(job.id, { created_resources: created })
-        },
+        }
       )
       created.ec2InstanceId = instanceId
       targetIp = ip
       computeChanged = true
     } else if (!wantDedicated && hadDedicated) {
       // higher → Basic: fall back to the shared pool, terminate the dedicated instance.
-      const { ensurePoolInstance } = await import('../pool-autoscale')
+      const { ensurePoolInstance } = await import('@/lib/tenancy/pool-autoscale')
       const { ip } = await ensurePoolInstance()
       const oldInstance = created.ec2InstanceId
       targetIp = ip
@@ -695,7 +742,7 @@ export interface DeprovisionResult {
 export async function deprovisionTenant(
   tenantId: string,
   provider: ProvisioningProvider,
-  ctx: { ownerId?: string | null },
+  ctx: { ownerId?: string | null }
 ): Promise<DeprovisionResult> {
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, backupKey: null, backedUp: false, error: 'tenant not found' }
@@ -718,7 +765,7 @@ export async function deprovisionTenant(
     // 2. Backup (only if there was ever a DB to back up).
     if (endpoint) {
       const archive = await provider.backupDb(endpoint, tenant.rds_db || 'jeffi_stores')
-      const { putTenantBackup } = await import('../tenant-backup-store')
+      const { putTenantBackup } = await import('@/lib/tenancy/tenant-backup-store')
       const { ownerKey } = await putTenantBackup({
         buffer: archive,
         ownerId: ctx.ownerId || 'unknown',
@@ -739,7 +786,7 @@ export async function deprovisionTenant(
     if (dedicatedInstanceId) {
       await provider.deleteAppInstance(dedicatedInstanceId).catch(() => {})
     } else {
-      const { deletePoolIfEmpty } = await import('../pool-autoscale')
+      const { deletePoolIfEmpty } = await import('@/lib/tenancy/pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
     }
 
@@ -751,7 +798,14 @@ export async function deprovisionTenant(
     const dnsResult = await retryTransient(() => provider.removeDns(dnsHosts), isTransientDnsError)
     if (dnsResult.error) {
       dnsRemovalFailed = dnsHosts
-      if (job) await recordStepEvent(job.id, 'deprovision', 'error', `removeDns failed after ${dnsResult.attempts} attempt(s): ${dnsResult.error?.message || dnsResult.error}`, { dnsHosts, attempts: dnsResult.attempts })
+      if (job)
+        await recordStepEvent(
+          job.id,
+          'deprovision',
+          'error',
+          `removeDns failed after ${dnsResult.attempts} attempt(s): ${dnsResult.error?.message || dnsResult.error}`,
+          { dnsHosts, attempts: dnsResult.attempts }
+        )
     }
 
     // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
@@ -768,7 +822,7 @@ export async function deprovisionTenant(
     if (dnsRemovalFailed) manualCleanup.dnsHosts = dnsRemovalFailed
     try {
       if (tenant.razorpay_linked_account_id) {
-        const { markLinkedAccountDeprovisioned } = await import('../razorpay-route')
+        const { markLinkedAccountDeprovisioned } = await import('@/lib/payments/razorpay-route')
         const marked = await markLinkedAccountDeprovisioned(tenant.razorpay_linked_account_id, slug)
         manualCleanup.routeAccount = {
           id: tenant.razorpay_linked_account_id,
@@ -781,10 +835,11 @@ export async function deprovisionTenant(
       const { getDraft: loadDraft } = await import('../tenant-registry')
       const draft = await loadDraft((created.ownerId as string) ?? '').catch(() => null)
       const pickupName = (draft?.data as any)?.wh?.pickupLocation || slug
-      const { deactivateDelhiveryPickupLocation } = await import('../delhivery')
-      const deactivated = await deactivateDelhiveryPickupLocation(pickupName).catch(
-        (e: any) => ({ ok: false, error: e?.message ?? String(e) }),
-      )
+      const { deactivateDelhiveryPickupLocation } = await import('@/lib/shipping/delhivery')
+      const deactivated = await deactivateDelhiveryPickupLocation(pickupName).catch((e: any) => ({
+        ok: false,
+        error: e?.message ?? String(e),
+      }))
       manualCleanup.delhiveryPickup = {
         name: pickupName,
         deletable: false,
@@ -792,10 +847,15 @@ export async function deprovisionTenant(
         ...(deactivated.error ? { deactivateError: deactivated.error } : {}),
       }
       const { alertProvisioningFailure } = await import('./alerts')
-      await alertProvisioningFailure(slug, 'external_cleanup',
+      await alertProvisioningFailure(
+        slug,
+        'external_cleanup',
         `Deprovisioned, but these cannot be deleted by API and need closing by hand: ${JSON.stringify(manualCleanup)}`,
-        tenantId)
-    } catch { /* bookkeeping must never fail a teardown that already deleted the billable resources */ }
+        tenantId
+      )
+    } catch {
+      /* bookkeeping must never fail a teardown that already deleted the billable resources */
+    }
     const routeAccount = Object.keys(manualCleanup).length ? manualCleanup : undefined
 
     // 4. Clear infra pointers.
@@ -804,7 +864,12 @@ export async function deprovisionTenant(
     if (job) {
       await updateProvisioningJob(job.id, {
         status: 'done',
-        created_resources: { ...created, deprovisioned: true, backupKey, ...(routeAccount ? { manualCleanup: routeAccount } : {}) },
+        created_resources: {
+          ...created,
+          deprovisioned: true,
+          backupKey,
+          ...(routeAccount ? { manualCleanup: routeAccount } : {}),
+        },
       })
     }
     return { ok: true, backupKey, backedUp }

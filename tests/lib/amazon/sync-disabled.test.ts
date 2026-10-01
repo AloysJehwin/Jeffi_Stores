@@ -9,7 +9,7 @@ describe('amazon/sync disabled + config branches', () => {
   })
 
   function commonMocks(clientOverrides: Record<string, any>) {
-    vi.doMock('@/lib/db', () => ({ query: vi.fn(), queryOne: vi.fn() }))
+    vi.doMock('@/lib/shared/db', () => ({ query: vi.fn(), queryOne: vi.fn() }))
     vi.doMock('@/lib/merchant/product-fetch', () => ({
       fetchAllActiveProducts: vi.fn().mockResolvedValue([]),
       fetchProduct: vi.fn().mockResolvedValue({ id: 'p1', sku: 'S', name: 'n', has_variants: false }),

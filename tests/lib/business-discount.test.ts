@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
 // Also mock pricing so we can verify re-exports work without circular issues
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import {
   getBusinessDiscountPct,
   getBusinessDiscountMap,
   applyBusinessDiscount,
   applyDiscount,
-} from '@/lib/business-discount'
+} from '@/lib/catalog/business-discount'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
@@ -43,10 +43,7 @@ describe('getBusinessDiscountPct', () => {
     const result = await getBusinessDiscountPct('user-1', 'cat-1')
     expect(result).toBe(15.5)
     expect(mockQueryOne).toHaveBeenCalledOnce()
-    expect(mockQueryOne).toHaveBeenCalledWith(
-      expect.stringContaining('business_discounts'),
-      ['user-1', 'cat-1']
-    )
+    expect(mockQueryOne).toHaveBeenCalledWith(expect.stringContaining('business_discounts'), ['user-1', 'cat-1'])
   })
 
   it('returns 0 when no row found (null)', async () => {
@@ -101,10 +98,7 @@ describe('getBusinessDiscountMap', () => {
   it('passes userId to query', async () => {
     mockQueryMany.mockResolvedValueOnce([])
     await getBusinessDiscountMap('u-xyz')
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('business_discounts'),
-      ['u-xyz']
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('business_discounts'), ['u-xyz'])
   })
 
   it('handles multiple categories with various decimal values', async () => {
