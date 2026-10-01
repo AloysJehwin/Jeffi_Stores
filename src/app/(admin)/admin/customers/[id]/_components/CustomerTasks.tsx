@@ -185,7 +185,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="px-2.5 py-1 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
+              className="hidden md:inline-flex items-center px-2.5 py-1 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
             >
               + Add
             </button>

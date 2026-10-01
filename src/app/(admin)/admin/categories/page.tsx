@@ -243,7 +243,7 @@ async function CategoriesHeader() {
         {canWrite && (
           <Link
             href={ap('/admin/categories/add', host)}
-            className="inline-flex items-center justify-center h-11 bg-accent-500 hover:bg-accent-600 text-white px-5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+            className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 hover:bg-accent-600 text-white px-5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
           >
             Add New Category
           </Link>
@@ -260,7 +260,7 @@ function CategoriesHeaderFallback() {
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
         <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
       </div>
-      <div className="inline-flex items-center justify-center h-11 bg-accent-500 text-white px-5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-70">
+      <div className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 text-white px-5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-70">
         Add New Category
       </div>
     </div>

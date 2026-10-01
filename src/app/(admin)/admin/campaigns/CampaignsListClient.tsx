@@ -212,7 +212,7 @@ export default function CampaignsListClient() {
         <RequireWrite scope="campaigns:write">
           <Link
             href={ap('/admin/campaigns/new')}
-            className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
+            className="hidden md:inline-flex items-center mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
           >
             + New Campaign
           </Link>
