@@ -4,6 +4,7 @@ import { getAllCategories, getAllBrands } from '@/lib/queries'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { createProduct } from './actions'
 
 export default async function AddProductPage() {
@@ -15,6 +16,7 @@ export default async function AddProductPage() {
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -40,5 +42,6 @@ export default async function AddProductPage() {
         hasInventory={hasInventory}
       />
     </div>
+    </MobileEditBlock>
   )
 }

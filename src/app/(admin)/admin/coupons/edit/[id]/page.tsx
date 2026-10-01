@@ -6,6 +6,7 @@ import Link from 'next/link'
 import CouponForm from '../../CouponForm'
 import Pagination from '@/components/admin/Pagination'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -163,6 +164,7 @@ export default async function EditCouponPage({
   const df = (draftRow?.fields || {}) as any
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
@@ -272,5 +274,6 @@ export default async function EditCouponPage({
         )}
       </div>
     </div>
+    </MobileEditBlock>
   )
 }

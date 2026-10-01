@@ -12,6 +12,7 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
 
 const PURCHASE_UNITS = [
@@ -564,6 +565,7 @@ export default function NewPOPage() {
   const roundOff = poTotal - rawTotal
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link
@@ -1236,5 +1238,6 @@ export default function NewPOPage() {
           document.body
         )}
     </div>
+    </MobileEditBlock>
   )
 }

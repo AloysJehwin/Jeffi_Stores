@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { discardReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,7 @@ export default async function EditReviewFormPage({
   const df = (draftRow?.fields || {}) as any
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
@@ -129,5 +131,6 @@ export default async function EditReviewFormPage({
         }}
       />
     </div>
+    </MobileEditBlock>
   )
 }

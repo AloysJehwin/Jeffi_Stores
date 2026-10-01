@@ -2,6 +2,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import Link from 'next/link'
 import CouponForm from '../CouponForm'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { createCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,7 @@ export const dynamic = 'force-dynamic'
 export default async function AddCouponPage() {
   const host = await getHost()
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link
@@ -27,5 +29,6 @@ export default async function AddCouponPage() {
 
       <CouponForm action={createCoupon} submitLabel="Save as Draft" showUserSelector />
     </div>
+    </MobileEditBlock>
   )
 }

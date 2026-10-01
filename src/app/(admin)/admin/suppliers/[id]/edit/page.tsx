@@ -7,6 +7,7 @@ import { Check } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 
 const inputCls = ADMIN_INPUT_CLASS
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -201,6 +202,7 @@ export default function EditSupplierPage() {
   if (loading) return null
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link
@@ -411,5 +413,6 @@ export default function EditSupplierPage() {
         </div>
       </form>
     </div>
+    </MobileEditBlock>
   )
 }

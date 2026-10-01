@@ -6,6 +6,7 @@ import { query, queryOne } from '@/lib/shared/db'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 import { getAdminSession } from '@/lib/auth/admin-auth'
+import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateProduct } from './actions'
 
 export default async function EditProductPage({
@@ -192,6 +193,7 @@ export default async function EditProductPage({
   }
 
   return (
+    <MobileEditBlock>
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
@@ -239,5 +241,6 @@ export default async function EditProductPage({
         hasReturns={hasReturns}
       />
     </div>
+    </MobileEditBlock>
   )
 }
