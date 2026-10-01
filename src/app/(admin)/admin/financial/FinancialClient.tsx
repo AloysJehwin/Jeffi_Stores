@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import type { Tab } from './_components/shared'
+import { OverviewTab } from './_components/OverviewTab'
 import { ReceivablesTab } from './_components/ReceivablesTab'
 import { PayablesTab } from './_components/PayablesTab'
 import { TransactionsTab } from './_components/TransactionsTab'
@@ -12,6 +13,7 @@ import { CashflowTab } from './_components/CashflowTab'
 import { CodRemittanceTab } from './_components/CodRemittanceTab'
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
   { key: 'receivables', label: 'Receivables' },
   { key: 'payables', label: 'Payables' },
   { key: 'transactions', label: 'Transactions' },
@@ -24,8 +26,8 @@ export default function FinancialClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
-  const validTabs: Tab[] = ['receivables', 'payables', 'transactions', 'pl', 'cashflow', 'cod_remittance']
-  const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'receivables')
+  const validTabs: Tab[] = ['overview', 'receivables', 'payables', 'transactions', 'pl', 'cashflow', 'cod_remittance']
+  const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'overview')
 
   const now = new Date()
   const fyStart = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
@@ -82,6 +84,7 @@ export default function FinancialClient() {
       </div>
 
       <div>
+        {tab === 'overview' && <OverviewTab />}
         {tab === 'receivables' && <ReceivablesTab initialData={allData.receivables ?? null} />}
         {tab === 'payables' && <PayablesTab initialData={allData.payables ?? null} />}
         {tab === 'transactions' && <TransactionsTab initialData={allData.transactions ?? null} />}
