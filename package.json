@@ -42,7 +42,7 @@
     "motion": "^13.4.6",
     "next": "^15.5.26",
     "node-forge": "^1.4.0",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.0.9",
     "openai": "^6.37.0",
     "otplib": "^13.4.0",
     "pdf-parse": "^2.4.5",
