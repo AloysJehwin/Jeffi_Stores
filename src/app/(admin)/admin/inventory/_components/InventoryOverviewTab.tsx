@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatINR } from '@/lib/shared/format'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import {
   LowStockWatchlistCard,
   PoValueTrendCard,
@@ -288,34 +289,44 @@ export default function InventoryOverviewTab() {
     }
   }, [])
 
+  const kpisLoading =
+    valuation.status === 'loading' ||
+    po.status === 'loading' ||
+    suppliers.status === 'loading' ||
+    stockLevels.status === 'loading'
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          label="Total stock value"
-          state={valuation}
-          render={d => ({ value: formatINR(d.totalValue, 0), sub: `${d.skuCount} SKUs, cost basis` })}
-        />
-        <KpiCard
-          label="Open purchase orders"
-          state={po}
-          render={d => ({ value: String(d.count), sub: `${formatINR(d.value, 0)} pending` })}
-        />
-        <KpiCard
-          label="Active suppliers"
-          state={suppliers}
-          render={d => ({ value: String(d.active) })}
-        />
-        <KpiCard
-          label="Low / out of stock"
-          state={stockLevels}
-          accent="warning"
-          render={d => ({
-            value: `${d.lowStock} low`,
-            sub: `${d.outOfStock} out of stock`,
-          })}
-        />
-      </div>
+      {kpisLoading ? (
+        <AdminStatsSkeleton cards={4} gridClass="grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCard
+            label="Total stock value"
+            state={valuation}
+            render={d => ({ value: formatINR(d.totalValue, 0), sub: `${d.skuCount} SKUs, cost basis` })}
+          />
+          <KpiCard
+            label="Open purchase orders"
+            state={po}
+            render={d => ({ value: String(d.count), sub: `${formatINR(d.value, 0)} pending` })}
+          />
+          <KpiCard
+            label="Active suppliers"
+            state={suppliers}
+            render={d => ({ value: String(d.active) })}
+          />
+          <KpiCard
+            label="Low / out of stock"
+            state={stockLevels}
+            accent="warning"
+            render={d => ({
+              value: `${d.lowStock} low`,
+              sub: `${d.outOfStock} out of stock`,
+            })}
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartSlot state={charts} empty={d => d.categorySegments.length === 0}>
@@ -346,10 +357,10 @@ function ChartSlot<T>({
 }) {
   if (state.status === 'loading') {
     return (
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+      <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 animate-fade-in">
         <div className="motion-safe:animate-pulse space-y-3">
           <div className="h-4 w-40 rounded bg-surface-secondary" />
-          <div className="h-32 w-full rounded bg-surface-secondary" />
+          <div className="h-40 w-full rounded bg-surface-secondary" />
         </div>
       </div>
     )
