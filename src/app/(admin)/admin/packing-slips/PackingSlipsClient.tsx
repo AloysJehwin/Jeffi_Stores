@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
+import PackingSlipsMobileList from './_components/PackingSlipsMobileList'
 
 interface Order {
   id: string
@@ -341,109 +342,120 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
               : 'No orders match the current filters.'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border-default bg-surface">
-                  <th className="px-4 py-3 text-left w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="rounded border-border-default"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Order #</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">
-                    <div className="flex items-center gap-1">
-                      Customer
-                      {customerSearch && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
-                          {customerSearch}
-                          <button onClick={() => setCustomerSearch('')} className="ml-1 hover:text-red-500">
-                            ×
-                          </button>
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Date</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">
-                    <div className="flex items-center gap-1">
-                      Status
-                      {statusFilter && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
-                          {statusLabel(statusFilter)}
-                          <button onClick={() => setStatusFilter('')} className="ml-1 hover:text-red-500">
-                            ×
-                          </button>
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-right font-semibold text-foreground-secondary">Total</th>
-                  <th className="px-4 py-3 text-center font-semibold text-foreground-secondary">Slip</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {paged.map(order => (
-                  <tr key={order.id} className="hover:bg-surface transition-colors">
-                    <td className="px-4 py-3">
+          <>
+            <div className="md:hidden p-4 pt-0 space-y-3">
+              <PackingSlipsMobileList
+                orders={paged}
+                statusColors={STATUS_COLORS}
+                statusLabel={statusLabel}
+                selectedIds={selectedIds}
+                onToggleOne={toggleOne}
+              />
+            </div>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface">
+                    <th className="px-4 py-3 text-left w-10">
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(order.id)}
-                        onChange={() => toggleOne(order.id)}
+                        checked={allSelected}
+                        onChange={toggleAll}
                         className="rounded border-border-default"
                       />
-                    </td>
-                    <td className="px-4 py-3 font-mono">
-                      <a
-                        href={ap(`/admin/orders/${order.id}`)}
-                        className="text-foreground font-medium hover:text-accent-500 hover:underline transition-colors"
-                      >
-                        #{order.order_number}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{order.customer_name || '—'}</td>
-                    <td className="px-4 py-3 text-foreground-secondary">
-                      {new Date(order.created_at).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
-                      >
-                        {statusLabel(order.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-foreground font-medium">
-                      ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <a
-                        href={`/api/admin/packing-slips/${order.id}`}
-                        download
-                        title="Download Packing Slip"
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-secondary-50 dark:bg-secondary-900/30 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800/50 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                          />
-                        </svg>
-                      </a>
-                    </td>
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Order #</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">
+                      <div className="flex items-center gap-1">
+                        Customer
+                        {customerSearch && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                            {customerSearch}
+                            <button onClick={() => setCustomerSearch('')} className="ml-1 hover:text-red-500">
+                              ×
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">Date</th>
+                    <th className="px-4 py-3 text-left font-semibold text-foreground-secondary">
+                      <div className="flex items-center gap-1">
+                        Status
+                        {statusFilter && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                            {statusLabel(statusFilter)}
+                            <button onClick={() => setStatusFilter('')} className="ml-1 hover:text-red-500">
+                              ×
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-4 py-3 text-right font-semibold text-foreground-secondary">Total</th>
+                    <th className="px-4 py-3 text-center font-semibold text-foreground-secondary">Slip</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {paged.map(order => (
+                    <tr key={order.id} className="hover:bg-surface transition-colors">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(order.id)}
+                          onChange={() => toggleOne(order.id)}
+                          className="rounded border-border-default"
+                        />
+                      </td>
+                      <td className="px-4 py-3 font-mono">
+                        <a
+                          href={ap(`/admin/orders/${order.id}`)}
+                          className="text-foreground font-medium hover:text-accent-500 hover:underline transition-colors"
+                        >
+                          #{order.order_number}
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{order.customer_name || '—'}</td>
+                      <td className="px-4 py-3 text-foreground-secondary">
+                        {new Date(order.created_at).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                        >
+                          {statusLabel(order.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-foreground font-medium">
+                        ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <a
+                          href={`/api/admin/packing-slips/${order.id}`}
+                          download
+                          title="Download Packing Slip"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-secondary-50 dark:bg-secondary-900/30 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800/50 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                            />
+                          </svg>
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {filtered.length > 0 && (

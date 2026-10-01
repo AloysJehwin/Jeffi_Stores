@@ -6,6 +6,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { Skeleton, SummaryCard, formatDate, formatINR } from './shared'
+import CodRemittanceMobileList from './CodRemittanceMobileList'
 
 export function CodRemittanceTab() {
   const [statusFilter, setStatusFilter] = useState<'cod_collected' | 'cod_pending' | 'paid' | 'all'>('cod_collected')
@@ -148,7 +149,23 @@ export function CodRemittanceTab() {
                   )}
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="md:hidden p-3 space-y-3">
+                <CodRemittanceMobileList
+                  orders={week.orders}
+                  canWrite={canWrite}
+                  selected={selected}
+                  onToggle={id =>
+                    setSelected(prev => {
+                      const next = new Set(prev)
+                      next.has(id) ? next.delete(id) : next.add(id)
+                      return next
+                    })
+                  }
+                  onMarkRemitted={markRemitted}
+                  marking={marking}
+                />
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary/50">
                     <tr className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">
@@ -219,7 +236,28 @@ export function CodRemittanceTab() {
       {/* Flat table — Pending / Remitted / All views */}
       {!loading && statusFilter !== 'cod_collected' && (
         <div className="rounded-xl border border-border-default overflow-hidden">
-          <div className="overflow-x-auto">
+          {orders.length > 0 && (
+            <div className="md:hidden p-3 space-y-3">
+              <CodRemittanceMobileList
+                orders={orders}
+                canWrite={canWrite}
+                selected={selected}
+                onToggle={id =>
+                  setSelected(prev => {
+                    const next = new Set(prev)
+                    next.has(id) ? next.delete(id) : next.add(id)
+                    return next
+                  })
+                }
+                onMarkRemitted={markRemitted}
+                marking={marking}
+              />
+            </div>
+          )}
+          {orders.length === 0 && (
+            <div className="md:hidden px-4 py-10 text-center text-foreground-muted text-sm">No orders found.</div>
+          )}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary">
                 <tr className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">

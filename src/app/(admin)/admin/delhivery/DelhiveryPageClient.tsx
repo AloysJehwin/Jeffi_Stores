@@ -8,6 +8,8 @@ import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TextControl, TextAreaControl } from '@/components/admin/site-controls/controls'
 import WalletCard from './WalletCard'
+import EligibleOrdersMobileList from './_components/EligibleOrdersMobileList'
+import PickupHistoryMobileList from './_components/PickupHistoryMobileList'
 
 type DefaultWarehouse = {
   pickupLocation: string
@@ -704,7 +706,10 @@ export default function DelhiveryPageClient({
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="md:hidden p-4 pt-0 space-y-3">
+              <EligibleOrdersMobileList orders={pagedOrders} selected={selected} onToggle={toggle} />
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
@@ -852,7 +857,21 @@ export default function DelhiveryPageClient({
               Update each request once you confirm pickup outcome with Delhivery
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="md:hidden px-4 py-4 space-y-3">
+            <PickupHistoryMobileList
+              requests={pagedHistory}
+              canWrite={canWrite}
+              statusStyles={STATUS_STYLES}
+              statusOptions={STATUS_OPTIONS}
+              downloadingId={downloadingId}
+              refreshingId={refreshingId}
+              updatingId={updatingId}
+              onDownloadLabels={handleDownloadLabels}
+              onRefresh={handleRefresh}
+              onStatusChange={handleStatusChange}
+            />
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-secondary">

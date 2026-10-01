@@ -21,6 +21,7 @@ import SerialEntryModal, {
   type SerialAssignment,
   SerialPicker,
 } from '@/components/admin/SerialEntryModal'
+import CashSaleMobileList from './_components/CashSaleMobileList'
 
 interface CashSale {
   id: string
@@ -1130,74 +1131,14 @@ export default function CashSaleClient() {
               </table>
             </div>
 
-            <div className="md:hidden divide-y divide-border-default">
-              {sales.map(sale => (
-                <div
-                  key={sale.id}
-                  className="p-4 space-y-2.5 hover:bg-surface-secondary transition-colors cursor-pointer"
-                  onClick={() => setSelectedSale(sale)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div onClick={e => e.stopPropagation()}>
-                      {sale.invoice_number ? (
-                        <a
-                          href={ap(`/admin/cash-sale/${sale.id}`)}
-                          className="font-mono font-semibold text-sm text-accent-500 hover:underline"
-                        >
-                          {sale.invoice_number}
-                        </a>
-                      ) : (
-                        <span className="font-mono text-xs text-foreground-muted">—</span>
-                      )}
-                      <div className="text-xs text-foreground-muted mt-0.5 font-mono">{sale.order_number}</div>
-                    </div>
-                    <span className="font-semibold text-foreground text-sm shrink-0">
-                      ₹{parseFloat(sale.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-foreground">Walk-in Customer</span>
-                    <span className="text-xs text-foreground-muted shrink-0">{fmtDate(sale.invoice_date)}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}
-                    >
-                      {sale.payment_status}
-                    </span>
-                    {sale.status === 'cancelled' && (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                        Cancelled
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-4 pt-1 border-t border-border-default" onClick={e => e.stopPropagation()}>
-                    <a
-                      href={`/api/admin/cash-sale/${sale.id}/receipt`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
-                    >
-                      PDF
-                    </a>
-                    <a
-                      href={ap(`/admin/cash-sale/${sale.id}`)}
-                      className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                    >
-                      View Detail
-                    </a>
-                    {sale.status !== 'cancelled' && canWrite && (
-                      <button
-                        onClick={() => cancelSale(sale.id)}
-                        disabled={cancellingId === sale.id}
-                        className="ml-auto text-xs font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="md:hidden p-4 pt-0 space-y-3">
+              <CashSaleMobileList
+                sales={sortedSales}
+                canWrite={canWrite}
+                cancellingId={cancellingId}
+                paymentColors={PAYMENT_COLORS}
+                onCancel={cancelSale}
+              />
             </div>
           </>
         )}
