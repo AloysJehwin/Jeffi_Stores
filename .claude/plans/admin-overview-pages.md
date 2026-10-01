@@ -40,6 +40,27 @@ The RFQs page gains the orders top section (image not received; parameters chose
 - Keep the existing filters, status tabs, sortable table, and mobile list.
 Match the orders page layout: stats → chart → filters → table. Reuse AdminFilters/Pagination/SortableHeader where applicable.
 
+## RICHER OVERVIEW (owner update): diagrams + graphs, not just KPI cards
+
+House style: NO charting library. Reuse the existing hand-rolled SVG toolkit in `src/components/admin/dashboard/Charts.tsx` — `TrendChart` (line/area), `DonutSplit` (donut), `RankedBars` (horizontal bars) — and the formatters/tiles in `dashboard/Primitives.tsx` (`rs`, `rsCompact`, `pctStr`, `delta`, stat tiles, `GroupLabel`). Also the top-level `RevenueTrendChart`, `DonutSplit`, `ProductBreakdownChart`, `CustomerEngagementChart` where they fit.
+
+### Financial Overview (enrich)
+- KPI tiles row (keep the 7) with delta vs previous period where data allows (use `delta`/`pctStr`).
+- Cashflow TrendChart: inflow vs outflow vs net over the period (monthly) from /cashflow.
+- DonutSplit: outflow composition (PO payments / refunds / other) or inflow vs outflow share.
+- RankedBars: top receivables by customer (or payables by supplier) from existing endpoints.
+- A P&L mini TrendChart: net revenue by month from /pl.
+- Receivables vs Payables aging indicator (overdue buckets) if the data exposes due dates.
+
+### Inventory Overview (enrich)
+- KPI tiles row (stock value, open POs, active suppliers, low/out-of-stock).
+- DonutSplit: stock value by category (from valuation `products` grouped) or in-stock vs low vs out.
+- RankedBars: top products/categories by stock value; or suppliers by open-PO value.
+- TrendChart: stock movements / PO value over time if the stock endpoint exposes dated rows; else omit.
+- Low-stock watchlist: a compact RankedBars or list of the lowest-stock SKUs (warning color).
+
+Rule still holds: real data only, omit (and report) any chart lacking a clean source rather than fabricate. Responsive; charts get an overflow-x container if needed; reduced-motion safe. These REPLACE the plain stat-only Overview tabs already shipped (c46cf2aa financial, 0bea9b3a inventory) — extend those tabs in place.
+
 ## Constraints (all batches)
 - Reuse existing endpoints/queries; do not invent figures or add fake data.
 - Desktop unchanged for existing tabs; only add the Overview tab + its content.
