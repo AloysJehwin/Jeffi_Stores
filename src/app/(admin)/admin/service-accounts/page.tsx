@@ -153,7 +153,7 @@ export default async function ServiceAccountsPage() {
             {canWrite && (
               <Link
                 href={ap('/admin/service-accounts/add')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
+                className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
               >
                 Create first account
               </Link>

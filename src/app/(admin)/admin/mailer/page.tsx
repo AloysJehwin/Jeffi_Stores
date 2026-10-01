@@ -166,9 +166,11 @@ async function MailerListContent({
       emptyState={
         <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
           No campaigns yet.{' '}
-          <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">
-            Create your first one.
-          </Link>
+          <span className="hidden md:contents">
+            <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">
+              Create your first one.
+            </Link>
+          </span>
         </div>
       }
       pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
