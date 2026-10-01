@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
     cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     cookieStore.set('session_id', user.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
