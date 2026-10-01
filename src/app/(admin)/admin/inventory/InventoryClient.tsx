@@ -17,6 +17,8 @@ import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/li
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
+import ResponsiveList from '@/components/admin/ResponsiveList'
+import SuppliersMobileList from './_components/SuppliersMobileList'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -134,6 +136,7 @@ type Supplier = {
 }
 
 function SuppliersTab() {
+  const canWriteSuppliers = useCanWrite('inventory')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -248,7 +251,30 @@ function SuppliersTab() {
           <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
         </div>
       ) : (
-        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <>
+        <div className="md:hidden space-y-3">
+          {sortedSuppliers.length === 0 ? (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-sm text-foreground-secondary">
+              {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
+            </div>
+          ) : (
+            <SuppliersMobileList
+              suppliers={sortedSuppliers}
+              canWrite={canWriteSuppliers}
+              onToggleActive={toggleActive}
+            />
+          )}
+          <ClientPagination
+            page={page}
+            total={total}
+            pageSize={PAGE_SIZE}
+            onChange={p => {
+              setPage(p)
+              setLoading(true)
+            }}
+          />
+        </div>
+        <div className="hidden md:block bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
@@ -387,6 +413,7 @@ function SuppliersTab() {
             />
           </div>
         </div>
+        </>
       )}
     </div>
   )
