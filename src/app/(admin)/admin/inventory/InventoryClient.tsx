@@ -20,10 +20,12 @@ import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesCo
 import ResponsiveList from '@/components/admin/ResponsiveList'
 import SuppliersMobileList from './_components/SuppliersMobileList'
 import PurchaseOrdersMobileList from './_components/PurchaseOrdersMobileList'
+import InventoryOverviewTab from './_components/InventoryOverviewTab'
 
-type Tab = 'suppliers' | 'po' | 'stock'
+type Tab = 'overview' | 'suppliers' | 'po' | 'stock'
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
   { key: 'suppliers', label: 'Suppliers' },
   { key: 'po', label: 'Purchase Orders' },
   { key: 'stock', label: 'Stock Ledger' },
@@ -3796,7 +3798,7 @@ export default function InventoryClient() {
   const tabParam = searchParams.get('tab') as Tab | null
   const poParam = searchParams.get('po') || undefined
   const [tab, setTab] = useState<Tab>(
-    tabParam && ['suppliers', 'po', 'stock'].includes(tabParam) ? tabParam : poParam ? 'po' : 'suppliers'
+    tabParam && ['overview', 'suppliers', 'po', 'stock'].includes(tabParam) ? tabParam : poParam ? 'po' : 'overview'
   )
 
   function handleTabChange(key: Tab) {
@@ -3820,6 +3822,7 @@ export default function InventoryClient() {
         ))}
       </div>
       <div>
+        {tab === 'overview' && <InventoryOverviewTab />}
         {tab === 'suppliers' && <SuppliersTab />}
         {tab === 'po' && <POTab initialPO={poParam} />}
         {tab === 'stock' && <StockTab />}
