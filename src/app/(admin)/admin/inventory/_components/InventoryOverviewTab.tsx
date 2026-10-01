@@ -31,7 +31,8 @@ function initial<T>(): CardState<T> {
   return { status: 'loading' }
 }
 
-type ValuationState = { totalValue: number; skuCount: number; lowStock: number | null; outOfStock: number }
+type ValuationState = { totalValue: number; skuCount: number }
+type StockLevelsState = { lowStock: number; outOfStock: number }
 type PoState = { count: number; value: number }
 type SupplierState = { active: number }
 
@@ -162,6 +163,7 @@ type ChartsState = {
 
 export default function InventoryOverviewTab() {
   const [valuation, setValuation] = useState<CardState<ValuationState>>(initial)
+  const [stockLevels, setStockLevels] = useState<CardState<StockLevelsState>>(initial)
   const [po, setPo] = useState<CardState<PoState>>(initial)
   const [suppliers, setSuppliers] = useState<CardState<SupplierState>>(initial)
   const [charts, setCharts] = useState<CardState<ChartsState>>(initial)
@@ -173,27 +175,37 @@ export default function InventoryOverviewTab() {
 
     async function loadValuation() {
       try {
-        const [valRes, lowRes] = await Promise.all([
-          fetch('/api/admin/inventory/stock?view=valuation&limit=1'),
-          fetch('/api/admin/inventory/stock?view=valuation&limit=1&stock_status=low_stock').catch(() => null),
-        ])
+        const valRes = await fetch('/api/admin/inventory/stock?view=valuation&limit=1')
         if (!valRes.ok) throw new Error('valuation')
         const val = await valRes.json()
-        const low = lowRes?.ok ? await lowRes.json() : null
         if (cancelled) return
-        const skuCount = Number(val?.total) || 0
-        const inStock = Number(val?.inStockCount) || 0
         setValuation({
           status: 'ready',
           data: {
             totalValue: Number(val?.totalValue) || 0,
-            skuCount,
-            outOfStock: Math.max(0, skuCount - inStock),
-            lowStock: low && typeof low.total === 'number' ? low.total : null,
+            skuCount: Number(val?.total) || 0,
           },
         })
       } catch {
         if (!cancelled) setValuation({ status: 'error' })
+      }
+    }
+
+    async function loadStockLevels() {
+      try {
+        const res = await fetch('/api/admin/inventory/stock-levels')
+        if (!res.ok) throw new Error('stock_levels')
+        const json = await res.json()
+        if (cancelled) return
+        setStockLevels({
+          status: 'ready',
+          data: {
+            lowStock: Number(json?.low_stock) || 0,
+            outOfStock: Number(json?.out_of_stock) || 0,
+          },
+        })
+      } catch {
+        if (!cancelled) setStockLevels({ status: 'error' })
       }
     }
 
@@ -243,7 +255,7 @@ export default function InventoryOverviewTab() {
 
     async function loadLowStock() {
       try {
-        const res = await fetch('/api/admin/inventory/stock?view=valuation&limit=200&stock_status=low_stock')
+        const res = await fetch('/api/admin/inventory/stock?view=valuation&limit=5000&sort=stock&dir=asc')
         if (!res.ok) throw new Error('low_stock')
         const json = await res.json()
         if (cancelled) return
@@ -266,6 +278,7 @@ export default function InventoryOverviewTab() {
     }
 
     loadValuation()
+    loadStockLevels()
     loadPo()
     loadSuppliers()
     loadCharts()
@@ -274,10 +287,6 @@ export default function InventoryOverviewTab() {
       cancelled = true
     }
   }, [])
-
-  const lowOutReady =
-    valuation.status === 'ready' && (valuation.data!.lowStock !== null || valuation.data!.outOfStock > 0)
-  const showLowOut = valuation.status !== 'ready' || lowOutReady || valuation.data!.skuCount > 0
 
   return (
     <div className="space-y-5">
@@ -297,17 +306,15 @@ export default function InventoryOverviewTab() {
           state={suppliers}
           render={d => ({ value: String(d.active) })}
         />
-        {showLowOut && (
-          <KpiCard
-            label="Low / out of stock"
-            state={valuation}
-            accent="warning"
-            render={d => ({
-              value: d.lowStock !== null ? String(d.lowStock) : String(d.outOfStock),
-              sub: d.lowStock !== null ? `${d.outOfStock} out of stock` : 'SKUs out of stock',
-            })}
-          />
-        )}
+        <KpiCard
+          label="Low / out of stock"
+          state={stockLevels}
+          accent="warning"
+          render={d => ({
+            value: `${d.lowStock} low`,
+            sub: `${d.outOfStock} out of stock`,
+          })}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
