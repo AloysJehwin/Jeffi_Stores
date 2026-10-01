@@ -7115,8 +7115,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/InventoryClient.tsx": {
-    "mtime": 1790833711.6793666,
-    "ast_hash": "a42c121937febe2f8b3e663c3ef16ed6",
+    "mtime": 1790844089.3500469,
+    "ast_hash": "128a09f242e8ad9b0368fdadc24f01a8",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/loading.tsx": {
@@ -12492,6 +12492,11 @@
   ".claude/plans/admin-overview-pages.md": {
     "mtime": 1790843118.2993648,
     "ast_hash": "d8d4a757e17eb63015b7d637708204d5",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/inventory/_components/InventoryOverviewTab.tsx": {
+    "mtime": 1790844066.7322226,
+    "ast_hash": "74afa38e581b9d859c49afcf2a7e455a",
     "semantic_hash": ""
   }
 }
