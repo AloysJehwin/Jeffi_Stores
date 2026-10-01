@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/jwt', () => ({ verifyReviewToken: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ verifyReviewToken: vi.fn() }))
 
-import { OPTIONS, POST } from '@/app/api/reviews/amp/route'
-import { verifyReviewToken } from '@/lib/jwt'
-import { queryOne } from '@/lib/db'
+import { OPTIONS, POST } from '@/app/api/(public)/reviews/amp/route'
+import { verifyReviewToken } from '@/lib/auth/jwt'
+import { queryOne } from '@/lib/shared/db'
 
 const PAYLOAD = { orderId: 'ord-1', productId: 'prod-1', userId: 'user-1' }
 
@@ -82,8 +82,8 @@ describe('POST /api/reviews/amp (JSON)', () => {
 
   it('submits review via JSON', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(null as any)   // no existing review
-      .mockResolvedValueOnce(null as any)   // INSERT (returns null but ignored)
+      .mockResolvedValueOnce(null as any) // no existing review
+      .mockResolvedValueOnce(null as any) // INSERT (returns null but ignored)
     const res = await POST(makeJsonReq({ token: 't', rating: 4, comment: 'Good product', title: 'Nice' }))
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)

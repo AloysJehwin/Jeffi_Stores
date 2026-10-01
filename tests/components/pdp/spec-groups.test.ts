@@ -2,30 +2,59 @@ import { describe, it, expect } from 'vitest'
 import { buildSpecGroups, type SpecSource } from '@/components/visitor/pdp/spec-groups'
 
 const build = (product: SpecSource) => buildSpecGroups(product)
-const rowsOf = (product: SpecSource, groupId: string) =>
-  build(product).groups.find(g => g.id === groupId)?.rows ?? []
+const rowsOf = (product: SpecSource, groupId: string) => build(product).groups.find(g => g.id === groupId)?.rows ?? []
 const valueOf = (product: SpecSource, groupId: string, label: string) =>
   rowsOf(product, groupId).find(r => r.label === label)?.value
 const allText = (product: SpecSource) =>
-  build(product).groups.flatMap(g => g.rows.flatMap(r => [r.label, r.value])).join(' | ')
+  build(product)
+    .groups.flatMap(g => g.rows.flatMap(r => [r.label, r.value]))
+    .join(' | ')
 
 describe('buildSpecGroups', () => {
   it('is empty for a product with nothing to show', () => {
     expect(build({})).toEqual({ handling: [], groups: [] })
-    expect(build({ brands: { name: null }, specifications: {}, condition: 'new', target_gender: 'unisex' }))
-      .toEqual({ handling: [], groups: [] })
+    expect(build({ brands: { name: null }, specifications: {}, condition: 'new', target_gender: 'unisex' })).toEqual({
+      handling: [],
+      groups: [],
+    })
   })
 
   it('never shows packaging, logistics, variant or internal fields', () => {
     const product = {
       sku: 'GMF-912-M8',
-      package_type: 'Blister Pack', length_cm: '12.00', breadth_cm: '8.00', height_cm: '3.00',
-      weight_grams: 750, weight: '0.75', weight_unit: 'kg', variant_type: 'Length', sub_variant_type: 'Pack',
-      currency: 'INR', asin: 'B0TESTASIN', categories: { name: 'Allen Screws' }, launch_date: '2026-01-01',
-      tax_class: 'standard', shipping_class: 'oversized',
+      package_type: 'Blister Pack',
+      length_cm: '12.00',
+      breadth_cm: '8.00',
+      height_cm: '3.00',
+      weight_grams: 750,
+      weight: '0.75',
+      weight_unit: 'kg',
+      variant_type: 'Length',
+      sub_variant_type: 'Pack',
+      currency: 'INR',
+      asin: 'B0TESTASIN',
+      categories: { name: 'Allen Screws' },
+      launch_date: '2026-01-01',
+      tax_class: 'standard',
+      shipping_class: 'oversized',
     } as SpecSource
     const text = allText(product)
-    for (const hidden of ['Blister Pack', 'Package', 'Weight', '750', 'Variant', 'Length', 'INR', 'Currency', 'B0TESTASIN', 'ASIN', 'Allen Screws', 'Category', '2026', 'oversized']) {
+    for (const hidden of [
+      'Blister Pack',
+      'Package',
+      'Weight',
+      '750',
+      'Variant',
+      'Length',
+      'INR',
+      'Currency',
+      'B0TESTASIN',
+      'ASIN',
+      'Allen Screws',
+      'Category',
+      '2026',
+      'oversized',
+    ]) {
       expect(text).not.toContain(hidden)
     }
     expect(build(product).groups.map(g => g.id)).toEqual(['codes'])
@@ -33,8 +62,11 @@ describe('buildSpecGroups', () => {
 
   it('keeps groups in order and marks the SKU as copyable', () => {
     const groups = build({
-      brands: { name: 'GMF' }, specifications: { 'Thread Type': 'Metric' }, compliance_standard: 'DIN 912',
-      warranty_months: 12, sku: 'GMF-1',
+      brands: { name: 'GMF' },
+      specifications: { 'Thread Type': 'Metric' },
+      compliance_standard: 'DIN 912',
+      warranty_months: 12,
+      sku: 'GMF-1',
     }).groups
     expect(groups.map(g => [g.id, g.title])).toEqual([
       ['key-details', 'Key details'],
@@ -61,8 +93,17 @@ describe('buildSpecGroups', () => {
     const product: SpecSource = {
       hsn_code: '7318',
       specifications: {
-        Material: 'Steel', 'HSN Code': '7318', Standard: 'DIN 912', 'Part Number': 'P-1', Colour: 'Black',
-        'Safety Rating': 'IP65', SKU: 'X-1', 'Package Type': 'Box', gst_rate: '18', Barcode: '890', MRP: '99',
+        Material: 'Steel',
+        'HSN Code': '7318',
+        Standard: 'DIN 912',
+        'Part Number': 'P-1',
+        Colour: 'Black',
+        'Safety Rating': 'IP65',
+        SKU: 'X-1',
+        'Package Type': 'Box',
+        gst_rate: '18',
+        Barcode: '890',
+        MRP: '99',
         'Drive Size': '1/2"',
       },
     }
@@ -76,8 +117,13 @@ describe('buildSpecGroups', () => {
   it('merges snake_case and Title Case keys, joins arrays and drops junk values', () => {
     const product: SpecSource = {
       specifications: {
-        'Thread Size': 'M8', thread_size: 'M10', 'Point Types': ['Split', 'Standard'],
-        Hardness: 'nan', Coating: '', Tolerance: 'null', 'Head Style': 'Socket',
+        'Thread Size': 'M8',
+        thread_size: 'M10',
+        'Point Types': ['Split', 'Standard'],
+        Hardness: 'nan',
+        Coating: '',
+        Tolerance: 'null',
+        'Head Style': 'Socket',
       },
     }
     expect(rowsOf(product, 'technical')).toEqual([
@@ -95,7 +141,9 @@ describe('buildSpecGroups', () => {
   })
 
   it('promotes a Dimensions spec and hides a Category spec', () => {
-    const product: SpecSource = { specifications: { Dimensions: '10 x 20 mm', Category: 'Hand Tools', Hardness: '36 HRc' } }
+    const product: SpecSource = {
+      specifications: { Dimensions: '10 x 20 mm', Category: 'Hand Tools', Hardness: '36 HRc' },
+    }
     expect(valueOf(product, 'key-details', 'Dimensions')).toBe('10 x 20 mm')
     expect(rowsOf(product, 'technical')).toEqual([{ label: 'Hardness', value: '36 HRc' }])
   })
@@ -114,7 +162,11 @@ describe('buildSpecGroups', () => {
   })
 
   it('lists digital details only for digital products', () => {
-    const digital: SpecSource = { license_type: 'Commercial', file_format: 'PDF', platform_compatibility: ['Windows', 'macOS'] }
+    const digital: SpecSource = {
+      license_type: 'Commercial',
+      file_format: 'PDF',
+      platform_compatibility: ['Windows', 'macOS'],
+    }
     expect(rowsOf(digital, 'key-details')).toEqual([])
     expect(rowsOf({ ...digital, is_digital: true }, 'key-details')).toEqual([
       { label: 'License', value: 'Commercial' },
@@ -152,8 +204,9 @@ describe('buildSpecGroups', () => {
     expect(wo({ shelf_life_days: 45 }, 'Shelf life')).toBe('45 days')
     expect(wo({ condition: 'new' }, 'Condition')).toBeUndefined()
     expect(wo({ condition: 'open_box' }, 'Condition')).toBe('Open Box')
-    expect(wo({ age_min: 3, age_max: 12, target_gender: 'female', target_audience: ['Students'] }, 'Suitable for'))
-      .toBe('3 to 12 years, Female, Students')
+    expect(
+      wo({ age_min: 3, age_max: 12, target_gender: 'female', target_audience: ['Students'] }, 'Suitable for')
+    ).toBe('3 to 12 years, Female, Students')
     expect(wo({ age_min: 14, target_gender: 'unisex' }, 'Suitable for')).toBe('14+ years')
     expect(wo({ age_max: 8 }, 'Suitable for')).toBe('Up to 8 years')
   })
@@ -177,8 +230,11 @@ describe('buildSpecGroups', () => {
   })
 
   it('returns only the handling flags that are set', () => {
-    expect(build({ fragile: true, hazardous: false, flammable: true, perishable: true }).handling)
-      .toEqual(['fragile', 'flammable', 'perishable'])
+    expect(build({ fragile: true, hazardous: false, flammable: true, perishable: true }).handling).toEqual([
+      'fragile',
+      'flammable',
+      'perishable',
+    ])
     expect(build({ hazardous: true }).groups).toEqual([])
   })
 })

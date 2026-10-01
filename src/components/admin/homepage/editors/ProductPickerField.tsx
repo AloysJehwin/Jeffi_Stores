@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Package, X } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
-import type { PickerProduct } from '@/app/api/admin/homepage/products/route'
+import type { PickerProduct } from '@/lib/catalog/homepage-sections'
 import { INPUT_CLASS, LABEL_CLASS } from './fields'
 
 interface ProductPickerFieldProps {
@@ -17,7 +17,9 @@ interface ProductPickerFieldProps {
 }
 
 async function fetchProducts(params: Record<string, string>): Promise<PickerProduct[]> {
-  const res = await fetch(`/api/admin/homepage/products?${new URLSearchParams(params).toString()}`, { credentials: 'include' })
+  const res = await fetch(`/api/admin/homepage/products?${new URLSearchParams(params).toString()}`, {
+    credentials: 'include',
+  })
   if (!res.ok) return []
   return ((await res.json()).products ?? []) as PickerProduct[]
 }
@@ -35,7 +37,15 @@ function Thumb({ product }: { product: PickerProduct }) {
   )
 }
 
-export default function ProductPickerField({ label, hint, ids, multiple = false, max = 12, disabled, onCommit }: ProductPickerFieldProps) {
+export default function ProductPickerField({
+  label,
+  hint,
+  ids,
+  multiple = false,
+  max = 12,
+  disabled,
+  onCommit,
+}: ProductPickerFieldProps) {
   const [selected, setSelected] = useState<PickerProduct[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PickerProduct[]>([])
@@ -43,19 +53,34 @@ export default function ProductPickerField({ label, hint, ids, multiple = false,
 
   useEffect(() => {
     let cancelled = false
-    if (!idsKey) { setSelected([]); return }
-    fetchProducts({ ids: idsKey }).then(rows => { if (!cancelled) setSelected(rows) })
-    return () => { cancelled = true }
+    if (!idsKey) {
+      setSelected([])
+      return
+    }
+    fetchProducts({ ids: idsKey }).then(rows => {
+      if (!cancelled) setSelected(rows)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [idsKey])
 
   useEffect(() => {
     const q = query.trim()
-    if (q.length < 2) { setResults([]); return }
+    if (q.length < 2) {
+      setResults([])
+      return
+    }
     let cancelled = false
     const timer = setTimeout(() => {
-      fetchProducts({ q }).then(rows => { if (!cancelled) setResults(rows) })
+      fetchProducts({ q }).then(rows => {
+        if (!cancelled) setResults(rows)
+      })
     }, 250)
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [query])
 
   const full = multiple && ids.length >= max
@@ -63,7 +88,10 @@ export default function ProductPickerField({ label, hint, ids, multiple = false,
   function pick(product: PickerProduct) {
     setQuery('')
     setResults([])
-    if (!multiple) { onCommit([product.id]); return }
+    if (!multiple) {
+      onCommit([product.id])
+      return
+    }
     if (!ids.includes(product.id) && !full) onCommit([...ids, product.id])
   }
 
@@ -74,9 +102,14 @@ export default function ProductPickerField({ label, hint, ids, multiple = false,
       {selected.length > 0 && (
         <ul className="mb-2 space-y-1.5">
           {selected.map(p => (
-            <li key={p.id} className="flex items-center gap-2 rounded-lg border border-border-default bg-surface px-2 py-1.5">
+            <li
+              key={p.id}
+              className="flex items-center gap-2 rounded-lg border border-border-default bg-surface px-2 py-1.5"
+            >
               <Thumb product={p} />
-              <span className="flex-1 min-w-0 text-sm text-foreground truncate" title={p.name}>{p.name}</span>
+              <span className="flex-1 min-w-0 text-sm text-foreground truncate" title={p.name}>
+                {p.name}
+              </span>
               {p.sku && <span className="text-[11px] text-foreground-muted shrink-0">{p.sku}</span>}
               <button
                 type="button"
@@ -98,7 +131,9 @@ export default function ProductPickerField({ label, hint, ids, multiple = false,
             type="text"
             value={query}
             disabled={disabled}
-            placeholder={multiple || selected.length === 0 ? 'Search products by name or SKU' : 'Search to replace this product'}
+            placeholder={
+              multiple || selected.length === 0 ? 'Search products by name or SKU' : 'Search to replace this product'
+            }
             onChange={e => setQuery(e.target.value)}
             className={INPUT_CLASS}
           />

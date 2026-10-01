@@ -13,14 +13,16 @@
  *   - inserts are chunked to stay under Postgres' 65535 bind-parameter limit
  */
 import { describe, it, expect, vi } from 'vitest'
-import { dumpTenantDb, restoreTenantDb } from '@/lib/tenant-db-backup'
+import { dumpTenantDb, restoreTenantDb } from '@/lib/tenancy/tenant-db-backup'
 
 /** A fake pg client/pool that answers the queries the module issues. */
-function makeDb(opts: {
-  tables?: string[]
-  data?: Record<string, { fields: string[]; rows: any[] }>
-  failOn?: RegExp
-} = {}) {
+function makeDb(
+  opts: {
+    tables?: string[]
+    data?: Record<string, { fields: string[]; rows: any[] }>
+    failOn?: RegExp
+  } = {}
+) {
   const tables = opts.tables ?? []
   const data = opts.data ?? {}
   const queries: Array<{ sql: string; params?: any[] }> = []
@@ -31,12 +33,12 @@ function makeDb(opts: {
     if (opts.failOn && opts.failOn.test(sql)) throw new Error('boom')
 
     if (/information_schema\.tables/.test(sql)) {
-      return { rows: tables.map((t) => ({ table_name: t })), fields: [] }
+      return { rows: tables.map(t => ({ table_name: t })), fields: [] }
     }
     const m = sql.match(/SELECT \* FROM public\."([^"]+)"/)
     if (m) {
       const d = data[m[1]] ?? { fields: [], rows: [] }
-      return { rows: d.rows, fields: d.fields.map((name) => ({ name })) }
+      return { rows: d.rows, fields: d.fields.map(name => ({ name })) }
     }
     return { rows: [], fields: [] }
   })
@@ -94,12 +96,27 @@ describe('tenant-db-backup', () => {
     it('stores rows as column-ordered tuples', async () => {
       const db = makeDb({
         tables: ['t'],
-        data: { t: { fields: ['a', 'b'], rows: [{ a: 1, b: 2 }, { a: 3, b: 4 }] } },
+        data: {
+          t: {
+            fields: ['a', 'b'],
+            rows: [
+              { a: 1, b: 2 },
+              { a: 3, b: 4 },
+            ],
+          },
+        },
       })
       const buf = await dumpTenantDb(db as any)
       const zlib = await import('zlib')
       const arc = JSON.parse(zlib.gunzipSync(buf).toString('utf8'))
-      expect(arc.tables[0]).toMatchObject({ table: 't', columns: ['a', 'b'], rows: [[1, 2], [3, 4]] })
+      expect(arc.tables[0]).toMatchObject({
+        table: 't',
+        columns: ['a', 'b'],
+        rows: [
+          [1, 2],
+          [3, 4],
+        ],
+      })
     })
 
     it('REFUSES an unsafe table identifier rather than building injectable SQL', async () => {
@@ -112,9 +129,17 @@ describe('tenant-db-backup', () => {
   describe('restoreTenantDb', () => {
     async function archiveOf(tables: any[], version = 1) {
       const zlib = await import('zlib')
-      return zlib.gzipSync(Buffer.from(JSON.stringify({
-        version, capturedAt: new Date().toISOString(), database: 'db', tables,
-      }), 'utf8'))
+      return zlib.gzipSync(
+        Buffer.from(
+          JSON.stringify({
+            version,
+            capturedAt: new Date().toISOString(),
+            database: 'db',
+            tables,
+          }),
+          'utf8'
+        )
+      )
     }
 
     it('rejects an archive from a future/unknown version', async () => {
@@ -128,7 +153,7 @@ describe('tenant-db-backup', () => {
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await restoreTenantDb(client as any, buf)
 
-      const sql = client.queries.map((q) => q.sql)
+      const sql = client.queries.map(q => q.sql)
       expect(sql).toContain('BEGIN')
       expect(sql).toContain('SET session_replication_role = replica')
       expect(sql).toContain('SET session_replication_role = DEFAULT')
@@ -139,7 +164,7 @@ describe('tenant-db-backup', () => {
       const client = makeDb()
       const buf = await archiveOf([{ table: 'orders', columns: ['a'], rows: [[1]] }])
       await restoreTenantDb(client as any, buf)
-      expect(client.queries.map((q) => q.sql)).toContain('TRUNCATE public."orders" CASCADE')
+      expect(client.queries.map(q => q.sql)).toContain('TRUNCATE public."orders" CASCADE')
     })
 
     it('reports how many tables and rows were restored', async () => {
@@ -156,15 +181,24 @@ describe('tenant-db-backup', () => {
       const buf = await archiveOf([{ table: 'empty', columns: ['a'], rows: [] }])
       const out = await restoreTenantDb(client as any, buf)
       expect(out).toEqual({ tables: 1, rows: 0 })
-      expect(client.queries.map((q) => q.sql)).toContain('TRUNCATE public."empty" CASCADE')
-      expect(client.queries.some((q) => /INSERT INTO/.test(q.sql))).toBe(false)
+      expect(client.queries.map(q => q.sql)).toContain('TRUNCATE public."empty" CASCADE')
+      expect(client.queries.some(q => /INSERT INTO/.test(q.sql))).toBe(false)
     })
 
     it('binds parameters positionally for a multi-row insert', async () => {
       const client = makeDb()
-      const buf = await archiveOf([{ table: 't', columns: ['a', 'b'], rows: [[1, 2], [3, 4]] }])
+      const buf = await archiveOf([
+        {
+          table: 't',
+          columns: ['a', 'b'],
+          rows: [
+            [1, 2],
+            [3, 4],
+          ],
+        },
+      ])
       await restoreTenantDb(client as any, buf)
-      const insert = client.queries.find((q) => /INSERT INTO/.test(q.sql))!
+      const insert = client.queries.find(q => /INSERT INTO/.test(q.sql))!
       expect(insert.sql).toContain('($1, $2), ($3, $4)')
       expect(insert.params).toEqual([1, 2, 3, 4])
     })
@@ -175,7 +209,7 @@ describe('tenant-db-backup', () => {
       const rows = Array.from({ length: 60001 }, (_, i) => [i])
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows }])
       const out = await restoreTenantDb(client as any, buf)
-      const inserts = client.queries.filter((q) => /INSERT INTO/.test(q.sql))
+      const inserts = client.queries.filter(q => /INSERT INTO/.test(q.sql))
       expect(inserts.length).toBe(2)
       expect(out.rows).toBe(60001)
     })
@@ -184,7 +218,7 @@ describe('tenant-db-backup', () => {
       const client = makeDb({ failOn: /INSERT INTO/ })
       const buf = await archiveOf([{ table: 't', columns: ['a'], rows: [[1]] }])
       await expect(restoreTenantDb(client as any, buf)).rejects.toThrow('boom')
-      expect(client.queries.map((q) => q.sql)).toContain('ROLLBACK')
+      expect(client.queries.map(q => q.sql)).toContain('ROLLBACK')
     })
 
     it('checks out AND releases a client when given a pool', async () => {
@@ -226,7 +260,7 @@ describe('tenant-db-backup', () => {
       const out = await restoreTenantDb(target as any, archive)
       expect(out).toEqual({ tables: 1, rows: 1 })
 
-      const insert = target.queries.find((q) => /INSERT INTO/.test(q.sql))!
+      const insert = target.queries.find(q => /INSERT INTO/.test(q.sql))!
       expect(insert.params![0]).toBe(1)
       expect(insert.params![1]).toBe('spec')
       // The bytea survived JSON as a real Buffer, not {type:'Buffer',data:[…]}
@@ -242,9 +276,8 @@ describe('tenant-db-backup', () => {
       const archive = await dumpTenantDb(source as any)
       const target = makeDb()
       await restoreTenantDb(target as any, archive)
-      const insert = target.queries.find((q) => /INSERT INTO/.test(q.sql))!
+      const insert = target.queries.find(q => /INSERT INTO/.test(q.sql))!
       expect(insert.params).toEqual([null, 'x'])
     })
   })
 })
-

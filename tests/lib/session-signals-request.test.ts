@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 
 // Mock NextRequest cookie access
 function makeNextRequest(headers: Record<string, string> = {}, fpHashCookie?: string) {
@@ -7,7 +7,7 @@ function makeNextRequest(headers: Record<string, string> = {}, fpHashCookie?: st
   return {
     headers: h,
     cookies: {
-      get: (name: string) => name === 'fp_hash' && fpHashCookie ? { value: fpHashCookie } : undefined,
+      get: (name: string) => (name === 'fp_hash' && fpHashCookie ? { value: fpHashCookie } : undefined),
     },
   } as any
 }
@@ -20,12 +20,15 @@ function makePlainRequest(headers: Record<string, string> = {}, cookieHeader?: s
 
 describe('extractSessionSignals', () => {
   it('reads all signals from a NextRequest with cookies', () => {
-    const req = makeNextRequest({
-      'user-agent': 'Chrome/120',
-      'accept-language': 'en-US,en;q=0.9',
-      'sec-ch-ua-platform': '"macOS"',
-      'x-forwarded-for': '203.0.113.5',
-    }, 'abc123')
+    const req = makeNextRequest(
+      {
+        'user-agent': 'Chrome/120',
+        'accept-language': 'en-US,en;q=0.9',
+        'sec-ch-ua-platform': '"macOS"',
+        'x-forwarded-for': '203.0.113.5',
+      },
+      'abc123'
+    )
 
     const s = extractSessionSignals(req)
     expect(s.userAgent).toBe('Chrome/120')

@@ -1,0 +1,32 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
+import { cancelOrder } from '@/lib/orders/orders'
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json().catch(() => ({}))
+    const restoreToCart = body?.restoreToCart === true
+    const autoCancelUnpaid = body?.autoCancelUnpaid === true
+
+    const result = await cancelOrder(id, {
+      reason: autoCancelUnpaid ? 'auto_cancel_unpaid' : 'user_request',
+      restoreToCart,
+      expectedUserId: authUser.userId,
+    })
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: result.status })
+    }
+
+    return NextResponse.json(result)
+  } catch (err) {
+    console.error('[route]', err)
+    return NextResponse.json({ error: 'Failed to request cancellation' }, { status: 500 })
+  }
+}

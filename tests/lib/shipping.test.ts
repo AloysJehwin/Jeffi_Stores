@@ -11,7 +11,7 @@ import {
   CARTON_MAX_WEIGHT_GRAMS,
   type ShipmentItem,
   type StoredDims,
-} from '@/lib/shipping'
+} from '@/lib/shipping/shipping'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -24,9 +24,7 @@ const storedDims = (l: number, b: number, h: number): StoredDims => ({
   height_cm: h,
 })
 
-function item(
-  overrides: Partial<ShipmentItem> & Pick<ShipmentItem, 'packageType'>,
-): ShipmentItem {
+function item(overrides: Partial<ShipmentItem> & Pick<ShipmentItem, 'packageType'>): ShipmentItem {
   return {
     weightGrams: 200,
     quantity: 1,
@@ -42,8 +40,15 @@ function item(
 describe('constants', () => {
   it('PACKAGE_TYPE_LABELS has an entry for every package type', () => {
     const types = [
-      'flat_poly_auto', 'flat_poly_s', 'flat_poly_m', 'flat_poly_l', 'flat_poly_xl',
-      'drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube',
+      'flat_poly_auto',
+      'flat_poly_s',
+      'flat_poly_m',
+      'flat_poly_l',
+      'flat_poly_xl',
+      'drill_bit_tube',
+      'drill_bit_set_case',
+      'corrugated_box',
+      'long_tube',
     ] as const
     for (const t of types) {
       expect(PACKAGE_TYPE_LABELS).toHaveProperty(t)
@@ -158,33 +163,43 @@ describe('resolvePackedDims', () => {
 
   describe('flat_poly_auto', () => {
     it('≤100g → S dims', () => {
-      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 100 }))).toEqual(
-        { length_cm: 15, breadth_cm: 10, height_cm: 3 },
-      )
+      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 100 }))).toEqual({
+        length_cm: 15,
+        breadth_cm: 10,
+        height_cm: 3,
+      })
     })
 
     it('101g – 500g → M dims', () => {
-      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 500 }))).toEqual(
-        { length_cm: 20, breadth_cm: 15, height_cm: 4 },
-      )
+      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 500 }))).toEqual({
+        length_cm: 20,
+        breadth_cm: 15,
+        height_cm: 4,
+      })
     })
 
     it('501g – 1500g → L dims', () => {
-      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 1500 }))).toEqual(
-        { length_cm: 25, breadth_cm: 20, height_cm: 5 },
-      )
+      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 1500 }))).toEqual({
+        length_cm: 25,
+        breadth_cm: 20,
+        height_cm: 5,
+      })
     })
 
     it('>1500g → XL dims', () => {
-      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 1501 }))).toEqual(
-        { length_cm: 30, breadth_cm: 25, height_cm: 5 },
-      )
+      expect(resolvePackedDims(item({ packageType: 'flat_poly_auto', weightGrams: 1501 }))).toEqual({
+        length_cm: 30,
+        breadth_cm: 25,
+        height_cm: 5,
+      })
     })
 
     it('null packageType treated as flat_poly_auto', () => {
-      expect(resolvePackedDims(item({ packageType: null, weightGrams: 100 }))).toEqual(
-        { length_cm: 15, breadth_cm: 10, height_cm: 3 },
-      )
+      expect(resolvePackedDims(item({ packageType: null, weightGrams: 100 }))).toEqual({
+        length_cm: 15,
+        breadth_cm: 10,
+        height_cm: 3,
+      })
     })
   })
 
@@ -220,9 +235,7 @@ describe('resolvePackedDims', () => {
 
   describe('drill_bit_tube', () => {
     it('uses stored length_cm when provided', () => {
-      const dims = resolvePackedDims(
-        item({ packageType: 'drill_bit_tube', storedDims: storedDims(35, 6, 6) }),
-      )
+      const dims = resolvePackedDims(item({ packageType: 'drill_bit_tube', storedDims: storedDims(35, 6, 6) }))
       expect(dims).toEqual({ length_cm: 35, breadth_cm: 8, height_cm: 8 })
     })
 
@@ -264,9 +277,7 @@ describe('resolvePackedDims', () => {
 
   describe('corrugated_box', () => {
     it('uses stored dims when provided', () => {
-      const dims = resolvePackedDims(
-        item({ packageType: 'corrugated_box', storedDims: storedDims(40, 30, 20) }),
-      )
+      const dims = resolvePackedDims(item({ packageType: 'corrugated_box', storedDims: storedDims(40, 30, 20) }))
       expect(dims).toEqual({ length_cm: 40, breadth_cm: 30, height_cm: 20 })
     })
 
@@ -278,9 +289,7 @@ describe('resolvePackedDims', () => {
 
   describe('drill_bit_set_case', () => {
     it('uses stored dims when provided', () => {
-      const dims = resolvePackedDims(
-        item({ packageType: 'drill_bit_set_case', storedDims: storedDims(25, 20, 8) }),
-      )
+      const dims = resolvePackedDims(item({ packageType: 'drill_bit_set_case', storedDims: storedDims(25, 20, 8) }))
       expect(dims).toEqual({ length_cm: 25, breadth_cm: 20, height_cm: 8 })
     })
 
@@ -301,40 +310,30 @@ describe('packIntoCartons', () => {
   })
 
   it('single item quantity 1 produces one carton', () => {
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_auto', weightGrams: 500, quantity: 1 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_auto', weightGrams: 500, quantity: 1 })])
     expect(cartons).toHaveLength(1)
   })
 
   it('carton actualWeightGrams equals item weight for qty=1', () => {
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 })])
     expect(cartons[0].actualWeightGrams).toBe(80)
   })
 
   it('chargedWeightGrams is max(actual, volumetric)', () => {
     // flat_poly_s: 15×10×3=450cm³; volumetric = 450/5 = 90g; actual = 80g → charged = 90
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 })])
     expect(cartons[0].chargedWeightGrams).toBe(90)
   })
 
   it('charged weight is actual when actual > volumetric', () => {
     // flat_poly_auto with 2000g (XL: 30×25×5=3750cm³; volumetric=750g < 2000g)
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_auto', weightGrams: 2000, quantity: 1 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_auto', weightGrams: 2000, quantity: 1 })])
     expect(cartons[0].chargedWeightGrams).toBe(cartons[0].actualWeightGrams)
   })
 
   it('high quantity splits into multiple cartons when weight exceeds max', () => {
     // Each unit = 10000g; maxCarton = 30000g → fits 3 per carton
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_auto', weightGrams: 10000, quantity: 7 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_auto', weightGrams: 10000, quantity: 7 })])
     // 7 units: carton1=3, carton2=3, carton3=1
     expect(cartons.length).toBeGreaterThanOrEqual(2)
     const totalWeight = cartons.reduce((s, c) => s + c.actualWeightGrams, 0)
@@ -342,10 +341,7 @@ describe('packIntoCartons', () => {
   })
 
   it('custom maxCartonWeightGrams is respected', () => {
-    const cartons = packIntoCartons(
-      [item({ packageType: 'flat_poly_auto', weightGrams: 400, quantity: 10 })],
-      1000,
-    )
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_auto', weightGrams: 400, quantity: 10 })], 1000)
     // Total=4000g, maxCarton=1000g → 4 cartons
     expect(cartons.length).toBe(4)
   })
@@ -374,9 +370,7 @@ describe('packIntoCartons', () => {
   })
 
   it('zero-weight item: total weight is 0 so no carton is packed', () => {
-    const cartons = packIntoCartons([
-      item({ packageType: 'flat_poly_s', weightGrams: 0, quantity: 1 }),
-    ])
+    const cartons = packIntoCartons([item({ packageType: 'flat_poly_s', weightGrams: 0, quantity: 1 })])
     // total weight=0, while(remaining>0) never fires → empty array
     expect(cartons).toHaveLength(0)
   })
@@ -399,9 +393,7 @@ describe('computeShipmentDims', () => {
   })
 
   it('single item: dims and weights match single carton', () => {
-    const result = computeShipmentDims([
-      item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 }),
-    ])
+    const result = computeShipmentDims([item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 })])
     expect(result.length_cm).toBe(15)
     expect(result.breadth_cm).toBe(10)
     expect(result.height_cm).toBe(3)
@@ -411,7 +403,7 @@ describe('computeShipmentDims', () => {
   it('two items: consolidated into one carton, dims from largest item', () => {
     // flat_poly_s: 15×10×3, flat_poly_xl: 30×25×5 — xl is largest by volume
     const result = computeShipmentDims([
-      item({ packageType: 'flat_poly_s',  weightGrams: 50,   quantity: 1 }),
+      item({ packageType: 'flat_poly_s', weightGrams: 50, quantity: 1 }),
       item({ packageType: 'flat_poly_xl', weightGrams: 2000, quantity: 1 }),
     ])
     expect(result.length_cm).toBe(30)

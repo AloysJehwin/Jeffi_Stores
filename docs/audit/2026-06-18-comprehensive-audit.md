@@ -507,7 +507,7 @@ Strong points: wishlist button has `aria-label`, share button has `aria-label`, 
 - E-invoice/E-way Bill deferred/blocked status
 - Rate limiting exempt for admin paths
 
-**Architecture diagrams:** None found. `deploy/aws-infrastructure.yaml` contains traffic flow comments and partially compensates.
+**Architecture diagrams:** None found. `deploy/aws/aws-infrastructure.yaml` contains traffic flow comments and partially compensates.
 
 **Recommendations:**
 1. Update ADR-0002 and ADR-0003 status from "Proposed" to "Accepted"

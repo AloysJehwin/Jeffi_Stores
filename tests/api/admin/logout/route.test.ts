@@ -10,20 +10,20 @@ const { mockVerifyToken, mockRevokeSession, mockRevokeAll } = vi.hoisted(() => (
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
 }))
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({ domain: '.jeffistores.in' }),
 }))
 // Opaque sessions: the route resolves the admin_sid cookie via verifyToken and
 // revokes the server-side session before clearing the cookie.
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   verifyToken: mockVerifyToken,
 }))
-vi.mock('@/lib/auth-sessions', () => ({
+vi.mock('@/lib/auth/auth-sessions', () => ({
   revokeSession: mockRevokeSession,
   revokeAllForPrincipal: mockRevokeAll,
 }))
 
-import { POST } from '@/app/api/admin/logout/route'
+import { POST } from '@/app/api/(admin)/admin/logout/route'
 import { cookies } from 'next/headers'
 
 const mockCookies = vi.mocked(cookies)
@@ -94,22 +94,22 @@ describe('POST /api/admin/logout', () => {
   })
 })
 
-  it('handles verifyToken throwing without crashing (best-effort revoke)', async () => {
-    const setCookie = makeSetFn()
-    const get = vi.fn().mockReturnValue({ value: 'bad-token' })
-    mockCookies.mockResolvedValue({ set: setCookie, get } as any)
-    mockVerifyToken.mockRejectedValue(new Error('bad token'))
-    const res = await POST()
-    expect(res.status).toBe(200)
-    expect(mockRevokeSession).not.toHaveBeenCalled()
-  })
+it('handles verifyToken throwing without crashing (best-effort revoke)', async () => {
+  const setCookie = makeSetFn()
+  const get = vi.fn().mockReturnValue({ value: 'bad-token' })
+  mockCookies.mockResolvedValue({ set: setCookie, get } as any)
+  mockVerifyToken.mockRejectedValue(new Error('bad token'))
+  const res = await POST()
+  expect(res.status).toBe(200)
+  expect(mockRevokeSession).not.toHaveBeenCalled()
+})
 
-  it('does not revoke when payload has no sid', async () => {
-    const setCookie = makeSetFn()
-    const get = vi.fn().mockReturnValue({ value: 'cookie-val' })
-    mockCookies.mockResolvedValue({ set: setCookie, get } as any)
-    mockVerifyToken.mockResolvedValue({ adminId: 'a1', role: 'admin', scopes: [] } as any)
-    const res = await POST()
-    expect(res.status).toBe(200)
-    expect(mockRevokeSession).not.toHaveBeenCalled()
-  })
+it('does not revoke when payload has no sid', async () => {
+  const setCookie = makeSetFn()
+  const get = vi.fn().mockReturnValue({ value: 'cookie-val' })
+  mockCookies.mockResolvedValue({ set: setCookie, get } as any)
+  mockVerifyToken.mockResolvedValue({ adminId: 'a1', role: 'admin', scopes: [] } as any)
+  const res = await POST()
+  expect(res.status).toBe(200)
+  expect(mockRevokeSession).not.toHaveBeenCalled()
+})

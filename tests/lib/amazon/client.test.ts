@@ -115,9 +115,7 @@ describe('amazon/client', () => {
 
   describe('spApiRequest', () => {
     it('makes an authenticated GET and returns json', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ ok: true, data: 1 }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ ok: true, data: 1 }))
       const { spApiRequest } = await import('@/lib/amazon/client')
       const res = await spApiRequest('GET', '/some/path', { query: { a: '1', b: undefined, c: '' } })
       expect(res).toEqual({ ok: true, data: 1 })
@@ -129,9 +127,7 @@ describe('amazon/client', () => {
     })
 
     it('sends body when provided', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ done: true }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ done: true }))
       const { spApiRequest } = await import('@/lib/amazon/client')
       await spApiRequest('PUT', '/p', { body: { hello: 'world' } })
       const opts = mockFetch.mock.calls[1][1] as any
@@ -148,12 +144,12 @@ describe('amazon/client', () => {
     })
 
     it('throws with status/retryAfter/rateLimit on non-ok', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(errorResponse(429, 'rate limited', {
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        errorResponse(429, 'rate limited', {
           'Retry-After': '5',
           'x-amzn-RateLimit-Limit': '2.0',
-        }))
+        })
+      )
       const { spApiRequest } = await import('@/lib/amazon/client')
       await expect(spApiRequest('GET', '/p')).rejects.toMatchObject({
         status: 429,
@@ -163,9 +159,7 @@ describe('amazon/client', () => {
     })
 
     it('handles error with no query and no headers gracefully', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(errorResponse(500, 'server error'))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(errorResponse(500, 'server error'))
       const { spApiRequest } = await import('@/lib/amazon/client')
       await expect(spApiRequest('GET', '/p')).rejects.toThrow(/failed \(500\)/)
     })
@@ -173,9 +167,7 @@ describe('amazon/client', () => {
 
   describe('listings item wrappers', () => {
     async function withToken(body: any, status = 200) {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse(body, status))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse(body, status))
       return import('@/lib/amazon/client')
     }
 
@@ -226,17 +218,13 @@ describe('amazon/client', () => {
     })
 
     it('deleteListingsItem swallows 404', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(errorResponse(404, 'not found'))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(errorResponse(404, 'not found'))
       const { deleteListingsItem } = await import('@/lib/amazon/client')
       await expect(deleteListingsItem('SKU-1')).resolves.toBeUndefined()
     })
 
     it('deleteListingsItem rethrows non-404', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(errorResponse(500, 'oops'))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(errorResponse(500, 'oops'))
       const { deleteListingsItem } = await import('@/lib/amazon/client')
       await expect(deleteListingsItem('SKU-1')).rejects.toThrow()
     })
@@ -252,9 +240,7 @@ describe('amazon/client', () => {
 
   describe('searchCatalogItems', () => {
     it('sets identifiersType only when identifiers present', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ items: [] }))
       const { searchCatalogItems } = await import('@/lib/amazon/client')
       await searchCatalogItems({ identifiers: '012345678905', identifiersType: 'UPC' })
       const url = mockFetch.mock.calls[1][0] as string
@@ -262,9 +248,7 @@ describe('amazon/client', () => {
     })
 
     it('omits identifiersType when only keywords given, defaults pageSize', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ items: [] }))
       const { searchCatalogItems } = await import('@/lib/amazon/client')
       await searchCatalogItems({ keywords: 'hex bolt', identifiersType: 'UPC' })
       const url = mockFetch.mock.calls[1][0] as string
@@ -273,9 +257,7 @@ describe('amazon/client', () => {
     })
 
     it('honors explicit pageSize', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ items: [] }))
       const { searchCatalogItems } = await import('@/lib/amazon/client')
       await searchCatalogItems({ keywords: 'x', pageSize: 5 })
       const url = mockFetch.mock.calls[1][0] as string
@@ -285,9 +267,7 @@ describe('amazon/client', () => {
 
   describe('getListingsRestrictions', () => {
     it('sends asin + default conditionType', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ restrictions: [] }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ restrictions: [] }))
       const { getListingsRestrictions } = await import('@/lib/amazon/client')
       const res = await getListingsRestrictions('B0ASIN')
       expect(res).toEqual({ restrictions: [] })
@@ -297,9 +277,7 @@ describe('amazon/client', () => {
     })
 
     it('accepts custom conditionType', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({ restrictions: [] }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({ restrictions: [] }))
       const { getListingsRestrictions } = await import('@/lib/amazon/client')
       await getListingsRestrictions('B0ASIN', 'used_good')
       const url = mockFetch.mock.calls[1][0] as string
@@ -309,22 +287,22 @@ describe('amazon/client', () => {
 
   describe('matchAsin', () => {
     it('returns gtin match when gtin lookup hits (12-digit UPC)', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [{ asin: 'B0GTIN', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'X', brand: 'Acme' }] }],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ gtin: '012345678905', name: 'anything' })
       expect(res).toMatchObject({ asin: 'B0GTIN', matchType: 'gtin' })
     })
 
     it('uses EAN type for 13-digit gtin', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [{ asin: 'B0EAN', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'X' }] }],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ gtin: '0123456789012', name: 'x' })
       expect(res?.asin).toBe('B0EAN')
@@ -346,53 +324,65 @@ describe('amazon/client', () => {
         // gtin lookup returns no items
         .mockResolvedValueOnce(jsonResponse({ items: [] }))
         // keyword search returns a strong match
-        .mockResolvedValueOnce(jsonResponse({
-          items: [{ asin: 'B0KW', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12', brand: 'Acme' }] }],
-        }))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            items: [
+              {
+                asin: 'B0KW',
+                summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12', brand: 'Acme' }],
+              },
+            ],
+          })
+        )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ gtin: '012345678905', name: 'Hex Bolt M12', brand: 'Acme' })
       expect(res).toMatchObject({ asin: 'B0KW', matchType: 'keyword' })
     })
 
     it('does keyword-only search when gtin too short', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [{ asin: 'B0KW2', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12' }] }],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ gtin: '123', name: 'Hex Bolt M12', mpn: 'KM9V' })
       expect(res?.asin).toBe('B0KW2')
     })
 
     it('filters out candidates whose brand differs', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
-          items: [{ asin: 'B0WRONG', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12', brand: 'OtherBrand' }] }],
-        }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              asin: 'B0WRONG',
+              summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12', brand: 'OtherBrand' }],
+            },
+          ],
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Hex Bolt M12', brand: 'Acme' })
       expect(res).toBeNull()
     })
 
     it('skips candidates without asin', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [{ summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M12' }] }],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Hex Bolt M12' })
       expect(res).toBeNull()
     })
 
     it('returns null when spec tokens disagree (size mismatch)', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [{ asin: 'B0M4', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Hex Bolt M4' }] }],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       // our name M12, candidate M4 -> size mismatch -> hard reject -> null
       const res = await matchAsin({ name: 'Hex Bolt M12' })
@@ -400,45 +390,50 @@ describe('amazon/client', () => {
     })
 
     it('picks highest scoring candidate with model + pack agreement', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
           items: [
             { asin: 'B0LOW', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Screw M6 16mm' }] },
-            { asin: 'B0HIGH', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Screw M6 16mm KM9V set of 13' }] },
+            {
+              asin: 'B0HIGH',
+              summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Screw M6 16mm KM9V set of 13' }],
+            },
           ],
-        }))
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Screw M6 16mm KM9V 13pc' })
       expect(res?.asin).toBe('B0HIGH')
     })
 
     it('rejects when pack counts disagree', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
-          items: [{ asin: 'B0PACK', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Screwdriver set of 9' }] }],
-        }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            { asin: 'B0PACK', summaries: [{ marketplaceId: 'A21TJRUUN4KGV', itemName: 'Screwdriver set of 9' }] },
+          ],
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Screwdriver 13pc' })
       expect(res).toBeNull()
     })
 
     it('handles empty items array from keyword search', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({}))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(jsonResponse({}))
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Hex Bolt M12' })
       expect(res).toBeNull()
     })
 
     it('uses summaries[0] fallback when no marketplace match in toCatalogMatch', async () => {
-      mockFetch
-        .mockResolvedValueOnce(tokenResponse())
-        .mockResolvedValueOnce(jsonResponse({
-          items: [{ asin: 'B0FB', summaries: [{ marketplaceId: 'OTHER', itemName: 'Hex Bolt M12', brandName: 'Acme' }] }],
-        }))
+      mockFetch.mockResolvedValueOnce(tokenResponse()).mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            { asin: 'B0FB', summaries: [{ marketplaceId: 'OTHER', itemName: 'Hex Bolt M12', brandName: 'Acme' }] },
+          ],
+        })
+      )
       const { matchAsin } = await import('@/lib/amazon/client')
       const res = await matchAsin({ name: 'Hex Bolt M12' })
       expect(res?.asin).toBe('B0FB')

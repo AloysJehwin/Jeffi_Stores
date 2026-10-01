@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { navItems } from '@/components/business/AccountSidebar'
-import { bp } from '@/lib/business-path'
+import { bp } from '@/lib/shared/business-path'
 
 export function BusinessAccountMobileTabBar() {
   const pathname = usePathname()
@@ -12,7 +12,7 @@ export function BusinessAccountMobileTabBar() {
     <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
         <div className="flex">
-          {navItems.map((item) => {
+          {navItems.map(item => {
             const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
             return (
               <Link
@@ -25,7 +25,9 @@ export function BusinessAccountMobileTabBar() {
                 }`}
               >
                 <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -48,7 +50,10 @@ export default function BusinessAccountMobileHeader() {
       <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4">
         <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
         <div className="flex items-center gap-4">
-          <Link href={bp('/business/account')} className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 block">
+          <Link
+            href={bp('/business/account')}
+            className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 block"
+          >
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
             ) : (
@@ -58,7 +63,9 @@ export default function BusinessAccountMobileHeader() {
             )}
           </Link>
           <div>
-            <p className="text-xl font-bold text-white">{user.firstName} {user.lastName}</p>
+            <p className="text-xl font-bold text-white">
+              {user.firstName} {user.lastName}
+            </p>
             <p className="text-sm text-white/70 mt-0.5">{user.email}</p>
           </div>
         </div>
@@ -67,7 +74,7 @@ export default function BusinessAccountMobileHeader() {
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map((item) => {
+            {navItems.map(item => {
               const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
               return (
                 <Link
@@ -80,7 +87,9 @@ export default function BusinessAccountMobileHeader() {
                   }`}
                 >
                   <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
+                    {item.label}
+                  </span>
                 </Link>
               )
             })}

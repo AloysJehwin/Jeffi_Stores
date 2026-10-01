@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/marketing', () => ({ canSendMarketing: vi.fn() }))
-vi.mock('@/lib/whatsapp', () => ({
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/shared/marketing', () => ({ canSendMarketing: vi.fn() }))
+vi.mock('@/lib/shared/whatsapp', () => ({
   sendAbandonedCartWhatsApp: vi.fn(),
   sendBackInStockWhatsApp: vi.fn(),
   sendPromoOfferWhatsApp: vi.fn(),
@@ -13,19 +13,15 @@ vi.mock('@/lib/whatsapp', () => ({
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
-import {
-  sendCampaignWhatsApp,
-  campaignSupportsWhatsApp,
-  CAMPAIGN_WA_KINDS,
-} from '@/lib/campaigns/whatsapp-dispatch'
-import { queryOne } from '@/lib/db'
-import { canSendMarketing } from '@/lib/marketing'
+import { sendCampaignWhatsApp, campaignSupportsWhatsApp, CAMPAIGN_WA_KINDS } from '@/lib/campaigns/whatsapp-dispatch'
+import { queryOne } from '@/lib/shared/db'
+import { canSendMarketing } from '@/lib/shared/marketing'
 import {
   sendAbandonedCartWhatsApp,
   sendBackInStockWhatsApp,
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
-} from '@/lib/whatsapp'
+} from '@/lib/shared/whatsapp'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockCanSend = vi.mocked(canSendMarketing)

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import type { DraftDiff, HomepageDraftSummary } from '@/lib/homepage-draft'
+import type { DraftDiff, HomepageDraftSummary } from '@/lib/catalog/homepage-draft'
 import { HOMEPAGE_DRAFT_CHANGED } from './draft-events'
 
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`
@@ -74,7 +74,10 @@ export default function HomepageDraftBar({ initial }: { initial: HomepageDraftSu
     try {
       const res = await fetch('/api/admin/homepage-draft/publish', { method: 'POST', credentials: 'include' })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) { showToast(data.error || 'Publish failed', 'error'); return }
+      if (!res.ok) {
+        showToast(data.error || 'Publish failed', 'error')
+        return
+      }
       showToast('Published - the homepage is live', 'success')
       await refresh()
     } catch {
@@ -95,7 +98,10 @@ export default function HomepageDraftBar({ initial }: { initial: HomepageDraftSu
     setBusy('discard')
     try {
       const res = await fetch('/api/admin/homepage-draft', { method: 'DELETE', credentials: 'include' })
-      if (res.ok) { window.location.reload(); return }
+      if (res.ok) {
+        window.location.reload()
+        return
+      }
       showToast('Failed to discard the draft', 'error')
     } catch {
       showToast('Failed to discard the draft', 'error')
@@ -112,13 +118,17 @@ export default function HomepageDraftBar({ initial }: { initial: HomepageDraftSu
     <div className="sticky top-2 z-20 flex flex-col gap-3 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 shadow-sm sm:flex-row sm:items-center">
       <div className="flex-1 min-w-0">
         <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <span className={`h-2 w-2 shrink-0 rounded-full ${pending ? 'bg-amber-500' : 'bg-emerald-500'}`} aria-hidden="true" />
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${pending ? 'bg-amber-500' : 'bg-emerald-500'}`}
+            aria-hidden="true"
+          />
           {pending ? 'Unpublished changes' : 'All changes are live'}
         </p>
         {pending && details && <p className="mt-0.5 text-xs text-foreground-secondary">{details}</p>}
         {pending && summary.updatedAt && now !== null && (
           <p className="mt-0.5 text-[11px] text-foreground-muted">
-            Last edited {timeAgo(summary.updatedAt, now)}{summary.updatedBy ? ` by ${summary.updatedBy}` : ''}
+            Last edited {timeAgo(summary.updatedAt, now)}
+            {summary.updatedBy ? ` by ${summary.updatedBy}` : ''}
           </p>
         )}
       </div>

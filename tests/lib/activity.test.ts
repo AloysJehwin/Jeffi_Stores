@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { logActivity } from '@/lib/activity'
-import { query } from '@/lib/db'
+import { logActivity } from '@/lib/shared/activity'
+import { query } from '@/lib/shared/db'
 
 const mockQuery = vi.mocked(query)
 
@@ -57,12 +57,8 @@ describe('logActivity', () => {
   })
 
   it('does not throw when DB insert fails (silent catch)', async () => {
-    mockQuery
-      .mockRejectedValueOnce(new Error('primary fail'))
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
-    await expect(
-      logActivity({ userId: 'user-1', kind: 'logout', summary: 'Logged out' })
-    ).resolves.toBeUndefined()
+    mockQuery.mockRejectedValueOnce(new Error('primary fail')).mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
+    await expect(logActivity({ userId: 'user-1', kind: 'logout', summary: 'Logged out' })).resolves.toBeUndefined()
   })
 
   it('passes actorId when provided', async () => {

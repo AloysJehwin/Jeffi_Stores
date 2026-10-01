@@ -4,7 +4,7 @@ import crypto from 'crypto'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -12,8 +12,8 @@ vi.mock('@/lib/db', () => ({
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/financial/payables/webhook/route'
-import { query } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/financial/payables/webhook/route'
+import { query } from '@/lib/shared/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -55,6 +55,37 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     const res = await POST(req)
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/invalid signature/i)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('fails closed with 401 when the signature header is missing', async () => {
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const raw = JSON.stringify(body)
+    const req = new NextRequest('http://localhost/api/admin/financial/payables/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: raw,
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('fails closed with 401 when the webhook secret is not configured', async () => {
+    delete process.env.RAZORPAYX_WEBHOOK_SECRET
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const res = await POST(makeReq(body, 'any-signature'))
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('rejects a valid-length signature that does not match', async () => {
+    const body = { event: 'payout.processed', payload: { payout: { entity: { id: 'p1', status: 'processed' } } } }
+    const raw = JSON.stringify(body)
+    const wrong = sign(raw, 'a-different-secret')
+    const res = await POST(makeReq(body, wrong))
+    expect(res.status).toBe(401)
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   // ── Payout with no entity ────────────────────────────────────────────────
@@ -83,10 +114,10 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     }
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE expense_payments SET payout_status/),
-      ['processed', 'pay_001']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE expense_payments SET payout_status/), [
+      'processed',
+      'pay_001',
+    ])
   })
 
   it('updates payout_status on payout.queued', async () => {
@@ -116,11 +147,11 @@ describe('POST /api/admin/financial/payables/webhook', () => {
       payload: { payout: { entity: { id: 'pay_004', status: 'failed' } } },
     }
     mockQuery
-      .mockResolvedValueOnce([] as any)                          // UPDATE payout_status
-      .mockResolvedValueOnce([{ expense_id: 'exp-1' }] as any)  // SELECT expense_id
-      .mockResolvedValueOnce([{ paid: '0' }] as any)            // SUM paid
+      .mockResolvedValueOnce([] as any) // UPDATE payout_status
+      .mockResolvedValueOnce([{ expense_id: 'exp-1' }] as any) // SELECT expense_id
+      .mockResolvedValueOnce([{ paid: '0' }] as any) // SUM paid
       .mockResolvedValueOnce([{ total_amount: '1000' }] as any) // total_amount
-      .mockResolvedValueOnce([] as any)                          // UPDATE expenses status
+      .mockResolvedValueOnce([] as any) // UPDATE expenses status
 
     const res = await POST(makeReq(body))
     expect(res.status).toBe(200)
@@ -177,7 +208,7 @@ describe('POST /api/admin/financial/payables/webhook', () => {
     expect(mockQuery).not.toHaveBeenCalled()
   })
 
-  // ── Signature skipped when no secret configured ───────────────────────────
+  // ── Valid signature accepted ───────────────────────────────────────────────
 
   it('accepts request with valid signature', async () => {
     const body = {

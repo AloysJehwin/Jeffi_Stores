@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
 }))
@@ -11,7 +11,7 @@ vi.mock('@/lib/amazon/client', () => ({
 }))
 
 import { backfillAsins } from '@/lib/amazon/asin-backfill'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as client from '@/lib/amazon/client'
 
 const mockQuery = vi.mocked(db.query)
@@ -34,7 +34,17 @@ describe('amazon/asin-backfill', () => {
     // variants query then simples query
     mockQueryMany
       .mockResolvedValueOnce([
-        { id: 'v1', sku: 'V1', gtin: '111', mpn: null, variant_name: 'Red', product_name: 'Widget', product_gtin: null, product_mpn: null, brand: 'Acme' },
+        {
+          id: 'v1',
+          sku: 'V1',
+          gtin: '111',
+          mpn: null,
+          variant_name: 'Red',
+          product_name: 'Widget',
+          product_gtin: null,
+          product_mpn: null,
+          brand: 'Acme',
+        },
       ] as any)
       .mockResolvedValueOnce([
         { id: 'p1', sku: 'P1', gtin: null, mpn: 'MPN9', product_name: 'Gadget', brand: 'Beta' },
@@ -57,9 +67,7 @@ describe('amazon/asin-backfill', () => {
 
   it('unmatched rows counted, confidence null', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([
-        { id: 'v1', sku: 'V1', product_name: 'W', brand: 'Acme' },
-      ] as any)
+      .mockResolvedValueOnce([{ id: 'v1', sku: 'V1', product_name: 'W', brand: 'Acme' }] as any)
       .mockResolvedValueOnce([] as any)
     mockMatchAsin.mockResolvedValueOnce(null)
 
@@ -71,12 +79,8 @@ describe('amazon/asin-backfill', () => {
 
   it('non-dry-run applies variant + product updates', async () => {
     mockQueryMany
-      .mockResolvedValueOnce([
-        { id: 'v1', sku: 'V1', gtin: '111', product_name: 'W', brand: 'Acme' },
-      ] as any)
-      .mockResolvedValueOnce([
-        { id: 'p1', sku: 'P1', product_name: 'G', brand: 'Beta' },
-      ] as any)
+      .mockResolvedValueOnce([{ id: 'v1', sku: 'V1', gtin: '111', product_name: 'W', brand: 'Acme' }] as any)
+      .mockResolvedValueOnce([{ id: 'p1', sku: 'P1', product_name: 'G', brand: 'Beta' }] as any)
     mockMatchAsin
       .mockResolvedValueOnce({ asin: 'B0V', matchType: 'gtin' } as any)
       .mockResolvedValueOnce({ asin: 'B0P', matchType: 'keyword' } as any)
@@ -136,7 +140,9 @@ describe('amazon/asin-backfill', () => {
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'v1', sku: 'V1', product_name: 'W', brand: 'Acme' }] as any)
       .mockResolvedValueOnce([] as any)
-    const err429: any = new Error('429'); err429.status = 429; err429.retryAfter = '0'
+    const err429: any = new Error('429')
+    err429.status = 429
+    err429.retryAfter = '0'
     mockMatchAsin.mockRejectedValueOnce(err429).mockResolvedValueOnce({ asin: 'B0', matchType: 'gtin' } as any)
 
     const p = backfillAsins()
@@ -151,7 +157,8 @@ describe('amazon/asin-backfill', () => {
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'v1', sku: 'V1', product_name: 'W', brand: 'Acme' }] as any)
       .mockResolvedValueOnce([] as any)
-    const err: any = new Error('500'); err.status = 500
+    const err: any = new Error('500')
+    err.status = 500
     mockMatchAsin.mockRejectedValueOnce(err)
 
     const rep = await backfillAsins()
@@ -164,7 +171,8 @@ describe('amazon/asin-backfill', () => {
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'v1', sku: 'V1', product_name: 'W', brand: 'Acme' }] as any)
       .mockResolvedValueOnce([] as any)
-    const err429: any = new Error('429'); err429.status = 429
+    const err429: any = new Error('429')
+    err429.status = 429
     mockMatchAsin.mockRejectedValue(err429)
 
     const p = backfillAsins()
@@ -175,10 +183,13 @@ describe('amazon/asin-backfill', () => {
   })
 
   it('caps rows sample at 100', async () => {
-    const many = Array.from({ length: 150 }, (_, i) => ({ id: `v${i}`, sku: `V${i}`, product_name: 'W', brand: 'Acme' }))
-    mockQueryMany
-      .mockResolvedValueOnce(many as any)
-      .mockResolvedValueOnce([] as any)
+    const many = Array.from({ length: 150 }, (_, i) => ({
+      id: `v${i}`,
+      sku: `V${i}`,
+      product_name: 'W',
+      brand: 'Acme',
+    }))
+    mockQueryMany.mockResolvedValueOnce(many as any).mockResolvedValueOnce([] as any)
     const rep = await backfillAsins()
     expect(rep.scanned).toBe(150)
     expect(rep.rows).toHaveLength(100)

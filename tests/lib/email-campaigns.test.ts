@@ -1,17 +1,17 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/template-vars', () => ({
+vi.mock('@/lib/shared/template-vars', () => ({
   buildVarMap: vi.fn(() => ({})),
   substituteVars: vi.fn((str: string) => str),
 }))
@@ -22,9 +22,9 @@ vi.mock('nodemailer', () => ({
   },
 }))
 
-import * as mailAudit from '@/lib/mail-audit'
-import * as db from '@/lib/db'
-import { renderCampaignEmail, sendCampaign, baseLayout, ctaButton } from '@/lib/email-campaigns'
+import * as mailAudit from '@/lib/shared/mail-audit'
+import * as db from '@/lib/shared/db'
+import { renderCampaignEmail, sendCampaign, baseLayout, ctaButton } from '@/lib/shared/email-campaigns'
 
 const mockSendAuditedMail = mailAudit.sendAuditedMail as ReturnType<typeof vi.fn>
 const mockQuery = db.query as ReturnType<typeof vi.fn>
@@ -164,10 +164,14 @@ describe('email-campaigns', () => {
     })
 
     it('includes recipient greeting when recipientName provided', () => {
-      const { html } = renderCampaignEmail('announcement', {
-        headline: 'Hello',
-        body: 'Msg',
-      }, 'Alice')
+      const { html } = renderCampaignEmail(
+        'announcement',
+        {
+          headline: 'Hello',
+          body: 'Msg',
+        },
+        'Alice'
+      )
       expect(html).toContain('Hi Alice,')
     })
 
@@ -180,9 +184,7 @@ describe('email-campaigns', () => {
     })
 
     it('throws on unknown template key', () => {
-      expect(() => renderCampaignEmail('unknown_key', {})).toThrow(
-        'Unknown template key: unknown_key'
-      )
+      expect(() => renderCampaignEmail('unknown_key', {})).toThrow('Unknown template key: unknown_key')
     })
 
     it('converts newlines to <br> in promotion body', () => {
@@ -245,7 +247,7 @@ describe('email-campaigns', () => {
     // ── announcement: fallback when headline absent ──────────────────────────
     it('uses default announcement subject when neither subject nor headline given', () => {
       const { subject } = renderCampaignEmail('announcement', { body: 'Msg' })
-      expect(subject).toContain("update from Jeffi Store")
+      expect(subject).toContain('update from Jeffi Store')
     })
 
     // ── custom: <html tag detection (not DOCTYPE) ────────────────────────────
@@ -289,7 +291,13 @@ describe('email-campaigns', () => {
         {
           name: 'Widget A',
           imageUrl: 'https://img.example.com/a.jpg',
-          starLinks: ['https://review.example.com/rate?token=abc123&star=1', '', '', '', 'https://review.example.com/rate?token=abc123&star=5'],
+          starLinks: [
+            'https://review.example.com/rate?token=abc123&star=1',
+            '',
+            '',
+            '',
+            'https://review.example.com/rate?token=abc123&star=5',
+          ],
           productUrl: 'https://jeffistores.in/products/widget-a',
         },
       ]
@@ -375,7 +383,11 @@ describe('email-campaigns', () => {
 
     it('renders review_request with imageUrl in both fallback html and ampHtml', () => {
       const items = [
-        { name: 'Img Item', imageUrl: 'https://cdn.example.com/img.jpg', starLinks: ['https://r.example.com?token=xyz'] },
+        {
+          name: 'Img Item',
+          imageUrl: 'https://cdn.example.com/img.jpg',
+          starLinks: ['https://r.example.com?token=xyz'],
+        },
       ]
       const { html, ampHtml } = renderCampaignEmail('review_request', {
         itemsJson: JSON.stringify(items),
@@ -463,9 +475,7 @@ describe('email-campaigns', () => {
 
     it('increments failed count on send error', async () => {
       setupDefaultCampaign()
-      mockSendAuditedMail
-        .mockResolvedValueOnce({ messageId: 'ok' })
-        .mockRejectedValueOnce(new Error('Send failed'))
+      mockSendAuditedMail.mockResolvedValueOnce({ messageId: 'ok' }).mockRejectedValueOnce(new Error('Send failed'))
 
       const result = await sendCampaign('camp-1')
       expect(result.sent).toBe(1)
@@ -559,9 +569,7 @@ describe('email-campaigns', () => {
 
     it('sends with null first_name recipient (no name greeting)', async () => {
       setupDefaultCampaign()
-      mockQueryMany.mockResolvedValue([
-        { user_id: 'u3', email: 'noname@example.com', first_name: null },
-      ])
+      mockQueryMany.mockResolvedValue([{ user_id: 'u3', email: 'noname@example.com', first_name: null }])
       const result = await sendCampaign('camp-1')
       expect(result.sent).toBe(1)
       expect(result.failed).toBe(0)
@@ -604,10 +612,7 @@ describe('email-campaigns', () => {
       })
       const result = await sendCampaign('camp-1')
       expect(result.sent).toBe(1)
-      expect(mockQueryMany).toHaveBeenCalledWith(
-        expect.stringContaining('customer_type'),
-        expect.anything()
-      )
+      expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('customer_type'), expect.anything())
     })
 
     it('resolves order_history audience with custom daysSinceOrder', async () => {
@@ -654,10 +659,7 @@ describe('email-campaigns', () => {
       })
       const result = await sendCampaign('camp-1')
       expect(result.sent).toBe(1)
-      expect(mockQueryMany).toHaveBeenCalledWith(
-        expect.stringContaining('u.id = $1'),
-        expect.arrayContaining(['u1'])
-      )
+      expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('u.id = $1'), expect.arrayContaining(['u1']))
     })
 
     it.each([

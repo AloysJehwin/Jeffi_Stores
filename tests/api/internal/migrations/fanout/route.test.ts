@@ -18,9 +18,13 @@ beforeEach(() => {
 
 const post = async (headers: Record<string, string>, body: unknown = {}) => {
   const { POST } = await import('@/app/api/internal/migrations/fanout/route')
-  return POST(new NextRequest('http://localhost/api/internal/migrations/fanout', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body),
-  }))
+  return POST(
+    new NextRequest('http://localhost/api/internal/migrations/fanout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 describe('POST /api/internal/migrations/fanout', () => {
@@ -61,7 +65,11 @@ describe('POST /api/internal/migrations/fanout', () => {
   // while the new code is already serving them.
   it('returns 500 when any tenant failed, naming them', async () => {
     runMigrationFanout.mockResolvedValue({
-      gitSha: 'abc', total: 3, applied: 2, skipped: 0, failed: 1,
+      gitSha: 'abc',
+      total: 3,
+      applied: 2,
+      skipped: 0,
+      failed: 1,
       failures: [{ slug: 'acme', error: 'connection refused' }],
     })
     const res = await post({ authorization: 'Bearer s3cret' })

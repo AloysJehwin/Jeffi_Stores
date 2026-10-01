@@ -1,22 +1,28 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('./db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
 import { vi as _vi } from 'vitest'
 
 // We test the pure transformation logic directly — DB is mocked
-import { getCrmDashboardData } from '@/lib/admin-crm'
-import * as db from '@/lib/db'
+import { getCrmDashboardData } from '@/lib/shared/admin-crm'
+import * as db from '@/lib/shared/db'
 
 const mockQueryOne = db.queryOne as ReturnType<typeof vi.fn>
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>
 
 function makeSegmentCounts(overrides = {}) {
   return {
-    total: '100', vip: '5', loyal: '10', repeat: '30',
-    one_time: '20', new: '8', at_risk: '7', dormant: '4',
-    b2b: '3', lead: '12',
+    total: '100',
+    vip: '5',
+    loyal: '10',
+    repeat: '30',
+    one_time: '20',
+    new: '8',
+    at_risk: '7',
+    dormant: '4',
+    b2b: '3',
+    lead: '12',
     ...overrides,
   }
 }
@@ -29,12 +35,11 @@ describe('getCrmDashboardData', () => {
   it('returns parsed segment counts', async () => {
     mockQueryOne
       .mockResolvedValueOnce(makeSegmentCounts()) // segmentCounts
-      .mockResolvedValueOnce({ count: '3' })       // leadCount
+      .mockResolvedValueOnce({ count: '3' }) // leadCount
       .mockResolvedValueOnce({ open_count: '5', overdue_count: '1', mine_count: '2' }) // taskCounts
       .mockResolvedValueOnce({ b0_20: '2', b20_40: '3', b40_60: '5', b60_80: '8', b80_100: '4', unscored: '10' }) // healthDistribution
 
-    mockQueryMany
-      .mockResolvedValue([]) // all queryMany calls return empty
+    mockQueryMany.mockResolvedValue([]) // all queryMany calls return empty
 
     const data = await getCrmDashboardData('admin-uuid')
 
@@ -70,7 +75,16 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
     mockQueryMany
-      .mockResolvedValueOnce([{ id: 'u1', first_name: 'Alice', last_name: 'Smith', email: 'a@x.com', last_order_at: '2024-01-01', ltv: '15000' }]) // crossingAtRisk
+      .mockResolvedValueOnce([
+        {
+          id: 'u1',
+          first_name: 'Alice',
+          last_name: 'Smith',
+          email: 'a@x.com',
+          last_order_at: '2024-01-01',
+          ltv: '15000',
+        },
+      ]) // crossingAtRisk
       .mockResolvedValue([]) // all others
 
     const data = await getCrmDashboardData('admin-uuid')
@@ -87,7 +101,16 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
     mockQueryMany
-      .mockResolvedValueOnce([{ id: 'u2', first_name: null, last_name: null, email: 'noreply@x.com', last_order_at: '2024-01-01', ltv: '500' }])
+      .mockResolvedValueOnce([
+        {
+          id: 'u2',
+          first_name: null,
+          last_name: null,
+          email: 'noreply@x.com',
+          last_order_at: '2024-01-01',
+          ltv: '500',
+        },
+      ])
       .mockResolvedValue([])
 
     const data = await getCrmDashboardData('admin-uuid')
@@ -102,9 +125,14 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
     const noteRow = {
-      user_id: 'u1', body: 'Called customer', created_at: '2024-06-01',
-      first_name: 'Joe', last_name: 'Doe', email: 'j@x.com',
-      admin_first_name: null, admin_last_name: null,
+      user_id: 'u1',
+      body: 'Called customer',
+      created_at: '2024-06-01',
+      first_name: 'Joe',
+      last_name: 'Doe',
+      email: 'j@x.com',
+      admin_first_name: null,
+      admin_last_name: null,
     }
 
     mockQueryMany
@@ -142,7 +170,15 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ open_count: '0', overdue_count: '0', mine_count: '0' })
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
-    const churnRow = { id: 'u3', first_name: 'Tim', last_name: null, email: 't@x.com', score: 22, ltv: '8000', days_since_last_order: '120' }
+    const churnRow = {
+      id: 'u3',
+      first_name: 'Tim',
+      last_name: null,
+      email: 't@x.com',
+      score: 22,
+      ltv: '8000',
+      days_since_last_order: '120',
+    }
 
     mockQueryMany
       .mockResolvedValueOnce([]) // crossingAtRisk
@@ -167,10 +203,17 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ open_count: '0', overdue_count: '0', mine_count: '0' })
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
-    const dormantRow = { id: 'u10', first_name: 'Dormant', last_name: 'User', email: 'd@x.com', last_order_at: '2023-01-01', ltv: '2500' }
+    const dormantRow = {
+      id: 'u10',
+      first_name: 'Dormant',
+      last_name: 'User',
+      email: 'd@x.com',
+      last_order_at: '2023-01-01',
+      ltv: '2500',
+    }
 
     mockQueryMany
-      .mockResolvedValueOnce([])          // crossingAtRisk
+      .mockResolvedValueOnce([]) // crossingAtRisk
       .mockResolvedValueOnce([dormantRow]) // crossingDormant
       .mockResolvedValue([])
 
@@ -196,7 +239,7 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce([]) // crossingDormant
       .mockResolvedValueOnce([]) // recentTags
       .mockResolvedValueOnce([]) // recentNotes
-      .mockResolvedValueOnce([tagRow])    // topTags
+      .mockResolvedValueOnce([tagRow]) // topTags
       .mockResolvedValueOnce([signupRow]) // recentSignups
       .mockResolvedValue([])
 
@@ -217,11 +260,18 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ open_count: '0', overdue_count: '0', mine_count: '0' })
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
-    const tagEventRow = { user_id: 'u5', tag: 'vip', created_at: '2024-06-01', first_name: 'Tag', last_name: 'User', email: 'tag@x.com' }
+    const tagEventRow = {
+      user_id: 'u5',
+      tag: 'vip',
+      created_at: '2024-06-01',
+      first_name: 'Tag',
+      last_name: 'User',
+      email: 'tag@x.com',
+    }
 
     mockQueryMany
-      .mockResolvedValueOnce([])           // crossingAtRisk
-      .mockResolvedValueOnce([])           // crossingDormant
+      .mockResolvedValueOnce([]) // crossingAtRisk
+      .mockResolvedValueOnce([]) // crossingDormant
       .mockResolvedValueOnce([tagEventRow]) // recentTags
       .mockResolvedValue([])
 
@@ -240,7 +290,14 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ open_count: '0', overdue_count: '0', mine_count: '0' })
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
-    const dropRow = { id: 'u20', first_name: 'Drop', last_name: 'Risks', email: 'dr@x.com', score: 30, trend_delta_7d: -25 }
+    const dropRow = {
+      id: 'u20',
+      first_name: 'Drop',
+      last_name: 'Risks',
+      email: 'dr@x.com',
+      score: 30,
+      trend_delta_7d: -25,
+    }
 
     mockQueryMany
       .mockResolvedValueOnce([]) // crossingAtRisk
@@ -266,7 +323,15 @@ describe('getCrmDashboardData', () => {
       .mockResolvedValueOnce({ open_count: '0', overdue_count: '0', mine_count: '0' })
       .mockResolvedValueOnce({ b0_20: '0', b20_40: '0', b40_60: '0', b60_80: '0', b80_100: '0', unscored: '0' })
 
-    const churnNullDays = { id: 'u4', first_name: null, last_name: null, email: 'x@x.com', score: 15, ltv: '500', days_since_last_order: null }
+    const churnNullDays = {
+      id: 'u4',
+      first_name: null,
+      last_name: null,
+      email: 'x@x.com',
+      score: 15,
+      ltv: '500',
+      days_since_last_order: null,
+    }
 
     mockQueryMany
       .mockResolvedValueOnce([]) // crossingAtRisk

@@ -20,7 +20,10 @@ export default function AiAssistantButton() {
         aria-label="Open AI assistant"
         className="group relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-all active:scale-95 hover:bg-surface-secondary"
       >
-        <span className="absolute inset-0 rounded-lg bg-gradient-to-br from-purple-500/0 via-purple-500/0 to-blue-500/0 group-hover:from-purple-500/10 group-hover:to-blue-500/10 transition-all" aria-hidden />
+        <span
+          className="absolute inset-0 rounded-lg bg-gradient-to-br from-purple-500/0 via-purple-500/0 to-blue-500/0 group-hover:from-purple-500/10 group-hover:to-blue-500/10 transition-all"
+          aria-hidden
+        />
         <svg
           className="w-5 h-5 relative text-purple-500 dark:text-purple-400 group-hover:scale-110 transition-transform"
           viewBox="0 0 24 24"

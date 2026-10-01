@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// pdfkit is mocked globally via tests/lib/__pdf-mocks.ts (setupFiles). qrcode &
+// pdfkit is mocked globally via tests/helpers/pdf-mocks.ts (setupFiles). qrcode &
 // bwip-js need per-file mocks because label-pdf uses toBuffer. label-pdf.ts loads
 // them via eval('require')(...), so the SAME fn must back both default and named
 // exports — otherwise vi.mocked(default.toBuffer) wouldn't be the fn used.
@@ -27,7 +27,7 @@ import {
   type LabelSerial,
   type LabelProduct,
   type LabelSize,
-} from '@/lib/label-pdf'
+} from '@/lib/documents/label-pdf'
 
 const fullBatch: LabelBatch = {
   batchId: 'B-1',
@@ -260,10 +260,7 @@ describe('barcode generation failure (null buffer)', () => {
   })
 
   it('shelf label without product renders without barcode when bwip fails', async () => {
-    const result = await generateShelfLabelPDF(
-      [{ displayCode: 'B-2', warehouseName: 'WH2' }],
-      1
-    )
+    const result = await generateShelfLabelPDF([{ displayCode: 'B-2', warehouseName: 'WH2' }], 1)
     expect(result).toBeInstanceOf(Buffer)
   })
 
@@ -309,7 +306,9 @@ describe('QR generation failure paths', () => {
     expect(await generateBatchLabelPDF([fullBatch], 1, true)).toBeInstanceOf(Buffer)
     expect(await generateSerialLabelPDF([fullSerial], 1, false)).toBeInstanceOf(Buffer)
     expect(await generateSerialLabelPDF([fullSerial], 1, true)).toBeInstanceOf(Buffer)
-    expect(await generateShelfLabelPDF([{ displayCode: 'C-2', warehouseName: 'W', productName: 'P', sku: 'S' }], 1)).toBeInstanceOf(Buffer)
+    expect(
+      await generateShelfLabelPDF([{ displayCode: 'C-2', warehouseName: 'W', productName: 'P', sku: 'S' }], 1)
+    ).toBeInstanceOf(Buffer)
   })
 })
 
@@ -325,10 +324,7 @@ describe('empty barcode text fallbacks', () => {
   })
 
   it('shelf displayCode with non-ASCII-only chars falls back to SHELF text', async () => {
-    const result = await generateShelfLabelPDF(
-      [{ displayCode: '★★', warehouseName: 'WH' }],
-      1
-    )
+    const result = await generateShelfLabelPDF([{ displayCode: '★★', warehouseName: 'WH' }], 1)
     expect(result).toBeInstanceOf(Buffer)
   })
 })
@@ -349,10 +345,7 @@ describe('optional-field absent branches', () => {
   })
 
   it('shelf label with productName but no sku (L454 false side)', async () => {
-    const result = await generateShelfLabelPDF(
-      [{ displayCode: 'D-1', warehouseName: 'WH', productName: 'Widget' }],
-      1
-    )
+    const result = await generateShelfLabelPDF([{ displayCode: 'D-1', warehouseName: 'WH', productName: 'Widget' }], 1)
     expect(result).toBeInstanceOf(Buffer)
   })
 })

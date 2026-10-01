@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PROOF_EXEMPT_PATHS } from '@/lib/session-binding-shared'
+import { PROOF_EXEMPT_PATHS } from '@/lib/auth/session-binding-shared'
 
 // EventSource cannot set the proof header, so the admin event stream must stay exempt or the
 // stream never connects under enforce mode. The old notifications stream route no longer exists.

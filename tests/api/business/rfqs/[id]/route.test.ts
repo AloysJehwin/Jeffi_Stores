@@ -12,11 +12,11 @@ const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQueryMany = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateBusiness: mockAuthenticateBusiness,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
@@ -24,7 +24,7 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-import { GET, PATCH } from '@/app/api/business/rfqs/[id]/route'
+import { GET, PATCH } from '@/app/api/(public)/business/rfqs/[id]/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const AUTH_USER = { userId: 'biz-1', email: 'biz@example.com', isBusiness: true, approvalStatus: 'approved' }
@@ -80,7 +80,7 @@ describe('GET /api/business/rfqs/[id]', () => {
     mockQueryOne.mockResolvedValue(SAMPLE_RFQ)
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'item-1', description: 'Bolt', quantity: 10 }]) // items
-      .mockResolvedValueOnce([{ category_id: 'cat-1', discount_pct: '5.00' }])      // discounts
+      .mockResolvedValueOnce([{ category_id: 'cat-1', discount_pct: '5.00' }]) // discounts
     const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -95,11 +95,11 @@ describe('GET /api/business/rfqs/[id]', () => {
     const rfqWithOrder = { ...SAMPLE_RFQ, converted_order_id: 'order-1' }
     const order = { id: 'order-1', order_number: 'ORD-001', payment_status: 'paid' }
     mockQueryOne
-      .mockResolvedValueOnce(rfqWithOrder)  // rfq
-      .mockResolvedValueOnce(order)         // order
+      .mockResolvedValueOnce(rfqWithOrder) // rfq
+      .mockResolvedValueOnce(order) // order
     mockQueryMany
-      .mockResolvedValueOnce([])  // items
-      .mockResolvedValueOnce([])  // discounts
+      .mockResolvedValueOnce([]) // items
+      .mockResolvedValueOnce([]) // discounts
     const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -146,14 +146,13 @@ describe('PATCH /api/business/rfqs/[id]', () => {
   it('updates notes when provided', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'pending' })
-    const res = await PATCH(makePatch(RFQ_ID, { notes: 'Updated notes' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
+    const res = await PATCH(makePatch(RFQ_ID, { notes: 'Updated notes' }) as any, {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE business_rfqs SET notes/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE business_rfqs SET notes/), expect.any(Array))
   })
 
   it('updates items when provided', async () => {
@@ -162,10 +161,7 @@ describe('PATCH /api/business/rfqs/[id]', () => {
     const items = [{ id: 'item-1', quantity: 5, requested_price: 100, notes: 'urgent' }]
     const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE business_rfq_items/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE business_rfq_items/), expect.any(Array))
   })
 
   it('skips item update when item has no id', async () => {
@@ -175,8 +171,8 @@ describe('PATCH /api/business/rfqs/[id]', () => {
     const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     // No item update query should have been called
-    const itemUpdates = mockQuery.mock.calls.filter((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('UPDATE business_rfq_items')
+    const itemUpdates = mockQuery.mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('UPDATE business_rfq_items')
     )
     expect(itemUpdates).toHaveLength(0)
   })
@@ -186,8 +182,8 @@ describe('PATCH /api/business/rfqs/[id]', () => {
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'pending' })
     const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
-    const noteUpdates = mockQuery.mock.calls.filter((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('UPDATE business_rfqs SET notes')
+    const noteUpdates = mockQuery.mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('UPDATE business_rfqs SET notes')
     )
     expect(noteUpdates).toHaveLength(0)
   })

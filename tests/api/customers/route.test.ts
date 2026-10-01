@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 vi.mock('@/lib/queries', () => ({
   getCustomers: vi.fn(),
 }))
 
-import { GET } from '@/app/api/customers/route'
-import * as jwt from '@/lib/jwt'
-import * as scopes from '@/lib/scopes'
+import { GET } from '@/app/api/(public)/customers/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as scopes from '@/lib/auth/scopes'
 import * as queries from '@/lib/queries'
 
 const ADMIN = { adminId: 'admin-1', role: 'admin', scopes: [] }

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 process.env.JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256'
 
-vi.mock('@/lib/otp', () => ({
+vi.mock('@/lib/auth/otp', () => ({
   generateOTP: vi.fn().mockReturnValue('123456'),
   storeOTP: vi.fn().mockResolvedValue(undefined),
   verifyOTP: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('@/lib/otp', () => ({
   recordSendOtp: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
@@ -24,14 +24,14 @@ vi.mock('@/lib/email', () => ({
   sendOTPEmail: vi.fn(),
 }))
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
-import { POST as sendOtpPOST } from '@/app/api/auth/send-otp/route'
-import { POST as verifyOtpPOST } from '@/app/api/auth/verify-otp/route'
-import * as otpLib from '@/lib/otp'
-import * as db from '@/lib/db'
+import { POST as sendOtpPOST } from '@/app/api/(public)/auth/send-otp/route'
+import { POST as verifyOtpPOST } from '@/app/api/(public)/auth/verify-otp/route'
+import * as otpLib from '@/lib/auth/otp'
+import * as db from '@/lib/shared/db'
 import * as emailLib from '@/lib/email'
 
 // ── helpers ──────────────────────────────────────────────────────────────────

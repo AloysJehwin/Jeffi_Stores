@@ -1,4 +1,4 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 // Shared product-join SQL used by both the Google Merchant (merchant/sync.ts) and the
 // Amazon (amazon/sync.ts) feed builders, so the two never drift. Returns a product row

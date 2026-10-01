@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
 import BusinessProductCard from '@/components/business/ProductCard'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.featured_for_you
 
@@ -87,9 +87,14 @@ export default function FeaturedForYou({
             <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{COPY.eyebrow}</p>
             <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">{title || COPY.title}</h2>
           </div>
-          <Link href={href} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+          <Link
+            href={href}
+            className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors"
+          >
             Explore more
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">

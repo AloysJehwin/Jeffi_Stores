@@ -34,7 +34,7 @@ class FakeWorker {
     this.terminated = true
   }
   emit(type: string, event: unknown) {
-    ;(this.listeners[type] || []).forEach((cb) => cb(event))
+    ;(this.listeners[type] || []).forEach(cb => cb(event))
   }
   emitMessage(data: unknown) {
     this.emit('message', { data })
@@ -95,10 +95,7 @@ describe('getLastOnDeviceError', () => {
 
 describe('generateRecap — worker lifecycle & result', () => {
   it('creates a worker lazily, sends init then generate, and resolves on result', async () => {
-    const promise = runtime.generateRecap(
-      { cart: [], events: [] } as never,
-      true,
-    )
+    const promise = runtime.generateRecap({ cart: [], events: [] } as never, true)
     const w = FakeWorker.instances[0]
     expect(FakeWorker.instances).toHaveLength(1)
     // init message first, then generate
@@ -117,17 +114,13 @@ describe('generateRecap — worker lifecycle & result', () => {
     expect(FakeWorker.instances).toHaveLength(1)
     // Only one init message even with two generate calls
     const w = FakeWorker.instances[0]
-    const inits = w.posted.filter((m) => (m as { type: string }).type === 'init')
+    const inits = w.posted.filter(m => (m as { type: string }).type === 'init')
     expect(inits).toHaveLength(1)
   })
 
   it('streams tokens via onToken and falls back to accumulator when result has no text', async () => {
     const tokens: string[] = []
-    const promise = runtime.generateRecap(
-      { cart: [] } as never,
-      false,
-      (partial) => tokens.push(partial),
-    )
+    const promise = runtime.generateRecap({ cart: [] } as never, false, partial => tokens.push(partial))
     const w = FakeWorker.instances[0]
     const gen = w.posted[1] as { id: number }
     // No repetition -> deloop returns the (untrimmed) original accumulator
@@ -164,13 +157,9 @@ describe('generateRecap — worker lifecycle & result', () => {
 describe('deloop (exercised via streaming tokens)', () => {
   it('trims a repeating word sequence in streamed output', async () => {
     let last = ''
-    const promise = runtime.generateRecap(
-      { cart: [] } as never,
-      false,
-      (partial) => {
-        last = partial
-      },
-    )
+    const promise = runtime.generateRecap({ cart: [] } as never, false, partial => {
+      last = partial
+    })
     const w = FakeWorker.instances[0]
     const gen = w.posted[1] as { id: number }
     // "Build Your Quality Build Your Quality" -> deloop keeps first occurrence
@@ -186,13 +175,9 @@ describe('deloop (exercised via streaming tokens)', () => {
 
   it('returns text unchanged when no repetition present', async () => {
     let last = ''
-    const promise = runtime.generateRecap(
-      { cart: [] } as never,
-      false,
-      (partial) => {
-        last = partial
-      },
-    )
+    const promise = runtime.generateRecap({ cart: [] } as never, false, partial => {
+      last = partial
+    })
     const w = FakeWorker.instances[0]
     const gen = w.posted[1] as { id: number }
     w.emitMessage({ type: 'token', id: gen.id, text: 'one two three four' })
@@ -255,13 +240,7 @@ describe('generateCartInsight / generateProductPitch / generateAffirmation', () 
   })
 
   it('generateProductPitch uses the pitch prompt', async () => {
-    const promise = runtime.generateProductPitch(
-      'Widget',
-      'Acme',
-      'Tools',
-      null,
-      false,
-    )
+    const promise = runtime.generateProductPitch('Widget', 'Acme', 'Tools', null, false)
     const w = FakeWorker.instances[0]
     const gen = w.posted[1] as { prompt: string; id: number }
     expect(gen.prompt).toBe('PITCH_PROMPT')

@@ -20,11 +20,10 @@ import {
   DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import { Pool } from 'pg'
-import { buildTenantSchemaSql } from '../tenant-migrations-schema'
-import { dumpTenantDb, restoreTenantDb } from '../tenant-db-backup'
-import { upsertTenantDns, deleteTenantDns } from '../tenant-dns'
-import fs from 'fs'
-import path from 'path'
+import { createPgPool, rdsSslOption } from '@/lib/shared/pg-pool'
+import { buildTenantSchemaSql } from '@/lib/tenant-migrations-schema'
+import { dumpTenantDb, restoreTenantDb } from '@/lib/tenancy/tenant-db-backup'
+import { upsertTenantDns, deleteTenantDns } from '@/lib/tenancy/tenant-dns'
 import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
 
 /**
@@ -34,7 +33,7 @@ import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
  * real @aws-sdk call and treats "already exists / already owned" as success so the
  * state machine can safely retry after crashes.
  *
- * Locked infra (from docs/PROVISIONING_ENGINE_PLAN.md):
+ * Locked infra (from docs/archive/PROVISIONING_ENGINE_PLAN.md):
  *   VPC vpc-04bd02e91e0bc0882, RDS SG sg-0e361f0f1b093bd83, region us-east-1
  *
  * Enable with PROVISIONING_PROVIDER=aws.
@@ -59,23 +58,29 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
 
   async ensureParamGroup(paramGroup: string, maxConnections: number): Promise<void> {
     try {
-      await this.rds.send(new CreateDBParameterGroupCommand({
-        DBParameterGroupName: paramGroup,
-        DBParameterGroupFamily: `postgres${RDS_ENGINE_VERSION}`,
-        Description: `Jeffi tenant param group (max_connections=${maxConnections})`,
-      }))
+      await this.rds.send(
+        new CreateDBParameterGroupCommand({
+          DBParameterGroupName: paramGroup,
+          DBParameterGroupFamily: `postgres${RDS_ENGINE_VERSION}`,
+          Description: `Jeffi tenant param group (max_connections=${maxConnections})`,
+        })
+      )
     } catch (err) {
       if (!isAlreadyExists(err)) throw err
     }
     // max_connections is static → pending-reboot
-    await this.rds.send(new ModifyDBParameterGroupCommand({
-      DBParameterGroupName: paramGroup,
-      Parameters: [{
-        ParameterName: 'max_connections',
-        ParameterValue: String(maxConnections),
-        ApplyMethod: 'pending-reboot',
-      }],
-    }))
+    await this.rds.send(
+      new ModifyDBParameterGroupCommand({
+        DBParameterGroupName: paramGroup,
+        Parameters: [
+          {
+            ParameterName: 'max_connections',
+            ParameterValue: String(maxConnections),
+            ApplyMethod: 'pending-reboot',
+          },
+        ],
+      })
+    )
   }
 
   async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }> {
@@ -91,25 +96,30 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     // already allowed, or running in-VPC), and createDbInstance must stay retry-safe.
     if (publicTest) await this.openLocalRdsAccess()
     try {
-      await this.rds.send(new CreateDBInstanceCommand({
-        DBInstanceIdentifier: args.dbInstanceId,
-        DBInstanceClass: RDS_INSTANCE_CLASS,
-        Engine: 'postgres',
-        EngineVersion: RDS_ENGINE_VERSION,
-        AllocatedStorage: 20,
-        MasterUsername: RDS_MASTER_USER,
-        MasterUserPassword: process.env.RDS_MASTER_PASSWORD,
-        DBName: 'jeffi_stores',
-        VpcSecurityGroupIds: [RDS_SG],
-        DBSubnetGroupName: RDS_SUBNET_GROUP,
-        DBParameterGroupName: args.paramGroup,
-        PubliclyAccessible: publicTest,
-        EnableIAMDatabaseAuthentication: true,
-        StorageType: 'gp3',
-        StorageEncrypted: true,
-        BackupRetentionPeriod: 7,
-        Tags: [{ Key: 'app', Value: 'jeffi-stores' }, { Key: 'kind', Value: 'tenant-db' }],
-      }))
+      await this.rds.send(
+        new CreateDBInstanceCommand({
+          DBInstanceIdentifier: args.dbInstanceId,
+          DBInstanceClass: RDS_INSTANCE_CLASS,
+          Engine: 'postgres',
+          EngineVersion: RDS_ENGINE_VERSION,
+          AllocatedStorage: 20,
+          MasterUsername: RDS_MASTER_USER,
+          MasterUserPassword: process.env.RDS_MASTER_PASSWORD,
+          DBName: 'jeffi_stores',
+          VpcSecurityGroupIds: [RDS_SG],
+          DBSubnetGroupName: RDS_SUBNET_GROUP,
+          DBParameterGroupName: args.paramGroup,
+          PubliclyAccessible: publicTest,
+          EnableIAMDatabaseAuthentication: true,
+          StorageType: 'gp3',
+          StorageEncrypted: true,
+          BackupRetentionPeriod: 7,
+          Tags: [
+            { Key: 'app', Value: 'jeffi-stores' },
+            { Key: 'kind', Value: 'tenant-db' },
+          ],
+        })
+      )
     } catch (err) {
       if (!isAlreadyExists(err)) throw err
     }
@@ -126,10 +136,12 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
    */
   private async openLocalRdsAccess(): Promise<void> {
     try {
-      const { currentPublicIp, authorizeSgIngress } = await import('../ec2-client')
+      const { currentPublicIp, authorizeSgIngress } = await import('@/lib/shared/ec2-client')
       const ip = await currentPublicIp()
       if (!ip) {
-        process.stderr.write('[provisioning] TENANT_RDS_PUBLIC_TEST: could not detect public IP; skipping SG self-authorize\n')
+        process.stderr.write(
+          '[provisioning] TENANT_RDS_PUBLIC_TEST: could not detect public IP; skipping SG self-authorize\n'
+        )
         return
       }
       await authorizeSgIngress({
@@ -140,7 +152,9 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
       })
       process.stderr.write(`[provisioning] TENANT_RDS_PUBLIC_TEST: authorized ${ip}/32 on 5432 in ${RDS_SG}\n`)
     } catch (err: any) {
-      process.stderr.write(`[provisioning] TENANT_RDS_PUBLIC_TEST: SG self-authorize failed (continuing): ${err?.message}\n`)
+      process.stderr.write(
+        `[provisioning] TENANT_RDS_PUBLIC_TEST: SG self-authorize failed (continuing): ${err?.message}\n`
+      )
     }
   }
 
@@ -202,15 +216,19 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   private tenantPool(endpoint: string, dbName: string): Pool {
     const masterPassword = process.env.RDS_MASTER_PASSWORD
     if (!masterPassword) {
-      throw new Error('RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for schema load / backup / restore')
+      throw new Error(
+        'RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for schema load / backup / restore'
+      )
     }
-    const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-    const ssl = fs.existsSync(certPath)
-      ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-      : { rejectUnauthorized: false }
-    return new Pool({
-      host: endpoint, port: 5432, database: dbName, user: RDS_MASTER_USER,
-      password: masterPassword, ssl, max: 2, connectionTimeoutMillis: 20000,
+    return createPgPool({
+      host: endpoint,
+      port: 5432,
+      database: dbName,
+      user: RDS_MASTER_USER,
+      password: masterPassword,
+      ssl: rdsSslOption(),
+      max: 2,
+      connectionTimeoutMillis: 20000,
     })
   }
 
@@ -225,34 +243,56 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     // the bucket must allow public read or every uploaded image 403s on display. The app writes
     // with IAM creds; the policy below only opens read + the app's own write, mirroring
     // jeffi-stores-bucket. Public access block must be OFF for the policy to take effect.
-    await this.s3.send(new PutPublicAccessBlockCommand({
-      Bucket: bucket,
-      PublicAccessBlockConfiguration: {
-        BlockPublicAcls: false, IgnorePublicAcls: false,
-        BlockPublicPolicy: false, RestrictPublicBuckets: false,
-      },
-    }))
-    await this.s3.send(new PutBucketPolicyCommand({
-      Bucket: bucket,
-      Policy: JSON.stringify({
-        Version: '2012-10-17',
-        Statement: [
-          { Sid: 'PublicReadAccess', Effect: 'Allow', Principal: '*', Action: ['s3:GetObject', 's3:GetObjectVersion'], Resource: `arn:aws:s3:::${bucket}/*` },
-          { Sid: 'AllowUploadFromApplication', Effect: 'Allow', Principal: '*', Action: ['s3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject'], Resource: `arn:aws:s3:::${bucket}/*` },
-        ],
-      }),
-    }))
-    await this.s3.send(new PutBucketCorsCommand({
-      Bucket: bucket,
-      CORSConfiguration: {
-        CORSRules: [{
-          AllowedMethods: ['GET', 'PUT', 'POST'],
-          AllowedOrigins: ['https://*.jeffistores.in'],
-          AllowedHeaders: ['*'],
-          MaxAgeSeconds: 3000,
-        }],
-      },
-    }))
+    await this.s3.send(
+      new PutPublicAccessBlockCommand({
+        Bucket: bucket,
+        PublicAccessBlockConfiguration: {
+          BlockPublicAcls: false,
+          IgnorePublicAcls: false,
+          BlockPublicPolicy: false,
+          RestrictPublicBuckets: false,
+        },
+      })
+    )
+    await this.s3.send(
+      new PutBucketPolicyCommand({
+        Bucket: bucket,
+        Policy: JSON.stringify({
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Sid: 'PublicReadAccess',
+              Effect: 'Allow',
+              Principal: '*',
+              Action: ['s3:GetObject', 's3:GetObjectVersion'],
+              Resource: `arn:aws:s3:::${bucket}/*`,
+            },
+            {
+              Sid: 'AllowUploadFromApplication',
+              Effect: 'Allow',
+              Principal: '*',
+              Action: ['s3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject'],
+              Resource: `arn:aws:s3:::${bucket}/*`,
+            },
+          ],
+        }),
+      })
+    )
+    await this.s3.send(
+      new PutBucketCorsCommand({
+        Bucket: bucket,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedMethods: ['GET', 'PUT', 'POST'],
+              AllowedOrigins: ['https://*.jeffistores.in'],
+              AllowedHeaders: ['*'],
+              MaxAgeSeconds: 3000,
+            },
+          ],
+        },
+      })
+    )
   }
 
   async ensureDns(hostnames: string[], targetIp?: string): Promise<void> {
@@ -272,11 +312,17 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async deleteDbInstance(dbInstanceId: string): Promise<void> {
-    await this.rds.send(new DeleteDBInstanceCommand({
-      DBInstanceIdentifier: dbInstanceId,
-      SkipFinalSnapshot: true,
-      DeleteAutomatedBackups: true,
-    })).catch((err) => { if (!/NotFound/i.test(err?.name || '')) throw err })
+    await this.rds
+      .send(
+        new DeleteDBInstanceCommand({
+          DBInstanceIdentifier: dbInstanceId,
+          SkipFinalSnapshot: true,
+          DeleteAutomatedBackups: true,
+        })
+      )
+      .catch(err => {
+        if (!/NotFound/i.test(err?.name || '')) throw err
+      })
   }
 
   async deleteBucket(bucket: string): Promise<void> {
@@ -286,7 +332,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     try {
       for (;;) {
         const listed = await this.s3.send(new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1000 }))
-        const keys = (listed.Contents ?? []).map((o) => ({ Key: o.Key! })).filter((o) => o.Key)
+        const keys = (listed.Contents ?? []).map(o => ({ Key: o.Key! })).filter(o => o.Key)
         if (keys.length === 0) break
         await this.s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys, Quiet: true } }))
         if (!listed.IsTruncated) break
@@ -296,8 +342,9 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
       return
     }
 
-    await this.s3.send(new DeleteBucketCommand({ Bucket: bucket }))
-      .catch((err) => { if (!/NoSuchBucket/i.test(err?.name || '')) throw err })
+    await this.s3.send(new DeleteBucketCommand({ Bucket: bucket })).catch(err => {
+      if (!/NoSuchBucket/i.test(err?.name || '')) throw err
+    })
   }
 
   async isDbInstanceGone(dbInstanceId: string): Promise<boolean> {
@@ -311,23 +358,22 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async deleteParamGroup(paramGroup: string): Promise<void> {
-    await this.rds.send(new DeleteDBParameterGroupCommand({ DBParameterGroupName: paramGroup }))
-      .catch((err) => {
-        const name = err?.name || ''
-        // NotFound → already gone (success). InvalidDBParameterGroupState → still attached
-        // to an instance that isn't fully deleted yet; caller retries after DB is gone.
-        if (/DBParameterGroupNotFound|NotFound/i.test(name)) return
-        throw err
-      })
+    await this.rds.send(new DeleteDBParameterGroupCommand({ DBParameterGroupName: paramGroup })).catch(err => {
+      const name = err?.name || ''
+      // NotFound → already gone (success). InvalidDBParameterGroupState → still attached
+      // to an instance that isn't fully deleted yet; caller retries after DB is gone.
+      if (/DBParameterGroupNotFound|NotFound/i.test(name)) return
+      throw err
+    })
   }
 
   // EC2 app instances (dedicated-tenant or shared pool) via the SigV4 ec2-client (no
   // @aws-sdk/client-ec2, matching pool-autoscale). userData boots the same app Docker image.
   async ensureAppInstance(
     args: { name: string; instanceType: string; userData?: string },
-    onLaunched?: (instanceId: string) => Promise<void>,
+    onLaunched?: (instanceId: string) => Promise<void>
   ): Promise<{ instanceId: string; ip: string }> {
-    const { runInstance, waitForState, getInstanceIp } = await import('../ec2-client')
+    const { runInstance, waitForState, getInstanceIp } = await import('@/lib/shared/ec2-client')
     const { instanceId } = await runInstance(args)
     // Record the id BEFORE waiting. Everything below can throw, and an id known only to this
     // stack frame is an instance nothing can find again — it stays running, billing, and
@@ -338,19 +384,21 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     let ip: string | null = null
     for (let i = 0; i < 10 && !ip; i++) {
       ip = await getInstanceIp(instanceId)
-      if (!ip) await new Promise((r) => setTimeout(r, 3000))
+      if (!ip) await new Promise(r => setTimeout(r, 3000))
     }
     if (!ip) throw new Error(`EC2 ${instanceId} running but no public IP assigned`)
     return { instanceId, ip }
   }
 
   async deleteAppInstance(instanceId: string): Promise<void> {
-    const { terminateInstance } = await import('../ec2-client')
-    await terminateInstance(instanceId).catch((e: any) => { if (!/NotFound|InvalidInstanceID/i.test(e?.message || '')) throw e })
+    const { terminateInstance } = await import('@/lib/shared/ec2-client')
+    await terminateInstance(instanceId).catch((e: any) => {
+      if (!/NotFound|InvalidInstanceID/i.test(e?.message || '')) throw e
+    })
   }
 
   async isInstanceGone(instanceId: string): Promise<boolean> {
-    const { isInstanceGone } = await import('../ec2-client')
+    const { isInstanceGone } = await import('@/lib/shared/ec2-client')
     return isInstanceGone(instanceId)
   }
 }

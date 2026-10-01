@@ -10,7 +10,7 @@ const { mockQuery, mockQueryOne, mockQueryMany, mockListProductStatuses } = vi.h
   mockListProductStatuses: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
@@ -20,11 +20,7 @@ vi.mock('@/lib/merchant/client', () => ({
   listProductStatuses: mockListProductStatuses,
 }))
 
-import {
-  refreshGmcStatusSnapshot,
-  getGmcSummary,
-  getGmcStatusPage,
-} from '@/lib/merchant/gmc-status'
+import { refreshGmcStatusSnapshot, getGmcSummary, getGmcStatusPage } from '@/lib/merchant/gmc-status'
 
 beforeEach(() => {
   vi.clearAllMocks()

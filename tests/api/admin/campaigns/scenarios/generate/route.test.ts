@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
 }))
 
@@ -21,10 +21,13 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
   validateScenarioSql: vi.fn(),
 }))
 
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string, public readonly provider: string = 'unknown') {
+    constructor(
+      message: string,
+      public readonly provider: string = 'unknown'
+    ) {
       super(message)
       this.name = 'AiClientError'
     }
@@ -35,12 +38,12 @@ vi.mock('@/lib/ai-client', () => ({
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/campaigns/scenarios/generate/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { query } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/campaigns/scenarios/generate/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { query } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiChat, AiClientError } from '@/lib/shared/ai-client'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,11 +52,13 @@ import { aiChat, AiClientError } from '@/lib/ai-client'
 const ADMIN = { adminId: 'admin-1', id: 'admin-1', role: 'super_admin', scopes: ['mailer'] }
 
 function postReq(body: unknown) {
-  return new NextRequest(new Request('http://localhost/api/admin/campaigns/scenarios/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }))
+  return new NextRequest(
+    new Request('http://localhost/api/admin/campaigns/scenarios/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 const VALID_AI_RESPONSE = {
@@ -61,7 +66,8 @@ const VALID_AI_RESPONSE = {
   kind: 'new_customer_welcome',
   description: 'First-time signups within 24h get a welcome email.',
   sql: "SELECT u.id FROM users u WHERE u.is_active = TRUE AND u.is_guest = FALSE AND u.marketing_opt_out = FALSE AND u.email IS NOT NULL AND NOT EXISTS (SELECT 1 FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.user_id = u.id AND ecs.sent_at > NOW() - ($2 || ' days')::interval) LIMIT $3",
-  product_sql: "SELECT p.id::text AS product_id, p.name AS name, p.slug AS slug, (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url, p.base_price::float AS price FROM products p WHERE p.is_active = TRUE ORDER BY p.is_featured DESC LIMIT 6",
+  product_sql:
+    'SELECT p.id::text AS product_id, p.name AS name, p.slug AS slug, (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url, p.base_price::float AS price FROM products p WHERE p.is_active = TRUE ORDER BY p.is_featured DESC LIMIT 6',
   explanation: 'Targets new signups in the last 24h.',
 }
 
@@ -85,7 +91,7 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
       fallbackUsed: false,
     } as any)
     vi.mocked(validateScenarioSql)
-      .mockReturnValueOnce(VALID_VALIDATION as any)   // audience SQL
+      .mockReturnValueOnce(VALID_VALIDATION as any) // audience SQL
       .mockReturnValueOnce(VALID_PRODUCT_VALIDATION as any) // product SQL
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
   })
@@ -152,9 +158,12 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
   it('writes audit log on success', async () => {
     await POST(postReq({ prompt: 'Welcome new customers' }))
 
-    const auditCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes('scenario_audit_log') && args[0].includes('ai_generate'),
-    )
+    const auditCall = vi
+      .mocked(query)
+      .mock.calls.find(
+        (args: any[]) =>
+          typeof args[0] === 'string' && args[0].includes('scenario_audit_log') && args[0].includes('ai_generate')
+      )
     expect(auditCall).toBeDefined()
     expect(auditCall![1]![0]).toBe('admin-1')
   })
@@ -204,9 +213,9 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
 
     await POST(postReq({ prompt: 'test scenario' }))
 
-    const auditCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes('ai_generate_failed'),
-    )
+    const auditCall = vi
+      .mocked(query)
+      .mock.calls.find((args: any[]) => typeof args[0] === 'string' && args[0].includes('ai_generate_failed'))
     expect(auditCall).toBeDefined()
   })
 
@@ -238,9 +247,9 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
 
     await POST(postReq({ prompt: 'test' }))
 
-    const auditCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes('ai_generate_unparseable'),
-    )
+    const auditCall = vi
+      .mocked(query)
+      .mock.calls.find((args: any[]) => typeof args[0] === 'string' && args[0].includes('ai_generate_unparseable'))
     expect(auditCall).toBeDefined()
   })
 
@@ -272,8 +281,7 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
       latencyMs: 100,
       fallbackUsed: false,
     } as any)
-    vi.mocked(validateScenarioSql)
-      .mockReturnValueOnce(VALID_VALIDATION as any)
+    vi.mocked(validateScenarioSql).mockReturnValueOnce(VALID_VALIDATION as any)
     // no second call expected since product_sql is empty
 
     const res = await POST(postReq({ prompt: 'test' }))
@@ -305,11 +313,13 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
   // --- Body parse edge cases ---
 
   it('handles non-JSON body gracefully (uses empty object)', async () => {
-    const req = new NextRequest(new Request('http://localhost/api/admin/campaigns/scenarios/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: 'not-json',
-    }))
+    const req = new NextRequest(
+      new Request('http://localhost/api/admin/campaigns/scenarios/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not-json',
+      })
+    )
 
     const res = await POST(req)
     // prompt will be empty → 400

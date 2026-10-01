@@ -9,18 +9,18 @@ const mockAuthenticateAnyUser = vi.hoisted(() => vi.fn())
 const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: mockAuthenticateAnyUser,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { PATCH } from '@/app/api/support/sessions/[sessionId]/route'
+import { PATCH } from '@/app/api/(public)/support/sessions/[sessionId]/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makePatch(sessionId: string) {
@@ -66,10 +66,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
     expect(body.success).toBe(true)
     // Should have made two query calls: UPDATE + DELETE
     expect(mockQuery).toHaveBeenCalledTimes(2)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringMatching(/UPDATE support_sessions/),
-      expect.any(Array)
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/UPDATE support_sessions/), expect.any(Array))
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/DELETE FROM websocket_connections/),
       expect.any(Array)

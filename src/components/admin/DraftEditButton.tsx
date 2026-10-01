@@ -32,7 +32,10 @@ export default function DraftEditButton({
     <>
       <button
         onClick={() => setOpen(true)}
-        className={className || 'flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors'}
+        className={
+          className ||
+          'flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors'
+        }
       >
         {label || (hasDraft ? 'Edit Draft' : 'Edit')}
       </button>

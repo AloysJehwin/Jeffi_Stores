@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import glob from 'fast-glob'
-import { getScopeForPath } from '@/lib/scopes'
+import { getScopeForPath } from '@/lib/auth/scopes'
 
 /**
  * Middleware gates a page with getScopeForPath. A page whose path matches no scope's `routes`
@@ -11,19 +11,26 @@ import { getScopeForPath } from '@/lib/scopes'
  * and ecom/store-status.
  */
 const SPECIAL_CASED = new Set([
-  '/admin',        // getScopeForPath returns dashboard:read explicitly
-  '/admin/login',  // pre-auth, deliberately null
-  '/admin/team',   // owner-only: the page redirects on !isPlatformOwner, which no scope expresses
+  '/admin', // getScopeForPath returns dashboard:read explicitly
+  '/admin/login', // pre-auth, deliberately null
+  '/admin/team', // owner-only: the page redirects on !isPlatformOwner, which no scope expresses
 ])
 
 function adminPages(): string[] {
-  return glob.sync('src/app/admin/**/page.tsx', { cwd: process.cwd() })
-    .map(f => '/' + f.replace('src/app/', '').replace(/\/page\.tsx$/, '').replace(/\/\([^)]*\)/g, ''))
+  return glob.sync('src/app/\\(admin\\)/admin/**/page.tsx', { cwd: process.cwd() }).map(
+    f =>
+      '/' +
+      f
+        .replace('src/app/', '')
+        .replace(/\/page\.tsx$/, '')
+        .replace(/^\([^)]*\)\//, '')
+        .replace(/\/\([^)]*\)/g, '')
+  )
 }
 
 describe('every admin page resolves to a scope middleware can enforce', () => {
   it('finds the admin pages (guards the glob)', () => {
-    expect(adminPages().length).toBeGreaterThan(50)
+    expect(adminPages().length).toBeGreaterThanOrEqual(93)
   })
 
   it('leaves no page ungated', () => {

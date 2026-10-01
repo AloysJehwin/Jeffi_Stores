@@ -6,7 +6,9 @@ vi.mock('@/components/visitor/ProductCard', () => ({
 }))
 vi.mock('@/components/visitor/SectionCarousel', () => ({
   default: ({ children, ariaLabel }: { children: React.ReactNode; ariaLabel: string }) => (
-    <div role="region" aria-label={ariaLabel}>{children}</div>
+    <div role="region" aria-label={ariaLabel}>
+      {children}
+    </div>
   ),
 }))
 
@@ -15,14 +17,19 @@ import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
 afterEach(cleanup)
 
 function mockFetch(status: number, body: unknown) {
-  return vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
-  )
+  return vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
 }
 
 describe('BuyAgainRow', () => {
   it('renders a card per previously ordered product', async () => {
-    const fetchSpy = mockFetch(200, { products: [{ id: 'p1', name: 'Hex bolt' }, { id: 'p2', name: 'Spanner' }] })
+    const fetchSpy = mockFetch(200, {
+      products: [
+        { id: 'p1', name: 'Hex bolt' },
+        { id: 'p2', name: 'Spanner' },
+      ],
+    })
 
     render(<BuyAgainRow />)
 

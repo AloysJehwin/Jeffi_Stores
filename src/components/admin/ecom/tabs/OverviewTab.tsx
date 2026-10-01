@@ -19,7 +19,11 @@ function surfaces(slug: string, plan: string | null): string[] {
   return hosts
 }
 
-export default function OverviewTab({ tenant: t, job, owners }: {
+export default function OverviewTab({
+  tenant: t,
+  job,
+  owners,
+}: {
   tenant: TenantDetail
   job: ProvisioningJob | null
   owners: TenantOwner[]
@@ -28,9 +32,13 @@ export default function OverviewTab({ tenant: t, job, owners }: {
 
   return (
     <div className="space-y-6 min-w-0">
-      <div className={`rounded-xl border p-5 ${serving
-        ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
-        : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20'}`}>
+      <div
+        className={`rounded-xl border p-5 ${
+          serving
+            ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
+            : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20'
+        }`}
+      >
         <div className="flex items-center gap-2.5 flex-wrap">
           <span className={`w-2.5 h-2.5 rounded-full ${DOT[t.status] || DOT.terminated}`} />
           <span className="font-semibold text-foreground capitalize">{t.status}</span>
@@ -46,7 +54,10 @@ export default function OverviewTab({ tenant: t, job, owners }: {
             <Field label="Subdomain" value={<Mono>{t.slug}.jeffistores.in</Mono>} />
             <Field label="Custom domain" value={t.custom_domain} />
             <Field label="Plan" value={<span className="capitalize">{t.plan || '—'}</span>} />
-            <Field label="Monthly" value={t.monthly_price_inr ? `₹${Number(t.monthly_price_inr).toLocaleString('en-IN')}` : '—'} />
+            <Field
+              label="Monthly"
+              value={t.monthly_price_inr ? `₹${Number(t.monthly_price_inr).toLocaleString('en-IN')}` : '—'}
+            />
             <Field label="Billing" value={<span className="capitalize">{t.billing_interval}</span>} />
             <Field label="Payout" value={t.daily_payout ? 'Daily (+5%)' : 'Weekly'} />
             <Field label="Subscription" value={<span className="capitalize">{t.subscription_status}</span>} />
@@ -61,7 +72,18 @@ export default function OverviewTab({ tenant: t, job, owners }: {
             <Field label="Database" value={t.rds_endpoint ? 'Provisioned' : NOT_PROVISIONED} />
             <Field label="EC2 target" value={t.ec2_target || 'shared pool'} />
             <Field label="Region" value={t.region} />
-            <Field label="Last job" value={job ? <Mono>{job.status} · {job.step}</Mono> : '—'} />
+            <Field
+              label="Last job"
+              value={
+                job ? (
+                  <Mono>
+                    {job.status} · {job.step}
+                  </Mono>
+                ) : (
+                  '—'
+                )
+              }
+            />
             <Field label="Last change" value={job ? new Date(job.updated_at).toLocaleString('en-IN') : '—'} />
             <Field wide label="Notification email" value={<Mono>{t.noreply_email}</Mono>} />
           </FieldGrid>
@@ -75,7 +97,7 @@ export default function OverviewTab({ tenant: t, job, owners }: {
           </p>
         ) : (
           <ul className="space-y-3">
-            {owners.map((o) => (
+            {owners.map(o => (
               <li key={o.id} className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
                   <div className="text-sm text-foreground break-all">{o.name || o.email}</div>
@@ -95,12 +117,23 @@ export default function OverviewTab({ tenant: t, job, owners }: {
 
       <Section title="Surfaces">
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {surfaces(t.slug, t.plan).map((host) => (
+          {surfaces(t.slug, t.plan).map(host => (
             <li key={host} className="flex items-center gap-2 text-sm min-w-0">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${serving ? 'bg-green-500' : 'bg-foreground-muted'}`} />
-              {serving
-                ? <a href={`https://${host}`} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all">{host} ↗</a>
-                : <span className="font-mono text-xs text-foreground-muted break-all">{host}</span>}
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${serving ? 'bg-green-500' : 'bg-foreground-muted'}`}
+              />
+              {serving ? (
+                <a
+                  href={`https://${host}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all"
+                >
+                  {host} ↗
+                </a>
+              ) : (
+                <span className="font-mono text-xs text-foreground-muted break-all">{host}</span>
+              )}
             </li>
           ))}
         </ul>

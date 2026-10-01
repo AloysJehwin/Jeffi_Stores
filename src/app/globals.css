@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --color-surface: #F9FAFB;
-    --color-surface-elevated: #FFFFFF;
-    --color-surface-secondary: #F3F4F6;
+    --color-surface: #f9fafb;
+    --color-surface-elevated: #ffffff;
+    --color-surface-secondary: #f3f4f6;
     --color-foreground: #111827;
-    --color-foreground-secondary: #4B5563;
-    --color-foreground-muted: #6B7280;
-    --color-border: #D1D5DB;
-    --color-border-secondary: #9CA3AF;
+    --color-foreground-secondary: #4b5563;
+    --color-foreground-muted: #6b7280;
+    --color-border: #d1d5db;
+    --color-border-secondary: #9ca3af;
     --color-card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 
     /* Brand colors — light mode */
@@ -25,107 +25,95 @@
     --color-surface: #1a1b23;
     --color-surface-elevated: #24252f;
     --color-surface-secondary: #2e303b;
-    --color-foreground: #F3F4F6;
-    --color-foreground-secondary: #D1D5DB;
-    --color-foreground-muted: #AEB4C0;
+    --color-foreground: #f3f4f6;
+    --color-foreground-secondary: #d1d5db;
+    --color-foreground-muted: #aeb4c0;
     --color-border: #3f4150;
-    --color-border-secondary: #4a4c5e;
+    --color-border-secondary: #6a6c82; /* WCAG AA 3:1 on --color-surface for input/UI outlines */
 
     /* Brand colors — dark mode (deeper for WCAG contrast on dark surfaces) */
     --primary-500: #d97706;
     --primary-600: #b45309;
-    --accent-500: #5a8a00;
+    --accent-500: #74a800; /* WCAG AA 4.5:1 as text on dark surface */
     --accent-600: #4a7200;
   }
 
   /* Force light-mode tokens even inside a .dark ancestor (landing-page preview shells) */
   .light-scope {
-    --color-surface: #F9FAFB;
-    --color-surface-elevated: #FFFFFF;
-    --color-surface-secondary: #F3F4F6;
+    --color-surface: #f9fafb;
+    --color-surface-elevated: #ffffff;
+    --color-surface-secondary: #f3f4f6;
     --color-foreground: #111827;
-    --color-foreground-secondary: #4B5563;
-    --color-foreground-muted: #6B7280;
-    --color-border: #D1D5DB;
-    --color-border-secondary: #9CA3AF;
+    --color-foreground-secondary: #4b5563;
+    --color-foreground-muted: #6b7280;
+    --color-border: #d1d5db;
+    --color-border-secondary: #9ca3af;
     --primary-500: #f59e0b;
     --primary-600: #d97706;
     --accent-500: #7cb900;
     --accent-600: #5a8a00;
   }
 
-  /* Ecom marketing demo: white/near-black scope with a single indigo accent.
-     Redefines the same tokens .light-scope does; touches nothing outside .ecom-clean. */
-  .ecom-clean {
-    --color-surface: #FFFFFF;
-    --color-surface-elevated: #FFFFFF;
-    --color-surface-secondary: #F5F6F8;
-    --color-foreground: #0B0D12;
-    --color-foreground-secondary: #3A3F4B;
-    --color-foreground-muted: #6B7280;
-    --color-border: #E5E7EB;
-    --color-border-secondary: #D1D5DB;
-    --primary-500: #f59e0b;
-    --primary-600: #d97706;
-    --accent-500: #7cb900;
-    --accent-600: #5a8a00;
+  /* White label text on the solid amber and green brand fills fails WCAG AA
+     contrast; near-black text passes. Scoped to the brand-fill plus text-white
+     pairing so tinted backgrounds and ghost styles keep their own text color. */
+  .bg-primary-500.text-white,
+  .bg-primary-600.text-white,
+  .bg-accent-500.text-white,
+  .bg-accent-600.text-white {
+    color: #111827 !important;
   }
 
   /* Remap brand utility classes to CSS vars so they shift with theme */
-  .bg-primary-500 { background-color: var(--primary-500) !important; }
-  .bg-primary-600 { background-color: var(--primary-600) !important; }
-  .hover\:bg-primary-600:hover { background-color: var(--primary-600) !important; }
-  .text-primary-500 { color: var(--primary-500) !important; }
-  .text-primary-600 { color: var(--primary-600) !important; }
-  .border-primary-500 { border-color: var(--primary-500) !important; }
+  .bg-primary-500 {
+    background-color: var(--primary-500) !important;
+  }
+  .bg-primary-600 {
+    background-color: var(--primary-600) !important;
+  }
+  .hover\:bg-primary-600:hover {
+    background-color: var(--primary-600) !important;
+  }
+  .text-primary-500 {
+    color: var(--primary-500) !important;
+  }
+  .text-primary-600 {
+    color: var(--primary-600) !important;
+  }
+  .border-primary-500 {
+    border-color: var(--primary-500) !important;
+  }
 
-  .bg-accent-500 { background-color: var(--accent-500) !important; }
-  .bg-accent-600 { background-color: var(--accent-600) !important; }
-  .hover\:bg-accent-500:hover { background-color: var(--accent-500) !important; }
-  .hover\:bg-accent-600:hover { background-color: var(--accent-600) !important; }
-  .text-accent-500 { color: var(--accent-500) !important; }
-  .text-accent-600 { color: var(--accent-600) !important; }
-  .border-accent-500 { border-color: var(--accent-500) !important; }
-  .border-b-accent-500 { border-bottom-color: var(--accent-500) !important; }
-  .focus\:ring-accent-500:focus { --tw-ring-color: var(--accent-500) !important; }
-  .group:hover .group-hover\:text-accent-600 { color: var(--accent-600) !important; }
-
-  /* Ecom demo: one restrained blue accent for primary buttons + active states */
-  .ecom-accent-bg { background-color: #2563eb !important; }
-  .ecom-accent-bg:hover { background-color: #1d4ed8 !important; }
-  .ecom-accent-text { color: #2563eb; }
-  .ecom-accent-border { border-color: #2563eb; }
-  .ecom-accent-ring:focus { --tw-ring-color: #2563eb; }
-
-  /* Ecom pages: recolor the brand accent (green) to a professional blue, scoped to .ecom-scope
-     on the ecom layout so the rest of the app keeps its green. */
-  .ecom-scope .bg-accent-600 { background-color:#1d4ed8 !important; }
-  .ecom-scope .text-accent-600 { color:#1d4ed8 !important; }
-  .ecom-scope .bg-accent-500 { background-color:#2563eb !important; }
-  .ecom-scope .text-accent-400 { color:#60a5fa !important; }
-  .ecom-scope .bg-accent-700 { background-color:#1e40af !important; }
-  .ecom-scope .to-accent-500 { --tw-gradient-to:#2563eb var(--tw-gradient-to-position) !important; }
-  .ecom-scope .border-accent-500 { border-color:#2563eb !important; }
-  .ecom-scope .bg-accent-900 { background-color:#172554 !important; }
-  .ecom-scope .bg-accent-50 { background-color:#eff6ff !important; }
-  .ecom-scope .text-accent-700 { color:#1e40af !important; }
-  .ecom-scope .text-accent-300 { color:#93c5fd !important; }
-  .ecom-scope .ring-accent-500 { --tw-ring-color:#2563eb !important; }
-  .ecom-scope .border-accent-400 { border-color:#60a5fa !important; }
-  .ecom-scope .border-accent-300 { border-color:#93c5fd !important; }
-  .ecom-scope .shadow-accent-600 { --tw-shadow-color:#1d4ed8 !important; }
-  .ecom-scope .from-accent-600 { --tw-gradient-from:#1d4ed8 var(--tw-gradient-from-position) !important; --tw-gradient-to:rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to) !important; }
-  .ecom-scope .border-accent-600 { border-color:#1d4ed8 !important; }
-  .ecom-scope .text-accent-500 { color:#2563eb !important; }
-  .ecom-scope .from-accent-500 { --tw-gradient-from:#2563eb var(--tw-gradient-from-position) !important; --tw-gradient-to:rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to) !important; }
-  .ecom-scope .border-accent-800 { border-color:#1e3a8a !important; }
-  .ecom-scope .border-accent-700 { border-color:#1e40af !important; }
-  .ecom-scope .border-accent-200 { border-color:#bfdbfe !important; }
-  .ecom-scope .bg-accent-100 { background-color:#dbeafe !important; }
-  .ecom-scope .hover\:bg-accent-500:hover { background-color:#2563eb !important; }
-  .ecom-scope .hover\:bg-accent-600:hover { background-color:#1d4ed8 !important; }
-  .ecom-scope .hover\:bg-accent-700:hover { background-color:#1e40af !important; }
-  .ecom-scope .group:hover .group-hover\:text-accent-600 { color:#1d4ed8 !important; }
+  .bg-accent-500 {
+    background-color: var(--accent-500) !important;
+  }
+  .bg-accent-600 {
+    background-color: var(--accent-600) !important;
+  }
+  .hover\:bg-accent-500:hover {
+    background-color: var(--accent-500) !important;
+  }
+  .hover\:bg-accent-600:hover {
+    background-color: var(--accent-600) !important;
+  }
+  .text-accent-500 {
+    color: var(--accent-500) !important;
+  }
+  .text-accent-600 {
+    color: var(--accent-600) !important;
+  }
+  .border-accent-500 {
+    border-color: var(--accent-500) !important;
+  }
+  .border-b-accent-500 {
+    border-bottom-color: var(--accent-500) !important;
+  }
+  .focus\:ring-accent-500:focus {
+    --tw-ring-color: var(--accent-500) !important;
+  }
+  .group:hover .group-hover\:text-accent-600 {
+    color: var(--accent-600) !important;
+  }
 
   * {
     @apply box-border;
@@ -153,7 +141,6 @@
     min-height: 100dvh;
   }
 
-
   /* Dark mode form input defaults */
   .dark input,
   .dark select,
@@ -161,11 +148,10 @@
     color-scheme: dark;
   }
 
-
   /* Light mode: make shadow-sm more visible so cards stand out from page bg */
   :root .shadow-sm,
   :root .hover\:shadow-xl:hover {
-    --tw-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+    --tw-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.06);
     box-shadow: var(--tw-shadow);
   }
 }
@@ -216,9 +202,15 @@
   }
 
   /* Icon-only: square, so a row of them lines up with the fields beside it. */
-  .control-md.control-icon { @apply w-[38px] px-0; }
-  .control-sm.control-icon { @apply w-[34px] px-0; }
-  .control-xs.control-icon { @apply w-[26px] px-0; }
+  .control-md.control-icon {
+    @apply w-[38px] px-0;
+  }
+  .control-sm.control-icon {
+    @apply w-[34px] px-0;
+  }
+  .control-xs.control-icon {
+    @apply w-[26px] px-0;
+  }
 }
 
 /* A textarea is the one control that must NOT be pinned — it grows with rows. */
@@ -290,28 +282,62 @@ textarea.field-xs {
   opacity: 0;
   animation: stagger-fade-up 0.5s ease-out forwards;
 }
-.stagger-grid > *:nth-child(1)  { animation-delay: 0ms; }
-.stagger-grid > *:nth-child(2)  { animation-delay: 50ms; }
-.stagger-grid > *:nth-child(3)  { animation-delay: 100ms; }
-.stagger-grid > *:nth-child(4)  { animation-delay: 150ms; }
-.stagger-grid > *:nth-child(5)  { animation-delay: 200ms; }
-.stagger-grid > *:nth-child(6)  { animation-delay: 250ms; }
-.stagger-grid > *:nth-child(7)  { animation-delay: 300ms; }
-.stagger-grid > *:nth-child(8)  { animation-delay: 350ms; }
-.stagger-grid > *:nth-child(9)  { animation-delay: 400ms; }
-.stagger-grid > *:nth-child(10) { animation-delay: 450ms; }
-.stagger-grid > *:nth-child(11) { animation-delay: 500ms; }
-.stagger-grid > *:nth-child(12) { animation-delay: 550ms; }
-.stagger-grid > *:nth-child(n+13) { animation-delay: 600ms; }
+.stagger-grid > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger-grid > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.stagger-grid > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.stagger-grid > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger-grid > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.stagger-grid > *:nth-child(6) {
+  animation-delay: 250ms;
+}
+.stagger-grid > *:nth-child(7) {
+  animation-delay: 300ms;
+}
+.stagger-grid > *:nth-child(8) {
+  animation-delay: 350ms;
+}
+.stagger-grid > *:nth-child(9) {
+  animation-delay: 400ms;
+}
+.stagger-grid > *:nth-child(10) {
+  animation-delay: 450ms;
+}
+.stagger-grid > *:nth-child(11) {
+  animation-delay: 500ms;
+}
+.stagger-grid > *:nth-child(12) {
+  animation-delay: 550ms;
+}
+.stagger-grid > *:nth-child(n + 13) {
+  animation-delay: 600ms;
+}
 
 @keyframes img-shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes razorpay-marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .razorpay-scroll {
@@ -324,6 +350,12 @@ textarea.field-xs {
 }
 
 @keyframes adminSelectFadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

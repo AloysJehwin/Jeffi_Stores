@@ -6,7 +6,7 @@ import {
   rankOf,
   shipmentStatusToStep,
   shipmentStatusToReverseStep,
-} from '@/lib/shipment-status'
+} from '@/lib/shipping/shipment-status'
 
 // Delhivery returns scans OLDEST-first. Each scan: { scanType, activity, date }.
 const s = (activity: string, date?: string, scanType = 'UD') => ({ scanType, activity, date: date ?? null })
@@ -19,7 +19,13 @@ describe('resolveShipmentStatus — order independence', () => {
       s('Shipment Recieved at Origin Center', '2026-07-19T03:54:42'),
     ]
     // In Transit activity → in_transit; must NOT stop at Manifested → created
-    expect(resolveShipmentStatus('UD', [scans[0], { ...scans[1], activity: 'In Transit' }, { ...scans[2], activity: 'In Transit' }])).toBe('in_transit')
+    expect(
+      resolveShipmentStatus('UD', [
+        scans[0],
+        { ...scans[1], activity: 'In Transit' },
+        { ...scans[2], activity: 'In Transit' },
+      ])
+    ).toBe('in_transit')
   })
 
   it('same scans reversed (newest-first) → still in_transit', () => {
@@ -50,40 +56,44 @@ describe('resolveShipmentStatus — order independence', () => {
 
 describe('resolveShipmentStatus — NDR / recovery', () => {
   it('NDR then later In Transit (recovered) → in_transit', () => {
-    expect(resolveShipmentStatus('UD', [
-      s('Delivery attempted', '2026-07-18T10:00:00'),
-      s('In Transit', '2026-07-19T09:00:00'),
-    ])).toBe('in_transit')
+    expect(
+      resolveShipmentStatus('UD', [
+        s('Delivery attempted', '2026-07-18T10:00:00'),
+        s('In Transit', '2026-07-19T09:00:00'),
+      ])
+    ).toBe('in_transit')
   })
 
   it('In Transit then later NDR → delivery_attempted', () => {
-    expect(resolveShipmentStatus('UD', [
-      s('In Transit', '2026-07-18T09:00:00'),
-      s('Undelivered', '2026-07-19T18:00:00'),
-    ])).toBe('delivery_attempted')
+    expect(
+      resolveShipmentStatus('UD', [s('In Transit', '2026-07-18T09:00:00'), s('Undelivered', '2026-07-19T18:00:00')])
+    ).toBe('delivery_attempted')
   })
 
   it('NDR then Delivered → delivered', () => {
-    expect(resolveShipmentStatus('UD', [
-      s('Delivery attempt failed', '2026-07-18T18:00:00'),
-      s('Delivered to consignee', '2026-07-19T11:00:00'),
-    ])).toBe('delivered')
+    expect(
+      resolveShipmentStatus('UD', [
+        s('Delivery attempt failed', '2026-07-18T18:00:00'),
+        s('Delivered to consignee', '2026-07-19T11:00:00'),
+      ])
+    ).toBe('delivered')
   })
 })
 
 describe('resolveShipmentStatus — RTO branch', () => {
   it('RTO scans present (beats forward chain) → rto_initiated', () => {
-    expect(resolveShipmentStatus('UD', [
-      s('In Transit', '2026-07-18T09:00:00'),
-      s('RTO Initiated', '2026-07-19T09:00:00'),
-    ])).toBe('rto_initiated')
+    expect(
+      resolveShipmentStatus('UD', [s('In Transit', '2026-07-18T09:00:00'), s('RTO Initiated', '2026-07-19T09:00:00')])
+    ).toBe('rto_initiated')
   })
 
   it('RTO Delivered + RTO Initiated → rto_delivered (max RTO stage)', () => {
-    expect(resolveShipmentStatus('UD', [
-      s('RTO Initiated', '2026-07-18T09:00:00'),
-      s('Returned to origin', '2026-07-20T09:00:00'),
-    ])).toBe('rto_delivered')
+    expect(
+      resolveShipmentStatus('UD', [
+        s('RTO Initiated', '2026-07-18T09:00:00'),
+        s('Returned to origin', '2026-07-20T09:00:00'),
+      ])
+    ).toBe('rto_delivered')
   })
 })
 
@@ -171,7 +181,9 @@ describe('resolveShipmentStatus — direct top-level codes', () => {
   })
 
   it('NDR with undelivered activity scan → delivery_attempted', () => {
-    expect(resolveShipmentStatus('NDR', [{ scanType: 'NDR', activity: 'Undelivered', date: null }])).toBe('delivery_attempted')
+    expect(resolveShipmentStatus('NDR', [{ scanType: 'NDR', activity: 'Undelivered', date: null }])).toBe(
+      'delivery_attempted'
+    )
   })
 
   it('DL → delivered', () => {
@@ -239,8 +251,7 @@ describe('resolveShipmentStatus — statusLabel fallback', () => {
 // ── resolveShipmentStatus — activityMap edge codes ─────────────────────────
 
 describe('resolveShipmentStatus — activityMap edge activity strings', () => {
-  const sc = (activity: string, date?: string, scanType = 'UD') =>
-    ({ scanType, activity, date: date ?? null })
+  const sc = (activity: string, date?: string, scanType = 'UD') => ({ scanType, activity, date: date ?? null })
 
   it('rto delivered activity → rto_delivered', () => {
     expect(resolveShipmentStatus('UD', [sc('RTO Delivered', '2026-07-20')])).toBe('rto_delivered')
@@ -338,8 +349,7 @@ describe('resolveShipmentStatus — activityMap edge activity strings', () => {
 // ── resolveShipmentStatus — ambiguous top-level PP/MF/PKD/OC/HOLD/LOST/MIS ─
 
 describe('resolveShipmentStatus — ambiguous top-level codes', () => {
-  const sc = (activity: string, date?: string, scanType = 'UD') =>
-    ({ scanType, activity, date: date ?? null })
+  const sc = (activity: string, date?: string, scanType = 'UD') => ({ scanType, activity, date: date ?? null })
 
   it('PP + picked-up scan → picked_up (scan beats ambiguous top)', () => {
     expect(resolveShipmentStatus('PP', [sc('Shipment picked up', '2026-07-18')])).toBe('picked_up')
@@ -374,24 +384,30 @@ describe('resolveShipmentStatus — ambiguous top-level codes', () => {
 
 describe('resolveShipmentStatus — scan ordering without dates', () => {
   it('later index wins when no dates available', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'UD', activity: 'In Transit', date: null },
-      { scanType: 'UD', activity: 'Out for delivery', date: null },
-    ])).toBe('out_for_delivery')
+    expect(
+      resolveShipmentStatus('UD', [
+        { scanType: 'UD', activity: 'In Transit', date: null },
+        { scanType: 'UD', activity: 'Out for delivery', date: null },
+      ])
+    ).toBe('out_for_delivery')
   })
 
   it('NDR at later index (no dates) beats earlier in_transit', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'UD', activity: 'In Transit', date: null },
-      { scanType: 'UD', activity: 'Undelivered', date: null },
-    ])).toBe('delivery_attempted')
+    expect(
+      resolveShipmentStatus('UD', [
+        { scanType: 'UD', activity: 'In Transit', date: null },
+        { scanType: 'UD', activity: 'Undelivered', date: null },
+      ])
+    ).toBe('delivery_attempted')
   })
 
   it('in_transit at later index beats earlier NDR (no dates)', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'UD', activity: 'Undelivered', date: null },
-      { scanType: 'UD', activity: 'In Transit', date: null },
-    ])).toBe('in_transit')
+    expect(
+      resolveShipmentStatus('UD', [
+        { scanType: 'UD', activity: 'Undelivered', date: null },
+        { scanType: 'UD', activity: 'In Transit', date: null },
+      ])
+    ).toBe('in_transit')
   })
 })
 
@@ -399,21 +415,19 @@ describe('resolveShipmentStatus — scan ordering without dates', () => {
 
 describe('resolveShipmentStatus — per-scan unambiguous scanType', () => {
   it('scan scanType=DL overrides ambiguous activity', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'DL', activity: 'Some unknown text', date: '2026-07-20' },
-    ])).toBe('delivered')
+    expect(resolveShipmentStatus('UD', [{ scanType: 'DL', activity: 'Some unknown text', date: '2026-07-20' }])).toBe(
+      'delivered'
+    )
   })
 
   it('scan scanType=PU → picked_up', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'PU', activity: '', date: '2026-07-16' },
-    ])).toBe('picked_up')
+    expect(resolveShipmentStatus('UD', [{ scanType: 'PU', activity: '', date: '2026-07-16' }])).toBe('picked_up')
   })
 
   it('ambiguous scan scanType=NDR resolved from activity', () => {
-    expect(resolveShipmentStatus('UD', [
-      { scanType: 'NDR', activity: 'out for delivery', date: '2026-07-18' },
-    ])).toBe('out_for_delivery')
+    expect(resolveShipmentStatus('UD', [{ scanType: 'NDR', activity: 'out for delivery', date: '2026-07-18' }])).toBe(
+      'out_for_delivery'
+    )
   })
 })
 

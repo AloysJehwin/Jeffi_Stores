@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runMigrationFanout } from '@/lib/tenant-migrations'
+import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 export const dynamic = 'force-dynamic'
 // The fan-out opens a connection per tenant and applies the full schema to each.
@@ -15,13 +16,11 @@ export const maxDuration = 300
 // Safe to call repeatedly — runMigrationFanout skips any tenant already recorded against this
 // gitSha, and the schema itself is now re-appliable (see tenant-migrations-schema.ts).
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (!verifyCronRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await request.json().catch(() => ({} as { gitSha?: string }))
+  const body = await request.json().catch(() => ({}) as { gitSha?: string })
   const gitSha = body.gitSha || process.env.GIT_SHA || `manual-${Date.now()}`
 
   const result = await runMigrationFanout(gitSha)

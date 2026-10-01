@@ -1,18 +1,18 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: vi.fn(),
 }))
 
 import { runScenario, runScenarioForAllCampaigns } from '@/lib/campaigns/runner'
-import { query } from '@/lib/db'
-import { getCampaign } from '@/lib/marketing'
+import { query } from '@/lib/shared/db'
+import { getCampaign } from '@/lib/shared/marketing'
 
 const mockQuery = query as ReturnType<typeof vi.fn>
 const mockGetCampaign = getCampaign as ReturnType<typeof vi.fn>
@@ -76,7 +76,8 @@ describe('runScenario', () => {
   it('counts sent and skipped correctly', async () => {
     mockGetCampaign.mockResolvedValue(makeCampaign())
     const rows = [{ id: '1' }, { id: '2' }, { id: '3' }]
-    const sendFn = vi.fn()
+    const sendFn = vi
+      .fn()
       .mockResolvedValueOnce({ ok: true })
       .mockResolvedValueOnce({ ok: false, reason: 'no_user' })
       .mockResolvedValueOnce({ ok: true })
@@ -91,10 +92,9 @@ describe('runScenario', () => {
     mockGetCampaign.mockResolvedValue(makeCampaign())
     const scenario = makeScenario({ findEligible: vi.fn().mockResolvedValue([{ id: '1' }]) })
     await runScenario(scenario, 'abandoned_checkout')
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE campaigns SET last_run_at'),
-      ['abandoned_checkout']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE campaigns SET last_run_at'), [
+      'abandoned_checkout',
+    ])
   })
 
   it('does not update last_run_at when no rows attempted', async () => {
@@ -151,9 +151,6 @@ describe('runScenarioForAllCampaigns', () => {
     mockQuery.mockResolvedValue({ rows: [] })
     const scenario = makeScenario({ kind: 'winback_90' })
     await runScenarioForAllCampaigns(scenario)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('scenario_kind = $1'),
-      ['winback_90']
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('scenario_kind = $1'), ['winback_90'])
   })
 })

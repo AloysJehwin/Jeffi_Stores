@@ -8,24 +8,24 @@ process.env.RAZORPAYX_KEY_SECRET = 'rzp_secret'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, query } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -38,7 +38,7 @@ let POST: (req: NextRequest) => Promise<Response>
 
 beforeAll(async () => {
   // Import after env vars are set so module-level RZP_KEY/SECRET constants are captured
-  const mod = await import('@/app/api/admin/financial/payables/sync-payouts/route')
+  const mod = await import('@/app/api/(admin)/admin/financial/payables/sync-payouts/route')
   POST = mod.POST
 })
 
@@ -103,9 +103,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
   it('skips payout when RZP fetch fails', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany.mockResolvedValueOnce([
-      { id: 'ep-1', payout_id: 'pout_bad', expense_id: 'exp-1' },
-    ])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'ep-1', payout_id: 'pout_bad', expense_id: 'exp-1' }])
     mockFetch.mockResolvedValue({ ok: false } as any)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
@@ -116,9 +114,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
   it('handles non-terminal status without updating expense', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockQueryMany.mockResolvedValueOnce([
-      { id: 'ep-1', payout_id: 'pout_1', expense_id: 'exp-1' },
-    ])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'ep-1', payout_id: 'pout_1', expense_id: 'exp-1' }])
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockFetch.mockResolvedValue({
       ok: true,
@@ -146,10 +142,7 @@ describe('POST /api/admin/financial/payables/sync-payouts', () => {
     } as any)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE expenses'),
-      expect.arrayContaining(['paid'])
-    )
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE expenses'), expect.arrayContaining(['paid']))
   })
 
   it('marks expense as partial when partially paid', async () => {

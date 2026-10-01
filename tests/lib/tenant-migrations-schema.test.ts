@@ -112,21 +112,30 @@ describe('buildTenantSchemaSql — column reconcile on existing tables', () => {
   })
 })
 
-
 describe('buildTenantSchemaSql — column reconciliation ordering', () => {
-  const firstIndex = (re: RegExp) => { const m = re.exec(sql); return m ? m.index : -1 }
+  const firstIndex = (re: RegExp) => {
+    const m = re.exec(sql)
+    return m ? m.index : -1
+  }
 
   it('adds every declared column right after its CREATE TABLE, before any constraint or index on it', () => {
-    const tables = [...new Set([...sql.matchAll(/ALTER TABLE (public\.[a-z0-9_]+) ADD COLUMN IF NOT EXISTS/g)].map(m => m[1]))]
+    const tables = [
+      ...new Set([...sql.matchAll(/ALTER TABLE (public\.[a-z0-9_]+) ADD COLUMN IF NOT EXISTS/g)].map(m => m[1])),
+    ]
     expect(tables.length).toBeGreaterThan(50)
     for (const table of tables) {
       const bare = table.replace('public.', '')
       const addCol = firstIndex(new RegExp(`ALTER TABLE ${table.replace('.', '\\.')} ADD COLUMN IF NOT EXISTS`))
       const create = firstIndex(new RegExp(`CREATE TABLE IF NOT EXISTS ${table.replace('.', '\\.')}\\s*\\(`))
       expect(addCol, table).toBeGreaterThan(create)
-      const firstConstraint = firstIndex(new RegExp(`ALTER TABLE (ONLY )?${table.replace('.', '\\.')}\\s+ADD CONSTRAINT`))
-      const firstIdx = firstIndex(new RegExp(`CREATE (UNIQUE )?INDEX IF NOT EXISTS [a-z0-9_]+ ON ${table.replace('.', '\\.')}`))
-      if (firstConstraint !== -1) expect(addCol, `${bare} constraint before column reconciliation`).toBeLessThan(firstConstraint)
+      const firstConstraint = firstIndex(
+        new RegExp(`ALTER TABLE (ONLY )?${table.replace('.', '\\.')}\\s+ADD CONSTRAINT`)
+      )
+      const firstIdx = firstIndex(
+        new RegExp(`CREATE (UNIQUE )?INDEX IF NOT EXISTS [a-z0-9_]+ ON ${table.replace('.', '\\.')}`)
+      )
+      if (firstConstraint !== -1)
+        expect(addCol, `${bare} constraint before column reconciliation`).toBeLessThan(firstConstraint)
       if (firstIdx !== -1) expect(addCol, `${bare} index before column reconciliation`).toBeLessThan(firstIdx)
     }
   })
@@ -145,7 +154,10 @@ describe('buildTenantSchemaSql — column reconciliation ordering', () => {
   })
 
   it('drops and re-adds CHECK constraints so a changed rule lands, while PRIMARY KEYs keep the existence guard', () => {
-    const block = sql.slice(sql.indexOf('DROP CONSTRAINT IF EXISTS customer_notes_source_check'), sql.indexOf('ADD CONSTRAINT customer_notes_source_check'))
+    const block = sql.slice(
+      sql.indexOf('DROP CONSTRAINT IF EXISTS customer_notes_source_check'),
+      sql.indexOf('ADD CONSTRAINT customer_notes_source_check')
+    )
     expect(block.length).toBeGreaterThan(0)
     expect(block.length).toBeLessThan(200)
     expect(sql).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM pg_constraint WHERE conname = 'customer_notes_pkey'/)

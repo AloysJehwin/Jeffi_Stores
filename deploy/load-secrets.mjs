@@ -26,10 +26,7 @@
  * the app reads it (so SM values written to .env.local act as defaults).
  */
 
-import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from '@aws-sdk/client-secrets-manager'
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
 import { writeFileSync, existsSync, readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -40,8 +37,8 @@ const REPO_ROOT = resolve(__dirname, '..')
 const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
 const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
 const SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
-const REGION    = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
-const FALLBACK  = process.env.ALLOW_ENV_FALLBACK === 'true'
+const REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
+const FALLBACK = process.env.ALLOW_ENV_FALLBACK === 'true'
 
 async function loadSecrets() {
   const client = new SecretsManagerClient({ region: REGION })
@@ -62,7 +59,10 @@ async function loadSecrets() {
 
   if (!secretString) {
     const msg = `[load-secrets] Secret "${SECRET_ID}" exists but SecretString is empty`
-    if (FALLBACK) { process.stderr.write(`${msg} — continuing\n`); return }
+    if (FALLBACK) {
+      process.stderr.write(`${msg} — continuing\n`)
+      return
+    }
     process.stderr.write(`${msg}\n`)
     process.exit(1)
   }
@@ -91,10 +91,14 @@ async function loadSecrets() {
   }
 
   // PROD: inject into process.env (same process as the app).
-  let loaded = 0, skipped = 0
+  let loaded = 0,
+    skipped = 0
   for (const [key, value] of Object.entries(secrets)) {
     if (typeof value !== 'string') continue
-    if (process.env[key] !== undefined) { skipped++; continue }
+    if (process.env[key] !== undefined) {
+      skipped++
+      continue
+    }
     process.env[key] = value
     loaded++
   }

@@ -37,7 +37,7 @@ describe('skeleton fallback contract', () => {
       expect(src).toContain('blurhash')
       expect(src).toContain('img-shimmer')
       // the blurhash branch must be conditional on a truthy hash
-      expect(src).toMatch(/blurhash\s*\n?\s*\?\s*<BlurhashCanvas/)
+      expect(src).toMatch(/blurhash\s*\?\s*\(?\s*<BlurhashCanvas/)
     })
 
     it(`${name} still resolves loading state on error`, () => {

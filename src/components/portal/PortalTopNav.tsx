@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { storeHostForHost } from '@/lib/forms-host'
+import { storeHostForHost } from '@/lib/tenancy/forms-host'
 
 export function storeUrlFrom(web: string): string {
   const trimmed = web.trim()

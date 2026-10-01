@@ -9,7 +9,7 @@ const { mockCreateSign } = vi.hoisted(() => ({
 }))
 
 // ---- mock db ----
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 // ---- mock google-merchant-helpers (used by google-sheets) ----
-vi.mock('@/lib/google-merchant-helpers', () => ({
+vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   getGoogleProductCategory: vi.fn().mockReturnValue('Hardware'),
   buildProductType: vi.fn().mockReturnValue('Tools > Hand Tools'),
   buildProductHighlights: vi.fn().mockReturnValue(['Made of Steel']),
@@ -26,7 +26,7 @@ vi.mock('@/lib/google-merchant-helpers', () => ({
 }))
 
 // ---- mock crypto — must use vi.hoisted variable so createSign is intercepted before module loads ----
-vi.mock('crypto', async (importOriginal) => {
+vi.mock('crypto', async importOriginal => {
   const actual = await importOriginal<typeof import('crypto')>()
   return {
     ...actual,
@@ -39,7 +39,13 @@ vi.mock('crypto', async (importOriginal) => {
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { getGoogleProductCategory, buildProductType, buildProductHighlights, buildProductDetails, buildCustomLabels } from '@/lib/google-merchant-helpers'
+import {
+  getGoogleProductCategory,
+  buildProductType,
+  buildProductHighlights,
+  buildProductDetails,
+  buildCustomLabels,
+} from '@/lib/shared/google-merchant-helpers'
 
 const mockGetGoogleProductCategory = vi.mocked(getGoogleProductCategory)
 const mockBuildProductType = vi.mocked(buildProductType)
@@ -47,8 +53,8 @@ const mockBuildProductHighlights = vi.mocked(buildProductHighlights)
 const mockBuildProductDetails = vi.mocked(buildProductDetails)
 const mockBuildCustomLabels = vi.mocked(buildCustomLabels)
 
-import { syncAllProductsToSheet, syncProductToSheet } from '@/lib/google-sheets'
-import { queryMany, queryOne } from '@/lib/db'
+import { syncAllProductsToSheet, syncProductToSheet } from '@/lib/shared/google-sheets'
+import { queryMany, queryOne } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)
@@ -99,7 +105,13 @@ const baseProduct = {
   material: 'Steel',
   product_images: [{ id: 'img1', image_url: 'https://cdn.example.com/bolt.jpg', is_primary: true, display_order: 0 }],
   product_variants: [],
-  categories: { id: 'cat1', name: 'Fasteners', google_product_category: '1167', parent_name: 'Hardware', parent_google_product_category: '632' },
+  categories: {
+    id: 'cat1',
+    name: 'Fasteners',
+    google_product_category: '1167',
+    parent_name: 'Hardware',
+    parent_google_product_category: '632',
+  },
   brands: { id: 'b1', name: 'Unbrako' },
 }
 
@@ -133,7 +145,8 @@ beforeEach(() => {
   mockBuildCustomLabels.mockReturnValue(['Bolts', '100-500', 'Unbrako', 'in-stock', 'standard'])
   process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
     client_email: 'test@project.iam.gserviceaccount.com',
-    private_key: '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0Z3VS5JJcds3xHn/ygWep4PAtEsHAGQmFjBCOB0RPIP2jqNV\n-----END RSA PRIVATE KEY-----',
+    private_key:
+      '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0Z3VS5JJcds3xHn/ygWep4PAtEsHAGQmFjBCOB0RPIP2jqNV\n-----END RSA PRIVATE KEY-----',
   })
   // Route by URL: OAuth calls always get a token; sheet API calls consume
   // from sheetResponseQueue in order; unknown calls get a safe fallback.
@@ -181,15 +194,9 @@ describe('syncAllProductsToSheet', () => {
   })
 
   it('updates rows when data has changed', async () => {
-    const existingRows = [
-      Array(38).fill(''),
-      ['BOLT-M6', ...Array(37).fill('')],
-    ]
+    const existingRows = [Array(38).fill(''), ['BOLT-M6', ...Array(37).fill('')]]
     mockQueryMany.mockResolvedValue([baseProduct])
-    sheetResponseQueue.push(
-      () => mockSheetWithRows(existingRows),
-      mockBatchUpdateResponse,
-    )
+    sheetResponseQueue.push(() => mockSheetWithRows(existingRows), mockBatchUpdateResponse)
 
     const result = await syncAllProductsToSheet()
     expect(result.updated).toBe(1)
@@ -280,10 +287,7 @@ describe('syncProductToSheet', () => {
 
   it('appends new rows for active product when no existing SKU rows', async () => {
     mockQueryOne.mockResolvedValue(baseProduct)
-    sheetResponseQueue.push(
-      () => ({ ok: true, json: vi.fn().mockResolvedValue({ values: [] }) }),
-      mockAppendResponse,
-    )
+    sheetResponseQueue.push(() => ({ ok: true, json: vi.fn().mockResolvedValue({ values: [] }) }), mockAppendResponse)
 
     await expect(syncProductToSheet('p1')).resolves.toBeUndefined()
   })
@@ -291,9 +295,7 @@ describe('syncProductToSheet', () => {
   it('does not append rows when product has no rows (variants with null price)', async () => {
     const varProduct = {
       ...baseVariantProduct,
-      product_variants: [
-        { sku: 'V1', variant_name: 'V1', price: null, mrp: null, stock_status: 'In Stock' },
-      ],
+      product_variants: [{ sku: 'V1', variant_name: 'V1', price: null, mrp: null, stock_status: 'In Stock' }],
     }
     mockQueryOne.mockResolvedValue(varProduct)
     sheetResponseQueue.push(() => ({ ok: true, json: vi.fn().mockResolvedValue({ values: [] }) }))
@@ -313,7 +315,7 @@ describe('syncProductToSheet', () => {
     // removeProductFromSheet calls: fetch SKU column, then (if rows) batchUpdate
     sheetResponseQueue.push(
       () => ({ ok: true, json: vi.fn().mockResolvedValue({ values: [['header'], ['BOLT-M6'], ['BOLT-M6-VAR']] }) }),
-      mockBatchUpdateResponse,
+      mockBatchUpdateResponse
     )
 
     await expect(syncProductToSheet('p1')).resolves.toBeUndefined()
@@ -333,7 +335,7 @@ describe('syncProductToSheet', () => {
     sheetResponseQueue.push(
       () => ({ ok: true, json: vi.fn().mockResolvedValue({ values: [['header'], ['BOLT-M6']] }) }),
       mockBatchUpdateResponse, // delete rows
-      mockAppendResponse,      // append new rows
+      mockAppendResponse // append new rows
     )
 
     await expect(syncProductToSheet('p1')).resolves.toBeUndefined()
@@ -352,7 +354,7 @@ describe('syncProductToSheet', () => {
         }),
       }),
       mockBatchUpdateResponse, // delete rows
-      mockAppendResponse,      // append new rows
+      mockAppendResponse // append new rows
     )
 
     await expect(syncProductToSheet('p1')).resolves.toBeUndefined()
@@ -367,10 +369,14 @@ describe('loadCredentials (fs fallback)', () => {
     delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON
 
     // Mock fs and path via require (loadCredentials uses require internally)
-    const fsMock = { readFileSync: vi.fn().mockReturnValue(JSON.stringify({
-      client_email: 'fs@project.iam.gserviceaccount.com',
-      private_key: '-----BEGIN RSA PRIVATE KEY-----\nMIIFakeKey\n-----END RSA PRIVATE KEY-----',
-    })) }
+    const fsMock = {
+      readFileSync: vi.fn().mockReturnValue(
+        JSON.stringify({
+          client_email: 'fs@project.iam.gserviceaccount.com',
+          private_key: '-----BEGIN RSA PRIVATE KEY-----\nMIIFakeKey\n-----END RSA PRIVATE KEY-----',
+        })
+      ),
+    }
     vi.doMock('fs', () => fsMock)
     vi.doMock('path', () => ({ join: vi.fn().mockReturnValue('/fake/path/creds.json') }))
 
@@ -402,9 +408,7 @@ describe('getAccessToken cache', () => {
     sheetResponseQueue.push(mockEmptySheetResponse)
     await syncAllProductsToSheet()
 
-    const oauthCallsAfterFirst = mockFetch.mock.calls.filter(c =>
-      String(c[0]).includes('oauth2.googleapis.com')
-    ).length
+    const oauthCallsAfterFirst = mockFetch.mock.calls.filter(c => String(c[0]).includes('oauth2.googleapis.com')).length
 
     // Second call: should use cache, no new OAuth call
     mockQueryMany.mockResolvedValue([])
@@ -571,9 +575,7 @@ describe('productToSheetRows — variant mrp fallbacks', () => {
     const varNoMrp = {
       ...baseVariantProduct,
       mrp: 30,
-      product_variants: [
-        { sku: 'VAR-NOMRP', variant_name: 'NoMRP', price: 25, mrp: null, stock_status: 'In Stock' },
-      ],
+      product_variants: [{ sku: 'VAR-NOMRP', variant_name: 'NoMRP', price: 25, mrp: null, stock_status: 'In Stock' }],
     }
     mockQueryMany.mockResolvedValue([varNoMrp])
     sheetResponseQueue.push(mockEmptySheetResponse, mockAppendResponse)
@@ -586,9 +588,7 @@ describe('productToSheetRows — variant mrp fallbacks', () => {
     const varNoMrpNoProdMrp = {
       ...baseVariantProduct,
       mrp: null,
-      product_variants: [
-        { sku: 'VAR-NOMRP2', variant_name: 'NoMRP2', price: 18, mrp: null, stock_status: 'In Stock' },
-      ],
+      product_variants: [{ sku: 'VAR-NOMRP2', variant_name: 'NoMRP2', price: 18, mrp: null, stock_status: 'In Stock' }],
     }
     mockQueryMany.mockResolvedValue([varNoMrpNoProdMrp])
     sheetResponseQueue.push(mockEmptySheetResponse, mockAppendResponse)

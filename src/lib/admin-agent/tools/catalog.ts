@@ -1,26 +1,39 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
 import type { ToolDef } from '../tools'
 import { ok } from '../tool-envelope'
 
-function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
 
 function slugify(s: string) {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 }
 
 const FEATURED_LIMIT = 6
 
 const UPDATABLE_PRODUCT_FIELDS = [
-  'name', 'base_price', 'short_description', 'is_featured', 'is_active',
-  'brand_id', 'category_id', 'gst_percentage',
+  'name',
+  'base_price',
+  'short_description',
+  'is_featured',
+  'is_active',
+  'brand_id',
+  'category_id',
+  'gst_percentage',
 ] as const
-type UpdatableField = typeof UPDATABLE_PRODUCT_FIELDS[number]
+type UpdatableField = (typeof UPDATABLE_PRODUCT_FIELDS)[number]
 
 export const CATALOG_TOOLS: ToolDef[] = [
   {
     name: 'list_featured_products',
-    description: 'List products currently flagged as is_featured = TRUE. Returns the same shape as search_products (id, name, sku, price, stock with variant rollup, image_url) so you can drop the result straight into a product_grid ui_block. Use this whenever the admin asks "show me featured products" / "what is currently featured" / "list featured items".',
+    description:
+      'List products currently flagged as is_featured = TRUE. Returns the same shape as search_products (id, name, sku, price, stock with variant rollup, image_url) so you can drop the result straight into a product_grid ui_block. Use this whenever the admin asks "show me featured products" / "what is currently featured" / "list featured items".',
     inputSchema: {
       type: 'object',
       properties: {
@@ -32,7 +45,17 @@ export const CATALOG_TOOLS: ToolDef[] = [
     handler: async ({ activeOnly, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 12, 1, 50)
       const onlyActive = activeOnly !== false
-      const rows = await queryMany<{ id: string; name: string; slug: string | null; sku: string | null; price: number; stock: number; image_url: string | null; brand: string | null; category: string | null }>(
+      const rows = await queryMany<{
+        id: string
+        name: string
+        slug: string | null
+        sku: string | null
+        price: number
+        stock: number
+        image_url: string | null
+        brand: string | null
+        category: string | null
+      }>(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS price,
                 ${EFFECTIVE_STOCK_SQL}::int AS stock,
@@ -48,9 +71,10 @@ export const CATALOG_TOOLS: ToolDef[] = [
       )
       const inStock = rows.filter(r => Number(r.stock) > 0).length
       return ok({
-        summary: rows.length === 0
-          ? 'No products are currently featured.'
-          : `${rows.length} featured product${rows.length === 1 ? '' : 's'} (${inStock} in stock${inStock !== rows.length ? `, ${rows.length - inStock} out` : ''}).`,
+        summary:
+          rows.length === 0
+            ? 'No products are currently featured.'
+            : `${rows.length} featured product${rows.length === 1 ? '' : 's'} (${inStock} in stock${inStock !== rows.length ? `, ${rows.length - inStock} out` : ''}).`,
         count: rows.length,
         data: { products: rows },
         displayHints: { primaryField: 'name', itemNoun: 'product' },
@@ -200,7 +224,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
   },
   {
     name: 'get_product_full',
-    description: 'Full product detail with all variants, sub-variants, and images. Use this (vs get_product) when you need the complete picture for editing or audits.',
+    description:
+      'Full product detail with all variants, sub-variants, and images. Use this (vs get_product) when you need the complete picture for editing or audits.',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' } },
@@ -249,7 +274,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
 
   {
     name: 'propose_create_product',
-    description: 'Propose creating a new product. Admin must approve. SKU must be unique. brandId / categoryId optional but recommended.',
+    description:
+      'Propose creating a new product. Admin must approve. SKU must be unique. brandId / categoryId optional but recommended.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -265,7 +291,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       required: ['name', 'sku', 'basePrice'],
     },
     mutating: true,
-    handler: async (input) => {
+    handler: async input => {
       const name = String(input.name || '').trim()
       const sku = String(input.sku || '').trim()
       const basePrice = Number(input.basePrice)
@@ -280,12 +306,15 @@ export const CATALOG_TOOLS: ToolDef[] = [
 
       const slug = slugify(name) + '-' + Date.now().toString(36)
       const existing = await queryOne<{ id: string; name: string }>(
-        `SELECT id::text, name FROM products WHERE sku = $1 LIMIT 1`, [sku]
+        `SELECT id::text, name FROM products WHERE sku = $1 LIMIT 1`,
+        [sku]
       )
-      const brand = brandId ? await queryOne<{ name: string }>(
-        `SELECT name FROM brands WHERE id = $1::uuid`, [brandId]) : null
-      const cat = categoryId ? await queryOne<{ name: string }>(
-        `SELECT name FROM categories WHERE id = $1::uuid`, [categoryId]) : null
+      const brand = brandId
+        ? await queryOne<{ name: string }>(`SELECT name FROM brands WHERE id = $1::uuid`, [brandId])
+        : null
+      const cat = categoryId
+        ? await queryOne<{ name: string }>(`SELECT name FROM categories WHERE id = $1::uuid`, [categoryId])
+        : null
       if (brandId && !brand) throw new Error(`Brand not found: ${brandId}`)
       if (categoryId && !cat) throw new Error(`Category not found: ${categoryId}`)
 
@@ -307,7 +336,9 @@ export const CATALOG_TOOLS: ToolDef[] = [
       ]
       if (existing) {
         ui_blocks.push({
-          type: 'callout', tone: 'warn', title: 'SKU already exists',
+          type: 'callout',
+          tone: 'warn',
+          title: 'SKU already exists',
           message: `SKU "${sku}" is already used by "${existing.name}". Insert will fail unless you change the SKU.`,
         })
       }
@@ -315,7 +346,17 @@ export const CATALOG_TOOLS: ToolDef[] = [
       return {
         proposed: true,
         kind: 'create_product',
-        payload: { name, sku, slug, basePrice, brandId, categoryId, shortDescription: shortDesc, weightGrams: weight, gstPercentage: gst },
+        payload: {
+          name,
+          sku,
+          slug,
+          basePrice,
+          brandId,
+          categoryId,
+          shortDescription: shortDesc,
+          weightGrams: weight,
+          gstPercentage: gst,
+        },
         confirmation: `Create product "${name}" (SKU ${sku}) at ₹${basePrice.toFixed(2)}?`,
         ui_blocks,
       }
@@ -323,7 +364,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_update_product',
-    description: 'Propose a partial product update. fields may include name, base_price, short_description, is_featured, is_active, brand_id, category_id, gst_percentage.',
+    description:
+      'Propose a partial product update. fields may include name, base_price, short_description, is_featured, is_active, brand_id, category_id, gst_percentage.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -335,7 +377,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
     mutating: true,
     handler: async ({ productId, fields }) => {
       const id = String(productId || '')
-      const incoming = (fields && typeof fields === 'object') ? fields as Record<string, unknown> : {}
+      const incoming = fields && typeof fields === 'object' ? (fields as Record<string, unknown>) : {}
       const product = await queryOne<any>(
         `SELECT p.id::text, p.name, p.base_price::text, p.short_description, p.is_featured, p.is_active,
                 p.brand_id::text, p.category_id::text, p.gst_percentage::text,
@@ -356,9 +398,12 @@ export const CATALOG_TOOLS: ToolDef[] = [
         const after = newVal == null ? '—' : String(newVal)
         if (before === after) continue
         if (k === 'name' && (!String(newVal).trim() || String(newVal).length > 255)) throw new Error('name 1-255 chars')
-        if (k === 'base_price' && (!Number.isFinite(Number(newVal)) || Number(newVal) < 0)) throw new Error('base_price ≥ 0')
-        if (k === 'short_description' && newVal != null && String(newVal).length > 500) throw new Error('short_description max 500')
-        if (k === 'gst_percentage' && (!Number.isFinite(Number(newVal)) || Number(newVal) < 0 || Number(newVal) > 50)) throw new Error('gst_percentage 0-50')
+        if (k === 'base_price' && (!Number.isFinite(Number(newVal)) || Number(newVal) < 0))
+          throw new Error('base_price ≥ 0')
+        if (k === 'short_description' && newVal != null && String(newVal).length > 500)
+          throw new Error('short_description max 500')
+        if (k === 'gst_percentage' && (!Number.isFinite(Number(newVal)) || Number(newVal) < 0 || Number(newVal) > 50))
+          throw new Error('gst_percentage 0-50')
         if (k === 'brand_id' && newVal) {
           const ok = await queryOne(`SELECT 1 FROM brands WHERE id = $1::uuid`, [String(newVal)])
           if (!ok) throw new Error(`Brand not found: ${newVal}`)
@@ -369,7 +414,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
         }
         changes.push({ field: k, before, after, rawAfter: newVal })
       }
-      if (changes.length === 0) return { proposed: false, info: 'No changes — provided fields match the current values.' }
+      if (changes.length === 0)
+        return { proposed: false, info: 'No changes — provided fields match the current values.' }
 
       const ui_blocks: any[] = [
         { type: 'heading', value: `Update "${product.name}"`, level: 2 },
@@ -382,7 +428,9 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const flippingInactive = changes.find(c => c.field === 'is_active' && String(c.rawAfter) === 'false')
       if (flippingInactive) {
         ui_blocks.push({
-          type: 'callout', tone: 'warn', title: 'Product will be hidden',
+          type: 'callout',
+          tone: 'warn',
+          title: 'Product will be hidden',
           message: 'is_active=false soft-deletes this product — it will disappear from storefront listings and search.',
         })
       }
@@ -390,7 +438,11 @@ export const CATALOG_TOOLS: ToolDef[] = [
       return {
         proposed: true,
         kind: 'update_product',
-        payload: { productId: id, productName: product.name, changes: Object.fromEntries(changes.map(c => [c.field, c.rawAfter])) },
+        payload: {
+          productId: id,
+          productName: product.name,
+          changes: Object.fromEntries(changes.map(c => [c.field, c.rawAfter])),
+        },
         confirmation: `Update ${changes.length} field${changes.length === 1 ? '' : 's'} on "${product.name}"?`,
         ui_blocks,
       }
@@ -398,7 +450,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_adjust_inventory',
-    description: 'Propose an inventory adjustment for a product. delta is a signed integer (negative = write-down). Logged in inventory_transactions.',
+    description:
+      'Propose an inventory adjustment for a product. delta is a signed integer (negative = write-down). Logged in inventory_transactions.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -417,7 +470,13 @@ export const CATALOG_TOOLS: ToolDef[] = [
       if (Math.abs(d) > 100000) throw new Error('delta too large (|delta| ≤ 100000)')
       if (!note || note.length > 200) throw new Error('reason required, max 200 chars')
 
-      const p = await queryOne<{ id: string; name: string; sku: string; inventory_quantity: number; has_variants: boolean }>(
+      const p = await queryOne<{
+        id: string
+        name: string
+        sku: string
+        inventory_quantity: number
+        has_variants: boolean
+      }>(
         `SELECT id::text, name, sku, inventory_quantity, has_variants
            FROM products WHERE id = $1::uuid LIMIT 1`,
         [id]
@@ -441,13 +500,17 @@ export const CATALOG_TOOLS: ToolDef[] = [
       ]
       if (newStock < 0) {
         ui_blocks.push({
-          type: 'callout', tone: 'error', title: 'Negative stock',
+          type: 'callout',
+          tone: 'error',
+          title: 'Negative stock',
           message: `New stock would be ${newStock}. Inventory cannot be negative; lower the |delta| or add stock first.`,
         })
       }
       if (p.has_variants) {
         ui_blocks.push({
-          type: 'callout', tone: 'info', title: 'Product has variants',
+          type: 'callout',
+          tone: 'info',
+          title: 'Product has variants',
           message: 'This adjusts the parent product row only. Variant-level stock is not changed.',
         })
       }
@@ -484,9 +547,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       if (p.is_featured === target) {
         return { proposed: false, info: `"${p.name}" is already ${target ? 'featured' : 'not featured'}.` }
       }
-      const cur = await queryOne<{ n: number }>(
-        `SELECT COUNT(*)::int AS n FROM products WHERE is_featured = TRUE`
-      )
+      const cur = await queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM products WHERE is_featured = TRUE`)
       const currentCount = cur?.n || 0
       const projectedCount = target ? currentCount + 1 : currentCount - 1
 
@@ -504,7 +565,9 @@ export const CATALOG_TOOLS: ToolDef[] = [
       ]
       if (target && currentCount >= FEATURED_LIMIT) {
         ui_blocks.push({
-          type: 'callout', tone: 'error', title: 'Featured limit reached',
+          type: 'callout',
+          tone: 'error',
+          title: 'Featured limit reached',
           message: `Already ${currentCount} of ${FEATURED_LIMIT} featured products. Unfeature one before adding "${p.name}".`,
         })
       }
@@ -555,7 +618,9 @@ export const CATALOG_TOOLS: ToolDef[] = [
       ]
       if (conflict) {
         ui_blocks.push({
-          type: 'callout', tone: 'warn', title: 'Possible duplicate',
+          type: 'callout',
+          tone: 'warn',
+          title: 'Possible duplicate',
           message: `Brand "${conflict.name}" already exists with the same slug or name.`,
         })
       }
@@ -599,7 +664,8 @@ export const CATALOG_TOOLS: ToolDef[] = [
         pathLabel = `${parent.parent_name ? parent.parent_name + ' / ' : ''}${parent.name} / ${n}`
       }
       const conflict = await queryOne<{ id: string; name: string }>(
-        `SELECT id::text, name FROM categories WHERE slug = $1 LIMIT 1`, [s]
+        `SELECT id::text, name FROM categories WHERE slug = $1 LIMIT 1`,
+        [s]
       )
       const ui_blocks: any[] = [
         { type: 'heading', value: `Create category: ${n}`, level: 2 },
@@ -615,7 +681,9 @@ export const CATALOG_TOOLS: ToolDef[] = [
       ]
       if (conflict) {
         ui_blocks.push({
-          type: 'callout', tone: 'warn', title: 'Slug already in use',
+          type: 'callout',
+          tone: 'warn',
+          title: 'Slug already in use',
           message: `Category "${conflict.name}" already uses slug "${s}". Insert will fail.`,
         })
       }

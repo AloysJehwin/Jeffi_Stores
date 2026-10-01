@@ -7,18 +7,21 @@ const { mockQuery, mockQueryOne, mockGetTenantPlan, mockPool } = vi.hoisted(() =
   mockPool: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({ query: mockQuery, queryOne: mockQueryOne }))
-vi.mock('@/lib/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
+vi.mock('@/lib/shared/db', () => ({ query: mockQuery, queryOne: mockQueryOne }))
+vi.mock('@/lib/auth/plan-gate', () => ({ getTenantPlan: mockGetTenantPlan }))
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: mockPool }) }))
-vi.mock('@/lib/tenant-ca', () => ({
+vi.mock('@/lib/tenancy/tenant-ca', () => ({
   issueTenantAdminCert: vi.fn().mockResolvedValue({
-    serial: 'AB', p12Buffer: Buffer.from(''), p12Password: 'x', expiresAt: new Date(),
+    serial: 'AB',
+    p12Buffer: Buffer.from(''),
+    p12Password: 'x',
+    expiresAt: new Date(),
   }),
 }))
 vi.mock('@/lib/email', () => ({ sendAdminCertificateEmail: vi.fn() }))
 
-import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
-import { TENANT_SCOPE_KEYS } from '@/lib/scopes'
+import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
+import { TENANT_SCOPE_KEYS } from '@/lib/auth/scopes'
 
 const BASIC = new Set(['products:read', 'products:write', 'orders:read', 'dashboard:read'])
 
@@ -32,14 +35,25 @@ describe('an owner is provisioned with the scopes their plan sells', () => {
   beforeEach(() => {
     mockQueryOne.mockReset()
     mockQueryOne.mockResolvedValue({ id: 'row-1' })
-    mockQueryOne.mockResolvedValueOnce(null)          // no existing super_admin
+    mockQueryOne.mockResolvedValueOnce(null) // no existing super_admin
     mockGetTenantPlan.mockReset()
     mockPool.mockReset()
-    mockPool.mockResolvedValue({ rows: [{
-      id: 't-1', slug: 'acme', display_name: 'Acme', plan: 'basic',
-      rds_endpoint: 'ep', rds_db: 'jeffi_stores', rds_port: 5432, iam_auth: true,
-      s3_bucket: 'b', region: 'us-east-1',
-    }] })
+    mockPool.mockResolvedValue({
+      rows: [
+        {
+          id: 't-1',
+          slug: 'acme',
+          display_name: 'Acme',
+          plan: 'basic',
+          rds_endpoint: 'ep',
+          rds_db: 'jeffi_stores',
+          rds_port: 5432,
+          iam_auth: true,
+          s3_bucket: 'b',
+          region: 'us-east-1',
+        },
+      ],
+    })
   })
 
   const opts = { tenantId: 't-1', tenantSlug: 'acme', ownerEmail: 'o@acme.test', ownerName: 'Owner' }
@@ -71,11 +85,22 @@ describe('a not-yet-ready tenant RDS self-heals', () => {
     mockGetTenantPlan.mockReset()
     mockGetTenantPlan.mockResolvedValue({ plan: 'basic', scopes: BASIC })
     mockPool.mockReset()
-    mockPool.mockResolvedValue({ rows: [{
-      id: 't-1', slug: 'acme', display_name: 'Acme', plan: 'basic',
-      rds_endpoint: 'ep', rds_db: 'jeffi_stores', rds_port: 5432, iam_auth: true,
-      s3_bucket: 'b', region: 'us-east-1',
-    }] })
+    mockPool.mockResolvedValue({
+      rows: [
+        {
+          id: 't-1',
+          slug: 'acme',
+          display_name: 'Acme',
+          plan: 'basic',
+          rds_endpoint: 'ep',
+          rds_db: 'jeffi_stores',
+          rds_port: 5432,
+          iam_auth: true,
+          s3_bucket: 'b',
+          region: 'us-east-1',
+        },
+      ],
+    })
   })
 
   const opts = { tenantId: 't-1', tenantSlug: 'acme', ownerEmail: 'o@acme.test', ownerName: 'Owner' }

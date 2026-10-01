@@ -28,7 +28,7 @@ const meta = {
   publishInstagramCarousel: vi.fn(),
   publishInstagramReel: vi.fn(),
 }
-vi.mock('@/lib/meta', () => meta)
+vi.mock('@/lib/catalog/meta', () => meta)
 
 // Cipher seam — passthrough so we can assert the encrypted token was decrypted.
 const cipher = { decryptToken: vi.fn((s: string) => `dec:${s}`) }
@@ -36,7 +36,7 @@ vi.mock('@/lib/crypto/token-cipher', () => cipher)
 
 // DB/caption seams — the fixtures always carry a non-empty caption, so ensureCaption never
 // reaches these, but they're mocked anyway to keep the suite hermetic (no real pg.Pool/Ollama).
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/social/caption', () => ({ generateSocialCaption: vi.fn() }))
 
 function post(over: Partial<ScheduledSocialPost> = {}): ScheduledSocialPost {
@@ -104,10 +104,7 @@ describe('social/publisher — publishScheduledPost', () => {
     })
     const { publishScheduledPost } = await import('@/lib/social/publisher')
     await publishScheduledPost(post())
-    expect(reg.updateSocialPost.mock.calls[0]).toEqual([
-      'post-1',
-      { status: 'publishing', bumpAttempts: true },
-    ])
+    expect(reg.updateSocialPost.mock.calls[0]).toEqual(['post-1', { status: 'publishing', bumpAttempts: true }])
   })
 
   it('publishes an FB post and marks the row posted', async () => {
@@ -131,16 +128,14 @@ describe('social/publisher — publishScheduledPost', () => {
     await publishScheduledPost(post())
     expect(cipher.decryptToken).toHaveBeenCalledWith('ENC_TOK')
     expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: 'dec:ENC_TOK', pageId: 'PAGE_1' }),
+      expect.objectContaining({ accessToken: 'dec:ENC_TOK', pageId: 'PAGE_1' })
     )
   })
 
   it('fails an IG post when no IG account is connected', async () => {
     // An instagram-provider row exists but carries no ig_user_id, so creds resolve
     // yet the IG target is missing — the publisher must reject before calling Meta.
-    reg.getTenantSocialAccounts.mockResolvedValue([
-      account({ provider: 'instagram', ig_user_id: null }),
-    ])
+    reg.getTenantSocialAccounts.mockResolvedValue([account({ provider: 'instagram', ig_user_id: null })])
     const { publishScheduledPost } = await import('@/lib/social/publisher')
     const r = await publishScheduledPost(post({ platform: 'ig' }))
     expect(r.ok).toBe(false)
@@ -171,7 +166,7 @@ describe('social/publisher — publishScheduledPost', () => {
     expect(reg.getTenantSocialAccounts).not.toHaveBeenCalled()
     expect(cipher.decryptToken).not.toHaveBeenCalled()
     expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: 'JEFFI_TOK', pageId: 'JEFFI_PAGE' }),
+      expect.objectContaining({ accessToken: 'JEFFI_TOK', pageId: 'JEFFI_PAGE' })
     )
   })
 
@@ -190,7 +185,7 @@ describe('social/publisher — publishScheduledPost', () => {
     const r = await publishScheduledPost(post({ image_urls: ['https://cdn/y.png'] }))
     expect(r).toEqual({ ok: true, postedId: 'fb_carousel' })
     expect(meta.publishFacebookCarousel).toHaveBeenCalledWith(
-      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'] }),
+      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'] })
     )
     expect(meta.publishFacebookPost).not.toHaveBeenCalled()
   })
@@ -202,7 +197,7 @@ describe('social/publisher — publishScheduledPost', () => {
     const r = await publishScheduledPost(post({ platform: 'ig', image_urls: ['https://cdn/y.png'] }))
     expect(r).toEqual({ ok: true, postedId: 'ig_carousel' })
     expect(meta.publishInstagramCarousel).toHaveBeenCalledWith(
-      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'], igUserId: 'IG_1' }),
+      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'], igUserId: 'IG_1' })
     )
     expect(meta.publishInstagramImage).not.toHaveBeenCalled()
   })
@@ -210,7 +205,7 @@ describe('social/publisher — publishScheduledPost', () => {
   it('generates a caption from the linked product when the post caption is blank', async () => {
     reg.getTenantSocialAccounts.mockResolvedValue([account()])
     meta.publishFacebookPost.mockResolvedValue({ id: 'fb_1' })
-    const dbMod = await import('@/lib/db')
+    const dbMod = await import('@/lib/shared/db')
     const captionMod = await import('@/lib/social/caption')
     vi.mocked(dbMod.queryOne).mockResolvedValue({ name: 'Widget', description: 'A fine widget' })
     vi.mocked(captionMod.generateSocialCaption).mockResolvedValue('Introducing the Widget!')
@@ -218,9 +213,12 @@ describe('social/publisher — publishScheduledPost', () => {
     const { publishScheduledPost } = await import('@/lib/social/publisher')
     await publishScheduledPost(post({ caption: '' }))
 
-    expect(captionMod.generateSocialCaption).toHaveBeenCalledWith({ productName: 'Widget', productDescription: 'A fine widget' })
+    expect(captionMod.generateSocialCaption).toHaveBeenCalledWith({
+      productName: 'Widget',
+      productDescription: 'A fine widget',
+    })
     expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Introducing the Widget!') }),
+      expect.objectContaining({ message: expect.stringContaining('Introducing the Widget!') })
     )
     // Persisted back to the row so a retry doesn't regenerate a different caption.
     expect(reg.updateSocialPost).toHaveBeenCalledWith('post-1', { caption: 'Introducing the Widget!' })
@@ -236,7 +234,7 @@ describe('social/publisher — publishScheduledPost', () => {
 
     expect(captionMod.generateSocialCaption).not.toHaveBeenCalled()
     expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Already written') }),
+      expect.objectContaining({ message: expect.stringContaining('Already written') })
     )
   })
 })

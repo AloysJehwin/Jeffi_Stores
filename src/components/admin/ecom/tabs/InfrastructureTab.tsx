@@ -3,7 +3,11 @@ import type { TenantMigrationRun } from '@/lib/tenant-migrations'
 import { Field, FieldGrid, Section, Mono, StatusPill, NOT_PROVISIONED } from '../EcomUI'
 
 export default function InfrastructureTab({
-  tenant: t, job, domains, migrations, currentSha,
+  tenant: t,
+  job,
+  domains,
+  migrations,
+  currentSha,
 }: {
   tenant: TenantDetail
   job: ProvisioningJob | null
@@ -46,16 +50,23 @@ export default function InfrastructureTab({
 
       <Section
         title="Schema version"
-        action={latest && (
-          behind
-            ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">behind</span>
-            : <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">current</span>
-        )}
+        action={
+          latest &&
+          (behind ? (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              behind
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              current
+            </span>
+          ))
+        }
       >
         {migrations.length === 0 ? (
           <p className="text-sm text-foreground-muted">
-            No migration has run against this store&apos;s database. Its schema is whatever
-            provisioning created — it has not received any later change.
+            No migration has run against this store&apos;s database. Its schema is whatever provisioning created — it
+            has not received any later change.
           </p>
         ) : (
           <>
@@ -63,21 +74,31 @@ export default function InfrastructureTab({
               <Field label="Store is on" value={<Mono>{latest!.git_sha.slice(0, 10)}</Mono>} />
               <Field label="Platform is on" value={currentSha ? <Mono>{currentSha.slice(0, 10)}</Mono> : '—'} />
               <Field label="Last run" value={new Date(latest!.ran_at).toLocaleString('en-IN')} />
-              <Field label="Result" value={
-                latest!.status === 'success'
-                  ? <span className="text-green-600 dark:text-green-400">success</span>
-                  : <span className="text-red-600 dark:text-red-400">{latest!.status}</span>
-              } />
+              <Field
+                label="Result"
+                value={
+                  latest!.status === 'success' ? (
+                    <span className="text-green-600 dark:text-green-400">success</span>
+                  ) : (
+                    <span className="text-red-600 dark:text-red-400">{latest!.status}</span>
+                  )
+                }
+              />
             </FieldGrid>
             {latest!.error && (
               <p className="mt-3 text-xs text-red-600 dark:text-red-400 break-words">{latest!.error}</p>
             )}
             {migrations.length > 1 && (
               <ul className="mt-4 pt-4 border-t border-border-default space-y-1.5">
-                {migrations.slice(1).map((m) => (
-                  <li key={`${m.git_sha}-${m.ran_at}`} className="flex items-center justify-between gap-3 text-xs min-w-0">
+                {migrations.slice(1).map(m => (
+                  <li
+                    key={`${m.git_sha}-${m.ran_at}`}
+                    className="flex items-center justify-between gap-3 text-xs min-w-0"
+                  >
                     <Mono>{m.git_sha.slice(0, 10)}</Mono>
-                    <span className={m.status === 'success' ? 'text-foreground-muted' : 'text-red-600 dark:text-red-400'}>
+                    <span
+                      className={m.status === 'success' ? 'text-foreground-muted' : 'text-red-600 dark:text-red-400'}
+                    >
                       {m.status} · {new Date(m.ran_at).toLocaleDateString('en-IN')}
                     </span>
                   </li>
@@ -95,7 +116,7 @@ export default function InfrastructureTab({
           </p>
         ) : (
           <ul className="space-y-3">
-            {domains.map((d) => (
+            {domains.map(d => (
               <li key={d.id} className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
                   <div className="text-sm text-foreground break-all">{d.domain}</div>
@@ -104,7 +125,11 @@ export default function InfrastructureTab({
                       token <span className="font-mono">{d.verification_token}</span>
                     </div>
                   )}
-                  {d.cert_arn && <div className="text-xs text-foreground-muted break-all mt-0.5">cert {d.cert_arn.split('/').pop()}</div>}
+                  {d.cert_arn && (
+                    <div className="text-xs text-foreground-muted break-all mt-0.5">
+                      cert {d.cert_arn.split('/').pop()}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <StatusPill status={d.status} />
@@ -125,7 +150,7 @@ export default function InfrastructureTab({
           <p className="text-sm text-foreground-muted">No DNS records recorded for this tenant yet.</p>
         ) : (
           <ul className="space-y-1.5">
-            {hosts.map((host) => (
+            {hosts.map(host => (
               <li key={host} className="flex items-center justify-between gap-3 text-sm min-w-0">
                 <span className="font-mono text-xs text-foreground break-all">{host}</span>
                 <span className="text-xs text-foreground-muted shrink-0">→ {t.ec2_target || 'pool'}</span>

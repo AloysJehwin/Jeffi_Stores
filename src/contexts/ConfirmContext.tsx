@@ -22,9 +22,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [resolver, setResolver] = useState<((v: boolean) => void) | null>(null)
 
   const confirm = useCallback((options: ConfirmOptions | string) => {
-    const normalized: ConfirmOptions = typeof options === 'string'
-      ? { message: options }
-      : options
+    const normalized: ConfirmOptions = typeof options === 'string' ? { message: options } : options
     setOpts(normalized)
     setOpen(true)
     return new Promise<boolean>(resolve => {
@@ -51,10 +49,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             if (e.key === 'Enter') close(true)
           }}
         >
-          <div
-            className="absolute inset-0 bg-black/50 animate-fade-in"
-            onClick={() => close(false)}
-          />
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => close(false)} />
           <div
             className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md animate-fade-in-up"
             onClick={e => e.stopPropagation()}
@@ -80,9 +75,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => close(true)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-all active:scale-95 ${
-                  opts.variant === 'danger'
-                    ? 'bg-red-600 hover:bg-red-700'
-                    : 'bg-accent-500 hover:bg-accent-600'
+                  opts.variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-accent-500 hover:bg-accent-600'
                 }`}
               >
                 {opts.confirmLabel || (opts.variant === 'danger' ? 'Delete' : 'Confirm')}

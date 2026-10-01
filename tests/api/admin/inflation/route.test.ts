@@ -3,15 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (hoisted before any imports) ────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
-vi.mock('@/lib/validate', async () => {
+vi.mock('@/lib/shared/validate', async () => {
   const { z } = await import('zod')
   return {
     parseBody: vi.fn(),
@@ -21,11 +21,11 @@ vi.mock('@/lib/validate', async () => {
 
 // ── Imports ────────────────────────────────────────────────────────────────────
 
-import { GET, POST } from '@/app/api/admin/inflation/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany, withTransaction } from '@/lib/db'
-import { parseBody } from '@/lib/validate'
+import { GET, POST } from '@/app/api/(admin)/admin/inflation/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany, withTransaction } from '@/lib/shared/db'
+import { parseBody } from '@/lib/shared/validate'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -204,10 +204,7 @@ describe('GET /api/admin/inflation', () => {
 
     const res = await GET(makeGet({ category_id: 'cat-1', percentage: '5', product_ids: 'p1,p2' }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      ['cat-1', ['p1', 'p2']]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), ['cat-1', ['p1', 'p2']])
   })
 })
 
@@ -304,11 +301,19 @@ describe('POST /api/admin/inflation', () => {
       query: vi.fn().mockImplementation((sql: string) => {
         if (sql.includes('product_variants pv')) {
           return {
-            rows: [{
-              id: 'v1', product_id: 'p1', variant_name: 'Small',
-              mrp_ex_gst: '50', mrp: '59', price_ex_gst: '40', price: '47.20',
-              discount_pct: '20', gst_percentage: '18',
-            }],
+            rows: [
+              {
+                id: 'v1',
+                product_id: 'p1',
+                variant_name: 'Small',
+                mrp_ex_gst: '50',
+                mrp: '59',
+                price_ex_gst: '40',
+                price: '47.20',
+                discount_pct: '20',
+                gst_percentage: '18',
+              },
+            ],
           }
         }
         if (sql.includes('product_sub_variants psv')) {
@@ -349,10 +354,7 @@ describe('POST /api/admin/inflation', () => {
 
     const res = await POST(makePost({ ...validBody, product_ids: ['p1', 'p2'] }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      ['cat-1', ['p1', 'p2']]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), ['cat-1', ['p1', 'p2']])
   })
 
   it('passes null for product_ids when empty array provided', async () => {
@@ -366,9 +368,6 @@ describe('POST /api/admin/inflation', () => {
 
     const res = await POST(makePost({ ...validBody, product_ids: [] }))
     expect(res.status).toBe(200)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.any(String),
-      ['cat-1', null]
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), ['cat-1', null])
   })
 })

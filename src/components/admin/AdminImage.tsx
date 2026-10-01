@@ -16,9 +16,7 @@ interface AdminImageProps {
 
 // Admin-panel image. Kept separate from the storefront component because admin surfaces render
 // URLs behind authorization and must never be reused on public pages.
-export default function AdminImage({
-  src, alt, className, wrapperClassName, blurhash, fallback,
-}: AdminImageProps) {
+export default function AdminImage({ src, alt, className, wrapperClassName, blurhash, fallback }: AdminImageProps) {
   const [loaded, setLoaded] = useState(false)
   const [errored, setErrored] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
@@ -36,7 +34,9 @@ export default function AdminImage({
 
   if (!src || errored) {
     return (
-      <div className={`${wrapperClassName ?? 'relative w-full h-full'} flex items-center justify-center bg-surface-secondary`}>
+      <div
+        className={`${wrapperClassName ?? 'relative w-full h-full'} flex items-center justify-center bg-surface-secondary`}
+      >
         {fallback ?? <ImageOff className="w-4 h-4 text-foreground-muted" aria-hidden="true" />}
         <span className="sr-only">{alt}</span>
       </div>
@@ -45,21 +45,20 @@ export default function AdminImage({
 
   return (
     <div className={wrapperClassName ?? 'relative w-full h-full'}>
-      {!loaded && (
-        blurhash
-          ? <BlurhashCanvas hash={blurhash} />
-          : (
-            <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
-                  animation: 'img-shimmer 1.4s infinite',
-                }}
-              />
-            </div>
-          )
-      )}
+      {!loaded &&
+        (blurhash ? (
+          <BlurhashCanvas hash={blurhash} />
+        ) : (
+          <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+                animation: 'img-shimmer 1.4s infinite',
+              }}
+            />
+          </div>
+        ))}
       <img
         ref={imgRef}
         src={src}
@@ -69,7 +68,10 @@ export default function AdminImage({
         // Painted above the placeholder instead of faded in on onLoad: a missed load event would leave a loaded image invisible.
         className={`${className ?? ''} relative`}
         onLoad={() => setLoaded(true)}
-        onError={() => { setErrored(true); setLoaded(true) }}
+        onError={() => {
+          setErrored(true)
+          setLoaded(true)
+        }}
       />
     </div>
   )

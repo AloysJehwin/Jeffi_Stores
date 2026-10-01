@@ -33,11 +33,15 @@ export function readUserProfile(): UserProfile {
     const raw = localStorage.getItem(PROFILE_KEY)
     if (!raw) return { ...DEFAULT_PROFILE }
     return { ...DEFAULT_PROFILE, ...JSON.parse(raw) }
-  } catch { return { ...DEFAULT_PROFILE } }
+  } catch {
+    return { ...DEFAULT_PROFILE }
+  }
 }
 
 function writeUserProfile(p: UserProfile) {
-  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)) } catch {}
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(p))
+  } catch {}
 }
 
 function addFrequent(existing: string[], incoming: string[], max: number): string[] {
@@ -54,9 +58,7 @@ function addFrequent(existing: string[], incoming: string[], max: number): strin
     seen.add(k)
     return true
   })
-  return merged
-    .sort((a, b) => (counts.get(b.toLowerCase()) || 0) - (counts.get(a.toLowerCase()) || 0))
-    .slice(0, max)
+  return merged.sort((a, b) => (counts.get(b.toLowerCase()) || 0) - (counts.get(a.toLowerCase()) || 0)).slice(0, max)
 }
 
 export interface OrderSignal {

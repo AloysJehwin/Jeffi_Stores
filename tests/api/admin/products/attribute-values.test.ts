@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { GET as productsGET } from '@/app/api/admin/products/attribute-values/route'
-import { GET as controlsGET } from '@/app/api/admin/controls/attribute-values/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { GET as productsGET } from '@/app/api/(admin)/admin/products/attribute-values/route'
+import { GET as controlsGET } from '@/app/api/(admin)/admin/controls/attribute-values/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 const ADMIN = { adminId: 'a1', role: 'admin', scopes: ['products:read', 'controls:read'] }
 const get = (path: string, qs: string) => new NextRequest(`http://localhost${path}?${qs}`)

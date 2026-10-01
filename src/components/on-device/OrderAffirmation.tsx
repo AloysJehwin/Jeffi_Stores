@@ -56,10 +56,12 @@ export default function OrderAffirmation({ items, total }: Props) {
           setDone(true)
           // Best-effort on-device LoRA fine-tune from this affirmation (gated on
           // the DB fine-tune flag + its platform flag + capability).
-          maybeRunFineTune(finetuneEnabled && finetuneAllowed, [{
-            prompt: `Order affirmation for: ${itemNames.join(', ')}`,
-            completion: final,
-          }])
+          maybeRunFineTune(finetuneEnabled && finetuneAllowed, [
+            {
+              prompt: `Order affirmation for: ${itemNames.join(', ')}`,
+              completion: final,
+            },
+          ])
           return
         } catch {
           // fall through to server
@@ -74,9 +76,12 @@ export default function OrderAffirmation({ items, total }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemNames }),
         })
-        if (res.status === 403) { setAiOff(true); return }
+        if (res.status === 403) {
+          setAiOff(true)
+          return
+        }
         if (!res.ok) throw new Error('ollama failed')
-        const data = await res.json() as { text?: string }
+        const data = (await res.json()) as { text?: string }
         if (!data.text) throw new Error('empty')
         setText(data.text)
         setDone(true)
@@ -84,17 +89,34 @@ export default function OrderAffirmation({ items, total }: Props) {
         // silently fail
       }
     })
-  }, [items, total, ondeviceEnabled, aiEnabled, finetuneEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled, flags.ondeviceFinetuneMobileEnabled, flags.ondeviceFinetuneDesktopEnabled])
+  }, [
+    items,
+    total,
+    ondeviceEnabled,
+    aiEnabled,
+    finetuneEnabled,
+    flags.ondeviceSummaryMobileEnabled,
+    flags.ondeviceSummaryDesktopEnabled,
+    flags.ondeviceFinetuneMobileEnabled,
+    flags.ondeviceFinetuneDesktopEnabled,
+  ])
 
   if (!aiEnabled || !text) return null
 
   return (
     <div className="flex items-start gap-2.5 bg-surface-elevated border border-border-default rounded-xl px-4 py-3 mb-6">
-      <svg className="w-4 h-4 text-accent-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+      <svg
+        className="w-4 h-4 text-accent-500 flex-shrink-0 mt-0.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        strokeWidth={2}
+      >
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <p className="text-sm text-foreground leading-relaxed flex-1">
-        {text}{!done && <span className="animate-pulse">▍</span>}
+        {text}
+        {!done && <span className="animate-pulse">▍</span>}
       </p>
       <span className="text-[9px] text-foreground-muted flex-shrink-0 mt-0.5">{source}</span>
     </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { returnToAdmin } from '@/app/api/admin/integrations/state'
+import { returnToAdmin } from '@/lib/shared/oauth-state'
 
 describe('returnToAdmin', () => {
   it('serves a no-store page that navigates onward instead of a cross-site redirect', async () => {
@@ -11,7 +11,9 @@ describe('returnToAdmin', () => {
     expect(res.headers.get('cache-control')).toBe('no-store')
     const html = await res.text()
     expect(html).toContain(`location.replace(${JSON.stringify(url)})`)
-    expect(html).toContain('content="0;url=https://admin.example.com/admin/data-source?tab=google_sheet&amp;connected=google_sheets"')
+    expect(html).toContain(
+      'content="0;url=https://admin.example.com/admin/data-source?tab=google_sheet&amp;connected=google_sheets"'
+    )
   })
 
   it('escapes the url so an error message cannot break out into markup or script', async () => {

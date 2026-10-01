@@ -1,4 +1,4 @@
-import { BIND_ENDPOINT, PROOF_HEADER } from '@/lib/session-binding-shared'
+import { BIND_ENDPOINT, PROOF_HEADER } from '@/lib/auth/session-binding-shared'
 
 // Browser half of key-bound sessions (see src/lib/session-binding.ts). The signing key is created
 // non-extractable and kept in IndexedDB: page code and DevTools can use it to sign here, but
@@ -24,7 +24,11 @@ let binding: Promise<void> | null = null
 // Shared by every tab of the origin, so a page load can skip the bind call while the cookie a
 // sibling tab (or the previous page) earned is still good.
 function remember(): void {
-  try { localStorage.setItem(STATE_KEY, JSON.stringify({ u: nextRefreshAt, b: boundCount, o: clockOffset })) } catch { /* private mode */ }
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({ u: nextRefreshAt, b: boundCount, o: clockOffset }))
+  } catch {
+    /* private mode */
+  }
 }
 
 function recall(): boolean {
@@ -51,12 +55,15 @@ function openDb(): Promise<IDBDatabase> {
 }
 
 function idb<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest): Promise<T> {
-  return openDb().then(db => new Promise<T>((resolve, reject) => {
-    const tx = db.transaction(STORE, mode)
-    const req = run(tx.objectStore(STORE))
-    req.onsuccess = () => resolve(req.result as T)
-    req.onerror = () => reject(req.error)
-  }))
+  return openDb().then(
+    db =>
+      new Promise<T>((resolve, reject) => {
+        const tx = db.transaction(STORE, mode)
+        const req = run(tx.objectStore(STORE))
+        req.onsuccess = () => resolve(req.result as T)
+        req.onerror = () => reject(req.error)
+      })
+  )
 }
 
 async function loadKey(): Promise<void> {
@@ -114,9 +121,10 @@ function bind(rawFetch: typeof fetch, retry = true): Promise<void> {
       }
       boundCount = typeof data?.bound === 'number' ? data.bound : 0
       // Nothing to keep alive when no session is bound here, so stop asking every minute.
-      nextRefreshAt = typeof data?.exp === 'number'
-        ? data.exp - clockOffset - REFRESH_MARGIN_MS
-        : Date.now() + (res.ok ? IDLE_RECHECK_MS : REFRESH_MARGIN_MS)
+      nextRefreshAt =
+        typeof data?.exp === 'number'
+          ? data.exp - clockOffset - REFRESH_MARGIN_MS
+          : Date.now() + (res.ok ? IDLE_RECHECK_MS : REFRESH_MARGIN_MS)
       remember()
     } catch {
       nextRefreshAt = Date.now() + REFRESH_MARGIN_MS
@@ -134,10 +142,8 @@ export function installSessionGuard(): void {
   w.__sg = true
 
   const rawFetch = window.fetch.bind(window)
-  const capped = (p: Promise<void>): Promise<void> => Promise.race([
-    p.catch(() => {}),
-    new Promise<void>(resolve => setTimeout(resolve, BIND_WAIT_MS)),
-  ])
+  const capped = (p: Promise<void>): Promise<void> =>
+    Promise.race([p.catch(() => {}), new Promise<void>(resolve => setTimeout(resolve, BIND_WAIT_MS))])
   const current = recall()
   let ready = capped(loadKey().then(() => (current ? undefined : bind(rawFetch))))
 
@@ -165,7 +171,9 @@ export function installSessionGuard(): void {
           init = await sign(input, init, method, apiPath)
         }
       }
-    } catch { /* send the request untouched */ }
+    } catch {
+      /* send the request untouched */
+    }
 
     const replayable = !(input instanceof Request) && !(init?.body instanceof ReadableStream)
     let res = await rawFetch(input, init)
@@ -178,7 +186,9 @@ export function installSessionGuard(): void {
       try {
         await capped(bind(rawFetch))
         if (boundCount > 0) res = await rawFetch(input, await sign(input, init, method, apiPath))
-      } catch { /* keep the original response */ }
+      } catch {
+        /* keep the original response */
+      }
     }
 
     // A login or logout just changed which sessions exist. Later calls wait for the new binding

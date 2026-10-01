@@ -3,30 +3,30 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
 }))
 
-vi.mock('@/lib/packing-slip-pdf', () => ({
+vi.mock('@/lib/documents/packing-slip-pdf', () => ({
   generateBulkPackingSlipPDF: vi.fn(),
   loadStoreSettings: vi.fn(),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/packing-slips/bulk/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
-import { generateBulkPackingSlipPDF, loadStoreSettings } from '@/lib/packing-slip-pdf'
+import { POST } from '@/app/api/(admin)/admin/packing-slips/bulk/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
+import { generateBulkPackingSlipPDF, loadStoreSettings } from '@/lib/documents/packing-slip-pdf'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)

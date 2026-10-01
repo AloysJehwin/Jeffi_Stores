@@ -39,11 +39,7 @@ export function AccountSearchProvider({ children }: { children: ReactNode }) {
     setQueryState('')
   }, [])
 
-  return (
-    <Ctx.Provider value={{ query, suggestions, placeholder, setQuery, register, clear }}>
-      {children}
-    </Ctx.Provider>
-  )
+  return <Ctx.Provider value={{ query, suggestions, placeholder, setQuery, register, clear }}>{children}</Ctx.Provider>
 }
 
 export function useAccountSearch() {

@@ -1,6 +1,6 @@
 'use client'
 
-import { VALUE_STAT_METRICS, valueStatMetrics, type ValueStatMetric } from '@/lib/homepage-sections'
+import { VALUE_STAT_METRICS, valueStatMetrics, type ValueStatMetric } from '@/lib/catalog/homepage-sections'
 import { Grid, HeadingFields, LABEL_CLASS, Note, Text, useSectionBinding, type EditorProps } from './fields'
 
 export default function ValueStatsEditor(props: EditorProps) {
@@ -10,7 +10,10 @@ export default function ValueStatsEditor(props: EditorProps) {
 
   function save(next: Map<ValueStatMetric, string>) {
     b.saveConfig({
-      metrics: VALUE_STAT_METRICS.filter(m => next.has(m.metric)).map(m => ({ metric: m.metric, label: next.get(m.metric) ?? '' })),
+      metrics: VALUE_STAT_METRICS.filter(m => next.has(m.metric)).map(m => ({
+        metric: m.metric,
+        label: next.get(m.metric) ?? '',
+      })),
     })
   }
 
@@ -35,7 +38,10 @@ export default function ValueStatsEditor(props: EditorProps) {
         {VALUE_STAT_METRICS.map(m => {
           const on = shown.has(m.metric)
           return (
-            <div key={m.metric} className="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)] items-end gap-2 sm:gap-3">
+            <div
+              key={m.metric}
+              className="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)] items-end gap-2 sm:gap-3"
+            >
               <label className="flex items-center gap-2 text-sm text-foreground min-h-[38px] cursor-pointer">
                 <input
                   type="checkbox"
@@ -47,13 +53,23 @@ export default function ValueStatsEditor(props: EditorProps) {
                 {m.label}
               </label>
               {on ? (
-                <Text label="Label" value={shown.get(m.metric) ?? m.label} disabled={!canWrite} onCommit={v => relabel(m.metric, v)} />
-              ) : <div />}
+                <Text
+                  label="Label"
+                  value={shown.get(m.metric) ?? m.label}
+                  disabled={!canWrite}
+                  onCommit={v => relabel(m.metric, v)}
+                />
+              ) : (
+                <div />
+              )}
             </div>
           )
         })}
       </div>
-      <Note>Counted live from your orders and catalogue. A number that is still zero is not shown; large numbers are rounded down, e.g. 1,234 shows as 1,200+.</Note>
+      <Note>
+        Counted live from your orders and catalogue. A number that is still zero is not shown; large numbers are rounded
+        down, e.g. 1,234 shows as 1,200+.
+      </Note>
     </Grid>
   )
 }

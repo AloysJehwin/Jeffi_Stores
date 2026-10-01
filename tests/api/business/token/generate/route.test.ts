@@ -1,18 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateBusiness: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateBusiness: vi.fn() }))
 vi.mock('jose', () => ({
   SignJWT: class {
-    setProtectedHeader() { return this }
-    setIssuedAt() { return this }
-    setExpirationTime() { return this }
-    async sign() { return 'mock-biz-token' }
+    setProtectedHeader() {
+      return this
+    }
+    setIssuedAt() {
+      return this
+    }
+    setExpirationTime() {
+      return this
+    }
+    async sign() {
+      return 'mock-biz-token'
+    }
   },
 }))
 
-import { POST } from '@/app/api/business/token/generate/route'
-import { authenticateBusiness } from '@/lib/jwt'
+import { POST } from '@/app/api/(public)/business/token/generate/route'
+import { authenticateBusiness } from '@/lib/auth/jwt'
 
 const USER = {
   userId: 'u1',

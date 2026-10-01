@@ -24,7 +24,19 @@ async function patchSetting(key: string, value: string | number | boolean): Prom
   return res.ok
 }
 
-export function SectionCard({ title, description, children, columns, defaultOpen = false }: { title: string; description?: string; children: ReactNode; columns?: boolean; defaultOpen?: boolean }) {
+export function SectionCard({
+  title,
+  description,
+  children,
+  columns,
+  defaultOpen = false,
+}: {
+  title: string
+  description?: string
+  children: ReactNode
+  columns?: boolean
+  defaultOpen?: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
 
   return (
@@ -39,18 +51,17 @@ export function SectionCard({ title, description, children, columns, defaultOpen
           <span className="block text-sm font-semibold text-foreground">{title}</span>
           {description && <span className="block text-xs text-foreground-muted mt-0.5">{description}</span>}
         </span>
-        <ChevronDown className={`w-4 h-4 shrink-0 mt-0.5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 shrink-0 mt-0.5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
       {/* Hidden rather than unmounted: KeyboardShortcutControl registers into a global
           conflict registry on mount, and unmounting would drop those registrations.
           `hidden` alone is not enough — Tailwind's grid/space-y set `display`, which beats
           the attribute — so the layout classes are only applied while open. */}
       <div
-        className={!open
-          ? 'hidden'
-          : columns
-            ? 'p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5'
-            : 'p-5 space-y-5'}>
+        className={!open ? 'hidden' : columns ? 'p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5' : 'p-5 space-y-5'}
+      >
         {children}
       </div>
     </section>
@@ -63,8 +74,20 @@ export function FullSpan({ children }: { children: ReactNode }) {
 }
 
 export function TextControl({
-  settingKey, label, hint, initial, placeholder, type = 'text',
-}: { settingKey: string; label: string; hint?: string; initial: string; placeholder?: string; type?: string }) {
+  settingKey,
+  label,
+  hint,
+  initial,
+  placeholder,
+  type = 'text',
+}: {
+  settingKey: string
+  label: string
+  hint?: string
+  initial: string
+  placeholder?: string
+  type?: string
+}) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(initial)
@@ -90,7 +113,10 @@ export function TextControl({
         type={type}
         value={value}
         placeholder={placeholder}
-        onChange={e => { setValue(e.target.value); setDirty(true) }}
+        onChange={e => {
+          setValue(e.target.value)
+          setDirty(true)
+        }}
         onBlur={save}
         disabled={saving || !canWrite}
         className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60"
@@ -100,8 +126,18 @@ export function TextControl({
 }
 
 export function TextAreaControl({
-  settingKey, label, hint, initial, rows = 4,
-}: { settingKey: string; label: string; hint?: string; initial: string; rows?: number }) {
+  settingKey,
+  label,
+  hint,
+  initial,
+  rows = 4,
+}: {
+  settingKey: string
+  label: string
+  hint?: string
+  initial: string
+  rows?: number
+}) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(initial)
@@ -126,7 +162,10 @@ export function TextAreaControl({
       <textarea
         value={value}
         rows={rows}
-        onChange={e => { setValue(e.target.value); setDirty(true) }}
+        onChange={e => {
+          setValue(e.target.value)
+          setDirty(true)
+        }}
         onBlur={save}
         disabled={saving || !canWrite}
         className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60 resize-y"
@@ -136,8 +175,26 @@ export function TextAreaControl({
 }
 
 export function NumberControl({
-  settingKey, label, hint, initial, prefix, suffix, min = 0, max, step = 1,
-}: { settingKey: string; label: string; hint?: string; initial: number; prefix?: string; suffix?: string; min?: number; max?: number; step?: number }) {
+  settingKey,
+  label,
+  hint,
+  initial,
+  prefix,
+  suffix,
+  min = 0,
+  max,
+  step = 1,
+}: {
+  settingKey: string
+  label: string
+  hint?: string
+  initial: number
+  prefix?: string
+  suffix?: string
+  min?: number
+  max?: number
+  step?: number
+}) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   // Held as a string so the field can be genuinely empty while typing. Coercing to a number
@@ -180,27 +237,46 @@ export function NumberControl({
         {hint && <span className="text-xs text-foreground-muted truncate">{hint}</span>}
       </label>
       <div className="relative max-w-xs">
-        {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{prefix}</span>}
+        {prefix && (
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{prefix}</span>
+        )}
         <input
           type="number"
           min={min}
           max={max}
           step={step}
           value={value}
-          onChange={e => { setValue(e.target.value); setDirty(true) }}
+          onChange={e => {
+            setValue(e.target.value)
+            setDirty(true)
+          }}
           onBlur={save}
           disabled={saving || !canWrite}
           className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-12' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
         />
-        {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>}
+        {suffix && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>
+        )}
       </div>
     </div>
   )
 }
 
 export function ToggleControl({
-  settingKey, label, hint, initial, locked, lockedHint,
-}: { settingKey: string; label: string; hint?: string; initial: boolean; locked?: boolean; lockedHint?: string }) {
+  settingKey,
+  label,
+  hint,
+  initial,
+  locked,
+  lockedHint,
+}: {
+  settingKey: string
+  label: string
+  hint?: string
+  initial: boolean
+  locked?: boolean
+  lockedHint?: string
+}) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [checked, setChecked] = useState(initial)
@@ -212,17 +288,23 @@ export function ToggleControl({
     setSaving(true)
     const ok = await patchSetting(settingKey, next)
     setSaving(false)
-    if (!ok) { setChecked(!next); showToast('Failed to save', 'error') }
-    else showToast('Saved', 'success')
+    if (!ok) {
+      setChecked(!next)
+      showToast('Failed to save', 'error')
+    } else showToast('Saved', 'success')
   }
 
   return (
-    <div className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${locked || !canWrite ? 'opacity-60' : ''}`}>
+    <div
+      className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${locked || !canWrite ? 'opacity-60' : ''}`}
+    >
       <div>
         <p className="text-sm font-semibold text-foreground">{label}</p>
-        {locked && lockedHint
-          ? <p className="text-xs text-foreground-muted mt-0.5">{lockedHint}</p>
-          : hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>}
+        {locked && lockedHint ? (
+          <p className="text-xs text-foreground-muted mt-0.5">{lockedHint}</p>
+        ) : (
+          hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>
+        )}
       </div>
       <Toggle checked={checked} onChange={onChange} disabled={saving || !!locked || !canWrite} />
     </div>
@@ -232,7 +314,27 @@ export function ToggleControl({
 // Keys Chrome/browsers reserve with a plain Ctrl/⌘ modifier — these keep their
 // default browser behavior and cannot be used for our shortcuts. Add Shift to the
 // combo (⌘/Ctrl + Shift + key) to use any of these instead.
-const RESERVED_MOD_KEYS = new Set(['r','f','l','t','w','n','a','c','v','x','z','y','p','s','d','h','j','u','q'])
+const RESERVED_MOD_KEYS = new Set([
+  'r',
+  'f',
+  'l',
+  't',
+  'w',
+  'n',
+  'a',
+  'c',
+  'v',
+  'x',
+  'z',
+  'y',
+  'p',
+  's',
+  'd',
+  'h',
+  'j',
+  'u',
+  'q',
+])
 
 function comboLabel(raw: string, isMac: boolean): string {
   const v = raw.toLowerCase().trim()
@@ -266,8 +368,14 @@ function registerShortcut(ownKey: string, combo: string) {
 }
 
 export function KeyboardShortcutControl({
-  settingKey, label, initial,
-}: { settingKey: string; label: string; initial: string }) {
+  settingKey,
+  label,
+  initial,
+}: {
+  settingKey: string
+  label: string
+  initial: string
+}) {
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [isMac, setIsMac] = useState(false)
@@ -319,7 +427,10 @@ export function KeyboardShortcutControl({
       setKey(fkey)
       save(mod, fkey)
     } else {
-      if (!key) { setModifier(mod); return }
+      if (!key) {
+        setModifier(mod)
+        return
+      }
       const stored = `${mod}+${key}`
       const conflict = findShortcutConflict(stored, settingKey)
       if (conflict) {
@@ -333,7 +444,10 @@ export function KeyboardShortcutControl({
 
   function applyKey(k: string, mod: string) {
     if (mod !== 'mod+shift' && RESERVED_MOD_KEYS.has(k)) {
-      showToast(`${isMac ? '⌘' : 'Ctrl'}+${k.toUpperCase()} is reserved by the browser — use a Shift combo or another key`, 'error')
+      showToast(
+        `${isMac ? '⌘' : 'Ctrl'}+${k.toUpperCase()} is reserved by the browser — use a Shift combo or another key`,
+        'error'
+      )
       return
     }
     const stored = mod === 'f' ? k : `${mod}+${k}`
@@ -357,16 +471,17 @@ export function KeyboardShortcutControl({
 
   const modName = isMac ? '⌘' : 'Ctrl'
 
-  const comboPreview = modifier === 'f'
-    ? key.toUpperCase()
-    : modifier === 'mod+shift'
-      ? `${modName}+⇧+${key.toUpperCase()}`
-      : `${modName}+${key.toUpperCase()}`
+  const comboPreview =
+    modifier === 'f'
+      ? key.toUpperCase()
+      : modifier === 'mod+shift'
+        ? `${modName}+⇧+${key.toUpperCase()}`
+        : `${modName}+${key.toUpperCase()}`
 
   const modifierOptions = [
-    { value: 'mod',       label: `${modName} + key` },
+    { value: 'mod', label: `${modName} + key` },
     { value: 'mod+shift', label: `${modName} + Shift + key` },
-    { value: 'f',         label: 'F-key only' },
+    { value: 'f', label: 'F-key only' },
   ]
 
   const fkeyOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -396,8 +511,12 @@ export function KeyboardShortcutControl({
             options={fkeyOptions}
             onChange={k => {
               const conflict = findShortcutConflict(k, settingKey)
-              if (conflict) { showToast(`${k.toUpperCase()} is already assigned to another shortcut`, 'error'); return }
-              setKey(k); save('f', k)
+              if (conflict) {
+                showToast(`${k.toUpperCase()} is already assigned to another shortcut`, 'error')
+                return
+              }
+              setKey(k)
+              save('f', k)
             }}
             disabled={saving || !canWrite}
             sm

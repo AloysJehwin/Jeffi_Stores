@@ -2,18 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...a: any[]) => mockQueryOne(...a),
   query: (...a: any[]) => mockQuery(...a),
   queryMany: vi.fn(),
 }))
 const mockPublish = vi.fn()
-vi.mock('@/lib/session-events', () => ({ publishSessionEvent: (...a: any[]) => mockPublish(...a) }))
+vi.mock('@/lib/auth/session-events', () => ({ publishSessionEvent: (...a: any[]) => mockPublish(...a) }))
 
 import {
-  computeDeadline, idleWindowMsFor, resolveSession, touchSession, getSessionDeadline,
-  revokeSessionById, revokeSession, sweepExpiredAdminSessions, DEFAULT_ADMIN_IDLE_MINUTES,
-} from '@/lib/auth-sessions'
+  computeDeadline,
+  idleWindowMsFor,
+  resolveSession,
+  touchSession,
+  getSessionDeadline,
+  revokeSessionById,
+  revokeSession,
+  sweepExpiredAdminSessions,
+  DEFAULT_ADMIN_IDLE_MINUTES,
+} from '@/lib/auth/auth-sessions'
 
 const TOKEN = 'a'.repeat(64)
 const ROW_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'
@@ -21,16 +28,35 @@ const flush = () => new Promise(r => setTimeout(r, 0))
 
 function liveRow(over: Record<string, unknown> = {}) {
   return {
-    id: ROW_ID, principal_type: 'admin', principal_id: 'adm-1', revoked_at: null,
+    id: ROW_ID,
+    principal_type: 'admin',
+    principal_id: 'adm-1',
+    revoked_at: null,
     expires_at: new Date(Date.now() + 8 * 3600_000).toISOString(),
-    last_seen_at: new Date().toISOString(), created_at: new Date().toISOString(),
-    idle_timeout_minutes: 60, role: 'admin', scopes: ['dashboard:read'], cert_cn: null,
-    approval_status: null, tenant_id: null, user_agent: null, accept_lang: null, ua_platform: null,
-    ip_net: null, fp_hash: null, email: 'a@x.com', first_name: 'A', last_name: 'B', ...over,
+    last_seen_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    idle_timeout_minutes: 60,
+    role: 'admin',
+    scopes: ['dashboard:read'],
+    cert_cn: null,
+    approval_status: null,
+    tenant_id: null,
+    user_agent: null,
+    accept_lang: null,
+    ua_platform: null,
+    ip_net: null,
+    fp_hash: null,
+    email: 'a@x.com',
+    first_name: 'A',
+    last_name: 'B',
+    ...over,
   }
 }
 
-beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rows: [], rowCount: 0 }) })
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockQuery.mockResolvedValue({ rows: [], rowCount: 0 })
+})
 
 describe('deadline math', () => {
   it('idle window: per-admin minutes, admin default, or the 24h cap for other principals', () => {
@@ -75,12 +101,21 @@ describe('resolveSession deadline + passive mode', () => {
 describe('touchSession', () => {
   it('moves last_seen_at, returns the new deadline and publishes it', async () => {
     const now = new Date().toISOString()
-    mockQueryOne.mockResolvedValue({ id: ROW_ID, principal_type: 'admin', expires_at: new Date(Date.now() + 3600_000 * 8).toISOString(), last_seen_at: now, idle_timeout_minutes: 120 })
+    mockQueryOne.mockResolvedValue({
+      id: ROW_ID,
+      principal_type: 'admin',
+      expires_at: new Date(Date.now() + 3600_000 * 8).toISOString(),
+      last_seen_at: now,
+      idle_timeout_minutes: 120,
+    })
     const d = await touchSession(TOKEN)
     expect(mockQueryOne.mock.calls[0][0]).toContain('SET last_seen_at = now()')
     expect(d?.deadlineAt).toBe(new Date(Date.parse(now) + 120 * 60_000).toISOString())
     await flush()
-    expect(mockPublish).toHaveBeenCalledWith(ROW_ID, expect.objectContaining({ type: 'deadline', deadlineAt: d!.deadlineAt }))
+    expect(mockPublish).toHaveBeenCalledWith(
+      ROW_ID,
+      expect.objectContaining({ type: 'deadline', deadlineAt: d!.deadlineAt })
+    )
   })
 
   it('returns null for a revoked or unknown session', async () => {
@@ -92,12 +127,33 @@ describe('touchSession', () => {
 
 describe('getSessionDeadline', () => {
   it('null when revoked or already past the deadline, otherwise the deadline pair', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: ROW_ID, principal_type: 'admin', expires_at: new Date(Date.now() + 3600_000).toISOString(), last_seen_at: new Date().toISOString(), idle_timeout_minutes: 60, revoked_at: new Date().toISOString() })
+    mockQueryOne.mockResolvedValueOnce({
+      id: ROW_ID,
+      principal_type: 'admin',
+      expires_at: new Date(Date.now() + 3600_000).toISOString(),
+      last_seen_at: new Date().toISOString(),
+      idle_timeout_minutes: 60,
+      revoked_at: new Date().toISOString(),
+    })
     expect(await getSessionDeadline(ROW_ID)).toBeNull()
-    mockQueryOne.mockResolvedValueOnce({ id: ROW_ID, principal_type: 'admin', expires_at: new Date(Date.now() + 3600_000).toISOString(), last_seen_at: new Date(Date.now() - 2 * 3600_000).toISOString(), idle_timeout_minutes: 60, revoked_at: null })
+    mockQueryOne.mockResolvedValueOnce({
+      id: ROW_ID,
+      principal_type: 'admin',
+      expires_at: new Date(Date.now() + 3600_000).toISOString(),
+      last_seen_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
+      idle_timeout_minutes: 60,
+      revoked_at: null,
+    })
     expect(await getSessionDeadline(ROW_ID)).toBeNull()
     const exp = new Date(Date.now() + 3600_000).toISOString()
-    mockQueryOne.mockResolvedValueOnce({ id: ROW_ID, principal_type: 'admin', expires_at: exp, last_seen_at: new Date().toISOString(), idle_timeout_minutes: 60, revoked_at: null })
+    mockQueryOne.mockResolvedValueOnce({
+      id: ROW_ID,
+      principal_type: 'admin',
+      expires_at: exp,
+      last_seen_at: new Date().toISOString(),
+      idle_timeout_minutes: 60,
+      revoked_at: null,
+    })
     const d = await getSessionDeadline(ROW_ID)
     expect(d?.expiresAt).toBe(exp)
   })

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
@@ -40,7 +40,7 @@ import {
   getLastAmazonSyncStatus,
   sendAmazonSyncFailureEmail,
 } from '@/lib/amazon/sync'
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import * as fetchMod from '@/lib/merchant/product-fetch'
 import * as mapper from '@/lib/amazon/mapper'
 import * as client from '@/lib/amazon/client'
@@ -80,7 +80,9 @@ describe('amazon/sync', () => {
     mockQueryOne.mockResolvedValue({ acquired: true } as any)
     mockFetchAll.mockResolvedValue([] as any)
     mockToListings.mockReturnValue([])
-    mockToOffer.mockImplementation((_p: any, asin: string) => createListing({ requirements: 'LISTING_OFFER_ONLY', attributes: { merchant_suggested_asin: [{ value: asin }] } }))
+    mockToOffer.mockImplementation((_p: any, asin: string) =>
+      createListing({ requirements: 'LISTING_OFFER_ONLY', attributes: { merchant_suggested_asin: [{ value: asin }] } })
+    )
     mockPut.mockResolvedValue({} as any)
   })
 
@@ -93,9 +95,7 @@ describe('amazon/sync', () => {
     })
 
     it('runs full sync with a full-create product (no variants, no asin)', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
 
@@ -107,20 +107,18 @@ describe('amazon/sync', () => {
     })
 
     it('handles a resolveListings error per-product then records error', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'BAD-SKU', name: 'Bad', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'BAD-SKU', name: 'Bad', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
-      mockToListings.mockImplementationOnce(() => { throw new Error('mapping failed') })
+      mockToListings.mockImplementationOnce(() => {
+        throw new Error('mapping failed')
+      })
 
       const result = await syncAllProductsToAmazon()
       expect(result.errors.some(e => e.sku === 'BAD-SKU' && /mapping failed/.test(e.error))).toBe(true)
     })
 
     it('records a put error into errors[]', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
       mockPut.mockRejectedValueOnce(new Error('put boom'))
@@ -133,18 +131,23 @@ describe('amazon/sync', () => {
     it('offer-only path: variant with trusted gtin asin, patches offer + persists asin', async () => {
       mockFetchAll.mockResolvedValueOnce([
         {
-          id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: true,
+          id: 'p1',
+          sku: 'SKU-1',
+          name: 'Widget',
+          has_variants: true,
           product_variants: [{ sku: 'V1', price: 10, asin: 'B00ASIN', asin_match: 'gtin' }],
         },
       ] as any)
-      mockToOffer.mockReturnValueOnce(createListing({
-        sku: 'V1',
-        requirements: 'LISTING_OFFER_ONLY',
-        attributes: {
-          purchasable_offer: [{ x: 1 }],
-          merchant_suggested_asin: [{ value: 'B00ASIN' }],
-        },
-      }))
+      mockToOffer.mockReturnValueOnce(
+        createListing({
+          sku: 'V1',
+          requirements: 'LISTING_OFFER_ONLY',
+          attributes: {
+            purchasable_offer: [{ x: 1 }],
+            merchant_suggested_asin: [{ value: 'B00ASIN' }],
+          },
+        })
+      )
 
       const result = await syncAllProductsToAmazon()
       expect(result.synced).toBe(1)
@@ -158,11 +161,13 @@ describe('amazon/sync', () => {
       mockFetchAll.mockResolvedValueOnce([
         { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false, asin: 'B00LISTED', asin_match: 'listed' },
       ] as any)
-      mockToOffer.mockReturnValueOnce(createListing({
-        sku: 'SKU-1',
-        requirements: 'LISTING_OFFER_ONLY',
-        attributes: { merchant_suggested_asin: [{ value: 'B00LISTED' }] },
-      }))
+      mockToOffer.mockReturnValueOnce(
+        createListing({
+          sku: 'SKU-1',
+          requirements: 'LISTING_OFFER_ONLY',
+          attributes: { merchant_suggested_asin: [{ value: 'B00LISTED' }] },
+        })
+      )
       // First UPDATE (variants) returns rowCount 0 -> triggers products update
       mockQuery.mockImplementation(async (sql: string) => {
         if (typeof sql === 'string' && sql.includes('UPDATE product_variants')) return { rowCount: 0 } as any
@@ -177,7 +182,10 @@ describe('amazon/sync', () => {
     it('variant with null price is skipped, falls back to full-create', async () => {
       mockFetchAll.mockResolvedValueOnce([
         {
-          id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: true,
+          id: 'p1',
+          sku: 'SKU-1',
+          name: 'Widget',
+          has_variants: true,
           product_variants: [{ sku: 'V1', price: null }],
         },
       ] as any)
@@ -191,7 +199,11 @@ describe('amazon/sync', () => {
     it('variant matches asin via catalog search (safeMatchAsin returns match)', async () => {
       mockFetchAll.mockResolvedValueOnce([
         {
-          id: 'p1', sku: 'SKU-1', name: 'Widget', brands: { name: 'Acme' }, has_variants: true,
+          id: 'p1',
+          sku: 'SKU-1',
+          name: 'Widget',
+          brands: { name: 'Acme' },
+          has_variants: true,
           product_variants: [{ sku: 'V1', price: 10, gtin: '123', variant_name: 'Red' }],
         },
       ] as any)
@@ -203,9 +215,7 @@ describe('amazon/sync', () => {
     })
 
     it('safeMatchAsin swallows matchAsin errors -> full create', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockRejectedValueOnce(new Error('rate limit'))
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
 
@@ -217,12 +227,12 @@ describe('amazon/sync', () => {
   describe('putWithBackoff retry on 429', () => {
     it('retries on 429 with retryAfter header then succeeds', async () => {
       vi.useFakeTimers()
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
-      const err429: any = new Error('rate limited'); err429.status = 429; err429.retryAfter = '0'
+      const err429: any = new Error('rate limited')
+      err429.status = 429
+      err429.retryAfter = '0'
       mockPut.mockRejectedValueOnce(err429).mockResolvedValueOnce({} as any)
 
       const p = syncAllProductsToAmazon()
@@ -235,12 +245,11 @@ describe('amazon/sync', () => {
 
     it('gives up after MAX_RETRIES 429s and records error', async () => {
       vi.useFakeTimers()
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
-      const err429: any = new Error('always 429'); err429.status = 429
+      const err429: any = new Error('always 429')
+      err429.status = 429
       mockPut.mockRejectedValue(err429)
 
       const p = syncAllProductsToAmazon()
@@ -251,12 +260,11 @@ describe('amazon/sync', () => {
     })
 
     it('non-429 error throws immediately (no retry)', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
-      const err: any = new Error('500 err'); err.status = 500
+      const err: any = new Error('500 err')
+      err.status = 500
       mockPut.mockRejectedValueOnce(err)
 
       const result = await syncAllProductsToAmazon()
@@ -268,10 +276,13 @@ describe('amazon/sync', () => {
       mockFetchAll.mockResolvedValueOnce([
         { id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false, asin: 'B0', asin_match: 'gtin' },
       ] as any)
-      mockToOffer.mockReturnValueOnce(createListing({
-        sku: 'SKU-1', requirements: 'LISTING_OFFER_ONLY',
-        attributes: { purchasable_offer: [{}], merchant_suggested_asin: [{ value: 'B0' }] },
-      }))
+      mockToOffer.mockReturnValueOnce(
+        createListing({
+          sku: 'SKU-1',
+          requirements: 'LISTING_OFFER_ONLY',
+          attributes: { purchasable_offer: [{}], merchant_suggested_asin: [{ value: 'B0' }] },
+        })
+      )
       mockPatch.mockRejectedValueOnce(new Error('patch fail'))
 
       const result = await syncAllProductsToAmazon()
@@ -312,7 +323,9 @@ describe('amazon/sync', () => {
     it('returns per-sku validation result', async () => {
       mockFetchProduct.mockResolvedValueOnce({ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false } as any)
       mockMatchAsin.mockResolvedValueOnce(null)
-      mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1', productType: 'PT', requirements: 'LISTING_FULL' })])
+      mockToListings.mockReturnValueOnce([
+        createListing({ sku: 'SKU-1', productType: 'PT', requirements: 'LISTING_FULL' }),
+      ])
       mockValidate.mockResolvedValueOnce({ status: 'VALID', issues: [] } as any)
       const out = await validateProductForAmazon('p1')
       expect(out[0]).toMatchObject({ sku: 'SKU-1', productType: 'PT', status: 'VALID' })
@@ -321,7 +334,9 @@ describe('amazon/sync', () => {
     it('captures validate error into row', async () => {
       mockFetchProduct.mockResolvedValueOnce({ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false } as any)
       mockMatchAsin.mockResolvedValueOnce(null)
-      mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1', productType: 'PT', requirements: 'LISTING_FULL' })])
+      mockToListings.mockReturnValueOnce([
+        createListing({ sku: 'SKU-1', productType: 'PT', requirements: 'LISTING_FULL' }),
+      ])
       mockValidate.mockRejectedValueOnce(new Error('validate boom'))
       const out = await validateProductForAmazon('p1')
       expect(out[0].error).toBe('validate boom')
@@ -331,12 +346,23 @@ describe('amazon/sync', () => {
   describe('dryRunAmazonSync', () => {
     it('reports offer-only postable row', async () => {
       mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', brands: { name: 'Acme' }, has_variants: false, asin: 'B0', asin_match: 'gtin' },
+        {
+          id: 'p1',
+          sku: 'SKU-1',
+          name: 'W',
+          brands: { name: 'Acme' },
+          has_variants: false,
+          asin: 'B0',
+          asin_match: 'gtin',
+        },
       ] as any)
-      mockToOffer.mockReturnValueOnce(createListing({
-        sku: 'SKU-1', requirements: 'LISTING_OFFER_ONLY',
-        attributes: { merchant_suggested_asin: [{ value: 'B0' }] },
-      }))
+      mockToOffer.mockReturnValueOnce(
+        createListing({
+          sku: 'SKU-1',
+          requirements: 'LISTING_OFFER_ONLY',
+          attributes: { merchant_suggested_asin: [{ value: 'B0' }] },
+        })
+      )
       mockValidate.mockResolvedValueOnce({ status: 'VALID', issues: [] } as any)
 
       const rep = await dryRunAmazonSync(10)
@@ -348,9 +374,7 @@ describe('amazon/sync', () => {
     })
 
     it('reports blocked create row with block reason from issues', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
       mockValidate.mockResolvedValueOnce({ status: 'INVALID', issues: [{ code: 'E1', message: 'bad thing' }] } as any)
@@ -363,9 +387,7 @@ describe('amazon/sync', () => {
     })
 
     it('block reason defaults to "invalid" when no issues', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
       mockValidate.mockResolvedValueOnce({ status: 'INVALID', issues: [] } as any)
@@ -375,9 +397,7 @@ describe('amazon/sync', () => {
     })
 
     it('validate throwing sets postable null + blockReason from message', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
       mockValidate.mockRejectedValueOnce(new Error('network down'))
@@ -388,11 +408,11 @@ describe('amazon/sync', () => {
     })
 
     it('resolveListings throwing produces a create/blocked row', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
-      mockToListings.mockImplementationOnce(() => { throw new Error('resolve boom') })
+      mockToListings.mockImplementationOnce(() => {
+        throw new Error('resolve boom')
+      })
 
       const rep = await dryRunAmazonSync()
       expect(rep.rows[0].strategy).toBe('create')
@@ -400,9 +420,7 @@ describe('amazon/sync', () => {
     })
 
     it('no listing (empty) leaves postable null', async () => {
-      mockFetchAll.mockResolvedValueOnce([
-        { id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false },
-      ] as any)
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'W', has_variants: false }] as any)
       mockMatchAsin.mockResolvedValueOnce(null)
       mockToListings.mockReturnValueOnce([])
 
@@ -441,9 +459,11 @@ describe('amazon/sync', () => {
 
   describe('sendAmazonSyncFailureEmail', () => {
     const result: any = {
-      synced: 1, deleted: 0,
+      synced: 1,
+      deleted: 0,
       errors: [{ sku: 'SKU-1', error: 'boom' }],
-      startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
     }
 
     it('sends without throwing', async () => {

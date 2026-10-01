@@ -1,8 +1,10 @@
-import { queryMany, queryOne } from '@/lib/db'
-import { round2 } from '@/lib/gst'
+import { queryMany, queryOne } from '@/lib/shared/db'
+import { round2 } from '@/lib/catalog/gst'
 import type { ToolDef } from '../tools'
 
-function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n))
+}
 
 function fmtAmount(n: number | string | null | undefined): string {
   const v = typeof n === 'number' ? n : parseFloat(String(n || '0'))
@@ -11,10 +13,12 @@ function fmtAmount(n: number | string | null | undefined): string {
 
 function monthBounds(month?: string): { from: string; to: string; label: string } {
   const now = new Date()
-  let y = now.getUTCFullYear(), m = now.getUTCMonth() + 1
+  let y = now.getUTCFullYear(),
+    m = now.getUTCMonth() + 1
   if (month && /^\d{4}-\d{2}$/.test(month)) {
     const [yy, mm] = month.split('-').map(Number)
-    y = yy; m = mm
+    y = yy
+    m = mm
   }
   const from = `${y}-${String(m).padStart(2, '0')}-01`
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
@@ -23,12 +27,22 @@ function monthBounds(month?: string): { from: string; to: string; label: string 
   return { from, to, label }
 }
 
-const PICKUP_EXCLUDE_STATUSES = ['shipped', 'delivered', 'cancelled', 'returned', 'return_requested', 'return_approved', 'return_received', 'return_rejected']
+const PICKUP_EXCLUDE_STATUSES = [
+  'shipped',
+  'delivered',
+  'cancelled',
+  'returned',
+  'return_requested',
+  'return_approved',
+  'return_received',
+  'return_rejected',
+]
 
 export const OPERATIONS_TOOLS: ToolDef[] = [
   {
     name: 'list_pending_pickups',
-    description: 'Orders that are paid, have an AWB assigned, and have NOT yet been added to a pending/picked-up Delhivery pickup request. Use to see what is ready to be handed to a courier.',
+    description:
+      'Orders that are paid, have an AWB assigned, and have NOT yet been added to a pending/picked-up Delhivery pickup request. Use to see what is ready to be handed to a courier.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,7 +77,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'list_recent_pickups',
-    description: 'Recent Delhivery pickup requests with their statuses (pending, picked_up, failed). Useful to confirm what was scheduled and the courier outcome.',
+    description:
+      'Recent Delhivery pickup requests with their statuses (pending, picked_up, failed). Useful to confirm what was scheduled and the courier outcome.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -88,12 +103,18 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'list_payables',
-    description: 'Vendor payables (expenses) that are unpaid or partially paid. Filter by status (unpaid|partial|paid|all) or due-window in days.',
+    description:
+      'Vendor payables (expenses) that are unpaid or partially paid. Filter by status (unpaid|partial|paid|all) or due-window in days.',
     inputSchema: {
       type: 'object',
       properties: {
         status: { type: 'string', description: 'unpaid | partial | paid | all (default: not paid)' },
-        dueWithinDays: { type: 'integer', description: 'Only show payables with due_date within N days from today.', minimum: 1, maximum: 365 },
+        dueWithinDays: {
+          type: 'integer',
+          description: 'Only show payables with due_date within N days from today.',
+          minimum: 1,
+          maximum: 365,
+        },
         limit: { type: 'integer', default: 50, minimum: 1, maximum: 200 },
       },
     },
@@ -105,12 +126,14 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       let i = 1
       const s = String(status || '').toLowerCase()
       if (s && s !== 'all') {
-        conds.push(`e.status = $${i++}`); params.push(s)
+        conds.push(`e.status = $${i++}`)
+        params.push(s)
       } else if (!s) {
         conds.push(`e.status != 'paid'`)
       }
       if (typeof dueWithinDays === 'number' && dueWithinDays > 0) {
-        conds.push(`e.due_date IS NOT NULL AND e.due_date <= CURRENT_DATE + ($${i++}::int)`); params.push(clamp(dueWithinDays, 1, 365))
+        conds.push(`e.due_date IS NOT NULL AND e.due_date <= CURRENT_DATE + ($${i++}::int)`)
+        params.push(clamp(dueWithinDays, 1, 365))
       }
       const where = conds.length ? `WHERE ${conds.join(' AND ')}` : ''
       const rows = await queryMany(
@@ -125,7 +148,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
          LIMIT ${lim}`,
         params
       )
-      let total_payable = 0, overdue = 0
+      let total_payable = 0,
+        overdue = 0
       for (const r of rows) {
         const remaining = parseFloat(r.total_amount as string) - parseFloat(r.paid_amount as string)
         total_payable += remaining
@@ -141,11 +165,17 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'list_receivables',
-    description: 'Outstanding customer receivables (orders with payment_status unpaid or partial), aged by days outstanding. Flag the over-30 and over-60 buckets.',
+    description:
+      'Outstanding customer receivables (orders with payment_status unpaid or partial), aged by days outstanding. Flag the over-30 and over-60 buckets.',
     inputSchema: {
       type: 'object',
       properties: {
-        daysOverdue: { type: 'integer', description: 'Only include orders aged >= N days. Omit for all outstanding.', minimum: 0, maximum: 365 },
+        daysOverdue: {
+          type: 'integer',
+          description: 'Only include orders aged >= N days. Omit for all outstanding.',
+          minimum: 0,
+          maximum: 365,
+        },
         limit: { type: 'integer', default: 50, minimum: 1, maximum: 200 },
       },
     },
@@ -172,7 +202,10 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
          LIMIT ${lim}`,
         [minDays]
       )
-      let total = 0, b0_30 = 0, b31_60 = 0, b60p = 0
+      let total = 0,
+        b0_30 = 0,
+        b31_60 = 0,
+        b60p = 0
       for (const r of rows) {
         const amt = parseFloat(r.total_amount as string)
         total += amt
@@ -195,7 +228,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'get_cashflow_summary',
-    description: 'Receipts (paid orders + cash sales) vs payments (vendor payouts) over a daysBack window. Returns daily and aggregate totals.',
+    description:
+      'Receipts (paid orders + cash sales) vs payments (vendor payouts) over a daysBack window. Returns daily and aggregate totals.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -230,7 +264,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'get_pl_summary',
-    description: 'Profit-and-loss for a single calendar month. Revenue (paid orders + cash sales), COGS, gross profit, gross margin %, tax collected. Defaults to current month.',
+    description:
+      'Profit-and-loss for a single calendar month. Revenue (paid orders + cash sales), COGS, gross profit, gross margin %, tax collected. Defaults to current month.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -268,7 +303,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       const gross = revenue - cogs
       return {
         month: label,
-        from, to,
+        from,
+        to,
         revenue: round2(revenue),
         cogs: round2(cogs),
         gross_profit: round2(gross),
@@ -280,7 +316,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'get_gst_summary',
-    description: 'GST output (sales) and input (purchase ITC) totals for a calendar month. Use as a quick sanity check before exporting GSTR-1 / GSTR-3B. Defaults to current month.',
+    description:
+      'GST output (sales) and input (purchase ITC) totals for a calendar month. Use as a quick sanity check before exporting GSTR-1 / GSTR-3B. Defaults to current month.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -315,7 +352,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       const itcTax = parseFloat(itc?.tax || '0')
       return {
         month: label,
-        from, to,
+        from,
+        to,
         output: {
           taxable: round2(parseFloat(out?.taxable || '0')),
           cgst: round2(parseFloat(out?.cgst || '0')),
@@ -335,7 +373,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'list_recent_transactions',
-    description: 'Most recent financial transactions across paid orders, cash sales, and vendor payouts. Sorted by date desc.',
+    description:
+      'Most recent financial transactions across paid orders, cash sales, and vendor payouts. Sorted by date desc.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -372,11 +411,16 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
 
   {
     name: 'propose_create_pickup_request',
-    description: 'Propose a Delhivery pickup request for one or more shipped orders. The actual Delhivery API call happens AFTER admin approval. Pass a list of order UUIDs (use list_pending_pickups to find them).',
+    description:
+      'Propose a Delhivery pickup request for one or more shipped orders. The actual Delhivery API call happens AFTER admin approval. Pass a list of order UUIDs (use list_pending_pickups to find them).',
     inputSchema: {
       type: 'object',
       properties: {
-        orderIds: { type: 'array', description: 'Order UUIDs (1-50). Each order must be paid, have an AWB, and not already be in an active pickup.' },
+        orderIds: {
+          type: 'array',
+          description:
+            'Order UUIDs (1-50). Each order must be paid, have an AWB, and not already be in an active pickup.',
+        },
         pickupDate: { type: 'string', description: 'YYYY-MM-DD. Defaults to tomorrow.' },
       },
       required: ['orderIds'],
@@ -393,8 +437,12 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('pickupDate must be YYYY-MM-DD')
 
       const eligible = await queryMany<{
-        id: string; order_number: string; awb_number: string; customer_name: string;
-        total_amount: string; status: string
+        id: string
+        order_number: string
+        awb_number: string
+        customer_name: string
+        total_amount: string
+        status: string
       }>(
         `SELECT o.id::text, o.order_number, o.awb_number,
                 COALESCE(o.customer_name, '') AS customer_name,
@@ -411,10 +459,17 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         [ids, ...PICKUP_EXCLUDE_STATUSES]
       )
       if (eligible.length === 0) {
-        return { proposed: false, info: 'No eligible orders found (must be paid, have AWB, not already in a pending/picked-up pickup, not shipped/delivered/cancelled).' }
+        return {
+          proposed: false,
+          info: 'No eligible orders found (must be paid, have AWB, not already in a pending/picked-up pickup, not shipped/delivered/cancelled).',
+        }
       }
       if (eligible.length !== ids.length) {
-        return { proposed: false, info: `Only ${eligible.length} of ${ids.length} orders are eligible. Re-check ids.`, eligibleCount: eligible.length }
+        return {
+          proposed: false,
+          info: `Only ${eligible.length} of ${ids.length} orders are eligible. Re-check ids.`,
+          eligibleCount: eligible.length,
+        }
       }
 
       const totalAmt = eligible.reduce((s, o) => s + parseFloat(o.total_amount || '0'), 0)
@@ -431,19 +486,23 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         confirmation: `Schedule a Delhivery pickup on ${dateStr} for ${eligible.length} order${eligible.length === 1 ? '' : 's'} (₹${fmtAmount(totalAmt)} total)?`,
         ui_blocks: [
           { type: 'heading', value: 'Pickup request', level: 2 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Pickup date', value: dateStr },
-            { key: 'Orders', value: String(eligible.length) },
-            { key: 'Total invoice value', value: `₹${fmtAmount(totalAmt)}` },
-          ]},
-          { type: 'table',
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Pickup date', value: dateStr },
+              { key: 'Orders', value: String(eligible.length) },
+              { key: 'Total invoice value', value: `₹${fmtAmount(totalAmt)}` },
+            ],
+          },
+          {
+            type: 'table',
             headers: ['Order #', 'Customer', 'AWB', 'Amount'],
             rows: eligible.map(o => [
               o.order_number,
               o.customer_name || '-',
               o.awb_number,
               `₹${fmtAmount(o.total_amount)}`,
-            ])
+            ]),
           },
         ],
       }
@@ -451,7 +510,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_sync_delhivery_statuses',
-    description: 'Propose a manual sync of all open AWBs against the Delhivery tracking API. The job updates order.status, shipped_at, delivered_at and may trigger customer status emails. Long-running (30-60s).',
+    description:
+      'Propose a manual sync of all open AWBs against the Delhivery tracking API. The job updates order.status, shipped_at, delivered_at and may trigger customer status emails. Long-running (30-60s).',
     inputSchema: { type: 'object', properties: {} },
     mutating: true,
     handler: async () => {
@@ -463,7 +523,7 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       const rvp = await queryOne<{ n: number }>(
         `SELECT COUNT(*)::int AS n FROM return_requests
          WHERE rvp_awb_number IS NOT NULL AND status = 'approved' AND received_at IS NULL`
-      ).catch(() => ({ n: 0 } as any))
+      ).catch(() => ({ n: 0 }) as any)
       const total = (open?.n || 0) + (rvp?.n || 0)
       if (total === 0) {
         return { proposed: false, info: 'No open AWBs or RVP shipments to sync.' }
@@ -475,19 +535,28 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         confirmation: `Run Delhivery status sync against ${open?.n || 0} forward AWB${open?.n === 1 ? '' : 's'} and ${rvp?.n || 0} RVP shipment${rvp?.n === 1 ? '' : 's'}?`,
         ui_blocks: [
           { type: 'heading', value: 'Delhivery status sync', level: 2 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Forward AWBs', value: String(open?.n || 0) },
-            { key: 'Return AWBs', value: String(rvp?.n || 0) },
-          ]},
-          { type: 'callout', tone: 'warn', title: 'Heads up',
-            message: 'This will hit the Delhivery tracking API and update status_codes on every open AWB. Customer status-update emails may also be sent. Expect 30-60 seconds.' },
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Forward AWBs', value: String(open?.n || 0) },
+              { key: 'Return AWBs', value: String(rvp?.n || 0) },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'warn',
+            title: 'Heads up',
+            message:
+              'This will hit the Delhivery tracking API and update status_codes on every open AWB. Customer status-update emails may also be sent. Expect 30-60 seconds.',
+          },
         ],
       }
     },
   },
   {
     name: 'propose_pay_payable',
-    description: 'Propose recording a vendor payment against a payable (expense). Creates an expense_payment row and updates expense status. Does NOT actually move money — it is a bookkeeping record. Requires payableId.',
+    description:
+      'Propose recording a vendor payment against a payable (expense). Creates an expense_payment row and updates expense status. Does NOT actually move money — it is a bookkeeping record. Requires payableId.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -503,7 +572,9 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
     handler: async ({ payableId, paymentMode, paidAt, transactionRef, amount }) => {
       const id = String(payableId || '').trim()
       if (!id) throw new Error('payableId is required')
-      const mode = String(paymentMode || '').toLowerCase().trim()
+      const mode = String(paymentMode || '')
+        .toLowerCase()
+        .trim()
       if (!['cash', 'upi', 'bank_transfer', 'cheque', 'other'].includes(mode)) {
         throw new Error('paymentMode must be one of: cash, upi, bank_transfer, cheque, other')
       }
@@ -512,9 +583,12 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       if (!/^\d{4}-\d{2}-\d{2}$/.test(payDate)) throw new Error('paidAt must be YYYY-MM-DD')
 
       const exp = await queryOne<{
-        id: string; expense_number: string; supplier_name: string;
-        total_amount: string; status: string;
-        paid_amount: string;
+        id: string
+        expense_number: string
+        supplier_name: string
+        total_amount: string
+        status: string
+        paid_amount: string
       }>(
         `SELECT e.id::text, e.expense_number, e.supplier_name, e.total_amount::text, e.status,
                 COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0)::text AS paid_amount
@@ -538,19 +612,24 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
 
       const blocks: unknown[] = [
         { type: 'heading', value: `Pay ${exp.expense_number}`, level: 2 },
-        { type: 'kv_pairs', pairs: [
-          { key: 'Vendor', value: exp.supplier_name },
-          { key: 'Expense', value: exp.expense_number },
-          { key: 'Amount', value: `₹${fmtAmount(payAmt)}` },
-          { key: 'Mode', value: mode },
-          { key: 'Date', value: payDate },
-          ...(ref ? [{ key: 'Reference', value: ref }] : []),
-          { key: 'Remaining after this', value: `₹${fmtAmount(remaining - payAmt)}` },
-        ]},
+        {
+          type: 'kv_pairs',
+          pairs: [
+            { key: 'Vendor', value: exp.supplier_name },
+            { key: 'Expense', value: exp.expense_number },
+            { key: 'Amount', value: `₹${fmtAmount(payAmt)}` },
+            { key: 'Mode', value: mode },
+            { key: 'Date', value: payDate },
+            ...(ref ? [{ key: 'Reference', value: ref }] : []),
+            { key: 'Remaining after this', value: `₹${fmtAmount(remaining - payAmt)}` },
+          ],
+        },
       ]
       if (isHighValue) {
         blocks.push({
-          type: 'callout', tone: 'warn', title: 'High-value payout',
+          type: 'callout',
+          tone: 'warn',
+          title: 'High-value payout',
           message: `This records a payment of ₹${fmtAmount(payAmt)} (over the ₹50,000 threshold). Double-check the vendor bank details and reference before approving.`,
         })
       }
@@ -574,7 +653,8 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_export_gstr1',
-    description: 'Propose an export of GSTR-1 outward-supplies data for a calendar month, in JSON or CSV. Downloads the export from the existing /api/admin/gst/gstr1 endpoint after approval.',
+    description:
+      'Propose an export of GSTR-1 outward-supplies data for a calendar month, in JSON or CSV. Downloads the export from the existing /api/admin/gst/gstr1 endpoint after approval.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -614,22 +694,33 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         proposed: true,
         kind: 'export_gstr1',
         payload: {
-          month: monthStr, from, to, format: fmt,
-          rowCount: counts.rows, b2bCount: counts.b2b, b2cCount: counts.b2c,
+          month: monthStr,
+          from,
+          to,
+          format: fmt,
+          rowCount: counts.rows,
+          b2bCount: counts.b2b,
+          b2cCount: counts.b2c,
         },
         confirmation: `Export GSTR-1 for ${monthStr} (${counts.rows} invoice${counts.rows === 1 ? '' : 's'}, ${fmt.toUpperCase()})?`,
         ui_blocks: [
           { type: 'heading', value: `GSTR-1 export · ${monthStr}`, level: 2 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Period', value: `${from} → ${to}` },
-            { key: 'Format', value: fmt.toUpperCase() },
-            { key: 'Invoices', value: String(counts.rows) },
-            { key: 'B2B', value: String(counts.b2b) },
-            { key: 'B2C', value: String(counts.b2c) },
-            { key: 'Invoice value', value: `₹${fmtAmount(counts.total)}` },
-          ]},
-          { type: 'callout', tone: 'info',
-            message: 'Read-only export — no rows are mutated. The file will be available after approval.' },
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Period', value: `${from} → ${to}` },
+              { key: 'Format', value: fmt.toUpperCase() },
+              { key: 'Invoices', value: String(counts.rows) },
+              { key: 'B2B', value: String(counts.b2b) },
+              { key: 'B2C', value: String(counts.b2c) },
+              { key: 'Invoice value', value: `₹${fmtAmount(counts.total)}` },
+            ],
+          },
+          {
+            type: 'callout',
+            tone: 'info',
+            message: 'Read-only export — no rows are mutated. The file will be available after approval.',
+          },
         ],
       }
     },

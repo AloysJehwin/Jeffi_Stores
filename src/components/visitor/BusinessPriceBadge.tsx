@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { applyDiscount } from '@/lib/pricing'
+import { applyDiscount } from '@/lib/catalog/pricing'
 
 interface Props {
   price: number

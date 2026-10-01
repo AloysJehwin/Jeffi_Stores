@@ -5,8 +5,8 @@ import { ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import AdminImage from '@/components/admin/AdminImage'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { ap } from '@/lib/admin-path'
-import type { HomepageSection } from '@/lib/homepage-sections'
+import { ap } from '@/lib/shared/admin-path'
+import type { HomepageSection } from '@/lib/catalog/homepage-sections'
 import type { SaveSectionConfig } from './HomepageSectionManager'
 import OfferSlideDisplayEditor, { type OfferSlide } from './OfferSlideDisplayEditor'
 
@@ -18,7 +18,10 @@ function readOfferIds(section: HomepageSection): string[] {
   return raw.filter((v): v is string => typeof v === 'string')
 }
 
-export default function OfferSliderControl({ section, saveConfig }: {
+export default function OfferSliderControl({
+  section,
+  saveConfig,
+}: {
   section: HomepageSection
   saveConfig: SaveSectionConfig
 }) {
@@ -29,7 +32,9 @@ export default function OfferSliderControl({ section, saveConfig }: {
   const [order, setOrder] = useState<string[]>(() => readOfferIds(section))
   const [editing, setEditing] = useState<string | null>(null)
 
-  useEffect(() => { setOrder(readOfferIds(section)) }, [section])
+  useEffect(() => {
+    setOrder(readOfferIds(section))
+  }, [section])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -45,7 +50,9 @@ export default function OfferSliderControl({ section, saveConfig }: {
     }
   }, [showToast])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   const byId = useMemo(() => new Map(offers.map(o => [o.id, o])), [offers])
 
@@ -83,8 +90,8 @@ export default function OfferSliderControl({ section, saveConfig }: {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-border-default bg-surface-secondary/40 px-3 py-2 text-xs text-foreground-muted">
-        Pick which offers appear as slides, set their order, and style each card here. Checked
-        offers show first, in the order below.{' '}
+        Pick which offers appear as slides, set their order, and style each card here. Checked offers show first, in the
+        order below.{' '}
         <a href={ap('/admin/offers?tab=offers')} className="text-accent-600 dark:text-accent-400 hover:underline">
           Edit offer data and products in the Offers page
         </a>
@@ -108,10 +115,7 @@ export default function OfferSliderControl({ section, saveConfig }: {
             const pos = chosen.indexOf(offer.id)
             const isEditing = editing === offer.id
             return (
-              <li
-                key={offer.id}
-                className="rounded-lg border border-border-default bg-surface px-2.5 py-2"
-              >
+              <li key={offer.id} className="rounded-lg border border-border-default bg-surface px-2.5 py-2">
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -124,7 +128,12 @@ export default function OfferSliderControl({ section, saveConfig }: {
 
                   <div className="w-9 h-9 shrink-0 overflow-hidden rounded bg-surface-secondary">
                     {offer.image_url && (
-                      <AdminImage src={offer.image_url} alt="" blurhash={offer.blurhash} className="w-full h-full object-cover" />
+                      <AdminImage
+                        src={offer.image_url}
+                        alt=""
+                        blurhash={offer.blurhash}
+                        className="w-full h-full object-cover"
+                      />
                     )}
                   </div>
 
@@ -174,10 +183,7 @@ export default function OfferSliderControl({ section, saveConfig }: {
                 </div>
 
                 {checked && isEditing && (
-                  <OfferSlideDisplayEditor
-                    offer={offer}
-                    onChange={patch => patchOffer(offer.id, patch)}
-                  />
+                  <OfferSlideDisplayEditor offer={offer} onChange={patch => patchOffer(offer.id, patch)} />
                 )}
               </li>
             )

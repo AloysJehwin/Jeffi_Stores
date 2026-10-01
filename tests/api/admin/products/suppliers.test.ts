@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
 const mockQueryOne = vi.fn()
 const mockQueryMany = vi.fn()
 const mockWithTransaction = vi.fn()
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
   withTransaction: (...a: any[]) => mockWithTransaction(...a),
 }))
 
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { GET, POST } from '@/app/api/admin/products/[id]/suppliers/route'
-import { PATCH, DELETE } from '@/app/api/admin/products/[id]/suppliers/[psId]/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { GET, POST } from '@/app/api/(admin)/admin/products/[id]/suppliers/route'
+import { PATCH, DELETE } from '@/app/api/(admin)/admin/products/[id]/suppliers/[psId]/route'
 
 const admin = { id: 'a1', role: 'super_admin', scopes: [] }
 
@@ -116,7 +116,9 @@ describe('POST /api/admin/products/[id]/suppliers', () => {
   })
 
   it('400 both variant and sub_variant set', async () => {
-    const res = await POST(req('POST', { supplier_id: 's', unit_cost: 5, variant_id: 'v', sub_variant_id: 'sv' }), { params: listParams })
+    const res = await POST(req('POST', { supplier_id: 's', unit_cost: 5, variant_id: 'v', sub_variant_id: 'sv' }), {
+      params: listParams,
+    })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/one leaf/)
   })
@@ -148,10 +150,20 @@ describe('POST /api/admin/products/[id]/suppliers', () => {
 
   it('creates preferred supplier with all optional fields', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'prod-1' })
-    const res = await POST(req('POST', {
-      supplier_id: 's', unit_cost: 5, is_preferred: true, currency: 'USDX',
-      gst_inclusive: true, moq: 10, lead_time_days: 3, notes: 'hello', variant_id: 'v1',
-    }), { params: listParams })
+    const res = await POST(
+      req('POST', {
+        supplier_id: 's',
+        unit_cost: 5,
+        is_preferred: true,
+        currency: 'USDX',
+        gst_inclusive: true,
+        moq: 10,
+        lead_time_days: 3,
+        notes: 'hello',
+        variant_id: 'v1',
+      }),
+      { params: listParams }
+    )
     const data = await res.json()
     expect(res.status).toBe(200)
     expect(data.success).toBe(true)
@@ -159,9 +171,15 @@ describe('POST /api/admin/products/[id]/suppliers', () => {
 
   it('handles invalid moq / lead_time_days as null', async () => {
     mockQueryOne.mockResolvedValueOnce({ id: 'prod-1' })
-    const res = await POST(req('POST', {
-      supplier_id: 's', unit_cost: 5, moq: 'abc', lead_time_days: 1.5,
-    }), { params: listParams })
+    const res = await POST(
+      req('POST', {
+        supplier_id: 's',
+        unit_cost: 5,
+        moq: 'abc',
+        lead_time_days: 1.5,
+      }),
+      { params: listParams }
+    )
     expect(res.status).toBe(200)
   })
 
@@ -190,9 +208,19 @@ describe('PATCH /api/admin/products/[id]/suppliers/[psId]', () => {
   })
 
   const existing = {
-    id: 'ps-1', product_id: 'prod-1', supplier_id: 'sup-1', unit_cost: '20',
-    currency: 'INR', gst_inclusive: false, moq: 5, lead_time_days: 2, notes: 'x',
-    is_preferred: false, variant_id: null, sub_variant_id: null, is_active: true,
+    id: 'ps-1',
+    product_id: 'prod-1',
+    supplier_id: 'sup-1',
+    unit_cost: '20',
+    currency: 'INR',
+    gst_inclusive: false,
+    moq: 5,
+    lead_time_days: 2,
+    notes: 'x',
+    is_preferred: false,
+    variant_id: null,
+    sub_variant_id: null,
+    is_active: true,
   }
 
   it('401 unauthenticated', async () => {
@@ -237,7 +265,8 @@ describe('PATCH /api/admin/products/[id]/suppliers/[psId]', () => {
 
   it('price change inserts new dated row', async () => {
     mockQueryOne.mockResolvedValueOnce(existing)
-    const clientQuery = vi.fn()
+    const clientQuery = vi
+      .fn()
       .mockResolvedValueOnce({ rows: [] }) // deactivate old
       .mockResolvedValueOnce({ rows: [{ id: 'ps-new' }] }) // insert
     mockWithTransaction.mockImplementationOnce(async (fn: any) => fn({ query: clientQuery }))
@@ -262,7 +291,9 @@ describe('PATCH /api/admin/products/[id]/suppliers/[psId]', () => {
     mockQueryOne.mockResolvedValueOnce(existing)
     const clientQuery = vi.fn().mockResolvedValue({ rows: [] })
     mockWithTransaction.mockImplementationOnce(async (fn: any) => fn({ query: clientQuery }))
-    const res = await PATCH(req('PATCH', { moq: 'nope', lead_time_days: 2.5, notes: '', currency: 'EURX' }), { params: editParams })
+    const res = await PATCH(req('PATCH', { moq: 'nope', lead_time_days: 2.5, notes: '', currency: 'EURX' }), {
+      params: editParams,
+    })
     expect(res.status).toBe(200)
   })
 

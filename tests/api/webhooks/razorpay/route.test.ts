@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -11,11 +11,11 @@ vi.mock('@/lib/email', () => ({
   sendNewOrderNotification: vi.fn(),
   sendPaymentStatusUpdate: vi.fn(),
 }))
-vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn() }))
-vi.mock('@/lib/marketing', () => ({ attributeConversion: vi.fn() }))
+vi.mock('@/lib/shared/auto-tasks', () => ({ createAutoTask: vi.fn() }))
+vi.mock('@/lib/shared/marketing', () => ({ attributeConversion: vi.fn() }))
 
-import { POST } from '@/app/api/webhooks/razorpay/route'
-import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
+import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import crypto from 'crypto'
 
 const mockQueryOne = vi.mocked(queryOne)
@@ -175,7 +175,13 @@ describe('POST /api/webhooks/razorpay', () => {
 
   it('handles payment_link.paid — processes with user', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ payment_status: 'unpaid', id: 'ord1', user_id: 'u1', total_amount: '200', order_number: '#2' })
+      .mockResolvedValueOnce({
+        payment_status: 'unpaid',
+        id: 'ord1',
+        user_id: 'u1',
+        total_amount: '200',
+        order_number: '#2',
+      })
       .mockResolvedValueOnce({ id: 'u1', email: 'u@e.com', first_name: 'A', last_name: 'B' })
       .mockResolvedValueOnce({ id: 'ord1' })
     mockQueryMany.mockResolvedValueOnce([])

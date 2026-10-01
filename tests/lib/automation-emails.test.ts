@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/marketing', () => ({
+vi.mock('@/lib/shared/marketing', () => ({
   getCampaign: vi.fn(),
   canSendMarketing: vi.fn(),
   alreadySentForReference: vi.fn(),
@@ -12,19 +12,19 @@ vi.mock('@/lib/marketing', () => ({
   wrapWithTracking: vi.fn(),
 }))
 
-vi.mock('@/lib/email-campaigns', () => ({
+vi.mock('@/lib/shared/email-campaigns', () => ({
   baseLayout: vi.fn(),
   ctaButton: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
@@ -44,12 +44,12 @@ import {
   sendPriceDropEmail,
   sendTestCampaignEmail,
   type EmailItem,
-} from '@/lib/automation-emails'
+} from '@/lib/shared/automation-emails'
 
-import * as marketing from '@/lib/marketing'
-import * as emailCampaigns from '@/lib/email-campaigns'
-import * as db from '@/lib/db'
-import * as mailAudit from '@/lib/mail-audit'
+import * as marketing from '@/lib/shared/marketing'
+import * as emailCampaigns from '@/lib/shared/email-campaigns'
+import * as db from '@/lib/shared/db'
+import * as mailAudit from '@/lib/shared/mail-audit'
 
 const mockGetCampaign = vi.mocked(marketing.getCampaign)
 const mockCanSendMarketing = vi.mocked(marketing.canSendMarketing)
@@ -608,7 +608,12 @@ describe('sendWinbackEmail', () => {
   })
 
   it('proceeds when no discount configured (no coupon_failed)', async () => {
-    mockGetCampaign.mockResolvedValue({ ...mockCampaign, kind: 'winback_180', discount_percent: 0, coupon_id: null } as any)
+    mockGetCampaign.mockResolvedValue({
+      ...mockCampaign,
+      kind: 'winback_180',
+      discount_percent: 0,
+      coupon_id: null,
+    } as any)
     mockQueryOne.mockResolvedValue(mockUser)
     mockCanSendMarketing.mockResolvedValue({ ok: true })
     mockAlreadySentForReference.mockResolvedValue(false)
@@ -672,9 +677,7 @@ describe('sendPriceDropEmail', () => {
 
   it('passes rounded oldPrice and newPrice in vars', async () => {
     mockGetCampaign.mockResolvedValue({ ...mockCampaign, kind: 'price_drop' } as any)
-    mockQueryOne
-      .mockResolvedValueOnce(mockUser)
-      .mockResolvedValueOnce(null) // no product image
+    mockQueryOne.mockResolvedValueOnce(mockUser).mockResolvedValueOnce(null) // no product image
     mockGetAssignedCouponCode.mockResolvedValue(null)
     mockGenerateCouponForCampaign.mockResolvedValue(null)
     mockCanSendMarketing.mockResolvedValue({ ok: true })

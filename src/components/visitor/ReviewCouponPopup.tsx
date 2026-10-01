@@ -34,9 +34,8 @@ export default function ReviewCouponPopup() {
 
   if (!visible || !coupon) return null
 
-  const discountText = coupon.discount_type === 'percentage'
-    ? `${coupon.discount_value}% off`
-    : `₹${coupon.discount_value} off`
+  const discountText =
+    coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`
 
   const dismiss = () => {
     sessionStorage.setItem('rfcoupon_dismissed', '1')
@@ -47,7 +46,9 @@ export default function ReviewCouponPopup() {
     <div className="fixed bottom-4 right-4 z-50 w-72 bg-white rounded-2xl shadow-2xl border border-orange-100 overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
       <div style={{ background: '#1a3a4a' }} className="px-4 py-2.5 flex items-center justify-between">
         <span className="text-white text-xs font-semibold">You earned a reward!</span>
-        <button onClick={dismiss} className="text-white/60 hover:text-white text-lg leading-none">×</button>
+        <button onClick={dismiss} className="text-white/60 hover:text-white text-lg leading-none">
+          ×
+        </button>
       </div>
       <div className="p-4 space-y-3">
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-3 text-white text-center space-y-0.5">
@@ -55,7 +56,14 @@ export default function ReviewCouponPopup() {
           <p className="text-2xl font-black tracking-widest">{coupon.code}</p>
           {coupon.description && <p className="text-xs opacity-80">{coupon.description}</p>}
           {coupon.valid_until && (
-            <p className="text-xs opacity-70">Valid until {new Date(coupon.valid_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-xs opacity-70">
+              Valid until{' '}
+              {new Date(coupon.valid_until).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
+            </p>
           )}
         </div>
         <a

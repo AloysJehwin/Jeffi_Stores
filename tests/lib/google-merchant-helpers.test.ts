@@ -5,7 +5,7 @@ import {
   buildProductHighlights,
   buildProductDetails,
   buildCustomLabels,
-} from '@/lib/google-merchant-helpers'
+} from '@/lib/shared/google-merchant-helpers'
 
 describe('getGoogleProductCategory', () => {
   it('returns categories.google_product_category when present', () => {

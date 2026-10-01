@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { webcrypto } from 'crypto'
 
-vi.mock('@/lib/db', () => ({ query: vi.fn().mockResolvedValue({ rows: [] }), queryOne: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ query: vi.fn().mockResolvedValue({ rows: [] }), queryOne: vi.fn() }))
 
-import * as db from '@/lib/db'
+import * as db from '@/lib/shared/db'
 import {
-  mintBindCookie, verifyBindCookie, verifyProof, parsePublicJwk, evaluateKeyBinding, bindingMode,
-  BIND_COOKIE, canRegisterKey,
-} from '@/lib/session-binding'
+  mintBindCookie,
+  verifyBindCookie,
+  verifyProof,
+  parsePublicJwk,
+  evaluateKeyBinding,
+  bindingMode,
+  BIND_COOKIE,
+  canRegisterKey,
+} from '@/lib/auth/session-binding'
 
 const b64url = (b: ArrayBuffer) => Buffer.from(b).toString('base64url')
 
@@ -80,7 +86,13 @@ describe('signed proof', () => {
 describe('evaluateKeyBinding', () => {
   const base = { sessionId: 'sess-1', sidHash: SID_HASH, principalType: 'customer' as const }
   const ctx = (over: Record<string, unknown>) => ({
-    host: HOST, method: 'GET', path: '/api/orders/1', bindCookies: {}, proof: null, fetchDest: 'empty', ...over,
+    host: HOST,
+    method: 'GET',
+    path: '/api/orders/1',
+    bindCookies: {},
+    proof: null,
+    fetchDest: 'empty',
+    ...over,
   })
 
   it('a copied sid with no binding cookie is refused once a key is on file', async () => {
@@ -97,7 +109,8 @@ describe('evaluateKeyBinding', () => {
     const cookie = mintBindCookie(SID_HASH, HOST).value
     const proof = await attacker.sign('GET', '/api/orders/1')
     const v = await evaluateKeyBinding({
-      ...base, sessionId: 'sess-2',
+      ...base,
+      sessionId: 'sess-2',
       ctx: ctx({ bindCookies: { [`customer`]: cookie }, proof }) as any,
     })
     expect(v).toMatchObject({ status: 'violation', reason: 'proof_invalid', reject: true })
@@ -107,8 +120,12 @@ describe('evaluateKeyBinding', () => {
     const victim = await browserKey()
     vi.mocked(db.queryOne).mockResolvedValue({ public_jwk: victim.jwk, bind_host: HOST } as any)
     const v = await evaluateKeyBinding({
-      ...base, sessionId: 'sess-3',
-      ctx: ctx({ bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value }, proof: await victim.sign('GET', '/api/orders/1') }) as any,
+      ...base,
+      sessionId: 'sess-3',
+      ctx: ctx({
+        bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value },
+        proof: await victim.sign('GET', '/api/orders/1'),
+      }) as any,
     })
     expect(v).toEqual({ status: 'ok', reject: false })
   })
@@ -123,9 +140,14 @@ describe('evaluateKeyBinding', () => {
 
   it('a page load with a copied sid is refused too, not just API calls', async () => {
     const { jwk } = await browserKey()
-    vi.mocked(db.queryOne).mockResolvedValue({ public_jwk: jwk, bind_host: HOST, created_at: new Date(Date.now() - 60_000) } as any)
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
     const v = await evaluateKeyBinding({
-      ...base, sessionId: 'sess-page',
+      ...base,
+      sessionId: 'sess-page',
       ctx: ctx({ path: '/admin/products', fetchDest: 'document' }) as any,
     })
     expect(v).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: true })
@@ -133,7 +155,11 @@ describe('evaluateKeyBinding', () => {
 
   it('requests already in flight when the key was registered are let through', async () => {
     const { jwk } = await browserKey()
-    vi.mocked(db.queryOne).mockResolvedValue({ public_jwk: jwk, bind_host: HOST, created_at: new Date(Date.now() - 3000) } as any)
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 3000),
+    } as any)
     const v = await evaluateKeyBinding({ ...base, sessionId: 'sess-grace', ctx: ctx({}) as any })
     expect(v).toEqual({ status: 'ok', reject: false })
   })
@@ -141,23 +167,41 @@ describe('evaluateKeyBinding', () => {
   it('that grace never covers a bad signature', async () => {
     const victim = await browserKey()
     const attacker = await browserKey()
-    vi.mocked(db.queryOne).mockResolvedValue({ public_jwk: victim.jwk, bind_host: HOST, created_at: new Date(Date.now() - 3000) } as any)
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: victim.jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 3000),
+    } as any)
     const v = await evaluateKeyBinding({
-      ...base, sessionId: 'sess-grace-2',
-      ctx: ctx({ bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value }, proof: await attacker.sign('GET', '/api/orders/1') }) as any,
+      ...base,
+      sessionId: 'sess-grace-2',
+      ctx: ctx({
+        bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value },
+        proof: await attacker.sign('GET', '/api/orders/1'),
+      }) as any,
     })
     expect(v).toMatchObject({ reason: 'proof_invalid', reject: true })
   })
 
   it('a just-created session with no key yet is let through so it can bind', async () => {
     vi.mocked(db.queryOne).mockResolvedValue(null as any)
-    const v = await evaluateKeyBinding({ ...base, sessionId: 'sess-5', sessionCreatedAt: Date.now() - 30_000, ctx: ctx({}) as any })
+    const v = await evaluateKeyBinding({
+      ...base,
+      sessionId: 'sess-5',
+      sessionCreatedAt: Date.now() - 30_000,
+      ctx: ctx({}) as any,
+    })
     expect(v).toEqual({ status: 'unbound', reject: false })
   })
 
   it('an old session that never bound is refused: nobody may attach a key to it later', async () => {
     vi.mocked(db.queryOne).mockResolvedValue(null as any)
-    const v = await evaluateKeyBinding({ ...base, sessionId: 'sess-5b', sessionCreatedAt: Date.now() - 60 * 60_000, ctx: ctx({}) as any })
+    const v = await evaluateKeyBinding({
+      ...base,
+      sessionId: 'sess-5b',
+      sessionCreatedAt: Date.now() - 60 * 60_000,
+      ctx: ctx({}) as any,
+    })
     expect(v).toEqual({ status: 'unbound', reject: true })
     expect(canRegisterKey(Date.now() - 60 * 60_000)).toBe(false)
     expect(canRegisterKey(Date.now() - 30_000)).toBe(true)
@@ -172,7 +216,8 @@ describe('evaluateKeyBinding', () => {
   it('switches itself off when no server secret is configured', () => {
     delete process.env.SESSION_BINDING_SECRET
     const saved = [process.env.JWT_SECRET, process.env.CRON_SECRET]
-    delete process.env.JWT_SECRET; delete process.env.CRON_SECRET
+    delete process.env.JWT_SECRET
+    delete process.env.CRON_SECRET
     expect(bindingMode()).toBe('off')
     ;[process.env.JWT_SECRET, process.env.CRON_SECRET] = saved
   })

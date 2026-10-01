@@ -1,26 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
 }))
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: () => ({}) },
   zPhone: { optional: () => ({}) },
   zIndianPin: { optional: () => ({}) },
 }))
 
-import { PATCH, DELETE } from '@/app/api/user/addresses/[id]/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as validate from '@/lib/validate'
+import { PATCH, DELETE } from '@/app/api/(public)/user/addresses/[id]/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as validate from '@/lib/shared/validate'
 
 const AUTH_USER = { userId: 'user-1' }
 const PARAMS = { params: Promise.resolve({ id: 'addr-42' }) }
@@ -139,10 +139,7 @@ describe('PATCH /api/user/addresses/[id]', () => {
 
     const res = await PATCH(makePatch({ ...VALID_PATCH_BODY, phone: '919876543210' }) as any, PARAMS)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(['+919876543210'])
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['+919876543210']))
   })
 
   it('returns 404 when address not found', async () => {
@@ -210,14 +207,8 @@ describe('DELETE /api/user/addresses/[id]', () => {
     expect(body.message).toMatch(/deleted successfully/i)
     // null out FK references first (2 UPDATE calls), then DELETE
     expect(db.query).toHaveBeenCalledTimes(3)
-    expect(db.query).toHaveBeenCalledWith(
-      expect.stringContaining('shipping_address_id = NULL'),
-      ['addr-42']
-    )
-    expect(db.query).toHaveBeenCalledWith(
-      expect.stringContaining('billing_address_id = NULL'),
-      ['addr-42']
-    )
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('shipping_address_id = NULL'), ['addr-42'])
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining('billing_address_id = NULL'), ['addr-42'])
     expect(db.query).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM addresses'),
       expect.arrayContaining(['addr-42', 'user-1'])

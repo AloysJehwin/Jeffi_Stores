@@ -37,7 +37,11 @@ export default function DeleteReviewFormButton({ id, title }: { id: string; titl
   if (!canWrite) return null
 
   return (
-    <button onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+    <button
+      onClick={handleDelete}
+      disabled={loading}
+      className="text-red-500 hover:underline text-sm disabled:opacity-50"
+    >
       {loading ? 'Deleting…' : 'Delete'}
     </button>
   )

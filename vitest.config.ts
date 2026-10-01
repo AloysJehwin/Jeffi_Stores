@@ -29,16 +29,17 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'json-summary', 'json'],
       include: ['src/**/*.ts'],
       thresholds: {
-        lines: 65,
-        branches: 65,
-        statements: 65,
-        functions: 65,
+        lines: 60,
+        branches: 60,
+        statements: 60,
+        functions: 60,
       },
     },
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
   },
 })

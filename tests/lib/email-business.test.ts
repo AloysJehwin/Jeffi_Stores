@@ -1,10 +1,10 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('@/lib/mail-audit', () => ({
+vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
-import * as mailAudit from '@/lib/mail-audit'
+import * as mailAudit from '@/lib/shared/mail-audit'
 import {
   sendRfqSubmittedEmail,
   sendRfqConvertedToQuotationEmail,
@@ -12,7 +12,7 @@ import {
   sendBusinessAccountRejectedEmail,
   sendBusinessInvoiceGeneratedEmail,
   sendBusinessOrderStatusEmail,
-} from '@/lib/email-business'
+} from '@/lib/shared/email-business'
 
 const mockSendAuditedMail = mailAudit.sendAuditedMail as ReturnType<typeof vi.fn>
 
@@ -42,9 +42,7 @@ describe('email-business', () => {
     it('uses correct template names', async () => {
       await sendRfqSubmittedEmail('buyer@example.com', 'Bob', 'RFQ-002')
 
-      const templateNames = mockSendAuditedMail.mock.calls.map(
-        (c: any[]) => c[0].templateName
-      )
+      const templateNames = mockSendAuditedMail.mock.calls.map((c: any[]) => c[0].templateName)
       expect(templateNames).toContain('rfq_submitted_user')
       expect(templateNames).toContain('rfq_submitted_admin')
     })
@@ -62,23 +60,31 @@ describe('email-business', () => {
         .mockRejectedValueOnce(new Error('Admin mail failed'))
 
       // Should complete without throwing
-      await expect(
-        sendRfqSubmittedEmail('buyer@example.com', 'Dave', 'RFQ-003')
-      ).resolves.toBeUndefined()
+      await expect(sendRfqSubmittedEmail('buyer@example.com', 'Dave', 'RFQ-003')).resolves.toBeUndefined()
     })
   })
 
   describe('sendRfqConvertedToQuotationEmail', () => {
     it('returns success on valid call', async () => {
       const result = await sendRfqConvertedToQuotationEmail(
-        'buyer@example.com', 'Eve', 'RFQ-010', 'QT-010', 12500, 'https://example.com/qt/010'
+        'buyer@example.com',
+        'Eve',
+        'RFQ-010',
+        'QT-010',
+        12500,
+        'https://example.com/qt/010'
       )
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
     it('includes quotation number in subject', async () => {
       await sendRfqConvertedToQuotationEmail(
-        'buyer@example.com', 'Eve', 'RFQ-010', 'QT-010', 12500, 'https://example.com'
+        'buyer@example.com',
+        'Eve',
+        'RFQ-010',
+        'QT-010',
+        12500,
+        'https://example.com'
       )
       const { subject } = mockSendAuditedMail.mock.calls[0][0]
       expect(subject).toContain('QT-010')
@@ -86,7 +92,12 @@ describe('email-business', () => {
 
     it('formats total amount with 2 decimal places in html', async () => {
       await sendRfqConvertedToQuotationEmail(
-        'buyer@example.com', 'Eve', 'RFQ-010', 'QT-010', 12500, 'https://example.com'
+        'buyer@example.com',
+        'Eve',
+        'RFQ-010',
+        'QT-010',
+        12500,
+        'https://example.com'
       )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('12,500.00')
@@ -95,7 +106,12 @@ describe('email-business', () => {
     it('returns error object on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP'))
       const result = await sendRfqConvertedToQuotationEmail(
-        'buyer@example.com', 'Eve', 'RFQ-010', 'QT-010', 0, 'https://example.com'
+        'buyer@example.com',
+        'Eve',
+        'RFQ-010',
+        'QT-010',
+        0,
+        'https://example.com'
       )
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
@@ -103,9 +119,7 @@ describe('email-business', () => {
 
   describe('sendBusinessAccountApprovedEmail', () => {
     it('returns success result', async () => {
-      const result = await sendBusinessAccountApprovedEmail(
-        'biz@example.com', 'Frank', 'Acme Corp'
-      )
+      const result = await sendBusinessAccountApprovedEmail('biz@example.com', 'Frank', 'Acme Corp')
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
@@ -123,24 +137,18 @@ describe('email-business', () => {
 
   describe('sendBusinessAccountRejectedEmail', () => {
     it('returns success result', async () => {
-      const result = await sendBusinessAccountRejectedEmail(
-        'biz@example.com', 'Grace', 'Globex', null
-      )
+      const result = await sendBusinessAccountRejectedEmail('biz@example.com', 'Grace', 'Globex', null)
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
     it('includes rejection note when provided', async () => {
-      await sendBusinessAccountRejectedEmail(
-        'biz@example.com', 'Grace', 'Globex', 'Incomplete documents'
-      )
+      await sendBusinessAccountRejectedEmail('biz@example.com', 'Grace', 'Globex', 'Incomplete documents')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('Incomplete documents')
     })
 
     it('omits rejection note block when null', async () => {
-      await sendBusinessAccountRejectedEmail(
-        'biz@example.com', 'Grace', 'Globex', null
-      )
+      await sendBusinessAccountRejectedEmail('biz@example.com', 'Grace', 'Globex', null)
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).not.toContain('Reason:')
     })
@@ -154,21 +162,36 @@ describe('email-business', () => {
   describe('sendBusinessInvoiceGeneratedEmail', () => {
     it('returns success result', async () => {
       const result = await sendBusinessInvoiceGeneratedEmail(
-        'biz@example.com', 'Hank', 'INV-001', 'ORD-001', 9999.99, 'https://example.com/inv/1'
+        'biz@example.com',
+        'Hank',
+        'INV-001',
+        'ORD-001',
+        9999.99,
+        'https://example.com/inv/1'
       )
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
     it('includes invoice number in subject', async () => {
       await sendBusinessInvoiceGeneratedEmail(
-        'biz@example.com', 'Hank', 'INV-007', 'ORD-007', 1000, 'https://example.com'
+        'biz@example.com',
+        'Hank',
+        'INV-007',
+        'ORD-007',
+        1000,
+        'https://example.com'
       )
       expect(mockSendAuditedMail.mock.calls[0][0].subject).toContain('INV-007')
     })
 
     it('formats amount with 2 decimal places', async () => {
       await sendBusinessInvoiceGeneratedEmail(
-        'biz@example.com', 'Hank', 'INV-007', 'ORD-007', 9999.99, 'https://example.com'
+        'biz@example.com',
+        'Hank',
+        'INV-007',
+        'ORD-007',
+        9999.99,
+        'https://example.com'
       )
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('9,999.99')
@@ -177,9 +200,7 @@ describe('email-business', () => {
 
   describe('sendBusinessOrderStatusEmail', () => {
     it('returns success for known status', async () => {
-      const result = await sendBusinessOrderStatusEmail(
-        'biz@example.com', 'Iris', 'ORD-100', 'shipped'
-      )
+      const result = await sendBusinessOrderStatusEmail('biz@example.com', 'Iris', 'ORD-100', 'shipped')
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
@@ -196,9 +217,7 @@ describe('email-business', () => {
     })
 
     it('includes invoice link when provided', async () => {
-      await sendBusinessOrderStatusEmail(
-        'biz@example.com', 'Iris', 'ORD-100', 'delivered', 'https://example.com/inv/1'
-      )
+      await sendBusinessOrderStatusEmail('biz@example.com', 'Iris', 'ORD-100', 'delivered', 'https://example.com/inv/1')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('https://example.com/inv/1')
     })

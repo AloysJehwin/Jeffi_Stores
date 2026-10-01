@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { ensureFingerprintCookie } from '@/lib/fp-beacon'
+import { ensureFingerprintCookie } from '@/lib/client/fp-beacon'
 
 interface User {
   id: string

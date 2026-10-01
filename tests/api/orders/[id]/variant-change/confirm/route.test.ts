@@ -1,28 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAnyUser: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), query: vi.fn(), resolveRequestTenant: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/razorpay', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAnyUser: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
+  queryOne: vi.fn(),
+  query: vi.fn(),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
+}))
+vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn(),
 }))
-vi.mock('@/lib/razorpay-route', () => ({
+vi.mock('@/lib/payments/razorpay-route', () => ({
   reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
   recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
-vi.mock('@/lib/variant-change', () => ({ applyVariantChange: vi.fn() }))
-vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/orders/variant-change', () => ({ applyVariantChange: vi.fn() }))
+vi.mock('@/lib/shared/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 
-import { POST } from '@/app/api/orders/[id]/variant-change/confirm/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
-import * as razorpayLib from '@/lib/razorpay'
-import * as vc from '@/lib/variant-change'
-import * as activity from '@/lib/activity'
+import { POST } from '@/app/api/(public)/orders/[id]/variant-change/confirm/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
+import * as razorpayLib from '@/lib/payments/razorpay'
+import * as vc from '@/lib/orders/variant-change'
+import * as activity from '@/lib/shared/activity'
 
 const USER = { userId: 'user-1' }
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
@@ -97,8 +101,8 @@ describe('POST variant-change confirm', () => {
 
     it('400 when no payment to refund', async () => {
       vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(BASE_VCR as any)  // vcr
-        .mockResolvedValueOnce(null as any)      // payment
+        .mockResolvedValueOnce(BASE_VCR as any) // vcr
+        .mockResolvedValueOnce(null as any) // payment
       expect((await POST(makeReq(), PARAMS)).status).toBe(400)
     })
 
@@ -184,7 +188,7 @@ describe('POST variant-change confirm', () => {
       const body = await res.json()
       // flush the microtask queue so the .catch(() => {}) handler executes
       await Promise.resolve()
-      await new Promise((r) => setTimeout(r, 0))
+      await new Promise(r => setTimeout(r, 0))
       expect(res.status).toBe(200)
       expect(body.settlement).toBe('collect')
       expect(body.razorpayOrderId).toBe('rzp_order_1')
@@ -197,7 +201,12 @@ describe('POST variant-change confirm', () => {
       const rzp = makeRazorpay()
       vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(activity.logActivity).mockRejectedValueOnce(new Error('log fail'))
-      vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_VCR, settlement_type: 'collect', price_diff: 40, user_id: null } as any)
+      vi.mocked(db.queryOne).mockResolvedValueOnce({
+        ...BASE_VCR,
+        settlement_type: 'collect',
+        price_diff: 40,
+        user_id: null,
+      } as any)
       const res = await POST(makeReq(), PARAMS)
       expect(res.status).toBe(200)
       expect(activity.logActivity).not.toHaveBeenCalled()

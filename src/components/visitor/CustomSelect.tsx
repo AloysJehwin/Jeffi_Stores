@@ -37,10 +37,13 @@ export default function CustomSelect({
   const selectedOption = options.find(o => o.value === value)
   const displayLabel = selectedOption?.label || placeholder
 
-  const handleSelect = useCallback((optionValue: string) => {
-    onChange(optionValue)
-    setIsOpen(false)
-  }, [onChange])
+  const handleSelect = useCallback(
+    (optionValue: string) => {
+      onChange(optionValue)
+      setIsOpen(false)
+    },
+    [onChange]
+  )
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -66,7 +69,7 @@ export default function CustomSelect({
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children
       if (items[highlightedIndex]) {
-        (items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
+        ;(items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
       }
     }
   }, [highlightedIndex, isOpen])
@@ -139,9 +142,7 @@ export default function CustomSelect({
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
           `}
         >
-          <span className={selectedOption ? 'text-foreground' : 'text-foreground-muted'}>
-            {displayLabel}
-          </span>
+          <span className={selectedOption ? 'text-foreground' : 'text-foreground-muted'}>{displayLabel}</span>
           <svg
             className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
@@ -176,7 +177,13 @@ export default function CustomSelect({
                   >
                     <span>{option.label}</span>
                     {option.value === value && (
-                      <svg className="w-4 h-4 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg
+                        className="w-4 h-4 text-accent-500 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}

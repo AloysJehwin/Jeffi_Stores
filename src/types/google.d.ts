@@ -1,8 +1,5 @@
 interface GoogleAccountsId {
-  initialize(config: {
-    client_id: string
-    callback: (response: { credential: string }) => void
-  }): void
+  initialize(config: { client_id: string; callback: (response: { credential: string }) => void }): void
   renderButton(
     parent: HTMLElement,
     options: {

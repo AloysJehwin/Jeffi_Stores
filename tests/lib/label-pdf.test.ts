@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// pdfkit, qrcode and bwip-js are all mocked globally in tests/lib/__pdf-mocks.ts
+// pdfkit, qrcode and bwip-js are all mocked globally in tests/helpers/pdf-mocks.ts
 // which is auto-loaded via setupFiles + the mock in tests/setup.ts.
 // We add qrcode.toBuffer and bwip-js.toBuffer mocks here since label-pdf uses those.
 
@@ -28,7 +28,7 @@ import {
   type LabelProduct,
   type LabelSize,
   type ShelfLabelItem,
-} from '@/lib/label-pdf'
+} from '@/lib/documents/label-pdf'
 
 const mockProduct: LabelProduct = {
   id: 'p1',
@@ -257,7 +257,7 @@ describe('generateShelfLabelPDF', () => {
 
   it('handles displayCode with non-ASCII characters gracefully', async () => {
     const item: ShelfLabelItem = {
-      displayCode: 'A-01–B',  // contains en-dash
+      displayCode: 'A-01–B', // contains en-dash
       warehouseName: 'Main',
     }
     const result = await generateShelfLabelPDF([item], 1)

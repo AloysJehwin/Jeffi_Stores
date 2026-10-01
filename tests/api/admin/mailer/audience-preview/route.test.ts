@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn() }))
 
-import { POST } from '@/app/api/admin/mailer/audience-preview/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/mailer/audience-preview/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -30,7 +30,9 @@ const sampleRecipients = [
 ]
 
 describe('POST /api/admin/mailer/audience-preview', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -64,16 +66,16 @@ describe('POST /api/admin/mailer/audience-preview', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([sampleRecipients[0]])
 
-    const res = await POST(makeRequest({
-      audience_type: 'order_history',
-      audience_filter: { daysSinceOrder: 30 },
-    }))
+    const res = await POST(
+      makeRequest({
+        audience_type: 'order_history',
+        audience_filter: { daysSinceOrder: 30 },
+      })
+    )
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.count).toBe(1)
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('30 days'),
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('30 days'))
   })
 
   it('defaults to 30 days when daysSinceOrder is not provided', async () => {
@@ -82,9 +84,7 @@ describe('POST /api/admin/mailer/audience-preview', () => {
     mockQueryMany.mockResolvedValue([])
 
     await POST(makeRequest({ audience_type: 'order_history' }))
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('30 days'),
-    )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('30 days'))
   })
 
   it('uses custom days when daysSinceOrder is provided', async () => {
@@ -92,13 +92,13 @@ describe('POST /api/admin/mailer/audience-preview', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
-    await POST(makeRequest({
-      audience_type: 'order_history',
-      audience_filter: { daysSinceOrder: 60 },
-    }))
-    expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('60 days'),
+    await POST(
+      makeRequest({
+        audience_type: 'order_history',
+        audience_filter: { daysSinceOrder: 60 },
+      })
     )
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('60 days'))
   })
 
   it('returns count=0 for empty recipient list', async () => {

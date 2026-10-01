@@ -5,11 +5,11 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   requireAdminScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
@@ -19,9 +19,9 @@ vi.mock('@/lib/db', () => ({
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { GET, POST } from '@/app/api/admin/business/rfqs/[id]/messages/route'
-import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany, query } from '@/lib/db'
+import { GET, POST } from '@/app/api/(admin)/admin/business/rfqs/[id]/messages/route'
+import { requireAdminScope } from '@/lib/auth/jwt'
+import { queryOne, queryMany, query } from '@/lib/shared/db'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,10 +36,7 @@ function makeReq(method: string, body?: unknown) {
     opts.headers = { 'Content-Type': 'application/json' }
     opts.body = JSON.stringify(body)
   }
-  return new NextRequest(new Request(
-    `http://localhost/api/admin/business/rfqs/${RFQ_ID}/messages`,
-    opts,
-  ))
+  return new NextRequest(new Request(`http://localhost/api/admin/business/rfqs/${RFQ_ID}/messages`, opts))
 }
 
 const OPEN_RFQ = { id: RFQ_ID, status: 'pending' }
@@ -74,9 +71,7 @@ describe('GET /api/admin/business/rfqs/[id]/messages', () => {
   })
 
   it('returns 401 when requireAdminScope returns a response', async () => {
-    vi.mocked(requireAdminScope).mockResolvedValue(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    )
+    vi.mocked(requireAdminScope).mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
     const res = await GET(makeReq('GET'), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
@@ -118,9 +113,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
   })
 
   it('returns 401 when requireAdminScope returns a response', async () => {
-    vi.mocked(requireAdminScope).mockResolvedValue(
-      NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    )
+    vi.mocked(requireAdminScope).mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
     const res = await POST(makeReq('POST', { message: 'hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
@@ -158,10 +151,9 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
   })
 
   it('returns 400 when counter_items is not an array', async () => {
-    const res = await POST(
-      makeReq('POST', { message: 'Offer', counter_items: { invalid: true } }),
-      { params: Promise.resolve({ id: RFQ_ID }) },
-    )
+    const res = await POST(makeReq('POST', { message: 'Offer', counter_items: { invalid: true } }), {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/array/)
@@ -173,7 +165,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
         message: 'Offer',
         counter_items: [{ offered_price: 100 }],
       }),
-      { params: Promise.resolve({ id: RFQ_ID }) },
+      { params: Promise.resolve({ id: RFQ_ID }) }
     )
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -186,7 +178,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
         message: 'Offer',
         counter_items: [{ rfq_item_id: 'riq-1' }],
       }),
-      { params: Promise.resolve({ id: RFQ_ID }) },
+      { params: Promise.resolve({ id: RFQ_ID }) }
     )
     expect(res.status).toBe(400)
   })
@@ -203,10 +195,9 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce(OPEN_RFQ as any) // rfq lookup
       .mockResolvedValueOnce(insertedMsg as any) // INSERT RETURNING
 
-    const res = await POST(
-      makeReq('POST', { message: 'We can offer at ₹180' }),
-      { params: Promise.resolve({ id: RFQ_ID }) },
-    )
+    const res = await POST(makeReq('POST', { message: 'We can offer at ₹180' }), {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -226,10 +217,9 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce(OPEN_RFQ as any)
       .mockResolvedValueOnce(insertedMsg as any)
 
-    const res = await POST(
-      makeReq('POST', { message: 'Counter offer', counter_items: counterItems }),
-      { params: Promise.resolve({ id: RFQ_ID }) },
-    )
+    const res = await POST(makeReq('POST', { message: 'Counter offer', counter_items: counterItems }), {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
     expect(res.status).toBe(200)
 
     // The INSERT should have been called with JSON-serialized counter_items
@@ -240,39 +230,57 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
   it('moves RFQ to negotiating when status is pending', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'pending' } as any)
-      .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
+      .mockResolvedValueOnce({
+        id: 'msg-new',
+        sender: 'admin',
+        message: 'Hi',
+        counter_items: null,
+        created_at: new Date().toISOString(),
+      } as any)
 
     await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
-    const updateCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
-    )
+    const updateCall = vi
+      .mocked(query)
+      .mock.calls.find((args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"))
     expect(updateCall).toBeDefined()
   })
 
   it('moves RFQ to negotiating when status is reviewed', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'reviewed' } as any)
-      .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
+      .mockResolvedValueOnce({
+        id: 'msg-new',
+        sender: 'admin',
+        message: 'Hi',
+        counter_items: null,
+        created_at: new Date().toISOString(),
+      } as any)
 
     await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
-    const updateCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
-    )
+    const updateCall = vi
+      .mocked(query)
+      .mock.calls.find((args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"))
     expect(updateCall).toBeDefined()
   })
 
   it('does NOT update status when already negotiating', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'negotiating' } as any)
-      .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
+      .mockResolvedValueOnce({
+        id: 'msg-new',
+        sender: 'admin',
+        message: 'Hi',
+        counter_items: null,
+        created_at: new Date().toISOString(),
+      } as any)
 
     await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
-    const updateCall = vi.mocked(query).mock.calls.find(
-      (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
-    )
+    const updateCall = vi
+      .mocked(query)
+      .mock.calls.find((args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"))
     expect(updateCall).toBeUndefined()
   })
 

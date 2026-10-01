@@ -1,6 +1,6 @@
 'use client'
 
-import { safeHref } from '@/lib/homepage-sections'
+import { safeHref } from '@/lib/catalog/homepage-sections'
 import { CtaFields, Grid, HeadingFields, Note, useSectionBinding, type EditorProps } from './fields'
 import TileListEditor, { readTiles } from './TileListEditor'
 
@@ -31,9 +31,16 @@ export default function SocialStripEditor(props: EditorProps) {
         itemLabel="Post"
         onCommit={next => b.saveConfig({ items: next })}
       />
-      <CtaFields props={props} hint="Your profile, e.g. https://instagram.com/yourstore. Leave empty to hide the button." urlPlaceholder="https://instagram.com/…" />
+      <CtaFields
+        props={props}
+        hint="Your profile, e.g. https://instagram.com/yourstore. Leave empty to hide the button."
+        urlPlaceholder="https://instagram.com/…"
+      />
       {badLinks > 0 && (
-        <Note>Links and images must start with https:// or /. {badLinks === 1 ? 'One post has' : `${badLinks} posts have`} a link that will be ignored.</Note>
+        <Note>
+          Links and images must start with https:// or /. {badLinks === 1 ? 'One post has' : `${badLinks} posts have`} a
+          link that will be ignored.
+        </Note>
       )}
     </Grid>
   )

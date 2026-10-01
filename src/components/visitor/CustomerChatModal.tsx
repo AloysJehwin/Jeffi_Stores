@@ -19,20 +19,20 @@ interface Props {
 type Verdict = 'helpful' | 'not_helpful'
 
 const SAMPLE_PROMPTS = [
-  "Help me find a gift",
+  'Help me find a gift',
   "What's new this week?",
   "What's popular right now?",
-  "Show me my recent orders",
+  'Show me my recent orders',
   "Recommend products based on what I've bought",
 ]
 
 const STATUS_STYLES: Record<string, string> = {
-  delivered:   'bg-green-500/15 text-green-600 dark:text-green-400',
-  shipped:     'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-  processing:  'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400',
-  confirmed:   'bg-accent-500/15 text-accent-600 dark:text-accent-400',
-  pending:     'bg-foreground-muted/15 text-foreground-muted',
-  cancelled:   'bg-red-500/15 text-red-600 dark:text-red-400',
+  delivered: 'bg-green-500/15 text-green-600 dark:text-green-400',
+  shipped: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+  processing: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400',
+  confirmed: 'bg-accent-500/15 text-accent-600 dark:text-accent-400',
+  pending: 'bg-foreground-muted/15 text-foreground-muted',
+  cancelled: 'bg-red-500/15 text-red-600 dark:text-red-400',
 }
 
 type Token =
@@ -41,7 +41,8 @@ type Token =
   | { kind: 'order'; number: string; status: string; amount: string; date: string }
 
 function tokenize(text: string): Token[] {
-  const re = /\[\[(product):([^\]|]+)\|([^\]|]+)(?:\|([^\]]*))?\]\]|\[\[(order):([^\]|]+)\|([^\]|]+)\|([^\]|]+)\|([^\]]+)\]\]/g
+  const re =
+    /\[\[(product):([^\]|]+)\|([^\]|]+)(?:\|([^\]]*))?\]\]|\[\[(order):([^\]|]+)\|([^\]|]+)\|([^\]|]+)\|([^\]]+)\]\]/g
   const tokens: Token[] = []
   let last = 0
   let m: RegExpExecArray | null
@@ -101,15 +102,33 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-500 transition-colors group min-w-0 overflow-hidden"
             >
               <div className="w-7 h-7 rounded-lg bg-accent-500/10 flex items-center justify-center shrink-0">
-                <svg className="w-3.5 h-3.5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11" />
+                <svg
+                  className="w-3.5 h-3.5 text-accent-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11"
+                  />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 truncate">{name}</p>
+                <p className="text-sm font-medium text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 truncate">
+                  {name}
+                </p>
                 {price && <p className="text-xs text-foreground-muted">₹{price}</p>}
               </div>
-              <svg className="w-3.5 h-3.5 text-foreground-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="w-3.5 h-3.5 text-foreground-muted shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </Link>
@@ -122,15 +141,29 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary transition-colors group min-w-0 overflow-hidden"
             >
               <div className="w-7 h-7 rounded-lg bg-foreground/5 flex items-center justify-center shrink-0">
-                <svg className="w-3.5 h-3.5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                <svg
+                  className="w-3.5 h-3.5 text-foreground-muted"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">#{number}</p>
-                <p className="text-xs text-foreground-muted">{date} · ₹{amount}</p>
+                <p className="text-xs text-foreground-muted">
+                  {date} · ₹{amount}
+                </p>
               </div>
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize shrink-0 ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize shrink-0 ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}
+              >
                 {status}
               </span>
             </Link>
@@ -142,7 +175,9 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
 }
 
 let idCounter = 0
-function uid() { return `msg-${++idCounter}-${Date.now()}` }
+function uid() {
+  return `msg-${++idCounter}-${Date.now()}`
+}
 
 export default function CustomerChatModal({ isOpen, onClose }: Props) {
   const { flags, identity } = useStoreConfig()
@@ -216,7 +251,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         body: JSON.stringify({ message: q, history }),
       })
       if (res.status === 403) {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'The assistant is not available right now.', id: uid() }])
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: 'The assistant is not available right now.', id: uid() },
+        ])
         return
       }
       const data = await res.json()
@@ -224,9 +262,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
       // the customer — fall back to a fixed friendly line for any failure.
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: (res.ok && data.message)
-          ? data.message
-          : "I'm having trouble responding right now. Please try again in a moment.",
+        content:
+          res.ok && data.message
+            ? data.message
+            : "I'm having trouble responding right now. Please try again in a moment.",
         id: uid(),
       }
       setMessages(prev => [...prev, assistantMsg])
@@ -246,7 +285,11 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         className={`fixed inset-0 z-30 transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        style={{ backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', backgroundColor: 'rgba(15,23,42,0.45)' }}
+        style={{
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          backgroundColor: 'rgba(15,23,42,0.45)',
+        }}
         aria-hidden="true"
         onClick={onClose}
       />
@@ -258,7 +301,6 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         }`}
       >
         <div className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl flex flex-col max-h-[min(700px,calc(100dvh-4rem))]">
-
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-default shrink-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shrink-0">
@@ -267,7 +309,9 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">{identity.name ? `${identity.name} Assistant` : 'Shopping Assistant'}</p>
+              <p className="text-sm font-semibold text-foreground">
+                {identity.name ? `${identity.name} Assistant` : 'Shopping Assistant'}
+              </p>
               <p className="text-[11px] text-foreground-muted">Products · Orders · Recommendations</p>
             </div>
             <button
@@ -299,20 +343,29 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
             )}
 
             {messages.map(msg => (
-              <div key={msg.id} className={`flex gap-2.5 min-w-0 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                  msg.role === 'user'
-                    ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400'
-                    : 'bg-gradient-to-br from-purple-500 to-blue-500 text-white'
-                }`}>
+              <div
+                key={msg.id}
+                className={`flex gap-2.5 min-w-0 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                    msg.role === 'user'
+                      ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400'
+                      : 'bg-gradient-to-br from-purple-500 to-blue-500 text-white'
+                  }`}
+                >
                   {msg.role === 'user' ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
                 </div>
-                <div className={`flex flex-col gap-1 max-w-[82%] min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start w-full'}`}>
-                  <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words overflow-hidden ${
-                    msg.role === 'user'
-                      ? 'bg-accent-500 text-white rounded-tr-sm'
-                      : 'bg-surface-secondary text-foreground rounded-tl-sm w-full'
-                  }`}>
+                <div
+                  className={`flex flex-col gap-1 max-w-[82%] min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start w-full'}`}
+                >
+                  <div
+                    className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words overflow-hidden ${
+                      msg.role === 'user'
+                        ? 'bg-accent-500 text-white rounded-tr-sm'
+                        : 'bg-surface-secondary text-foreground rounded-tl-sm w-full'
+                    }`}
+                  >
                     {msg.role === 'assistant' ? parseContent(msg.content, onClose) : msg.content}
                   </div>
                   {msg.role === 'assistant' && (
@@ -372,7 +425,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
           {/* Input */}
           <div className="border-t border-border-default px-3 py-2.5 shrink-0">
             <form
-              onSubmit={e => { e.preventDefault(); submit() }}
+              onSubmit={e => {
+                e.preventDefault()
+                submit()
+              }}
               className="flex items-end gap-2"
             >
               <textarea
@@ -380,7 +436,10 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit() }
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    submit()
+                  }
                 }}
                 placeholder="Ask about products or your orders…"
                 rows={1}
@@ -399,7 +458,6 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
               </button>
             </form>
           </div>
-
         </div>
       </div>
     </>

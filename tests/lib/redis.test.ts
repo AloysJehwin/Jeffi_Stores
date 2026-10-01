@@ -35,23 +35,23 @@ describe('redis module — with REDIS_URL (ioredis path)', () => {
   })
 
   it('exports a default proxy object', async () => {
-    const redisModule = await import('@/lib/redis')
+    const redisModule = await import('@/lib/shared/redis')
     expect(redisModule.default).toBeDefined()
     expect(typeof redisModule.default).toBe('object')
   })
 
   it('getRedisClient returns a client', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     expect(client).toBeDefined()
   })
 
   it('returns the same client on repeated calls (singleton)', async () => {
     // Both calls use the same imported module instance — singleton must hold
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const c1 = getRedisClient()
     // Call a second time within the same module scope
-    const c2 = (await import('@/lib/redis')).getRedisClient()
+    const c2 = (await import('@/lib/shared/redis')).getRedisClient()
     // The module-level redisClient variable is shared, so the result is the same reference
     expect(typeof c1).toBe('object')
     expect(typeof c2).toBe('object')
@@ -61,7 +61,7 @@ describe('redis module — with REDIS_URL (ioredis path)', () => {
   })
 
   it('ioredis constructor is called with REDIS_URL', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     // With REDIS_URL set, client should be defined and have the expected interface
     expect(client).toBeDefined()
@@ -70,7 +70,7 @@ describe('redis module — with REDIS_URL (ioredis path)', () => {
   })
 
   it('proxy delegates get to the underlying client', async () => {
-    const redisModule = await import('@/lib/redis')
+    const redisModule = await import('@/lib/shared/redis')
     const client = redisModule.default
     // The proxy wraps getRedisClient()[prop], so calling .get should work
     expect(typeof client.get).toBe('function')
@@ -89,20 +89,20 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('getRedisClient returns a client even without REDIS_URL', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     expect(client).toBeDefined()
   })
 
   it('in-memory client: set returns OK', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     const result = await client.set('k', 'v')
     expect(result).toBe('OK')
   })
 
   it('in-memory client: get returns stored value', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.set('hello', 'world')
     const val = await client.get('hello')
@@ -110,14 +110,14 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('in-memory client: get returns null for missing key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     const val = await client.get('nonexistent')
     expect(val).toBeNull()
   })
 
   it('in-memory client: del removes the key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.set('todel', 'x')
     const count = await client.del('todel')
@@ -126,21 +126,21 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('in-memory client: del returns 0 for missing key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     const count = await client.del('never-existed')
     expect(count).toBe(0)
   })
 
   it('in-memory client: incr starts at 1 for missing key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     const v = await client.incr('new-counter')
     expect(v).toBe(1)
   })
 
   it('in-memory client: incr increments existing value', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.incr('cnt')
     await client.incr('cnt')
@@ -149,7 +149,7 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('in-memory client: ttl returns -1 for key with no expiry', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.set('no-exp', 'val')
     const t = await client.ttl('no-exp')
@@ -157,14 +157,14 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('in-memory client: ttl returns -1 for missing key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     const t = await client.ttl('missing')
     expect(t).toBe(-1)
   })
 
   it('in-memory client: set with EX stores with expiry', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.set('exp-key', 'val', 'EX', 3600)
     const t = await client.ttl('exp-key')
@@ -173,7 +173,7 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('in-memory client: get returns null for expired key', async () => {
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     // Note: EX=0 is falsy — the source guard is `if (args[0] === 'EX' && args[1])`,
     // so EX=0 is silently ignored and the key is stored without an expiry.
@@ -187,7 +187,7 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   it('in-memory client: ttl returns -2 for key with past expiry', async () => {
     // Directly test the ttl logic with a past expiry using the in-memory store
     // We do this via the same store by setting EX=0
-    const { getRedisClient } = await import('@/lib/redis')
+    const { getRedisClient } = await import('@/lib/shared/redis')
     const client = getRedisClient()
     await client.set('ttl-past', 'x', 'EX', 0)
     const t = await client.ttl('ttl-past')
@@ -196,7 +196,7 @@ describe('redis module — without REDIS_URL (in-memory fallback)', () => {
   })
 
   it('default export proxy works for get', async () => {
-    const mod = await import('@/lib/redis')
+    const mod = await import('@/lib/shared/redis')
     expect(typeof mod.default.get).toBe('function')
   })
 })

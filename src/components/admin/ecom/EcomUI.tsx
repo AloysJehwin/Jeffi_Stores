@@ -33,21 +33,27 @@ export function EcomHero({
 export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }) {
   const total = mix.reduce((s, m) => s + m.count, 0) || 1
   const colors: Record<string, string> = {
-    basic: 'bg-sky-500', growth: 'bg-emerald-500', pro: 'bg-violet-500', enterprise: 'bg-amber-500',
+    basic: 'bg-sky-500',
+    growth: 'bg-emerald-500',
+    pro: 'bg-violet-500',
+    enterprise: 'bg-amber-500',
   }
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:h-56 flex flex-col">
       <p className="font-semibold text-foreground mb-4">Plan mix</p>
       <div className="flex-1 flex flex-col justify-center gap-3">
         {mix.length === 0 && <p className="text-sm text-foreground-muted">No tenants yet.</p>}
-        {mix.map((m) => (
+        {mix.map(m => (
           <div key={m.plan}>
             <div className="flex justify-between text-xs mb-1">
               <span className="capitalize text-foreground-secondary">{m.plan}</span>
               <span className="text-foreground-muted">{m.count}</span>
             </div>
             <div className="h-2.5 rounded-full bg-surface-secondary overflow-hidden">
-              <div className={`h-full rounded-full ${colors[m.plan] || 'bg-foreground-muted'}`} style={{ width: `${(m.count / total) * 100}%` }} />
+              <div
+                className={`h-full rounded-full ${colors[m.plan] || 'bg-foreground-muted'}`}
+                style={{ width: `${(m.count / total) * 100}%` }}
+              />
             </div>
           </div>
         ))}
@@ -79,7 +85,11 @@ export function StatusPill({ status }: { status: string }) {
 }
 
 export function DetailLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return <Link href={href} className="text-accent-600 dark:text-accent-400 hover:underline">{children}</Link>
+  return (
+    <Link href={href} className="text-accent-600 dark:text-accent-400 hover:underline">
+      {children}
+    </Link>
+  )
 }
 
 /** Label/value pair used by every tenant detail section. */
@@ -98,8 +108,16 @@ export function Mono({ children }: { children: React.ReactNode }) {
 
 export const NOT_PROVISIONED = <span className="text-amber-500">not provisioned</span>
 
-export function Section({ title, action, children, className = '' }: {
-  title: string; action?: React.ReactNode; children: React.ReactNode; className?: string
+export function Section({
+  title,
+  action,
+  children,
+  className = '',
+}: {
+  title: string
+  action?: React.ReactNode
+  children: React.ReactNode
+  className?: string
 }) {
   return (
     <section className={`rounded-xl border border-border-default p-5 bg-surface-elevated min-w-0 ${className}`}>
@@ -117,16 +135,16 @@ export function FieldGrid({ children }: { children: React.ReactNode }) {
 }
 
 export const TENANT_TABS = [
-  { key: 'overview',       label: 'Overview' },
-  { key: 'provisioning',   label: 'Provisioning' },
+  { key: 'overview', label: 'Overview' },
+  { key: 'provisioning', label: 'Provisioning' },
   { key: 'infrastructure', label: 'Infrastructure' },
-  { key: 'commerce',       label: 'Commerce' },
-  { key: 'shipments',      label: 'Shipments' },
-  { key: 'access',         label: 'Access' },
-  { key: 'kyc',            label: 'KYC' },
+  { key: 'commerce', label: 'Commerce' },
+  { key: 'shipments', label: 'Shipments' },
+  { key: 'access', label: 'Access' },
+  { key: 'kyc', label: 'KYC' },
 ] as const
 
-export type TenantTab = typeof TENANT_TABS[number]['key']
+export type TenantTab = (typeof TENANT_TABS)[number]['key']
 
 export function isTenantTab(v: string | undefined): v is TenantTab {
   return !!v && TENANT_TABS.some(t => t.key === v)
@@ -139,8 +157,14 @@ export function isTenantTab(v: string | undefined): v is TenantTab {
  * Lives under /admin/ecom/customers/[id] because the sidebar marks a group active with
  * startsWith(href + '/'), so an object page on its own path would never expand its nav group.
  */
-export function TenantTabNav({ tenantId, active, badges }: {
-  tenantId: string; active: TenantTab; badges?: Partial<Record<TenantTab, React.ReactNode>>
+export function TenantTabNav({
+  tenantId,
+  active,
+  badges,
+}: {
+  tenantId: string
+  active: TenantTab
+  badges?: Partial<Record<TenantTab, React.ReactNode>>
 }) {
   return (
     <div className="border-b border-border-default -mx-6 px-6 overflow-x-auto">

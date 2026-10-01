@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/admin-crm', () => ({
+vi.mock('@/lib/shared/admin-crm', () => ({
   getCrmDashboardData: vi.fn(),
 }))
 
-import { GET } from '@/app/api/admin/crm/dashboard/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getCrmDashboardData } from '@/lib/admin-crm'
+import { GET } from '@/app/api/(admin)/admin/crm/dashboard/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getCrmDashboardData } from '@/lib/shared/admin-crm'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -28,7 +28,9 @@ function makeReq() {
   return new NextRequest('http://localhost/api/admin/crm/dashboard')
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('GET /api/admin/crm/dashboard', () => {
   it('returns 401 when unauthenticated', async () => {

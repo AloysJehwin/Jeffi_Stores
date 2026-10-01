@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildVarMap, substituteVars, previewVarMap, TEMPLATE_VARS } from '@/lib/template-vars'
+import { buildVarMap, substituteVars, previewVarMap, TEMPLATE_VARS } from '@/lib/shared/template-vars'
 
 describe('buildVarMap', () => {
   it('maps customer fields correctly', () => {

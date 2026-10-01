@@ -1,4 +1,4 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/shared/db'
 import type { ToolDef } from '../tools'
 import { ok } from '../tool-envelope'
 
@@ -160,7 +160,9 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
     mutating: false,
     handler: async ({ tagSlug, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 25, 1, 200)
-      const slug = String(tagSlug || '').trim().toLowerCase()
+      const slug = String(tagSlug || '')
+        .trim()
+        .toLowerCase()
       if (!slug) throw new Error('tagSlug is required')
       const rows = await queryMany(
         `SELECT u.id::text, u.email,
@@ -174,9 +176,10 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         [slug, lim]
       )
       return ok({
-        summary: rows.length === 0
-          ? `No customers tagged "${slug}".`
-          : `Found ${rows.length}${rows.length === lim ? '+' : ''} customer${rows.length === 1 ? '' : 's'} tagged "${slug}".`,
+        summary:
+          rows.length === 0
+            ? `No customers tagged "${slug}".`
+            : `Found ${rows.length}${rows.length === lim ? '+' : ''} customer${rows.length === 1 ? '' : 's'} tagged "${slug}".`,
         count: rows.length,
         data: { tag: slug, customers: rows, truncated: rows.length === lim },
         displayHints: { primaryField: 'name', itemNoun: 'customer' },
@@ -231,7 +234,10 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
       properties: {
         customerId: { type: 'string' },
         body: { type: 'string', description: 'Note text. Max 2000 chars.' },
-        isPrivate: { type: 'string', description: 'Reserved privacy flag. Pass "true" to mark; ignored if column missing.' },
+        isPrivate: {
+          type: 'string',
+          description: 'Reserved privacy flag. Pass "true" to mark; ignored if column missing.',
+        },
       },
       required: ['customerId', 'body'],
     },
@@ -250,11 +256,14 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         confirmation: `Add a note to ${c.name} (${c.email}): "${preview}"?`,
         ui_blocks: [
           { type: 'heading', value: 'New customer note', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Customer', value: c.name },
-            { key: 'Email', value: c.email },
-            { key: 'Length', value: `${text.length} chars${priv ? ' (private)' : ''}` },
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Customer', value: c.name },
+              { key: 'Email', value: c.email },
+              { key: 'Length', value: `${text.length} chars${priv ? ' (private)' : ''}` },
+            ],
+          },
           { type: 'code_block', content: text },
         ],
       }
@@ -274,13 +283,15 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
     },
     mutating: true,
     handler: async ({ customerId, tagSlug, expiresAt }) => {
-      const slug = String(tagSlug || '').trim().toLowerCase()
+      const slug = String(tagSlug || '')
+        .trim()
+        .toLowerCase()
       if (!slug) throw new Error('tagSlug is required')
       const c = await loadCustomerLite(String(customerId))
-      const existing = await queryOne(
-        `SELECT 1 FROM customer_tags WHERE user_id = $1::uuid AND tag = $2 LIMIT 1`,
-        [c.id, slug]
-      )
+      const existing = await queryOne(`SELECT 1 FROM customer_tags WHERE user_id = $1::uuid AND tag = $2 LIMIT 1`, [
+        c.id,
+        slug,
+      ])
       const expIso = expiresAt ? String(expiresAt) : null
       if (existing) {
         return {
@@ -298,12 +309,15 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         confirmation: `Add tag "${slug}" to ${c.name} (${c.email})?`,
         ui_blocks: [
           { type: 'heading', value: 'Add customer tag', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Customer', value: c.name },
-            { key: 'Email', value: c.email },
-            { key: 'Tag', value: slug },
-            ...(expIso ? [{ key: 'Expires at', value: expIso }] : []),
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Customer', value: c.name },
+              { key: 'Email', value: c.email },
+              { key: 'Tag', value: slug },
+              ...(expIso ? [{ key: 'Expires at', value: expIso }] : []),
+            ],
+          },
         ],
       }
     },
@@ -321,13 +335,15 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
     },
     mutating: true,
     handler: async ({ customerId, tagSlug }) => {
-      const slug = String(tagSlug || '').trim().toLowerCase()
+      const slug = String(tagSlug || '')
+        .trim()
+        .toLowerCase()
       if (!slug) throw new Error('tagSlug is required')
       const c = await loadCustomerLite(String(customerId))
-      const existing = await queryOne(
-        `SELECT 1 FROM customer_tags WHERE user_id = $1::uuid AND tag = $2 LIMIT 1`,
-        [c.id, slug]
-      )
+      const existing = await queryOne(`SELECT 1 FROM customer_tags WHERE user_id = $1::uuid AND tag = $2 LIMIT 1`, [
+        c.id,
+        slug,
+      ])
       if (!existing) {
         return {
           proposed: false,
@@ -344,11 +360,14 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         confirmation: `Remove tag "${slug}" from ${c.name} (${c.email})?`,
         ui_blocks: [
           { type: 'heading', value: 'Remove customer tag', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Customer', value: c.name },
-            { key: 'Email', value: c.email },
-            { key: 'Tag to remove', value: slug },
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Customer', value: c.name },
+              { key: 'Email', value: c.email },
+              { key: 'Tag to remove', value: slug },
+            ],
+          },
         ],
       }
     },
@@ -369,7 +388,9 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
     },
     mutating: true,
     handler: async ({ customerId, title, dueAt, assignedToAdminId, priority }) => {
-      const t = String(title || '').trim().slice(0, 255)
+      const t = String(title || '')
+        .trim()
+        .slice(0, 255)
       if (!t) throw new Error('title is required')
       const c = await loadCustomerLite(String(customerId))
       const validPriorities = ['low', 'medium', 'high', 'urgent']
@@ -390,18 +411,25 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         proposed: true,
         kind: 'create_customer_task',
         payload: {
-          customerId: c.id, title: t, dueAt: due, assignedToAdminId: assignee, priority: pr,
+          customerId: c.id,
+          title: t,
+          dueAt: due,
+          assignedToAdminId: assignee,
+          priority: pr,
         },
         confirmation: `Create ${pr} task "${t}" on ${c.name} (${c.email})${due ? `, due ${due}` : ''}?`,
         ui_blocks: [
           { type: 'heading', value: 'New customer task', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Customer', value: c.name },
-            { key: 'Email', value: c.email },
-            { key: 'Priority', value: pr },
-            { key: 'Assignee', value: assigneeLabel },
-            ...(due ? [{ key: 'Due', value: due }] : []),
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Customer', value: c.name },
+              { key: 'Email', value: c.email },
+              { key: 'Priority', value: pr },
+              { key: 'Assignee', value: assigneeLabel },
+              ...(due ? [{ key: 'Due', value: due }] : []),
+            ],
+          },
           { type: 'text', value: t, weight: 'bold' },
         ],
       }
@@ -409,7 +437,8 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_close_customer_task',
-    description: 'Propose marking a customer task as completed (with an optional resolution note appended to description).',
+    description:
+      'Propose marking a customer task as completed (with an optional resolution note appended to description).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -422,10 +451,16 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
     handler: async ({ taskId, resolution }) => {
       const tid = String(taskId || '').trim()
       if (!tid) throw new Error('taskId is required')
-      const r = String(resolution || '').trim().slice(0, 500)
+      const r = String(resolution || '')
+        .trim()
+        .slice(0, 500)
       const task = await queryOne<{
-        id: string; title: string; status: string; user_id: string;
-        customer_email: string; customer_name: string;
+        id: string
+        title: string
+        status: string
+        user_id: string
+        customer_email: string
+        customer_name: string
       }>(
         `SELECT ct.id::text, ct.title, ct.status, ct.user_id::text,
                 u.email AS customer_email,
@@ -440,9 +475,7 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         return {
           proposed: false,
           info: `Task "${task.title}" is already ${task.status}.`,
-          ui_blocks: [
-            { type: 'callout', tone: 'info', message: `Task already ${task.status}.` },
-          ],
+          ui_blocks: [{ type: 'callout', tone: 'info', message: `Task already ${task.status}.` }],
         }
       }
       return {
@@ -452,19 +485,23 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         confirmation: `Close task "${task.title}" for ${task.customer_name}${r ? ` with resolution: "${r}"` : ''}?`,
         ui_blocks: [
           { type: 'heading', value: 'Close customer task', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Task', value: task.title },
-            { key: 'Customer', value: task.customer_name },
-            { key: 'Email', value: task.customer_email },
-            ...(r ? [{ key: 'Resolution', value: r }] : []),
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Task', value: task.title },
+              { key: 'Customer', value: task.customer_name },
+              { key: 'Email', value: task.customer_email },
+              ...(r ? [{ key: 'Resolution', value: r }] : []),
+            ],
+          },
         ],
       }
     },
   },
   {
     name: 'propose_toggle_marketing_opt_out',
-    description: 'Propose flipping a customer\'s marketing opt-out flag. PRIVACY-SENSITIVE: opting OUT stops them receiving marketing immediately.',
+    description:
+      "Propose flipping a customer's marketing opt-out flag. PRIVACY-SENSITIVE: opting OUT stops them receiving marketing immediately.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -486,29 +523,32 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         return {
           proposed: false,
           info: `${c.name} is already opted ${target ? 'OUT of' : 'IN to'} marketing.`,
-          ui_blocks: [
-            { type: 'callout', tone: 'info', message: `No change, already opted ${target ? 'out' : 'in'}.` },
-          ],
+          ui_blocks: [{ type: 'callout', tone: 'info', message: `No change, already opted ${target ? 'out' : 'in'}.` }],
         }
       }
       const ui_blocks: unknown[] = [
         { type: 'heading', value: target ? 'Opt customer OUT of marketing' : 'Opt customer IN to marketing', level: 3 },
-        { type: 'kv_pairs', pairs: [
-          { key: 'Customer', value: c.name },
-          { key: 'Email', value: c.email },
-          { key: 'Current state', value: wasOptedOut ? 'Opted out' : 'Opted in' },
-          { key: 'New state', value: target ? 'Opted out' : 'Opted in' },
-        ]},
+        {
+          type: 'kv_pairs',
+          pairs: [
+            { key: 'Customer', value: c.name },
+            { key: 'Email', value: c.email },
+            { key: 'Current state', value: wasOptedOut ? 'Opted out' : 'Opted in' },
+            { key: 'New state', value: target ? 'Opted out' : 'Opted in' },
+          ],
+        },
       ]
       if (target) {
         ui_blocks.push({
-          type: 'callout', tone: 'warn',
+          type: 'callout',
+          tone: 'warn',
           title: 'Privacy-sensitive change',
           message: `${c.email} is currently receiving marketing emails. Opting them out will stop all marketing immediately. Confirm only if the customer asked for this.`,
         })
       } else {
         ui_blocks.push({
-          type: 'callout', tone: 'warn',
+          type: 'callout',
+          tone: 'warn',
           title: 'Re-enabling marketing',
           message: `Make sure the customer explicitly consented before opting them back in.`,
         })
@@ -524,38 +564,46 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_create_tag_definition',
-    description: 'Propose creating a new tag type that admins can apply to customers. Curates the vocabulary and does NOT tag any customer.',
+    description:
+      'Propose creating a new tag type that admins can apply to customers. Curates the vocabulary and does NOT tag any customer.',
     inputSchema: {
       type: 'object',
       properties: {
         slug: { type: 'string', description: 'Lowercase slug (will be sanitized). Max 60 chars.' },
         label: { type: 'string', description: 'Display label (passed through; current schema only stores slug).' },
         color: { type: 'string', description: 'Color token, e.g. "blue", "purple", "accent". Default "accent".' },
-        description: { type: 'string', description: 'Optional description (held in payload only; schema does not store it yet).' },
+        description: {
+          type: 'string',
+          description: 'Optional description (held in payload only; schema does not store it yet).',
+        },
       },
       required: ['slug', 'label'],
     },
     mutating: true,
     handler: async ({ slug, label, color, description }) => {
-      const cleaned = String(slug || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60)
+      const cleaned = String(slug || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .slice(0, 60)
       if (!cleaned) throw new Error('slug is required')
       if (!/^[a-z0-9][a-z0-9-]*$/.test(cleaned)) {
         throw new Error('slug must be lowercase alphanumerics + hyphens')
       }
-      const lbl = String(label || '').trim().slice(0, 80) || cleaned
-      const col = String(color || 'accent').trim().slice(0, 20)
+      const lbl =
+        String(label || '')
+          .trim()
+          .slice(0, 80) || cleaned
+      const col = String(color || 'accent')
+        .trim()
+        .slice(0, 20)
       const desc = description ? String(description).trim().slice(0, 280) : null
-      const existing = await queryOne(
-        `SELECT 1 FROM customer_tag_definitions WHERE tag = $1 LIMIT 1`,
-        [cleaned]
-      )
+      const existing = await queryOne(`SELECT 1 FROM customer_tag_definitions WHERE tag = $1 LIMIT 1`, [cleaned])
       if (existing) {
         return {
           proposed: false,
           info: `Tag definition "${cleaned}" already exists.`,
-          ui_blocks: [
-            { type: 'callout', tone: 'info', message: `"${cleaned}" is already a tag, nothing to create.` },
-          ],
+          ui_blocks: [{ type: 'callout', tone: 'info', message: `"${cleaned}" is already a tag, nothing to create.` }],
         }
       }
       return {
@@ -565,12 +613,15 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
         confirmation: `Create tag definition "${cleaned}" (${lbl}, color=${col})?`,
         ui_blocks: [
           { type: 'heading', value: 'New tag definition', level: 3 },
-          { type: 'kv_pairs', pairs: [
-            { key: 'Slug', value: cleaned },
-            { key: 'Label', value: lbl },
-            { key: 'Color', value: col },
-            ...(desc ? [{ key: 'Description', value: desc }] : []),
-          ]},
+          {
+            type: 'kv_pairs',
+            pairs: [
+              { key: 'Slug', value: cleaned },
+              { key: 'Label', value: lbl },
+              { key: 'Color', value: col },
+              ...(desc ? [{ key: 'Description', value: desc }] : []),
+            ],
+          },
         ],
       }
     },

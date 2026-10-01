@@ -13,11 +13,11 @@ const mockQueryMany = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 const mockSendRfqSubmittedEmail = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateBusiness: mockAuthenticateBusiness,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: mockQuery,
   queryOne: mockQueryOne,
   queryMany: mockQueryMany,
@@ -25,11 +25,11 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/email-business', () => ({
+vi.mock('@/lib/shared/email-business', () => ({
   sendRfqSubmittedEmail: mockSendRfqSubmittedEmail,
 }))
 
-import { POST } from '@/app/api/business/rfqs/[id]/resubmit/route'
+import { POST } from '@/app/api/(public)/business/rfqs/[id]/resubmit/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const APPROVED_USER = {
@@ -49,7 +49,17 @@ const REJECTED_RFQ = {
 }
 
 const SOURCE_ITEMS = [
-  { product_id: null, variant_id: null, sub_variant_id: null, description: 'Bolt', quantity: 5, unit: 'Nos', requested_price: 10, notes: null, position: 0 },
+  {
+    product_id: null,
+    variant_id: null,
+    sub_variant_id: null,
+    description: 'Bolt',
+    quantity: 5,
+    unit: 'Nos',
+    requested_price: 10,
+    notes: null,
+    position: 0,
+  },
 ]
 
 const NEW_RFQ = { id: 'rfq-new-1', rfq_number: 'RFQ/25-26/JAN/4', user_id: 'biz-1' }
@@ -113,20 +123,16 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
   it('creates new rfq copying items from rejected rfq', async () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne
-      .mockResolvedValueOnce(REJECTED_RFQ)       // source rfq
-      .mockResolvedValueOnce({ max_seq: '3' })   // max seq
-      .mockResolvedValueOnce(NEW_RFQ)             // insert
+      .mockResolvedValueOnce(REJECTED_RFQ) // source rfq
+      .mockResolvedValueOnce({ max_seq: '3' }) // max seq
+      .mockResolvedValueOnce(NEW_RFQ) // insert
       .mockResolvedValueOnce({ first_name: 'Biz', last_name: 'Owner' }) // user profile
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
     const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.rfq.id).toBe('rfq-new-1')
-    expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(
-      APPROVED_USER.email,
-      'Biz Owner',
-      NEW_RFQ.rfq_number
-    )
+    expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(APPROVED_USER.email, 'Biz Owner', NEW_RFQ.rfq_number)
   })
 
   it('sets notes to "Resubmitted from ..." with original notes when no additional notes given', async () => {
@@ -139,8 +145,8 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
     await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     // The INSERT call should contain combined notes
-    const insertCall = mockQueryOne.mock.calls.find((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
+    const insertCall = mockQueryOne.mock.calls.find(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
     )
     expect(insertCall![1][2]).toContain('Resubmitted from RFQ/25-26/JAN/3')
     expect(insertCall![1][2]).toContain('Original note')
@@ -154,9 +160,11 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)
       .mockResolvedValueOnce({ first_name: null, last_name: null })
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
-    await POST(makePost(RFQ_ID, { notes: 'Please reconsider pricing' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
-    const insertCall = mockQueryOne.mock.calls.find((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
+    await POST(makePost(RFQ_ID, { notes: 'Please reconsider pricing' }) as any, {
+      params: Promise.resolve({ id: RFQ_ID }),
+    })
+    const insertCall = mockQueryOne.mock.calls.find(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
     )
     expect(insertCall![1][2]).toContain('Please reconsider pricing')
   })
@@ -181,7 +189,17 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     const twoItems = [
       { ...SOURCE_ITEMS[0], position: 0 },
-      { product_id: null, variant_id: null, sub_variant_id: null, description: 'Nut', quantity: 10, unit: 'Pcs', requested_price: 5, notes: null, position: 1 },
+      {
+        product_id: null,
+        variant_id: null,
+        sub_variant_id: null,
+        description: 'Nut',
+        quantity: 10,
+        unit: 'Pcs',
+        requested_price: 5,
+        notes: null,
+        position: 1,
+      },
     ]
     mockQueryOne
       .mockResolvedValueOnce(REJECTED_RFQ)
@@ -191,8 +209,8 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     mockQueryMany.mockResolvedValue(twoItems)
     const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(201)
-    const itemInserts = mockQuery.mock.calls.filter((c: any) =>
-      typeof c[0] === 'string' && c[0].includes('business_rfq_items')
+    const itemInserts = mockQuery.mock.calls.filter(
+      (c: any) => typeof c[0] === 'string' && c[0].includes('business_rfq_items')
     )
     expect(itemInserts).toHaveLength(2)
   })

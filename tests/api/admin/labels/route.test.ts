@@ -1,39 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/label-pdf', () => ({
+vi.mock('@/lib/documents/label-pdf', () => ({
   generateLabelPDF: vi.fn().mockResolvedValue(Buffer.from('pdf')),
   generateLabelSheetPDF: vi.fn().mockResolvedValue(Buffer.from('sheet-pdf')),
   LABEL_SIZES: [{ size: '40x25' }, { size: '60x40' }],
 }))
 
-vi.mock('@/lib/get-host', () => ({
+vi.mock('@/lib/tenancy/get-host', () => ({
   getHost: vi.fn().mockResolvedValue('localhost'),
 }))
 
-vi.mock('@/lib/admin-path', () => ({
+vi.mock('@/lib/shared/admin-path', () => ({
   ap: vi.fn((path: string) => path),
 }))
 
-import { POST } from '@/app/api/admin/labels/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/labels/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryMany } from '@/lib/shared/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -49,7 +49,9 @@ function makeReq(body: any) {
   })
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('POST /api/admin/labels', () => {
   it('returns 401 when unauthenticated', async () => {

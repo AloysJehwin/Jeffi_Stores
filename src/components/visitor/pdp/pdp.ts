@@ -24,7 +24,7 @@ export function canAddDirectly(p: Pick<PdpCard, 'hasVariants' | 'effectiveStock'
 export function purchasableNow(
   launchDate: string | Date | null | undefined,
   discontinueDate: string | Date | null | undefined,
-  now: Date = new Date(),
+  now: Date = new Date()
 ): boolean {
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)

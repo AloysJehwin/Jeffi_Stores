@@ -1,10 +1,5 @@
-import { queryMany } from '@/lib/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/automation-emails'
+import { queryMany } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
@@ -26,7 +21,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   kind: 'abandoned_cart',
   name: 'Abandoned Cart',
   description: 'Customer left items in cart without checking out',
-  trigger: 'Fires when a logged-in customer adds items to their cart, then leaves the cart untouched for at least the campaign\'s delay (in hours). Sends at most once per cooldown window per user. Skipped if cart is empty or if user opted out of marketing.',
+  trigger:
+    "Fires when a logged-in customer adds items to their cart, then leaves the cart untouched for at least the campaign's delay (in hours). Sends at most once per cooldown window per user. Skipped if cart is empty or if user opted out of marketing.",
   defaultParams: {
     lookbackDays: 30,
     sendCooldownDays: 7,
@@ -36,19 +32,54 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     whatsappEnabled: false,
   },
   paramSchema: {
-    lookbackDays:            { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',              description: 'Only consider carts updated in the last N days' },
-    sendCooldownDays:        { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)',     description: 'Skip users sent this campaign within N days' },
-    maxRecipientsPerSweep:   { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',       description: 'Hard limit per sweep' },
-    maxItemsPerEmail:        { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',         description: 'Cap on cart items rendered in the email body' },
-    secondEmailDelayHours:   { type: 'integer', min: 24, max: 168, label: 'Second email delay (hours)', description: 'Send follow-up email N hours after first email if cart still not checked out' },
-    whatsappEnabled:         { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
+    lookbackDays: {
+      type: 'integer',
+      min: 1,
+      max: 90,
+      label: 'Lookback (days)',
+      description: 'Only consider carts updated in the last N days',
+    },
+    sendCooldownDays: {
+      type: 'integer',
+      min: 1,
+      max: 30,
+      label: 'Per-user cooldown (days)',
+      description: 'Skip users sent this campaign within N days',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
+    },
+    maxItemsPerEmail: {
+      type: 'integer',
+      min: 1,
+      max: 10,
+      label: 'Items shown in email',
+      description: 'Cap on cart items rendered in the email body',
+    },
+    secondEmailDelayHours: {
+      type: 'integer',
+      min: 24,
+      max: 168,
+      label: 'Second email delay (hours)',
+      description: 'Send follow-up email N hours after first email if cart still not checked out',
+    },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
   async findEligible({ campaign, params }) {
     // Sequence 1: users who haven't received ANY email in cooldown window
     // Sequence 2: users who received seq=1 but NOT seq=2, cart still active,
     //             and secondEmailDelayHours have passed since seq=1
-    const seq1 = await queryMany<Row>(`
+    const seq1 = await queryMany<Row>(
+      `
       SELECT DISTINCT ci.user_id, 1 AS sequence
       FROM cart_items ci
       JOIN users u ON u.id = ci.user_id
@@ -67,10 +98,13 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
             AND ecs.sent_at > NOW() - ($4::text || ' days')::interval
         )
       LIMIT $5
-    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep])
+    `,
+      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep]
+    )
 
     // Sequence 2: got seq=1, no seq=2 yet, secondEmailDelayHours passed, cart still active
-    const seq2 = await queryMany<Row>(`
+    const seq2 = await queryMany<Row>(
+      `
       SELECT DISTINCT ci.user_id, 2 AS sequence
       FROM cart_items ci
       JOIN users u ON u.id = ci.user_id
@@ -102,7 +136,15 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
             AND o.created_at > ecs1.sent_at
         )
       LIMIT $4
-    `, [campaign.kind, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep, params.secondEmailDelayHours])
+    `,
+      [
+        campaign.kind,
+        params.lookbackDays,
+        params.sendCooldownDays,
+        params.maxRecipientsPerSweep,
+        params.secondEmailDelayHours,
+      ]
+    )
 
     // Merge — seq1 users take priority, don't double-send
     const seq1Ids = new Set(seq1.map(r => r.user_id))
@@ -111,7 +153,13 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   },
 
   async findSuppressed({ campaign, params }) {
-    const rows = await queryMany<{ user_id: string; reason: string; reason_detail: string | null; blocked_until: string | null }>(`
+    const rows = await queryMany<{
+      user_id: string
+      reason: string
+      reason_detail: string | null
+      blocked_until: string | null
+    }>(
+      `
       WITH eligible_carts AS (
         SELECT DISTINCT ci.user_id
         FROM cart_items ci
@@ -150,7 +198,9 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
       LIMIT 200
-    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays])
+    `,
+      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays]
+    )
     return rows.map(r => ({
       user_id: r.user_id,
       reason: r.reason as any,
@@ -161,7 +211,15 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
 
   async send(row, { campaign, params }) {
     const sequence = row.sequence || 1
-    const items = await queryMany<{ product_id: string; product_slug: string | null; name: string; quantity: number; price: number; image_url: string | null }>(`
+    const items = await queryMany<{
+      product_id: string
+      product_slug: string | null
+      name: string
+      quantity: number
+      price: number
+      image_url: string | null
+    }>(
+      `
       SELECT p.id::text AS product_id,
              p.slug AS product_slug,
              p.name,
@@ -173,7 +231,9 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       LEFT JOIN product_variants pv ON pv.id = ci.variant_id
       WHERE ci.user_id = $1 AND ci.saved_for_later = FALSE
       LIMIT $2
-    `, [row.user_id, params.maxItemsPerEmail])
+    `,
+      [row.user_id, params.maxItemsPerEmail]
+    )
     if (items.length === 0) return { ok: false, reason: 'no_items' }
 
     const user = await fetchUserContext(row.user_id)
@@ -190,9 +250,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     )
 
     // Sequence 2 always gets a coupon if available
-    const { couponCode, discountPercent } = sequence === 2
-      ? await resolveCoupon(campaign, row.user_id)
-      : await resolveCoupon(campaign, row.user_id)
+    const { couponCode, discountPercent } =
+      sequence === 2 ? await resolveCoupon(campaign, row.user_id) : await resolveCoupon(campaign, row.user_id)
 
     const emailResult = await sendCampaignEmail({
       campaign,
@@ -218,4 +277,3 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     return emailResult
   },
 }
-

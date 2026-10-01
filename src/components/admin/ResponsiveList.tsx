@@ -21,6 +21,10 @@ interface ResponsiveListProps<T> {
   pagination?: ReactNode
   minWidth?: MinWidth
   className?: string
+  // When provided, replaces the default per-item card mapping in the mobile
+  // section - lets a caller own the whole mobile experience (tap, sheets)
+  // while the desktop table stays driven by tableHead/tableBody.
+  mobileList?: ReactNode
 }
 
 const DEFAULT_EMPTY = (
@@ -40,15 +44,18 @@ export default function ResponsiveList<T>({
   pagination,
   minWidth = 'lg',
   className = '',
+  mobileList,
 }: ResponsiveListProps<T>) {
   const isEmpty = items.length === 0
 
   return (
     <>
       <div className={`md:hidden space-y-3 ${className}`}>
-        {!isEmpty
-          ? items.map((item) => <Fragment key={getKey(item)}>{renderCard(item)}</Fragment>)
-          : !hasOwnEmptyState && (emptyState ?? DEFAULT_EMPTY)}
+        {!isEmpty ? (
+          mobileList ?? items.map(item => <Fragment key={getKey(item)}>{renderCard(item)}</Fragment>)
+        ) : (
+          !hasOwnEmptyState && (emptyState ?? DEFAULT_EMPTY)
+        )}
         {pagination}
       </div>
 

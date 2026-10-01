@@ -44,7 +44,8 @@ export default function CouponNudge({ subtotal, signedIn, applying, onApply }: C
     <div className="mt-2 flex items-center justify-between gap-3 rounded-lg border border-dashed border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 px-3 py-2">
       {nudge.shortfall > 0 ? (
         <p className="text-xs text-foreground-secondary">
-          Add <span className="font-semibold text-foreground">{inr(nudge.shortfall)}</span> more to unlock {code} and save {inr(nudge.saving)}
+          Add <span className="font-semibold text-foreground">{inr(nudge.shortfall)}</span> more to unlock {code} and
+          save {inr(nudge.saving)}
         </p>
       ) : (
         <>

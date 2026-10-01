@@ -12,18 +12,18 @@ import { NextRequest } from 'next/server'
 const mockAuthenticateAnyUser = vi.hoisted(() => vi.fn())
 const mockQueryMany = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: mockAuthenticateAnyUser,
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: mockQueryMany,
   withTransaction: vi.fn(),
 }))
 
-import { GET } from '@/app/api/support/bot/route'
+import { GET } from '@/app/api/(public)/support/bot/route'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function makeRequest(msg: string, headers: Record<string, string> = {}) {

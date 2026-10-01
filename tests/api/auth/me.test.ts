@@ -14,26 +14,26 @@ const mockCookieStore = vi.hoisted(() => {
   }
 })
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateUser: vi.fn(),
   authenticateBusiness: vi.fn(),
   authenticateAnyUser: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
-vi.mock('@/lib/activity', () => ({
+vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('@/lib/cookie-domain', () => ({
+vi.mock('@/lib/auth/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({}),
 }))
 
-vi.mock('@/app/legal/policies', () => ({
+vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
@@ -41,10 +41,10 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
 
-import { GET } from '@/app/api/auth/me/route'
-import { POST as logoutPOST } from '@/app/api/auth/logout/route'
-import * as jwtLib from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { GET } from '@/app/api/(public)/auth/me/route'
+import { POST as logoutPOST } from '@/app/api/(public)/auth/logout/route'
+import * as jwtLib from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 function meRequest(cookieValue?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -141,10 +141,7 @@ describe('GET /api/auth/me', () => {
     vi.mocked(db.queryOne).mockResolvedValue(USER_ROW)
 
     await GET(meRequest('valid-token') as any)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.stringContaining('FROM users'),
-      ['user-1']
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('FROM users'), ['user-1'])
   })
 })
 
@@ -182,12 +179,8 @@ describe('POST /api/auth/logout', () => {
     vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
 
     await logoutPOST(logoutRequest() as any)
-    const sessionSetCalls = mockCookieStore.set.mock.calls.filter(
-      (c: any[]) => c[0] === 'session_id'
-    )
-    const guestCall = sessionSetCalls.find((c: any[]) =>
-      typeof c[1] === 'string' && c[1].startsWith('guest_')
-    )
+    const sessionSetCalls = mockCookieStore.set.mock.calls.filter((c: any[]) => c[0] === 'session_id')
+    const guestCall = sessionSetCalls.find((c: any[]) => typeof c[1] === 'string' && c[1].startsWith('guest_'))
     expect(guestCall).toBeDefined()
   })
 })

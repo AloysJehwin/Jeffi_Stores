@@ -1,10 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-vi.mock('./db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
-import { listOffersByIds } from '@/lib/product-offers'
-import * as db from '@/lib/db'
+import { listOffersByIds } from '@/lib/catalog/product-offers'
+import * as db from '@/lib/shared/db'
 
 const mockQueryMany = db.queryMany as ReturnType<typeof vi.fn>
 

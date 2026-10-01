@@ -25,13 +25,15 @@ app.prepare().then(() => {
     try {
       // Add certificate headers for middleware to check
       const clientCert = req.socket.getPeerCertificate()
-      
+
       if (req.client.authorized) {
         req.headers['x-client-cert'] = 'PRESENT'
         req.headers['x-client-cert-verified'] = 'SUCCESS'
-        req.headers['x-client-dn'] = clientCert.subject ? 
-          Object.entries(clientCert.subject).map(([k, v]) => `${k}=${v}`).join(',') : 
-          'UNKNOWN'
+        req.headers['x-client-dn'] = clientCert.subject
+          ? Object.entries(clientCert.subject)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(',')
+          : 'UNKNOWN'
       } else {
         req.headers['x-client-cert-verified'] = 'FAILED'
       }
@@ -44,7 +46,7 @@ app.prepare().then(() => {
       res.end('internal server error')
     }
   })
-    .once('error', (err) => {
+    .once('error', err => {
       console.error(err)
       process.exit(1)
     })

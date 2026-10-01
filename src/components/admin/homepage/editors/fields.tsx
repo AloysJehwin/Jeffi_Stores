@@ -5,9 +5,13 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import Toggle from '@/components/ui/Toggle'
 import {
-  sectionLayout, sectionLimit, sectionCopyDefaults,
-  type HomepageSection, type SectionCopy, type SectionType,
-} from '@/lib/homepage-sections'
+  sectionLayout,
+  sectionLimit,
+  sectionCopyDefaults,
+  type HomepageSection,
+  type SectionCopy,
+  type SectionType,
+} from '@/lib/catalog/homepage-sections'
 
 /** Live catalogue data loaded server-side, so an editor never shows an empty picker. */
 export interface SectionOptions {
@@ -16,8 +20,12 @@ export interface SectionOptions {
   /** Top-level categories by id, for sections that pick whole departments (category tabs). */
   topCategories?: { value: string; label: string }[]
   counts: {
-    featured: number; newArrivals: number; bestSellers: number; onSale: number
-    bundles?: number; approvedReviews?: number
+    featured: number
+    newArrivals: number
+    bestSellers: number
+    onSale: number
+    bundles?: number
+    approvedReviews?: number
   }
   /** Store-specific storefront defaults, e.g. the About story from the store settings. */
   copyDefaults?: Partial<Record<SectionType, SectionCopy>>
@@ -55,7 +63,14 @@ function useExternalValue(value: string) {
   return { draft, setDraft, focused }
 }
 
-export function Text({ label, value, disabled, hint, placeholder, onCommit }: {
+export function Text({
+  label,
+  value,
+  disabled,
+  hint,
+  placeholder,
+  onCommit,
+}: {
   label: string
   value: string
   disabled: boolean
@@ -72,9 +87,14 @@ export function Text({ label, value, disabled, hint, placeholder, onCommit }: {
         value={draft}
         disabled={disabled}
         placeholder={placeholder}
-        onFocus={() => { focused.current = true }}
+        onFocus={() => {
+          focused.current = true
+        }}
         onChange={e => setDraft(e.target.value)}
-        onBlur={() => { focused.current = false; if (draft !== value) onCommit(draft) }}
+        onBlur={() => {
+          focused.current = false
+          if (draft !== value) onCommit(draft)
+        }}
         className={INPUT_CLASS}
       />
       {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
@@ -82,7 +102,14 @@ export function Text({ label, value, disabled, hint, placeholder, onCommit }: {
   )
 }
 
-export function TextArea({ label, value, disabled, hint, rows = 3, onCommit }: {
+export function TextArea({
+  label,
+  value,
+  disabled,
+  hint,
+  rows = 3,
+  onCommit,
+}: {
   label: string
   value: string
   disabled: boolean
@@ -98,9 +125,14 @@ export function TextArea({ label, value, disabled, hint, rows = 3, onCommit }: {
         value={draft}
         rows={rows}
         disabled={disabled}
-        onFocus={() => { focused.current = true }}
+        onFocus={() => {
+          focused.current = true
+        }}
         onChange={e => setDraft(e.target.value)}
-        onBlur={() => { focused.current = false; if (draft !== value) onCommit(draft) }}
+        onBlur={() => {
+          focused.current = false
+          if (draft !== value) onCommit(draft)
+        }}
         className={`${INPUT_CLASS} resize-none`}
       />
       {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
@@ -108,7 +140,14 @@ export function TextArea({ label, value, disabled, hint, rows = 3, onCommit }: {
   )
 }
 
-export function NumberField({ label, value, disabled, hint, min = 1, onCommit }: {
+export function NumberField({
+  label,
+  value,
+  disabled,
+  hint,
+  min = 1,
+  onCommit,
+}: {
   label: string
   value: number
   disabled: boolean
@@ -125,12 +164,17 @@ export function NumberField({ label, value, disabled, hint, min = 1, onCommit }:
         min={min}
         value={draft}
         disabled={disabled}
-        onFocus={() => { focused.current = true }}
+        onFocus={() => {
+          focused.current = true
+        }}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => {
           focused.current = false
           const n = parseInt(draft, 10)
-          if (!Number.isFinite(n) || n < min) { setDraft(String(value)); return }
+          if (!Number.isFinite(n) || n < min) {
+            setDraft(String(value))
+            return
+          }
           if (n !== value) onCommit(n)
         }}
         className={INPUT_CLASS}
@@ -140,7 +184,15 @@ export function NumberField({ label, value, disabled, hint, min = 1, onCommit }:
   )
 }
 
-export function Select({ label, value, options, disabled, hint, placeholder, onChange }: {
+export function Select({
+  label,
+  value,
+  options,
+  disabled,
+  hint,
+  placeholder,
+  onChange,
+}: {
   label: string
   value: string
   options: { value: string; label: string }[]
@@ -152,7 +204,14 @@ export function Select({ label, value, options, disabled, hint, placeholder, onC
   return (
     <div>
       <label className={LABEL_CLASS}>{label}</label>
-      <AdminSelect value={value} options={options} disabled={disabled} placeholder={placeholder} onChange={onChange} sm />
+      <AdminSelect
+        value={value}
+        options={options}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={onChange}
+        sm
+      />
       {hint && <p className="text-[11px] text-foreground-muted mt-1">{hint}</p>}
     </div>
   )
@@ -173,7 +232,14 @@ function localToIso(local: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-export function DateTimeField({ label, value, disabled, hint, placeholder, onCommit }: {
+export function DateTimeField({
+  label,
+  value,
+  disabled,
+  hint,
+  placeholder,
+  onCommit,
+}: {
   label: string
   value: string | null
   disabled: boolean
@@ -196,7 +262,13 @@ export function DateTimeField({ label, value, disabled, hint, placeholder, onCom
   )
 }
 
-export function ToggleField({ label, checked, disabled, hint, onChange }: {
+export function ToggleField({
+  label,
+  checked,
+  disabled,
+  hint,
+  onChange,
+}: {
   label: string
   checked: boolean
   disabled: boolean
@@ -295,7 +367,11 @@ export function HeadingFields({ props, eyebrowHint }: { props: EditorProps; eyeb
   )
 }
 
-export function CtaFields({ props, hint, urlPlaceholder = '/products' }: {
+export function CtaFields({
+  props,
+  hint,
+  urlPlaceholder = '/products',
+}: {
   props: EditorProps
   hint?: string
   urlPlaceholder?: string
@@ -338,9 +414,23 @@ export function LayoutField({ props }: { props: EditorProps }) {
   )
 }
 
-export function LimitField({ props, label = 'How many to show', hint }: { props: EditorProps; label?: string; hint?: string }) {
+export function LimitField({
+  props,
+  label = 'How many to show',
+  hint,
+}: {
+  props: EditorProps
+  label?: string
+  hint?: string
+}) {
   const b = useSectionBinding(props)
   return (
-    <NumberField label={label} value={b.limit} disabled={!props.canWrite} hint={hint} onCommit={v => b.saveConfig({ limit: v })} />
+    <NumberField
+      label={label}
+      value={b.limit}
+      disabled={!props.canWrite}
+      hint={hint}
+      onCommit={v => b.saveConfig({ limit: v })}
+    />
   )
 }

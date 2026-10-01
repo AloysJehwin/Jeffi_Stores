@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Search } from 'lucide-react'
-import { joinFilterValues, splitFilterValues } from '@/lib/product-attribute-filters'
+import { joinFilterValues, splitFilterValues } from '@/lib/catalog/product-attribute-filters-shared'
 
 interface ValueRow {
   value: string
@@ -19,7 +19,15 @@ interface Props {
   endpoint?: string
 }
 
-export default function FilterValueHelp({ field, label, value, onChange, placeholder, multi = true, endpoint = '/api/admin/products/attribute-values' }: Props) {
+export default function FilterValueHelp({
+  field,
+  label,
+  value,
+  onChange,
+  placeholder,
+  multi = true,
+  endpoint = '/api/admin/products/attribute-values',
+}: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [rows, setRows] = useState<ValueRow[]>([])
@@ -28,16 +36,23 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
   const searchRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const fetchValues = useCallback(async (q: string) => {
-    setLoading(true)
-    try {
-      const res = await fetch(`${endpoint}?field=${encodeURIComponent(field)}&search=${encodeURIComponent(q)}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setRows(data.values || [])
+  const fetchValues = useCallback(
+    async (q: string) => {
+      setLoading(true)
+      try {
+        const res = await fetch(`${endpoint}?field=${encodeURIComponent(field)}&search=${encodeURIComponent(q)}`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setRows(data.values || [])
+        }
+      } finally {
+        setLoading(false)
       }
-    } finally { setLoading(false) }
-  }, [field, endpoint])
+    },
+    [field, endpoint]
+  )
 
   useEffect(() => {
     if (!open) return
@@ -49,11 +64,17 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
     if (!open) return
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => fetchValues(search), 300)
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [search, open, fetchValues])
 
   function toggle(v: string) {
-    if (!multi) { onChange(v === value ? '' : v); setOpen(false); return }
+    if (!multi) {
+      onChange(v === value ? '' : v)
+      setOpen(false)
+      return
+    }
     const next = selected.includes(v) ? selected.filter(s => s !== v) : [...selected, v]
     onChange(joinFilterValues(next))
   }
@@ -75,9 +96,19 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
             <span className="text-foreground-muted text-sm px-1">{placeholder || `Any ${label}`}</span>
           )}
           {selected.map(v => (
-            <span key={v} className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded">
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded"
+            >
               {v}
-              <button type="button" onClick={e => { e.stopPropagation(); removeTag(v) }} className="hover:text-accent-900">
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  removeTag(v)
+                }}
+                className="hover:text-accent-900"
+              >
                 <X className="w-2.5 h-2.5" />
               </button>
             </span>
@@ -99,8 +130,14 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
 
       {/* Value Help Popup */}
       {open && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/50" onClick={() => setOpen(false)}>
-          <div className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
               <div>
@@ -109,7 +146,11 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
                   <p className="text-xs text-foreground-muted mt-0.5">{selected.length} selected</p>
                 )}
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="text-foreground-muted hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-foreground-muted hover:text-foreground"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -133,12 +174,23 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
             {multi && selected.length > 0 && (
               <div className="px-5 py-2 border-b border-border-default flex flex-wrap gap-1.5">
                 {selected.map(v => (
-                  <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 rounded-full">
+                  <span
+                    key={v}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 rounded-full"
+                  >
                     {v}
-                    <button type="button" onClick={() => removeTag(v)}><X className="w-2.5 h-2.5" /></button>
+                    <button type="button" onClick={() => removeTag(v)}>
+                      <X className="w-2.5 h-2.5" />
+                    </button>
                   </span>
                 ))}
-                <button type="button" onClick={() => onChange('')} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
+                <button
+                  type="button"
+                  onClick={() => onChange('')}
+                  className="text-xs text-foreground-muted hover:text-foreground underline"
+                >
+                  Clear all
+                </button>
               </div>
             )}
 
@@ -155,8 +207,12 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
                   <thead className="bg-surface-secondary sticky top-0">
                     <tr>
                       {multi && <th className="w-10 px-4 py-2.5" />}
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Value</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Products</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                        Value
+                      </th>
+                      <th className="px-4 py-2.5 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                        Products
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
@@ -170,17 +226,27 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
                         >
                           {multi && (
                             <td className="px-4 py-2.5">
-                              <span className={`w-4 h-4 rounded border flex items-center justify-center
-                                ${isSelected ? 'bg-accent-500 border-accent-500' : 'border-border-secondary'}`}>
+                              <span
+                                className={`w-4 h-4 rounded border flex items-center justify-center
+                                ${isSelected ? 'bg-accent-500 border-accent-500' : 'border-border-secondary'}`}
+                              >
                                 {isSelected && (
-                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                  <svg
+                                    className="w-2.5 h-2.5 text-white"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                  >
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                   </svg>
                                 )}
                               </span>
                             </td>
                           )}
-                          <td className={`px-4 py-2.5 font-medium ${isSelected ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}>
+                          <td
+                            className={`px-4 py-2.5 font-medium ${isSelected ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}
+                          >
                             {r.value}
                           </td>
                           <td className="px-4 py-2.5 text-right text-foreground-muted tabular-nums">{r.count}</td>
@@ -194,10 +260,18 @@ export default function FilterValueHelp({ field, label, value, onChange, placeho
 
             {/* Footer */}
             <div className="flex items-center justify-between px-5 py-3 border-t border-border-default bg-surface-secondary rounded-b-xl">
-              <button type="button" onClick={() => onChange('')} className="px-4 py-2 text-sm text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                className="px-4 py-2 text-sm text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
+              >
                 Clear
               </button>
-              <button type="button" onClick={() => setOpen(false)} className="px-6 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-6 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+              >
                 {multi ? `Apply (${selected.length} selected)` : 'Close'}
               </button>
             </div>

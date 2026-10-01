@@ -3,16 +3,16 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/ai-client', () => ({ aiChat: vi.fn() }))
-vi.mock('@/lib/brand', () => ({ storeDescriptorForPrompt: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/ai-client', () => ({ aiChat: vi.fn() }))
+vi.mock('@/lib/catalog/brand', () => ({ storeDescriptorForPrompt: vi.fn() }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/ai-enrich-field/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { aiChat } from '@/lib/ai-client'
-import { storeDescriptorForPrompt } from '@/lib/brand'
+import { POST } from '@/app/api/(admin)/admin/ai-enrich-field/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { aiChat } from '@/lib/shared/ai-client'
+import { storeDescriptorForPrompt } from '@/lib/catalog/brand'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -91,7 +91,11 @@ describe('POST /api/admin/ai-enrich-field', () => {
   })
 
   it('allows a tenant admin holding both the AI entitlement and the field scope', async () => {
-    mockAuth.mockResolvedValue({ adminId: 't1', role: 'super_admin', scopes: ['catalog_enrichment:write', 'brands:write'] } as any)
+    mockAuth.mockResolvedValue({
+      adminId: 't1',
+      role: 'super_admin',
+      scopes: ['catalog_enrichment:write', 'brands:write'],
+    } as any)
     aiReply(JSON.stringify({ result: 'Better brand blurb' }))
     const res = await POST(makeReq({ value: 'brand blurb', scope: 'brands:write' }))
     expect(res.status).toBe(200)

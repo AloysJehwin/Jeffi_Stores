@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
-vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
@@ -13,24 +13,24 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/email', () => ({
   sendAdminContactEmail: vi.fn(),
 }))
-vi.mock('@/lib/validate', () => ({
+vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { _def: {} },
 }))
-vi.mock('@/lib/template-vars', () => ({
+vi.mock('@/lib/shared/template-vars', () => ({
   buildVarMap: vi.fn().mockReturnValue({}),
   substituteVars: vi.fn().mockImplementation((s: string) => s),
 }))
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
-import { POST } from '@/app/api/admin/orders/[id]/send-customer-mail/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne } from '@/lib/shared/db'
 import { sendAdminContactEmail } from '@/lib/email'
-import { parseBody } from '@/lib/validate'
-import { buildVarMap, substituteVars } from '@/lib/template-vars'
+import { parseBody } from '@/lib/shared/validate'
+import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

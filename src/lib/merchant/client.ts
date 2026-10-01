@@ -50,13 +50,15 @@ export async function getAccessToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
 
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
-  const payload = Buffer.from(JSON.stringify({
-    iss: creds.clientEmail,
-    scope: SCOPE,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  })).toString('base64url')
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: creds.clientEmail,
+      scope: SCOPE,
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600,
+    })
+  ).toString('base64url')
 
   const signer = createSign('RSA-SHA256')
   signer.update(header + '.' + payload)

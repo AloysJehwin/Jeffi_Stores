@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeEdd, transitDays } from '@/lib/edd'
+import { computeEdd, transitDays } from '@/lib/shipping/edd'
 
 function daysFromToday(edd: string): number {
   const d = new Date(edd + 'T00:00:00Z')

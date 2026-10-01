@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('path', async (importOriginal) => {
+vi.mock('path', async importOriginal => {
   const actual = await importOriginal<typeof import('path')>()
   return {
     ...actual,
@@ -9,8 +9,8 @@ vi.mock('path', async (importOriginal) => {
   }
 })
 
-import { generatePolicyPDF } from '@/lib/policy-pdf'
-import type { Policy, Section } from '@/app/legal/policies'
+import { generatePolicyPDF } from '@/lib/documents/policy-pdf'
+import type { Policy, Section } from '@/lib/legals/policies'
 
 beforeEach(() => {
   vi.clearAllMocks()

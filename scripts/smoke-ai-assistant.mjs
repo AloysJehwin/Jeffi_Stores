@@ -3,8 +3,7 @@
  * Smoke-test the AI assistant against RAG before/after catalog enrichment.
  *
  * Hits Razer pgvector for vector search (same path as src/lib/rag.ts) and
- * RDS via the SSH tunnel for hydrating product rows (same path as
- * searchCandidatesViaRag in src/lib/ai-assistant.ts).
+ * RDS via the SSH tunnel for hydrating product rows.
  *
  * Outputs a markdown table with top-3 hits + similarity for each query.
  *

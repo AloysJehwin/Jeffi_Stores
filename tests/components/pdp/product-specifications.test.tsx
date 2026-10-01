@@ -7,7 +7,9 @@ afterEach(cleanup)
 describe('ProductSpecifications', () => {
   it('renders nothing when the product has nothing customer-facing', () => {
     const { container } = render(
-      <ProductSpecifications product={{ brands: { name: null }, condition: 'new', specifications: { 'Package Type': 'Box' } }} />,
+      <ProductSpecifications
+        product={{ brands: { name: null }, condition: 'new', specifications: { 'Package Type': 'Box' } }}
+      />
     )
     expect(container.innerHTML).toBe('')
   })
@@ -25,7 +27,7 @@ describe('ProductSpecifications', () => {
           flammable: true,
           perishable: true,
         }}
-      />,
+      />
     )
     expect(screen.getByRole('heading', { name: 'Specifications' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Key details' })).toBeTruthy()

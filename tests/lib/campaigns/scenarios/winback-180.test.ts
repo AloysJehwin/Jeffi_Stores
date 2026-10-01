@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from 'vitest'
 
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
-vi.mock('@/lib/automation-emails', () => ({
+vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
+vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),

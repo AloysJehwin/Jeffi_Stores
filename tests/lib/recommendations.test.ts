@@ -19,15 +19,15 @@ const { mockQueryMany, mockFindSimilarProductIds, mockAiChat, AiClientError } = 
   }
 })
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: mockQueryMany,
 }))
 
-vi.mock('@/lib/rag', () => ({
+vi.mock('@/lib/shared/rag', () => ({
   findSimilarProductIds: mockFindSimilarProductIds,
 }))
 
-vi.mock('@/lib/ai-client', () => ({
+vi.mock('@/lib/shared/ai-client', () => ({
   aiChat: mockAiChat,
   AiClientError,
 }))
@@ -40,12 +40,7 @@ vi.mock('@/lib/queries', () => ({
 }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
-import {
-  aggregateUserSignals,
-  getCandidates,
-  getFeaturedForUser,
-  getBestSellerCards,
-} from '@/lib/recommendations'
+import { aggregateUserSignals, getCandidates, getFeaturedForUser, getBestSellerCards } from '@/lib/catalog/recommendations'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -449,9 +444,7 @@ describe('curate branches (via getFeaturedForUser)', () => {
     mockQueryMany.mockImplementation(async (sql: string) => {
       const kind = sqlKind(sql)
       // signals return rows with categories/brands but empty names to keep seedQuery empty
-      if (kind === 'signals') return [
-        { product_id: 'p1', name: '', category_id: 'c1', brand_id: 'b1', score: 5 },
-      ]
+      if (kind === 'signals') return [{ product_id: 'p1', name: '', category_id: 'c1', brand_id: 'b1', score: 5 }]
       if (kind === 'owned') return []
       if (kind === 'heuristic') return [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }, { id: 'p4' }, { id: 'p5' }]
       if (kind === 'hydrate') return [card('p1'), card('p2'), card('p3'), card('p4'), card('p5')]

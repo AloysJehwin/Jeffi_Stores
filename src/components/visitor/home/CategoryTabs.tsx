@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
-import type { CardProps } from '@/lib/product-card-props'
-import { SECTION_COPY_DEFAULTS } from '@/lib/homepage-sections'
+import type { CardProps } from '@/lib/catalog/product-card-props'
+import { SECTION_COPY_DEFAULTS } from '@/lib/catalog/homepage-sections'
 
 const COPY = SECTION_COPY_DEFAULTS.category_tabs
 
@@ -38,10 +38,17 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
           <div>
-            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">{eyebrow ?? COPY.eyebrow}</p>
+            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">
+              {eyebrow ?? COPY.eyebrow}
+            </p>
             <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">{title ?? COPY.title}</h2>
           </div>
-          <div role="tablist" aria-label={title ?? COPY.title} onKeyDown={onKeyDown} className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+          <div
+            role="tablist"
+            aria-label={title ?? COPY.title}
+            onKeyDown={onKeyDown}
+            className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1"
+          >
             {tabs.map((tab, i) => {
               const selected = tab.id === current.id
               return (
@@ -69,7 +76,9 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
 
         <div id={`category-panel-${current.id}`} role="tabpanel" aria-labelledby={`category-tab-${current.id}`}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
-            {current.products.map(p => <ProductCard key={p.id} {...p} />)}
+            {current.products.map(p => (
+              <ProductCard key={p.id} {...p} />
+            ))}
           </div>
           <div className="text-center mt-7">
             <Link
@@ -77,7 +86,14 @@ export default function CategoryTabs({ tabs, eyebrow, title }: CategoryTabsProps
               className="inline-flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold"
             >
               View all {current.name}
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </Link>

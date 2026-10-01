@@ -9,7 +9,7 @@ import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {
@@ -145,13 +145,28 @@ interface PolicyProps {
   freeShippingThreshold?: number
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
+const DeliveryInfo = ({
+  returnAllowed,
+  returnDays,
+  replacementAllowed,
+  replacementDays,
+  isCodAllowed,
+  freeShippingThreshold = 500,
+}: PolicyProps) => {
   const items = [
     {
       icon: (
-        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
-          <path d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5"/>
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5" />
         </svg>
       ),
       label: 'Free Delivery',
@@ -161,8 +176,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
     },
     {
       icon: (
-        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       ),
       label: returnAllowed ? 'Easy Returns' : 'Non-Returnable',
@@ -174,8 +197,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
     },
     {
       icon: (
-        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
         </svg>
       ),
       label: replacementAllowed ? 'Free Replacement' : 'Non-Replaceable',
@@ -187,8 +218,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
     },
     {
       icon: (
-        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
         </svg>
       ),
       label: '100% Genuine',
@@ -202,28 +241,54 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 items-stretch">
         {items.map((item, i) => (
-          <Link key={i} href={item.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden">
+          <Link
+            key={i}
+            href={item.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden"
+          >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
               {item.icon}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground leading-tight group-hover:text-accent-600 transition-colors">{item.label}</p>
+              <p className="text-sm font-semibold text-foreground leading-tight group-hover:text-accent-600 transition-colors">
+                {item.label}
+              </p>
               <p className="text-[11px] text-foreground-muted leading-snug mt-0.5">{item.sub}</p>
             </div>
           </Link>
         ))}
       </div>
 
-      <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
-        <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      <Link
+        href="/legal/faq"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group"
+      >
+        <svg
+          className="w-4 h-4 text-green-600 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          />
         </svg>
-        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors w-10 leading-tight shrink-0">Secure Payment</span>
+        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors w-10 leading-tight shrink-0">
+          Secure Payment
+        </span>
         <div className="flex items-center gap-1 flex-wrap ml-2">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
-            <span key={m} className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap">
+            <span
+              key={m}
+              className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap"
+            >
               {m}
             </span>
           ))}
@@ -238,11 +303,23 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
   )
 }
 
-export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500 }: ProductDetailClientProps) {
+export default function ProductDetailClient({
+  product,
+  initialSkuParam,
+  freeShippingThreshold = 500,
+}: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
-  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
+  const [selectedUnit, setSelectedUnit] = useState<{
+    key: string
+    label: string | null
+    min: number
+    max: number | null
+    step: number
+    factor: number
+    dimension: string
+  }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
   const { user } = useAuth()
   const { showToast } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
@@ -252,49 +329,65 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   }, [product.slug])
 
   useEffect(() => {
-    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } }).catch(() => {})
+    fetch(`/api/products/${product.id}/view`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Auth-Portal': 'business' },
+    }).catch(() => {})
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const baseDisplayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
   const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
   const rawMrp = product.mrp ? Number(product.mrp) : null
-  const mrp = (!gstEnabled && rawMrp != null && gstRatePdp > 0) ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
 
   // Apply per-category business discount
   const categoryId = product.categories?.id
-  const businessDiscountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-    ? (user.businessDiscountMap?.[categoryId] ?? 0)
-    : 0
-  const displayPrice = businessDiscountPct > 0
-    ? applyDiscount(baseDisplayPrice, businessDiscountPct)
-    : baseDisplayPrice
+  const businessDiscountPct =
+    user?.isBusiness && user.approvalStatus === 'approved' && categoryId
+      ? (user.businessDiscountMap?.[categoryId] ?? 0)
+      : 0
+  const displayPrice = businessDiscountPct > 0 ? applyDiscount(baseDisplayPrice, businessDiscountPct) : baseDisplayPrice
 
-  const mrpDiscount = mrp && mrp > displayPrice
-    ? mrpDiscountPct(mrp, displayPrice)
-    : 0
+  const mrpDiscount = mrp && mrp > displayPrice ? mrpDiscountPct(mrp, displayPrice) : 0
 
   const brand = product.brands
   const cat = product.categories
-  const returnAllowed = (brand?.return_allowed === false || cat?.return_allowed === false)
-    ? false
-    : (brand?.return_allowed ?? cat?.return_allowed ?? true)
+  const returnAllowed =
+    brand?.return_allowed === false || cat?.return_allowed === false
+      ? false
+      : (brand?.return_allowed ?? cat?.return_allowed ?? true)
   const returnDays = returnAllowed
-    ? (brand?.return_allowed === false ? (brand.return_window_days ?? 7) : (cat?.return_window_days ?? brand?.return_window_days ?? 7))
+    ? brand?.return_allowed === false
+      ? (brand.return_window_days ?? 7)
+      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
     : 0
-  const replacementAllowed = (brand?.replacement_allowed === false || cat?.replacement_allowed === false)
-    ? false
-    : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
+  const replacementAllowed =
+    brand?.replacement_allowed === false || cat?.replacement_allowed === false
+      ? false
+      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
   const replacementDays = replacementAllowed
-    ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
+    ? brand?.replacement_allowed === false
+      ? (brand.replacement_window_days ?? 7)
+      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false, freeShippingThreshold }
+  const policy: PolicyProps = {
+    returnAllowed,
+    returnDays,
+    replacementAllowed,
+    replacementDays,
+    isCodAllowed: product.is_cod_allowed ?? false,
+    freeShippingThreshold,
+  }
 
   const handleShare = useCallback(async () => {
     const url = window.location.href
     const shareData = { title: product.name, text: `Check out ${product.name}`, url }
     if (navigator.share) {
-      try { await navigator.share(shareData) } catch {}
+      try {
+        await navigator.share(shareData)
+      } catch {}
     } else {
       await navigator.clipboard.writeText(url)
       showToast('Link copied to clipboard!', 'success')
@@ -318,7 +411,9 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
             images={product.product_images || []}
             productName={product.name}
             variantImages={variantImages}
-            discountPct={businessDiscountPct > 0 ? null : (product.discount_pct != null ? Number(product.discount_pct) : null)}
+            discountPct={
+              businessDiscountPct > 0 ? null : product.discount_pct != null ? Number(product.discount_pct) : null
+            }
             ribbonLabel={businessDiscountPct > 0 ? 'Business offer' : undefined}
           />
         </div>
@@ -331,9 +426,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
       {/* Product info column — order-2 on mobile, natural on desktop */}
       <div className="order-2 lg:order-none lg:pl-4 min-w-0">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1 min-w-0">
-            {product.name}
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1 min-w-0">{product.name}</h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <button
               onClick={handleShare}
@@ -341,7 +434,11 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
               className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                />
               </svg>
             </button>
           </div>
@@ -367,7 +464,10 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
           handlingDays={Number(product.handling_days ?? 2)}
           isCodAllowed={product.is_cod_allowed ?? false}
           onVariantChange={handleVariantChange}
-          onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
+          onSelectionChange={(vId, svId) => {
+            setSelectedVariantId(vId)
+            setSelectedSubVariantId(svId)
+          }}
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           categoryId={categoryId ?? null}
           productUnits={product.product_units ?? []}
@@ -377,31 +477,38 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
         {(() => {
           const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
           const overallStockQty = hasVariants
-            ? product.product_variants?.reduce((sum: number, v: any) => sum + (v.stock_status !== 'Out of Stock' ? 1 : 0), 0) ?? 0
-            : (product.stock_status !== 'Out of Stock' ? 1 : 0)
+            ? (product.product_variants?.reduce(
+                (sum: number, v: any) => sum + (v.stock_status !== 'Out of Stock' ? 1 : 0),
+                0
+              ) ?? 0)
+            : product.stock_status !== 'Out of Stock'
+              ? 1
+              : 0
           return (
             <RequestQuoteButton
-              items={[{
-                productId: product.id,
-                variantId: selectedVariantId || undefined,
-                subVariantId: selectedSubVariantId || undefined,
-                description: product.name,
-                quantity: 1,
-                unit: selectedUnit.key,
-                unitMin: selectedUnit.min,
-                unitMax: selectedUnit.max ?? undefined,
-                unitStep: selectedUnit.step,
-                unitFactor: selectedUnit.factor,
-                unitDimension: selectedUnit.dimension,
-                currentPrice: hasVariants ? null : displayPrice,
-                imageUrl: primaryImage?.image_url ?? null,
-                brandName: product.brands?.name ?? null,
-                categoryName: product.categories?.name ?? null,
-                sku: hasVariants ? null : (product.sku || null),
-                stockStatus: hasVariants ? null : (overallStockQty > 0 ? 'in' : 'out'),
-                variants: hasVariants ? product.product_variants : undefined,
-                businessDiscountPct: businessDiscountPct > 0 ? businessDiscountPct : undefined,
-              }]}
+              items={[
+                {
+                  productId: product.id,
+                  variantId: selectedVariantId || undefined,
+                  subVariantId: selectedSubVariantId || undefined,
+                  description: product.name,
+                  quantity: 1,
+                  unit: selectedUnit.key,
+                  unitMin: selectedUnit.min,
+                  unitMax: selectedUnit.max ?? undefined,
+                  unitStep: selectedUnit.step,
+                  unitFactor: selectedUnit.factor,
+                  unitDimension: selectedUnit.dimension,
+                  currentPrice: hasVariants ? null : displayPrice,
+                  imageUrl: primaryImage?.image_url ?? null,
+                  brandName: product.brands?.name ?? null,
+                  categoryName: product.categories?.name ?? null,
+                  sku: hasVariants ? null : product.sku || null,
+                  stockStatus: hasVariants ? null : overallStockQty > 0 ? 'in' : 'out',
+                  variants: hasVariants ? product.product_variants : undefined,
+                  businessDiscountPct: businessDiscountPct > 0 ? businessDiscountPct : undefined,
+                },
+              ]}
               className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
               unitMeta={selectedUnit}
               productUnits={product.product_units ?? []}

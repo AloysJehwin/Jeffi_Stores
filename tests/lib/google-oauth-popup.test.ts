@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 
 describe('openGoogleOAuthPopup — server-side (window undefined)', () => {
   it('resolves with window unavailable error when window is not defined', async () => {
@@ -50,10 +50,12 @@ describe('openGoogleOAuthPopup — postMessage with accessToken', () => {
     const promise = openGoogleOAuthPopup({ clientId: 'client-id' })
 
     // Dispatch a valid postMessage
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { source: 'jeffi-google-oauth', accessToken: 'token-abc' },
-      origin: window.location.origin,
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { source: 'jeffi-google-oauth', accessToken: 'token-abc' },
+        origin: window.location.origin,
+      })
+    )
 
     const result = await promise
     expect(result.accessToken).toBe('token-abc')
@@ -66,10 +68,12 @@ describe('openGoogleOAuthPopup — postMessage with accessToken', () => {
 
     const promise = openGoogleOAuthPopup({ clientId: 'client-id' })
 
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { source: 'jeffi-google-oauth', error: 'access_denied' },
-      origin: window.location.origin,
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { source: 'jeffi-google-oauth', error: 'access_denied' },
+        origin: window.location.origin,
+      })
+    )
 
     const result = await promise
     expect(result.accessToken).toBeNull()
@@ -83,16 +87,20 @@ describe('openGoogleOAuthPopup — postMessage with accessToken', () => {
     const promise = openGoogleOAuthPopup({ clientId: 'client-id' })
 
     // Send from wrong origin — should be ignored
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { source: 'jeffi-google-oauth', accessToken: 'evil-token' },
-      origin: 'https://evil.com',
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { source: 'jeffi-google-oauth', accessToken: 'evil-token' },
+        origin: 'https://evil.com',
+      })
+    )
 
     // Then send the real one
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { source: 'jeffi-google-oauth', accessToken: 'real-token' },
-      origin: window.location.origin,
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { source: 'jeffi-google-oauth', accessToken: 'real-token' },
+        origin: window.location.origin,
+      })
+    )
 
     const result = await promise
     expect(result.accessToken).toBe('real-token')
@@ -105,10 +113,12 @@ describe('openGoogleOAuthPopup — postMessage with accessToken', () => {
     const promise = openGoogleOAuthPopup({ clientId: 'client-id' })
 
     // Wrong source field — should be ignored
-    window.dispatchEvent(new MessageEvent('message', {
-      data: { source: 'other-app', accessToken: 'fake-token' },
-      origin: window.location.origin,
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { source: 'other-app', accessToken: 'fake-token' },
+        origin: window.location.origin,
+      })
+    )
 
     // Send timeout to resolve
     vi.advanceTimersByTime(3 * 60 * 1000 + 100)

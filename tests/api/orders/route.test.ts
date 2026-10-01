@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   queryCount: vi.fn(),
   queryOne: vi.fn(),
 }))
 
-import { GET } from '@/app/api/orders/route'
-import * as jwt from '@/lib/jwt'
-import * as db from '@/lib/db'
+import { GET } from '@/app/api/(public)/orders/route'
+import * as jwt from '@/lib/auth/jwt'
+import * as db from '@/lib/shared/db'
 
 const USER = { userId: 'user-1', isBusiness: false }
 const BIZ_USER = { userId: 'biz-user-1', isBusiness: true }
@@ -86,10 +86,7 @@ describe('GET /api/orders', () => {
     vi.mocked(db.queryCount).mockResolvedValueOnce(1)
     const res = await GET(makeRequest() as any)
     expect(res.status).toBe(200)
-    expect(db.queryOne).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT email, phone FROM users'),
-      ['biz-user-1']
-    )
+    expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT email, phone FROM users'), ['biz-user-1'])
   })
 
   it('uses business query when x-auth-portal header is business', async () => {

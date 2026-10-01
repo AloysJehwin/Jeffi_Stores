@@ -137,7 +137,7 @@ export async function putListingsItem(sku: string, listing: unknown): Promise<an
 export async function patchListingsItem(
   sku: string,
   productType: string,
-  patches: Array<{ op: 'add' | 'replace' | 'delete' | 'merge'; path: string; value?: unknown }>,
+  patches: Array<{ op: 'add' | 'replace' | 'delete' | 'merge'; path: string; value?: unknown }>
 ): Promise<any> {
   const creds = await resolveAmazonCreds()
   return spApiRequest('PATCH', itemPath(creds.sellerId, sku), {
@@ -175,7 +175,9 @@ export async function getListingsItem(sku: string): Promise<any> {
 }
 
 // Paginated read of our own listings (analog of GMC listProductStatuses).
-export async function searchListingsItems(pageToken?: string): Promise<{ items?: any[]; pagination?: { nextToken?: string } }> {
+export async function searchListingsItems(
+  pageToken?: string
+): Promise<{ items?: any[]; pagination?: { nextToken?: string } }> {
   const creds = await resolveAmazonCreds()
   return spApiRequest('GET', `${LISTINGS_BASE}/${encodeURIComponent(creds.sellerId)}`, {
     query: {
@@ -226,13 +228,46 @@ function toCatalogMatch(item: any, marketplaceId: string): CatalogMatch {
 // inch fractions (1/2"), and product-TYPE words (the item kind). Both size AND type must agree,
 // because e.g. a Dowel Pin M4 and a Button Screw M4 share the size but are different products.
 const TYPE_WORDS = [
-  'bolt', 'screw', 'nut', 'washer', 'dowel', 'pin', 'stud', 'rivet', 'anchor',
-  'socket', 'cap', 'button', 'countersunk', 'csk', 'grub', 'set', 'hex', 'allen',
-  'lock', 'nyloc', 'flange', 'wrench', 'spanner', 'driver', 'drill', 'level',
-  'lug', 'terminal', 'durlok', 'shcs', 'taper',
+  'bolt',
+  'screw',
+  'nut',
+  'washer',
+  'dowel',
+  'pin',
+  'stud',
+  'rivet',
+  'anchor',
+  'socket',
+  'cap',
+  'button',
+  'countersunk',
+  'csk',
+  'grub',
+  'set',
+  'hex',
+  'allen',
+  'lock',
+  'nyloc',
+  'flange',
+  'wrench',
+  'spanner',
+  'driver',
+  'drill',
+  'level',
+  'lug',
+  'terminal',
+  'durlok',
+  'shcs',
+  'taper',
 ]
 
-function extractSpecTokens(text: string): { sizes: Set<string>; dims: Set<string>; types: Set<string>; models: Set<string>; packs: Set<string> } {
+function extractSpecTokens(text: string): {
+  sizes: Set<string>
+  dims: Set<string>
+  types: Set<string>
+  models: Set<string>
+  packs: Set<string>
+} {
   const t = ` ${(text || '').toLowerCase()} `
   const sizes = new Set<string>()
   const dims = new Set<string>()
@@ -307,14 +342,20 @@ export async function matchAsin(input: {
     if (!m.asin) continue
     if (brandLc && (m.brand || '').toLowerCase().trim() !== brandLc) continue
     const score = scoreCandidate(input.name, m.title || '')
-    if (score > bestScore) { bestScore = score; best = m }
+    if (score > bestScore) {
+      bestScore = score
+      best = m
+    }
   }
   return best ? { ...best, matchType: 'keyword' } : null
 }
 
 // Brand-gate check: whether we're allowed to create an offer on an ASIN. Empty restrictions
 // array => listable now; entries => approval required (with a reasonCode / approval link).
-export async function getListingsRestrictions(asin: string, conditionType = 'new_new'): Promise<{ restrictions?: any[] }> {
+export async function getListingsRestrictions(
+  asin: string,
+  conditionType = 'new_new'
+): Promise<{ restrictions?: any[] }> {
   const creds = await resolveAmazonCreds()
   return spApiRequest('GET', RESTRICTIONS_BASE, {
     query: {

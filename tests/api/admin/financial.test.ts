@@ -5,20 +5,20 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/financial', () => ({
+vi.mock('@/lib/payments/financial', () => ({
   getPLReport: vi.fn(),
   getReceivablesAging: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   getFinancialYear: vi.fn(),
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
@@ -27,11 +27,11 @@ vi.mock('@/lib/gst', () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import { GET as plGET } from '@/app/api/admin/financial/pl/route'
-import { GET as receivablesGET } from '@/app/api/admin/financial/receivables/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { getPLReport, getReceivablesAging } from '@/lib/financial'
+import { GET as plGET } from '@/app/api/(admin)/admin/financial/pl/route'
+import { GET as receivablesGET } from '@/app/api/(admin)/admin/financial/receivables/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { getPLReport, getReceivablesAging } from '@/lib/payments/financial'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,7 +68,7 @@ describe('GET /api/admin/financial/pl', () => {
     expect(json).toMatchObject({ revenue: 100000, netProfit: 30000 })
     expect(getPLReport).toHaveBeenCalledWith(
       expect.stringMatching(/^\d{4}-04-01$/),
-      expect.stringMatching(/^\d{4}-03-31$/),
+      expect.stringMatching(/^\d{4}-03-31$/)
     )
   })
 
@@ -129,9 +129,11 @@ describe('GET /api/admin/financial/receivables', () => {
   it('passes from/to/search/page/customerPhone to getReceivablesAging', async () => {
     vi.mocked(getReceivablesAging).mockResolvedValue({ rows: [], total: 0 } as any)
 
-    await receivablesGET(makeReq(
-      'http://localhost/api/admin/financial/receivables?from=2024-01-01&to=2024-12-31&search=acme&customerPhone=9999999999&page=3'
-    ))
+    await receivablesGET(
+      makeReq(
+        'http://localhost/api/admin/financial/receivables?from=2024-01-01&to=2024-12-31&search=acme&customerPhone=9999999999&page=3'
+      )
+    )
 
     expect(getReceivablesAging).toHaveBeenCalledWith({
       from: '2024-01-01',

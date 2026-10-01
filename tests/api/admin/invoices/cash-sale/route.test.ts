@@ -5,19 +5,19 @@ import { NextRequest, NextResponse } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/jwt', () => ({
+vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
 
-vi.mock('@/lib/scopes', () => ({
+vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
-vi.mock('@/lib/gst', () => ({
+vi.mock('@/lib/catalog/gst', () => ({
   calculateGST: vi.fn(),
   getFinancialYear: vi.fn(),
   generateInvoiceNumber: vi.fn(),
@@ -25,38 +25,35 @@ vi.mock('@/lib/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/pricing', () => ({
+vi.mock('@/lib/catalog/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
   lineItemExGst: vi.fn(),
 }))
 
-vi.mock('@/lib/inventory', () => ({
+vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
   recomputeStockStatusForProduct: vi.fn(),
 }))
 
-vi.mock('@/lib/shelf', () => ({
+vi.mock('@/lib/catalog/shelf', () => ({
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 // The route now reads GST state via getFeatureFlags() instead of ENABLE_GST
 // directly. Mirror that env-driven state so per-test ENABLE_GST still applies.
-vi.mock('@/lib/site-controls', () => ({
+vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn(async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' })),
 }))
 
-vi.mock('@/lib/validate', () => {
+vi.mock('@/lib/shared/validate', () => {
   return {
     parseBody: vi.fn((schema: any, data: any) => {
       const result = schema.safeParse(data)
       if (result.success) return { ok: true, data: result.data }
       return {
         ok: false,
-        response: NextResponse.json(
-          { error: result.error.issues[0]?.message ?? 'Validation error' },
-          { status: 400 },
-        ),
+        response: NextResponse.json({ error: result.error.issues[0]?.message ?? 'Validation error' }, { status: 400 }),
       }
     }),
   }
@@ -66,15 +63,15 @@ vi.mock('@/lib/validate', () => {
 // Import handler AFTER mocks
 // ---------------------------------------------------------------------------
 
-import { POST } from '@/app/api/admin/invoices/cash-sale/route'
-import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
-import { withTransaction } from '@/lib/db'
-import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
-import { logStockMovement } from '@/lib/inventory'
-import { getFeatureFlags } from '@/lib/site-controls'
-import { parseBody } from '@/lib/validate'
+import { POST } from '@/app/api/(admin)/admin/invoices/cash-sale/route'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { withTransaction } from '@/lib/shared/db'
+import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/catalog/gst'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { logStockMovement } from '@/lib/orders/inventory'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,11 +80,13 @@ import { parseBody } from '@/lib/validate'
 const ADMIN = { adminId: 'admin-1', username: 'testadmin', id: 'admin-1', role: 'super_admin', scopes: ['invoices'] }
 
 function postReq(body: unknown) {
-  return new NextRequest(new Request('http://localhost/api/admin/invoices/cash-sale', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }))
+  return new NextRequest(
+    new Request('http://localhost/api/admin/invoices/cash-sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  )
 }
 
 const VALID_BODY = {
@@ -106,7 +105,8 @@ const VALID_BODY = {
 
 function makeDefaultClient() {
   return {
-    query: vi.fn()
+    query: vi
+      .fn()
       // site_settings for invoice_prefix
       .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
       // INSERT cash_sales RETURNING id, sale_number
@@ -137,7 +137,9 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(getNextInvoiceSequence).mockResolvedValue(1 as any)
     vi.mocked(lineItemFromMrpIncl).mockReturnValue(100)
     vi.mocked(lineItemExGst).mockReturnValue(84.75)
-    vi.mocked(getFeatureFlags).mockImplementation(async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' }) as any)
+    vi.mocked(getFeatureFlags).mockImplementation(
+      async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' }) as any
+    )
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
     // Re-setup parseBody — resetAllMocks wipes the factory implementation
     vi.mocked(parseBody).mockImplementation((schema: any, data: any) => {
@@ -145,10 +147,7 @@ describe('POST /api/admin/invoices/cash-sale', () => {
       if (result.success) return { ok: true, data: result.data }
       return {
         ok: false,
-        response: NextResponse.json(
-          { error: result.error.issues[0]?.message ?? 'Validation error' },
-          { status: 400 },
-        ),
+        response: NextResponse.json({ error: result.error.issues[0]?.message ?? 'Validation error' }, { status: 400 }),
       }
     })
   })
@@ -180,18 +179,22 @@ describe('POST /api/admin/invoices/cash-sale', () => {
   })
 
   it('returns 400 when item unit_price is negative', async () => {
-    const res = await POST(postReq({
-      ...VALID_BODY,
-      items: [{ ...VALID_BODY.items[0], unit_price: -1 }],
-    }))
+    const res = await POST(
+      postReq({
+        ...VALID_BODY,
+        items: [{ ...VALID_BODY.items[0], unit_price: -1 }],
+      })
+    )
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when item quantity is zero', async () => {
-    const res = await POST(postReq({
-      ...VALID_BODY,
-      items: [{ ...VALID_BODY.items[0], quantity: 0 }],
-    }))
+    const res = await POST(
+      postReq({
+        ...VALID_BODY,
+        items: [{ ...VALID_BODY.items[0], quantity: 0 }],
+      })
+    )
     expect(res.status).toBe(400)
   })
 
@@ -244,18 +247,19 @@ describe('POST /api/admin/invoices/cash-sale', () => {
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] }) // site_settings (GST enabled)
           .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          .mockResolvedValueOnce({ rows: [] }) // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] }) // INSERT cash_sale_items
           // unit factor lookup (buy_unit is null → returns empty)
           .mockResolvedValueOnce({ rows: [] })
           // perishable/serialized check
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] })                  // UPDATE products
+          .mockResolvedValueOnce({ rows: [] }) // UPDATE products
           // second perishable check (shelf sync loop)
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
@@ -270,27 +274,30 @@ describe('POST /api/admin/invoices/cash-sale', () => {
   it('deducts stock at variant level when variant_id provided', async () => {
     const bodyWithVariant = {
       ...VALID_BODY,
-      items: [{
-        ...VALID_BODY.items[0],
-        product_id: '111e4567-e89b-12d3-a456-426614174001',
-        variant_id: '222e4567-e89b-12d3-a456-426614174002',
-      }],
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          product_id: '111e4567-e89b-12d3-a456-426614174001',
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+        },
+      ],
     }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] }) // site_settings (GST enabled)
           .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          .mockResolvedValueOnce({ rows: [] }) // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] }) // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
           // perishable/serialized check
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] })                   // UPDATE product_variants
+          .mockResolvedValueOnce({ rows: [] }) // UPDATE product_variants
           // second perishable check (shelf sync loop)
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
@@ -305,28 +312,31 @@ describe('POST /api/admin/invoices/cash-sale', () => {
   it('deducts stock at sub_variant level when sub_variant_id provided', async () => {
     const bodyWithSV = {
       ...VALID_BODY,
-      items: [{
-        ...VALID_BODY.items[0],
-        product_id: '111e4567-e89b-12d3-a456-426614174001',
-        variant_id: '222e4567-e89b-12d3-a456-426614174002',
-        sub_variant_id: '333e4567-e89b-12d3-a456-426614174003',
-      }],
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          product_id: '111e4567-e89b-12d3-a456-426614174001',
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+          sub_variant_id: '333e4567-e89b-12d3-a456-426614174003',
+        },
+      ],
     }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] }) // site_settings (GST enabled)
           .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          .mockResolvedValueOnce({ rows: [] }) // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] }) // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
           // perishable/serialized check
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] })                   // UPDATE product_sub_variants
+          .mockResolvedValueOnce({ rows: [] }) // UPDATE product_sub_variants
           // second perishable check (shelf sync loop)
           .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
@@ -346,11 +356,12 @@ describe('POST /api/admin/invoices/cash-sale', () => {
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] }) // site_settings (GST enabled)
           .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          .mockResolvedValueOnce({ rows: [] }) // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] }) // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
           // perishable/serialized check

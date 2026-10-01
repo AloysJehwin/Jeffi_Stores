@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ALIASED_SPEC_KEYS, canonicalSpecKey, isJunkSpecValue, readSpecifications, specKeySql, specLabel, specValues,
-} from '@/lib/product-specs'
+  ALIASED_SPEC_KEYS,
+  canonicalSpecKey,
+  isJunkSpecValue,
+  readSpecifications,
+  specKeySql,
+  specLabel,
+  specValues,
+} from '@/lib/catalog/product-specs'
 
 describe('canonicalSpecKey', () => {
   it('meets however the key was typed', () => {
@@ -44,7 +50,12 @@ describe('specLabel', () => {
 
 describe('readSpecifications', () => {
   it('merges spellings of one key and prefers the label as written', () => {
-    const out = readSpecifications({ thread_type: 'BSW', 'Thread Type': ['UNC', 'bsw'], Hardness: '36 HRc', empty: 'nan' })
+    const out = readSpecifications({
+      thread_type: 'BSW',
+      'Thread Type': ['UNC', 'bsw'],
+      Hardness: '36 HRc',
+      empty: 'nan',
+    })
     expect(out).toEqual([
       { key: 'hardness', label: 'Hardness', values: ['36 HRc'] },
       { key: 'thread type', label: 'Thread Type', values: ['BSW', 'UNC'] },

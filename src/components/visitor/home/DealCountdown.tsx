@@ -40,9 +40,14 @@ export default function DealCountdown({ endsAt }: { endsAt: string }) {
   return (
     <div className="flex items-center gap-1.5" role="timer" aria-label="Offer ends in">
       {parts.map(part => (
-        <div key={part.label} className="flex flex-col items-center min-w-[2.5rem] px-2 py-1 rounded-lg bg-primary-500 text-white">
+        <div
+          key={part.label}
+          className="flex flex-col items-center min-w-[2.5rem] px-2 py-1 rounded-lg bg-primary-500 text-white"
+        >
           <span className="text-sm md:text-base font-black leading-none tabular-nums">{part.value}</span>
-          <span className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">{part.label}</span>
+          <span className="text-[9px] font-bold uppercase tracking-wider opacity-80 leading-none mt-0.5">
+            {part.label}
+          </span>
         </div>
       ))}
     </div>

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/google-merchant-helpers', () => ({
+vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   getGoogleProductCategory: vi.fn(),
   buildProductType: vi.fn(),
   buildProductHighlights: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('@/lib/google-merchant-helpers', () => ({
 }))
 
 import { productToGmcItems } from '@/lib/merchant/mapper'
-import * as helpers from '@/lib/google-merchant-helpers'
+import * as helpers from '@/lib/shared/google-merchant-helpers'
 
 const mockGetGoogleProductCategory = vi.mocked(helpers.getGoogleProductCategory)
 const mockBuildProductType = vi.mocked(helpers.buildProductType)
@@ -48,9 +48,7 @@ describe('merchant/mapper', () => {
     mockGetGoogleProductCategory.mockReturnValue('Hardware > Tools')
     mockBuildProductType.mockReturnValue('Tools > Hand Tools')
     mockBuildProductHighlights.mockReturnValue(['Durable', 'Lightweight'])
-    mockBuildProductDetails.mockReturnValue([
-      { section: 'Specs', attribute: 'Material', value: 'Steel' },
-    ])
+    mockBuildProductDetails.mockReturnValue([{ section: 'Specs', attribute: 'Material', value: 'Steel' }])
     mockBuildCustomLabels.mockReturnValue(['label0', 'label1', 'label2', 'label3', 'label4'])
   })
 
@@ -218,9 +216,7 @@ describe('merchant/mapper', () => {
 
     it('uses first image when no primary flagged', () => {
       const product = makeProduct({
-        product_images: [
-          { id: 'img1', image_url: 'https://cdn.example.com/first.jpg', is_primary: false },
-        ],
+        product_images: [{ id: 'img1', image_url: 'https://cdn.example.com/first.jpg', is_primary: false }],
       })
       const items = productToGmcItems(product)
       expect(items[0].imageLink).toBe('https://cdn.example.com/first.jpg')
@@ -265,9 +261,13 @@ describe('merchant/mapper', () => {
     })
 
     it('sets identifierExists false when no identifiers', () => {
-      const items = productToGmcItems(makeProduct({
-        gtin: null, mpn: null, brands: { name: '' }
-      }))
+      const items = productToGmcItems(
+        makeProduct({
+          gtin: null,
+          mpn: null,
+          brands: { name: '' },
+        })
+      )
       expect(items[0].identifierExists).toBe(false)
     })
   })
@@ -276,10 +276,13 @@ describe('merchant/mapper', () => {
     function makeVariantProduct(variantOverrides: any[] = []) {
       return makeProduct({
         has_variants: true,
-        product_variants: variantOverrides.length > 0 ? variantOverrides : [
-          { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
-          { sku: 'TW-001-L', variant_name: 'Large', price: 249, mrp: 299, stock_status: 'Out of Stock' },
-        ],
+        product_variants:
+          variantOverrides.length > 0
+            ? variantOverrides
+            : [
+                { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
+                { sku: 'TW-001-L', variant_name: 'Large', price: 249, mrp: 299, stock_status: 'Out of Stock' },
+              ],
       })
     }
 
@@ -289,48 +292,52 @@ describe('merchant/mapper', () => {
     })
 
     it('filters out variants with null price', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
-        { sku: 'TW-001-NP', variant_name: 'No Price', price: null, mrp: null, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([
+          { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
+          { sku: 'TW-001-NP', variant_name: 'No Price', price: null, mrp: null, stock_status: 'In Stock' },
+        ])
+      )
       expect(items).toHaveLength(1)
     })
 
     it('sets title as product name + variant name', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' }])
+      )
       expect(items[0].title).toBe('Test Widget - Small')
     })
 
     it('sets link with sku query param', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: null, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([
+          { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: null, stock_status: 'In Stock' },
+        ])
+      )
       expect(items[0].link).toContain('?sku=')
     })
 
     it('sets itemGroupId from product sku', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'TW-001-S', variant_name: 'Small', price: 199, mrp: 249, stock_status: 'In Stock' }])
+      )
       expect(items[0].itemGroupId).toBe('TW-001')
     })
 
     it('sets sale price when variant mrp > variant price', () => {
       // Mapper: price field = mrp (listed), salePrice = actual price (discounted)
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: 249, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: 249, stock_status: 'In Stock' }])
+      )
       expect(items[0].price.value).toBe('249.00')
       expect(items[0].salePrice?.value).toBe('199.00')
       expect(items[0].salePrice).toBeDefined()
     })
 
     it('falls back to product mrp when variant has no mrp', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: null, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: null, stock_status: 'In Stock' }])
+      )
       // product.mrp = 249 > 199 so hasSale is true; price = mrp (249), salePrice = price (199)
       expect(items[0].price.value).toBe('249.00')
       expect(items[0].salePrice?.value).toBe('199.00')
@@ -339,17 +346,19 @@ describe('merchant/mapper', () => {
 
     it('sets sizes from variant_name', () => {
       // Content API v2.1: sizes is an array of strings.
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'VAR-1', variant_name: 'XL', price: 199, mrp: 249, stock_status: 'In Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'VAR-1', variant_name: 'XL', price: 199, mrp: 249, stock_status: 'In Stock' }])
+      )
       expect(items[0].sizes).toEqual(['XL'])
     })
 
     it('sets availability per variant stock_status', () => {
-      const items = productToGmcItems(makeVariantProduct([
-        { sku: 'VAR-IN', variant_name: 'A', price: 100, mrp: 120, stock_status: 'In Stock' },
-        { sku: 'VAR-OUT', variant_name: 'B', price: 100, mrp: 120, stock_status: 'Out of Stock' },
-      ]))
+      const items = productToGmcItems(
+        makeVariantProduct([
+          { sku: 'VAR-IN', variant_name: 'A', price: 100, mrp: 120, stock_status: 'In Stock' },
+          { sku: 'VAR-OUT', variant_name: 'B', price: 100, mrp: 120, stock_status: 'Out of Stock' },
+        ])
+      )
       expect(items[0].availability).toBe('in stock')
       expect(items[1].availability).toBe('out of stock')
     })

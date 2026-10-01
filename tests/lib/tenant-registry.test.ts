@@ -35,9 +35,13 @@ describe('slugFromHost', () => {
   // dev subdomain 404 before its host branch could run.
   it('never treats a development host as a custom domain', () => {
     for (const host of [
-      'localhost', 'localhost:3000',
-      'ecom.localhost:3000', 'admin.localhost:3000', 'admin-acme.localhost:3000',
-      '127.0.0.1:3000', 'jeffi.local',
+      'localhost',
+      'localhost:3000',
+      'ecom.localhost:3000',
+      'admin.localhost:3000',
+      'admin-acme.localhost:3000',
+      '127.0.0.1:3000',
+      'jeffi.local',
     ]) {
       expect(slugFromHost(host)).toEqual({ slug: null, isCustomDomain: false })
     }

@@ -22,14 +22,11 @@ function CategoryCard({ cat }: { cat: OfferCategory }) {
         <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400">
           <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-6 h-6" />
         </div>
-        <Link
-          href={cat.slug ? `/categories/${cat.slug}` : '/categories'}
-          className="min-w-0 flex-1"
-        >
-          <h3 className="font-semibold text-foreground group-hover:text-accent-600 transition-colors truncate">{cat.name}</h3>
-          {hasSubs && (
-            <p className="text-xs text-foreground-muted">{cat.subcategories.length} subcategories</p>
-          )}
+        <Link href={cat.slug ? `/categories/${cat.slug}` : '/categories'} className="min-w-0 flex-1">
+          <h3 className="font-semibold text-foreground group-hover:text-accent-600 transition-colors truncate">
+            {cat.name}
+          </h3>
+          {hasSubs && <p className="text-xs text-foreground-muted">{cat.subcategories.length} subcategories</p>}
         </Link>
         {hasSubs && (
           <button
@@ -41,7 +38,10 @@ function CategoryCard({ cat }: { cat: OfferCategory }) {
           >
             <svg
               className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>

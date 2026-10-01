@@ -22,7 +22,11 @@ export default function BusinessCtaEditor(props: EditorProps) {
         hint={copyHint(section.subtitle == null && !!d.subtitle, 'Pitch the bulk or B2B experience in a line or two.')}
         onCommit={b.subtitle}
       />
-      <CtaFields props={props} urlPlaceholder="Business signup page" hint="Leave empty to use your business signup page." />
+      <CtaFields
+        props={props}
+        urlPlaceholder="Business signup page"
+        hint="Leave empty to use your business signup page."
+      />
     </Grid>
   )
 }

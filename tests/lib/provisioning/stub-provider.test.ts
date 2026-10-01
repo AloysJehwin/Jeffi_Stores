@@ -48,7 +48,7 @@ describe('StubProvisioningProvider', () => {
 
       expect(await p.getDbEndpoint(ARGS.dbInstanceId)).toBeNull() // poll 1
       expect(await p.getDbEndpoint(ARGS.dbInstanceId)).toBeNull() // poll 2
-      const ep = await p.getDbEndpoint(ARGS.dbInstanceId)         // now available
+      const ep = await p.getDbEndpoint(ARGS.dbInstanceId) // now available
       expect(ep).toBe('jeffi-tenant-acme.stub.us-east-1.rds.amazonaws.com')
     })
 
@@ -81,7 +81,7 @@ describe('StubProvisioningProvider', () => {
       const p = new StubProvisioningProvider(1)
       await p.createDbInstance(ARGS)
       expect(await p.getDbEndpoint(ARGS.dbInstanceId)).toBeNull() // burns the 1 pending poll
-      await p.createDbInstance(ARGS)                              // retry must not reset it
+      await p.createDbInstance(ARGS) // retry must not reset it
       expect(await p.getDbEndpoint(ARGS.dbInstanceId)).not.toBeNull()
     })
   })
@@ -245,4 +245,3 @@ describe('StubProvisioningProvider', () => {
     })
   })
 })
-

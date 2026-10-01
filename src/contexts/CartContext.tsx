@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { useStoreConfig } from './StoreConfigContext'
-import { pickUnitPrice } from '@/lib/pricing'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
 
 interface CartItem {
   id: string
@@ -77,7 +77,14 @@ interface CartContextType {
   savedItems: CartItem[]
   cartCount: number
   isLoading: boolean
-  addToCart: (productId: string, quantity?: number, variantId?: string, buyMode?: string, buyUnit?: string, subVariantId?: string) => Promise<void>
+  addToCart: (
+    productId: string,
+    quantity?: number,
+    variantId?: string,
+    buyMode?: string,
+    buyUnit?: string,
+    subVariantId?: string
+  ) => Promise<void>
   removeFromCart: (cartItemId: string) => Promise<void>
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   saveForLater: (cartItemId: string) => Promise<void>
@@ -98,8 +105,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const prevUserIdRef = useRef<string | null | undefined>(undefined)
 
-  const portalHeaders = (): Record<string, string> =>
-    user?.isBusiness ? { 'X-Auth-Portal': 'business' } : {}
+  const portalHeaders = (): Record<string, string> => (user?.isBusiness ? { 'X-Auth-Portal': 'business' } : {})
 
   const fetchCart = async () => {
     try {
@@ -138,12 +144,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const addToCart = async (productId: string, quantity = 1, variantId?: string, buyMode = 'unit', buyUnit?: string, subVariantId?: string) => {
+  const addToCart = async (
+    productId: string,
+    quantity = 1,
+    variantId?: string,
+    buyMode = 'unit',
+    buyUnit?: string,
+    subVariantId?: string
+  ) => {
     try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...portalHeaders() },
-        body: JSON.stringify({ productId, quantity, variantId: variantId || null, buyMode, buyUnit: buyUnit || null, subVariantId: subVariantId || null }),
+        body: JSON.stringify({
+          productId,
+          quantity,
+          variantId: variantId || null,
+          buyMode,
+          buyUnit: buyUnit || null,
+          subVariantId: subVariantId || null,
+        }),
         credentials: 'include',
       })
 
@@ -177,9 +197,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const updateQuantity = async (cartItemId: string, quantity: number) => {
-    setCartItems(prev => prev.map(item =>
-      item.id === cartItemId ? { ...item, quantity } : item
-    ))
+    setCartItems(prev => prev.map(item => (item.id === cartItemId ? { ...item, quantity } : item)))
     try {
       const response = await fetch('/api/cart', {
         method: 'PATCH',
@@ -245,7 +263,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
       const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
-      const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
+      const unitFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
       // GST off ⇒ charge the ex-GST column (fallback to inclusive when null).
       // GST on  ⇒ the inclusive price (frozen add-time price for custom qty).
       const price = !gstEnabled
@@ -254,11 +272,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
               inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
               exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
             },
-            false,
+            false
           ) * unitFactor
-        : (isCustomQty
-            ? item.price_at_addition
-            : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor)
+        : isCustomQty
+          ? item.price_at_addition
+          : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
       return total + price * item.quantity
     }, 0)
   }
@@ -268,13 +286,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!gstEnabled) return 0
     return cartItems.reduce((tax, item) => {
       const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
-      const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
+      const unitFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
       const price = isCustomQty
         ? item.price_at_addition
         : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
       const gstRate = item.products.gst_percentage || 0
       const itemTotal = price * item.quantity
-      const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
+      const itemTax = itemTotal - itemTotal / (1 + gstRate / 100)
       return tax + itemTax
     }, 0)
   }

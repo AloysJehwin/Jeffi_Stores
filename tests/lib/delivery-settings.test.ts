@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/db', () => ({
+vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
 
-import { getDeliverySettings, invalidateDeliverySettingsCache } from '@/lib/delivery-settings'
-import { queryMany } from '@/lib/db'
+import { getDeliverySettings, invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { queryMany } from '@/lib/shared/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 
@@ -50,25 +50,19 @@ describe('getDeliverySettings', () => {
   })
 
   it('parses enabled=false when row value is "false"', async () => {
-    mockQueryMany.mockResolvedValue(
-      makeRows({ delivery_charges_enabled: 'false' })
-    )
+    mockQueryMany.mockResolvedValue(makeRows({ delivery_charges_enabled: 'false' }))
     const s = await getDeliverySettings()
     expect(s.enabled).toBe(false)
   })
 
   it('floors negative ratePerKg to 0', async () => {
-    mockQueryMany.mockResolvedValue(
-      makeRows({ delivery_rate_per_kg: '-10' })
-    )
+    mockQueryMany.mockResolvedValue(makeRows({ delivery_rate_per_kg: '-10' }))
     const s = await getDeliverySettings()
     expect(s.ratePerKg).toBe(0)
   })
 
   it('floors negative freeThreshold to 0', async () => {
-    mockQueryMany.mockResolvedValue(
-      makeRows({ delivery_free_threshold: '-100' })
-    )
+    mockQueryMany.mockResolvedValue(makeRows({ delivery_free_threshold: '-100' }))
     const s = await getDeliverySettings()
     expect(s.freeThreshold).toBe(0)
   })

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('@/lib/redis', () => ({
+vi.mock('@/lib/shared/redis', () => ({
   default: {
     get: vi.fn(),
     set: vi.fn(),
@@ -20,8 +20,8 @@ import {
   checkSendOtpRateLimit,
   recordSendOtp,
   resetSendOtpCounter,
-} from '@/lib/otp'
-import redis from '@/lib/redis'
+} from '@/lib/auth/otp'
+import redis from '@/lib/shared/redis'
 
 const mockRedis = vi.mocked(redis)
 
@@ -43,20 +43,14 @@ describe('storeOTP', () => {
   it('sets otp key and attempts key in redis', async () => {
     mockRedis.set = vi.fn().mockResolvedValue('OK')
     await storeOTP('User@Example.COM', '123456')
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      'otp:user@example.com', '123456', 'EX', 600
-    )
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      'otp:attempts:user@example.com', '0', 'EX', 600
-    )
+    expect(mockRedis.set).toHaveBeenCalledWith('otp:user@example.com', '123456', 'EX', 600)
+    expect(mockRedis.set).toHaveBeenCalledWith('otp:attempts:user@example.com', '0', 'EX', 600)
   })
 
   it('normalises email to lowercase', async () => {
     mockRedis.set = vi.fn().mockResolvedValue('OK')
     await storeOTP('TEST@DOMAIN.COM', '999999')
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      'otp:test@domain.com', '999999', 'EX', 600
-    )
+    expect(mockRedis.set).toHaveBeenCalledWith('otp:test@domain.com', '999999', 'EX', 600)
   })
 })
 
@@ -71,9 +65,10 @@ describe('verifyOTP', () => {
   })
 
   it('returns invalid and increments attempts on wrong OTP', async () => {
-    mockRedis.get = vi.fn()
+    mockRedis.get = vi
+      .fn()
       .mockResolvedValueOnce('654321') // storedOtp
-      .mockResolvedValueOnce('0')      // attempts
+      .mockResolvedValueOnce('0') // attempts
     mockRedis.del = vi.fn().mockResolvedValue(1)
     mockRedis.incr = vi.fn().mockResolvedValue(1)
     const result = await verifyOTP('a@b.com', '000000')
@@ -83,9 +78,10 @@ describe('verifyOTP', () => {
   })
 
   it('returns invalid and clears keys when attempts >= MAX', async () => {
-    mockRedis.get = vi.fn()
+    mockRedis.get = vi
+      .fn()
       .mockResolvedValueOnce('654321') // storedOtp
-      .mockResolvedValueOnce('5')      // attempts = 5 >= MAX_ATTEMPTS
+      .mockResolvedValueOnce('5') // attempts = 5 >= MAX_ATTEMPTS
     mockRedis.del = vi.fn().mockResolvedValue(1)
     const result = await verifyOTP('a@b.com', '000000')
     expect(result.valid).toBe(false)
@@ -94,9 +90,10 @@ describe('verifyOTP', () => {
   })
 
   it('returns valid on correct OTP and stores verified flag', async () => {
-    mockRedis.get = vi.fn()
+    mockRedis.get = vi
+      .fn()
       .mockResolvedValueOnce('123456') // storedOtp
-      .mockResolvedValueOnce('0')      // attempts
+      .mockResolvedValueOnce('0') // attempts
     mockRedis.ttl = vi.fn().mockResolvedValue(300)
     mockRedis.set = vi.fn().mockResolvedValue('OK')
     const result = await verifyOTP('a@b.com', '123456')
@@ -106,9 +103,7 @@ describe('verifyOTP', () => {
   })
 
   it('uses fallback TTL of 300 when ttl returns <= 0', async () => {
-    mockRedis.get = vi.fn()
-      .mockResolvedValueOnce('111111')
-      .mockResolvedValueOnce('0')
+    mockRedis.get = vi.fn().mockResolvedValueOnce('111111').mockResolvedValueOnce('0')
     mockRedis.ttl = vi.fn().mockResolvedValue(-1)
     mockRedis.set = vi.fn().mockResolvedValue('OK')
     await verifyOTP('b@c.com', '111111')
@@ -151,9 +146,10 @@ describe('checkSendOtpRateLimit', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('allows first send (no previous send)', async () => {
-    mockRedis.get = vi.fn()
-      .mockResolvedValueOnce(null)  // lastSend
-      .mockResolvedValueOnce(null)  // sendCount
+    mockRedis.get = vi
+      .fn()
+      .mockResolvedValueOnce(null) // lastSend
+      .mockResolvedValueOnce(null) // sendCount
     const result = await checkSendOtpRateLimit('a@b.com')
     expect(result.allowed).toBe(true)
     expect(result.retryAfter).toBe(0)
@@ -161,9 +157,10 @@ describe('checkSendOtpRateLimit', () => {
 
   it('blocks when within cooldown window', async () => {
     const now = Math.floor(Date.now() / 1000)
-    mockRedis.get = vi.fn()
+    mockRedis.get = vi
+      .fn()
       .mockResolvedValueOnce(String(now - 10)) // sent 10s ago
-      .mockResolvedValueOnce('1')               // sendCount = 1
+      .mockResolvedValueOnce('1') // sendCount = 1
     const result = await checkSendOtpRateLimit('a@b.com')
     expect(result.allowed).toBe(false)
     expect(result.retryAfter).toBeGreaterThan(0)
@@ -178,12 +175,7 @@ describe('recordSendOtp', () => {
     mockRedis.incr = vi.fn().mockResolvedValue(1)
     mockRedis.get = vi.fn().mockResolvedValue('1')
     await recordSendOtp('user@test.com')
-    expect(mockRedis.set).toHaveBeenCalledWith(
-      'otp:lastSend:user@test.com',
-      expect.any(String),
-      'EX',
-      3600
-    )
+    expect(mockRedis.set).toHaveBeenCalledWith('otp:lastSend:user@test.com', expect.any(String), 'EX', 3600)
     expect(mockRedis.incr).toHaveBeenCalledWith('otp:sendCount:user@test.com')
   })
 })
