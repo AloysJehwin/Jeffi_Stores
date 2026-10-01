@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Download, Eye, Mail, Pencil, X } from 'lucide-react'
+import { Check, Download, Eye, Mail, X } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
@@ -14,7 +14,6 @@ interface Props {
   sendingEmailId: string | null
   cancellingId: string | null
   onSendEmail: (inv: Invoice) => void
-  onEdit: (inv: Invoice) => void
   onCancel: (inv: Invoice) => void
 }
 
@@ -46,7 +45,6 @@ export default function InvoicesMobileList({
   sendingEmailId,
   cancellingId,
   onSendEmail,
-  onEdit,
   onCancel,
 }: Props) {
   const [selected, setSelected] = useState<Invoice | null>(null)
@@ -86,12 +84,6 @@ export default function InvoicesMobileList({
         })
       }
       if (inv.source === 'offline' && inv.status !== 'cancelled' && canWrite) {
-        actions.push({
-          key: 'edit',
-          label: 'Edit invoice',
-          icon: <Pencil className="w-4 h-4" />,
-          onSelect: () => onEdit(inv),
-        })
         actions.push({
           key: 'cancel',
           label: 'Cancel invoice',

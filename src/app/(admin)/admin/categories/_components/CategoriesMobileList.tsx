@@ -2,14 +2,13 @@
 
 import { Fragment, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Power, Trash2, ChevronRight } from 'lucide-react'
+import { Power, Trash2, ChevronRight } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
-import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import CategoryMobileCardBody from './CategoryMobileCardBody'
 import CategoryMobileDetailBody from './CategoryMobileDetailBody'
 
@@ -65,7 +64,6 @@ export default function CategoriesMobileList({
 
   const [selected, setSelected] = useState<Category | null>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
-  const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   async function deleteCategory(category: Category) {
@@ -98,12 +96,6 @@ export default function CategoriesMobileList({
     const current = categoriesById.get(category.id) ?? category
     const actions: MobileAction[] = []
     if (canWrite) {
-      actions.push({
-        key: 'edit',
-        label: 'Edit category',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => setEditCategory(current),
-      })
       actions.push({
         key: 'active',
         label: current.is_active ? 'Deactivate' : 'Activate',
@@ -211,18 +203,6 @@ export default function CategoriesMobileList({
         title={selected?.name}
         actions={selected ? buildActions(selected) : []}
       />
-
-      {editCategory && (
-        <DraftConfirmModal
-          entity="categories"
-          productId={editCategory.id}
-          productName={editCategory.name}
-          productSku={null}
-          existingDraftId={null}
-          backUrl={backUrl}
-          onClose={() => setEditCategory(null)}
-        />
-      )}
     </>
   )
 }

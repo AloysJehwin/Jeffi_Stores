@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Star, Tag, Power, Trash2 } from 'lucide-react'
+import { Eye, Star, Tag, Power, Trash2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -13,7 +13,6 @@ import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/
 import ProductMobileCardBody from './ProductMobileCardBody'
 import ProductMobileDetailBody from './ProductMobileDetailBody'
 import ProductLabelModal from './ProductLabelModal'
-import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 
 interface Props {
   products: any[]
@@ -38,7 +37,6 @@ export default function ProductsMobileList({
   const [selected, setSelected] = useState<any>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
-  const [draftProduct, setDraftProduct] = useState<{ id: string; name: string; sku: string | null } | null>(null)
   const [overrides, setOverrides] = useState<Record<string, { is_active?: boolean; is_featured?: boolean }>>({})
   const [busy, setBusy] = useState(false)
 
@@ -124,18 +122,6 @@ export default function ProductsMobileList({
     ]
     if (canWrite) {
       actions.push({
-        key: 'edit',
-        label: 'Edit product',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => {
-          if (product.is_active) {
-            setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null })
-          } else {
-            router.push(ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`))
-          }
-        },
-      })
-      actions.push({
         key: 'feature',
         label: product.is_featured ? 'Remove from featured' : 'Mark as featured',
         icon: <Star className={`w-4 h-4 ${product.is_featured ? 'fill-current' : ''}`} />,
@@ -215,16 +201,6 @@ export default function ProductsMobileList({
       />
 
       <ProductLabelModal product={labelProduct} onClose={() => setLabelProduct(null)} />
-      {draftProduct && (
-        <DraftConfirmModal
-          productId={draftProduct.id}
-          productName={draftProduct.name}
-          productSku={draftProduct.sku}
-          existingDraftId={null}
-          backUrl={backUrl}
-          onClose={() => setDraftProduct(null)}
-        />
-      )}
     </div>
   )
 }

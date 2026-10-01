@@ -2447,7 +2447,6 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 sendingEmailId={sendingEmailId}
                 cancellingId={cancellingId}
                 onSendEmail={sendInvoiceEmail}
-                onEdit={openEdit}
                 onCancel={cancelInvoice}
               />
             </>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Power } from 'lucide-react'
+import { Eye, Power } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
@@ -49,12 +49,6 @@ export default function SuppliersMobileList({ suppliers, canWrite, onToggleActiv
       },
     ]
     if (canWrite) {
-      actions.push({
-        key: 'edit',
-        label: 'Edit supplier',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/suppliers/${supplier.id}/edit`)),
-      })
       actions.push({
         key: 'active',
         label: supplier.is_active ? 'Deactivate' : 'Activate',
