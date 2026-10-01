@@ -12485,18 +12485,28 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/OverviewTab.tsx": {
-    "mtime": 1790843381.0510676,
-    "ast_hash": "082da5f404ce7e07b2c0cf9ca57a844a",
+    "mtime": 1790855467.57401,
+    "ast_hash": "186720272632a06816343854fdee4050",
     "semantic_hash": ""
   },
   ".claude/plans/admin-overview-pages.md": {
-    "mtime": 1790843118.2993648,
-    "ast_hash": "d8d4a757e17eb63015b7d637708204d5",
+    "mtime": 1790855065.790024,
+    "ast_hash": "06de7c7b6af8222d168fb50962a0cfcd",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/_components/InventoryOverviewTab.tsx": {
-    "mtime": 1790844066.7322226,
-    "ast_hash": "74afa38e581b9d859c49afcf2a7e455a",
+    "mtime": 1790856203.9827108,
+    "ast_hash": "ec0f04572ade07718c5cfd25dd3e7649",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/financial/_components/OverviewCharts.tsx": {
+    "mtime": 1790855298.6904745,
+    "ast_hash": "d722c2e46e0ee8e6664b21feb00a5b69",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/inventory/_components/InventoryOverviewCharts.tsx": {
+    "mtime": 1790856136.2411103,
+    "ast_hash": "b11279534aaac91e7eb2ee69bcd79409",
     "semantic_hash": ""
   }
 }
